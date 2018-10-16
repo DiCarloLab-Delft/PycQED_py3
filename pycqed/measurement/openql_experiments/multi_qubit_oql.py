@@ -490,6 +490,54 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
     p = oqh.compile(p)
     return p
 
+def fluxed_ramsey(qubit_idx: int, wait_time: float,
+                    flux_cw: str='fl_cw_02',
+                    platf_cfg: str=''):
+    """
+    Single qubit Ramsey sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        maxtime:        longest plux pulse time
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="fluxed_ramsey", nqubits=platf.get_qubit_number(),
+                p=platf)
+    wait_time = wait_time/1e-9
+
+    k = Kernel("fluxed_ramsey_2", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    k.gate(flux_cw, 2, 0)
+    k.gate("wait", [qubit_idx], wait_time)
+    k.gate('rx90', qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    k = Kernel("fluxed_ramsey_2", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    k.gate(flux_cw, 2, 0)
+    k.gate("wait", [qubit_idx], wait_time)
+    k.gate('ry90', qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    # adding the calibration points
+    # add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    with suppress_stdout():
+        p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 # FIMXE: merge into the real chevron seq
 def Chevron_hack(qubit_idx: int, qubit_idx_spec,
@@ -580,10 +628,12 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         raise ValueError("target_qubit_sequence not recognized")
     k.gate('rx180', [qubit_idx])
 
-    k.gate("wait", [qubit_idx], buffer_nanoseconds)
+    if buffer_nanoseconds>0:
+        k.gate("wait", [qubit_idx], buffer_nanoseconds)
     k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
 
-    k.gate('wait', [qubit_idx], buffer_nanoseconds2)
+    if buffer_nanoseconds2>0:
+        k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.gate('rx180', [qubit_idx])
 
     k.measure(qubit_idx)
@@ -659,20 +709,15 @@ def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
 
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
-                        platf_cfg):
+                        platf_cfg, wait_after_flux: float=None):
     '''
     Two qubit bell state tomography.
 
     Args:
         bell_state      (int): index of prepared bell state
         q0, q1          (str): names of the target qubits
-        wait_after_trigger (float): delay time in seconds after sending the
-                                    trigger for the flux pulse
-        clock_cycle     (float): period of the internal AWG clock
-        wait_during_flux (int): wait time during the flux pulse
-        single_qubit_compiled_phase (bool): wether to do single qubit phase
-            correction in the recovery pulse
-        RO_target   (str): can be q0, q1, or 'all'
+        wait_after_flux (float): wait time after the flux pulse and
+            after-rotation before tomographic rotations
     '''
     tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
 
@@ -711,15 +756,18 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate('fl_cw_01', [2, 0])
             # after-rotations
             k.gate(after_pulse_q1, [q1])
+            # possibly wait
+            if wait_after_flux is not None:
+                k.gate("wait", [q0,q1], round(wait_after_flux*1e9))
             # tomo pulses
-            k.gate(p_q1, [q0])
             k.gate(p_q0, [q1])
+            k.gate(p_q1, [q0])
             # measure
             k.measure(q0)
             k.measure(q1)
             # sync barrier before tomo
             # k.gate("wait", [q0, q1], 0)
-            k.gate("wait", [2, 0], 0)
+            # k.gate("wait", [2, 0], 0)
             p.add_kernel(k)
     # 7 repetitions is because of assumptions in tomo analysis
     p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1, reps_per_cal_pt=7)
@@ -1000,37 +1048,20 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             k.gate('rx90', [q0])
             if not CZ_disabled:
                 for j in range(nr_of_repeated_gates):
-                    if j != 0 and wait_time_between > 0:
+                    if wait_time_between>0:
                         k.gate('wait', [2, 0], wait_time_between)
                     k.gate(flux_codeword, [2, 0])
-                if fixed_max_nr_of_repeated_gates is not None:
-                    for l in range(fixed_max_nr_of_repeated_gates-j):
-                        if wait_time_between > 0:
-                            k.gate('wait', [2, 0], wait_time_between)
-                        k.gate('fl_cw_00', [2, 0])
             else:
                 for j in range(nr_of_repeated_gates):
-                    if j != 0 and wait_time_between > 0:
-                        k.gate('wait', [2, 0], wait_time_between)
-                    if CZ_duration > 0:
-                        k.gate('wait', [2, 0], CZ_duration)  # in ns
-                if fixed_max_nr_of_repeated_gates is not None:
-                    for l in range(fixed_max_nr_of_repeated_gates-j):
-                        if wait_time_between > 0:
-                            k.gate('wait', [2, 0], wait_time_between)
-                        if CZ_duration > 0:
-                            k.gate('wait', [2, 0], CZ_duration)
-            try:
-                if wait_time_after > 0:
-                    k.gate('wait', [2, 0], (wait_time_after))
-            except Exception as e:
-                print('Wait time after-between',
-                      (wait_time_after-wait_time_between))
-                raise(e)
+                    k.gate('wait', [2, 0], wait_time_between + CZ_duration)
+            if wait_time_after>0:
+                k.gate('wait', [2, 0], (wait_time_after))
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
                 # special because the cw phase pulses go in mult of 20 deg
                 k.gate('ry90', [q0])
+            elif angle == 0:
+                k.gate('rx90', [q0])
             else:
                 k.gate('cw_{:02}'.format(cw_idx), [q0])
             if case == 'excitation':
@@ -1038,6 +1069,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
 
             k.measure(q0)
             k.measure(q1)
+            k.gate('wait', [q1,q0], 0)
             # Implements a barrier to align timings
             # k.gate('wait', [q0, q1], 0)
             # hardcoded barrier because of openQL #104
@@ -1509,6 +1541,7 @@ def sliding_flux_pulses_seq(
         qubits: list, platf_cfg: str,
         angles=np.arange(0, 360, 20), wait_time: int=0,
         flux_codeword_a: str='fl_cw_01', flux_codeword_b: str='fl_cw_01',
+        ramsey_axis: str='x',
         add_cal_points: bool=True):
     """
     Experiment to measure effect flux pulses on each other.
@@ -1529,6 +1562,8 @@ def sliding_flux_pulses_seq(
             first microwave pulse.
         flux_codeword_a : flux codeword of the stimulus (1st) pulse
         flux_codeword_b : flux codeword of the spectator (2nd) pulse
+        ramsey_axis : chooses between doing x90 or y90 rotation at the
+            beginning of Ramsey sequence
         add_cal_points : if True adds calibration points at the end
     """
 
@@ -1545,7 +1580,14 @@ def sliding_flux_pulses_seq(
         k.gate(flux_codeword_a, [2, 0])
         # hardcoded because of flux_tuples, [q1, q0])
         k.gate('wait', [q0, q1], wait_time)
-        k.gate('rx90', [q0])
+
+        if ramsey_axis == 'x':
+            k.gate('rx90', [q0])
+        elif ramsey_axis == 'y':
+            k.gate('ry90', [q0])
+        else:
+            raise ValueError('ramsey_axis must be "x" ot "y"')
+
         k.gate(flux_codeword_b, [2, 0])
         k.gate('wait', [q0, q1], 60)
         # hardcoded because of flux_tuples, [q1, q0])

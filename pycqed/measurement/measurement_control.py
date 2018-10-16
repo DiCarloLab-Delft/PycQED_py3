@@ -425,7 +425,7 @@ class MeasurementControl(Instrument):
                     # that was actually set rather than the one that was
                     # intended. This does require custom support from
                     # a sweep function.
-                    x[-i] = set_val
+                    x[-i-1] = set_val
 
         # used for next iteration
         self.last_sweep_pts = x

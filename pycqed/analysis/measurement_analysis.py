@@ -7961,11 +7961,17 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         if use_distance:
             self.Z[0]=np.array(self.S21dist)
         flux = self.Y[:, 0]
+        self.make_raw_figure(transpose=transpose, cmap=cmap,
+                                                      add_title=add_title,
+                                                      xlabel=xlabel, ylabel=ylabel)
+
+
         self.peaks_low, self.peaks_high = self.find_peaks()
         self.f, self.ax = self.make_unfiltered_figure(self.peaks_low, self.peaks_high,
                                                       transpose=transpose, cmap=cmap,
                                                       add_title=add_title,
                                                       xlabel=xlabel, ylabel=ylabel)
+
 
         self.filtered_dat = self.filter_data(flux, self.peaks_low, self.peaks_high,
                                         a=filt_func_a, x0=filt_func_x0,
@@ -8059,6 +8065,29 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
         return (filt_flux_low, filt_flux_high,
                 filt_peaks_low, filt_peaks_high, filter_func)
+
+    def make_raw_figure(self,  transpose, cmap,
+                               xlabel=None, ylabel='Frequency (GHz)',
+                               add_title=True):
+        flux = self.Y[:, 0]
+        title = ' raw data avoided crossing'
+        f, ax = plt.subplots()
+        if add_title:
+            ax.set_title(self.timestamp_string + title)
+
+        pl_tools.flex_colormesh_plot_vs_xy(self.X[0] * 1e-9, flux, self.Z[0],
+                                           ax=ax, transpose=transpose,
+                                           cmap=cmap)
+
+        # self.ylabel because the axes are transposed
+        xlabel = self.ylabel if xlabel is None else xlabel
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(min(self.X[0] * 1e-9), max(self.X[0] * 1e-9))
+        ax.set_xlim(min(flux), max(flux))
+        f.savefig(os.path.join(self.folder, title + '.png'), format='png',
+                  dpi=600)
+        return f, ax
 
     def make_unfiltered_figure(self, peaks_low, peaks_high, transpose, cmap,
                                xlabel=None, ylabel='Frequency (GHz)',

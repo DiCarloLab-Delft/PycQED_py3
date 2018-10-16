@@ -154,6 +154,26 @@ class None_Sweep(Soft_Sweep):
         '''
         pass
 
+class None_Sweep_With_Parameter_Returned(Soft_Sweep):
+
+    def __init__(self, sweep_control='soft', sweep_points=None,
+                 name: str='None_Sweep', parameter_name: str='pts',
+                 unit: str='arb. unit',
+                 **kw):
+        super(None_Sweep, self).__init__()
+        self.sweep_control = sweep_control
+        self.name = name
+        self.parameter_name = parameter_name
+        self.unit = unit
+        self.sweep_points = sweep_points
+
+    def set_parameter(self, val):
+        '''
+        returns something a bit different to simulate the set_parameter reading
+        out the set parameter from the instrument
+        '''
+        return val+0.1
+
 
 class None_Sweep_idx(None_Sweep):
 

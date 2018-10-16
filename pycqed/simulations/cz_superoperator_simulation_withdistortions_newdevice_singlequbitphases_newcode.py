@@ -1042,7 +1042,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data
 
             T2_q0_vec=expT2(f_pulse_convolved_new,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
-            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
+            if T1_q0 != 0:
+                Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
+            else:
+            	Tphi01_q0_vec = T2_q0_vec     # in the case where we don't want T1 and we are inputting Tphi and not T2
 
             c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
 

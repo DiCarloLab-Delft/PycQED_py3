@@ -163,6 +163,32 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(z0, z[0, :])
         np.testing.assert_array_almost_equal(z1, z[1, :])
 
+    def test_soft_sweep_2D_with_reading_of_set_parameter(self):
+        sweep_pts = np.linspace(0, 10, 30)
+        sweep_pts_2D = np.linspace(0, 10, 5)
+        self.MC.set_sweep_function(None_Sweep_With_Parameter_Returned(
+                                                    sweep_control='soft'))
+        self.MC.set_sweep_function_2D(None_Sweep_With_Parameter_Returned(
+                                                    sweep_control='soft'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_sweep_points_2D(sweep_pts_2D)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        dat = self.MC.run('2D_soft', mode='2D')
+        dset = dat["dset"]
+        x = dset[:, 0]
+        y = dset[:, 1]
+        xr = np.arange(len(sweep_pts)*len(sweep_pts_2D))/15
+        z = np.array([np.sin(xr/np.pi), np.cos(xr/np.pi)])
+        z0 = dset[:, 2]
+        z1 = dset[:, 3]
+
+        x_tiled = np.tile(sweep_pts+0.1, len(sweep_pts_2D))
+        y_rep = np.repeat(sweep_pts_2D+0.1, len(sweep_pts))
+        np.testing.assert_array_almost_equal(x, x_tiled)
+        np.testing.assert_array_almost_equal(y, y_rep)
+        np.testing.assert_array_almost_equal(z0, z[0, :])
+        np.testing.assert_array_almost_equal(z1, z[1, :])
+
     def test_soft_sweep_2D_function_calls(self):
         sweep_pts = np.arange(0, 30, 1)
         sweep_pts_2D = np.arange(0, 5, 1)

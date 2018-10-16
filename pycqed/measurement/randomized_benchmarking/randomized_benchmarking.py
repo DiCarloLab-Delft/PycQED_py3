@@ -119,7 +119,8 @@ def randomized_benchmarking_sequence(
 
     Args:
         n_cl           (int) : number of Cliffords
-        desired_net_cl (int) : idx of the desired net clifford
+        desired_net_cl (int) : idx of the desired net clifford, if None is
+            specified no recovery Clifford is calculated
         number_of_qubits(int): used to determine if Cliffords are drawn
             from the single qubit or two qubit clifford group.
         max_clifford_idx (int): used to set the index of the highest random
@@ -140,6 +141,7 @@ def randomized_benchmarking_sequence(
     The old method exists to establish the equivalence between the two methods.
 
     """
+
     if number_of_qubits == 1:
         Cl = tqc.SingleQubitClifford
         group_size = np.min([24, max_clifford_idx])
@@ -163,19 +165,28 @@ def randomized_benchmarking_sequence(
         rb_clif_ind_intl[1::2] = interleaving_cl
         rb_clifford_indices = rb_clif_ind_intl
 
+    if desired_net_cl is not None:
+        # Calculate the net clifford
+        net_clifford = calculate_net_clifford(rb_clifford_indices,Cl)
+
+        # determine the inverse of the sequence
+        recovery_to_idx_clifford = net_clifford.get_inverse()
+        recovery_clifford = Cl(desired_net_cl)*recovery_to_idx_clifford
+        rb_clifford_indices = np.append(rb_clifford_indices,
+                                        recovery_clifford.idx)
+    return rb_clifford_indices
+
+def calculate_net_clifford(rb_clifford_indices,Cl):
     # Calculate the net clifford
     net_clifford = Cl(0)
     for idx in rb_clifford_indices:
-        cliff = Cl(idx)
+        # hacking in exception for benchmarking only CZ
+        # (not as a member of CNOT group)
+        # abs is to remove the sign that is used to treat CZ ac CZ
+        # and not member of CNOT-like set of gates
+        cliff = Cl(abs(idx))
         # order of operators applied in is right to left, therefore
         # the new operator is applied on the left side.
         net_clifford = cliff*net_clifford
-
-    # determine the inverse of the sequence
-    recovery_to_idx_clifford = net_clifford.get_inverse()
-    recovery_clifford = Cl(desired_net_cl)*recovery_to_idx_clifford
-    rb_clifford_indices = np.append(rb_clifford_indices,
-                                    recovery_clifford.idx)
-    return rb_clifford_indices
-
+    return net_clifford
 

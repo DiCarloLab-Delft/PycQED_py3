@@ -139,6 +139,10 @@ class CCLight_Transmon(Qubit):
                            label='Readout pulse amplitude',
                            initial_value=0.1,
                            parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_amp_CW', unit='V',
+                           label='Readout pulse amplitude',
+                           initial_value=0.1,
+                           parameter_class=ManualParameter)
         self.add_parameter('ro_pulse_phi', unit='deg', initial_value=0,
                            parameter_class=ManualParameter)
 
@@ -344,6 +348,26 @@ class CCLight_Transmon(Qubit):
             set_cmd=self._set_mw_vsm_delay,
             get_cmd=self._get_mw_vsm_delay)
 
+        self.add_parameter('mw_fine_delay', label='fine delay of the AWG channel',
+            unit='s',
+            docstring='This parameters serves for fine tuning of '
+                    'the RO, MW and flux pulses. It should be kept '
+                    'positive and below 20e-9. Any larger adjustments'
+                    'should be done by changing CCL dio delay'
+                    'through device object.',
+            set_cmd=self._set_mw_fine_delay,
+            get_cmd=self._get_mw_fine_delay)
+
+        self.add_parameter('flux_fine_delay', label='fine delay of the AWG channel',
+            unit='s',
+            docstring='This parameters serves for fine tuning of '
+                    'the RO, MW and flux pulses. It should be kept '
+                    'positive and below 20e-9. Any larger adjustments'
+                    'should be done by changing CCL dio delay'
+                    'through device object.',
+            set_cmd=self._set_flux_fine_delay,
+            get_cmd=self._get_flux_fine_delay)
+
         self.add_parameter('mw_vsm_ch_in',
                            label='VSM input channel Gaussian component',
                            vals=vals.Ints(1, 4),
@@ -385,6 +409,44 @@ class CCLight_Transmon(Qubit):
 
     def _get_mw_vsm_delay(self):
         return self._mw_vsm_delay
+
+    def _set_mw_fine_delay(self,val):
+        if self.cfg_with_vsm():
+            logging.warning('CCL transmon is using VSM. Use mw_vsm_delay to'
+                            'adjust delay')
+        else:
+            lutman = self.find_instrument(self.instr_LutMan_MW())
+            AWG = lutman.find_instrument(lutman.AWG())
+            using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+            if using_QWG:
+                logging.warning('CCL transmon is using QWG. Not implemented.')
+            else:
+                AWG.set('sigouts_{}_delay'.format(lutman.channel_I()-1), val)
+                AWG.set('sigouts_{}_delay'.format(lutman.channel_Q()-1), val)
+        self._mw_fine_delay = val
+
+
+    def _get_mw_fine_delay(self):
+        return self._mw_fine_delay
+
+    def _set_flux_fine_delay(self,val):
+        if self.cfg_with_vsm():
+            logging.warning('CCL transmon is using VSM. Use mw_vsm_delay to'
+                            'adjust delay')
+        else:
+            lutman = self.find_instrument(self.instr_LutMan_Flux())
+            AWG = lutman.find_instrument(lutman.AWG())
+            using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+            if using_QWG:
+                logging.warning('CCL transmon is using QWG. Not implemented.')
+            else:
+                AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
+                # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
+        self._flux_fine_delay = val
+
+
+    def _get_flux_fine_delay(self):
+        return self._flux_fine_delay
 
     def add_spec_parameters(self):
         self.add_parameter('spec_vsm_amp',
@@ -622,12 +684,14 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
     def prepare_for_continuous_wave(self):
+        if 'optimal' in self.ro_acq_weight_type():
+            self.ro_acq_weight_type('SSB')
         if self.ro_acq_weight_type() not in {'DSB', 'SSB'}:
             # this is because the CW acquisition detects using angle and phase
             # and this requires two channels to rotate the signal properly.
             raise ValueError('Readout "{}" '.format(self.ro_acq_weight_type())
                              + 'weight type must be "SSB" or "DSB"')
-        self.prepare_readout()
+        self.prepare_readout(CW=True)
         self._prep_cw_spec()
         # source is turned on in measure spec when needed
         self.instr_LO_mw.get_instr().off()
@@ -645,7 +709,7 @@ class CCLight_Transmon(Qubit):
 
         self.instr_spec_source.get_instr().power(self.spec_pow())
 
-    def prepare_readout(self):
+    def prepare_readout(self, CW=False):
         """
         Configures the readout. Consists of the following steps
         - instantiate the relevant detector functions
@@ -655,7 +719,7 @@ class CCLight_Transmon(Qubit):
         """
         if self.cfg_prepare_ro_awg():
             self.instr_acquisition.get_instr().load_default_settings()
-            self._prep_ro_pulse()
+            self._prep_ro_pulse(CW=CW)
             self._prep_ro_integration_weights()
 
         self._prep_ro_instantiate_detectors()
@@ -753,7 +817,7 @@ class CCLight_Transmon(Qubit):
         LO.on()
         LO.power(self.ro_pow_LO())
 
-    def _prep_ro_pulse(self, upload=True):
+    def _prep_ro_pulse(self, upload=True, CW=False):
         """
         Sets the appropriate parameters in the RO LutMan and uploads the
         desired wave.
@@ -780,6 +844,11 @@ class CCLight_Transmon(Qubit):
             ro_pulse_mixer_offs_Q
 
         """
+        if CW:
+            ro_amp=self.ro_pulse_amp_CW()
+        else: 
+            ro_amp=self.ro_pulse_amp()
+
         if 'UHFQC' not in self.instr_acquisition():
             raise NotImplementedError()
         UHFQC = self.instr_acquisition.get_instr()
@@ -803,7 +872,7 @@ class CCLight_Transmon(Qubit):
             ro_lm.set('M_length_R{}'.format(idx),
                       self.ro_pulse_length())
             ro_lm.set('M_amp_R{}'.format(idx),
-                      self.ro_pulse_amp())
+                      ro_amp)
             ro_lm.set('M_phi_R{}'.format(idx),
                       self.ro_pulse_phi())
             ro_lm.set('M_down_length0_R{}'.format(idx),
@@ -1397,7 +1466,7 @@ class CCLight_Transmon(Qubit):
         # Starting specmode if set in config
         if self.cfg_spec_mode():
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
-                               ro_amp=self.ro_pulse_amp())
+                               ro_amp=self.ro_pulse_amp_CW())
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
         CCL.stop()
@@ -1579,7 +1648,7 @@ class CCLight_Transmon(Qubit):
             # Starting specmode if set in config
         if self.cfg_spec_mode():
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
-                               ro_amp=self.ro_pulse_amp())
+                               ro_amp=self.ro_pulse_amp_CW())
 
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
@@ -1712,6 +1781,7 @@ class CCLight_Transmon(Qubit):
                      update: bool=True,
                      verbose: bool=True,
                      SNR_detector: bool=False,
+                     shots_per_meas: int=4092,
                      cal_residual_excitation: bool=False,
                      disable_metadata: bool=False):
         old_RO_digit = self.ro_acq_digitized()
@@ -1745,7 +1815,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
-        d.nr_shots = 4092
+        d.nr_shots = shots_per_meas
         MC.set_detector_function(d)
         MC.run('SSRO{}'.format(self.msmt_suffix),
                disable_snapshot_metadata=disable_metadata)
@@ -2721,7 +2791,8 @@ class CCLight_Transmon(Qubit):
         #            'phase' : -1}
 
     def measure_echo(self, times=None, MC=None,
-                     analyze=True, close_fig=True, update=True):
+                     analyze=True, close_fig=True, update=True,
+                     label: str=''):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -2765,7 +2836,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('echo'+self.msmt_suffix)
+        MC.run('echo'+label+self.msmt_suffix)
         a = ma.Echo_analysis(label='echo', auto=True, close_fig=True)
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
