@@ -2793,7 +2793,8 @@ class CCLight_Transmon(Qubit):
         #            'phase' : -1}
 
     def measure_echo(self, times=None, MC=None,
-                     analyze=True, close_fig=True, update=True):
+                     analyze=True, close_fig=True, update=True,
+                     label: str=''):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -2837,7 +2838,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('echo'+self.msmt_suffix)
+        MC.run('echo'+label+self.msmt_suffix)
         a = ma.Echo_analysis(label='echo', auto=True, close_fig=True)
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
