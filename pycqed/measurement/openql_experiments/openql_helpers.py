@@ -44,10 +44,8 @@ def create_program(pname: str, platf_cfg: str, nregisters: int=0):
 
     p.platf = platf
     p.output_dir = ql.get_option('output_dir')
-    p.name = p.name_
     p.nqubits = platf.get_qubit_number()
     p.nregisters = nregisters
-
     return p
 
 
@@ -56,9 +54,6 @@ def create_kernel(kname: str, program):
     Wrapper around constructor of openQL "Kernel" class.
     """
     k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
-    k.qubit_count = k.qubit_count_
-    k.platform = k.platform_
-    k.name = k.name_
     return k
 
 
