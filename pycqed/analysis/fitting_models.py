@@ -576,7 +576,7 @@ def residual_complex_fcn(pars, cmp_fcn, x, y):
 ####################
 # Guess functions  #
 ####################
-def exp_dec_guess(model, data, t):
+def exp_dec_guess(model, data, t, vary_n=False):
     '''
     Assumes exponential decay in estimating the parameters
     '''
@@ -587,7 +587,7 @@ def exp_dec_guess(model, data, t):
 
     model.set_param_hint('amplitude', value=amp_guess)
     model.set_param_hint('tau', value=tau_guess)
-    model.set_param_hint('n', value=1, vary=False)
+    model.set_param_hint('n', value=1, vary=vary_n)
     model.set_param_hint('offset', value=offs_guess)
 
     params = model.make_params()

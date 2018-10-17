@@ -2126,6 +2126,10 @@ class TD_UHFQC(TD_Analysis):
 
 class Echo_analysis(TD_Analysis):
 
+    def __init__(self,vary_n=False,**kw):
+        self.vary_n = vary_n
+        super(Echo_analysis, self).__init__(**kw)
+
     def run_default_analysis(self, close_file=True, **kw):
         self.get_naming_and_values()
         norm = self.normalize_data_to_calibration_points(
@@ -2148,7 +2152,7 @@ class Echo_analysis(TD_Analysis):
         model.guess = fit_mods.exp_dec_guess
 
         params = model.guess(model, data=self.corr_data[:-self.NoCalPoints],
-                             t=self.sweep_points[:-self.NoCalPoints])
+                             t=self.sweep_points[:-self.NoCalPoints],vary_n=self.vary_n)
         self.fit_res = model.fit(data=self.corr_data[:-self.NoCalPoints],
                                  t=self.sweep_points[:-self.NoCalPoints],
                                  params=params)
@@ -2180,6 +2184,9 @@ class Echo_analysis(TD_Analysis):
             self.fit_res.params['tau'].value * scale_factor,
             self.fit_res.params['tau'].stderr * scale_factor,
             unit)
+        textstr += '\n$n$={:.2g}$\pm$({:.2g})'.format(
+            self.fit_res.params['n'].value,
+            self.fit_res.params['n'].stderr)
         if show_guess:
             self.ax.plot(x_fine, self.fit_res.eval(
                 t=x_fine, **self.fit_res.init_values), label='guess')
