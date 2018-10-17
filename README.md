@@ -1,25 +1,32 @@
 # PycQED 
 [![Build Status](https://gitlab.com/dicarlolab/pycqed/badges/master/build.svg)](https://gitlab.com/dicarlolab/pycqed/pipelines)
-[![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179) [![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger) [![Coverage Status](https://coveralls.io/repos/github/DiCarloLab-Delft/PycQED_py3/badge.svg?branch=master)](https://coveralls.io/github/DiCarloLab-Delft/PycQED_py3?branch=master)
+[![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179)
+[![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger)
+[![codecov](https://codecov.io/gl/dicarlolab/pycqed/branch/master/graph/badge.svg)](https://codecov.io/gl/dicarlolab/pycqed)
 
-A python based measurement environment for circuit-QED experiments by the [DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/), Delft University of Technology.
-This module is build on top of qcodes and is not intended as a stand-alone package.
+A Python-based measurement environment for circuit-QED experiments by the 
+[DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/),
+Delft University of Technology.
+This module is build on top of [QCoDeS](http://qcodes.github.io/Qcodes/) and 
+is not intended as a stand-alone 
+package.
 
 ## License
 This software is released under the [MIT License](LICENSE.md)
 
 ## Contributors
 Contributors (in alphabetical order):
-Serwan Asaad,
-Niels Bultink,
-Christian Dickel,
-Bart Dikken,
-Xiang Fu,
-Sjoerd de Jong,
-Gijs de Lange,
-Nathan Langford,
-Florian Luthi,
-Adriaan Rol,
+
+- Serwan Asaad
+- Niels Bultink
+- Christian Dickel
+- Bart Dikken
+- Xiang Fu
+- Sjoerd de Jong
+- Gijs de Lange
+- Nathan Langford
+- Florian Luthi
+- Adriaan Rol
 
 ## Contributing
 Please see [Contributing.md](.github/CONTRIBUTING.md)
@@ -41,7 +48,7 @@ Or run a specific test using e.g.
 
 ## Usage
 
-+ start up qcodes
++ start up QCoDeS
 + load corresponding [config file](init\config\)
 + set folder locations
 + create instruments
@@ -144,8 +151,9 @@ The scripts that run an experiment. Dig around a bit here to get a feel of what 
 It is split into personal folders for messing around with your personal files and project folders where people working on the same project have their experimental scripts.
 
 ## Other useful stuff
-A little document containing some handy git commands.
-[Git tips & tricks ](docs/git_tips_and_tricks.md).
 
-Lecture series on scientific python
+A little document containing some handy git commands:
+[Git tips & tricks](docs/git_tips_and_tricks.md).
+
+Lecture series on scientific Python: 
 [Scientific Computing with Python](https://github.com/jrjohansson/scientific-python-lectures)
