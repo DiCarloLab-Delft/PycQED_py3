@@ -2,11 +2,18 @@ import unittest
 import numpy as np
 import pycqed as pq
 import os
+import matplotlib.pyplot as plt
 from pycqed.analysis_v2 import measurement_analysis as ma
 from pycqed.analysis_v2 import readout_analysis as ra
 
 # Add test: 20180508\182642 - 183214
+
+
 class Test_SSRO_auto_angle(unittest.TestCase):
+
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
 
     @classmethod
     def setUpClass(self):
@@ -28,7 +35,7 @@ class Test_SSRO_auto_angle(unittest.TestCase):
                 'fixed_p10': 0,
                 'nr_bins': 100,
             }
-            label = 'SSRO_%d_%.2f' % (angle,ro_amp_high_factor*100)
+            label = 'SSRO_%d_%.2f' % (angle, ro_amp_high_factor*100)
             aut = ma.Singleshot_Readout_Analysis(t_start=ts, t_stop=te,
                                                  label=label,
                                                  extract_only=True,
@@ -62,6 +69,10 @@ class Test_SSRO_auto_angle(unittest.TestCase):
 
 
 class Test_SSRO_discrimination_analysis(unittest.TestCase):
+
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
 
     @classmethod
     def setUpClass(self):

@@ -39,7 +39,7 @@ setup(name='PycQED',
       maintainer_email='adriaan.rol@gmail.com',
       description='Python based Circuit QED data acquisition framework '
                   'developed by members of the DiCarlo-lab at '
-                   'QuTech, Delft University of Technology',
+                  'QuTech, Delft University of Technology',
       long_description=readme(),
       url='https://github.com/DiCarloLab-Delft/PycQED_py3',
       classifiers=[
@@ -47,24 +47,16 @@ setup(name='PycQED',
           'Intended Audience :: Science/Research',
           'Programming Language :: Python :: 3 :: Only',
           'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
           'Topic :: Scientific/Engineering'
       ],
       license=license(),
       # if we want to install without tests:
       # packages=find_packages(exclude=["*.tests", "tests"]),
       packages=find_packages(),
-      install_requires=[
-          'numpy>=1.10',
-          'pyvisa>=1.8',
-          'IPython>=4.0',
-          'ipywidgets>=4.1',
-          'lmfit>=0.9.5',
-          # 'qcodes>=0.1.0', # commented out for travis testing
-          'scipy>=0.17',
-          'h5py>=2.6',
-      ],
-      test_suite='pycqed.tests',
+      install_requires=list(open('requirements.txt')
+                            .read()
+                            .strip()
+                            .split('\n')),
+      tests_require=['pytest'],
       zip_safe=False)
-
-
-

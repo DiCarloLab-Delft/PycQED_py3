@@ -3,22 +3,13 @@ This file reads in a pygsti dataset file and converts it to a valid
 OpenQL sequence.
 """
 
-from os.path import join, dirname
-import openql.openql as ql
-from pycqed.utilities.general import suppress_stdout
-from openql.openql import Program, Kernel, Platform
-from pycqed.measurement.openql_experiments.single_qubit_oql import \
-    add_single_qubit_cal_points
-from pycqed.measurement.openql_experiments.multi_qubit_oql import \
-    add_two_q_cal_points, add_multi_q_cal_points
+from os.path import join
 
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.randomized_benchmarking import \
+    randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group \
     import SingleQubitClifford, TwoQubitClifford
-base_qasm_path = join(dirname(__file__), 'qasm_files')
-output_dir = join(dirname(__file__), 'output')
-ql.set_output_dir(output_dir)
 
 
 def randomized_benchmarking(qubits: list, platf_cfg: str,
@@ -111,12 +102,9 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                 program_name='Interleaved_RB_s{}_int{}_ncl{}_{}'.format(i))
 
     '''
-    platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname=program_name, nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = oqh.create_program(program_name, platf_cfg)
 
     # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
 
     if not oqh.check_recompilation_needed(
@@ -164,9 +152,8 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                         recovery_to_idx_clifford = net_cl_seq.get_inverse()
                         recovery_clifford = Cl(net_clifford)*recovery_to_idx_clifford
                         cl_seq_decomposed_with_net = cl_seq_decomposed+[recovery_clifford.gate_decomposition]
-
-                        k = Kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
-                            n_cl, seed, net_clifford, interleaving_cl), p=platf)
+                        k = oqh.create_kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
+                            n_cl, seed, net_clifford, interleaving_cl), p)
                         if initialize:
                             for qubit_idx in qubit_map.values():
                                 k.prepz(qubit_idx)
@@ -174,7 +161,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                         for gates in cl_seq_decomposed_with_net:
                             for g, q in gates:
                                 if isinstance(q, str):
-                                    k.gate(g, qubit_map[q])
+                                    k.gate(g, [qubit_map[q]])
                                 elif isinstance(q, list):
                                     # proper codeword
                                     k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
@@ -186,8 +173,8 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                         p.add_kernel(k)
                 elif simultaneous_single_qubit_RB: 
                     for net_clifford in net_cliffords:
-                        k = Kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
-                            n_cl, seed, net_clifford, interleaving_cl), p=platf)
+                        k = oqh.create_kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
+                            n_cl, seed, net_clifford, interleaving_cl), p)
                         if initialize:
                             for qubit_idx in qubit_map.values():
                                 k.prepz(qubit_idx)
@@ -219,7 +206,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                             # q_idx = 0
                                 try: # for possible different lengths in gate_seqs
                                     g = gate_seqs[gj][gi]
-                                    k.gate(g[0], q_idx)
+                                    k.gate(g[0], [q_idx])
                                 except IndexError as e: 
                                     pass 
                         # end of #157 HACK 
@@ -230,10 +217,11 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                         k.gate("wait",  list(qubit_map.values()), 0)
                         p.add_kernel(k)
 
+
         if cal_points:
             if number_of_qubits == 1:
-                p = add_single_qubit_cal_points(
-                    p, platf=platf, qubit_idx=qubits[0],
+                p = oqh.add_single_qubit_cal_points(
+                    p, qubit_idx=qubits[0],
                     f_state_cal_pts=f_state_cal_pts)
             elif number_of_qubits == 2:
 
@@ -241,12 +229,8 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                     combinations = ['00', '01', '10', '11', '02', '20', '22']
                 else:
                     combinations = ['00', '01', '10', '11']
-                p = add_multi_q_cal_points(p, platf=platf,
-                                           qubits=qubits,
-                                           combinations=combinations)
+                p = oqh.add_multi_q_cal_points(p, qubits=qubits,
+                                               combinations=combinations)
 
-
-    with suppress_stdout():
-        p.compile(verbose=False)
-
+    p = oqh.compile(p)
     return p

@@ -160,7 +160,7 @@ class None_Sweep_With_Parameter_Returned(Soft_Sweep):
                  name: str='None_Sweep', parameter_name: str='pts',
                  unit: str='arb. unit',
                  **kw):
-        super(None_Sweep, self).__init__()
+        super().__init__()
         self.sweep_control = sweep_control
         self.name = name
         self.parameter_name = parameter_name
