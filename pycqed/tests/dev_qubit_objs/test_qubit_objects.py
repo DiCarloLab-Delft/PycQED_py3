@@ -4,6 +4,7 @@ import os
 import pycqed as pq
 import time
 import openql
+import warnings
 import pycqed.analysis.analysis_toolbox as a_tools
 
 import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
@@ -138,8 +139,9 @@ class Test_QO(unittest.TestCase):
 
     def test_prep_for_continuous_wave(self):
         self.CCL_qubit.ro_acq_weight_type('optimal')
-        with self.assertRaises(ValueError):
+        with warnings.catch_warnings(record=True) as w:
             self.CCL_qubit.prepare_for_continuous_wave()
+            self.assertEqual(str(w[0].message), 'Changing ro_acq_weight_type to SSB.')
         self.CCL_qubit.ro_acq_weight_type('SSB')
         self.CCL_qubit.prepare_for_continuous_wave()
 

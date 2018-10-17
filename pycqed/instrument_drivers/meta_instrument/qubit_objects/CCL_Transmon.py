@@ -2,6 +2,7 @@ import time
 import logging
 import numpy as np
 from autodepgraph import AutoDepGraph_DAG
+import warnings
 
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
@@ -685,6 +686,7 @@ class CCLight_Transmon(Qubit):
 
     def prepare_for_continuous_wave(self):
         if 'optimal' in self.ro_acq_weight_type():
+            warnings.warn('Changing ro_acq_weight_type to SSB.')
             self.ro_acq_weight_type('SSB')
         if self.ro_acq_weight_type() not in {'DSB', 'SSB'}:
             # this is because the CW acquisition detects using angle and phase
