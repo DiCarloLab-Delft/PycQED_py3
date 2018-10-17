@@ -1,6 +1,8 @@
 import numpy as np
-from pycqed.utilities.general import int2base
+import openql.openql as ql
 import pycqed.measurement.openql_experiments.openql_helpers as oqh
+from pycqed.utilities.general import int2base, suppress_stdout
+from os.path import join
 
 
 def single_flux_pulse_seq(qubit_indices: tuple,
@@ -491,8 +493,8 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
     return p
 
 def fluxed_ramsey(qubit_idx: int, wait_time: float,
-                    flux_cw: str='fl_cw_02',
-                    platf_cfg: str=''):
+                  flux_cw: str='fl_cw_02',
+                  platf_cfg: str=''):
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -506,12 +508,10 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
         p:              OpenQL Program object containing
 
     """
-    platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="fluxed_ramsey", nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = oqh.create_program('OpenQL_Platform', platf_cfg)
     wait_time = wait_time/1e-9
 
-    k = Kernel("fluxed_ramsey_2", p=platf)
+    k = oqh.create_kernel("fluxed_ramsey_1", p)
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.gate(flux_cw, 2, 0)
@@ -520,7 +520,7 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    k = Kernel("fluxed_ramsey_2", p=platf)
+    k = oqh.create_kernel("fluxed_ramsey_2", p)
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.gate(flux_cw, 2, 0)
@@ -535,7 +535,7 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
     with suppress_stdout():
         p.compile()
     # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
+    p.output_dir = ql.get_option('output_dir')
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
@@ -1498,12 +1498,12 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
 
 
 def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
-    '''
+    """
     VQE tomography for two qubits.
     Args:
         cardinal        (int) : index of prep gate
         q0, q1          (int) : target qubits for the sequence
-    '''
+    """
     tomo_pulses = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
     tomo_list_q0 = tomo_pulses
     tomo_list_q1 = tomo_pulses

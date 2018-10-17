@@ -5,8 +5,6 @@ OpenQL sequence.
 import time
 import numpy as np
 from os.path import join
-import openql.openql as ql
-from pycqed.utilities.general import suppress_stdout
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.gate_set_tomography.pygsti_helpers import \
     pygsti_expList_from_dataset, gst_exp_filepath, split_expList
