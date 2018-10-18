@@ -223,15 +223,15 @@ class Base_MW_LutMan(Base_LutMan):
 
         This method also generates the waveforms.
 
-        This method contains several steps 
-            1. determine what ef-pulses to generate 
+        This method contains several steps
+            1. determine what ef-pulses to generate
             2. generate a LutMap to use and upload the waveforms
-            3. generate the ef-pulses in a for-loop 
+            3. generate the ef-pulses in a for-loop
             4. couple the waveforms to the AWG params
-            5. upload the codeword program that couples AWG parameters 
+            5. upload the codeword program that couples AWG parameters
         """
 
-        # 1. Determine what ef-pulses to generate 
+        # 1. Determine what ef-pulses to generate
         if not isinstance(amps, Iterable) and (mod_freqs is None):
             amps = [self.mw_ef_amp180()]
         elif len(amps) == 1:
@@ -245,23 +245,23 @@ class Base_MW_LutMan(Base_LutMan):
         elif len(mod_freqs) == 1:
             mod_freqs = [mod_freqs]*len(amps)
 
-        # 2. Generate a LutMap for the ef-pulses 
+        # 2. Generate a LutMap for the ef-pulses
         for i, (amp, mod_freq) in enumerate(zip(amps, mod_freqs)):
             cw_idx = i + 9
             possible_channels = ('channel_GI', 'channel_GQ',
-                                'channel_DI', 'channel_DQ',
-                                'channel_I', 'channel_Q')
-            # 
+                                 'channel_DI', 'channel_DQ',
+                                 'channel_I', 'channel_Q')
+            #
             codewords = ['wave_ch{}_cw{:03}'.format(self[ch](), cw_idx)
-                for ch in possible_channels if hasattr(self, ch)]
+                         for ch in possible_channels if hasattr(self, ch)]
 
-            # 3. Generate the ef-pulses in the for loop 
+            # 3. Generate the ef-pulses in the for loop
             self._wave_dict['ef_{}'.format(i)] = self.wf_func(
                 amp=amp, sigma_length=self.mw_gauss_width(),
                 f_modulation=mod_freq, sampling_rate=self.sampling_rate(),
                 phase=0,
                 motzoi=self.mw_motzoi())
-            # 4. Set the waveforms 
+            # 4. Set the waveforms
             for cw, waveform in zip(codewords,
                                     self._wave_dict['ef_{}'.format(i)]):
                 self.AWG.get_instr().set(cw, waveform)
@@ -372,7 +372,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0.5)
 
-
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
         for awg_ch in [self.channel_I(), self.channel_Q()]:
@@ -392,19 +391,19 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         return vals[0]
 
     def generate_standard_waveforms(self):
-            wave_dict = super().generate_standard_waveforms(
-                apply_predistortion_matrix=False)
-            
-            wave_dict['square'] = wf.mod_square(
-                amp=self.sq_amp(),
-                length=self.mw_gauss_width()*4,  # to ensure same duration as mw
-                f_modulation=self.mw_modulation(),
-                sampling_rate=self.sampling_rate())
+        wave_dict = super().generate_standard_waveforms(
+            apply_predistortion_matrix=False)
 
-            if self.mixer_apply_predistortion_matrix():
-                self._wave_dict = self.apply_mixer_predistortion_corrections(
-                    self._wave_dict)
-            return self._wave_dict
+        wave_dict['square'] = wf.mod_square(
+            amp=self.sq_amp(),
+            length=self.mw_gauss_width()*4,  # to ensure same duration as mw
+            f_modulation=self.mw_modulation(),
+            sampling_rate=self.sampling_rate())
+
+        if self.mixer_apply_predistortion_matrix():
+            self._wave_dict = self.apply_mixer_predistortion_corrections(
+                self._wave_dict)
+        return self._wave_dict
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True, stop_start: bool = True,
@@ -678,6 +677,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
+
 
 class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
     def __init__(self, name, **kw):
