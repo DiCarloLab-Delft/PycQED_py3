@@ -91,10 +91,9 @@ class Test_MW_LutMan(unittest.TestCase):
     def test_generating_standard_pulses(self):
         """Test if standard waveforms are correctly generated."""
 
-
         self.AWG8_MW_LutMan.LutMap(mwl.default_mw_lutmap)
         print(self.AWG8_MW_LutMan.LutMap())
-        self.AWG8_MW_LutMan.generate_standard_waveforms_new()
+        self.AWG8_MW_LutMan.generate_standard_waveforms()
 
         # remove this line later
         self.AWG8_MW_LutMan.set_default_lutmap()
@@ -118,28 +117,22 @@ class Test_MW_LutMan(unittest.TestCase):
             delay=0, phase=0)[0]
         np.testing.assert_array_almost_equal(expected_wf_spec, generated_wf[0])
 
+    def test_codeword_idx_to_parnames(self):
+
+        parnames = self.AWG8_MW_LutMan.codeword_idx_to_parnames(3)
+        expected_parnames = ['wave_ch1_cw003', 'wave_ch2_cw003']
+        self.assertEqual(parnames, expected_parnames)
+
+        parnames = self.AWG8_VSM_MW_LutMan.codeword_idx_to_parnames(3)
+        expected_parnames = ['wave_ch1_cw003', 'wave_ch2_cw003',
+                             'wave_ch3_cw003', 'wave_ch4_cw003']
+        self.assertEqual(parnames, expected_parnames)
 
     def test_lut_mapping_AWG8(self):
         self.AWG8_MW_LutMan.set_default_lutmap()
         expected_dict = {
-            'rY90': ('wave_ch1_cw004',
-                     'wave_ch2_cw004'),
-            'I': ('wave_ch1_cw000',
-                  'wave_ch2_cw000'),
-            'rY180': ('wave_ch1_cw002',
-                      'wave_ch2_cw002'),
-            'rX180': ('wave_ch1_cw001',
-                      'wave_ch2_cw001'),
-            'rPhi90': ('wave_ch1_cw007',
-                       'wave_ch2_cw007'),
-            'rX90': ('wave_ch1_cw003',
-                     'wave_ch2_cw003'),
-            'rYm90': ('wave_ch1_cw006',
-                      'wave_ch2_cw006'),
-            'rXm90': ('wave_ch1_cw005',
-                      'wave_ch2_cw005'),
-            'spec': ('wave_ch1_cw008',
-                     'wave_ch2_cw008')}
+            0: {"name": "I",        "theta": 0, "phi": 0, "type": "ge"},
+            1: {"name": "rX180",    "theta": 180, "phi": 0, "type": "ge"}, }
         # Does not check the full lutmap
         dict_contained_in(expected_dict, self.AWG8_MW_LutMan.LutMap())
 
@@ -160,42 +153,8 @@ class Test_MW_LutMan(unittest.TestCase):
     def test_lut_mapping_AWG8_VSM(self):
         self.AWG8_VSM_MW_LutMan.set_default_lutmap()
         expected_dict = {
-            'rY90': ('wave_ch1_cw004',
-                     'wave_ch2_cw004',
-                     'wave_ch3_cw004',
-                     'wave_ch4_cw004'),
-            'I': ('wave_ch1_cw000',
-                  'wave_ch2_cw000',
-                  'wave_ch3_cw000',
-                  'wave_ch4_cw000'),
-            'rY180': ('wave_ch1_cw002',
-                      'wave_ch2_cw002',
-                      'wave_ch3_cw002',
-                      'wave_ch4_cw002'),
-            'rX180': ('wave_ch1_cw001',
-                      'wave_ch2_cw001',
-                      'wave_ch3_cw001',
-                      'wave_ch4_cw001'),
-            'rPhi90': ('wave_ch1_cw007',
-                       'wave_ch2_cw007',
-                       'wave_ch3_cw007',
-                       'wave_ch4_cw007'),
-            'rX90': ('wave_ch1_cw003',
-                     'wave_ch2_cw003',
-                     'wave_ch3_cw003',
-                     'wave_ch4_cw003'),
-            'rYm90': ('wave_ch1_cw006',
-                      'wave_ch2_cw006',
-                      'wave_ch3_cw006',
-                      'wave_ch4_cw006'),
-            'rXm90': ('wave_ch1_cw005',
-                      'wave_ch2_cw005',
-                      'wave_ch3_cw005',
-                      'wave_ch4_cw005'),
-            'spec': ('wave_ch1_cw008',
-                     'wave_ch2_cw008',
-                     'wave_ch3_cw008',
-                     'wave_ch4_cw008')}
+            0: {"name": "I",        "theta": 0, "phi": 0, "type": "ge"},
+            1: {"name": "rX180",    "theta": 180, "phi": 0, "type": "ge"}, }
         # Does not check the full lutmap
         dict_contained_in(expected_dict, self.AWG8_VSM_MW_LutMan.LutMap())
 
