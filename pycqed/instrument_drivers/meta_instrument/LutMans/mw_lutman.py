@@ -219,10 +219,10 @@ class Base_MW_LutMan(Base_LutMan):
                 raise ValueError
 
         # Add predistortions + test
-        # if (self.mixer_apply_predistortion_matrix()
-        #         and apply_predistortion_matrix):
-        #     self._wave_dict = self.apply_mixer_predistortion_corrections(
-        #         self._wave_dict)
+        if (self.mixer_apply_predistortion_matrix()
+                and apply_predistortion_matrix):
+            self._wave_dict = self.apply_mixer_predistortion_corrections(
+                self._wave_dict)
         return self._wave_dict
 
     def apply_mixer_predistortion_corrections(self, wave_dict):
@@ -247,6 +247,19 @@ class Base_MW_LutMan(Base_LutMan):
 
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
+
+    def load_phase_pulses_to_AWG_lookuptable(self,
+                                             phases):
+        """
+        Loads rPhi90 pulses onto the AWG lookuptable.
+        """
+
+        if (len(phases) > 18):
+            raise ValueError('max 18 amplitude values can be provided')
+        lm = self.LutMap()
+        for i, (phase) in enumerate(phases):
+            lm[i+9] = {"name": "rPhi90",    "theta": 90,
+                       "phi": phase, "type": "ge"},
 
     def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
                                                mod_freqs: list=None):
@@ -441,21 +454,20 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             # Add if statemetn based on the hash here
             self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 
-        for waveform_name in self.LutMap().keys():
+        for waveform_key in self.LutMap().keys():
             self.load_waveform_realtime(
-                waveform_name=waveform_name,
-                wf_nr=None, regenerate_waveforms=False)
+                waveform_key=waveform_key, regenerate_waveforms=False)
 
         self._update_expected_program_hash()
 
-    def load_waveform_realtime(self, waveform_name: str,
+    def load_waveform_realtime(self, waveform_key,
                                wf_nr: int = None,
                                regenerate_waveforms: bool=True):
         """
         Loads a waveform using the realtime memory manipulation.
 
         Args:
-            waveform_name:        (str) : name of the waveform
+            waveform_key:         (int) : key of the waveform in _wave_dict
             wf_nr                 (int) : what codeword to load the pulse onto
                 if set to None, will determine awg_nr based on self.LutMap
             regenerate_waveforms (bool) : if True regenerates all waveforms
@@ -464,12 +476,10 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        I, Q = self._wave_dict[waveform_name]
+        I, Q = self._wave_dict[waveform_key]
 
-        if isinstance(waveform_name, int):
-            wf_nr = waveform_name
-        # if wf_nr is None:
-        #     wf_nr = int(self.LutMap()[waveform_name][0][-3:])
+        if wf_nr is None:
+            wf_nr = waveform_key
 
         AWG = self.AWG.get_instr()
 
@@ -591,14 +601,14 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                 parameter_class=ManualParameter, initial_value=None,
                 vals=vals.Ints())
 
-    def load_waveform_realtime(self, waveform_name: str,
+    def load_waveform_realtime(self, waveform_key,
                                wf_nr: int = None,
                                regenerate_waveforms: bool=True):
         """
         Loads a waveform using the realtime memory manipulation.
 
         Args:
-            waveform_name:        (str) : name of the waveform
+            waveform_key:         (int) : key of the waveform in _wave_dict
             wf_nr                 (int) : what codeword to load the pulse onto
                 if set to None, will determine awg_nr based on self.LutMap
             regenerate_waveforms (bool) : if True regenerates all waveforms
@@ -607,15 +617,10 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        GI, GQ, DI, DQ = self._wave_dict[waveform_name]
+        GI, GQ, DI, DQ = self._wave_dict[waveform_key]
 
-        # if wf_nr is None:
-        #     wf_nr = int(self.LutMap()[waveform_name][0][-3:])
-
-        if isinstance(waveform_name, int):
-            wf_nr = waveform_name
-        # if wf_nr is None:
-        #     wf_nr = int(self.LutMap()[waveform_name][0][-3:])
+        if wf_nr is None:
+            wf_nr = waveform_key
 
         AWG = self.AWG.get_instr()
 
