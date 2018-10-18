@@ -385,12 +385,12 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('mw_vsm_G_amp',
                            label='VSM amp Gaussian component',
-                           vals=vals.Numbers(0.2, 3.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_D_amp',
                            label='VSM amp Derivative component',
-                           vals=vals.Numbers(0.2, 3.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_G_phase',
@@ -452,7 +452,7 @@ class CCLight_Transmon(Qubit):
     def add_spec_parameters(self):
         self.add_parameter('spec_vsm_amp',
                            label='VSM amplitude for spec pulses',
-                           vals=vals.Numbers(0.2, 3.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
 
@@ -1121,7 +1121,7 @@ class CCLight_Transmon(Qubit):
         """
         if amps is None:
             if self.cfg_with_vsm():
-                amps = np.linspace(0.2, 2, 31)
+                amps = np.linspace(0.1, 1, 31)
             else:
                 amps = np.linspace(0, 1, 31)
 
