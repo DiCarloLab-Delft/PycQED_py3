@@ -20,8 +20,6 @@ default_mw_lutmap = {
 }
 
 
-
-
 def mw_lutmap_is_valid(lutmap: dict) -> bool:
     """
     Test if lutmap obeys schema.
@@ -81,13 +79,27 @@ class Base_MW_LutMan(Base_LutMan):
         """
         Set's the default lutmap for standard microwave drive pulses.ef
         """
-        def_lm = self._def_lm
-        LutMap = OrderedDict()
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
-        self.LutMap(LutMap)
+        self.LutMap(default_mw_lutmap.copy())
+
+        # def_lm = self._def_lm
+        # LutMap = OrderedDict()
+        # for cw_idx, cw_key in enumerate(def_lm):
+        #     LutMap[cw_key] = (
+        #         'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
+        #         'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
+        # self.LutMap(LutMap)
+
+    def codeword_idx_to_parnames(self, cw_idx: int):
+        """Convert a codeword_idx to a list of par names for the waveform."""
+
+        # the possible channels way of doing this is to make it work both for
+        # VSM style lutmans and no VSM style lutmans.
+        possible_channels = ('channel_GI', 'channel_GQ',
+                             'channel_DI', 'channel_DQ',
+                             'channel_I', 'channel_Q')
+        codewords = ['wave_ch{}_cw{:03}'.format(self[ch](), cw_idx)
+                     for ch in possible_channels if hasattr(self, ch)]
+        return codewords
 
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
@@ -167,7 +179,7 @@ class Base_MW_LutMan(Base_LutMan):
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(1, self._num_channels))
 
-    def generate_standard_waveforms_new(
+    def generate_standard_waveforms(
             self, apply_predistortion_matrix: bool=True):
         self._wave_dict = OrderedDict()
 
@@ -216,7 +228,7 @@ class Base_MW_LutMan(Base_LutMan):
         #         self._wave_dict)
         return self._wave_dict
 
-    def generate_standard_waveforms(self,
+    def generate_standard_waveforms_old(self,
                                     apply_predistortion_matrix: bool=True):
         self._wave_dict = OrderedDict()
         if self.cfg_sideband_mode() == 'static':
@@ -322,8 +334,15 @@ class Base_MW_LutMan(Base_LutMan):
                                            regenerate_waveforms: bool=False):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
-        waveforms = self._wave_dict[waveform_name]
-        codewords = self.LutMap()[waveform_name]
+
+        if isinstance(waveform_name, int):
+            cw_idx = waveform_name
+        else:
+            raise DeprecationWarning
+
+        waveforms = self._wave_dict[cw_idx]
+        codewords = self.codeword_idx_to_parnames(cw_idx)
+
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
 
@@ -502,7 +521,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         assert vals[0] == vals[1]
         return vals[0]
 
-    def generate_standard_waveforms(self):
+    def generate_standard_waveforms_old(self):
         wave_dict = super().generate_standard_waveforms(
             apply_predistortion_matrix=False)
 
@@ -571,8 +590,10 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
         I, Q = self._wave_dict[waveform_name]
 
-        if wf_nr is None:
-            wf_nr = int(self.LutMap()[waveform_name][0][-3:])
+        if isinstance(waveform_name, int):
+            wf_nr = waveform_name
+        # if wf_nr is None:
+        #     wf_nr = int(self.LutMap()[waveform_name][0][-3:])
 
         AWG = self.AWG.get_instr()
 
@@ -644,19 +665,19 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         self.wf_func = wf.mod_gauss_VSM
         self.spec_func = wf.block_pulse_vsm
 
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = OrderedDict()
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'wave_ch{}_cw{:03}'.format(self.channel_GI(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_GQ(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_DI(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_DQ(), cw_idx))
-        self.LutMap(LutMap)
+    # def set_default_lutmap(self):
+    #     """
+    #     Set's the default lutmap for standard microwave drive pulses.
+    #     """
+    #     def_lm = self._def_lm
+    #     LutMap = OrderedDict()
+    #     for cw_idx, cw_key in enumerate(def_lm):
+    #         LutMap[cw_key] = (
+    #             'wave_ch{}_cw{:03}'.format(self.channel_GI(), cw_idx),
+    #             'wave_ch{}_cw{:03}'.format(self.channel_GQ(), cw_idx),
+    #             'wave_ch{}_cw{:03}'.format(self.channel_DI(), cw_idx),
+    #             'wave_ch{}_cw{:03}'.format(self.channel_DQ(), cw_idx))
+    #     self.LutMap(LutMap)
 
     def _add_waveform_parameters(self):
         super(AWG8_MW_LutMan, self)._add_waveform_parameters()
@@ -671,8 +692,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
     def generate_standard_waveforms(self):
 
-        wave_dict = super(AWG8_MW_LutMan, self).generate_standard_waveforms(
-            apply_predistortion_matrix=False)
+        wave_dict = super(AWG8_MW_LutMan, self).generate_standard_waveforms()
         wave_dict['square'] = wf.mod_square_VSM(
             amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
             length=self.mw_gauss_width()*4,  # to ensure same duration as mw
@@ -727,8 +747,13 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
         GI, GQ, DI, DQ = self._wave_dict[waveform_name]
 
-        if wf_nr is None:
-            wf_nr = int(self.LutMap()[waveform_name][0][-3:])
+        # if wf_nr is None:
+        #     wf_nr = int(self.LutMap()[waveform_name][0][-3:])
+
+        if isinstance(waveform_name, int):
+            wf_nr = waveform_name
+        # if wf_nr is None:
+        #     wf_nr = int(self.LutMap()[waveform_name][0][-3:])
 
         AWG = self.AWG.get_instr()
 
@@ -977,16 +1002,16 @@ class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
         # all channels are used and hardcoded in functionality
         pass
 
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = OrderedDict()
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'wave_ch1_cw{:03}'.format(cw_idx),
-                'wave_ch2_cw{:03}'.format(cw_idx),
-                'wave_ch3_cw{:03}'.format(cw_idx),
-                'wave_ch4_cw{:03}'.format(cw_idx))
-        self.LutMap(LutMap)
+    # def set_default_lutmap(self):
+    #     """
+    #     Set's the default lutmap for standard microwave drive pulses.
+    #     """
+    #     def_lm = self._def_lm
+    #     LutMap = OrderedDict()
+    #     for cw_idx, cw_key in enumerate(def_lm):
+    #         LutMap[cw_key] = (
+    #             'wave_ch1_cw{:03}'.format(cw_idx),
+    #             'wave_ch2_cw{:03}'.format(cw_idx),
+    #             'wave_ch3_cw{:03}'.format(cw_idx),
+    #             'wave_ch4_cw{:03}'.format(cw_idx))
+    #     self.LutMap(LutMap)
