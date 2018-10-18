@@ -1,7 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-# FIXME: add support for QtPlot render wave
-# from qcodes.plots.pyqtgraph import QtPlot
 import logging
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
@@ -197,7 +195,6 @@ class Base_LutMan(Instrument):
         return fig, ax
 
 
-
 def get_redundant_codewords(codeword: int, bit_width: int=4, bit_shift: int=0):
     """
     Takes in a desired codeword and generates the redundant codewords.
@@ -226,12 +223,11 @@ def get_redundant_codewords(codeword: int, bit_width: int=4, bit_shift: int=0):
         redundant_codewords (list): all redundant combinations of the codeword
             see example above.
     """
-    codeword_shifted = codeword<<bit_shift
+    codeword_shifted = codeword << bit_shift
     redundant_codewords = []
     for i in range(2**bit_width):
-        if bit_shift == 0: #assumes the higher bits are used
-            redundant_codewords.append(codeword_shifted+(i<<bit_width))
-        else: # assumes the lower bits are used
+        if bit_shift == 0:  # assumes the higher bits are used
+            redundant_codewords.append(codeword_shifted+(i << bit_width))
+        else:  # assumes the lower bits are used
             redundant_codewords.append(codeword_shifted+i)
     return redundant_codewords
-

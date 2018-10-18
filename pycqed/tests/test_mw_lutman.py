@@ -35,7 +35,7 @@ class Test_MW_LutMan(unittest.TestCase):
         self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
         self.QWG_MW_LutMan = mwl.QWG_MW_LutMan('QWG_MW_LutMan')
 
-    def test__program_hash_differs_AWG8_lutman(self):
+    def test_program_hash_differs_AWG8_lutman(self):
 
         # set to a random value to ensure different
         self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
@@ -46,7 +46,7 @@ class Test_MW_LutMan(unittest.TestCase):
         hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
         self.assertFalse(hash_differs)
 
-    def test__program_hash_differs_AWG8_VSM_lutman(self):
+    def test_program_hash_differs_AWG8_VSM_lutman(self):
 
         # set to a random value to ensure different
         self.AWG8_VSM_MW_LutMan._awgs_mwG_sequencer_program_expected_hash(
@@ -58,7 +58,7 @@ class Test_MW_LutMan(unittest.TestCase):
         hash_differs = self.AWG8_VSM_MW_LutMan._program_hash_differs()
         self.assertFalse(hash_differs)
 
-    def test__program_hash_updated_when_loading_program(self):
+    def test_program_hash_updated_when_loading_program(self):
         self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
         hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
         self.assertTrue(hash_differs)
@@ -87,6 +87,37 @@ class Test_MW_LutMan(unittest.TestCase):
             delay=0, phase=0)[0]
         uploaded_wf = self.AWG.get('wave_ch1_cw008')
         np.testing.assert_array_almost_equal(expected_wf_spec, uploaded_wf)
+
+    def test_generating_standard_pulses(self):
+        """Test if standard waveforms are correctly generated."""
+
+
+        self.AWG8_MW_LutMan.LutMap(mwl.default_mw_lutmap)
+        print(self.AWG8_MW_LutMan.LutMap())
+        self.AWG8_MW_LutMan.generate_standard_waveforms_new()
+
+        # remove this line later
+        self.AWG8_MW_LutMan.set_default_lutmap()
+
+        expected_wf = wf.mod_gauss(
+            amp=self.AWG8_MW_LutMan.mw_amp180(),
+            sigma_length=self.AWG8_MW_LutMan.mw_gauss_width(),
+            f_modulation=self.AWG8_MW_LutMan.mw_modulation(),
+            sampling_rate=self.AWG8_MW_LutMan.sampling_rate(),
+            phase=0,
+            motzoi=self.AWG8_MW_LutMan.mw_motzoi())[0]
+        # expected on cw 1 based on LutMap
+        generated_wf = self.AWG8_MW_LutMan._wave_dict[1]
+        np.testing.assert_array_almost_equal(expected_wf, generated_wf[0])
+
+        generated_wf = self.AWG8_MW_LutMan._wave_dict[8]
+        expected_wf_spec = wf.block_pulse(
+            length=self.AWG8_MW_LutMan.spec_length(),
+            amp=self.AWG8_MW_LutMan.spec_amp(),
+            sampling_rate=self.AWG8_MW_LutMan.sampling_rate(),
+            delay=0, phase=0)[0]
+        np.testing.assert_array_almost_equal(expected_wf_spec, generated_wf[0])
+
 
     def test_lut_mapping_AWG8(self):
         self.AWG8_MW_LutMan.set_default_lutmap()
@@ -209,6 +240,26 @@ class Test_LutMan_Utils(unittest.TestCase):
             print(bin(cw))
             self.assertEqual((cw & (256-16)) >> 4, target_cw)
         self.assertEqual(len(red_cws_B), 2**4)
+
+    def test_valid_mw_lutmap(self):
+
+        valid_mw_lutmap = {
+            0: {"name": "I",        "theta": 0, "phi": 0, "type": "ge"},
+            1: {"name": "rX180",    "theta": 180, "phi": 0, "type": "ge"}, }
+        self.assertTrue(mwl.mw_lutmap_is_valid(valid_mw_lutmap))
+
+        invalid_mw_lutmap = {
+            "0": {"name": "I",        "theta": 0, "phi": 0, "type": "ge"}, }
+        with self.assertRaises(TypeError):
+            mwl.mw_lutmap_is_valid(invalid_mw_lutmap)
+
+    def test_theta_to_amp(self):
+        ref_amp180 = 1.5
+        thetas = [0, 180, 270, -90, -180]
+        expected_amps = [0, 1.5, -.75, -.75, 1.5]
+        for theta, exp_amp in zip(thetas, expected_amps):
+            self.assertEqual(
+                mwl.theta_to_amp(theta, ref_amp180), exp_amp)
 
 
 def dict_contained_in(subset, superset):
