@@ -6,7 +6,70 @@ from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
 
 
+default_mw_lutmap = {
+    0: {"name": "I",        "theta": 0, "phi": 0, "type": "ge"},
+    1: {"name": "rX180",    "theta": 180, "phi": 0, "type": "ge"},
+    2: {"name": "rY180",    "theta": 180, "phi": 90, "type": "ge"},
+    3: {"name": "rX90",     "theta": 90, "phi": 0, "type": "ge"},
+    4: {"name": "rY90",     "theta": 90, "phi": 90, "type": "ge"},
+    5: {"name": "rXm90",    "theta": -90, "phi": 0, "type": "ge"},
+    6: {"name": "rYm90",    "theta": -90, "phi": 90, "type": "ge"},
+    7: {"name": "rPhi90",   "theta": 90, "phi": 0, "type": "ge"},
+    8: {"name": "spec",     "type": "spec"},
+    9: {"name": "rX12",      "theta": 180, "phi": 0, "type": "ef"},
+}
+
+
+
+
+def mw_lutmap_is_valid(lutmap: dict) -> bool:
+    """
+    Test if lutmap obeys schema.
+
+    Args:
+        lutmap
+    Return:
+        valid (bool):
+    """
+    for key, value in lutmap.items():
+        if not isinstance(key, int):
+            raise TypeError
+
+    return True
+
+
+def theta_to_amp(theta: float, amp180: float):
+    """
+    Convert θ in deg to pulse amplitude based on a reference amp180.
+
+    Note that all angles are mapped onto the domain [-180, 180) so that
+    the minimum possible angle for each rotation is used.
+    """
+    # phase wrapped to [-180, 180)
+    theta_wrap = ((-theta+180) % 360-180)*-1
+    amp = theta_wrap/180*amp180
+    return amp
+
+
 class Base_MW_LutMan(Base_LutMan):
+    """
+    The base class for the microwave lutman.
+
+    Standard microwave pulses are generated based on a lutmap.
+
+    - Schema of lutmap.
+    - important attributes
+        self._wave_dict
+
+    Typical usage flow of the mw-lutmans
+
+        1. specify a lutmap that determines what waveforms are used.
+        2. set some parameters such as mw_amp180
+        3. generate waveforms -> stored in self._wave_dict
+        4. upload waveforms
+
+    """
+
     _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
                'rXm90',  'rYm90', 'rPhi90', 'spec']
     # use remaining codewords to set pi/2 gates for various angles
@@ -103,6 +166,55 @@ class Base_MW_LutMan(Base_LutMan):
         self.add_parameter('channel_Q',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(1, self._num_channels))
+
+    def generate_standard_waveforms_new(
+            self, apply_predistortion_matrix: bool=True):
+        self._wave_dict = OrderedDict()
+
+        if self.cfg_sideband_mode() == 'static':
+            f_modulation = self.mw_modulation()
+        else:
+            f_modulation = 0
+
+        # lutmap is expected to obey lutmap mw schema
+        for idx, waveform in self.LutMap().items():
+            if waveform['type'] == 'ge':
+                amp = theta_to_amp(theta=waveform['theta'],
+                                   amp180=self.mw_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=f_modulation,
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=self.mw_motzoi())
+            elif waveform['type'] == 'ef':
+                amp = theta_to_amp(theta=waveform['theta'],
+                                   amp180=self.mw_ef_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=self.mw_ef_modulation(),
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=0)
+                pass
+            elif waveform['type'] == 'spec':
+                self._wave_dict[idx] = self.spec_func(
+                    amp=self.spec_amp(),
+                    length=self.spec_length(),
+                    sampling_rate=self.sampling_rate(),
+                    delay=0,
+                    phase=0)
+            else:
+                raise ValueError
+
+        # Add predistortions + test
+        # if (self.mixer_apply_predistortion_matrix()
+        #         and apply_predistortion_matrix):
+        #     self._wave_dict = self.apply_mixer_predistortion_corrections(
+        #         self._wave_dict)
+        return self._wave_dict
 
     def generate_standard_waveforms(self,
                                     apply_predistortion_matrix: bool=True):
