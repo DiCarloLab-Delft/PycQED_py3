@@ -1385,7 +1385,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             qoi = simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1)
-            cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])    # this is actually not used in the following
+            cost_func_val = (-np.log10(1-qoi['avgatefid_compsubspace_pc']))**4    # this is actually not used in the following
             quantities_of_interest = [cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, 
                              qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], 
                              qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100]
