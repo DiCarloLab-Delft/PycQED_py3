@@ -175,6 +175,37 @@ class Test_MW_LutMan(unittest.TestCase):
             uploaded_wf = self.AWG.get('wave_ch{}_cw001'.format(i+1))
             np.testing.assert_array_almost_equal(expected_wfs[i], uploaded_wf)
 
+    def test_load_ef_rabi_pulses_to_AWG_lookuptable_correct_pars(self):
+        self.AWG8_VSM_MW_LutMan.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        ef_pulse_pars = self.AWG8_VSM_MW_LutMan.LutMap()[9]
+        self.assertEqual(ef_pulse_pars['type'], 'raw-drag')
+        exp_amp = self.AWG8_VSM_MW_LutMan.mw_ef_amp180()
+        self.assertEqual(ef_pulse_pars['drag_pars']['amp'], exp_amp)
+
+
+        amps = [.1, .2, .5]
+        self.AWG8_VSM_MW_LutMan.load_ef_rabi_pulses_to_AWG_lookuptable(
+            amps=amps)
+        for i, exp_amp in enumerate(amps):
+            ef_pulse_pars = self.AWG8_VSM_MW_LutMan.LutMap()[i+9]
+            self.assertEqual(ef_pulse_pars['type'], 'raw-drag')
+            self.assertEqual(ef_pulse_pars['drag_pars']['amp'], exp_amp)
+
+    def test_load_ef_rabi_pulses_to_AWG_lookuptable_correct_waveform(self):
+        self.AWG8_VSM_MW_LutMan.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        expected_wf = wf.mod_gauss(
+            amp=self.AWG8_MW_LutMan.mw_ef_amp180(),
+            sigma_length=self.AWG8_MW_LutMan.mw_gauss_width(),
+            f_modulation=self.AWG8_MW_LutMan.mw_ef_modulation(),
+            sampling_rate=self.AWG8_MW_LutMan.sampling_rate(), phase=0,
+            motzoi=self.AWG8_MW_LutMan.mw_motzoi())[0]
+
+        uploaded_wf = self.AWG.get('wave_ch1_cw009')
+        np.testing.assert_array_almost_equal(expected_wf, uploaded_wf)
+
+
     @classmethod
     def tearDownClass(self):
         for inststr in list(self.AWG._all_instruments):
