@@ -1,11 +1,14 @@
 import unittest
 import pycqed as pq
-import numpy as np
 import os
+import matplotlib.pyplot as plt
 from pycqed.analysis_v2 import measurement_analysis as ma
 
 
 class Test_Timing_Cal_Flux_Coarse(unittest.TestCase):
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
 
     @classmethod
     def setUpClass(self):

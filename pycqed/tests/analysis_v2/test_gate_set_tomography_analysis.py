@@ -1,11 +1,14 @@
 import unittest
-import numpy as np
+import matplotlib.pyplot as plt
 import pycqed as pq
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
 
 
 class Test_GST_data_extraction_analysis(unittest.TestCase):
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
 
     @classmethod
     def setUpClass(self):

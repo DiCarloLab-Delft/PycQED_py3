@@ -11,6 +11,7 @@ from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
 from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+import time
 
 
 class Base_Flux_LutMan(Base_LutMan):
@@ -323,8 +324,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 positive_branch=positive_branch) for e in eps])
 
         polycoeffs_A = self.get_polycoeffs_state(state=state_A)
-        polycoeffs_B = self.get_polycoeffs_state(state=state_B)
-        polycoeffs = polycoeffs_B - polycoeffs_A
+        if state_B is not None:
+            polycoeffs_B = self.get_polycoeffs_state(state=state_B)
+            polycoeffs = polycoeffs_B - polycoeffs_A
+        else:
+            polycoeffs = copy(polycoeffs_A)
+            polycoeffs[-1] = 0
 
         p = np.poly1d(polycoeffs)
         sols = (p-eps).roots
@@ -376,11 +381,22 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         awg_nr = awg_ch//2
         ch_pair = awg_ch % 2
 
-        channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
-            awg_nr, ch_pair))
+        for i in range(5):
+            channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
+                awg_nr, ch_pair))
+            if channel_amp is not None:
+                break
+            time.sleep(0.5)
+
 
         # channel range of 5 corresponds to -2.5V to +2.5V
-        channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
+        for i in range(5):
+            channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
+            if channel_range_pp is not None:
+                break
+            time.sleep(0.5)
+
+
         # direct_mode = AWG.get('sigouts_{}_direct'.format(awg_ch))
         scalefactor = channel_amp*(channel_range_pp/2)
         return scalefactor

@@ -211,7 +211,7 @@ def generate_config(filename: str,
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
 
-            cfg["instructions"]['C1'+lut_map[CW].format(q)] = {
+            cfg["instructions"]['c1'+lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": mw_latency,
                 "qubits": [q],
@@ -225,7 +225,7 @@ def generate_config(filename: str,
                 "cc_light_cond": 1}  # 1 means : do if last meas. == 1
 
 
-            cfg["instructions"]['C0'+lut_map[CW].format(q)] = {
+            cfg["instructions"]['c0'+lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": mw_latency,
                 "qubits": [q],
@@ -277,7 +277,7 @@ def generate_config(filename: str,
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
             "disable_optimization": True,
             "type": "flux",
-            "cc_light_instr_type": "two_qubits_gate",
+            "cc_light_instr_type": "two_qubit_gate",
             "cc_light_instr": "fl_cw_{:02}".format(1),
             "cc_light_right_codeword": 1,
             "cc_light_left_codeword": 1,
@@ -294,7 +294,7 @@ def generate_config(filename: str,
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": True,
                 "type": "flux",
-                "cc_light_instr_type": "two_qubits_gate",
+                "cc_light_instr_type": "two_qubit_gate",
                 "cc_light_instr": "fl_cw_{:02}".format(cw_flux),
                 "cc_light_right_codeword": cw_flux,
                 "cc_light_left_codeword": cw_flux,
