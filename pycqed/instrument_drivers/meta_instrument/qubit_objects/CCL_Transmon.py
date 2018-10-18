@@ -857,7 +857,7 @@ class CCLight_Transmon(Qubit):
         """
         if CW:
             ro_amp=self.ro_pulse_amp_CW()
-        else: 
+        else:
             ro_amp=self.ro_pulse_amp()
 
         if 'UHFQC' not in self.instr_acquisition():
@@ -1565,7 +1565,8 @@ class CCLight_Transmon(Qubit):
                              close_fig=close_fig, normalize=True)
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
-                                             analyze: bool =True, close_fig: bool=True):
+                                             analyze: bool =True, close_fig: bool=True,
+                                             fluxChan=None,):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1588,7 +1589,10 @@ class CCLight_Transmon(Qubit):
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
-            dac_par =  fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            if fluxChan==None:
+                dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            else:
+                dac_par = fluxcontrol.parameters[(fluxChan)]
 
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
@@ -2096,7 +2100,7 @@ class CCLight_Transmon(Qubit):
                 a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=True)
                 f_res.append(a.fit_results.params['f0'].value*1e9)  # fit converts to Hz
         print('dispersive shift is {} MHz'.format((f_res[1]-f_res[0])*1e-6))
-    
+
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
                                   no_figs: bool=False,
