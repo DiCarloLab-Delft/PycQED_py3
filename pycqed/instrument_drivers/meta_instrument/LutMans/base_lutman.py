@@ -118,37 +118,44 @@ class Base_LutMan(Instrument):
         if stop_start:
             AWG.start()
 
-    def render_wave(self, wave_name, show=True, time_units='lut_index',
+    def render_wave(self, wave_id,
+                    show=True, time_units='lut_index',
                     reload_pulses=True):
         """
-        Renders a waveform
+        Render a waveform.
+
+        Args:
+            wave_id: can be either the "name" of a waveform or
+                the integer key in self._wave_dict.
         """
+        if wave_id not in self.LutMap().keys():
+            wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
+
         if reload_pulses:
             self.generate_standard_waveforms()
         fig, ax = plt.subplots(1, 1)
         if time_units == 'lut_index':
-            x = np.arange(len(self._wave_dict[wave_name][0]))
+            x = np.arange(len(self._wave_dict[wave_id][0]))
             ax.set_xlabel('Lookuptable index (i)')
             if self._voltage_min is not None:
                 ax.vlines(
                     2048, self._voltage_min, self._voltage_max, linestyle='--')
         elif time_units == 's':
-            x = (np.arange(len(self._wave_dict[wave_name][0]))
+            x = (np.arange(len(self._wave_dict[wave_id][0]))
                  / self.sampling_rate.get())
 
             if self._voltage_min is not None:
                 ax.vlines(2048 / self.sampling_rate.get(),
                           self._voltage_min, self._voltage_max, linestyle='--')
 
-        ax.set_title(wave_name)
-        if len(self._wave_dict[wave_name]) == 2:
-            ax.plot(x, self._wave_dict[wave_name][0], marker='.', label='chI')
-            ax.plot(x, self._wave_dict[wave_name][1], marker='.', label='chQ')
-        elif len(self._wave_dict[wave_name]) == 4:
-            ax.plot(x, self._wave_dict[wave_name][0], marker='.', label='chGI')
-            ax.plot(x, self._wave_dict[wave_name][1], marker='.', label='chGQ')
-            ax.plot(x, self._wave_dict[wave_name][2], marker='.', label='chDI')
-            ax.plot(x, self._wave_dict[wave_name][3], marker='.', label='chDQ')
+        if len(self._wave_dict[wave_id]) == 2:
+            ax.plot(x, self._wave_dict[wave_id][0], marker='.', label='chI')
+            ax.plot(x, self._wave_dict[wave_id][1], marker='.', label='chQ')
+        elif len(self._wave_dict[wave_id]) == 4:
+            ax.plot(x, self._wave_dict[wave_id][0], marker='.', label='chGI')
+            ax.plot(x, self._wave_dict[wave_id][1], marker='.', label='chGQ')
+            ax.plot(x, self._wave_dict[wave_id][2], marker='.', label='chDI')
+            ax.plot(x, self._wave_dict[wave_id][3], marker='.', label='chDQ')
         else:
             raise ValueError("waveform shape not understood")
         ax.legend()
@@ -166,17 +173,19 @@ class Base_LutMan(Instrument):
             plt.show()
         return fig, ax
 
-    def render_wave_PSD(self, wave_name, show=True, reload_pulses=True,
+    def render_wave_PSD(self, wave_id, show=True, reload_pulses=True,
                         f_bounds=None, y_bounds=None):
+        if wave_id not in self.LutMap().keys():
+            wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
         if reload_pulses:
             self.generate_standard_waveforms()
         fig, ax = plt.subplots(1, 1)
         f_axis, PSD_I = PSD(
-            self._wave_dict[wave_name][0], 1/self.sampling_rate())
+            self._wave_dict[wave_id][0], 1/self.sampling_rate())
         f_axis, PSD_Q = PSD(
-            self._wave_dict[wave_name][1], 1/self.sampling_rate())
+            self._wave_dict[wave_id][1], 1/self.sampling_rate())
 
-        ax.set_title(wave_name)
+
         ax.plot(f_axis, PSD_I,
                 marker=',', label='chI')
         ax.plot(f_axis, PSD_Q,
@@ -231,3 +240,13 @@ def get_redundant_codewords(codeword: int, bit_width: int=4, bit_shift: int=0):
         else:  # assumes the lower bits are used
             redundant_codewords.append(codeword_shifted+i)
     return redundant_codewords
+
+
+
+def get_wf_idx_from_name(name, lutmap):
+    """Find first match to a name in a lutmap."""
+    for idx_key, waveform in lutmap.items():
+        if waveform['name'] == name:
+            return idx_key
+    else:
+        return False

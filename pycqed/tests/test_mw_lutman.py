@@ -5,7 +5,7 @@ import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import \
-    get_redundant_codewords
+    get_redundant_codewords, get_wf_idx_from_name
 
 
 class Test_MW_LutMan(unittest.TestCase):
@@ -183,7 +183,6 @@ class Test_MW_LutMan(unittest.TestCase):
         exp_amp = self.AWG8_VSM_MW_LutMan.mw_ef_amp180()
         self.assertEqual(ef_pulse_pars['drag_pars']['amp'], exp_amp)
 
-
         amps = [.1, .2, .5]
         self.AWG8_VSM_MW_LutMan.load_ef_rabi_pulses_to_AWG_lookuptable(
             amps=amps)
@@ -204,6 +203,12 @@ class Test_MW_LutMan(unittest.TestCase):
 
         uploaded_wf = self.AWG.get('wave_ch1_cw009')
         np.testing.assert_array_almost_equal(expected_wf, uploaded_wf)
+
+    def test_render_wave(self):
+        self.AWG8_VSM_MW_LutMan.render_wave('rX180', show=False)
+
+    def test_render_wave_PSD(self):
+        self.AWG8_VSM_MW_LutMan.render_wave_PSD('rX180', show=False)
 
 
     @classmethod
@@ -250,6 +255,12 @@ class Test_LutMan_Utils(unittest.TestCase):
         for theta, exp_amp in zip(thetas, expected_amps):
             self.assertEqual(
                 mwl.theta_to_amp(theta, ref_amp180), exp_amp)
+
+    def test_get_wf_idx_from_name(self):
+        idx = get_wf_idx_from_name('rX12', mwl.default_mw_lutmap)
+        self.assertEqual(idx, 9)
+
+
 
 
 def dict_contained_in(subset, superset):
