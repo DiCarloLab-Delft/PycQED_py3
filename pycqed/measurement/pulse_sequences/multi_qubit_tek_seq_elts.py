@@ -1058,27 +1058,33 @@ def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
         cl_seq = rb.randomized_benchmarking_sequence_new(
             nr_cliffords_value,
             number_of_qubits=2,
-            clifford_decomp_name=clifford_decomposition_name,
-            interleaved_gate=interleaved_gate,
+            interleaving_cl=interleaved_gate,
             desired_net_cl=net_clifford)
 
         pulse_list = []
-        previous_qbname = None
         for idx in cl_seq:
+            # print(idx)
             pulse_tuples_list = tqc.TwoQubitClifford(idx).gate_decomposition
+            # print(pulse_tuples_list)
+            pulsed_qubits = {qb1n, qb2n}
             for j, pulse_tuple in enumerate(pulse_tuples_list):
                 if isinstance(pulse_tuple[1], list):
                     pulse_list += [operation_dict[CZ_pulse_name]]
-                    previous_qbname = pulse_tuple[0]
+                    pulsed_qubits = {qb1n, qb2n}
                 else:
                     qb_name = qb1n if '0' in pulse_tuple[1] else qb2n
-                    if qb_name == previous_qbname or j == 0:
-                        pulse_name = pulse_tuple[0]
-                    else:
-                        pulse_name = pulse_tuple[0]+'s'
-                    pulse_list += [pulse_name + ' ' + qb_name]
-                    previous_qbname = qb_name
+                    pulse_name = pulse_tuple[0]
+                    if not 'Z' in pulse_name:
+                        if qb_name not in pulsed_qubits:
+                            pulse_name += 's'
+                        else:
+                            pulsed_qubits = set()
+                        pulsed_qubits |= {qb_name}
+                    pulse_list += [operation_dict[pulse_name + ' ' + qb_name]]
 
+
+        # from pprint import pprint
+        # pprint(pulse_list)
         pulse_list += [operation_dict['RO mux']]
 
         el = multi_pulse_elt(i, station, pulse_list)
@@ -1316,14 +1322,11 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                     for k in range(n):
                         pulse_list.append(deepcopy(pulse_dict[pulse_keys_by_qubit[k][j]]))
 
-                refpoint = []
-                # firstssb = False
-
                 for p in pulse_list:
                     p['refpoint'] = 'end'
 
                 a = [iii for iii in pulse_list if
-                     iii['pulse_type']=='SSB_DRAG_pulse']
+                     iii['pulse_type'] == 'SSB_DRAG_pulse']
                 a[0]['refpoint'] = 'end'
                 refpoint = [a[0]['target_qubit']]
 
@@ -2239,9 +2242,10 @@ def general_multi_qubit_seq(
         sweep_params = (
             ('X90', {}),
             ('X90', {'pulse_pars': {'refpoint': 'start',
-                    'pulse_delay': (lambda sp: sp),
-                    'phase': (lambda sp:
-                        ((sp-sweep_points[0]) * 1.1 * 360) % 360)}}),
+                                    'pulse_delay': (lambda sp: sp),
+                                    'phase': (lambda sp:
+                        (            (sp-sweep_points[0]) *
+                                    art_det * 360) % 360)}}),
         )
 
         # T1
@@ -2286,24 +2290,35 @@ def general_multi_qubit_seq(
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    for i, sp in enumerate(sweep_points):
+    len_sweep_pts = len(sweep_points)
+
+    if (not isinstance(sweep_points, list) and
+            not isinstance(sweep_points, np.ndarray)):
+        if isinstance(sweep_points, dict):
+            len_sweep_pts = len(sweep_points[list(sweep_points)[0]])
+            assert (np.all([len_sweep_pts ==
+                            len(sp) for sp in sweep_points.values()]))
+        else:
+            raise ValueError('Unrecognized type for "sweep_points".')
+
+    for i in np.arange(len_sweep_pts):
         pulse_list = []
-        if cal_points and no_cal_points==4 and \
-                (i == (len(sweep_points)-4) or i == (len(sweep_points)-3)):
+        if cal_points and no_cal_points == 4 and \
+                (i == (len_sweep_pts-4) or i == (len_sweep_pts-3)):
             for qb_name in qb_names:
                 qbn = ' ' + qb_name
                 if qb_name != qb_names[0]:
                     qbn = 's ' + qb_name
                 pulse_list += [operation_dict['I' + qbn]]
-        elif cal_points and no_cal_points==4 and \
-                (i == (len(sweep_points)-2) or i == (len(sweep_points)-1)):
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len_sweep_pts-2) or i == (len_sweep_pts-1)):
             for qb_name in qb_names:
                 qbn = ' ' + qb_name
                 if qb_name != qb_names[0]:
                     qbn = 's ' + qb_name
-                pulse_list += [ operation_dict['X180' + qbn]]
-        elif cal_points and no_cal_points==2 and \
-                (i == (len(sweep_points)-2) or i == (len(sweep_points)-1)):
+                pulse_list += [operation_dict['X180' + qbn]]
+        elif cal_points and no_cal_points == 2 and \
+                (i == (len_sweep_pts-2) or i == (len_sweep_pts-1)):
             for qb_name in qb_names:
                 qbn = ' ' + qb_name
                 if qb_name != qb_names[0]:
@@ -2313,6 +2328,7 @@ def general_multi_qubit_seq(
             for sweep_tuple in sweep_params:
                 pulse_key = [x for x in sweep_tuple if isinstance(x, str)][0]
                 params_dict = [x for x in sweep_tuple if isinstance(x, dict)][0]
+
                 proceed = True
 
                 if 'condition' in params_dict:
@@ -2321,30 +2337,42 @@ def general_multi_qubit_seq(
 
                 if proceed:
                     if 'mux' in pulse_key:
-                        print(pulse_key)
+                        # print(pulse_key)
                         pulse_pars_dict = deepcopy(operation_dict[pulse_key])
                         if 'pulse_pars' in params_dict:
                             for pulse_par_name, pulse_par in \
                                     params_dict['pulse_pars'].items():
                                 if hasattr(pulse_par, '__call__'):
-                                    pulse_pars_dict[pulse_par_name] = \
-                                        pulse_par(sp)
+                                    if isinstance(sweep_points, dict):
+                                        if 'RO mux' in sweep_points.keys():
+                                            pulse_pars_dict[pulse_par_name] = \
+                                                pulse_par(sweep_points[
+                                                              'RO mux'][i])
+                                    else:
+                                        pulse_pars_dict[pulse_par_name] = \
+                                            pulse_par(sweep_points[i])
                                 else:
                                     pulse_pars_dict[pulse_par_name] = \
                                         pulse_par
                         pulse_list += [pulse_pars_dict]
                     else:
-                        print(pulse_key)
+                        # print(pulse_key)
                         for qb_name in qb_names:
-                            print(qb_name)
+                            # print(qb_name)
                             pulse_pars_dict = deepcopy(operation_dict[
-                                                           pulse_key + ' ' + qb_name])
+                                                           pulse_key + ' ' +
+                                                           qb_name])
                             if 'pulse_pars' in params_dict:
                                 for pulse_par_name, pulse_par in \
                                         params_dict['pulse_pars'].items():
                                     if hasattr(pulse_par, '__call__'):
-                                        pulse_pars_dict[pulse_par_name] = \
-                                            pulse_par(sp)
+                                        if isinstance(sweep_points, dict):
+                                            pulse_pars_dict[pulse_par_name] = \
+                                                pulse_par(sweep_points[
+                                                              qb_name][i])
+                                        else:
+                                            pulse_pars_dict[pulse_par_name] = \
+                                                pulse_par(sweep_points[i])
                                     else:
                                         pulse_pars_dict[pulse_par_name] = \
                                             pulse_par
@@ -2353,12 +2381,12 @@ def general_multi_qubit_seq(
 
                             pulse_list += [pulse_pars_dict]
 
-        if 'repeat' in params_dict:
-            n = params_dict['repeat']
-            pulse_list += (n-1)*pulse_list
+                if 'repeat' in params_dict:
+                    n = params_dict['repeat']
+                    pulse_list = n*pulse_list
 
         if not np.any([p['operation_type'] == 'RO' for p in pulse_list]):
-            print('in add mux')
+            # print('in add mux')
             pulse_list += [operation_dict['RO mux']]
         el = multi_pulse_elt(i, station, pulse_list)
 

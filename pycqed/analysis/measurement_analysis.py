@@ -10696,10 +10696,10 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
             if len(self.sweep_points_2D[0]) == 2 or fit_statistics:
                 std_cphases = 0
                 ax.set_title(r"Cphase $= {:0.2f}\pm {:0.2f}$ deg, "
-                             '\n{:0.4f} ns{:0.4f} V \n {}'.format(
+                             '\n{:0.1f} ns, {:0.4f} V \n {}'.format(
                     cphase*180/np.pi, std_cphases*180/np.pi,
-                    self.sweep_points_2D[0][0]*1e9,
-                    self.sweep_points_2D[1][0],
+                    self.sweep_points_2D[1][0]*1e9,
+                    self.sweep_points_2D[0][0],
                     self.timestamp_string))
             else:
                 ax.set_title('Cosine fits \n' + self.timestamp_string)
@@ -10727,8 +10727,10 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                 ax.set_title(plot_title)
 
             if save_plot:
-                self.fig.savefig(self.folder +
-                            '\\Phase_fits_{}.png'.format(self.timestamp_string))
+                self.save_fig(self.fig, ('Phase_fits_{}'.format(
+                    self.timestamp_string)))
+                # self.fig.savefig(self.folder +
+                #             '\\Phase_fits_{}.png'.format(self.timestamp_string))
             plt.show()
 
         self.fitted_phases = phase_list

@@ -251,7 +251,7 @@ def randomized_benchmarking_sequence_new(
     if number_of_qubits == 1:
         Cl = tqc.SingleQubitClifford
         group_size = np.min([24, max_clifford_idx])
-    elif number_of_qubits ==2:
+    elif number_of_qubits == 2:
         Cl = tqc.TwoQubitClifford
         group_size = np.min([11520, max_clifford_idx])
     else:
