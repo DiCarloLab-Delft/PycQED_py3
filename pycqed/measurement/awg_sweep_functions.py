@@ -2505,6 +2505,54 @@ class Readout_pulse_scope_swf(swf.Hard_Sweep):
                 comm_freq=self.comm_freq,
                 verbose=self.verbose)
 
+class readout_photons_in_resonator_swf(swf.Hard_Sweep):
+    def __init__(self, delay_ro_relax, delay_buffer, ramsey_times,
+                 RO_pars, pulse_pars, cal_points=((-4, -3), (-2, -1)),
+                 verbose=False, upload=True, return_seq=False,
+                 artificial_detuning=None):
+        super().__init__()
+        self.delay_ro_relax = delay_ro_relax
+        self.delay_buffer = delay_buffer
+        self.ramsey_times = ramsey_times
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.cal_points = cal_points
+        self.artificial_detuning = artificial_detuning
+        self.verbose = verbose
+        self.upload = upload
+        self.return_seq = return_seq
+
+        self.name = 'read out photons in RO'
+        self.parameter_name = 'ramsey_times'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            csqs.readout_photons_in_resonator_seq(
+                delay_ro_relax=self. delay_ro_relax,
+                pulse_pars=self.pulse_pars,
+                RO_pars=self.RO_pars,
+                delay_buffer=self.delay_buffer,
+                cal_points=self.cal_points,
+                ramsey_times=self.ramsey_times,
+                return_seq=self.return_seq,
+                artificial_detuning=self.artificial_detuning,
+                verbose=self.verbose)
+
+class readout_photons_in_resonator_soft_swf(swf.Soft_Sweep):
+
+    def __init__(self, hard_sweep):
+
+        super().__init__()
+        self.hard_sweep = hard_sweep
+        self.name = 'read out photons in RO'
+        self.parameter_name = 'delay_to_relax'
+        self.unit = 's'
+
+    def set_parameter(self, val):
+        self.hard_sweep.delay_to_relax = val
+        self.hard_sweep.prepare()
+
 
 class Custom_single_qubit_swf(swf.Hard_Sweep):
 

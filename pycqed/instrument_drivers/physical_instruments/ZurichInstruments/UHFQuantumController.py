@@ -1084,33 +1084,26 @@ setTrigger(0);"""
         Qwave = - RO_amp * np.sin(2 * np.pi * sample_idxs * f_RO_mod / f_sampling)
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
 
+
     def awg_sequence_acquisition_and_pulse_SSB_gaussian_filtered(
             self, f_RO_mod, RO_amp, RO_pulse_length, filter_sigma, nr_sigma,
             alpha=1, phi_skew=0):
-        f_sampling = 1.8e9
+        f_sampling = 1.2e9
         samples = RO_pulse_length*f_sampling
 
         wave = RO_amp*np.ones(int(samples))
 
-        filter_samples = int(filter_sigma*nr_sigma*f_sampling)
-        filter_sample_idxs = np.arange(filter_samples)
-        filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
-                        (filter_sigma*f_sampling)**2)
-        filter /= filter.sum()
+        waveFiltered = gaussian_filter(wave, filter_sigma, nr_sigma, sampling_rate =  f_sampling)
 
-        waveFiltered = np.convolve(wave, filter, mode='full')
-
-        Iwave = alpha * waveFiltered * np.cos(2 * np.pi *
-                np.arange(len(waveFiltered)) * f_RO_mod / f_sampling +
-                phi_skew * np.pi / 180)
-        Qwave = -waveFiltered * np.sin(2 * np.pi *
-                np.arange(len(waveFiltered)) * f_RO_mod / f_sampling)
+        Iwave, Qwave = IQ_split(waveFiltered, f_RO_mod, phi_skew= phi_skew, alpha = alpha,
+                                sampling_rate =  f_sampling)
 
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
 
+
     def awg_sequence_acquisition_and_pulse_SSB_CLEAR_pulse(
-            self, amp_base, length_total, delta_amp_segments, length_segments,
-            sampling_rate=2e8, delay=0, phase=0):
+            self, amp_base, length_total, delta_amp_segments, length_segments, f_RO_mod,
+            sampling_rate = 1.2e9, phase = 0, alpha=1):
         '''
         Generates the envelope of a CLEAR pulse.
             length_total in s
@@ -1122,35 +1115,21 @@ setTrigger(0);"""
             phase in degrees
         '''
 
-        if len(delta_amp_segments)==len( length_segments)==4:
-            pass
-        else:
-            raise ValueError('delta_amp_segments and length_segments need to be lists of length 4')
+        amp_pulse = CLEAR_shape(  amp_base, length_total, delta_amp_segments,
+                                length_segments, sampling_rate=sampling_rate)
 
 
-        nr_samples = (length_total+delay)*sampling_rate
-        delay_samples = int(delay*sampling_rate)
-        pulse_samples = int(nr_samples - delay_samples)
-        segments_samples = list(map(lambda x: int(x*sampling_rate),length_segments))
+        Iwave, Qwave = IQ_split(amp_pulse, f_RO_mod, phi_skew= phase, alpha = alpha,
+                                sampling_rate =  sampling_rate)
 
-        amp_pulse=np.concatenate(((np.ones(segments_samples[0])*(amp_base+delta_amp_segments[0])),
-                                  (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[1])),
-                                  (np.ones(pulse_samples-sum(segments_samples))*amp_base),
-                                  (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[2])),
-                                  (np.ones(segments_samples[3])*(amp_base+delta_amp_segments[3]))))
-        amp_I=amp_pulse*np.cos(phase*2*np.pi/360)
-        amp_Q=amp_pulse*np.sin(phase*2*np.pi/360)
-        block_I = amp_I * np.ones(pulse_samples)
-        block_Q = amp_Q * np.ones(pulse_samples)
-        Zeros = np.zeros(delay_samples)
-        pulse_I = list(Zeros)+list(block_I)
-        pulse_Q = list(Zeros)+list(block_Q)
-        self.awg_sequence_acquisition_and_pulse(pulse_I, pulse_Q)
+        self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
 
 
-    def awg_sequence_acquisition_and_pulse_SSB_gauss_CLEAR_pulse(self,amp_base, length_total, delta_amp_segments, length_segments,
-                          gauss_amp, sigma, sampling_rate=2e8, delay=0, phase=0):
-        '''
+    def awg_sequence_acquisition_and_pulse_SSB_gauss_CLEAR_pulse(self,
+                          amp_base, length_total, delta_amp_segments,
+                          length_segments, sigma, nr_sigma, f_RO_mod,
+                          alpha=1, sampling_rate=1.2e9, phase=0):
+        """
         Generates the envelope of a gaussian filtered CLEAR pulse.
             length_total in s
             length_segments list of length 4 in s
@@ -1161,40 +1140,18 @@ setTrigger(0);"""
             sampling_rate in Hz
             empty delay in s
             phase in degrees
-        '''
+        """
+        amp_pulse = CLEAR_shape(amp_base, length_total, delta_amp_segments,
+                                length_segments, sampling_rate=sampling_rate)
 
-        if len(delta_amp_segments)==len( length_segments)==4:
-            pass
-        else:
-            raise ValueError('delta_amp_segments and length_segments need to be lists of length 4')
+        amp_filtered = gaussian_filter( amp_pulse, sigma, nr_sigma,
+                                        sampling_rate=sampling_rate)
 
+        pulse_I, pulse_Q = IQ_split(amp_filtered, f_RO_mod, phi_skew=phase,
+                                alpha=alpha, sampling_rate=sampling_rate)
 
-        nr_samples = (length_total+delay)*sampling_rate
-        delay_samples = int(delay*sampling_rate)
-        pulse_samples = int(nr_samples - delay_samples)
-        segments_samples = list(map(lambda x: int(x*sampling_rate),length_segments))
-
-        amp_pulse=np.concatenate(((np.ones(segments_samples[0])*(amp_base+delta_amp_segments[0])),
-                                  (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[1])),
-                                  (np.ones(pulse_samples-sum(segments_samples))*amp_base),
-                                  (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[2])),
-                                  (np.ones(segments_samples[3])*(amp_base+delta_amp_segments[3]))))
-
-
-        gaussian=gauss_amp*np.exp(-0.5*np.square(((np.linspace(0,length_total, pulse_samples))
-                                                  -length_total/2)/sigma))
-
-        amp_pulse=np.convolve(amp_pulse,gaussian,mode='same')
-
-
-        amp_I=amp_pulse*np.cos(phase*2*np.pi/360)
-        amp_Q=amp_pulse*np.sin(phase*2*np.pi/360)
-        block_I = amp_I * np.ones(pulse_samples)
-        block_Q = amp_Q * np.ones(pulse_samples)
-        Zeros = np.zeros(delay_samples)
-        pulse_I = list(Zeros)+list(block_I)
-        pulse_Q = list(Zeros)+list(block_Q)
         self.awg_sequence_acquisition_and_pulse(pulse_I, pulse_Q)
+
 
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
@@ -1293,3 +1250,54 @@ class ziShellCompilationError(ziShellError):
     Exception raised when the zi AWG-8 compiler encounters an error.
     """
     pass
+
+####################
+# Helper Functions #
+####################
+
+def gaussian_filter(wave, filter_sigma, nr_sigma, sampling_rate = 1.2e9):
+
+    filter_samples = int(filter_sigma*nr_sigma*sampling_rate)
+    filter_sample_idxs = np.arange(filter_samples)
+    filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
+                    (filter_sigma*sampling_rate)**2)
+    filter /= filter.sum()
+
+    waveFiltered = np.convolve(wave, filter, mode='full')
+    return  waveFiltered
+
+
+
+def IQ_split(wave, f_RO_mod, phi_skew=0, alpha = 1, sampling_rate = 1.2e9):
+
+    Iwave = alpha * wave * np.cos(2 * np.pi *
+                          np.arange(len(wave)) * f_RO_mod /sampling_rate +
+                          phi_skew * np.pi / 180)
+    Qwave = -wave * np.sin(2 * np.pi *
+                            np.arange(len(wave)) * f_RO_mod /sampling_rate)
+
+    return Iwave, Qwave
+
+
+
+def CLEAR_shape(  amp_base, length_total, delta_amp_segments,
+                 length_segments, sampling_rate=1.2e9):
+
+    if len(delta_amp_segments) == len( length_segments) == 4:
+        pass
+    else:
+        raise ValueError(
+            'delta_amp_segments and length_segments need to be lists of length 4')
+
+
+    pulse_samples = (length_total)*sampling_rate
+    segments_samples = list(map(lambda x: int(x*sampling_rate), length_segments))
+
+    amp_pulse = np.concatenate(
+        ((np.ones(segments_samples[0])*(amp_base+delta_amp_segments[0])),
+         (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[1])),
+         (np.ones(pulse_samples-sum(segments_samples))*amp_base),
+         (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[2])),
+         (np.ones(segments_samples[3])*(amp_base+delta_amp_segments[3]))))
+
+    return amp_pulse

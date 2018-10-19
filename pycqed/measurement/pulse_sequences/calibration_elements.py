@@ -4,6 +4,7 @@ from pycqed.measurement.waveform_control import sequence
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     get_pulse_dict_from_pars
 
+
 station = None
 
 def cos_seq(amplitude, frequency, channels, phases,
@@ -205,3 +206,90 @@ def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
         return seq, el_list
     else:
         return seq_name
+
+def readout_photons_in_resonator_seq(delay_ro_relax, delay_buffer, ramsey_times,
+                            RO_pars, pulse_pars, cal_points=((-4, -3), (-2, -1)),
+                            verbose=False, upload=True, return_seq=False,
+                            artificial_detuning=None):
+    """
+    Prepares the AWGs for a readout pulse shape and timing measurement.
+
+    The sequence consists of two readout pulses sandwitching two ramsey pulses
+    inbetween. The delay between the first readout pulse and first ramsey pulse
+    is swept, to measure the ac stark shift and dephasing from any residual
+    photons.
+
+    Important: This sequence includes two readouts per segment. For this reason
+    the calibration points are also duplicated.
+
+    Args:
+        delay_ro_relax: delay between the end of the first readout
+                        pulse and the start of the first ramsey pulse.
+
+        pulse_pars: Pulse dictionary for the ramsey pulse.
+        RO_pars: Pulse dictionary for the readout pulse.
+        delay_buffer: delay between the start of the last ramsey pulse and the
+                      start of the second readout pulse.
+        ramsey_times: delays between ramsey pulses
+        cal_points: True for default calibration points, False for no
+                          calibration points or a list of two lists, containing
+                          the indices of the calibration segments for the ground
+                          and excited state.
+
+    Returns:
+        The sequence object and the element list if return_seq is True. Else
+        return the sequence name.
+    """
+    if cal_points is True: cal_points = ((-4, -3), (-2, -1))
+    elif cal_points is False or cal_points is None: cal_points = ((), ())
+
+    seq_name = 'readout_photons_in_resonator_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    readout_x1 = deepcopy(RO_pars)
+    readout_x1['refpoint'] = 'end'
+    readout_x2 = deepcopy(RO_pars)
+    readout_x2['refpoint'] = 'start'
+    ramsey_x1 = deepcopy(pulse_pars)
+    ramsey_x1['refpoint'] = 'start'
+    ramsey_x2 = deepcopy(pulse_pars)
+    ramsey_x2['refpoint'] = 'start'
+    pulse_length = ramsey_x2['nr_sigma']*ramsey_x2['sigma']
+
+    for i, tau in enumerate(ramsey_times):
+        if i in cal_points[0] or i - len(ramsey_times) in cal_points[0]:
+            el = multi_pulse_elt(2 * i, station, [pulses['I'], RO_pars])
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+            el = multi_pulse_elt(2 * i + 1, station, [pulses['I'], RO_pars])
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+        elif i in cal_points[1] or i - len(ramsey_times) in cal_points[1]:
+            el = multi_pulse_elt(2 * i, station, [pulses['X180'], RO_pars])
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+            el = multi_pulse_elt(2 * i + 1, station, [pulses['X180'], RO_pars])
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+        else:
+            if artificial_detuning is not None:
+                Dphase = ((tau-ramsey_times[0]) * artificial_detuning * 360) % 360
+                ramsey_x2['phase'] = Dphase
+
+            readout_x2['pulse_delay'] = delay_ro_relax+ tau+ delay_buffer+ 2*pulse_length
+            ramsey_x1['pulse_delay'] = delay_ro_relax
+            ramsey_x2['pulse_delay'] = delay_ro_relax+ tau+ pulse_length
+
+            el = multi_pulse_elt(2 * i, station,
+                                 [readout_x1, ramsey_x1, ramsey_x2, readout_x2])
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+

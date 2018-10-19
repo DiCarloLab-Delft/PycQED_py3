@@ -180,8 +180,8 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pulse_shape', initial_value='square',
                            docstring="Shape of the RO pulse. ['square',"
-                                     "'gaussian_filtered']",
-                           vals=vals.Enum('square', 'gaussian_filtered'),
+                                     "'gaussian_filtered','CLEAR']",
+                           vals=vals.Enum('square', 'gaussian_filtered','CLEAR'),
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pulse_filter_sigma', unit='s',
                            initial_value=10e-9,
@@ -197,7 +197,22 @@ class QuDev_transmon(Qubit):
                            label='RO pulse Gaussian filter length',
                            vals=vals.Numbers(0),
                            parameter_class=ManualParameter)
-
+        # add CLEAR pulse parameters
+        self.add_parameter('ro_CLEAR_delta_amp_segment',
+                           initial_value=None, unit='',
+                           docstring='Amplitudes of the ring up and ring down'
+                                     'segments of the CLEAR pulse. The '
+                                     'amplitudes are added to RO_amp',
+                           label='CLEAR-segment amplitudes',
+                           vals=vals.Lists(vals.Numbers()),
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_CLEAR_segment_length',
+                           initial_value=None, unit='s',
+                           docstring='Length of the ring up and ring down'
+                                     'segments of the CLEAR pulse.',
+                           label='CLEAR-segment length',
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
         # add pulsed spectroscopy pulse parameters
         self.add_operation('Spec')
         self.add_pulse_parameter('Spec', 'spec_pulse_type', 'pulse_type',
@@ -444,7 +459,6 @@ class QuDev_transmon(Qubit):
         self.readout_DC_LO.pulsemod_state('Off')
         self.readout_DC_LO.frequency(f_RO - self.f_RO_mod())
         self.readout_DC_LO.on()
-
         # readout pulse
         if not multiplexed:
             if self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
@@ -464,6 +478,15 @@ class QuDev_transmon(Qubit):
                         filter_sigma=self.ro_pulse_filter_sigma(),
                         nr_sigma=self.ro_pulse_nr_sigma(),
                         alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
+                elif self.ro_pulse_shape() == 'CLEAR':
+                    self.UHFQC.awg_sequence_acquisition_and_pulse_SSB_gauss_CLEAR_pulse(
+                        delta_amp_segments=self.ro_CLEAR_delta_amp_segment(),
+                        length_segments=self.ro_CLEAR_segment_length(),
+                        f_RO_mod=self.f_RO_mod(), amp_base=self.RO_amp(),
+                        length_total=self.RO_pulse_length(),
+                        sigma=self.ro_pulse_filter_sigma(),
+                        nr_sigma=self.ro_pulse_nr_sigma(),
+                        phase=self.ro_phi_skew())
                 else:
                     raise ValueError('Invalid ro pulse shape.')
                 self.readout_UC_LO.pulsemod_state('Off')
@@ -1551,6 +1574,83 @@ class QuDev_transmon(Qubit):
             channels=self.int_avg_det.channels,
             integration_length=self.RO_acq_integration_length(),
             values_per_point=2, values_per_point_suffex=['_probe', '_measure'])
+        MC.set_detector_function(d)
+        MC.run_2D(label)
+
+        # Create a MeasurementAnalysis object for this measurement
+        if analyze:
+            ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
+
+    def readout_RO_photons(self, delay_to_relax, delay_buffer, ramsey_times,
+                           cal_points=((-4, -3), (-2, -1)),
+                           verbose=False, upload=True, return_seq=False,
+                           artificial_detuning=None, analyze=True, label=None,
+                           close_fig=True, MC=None):
+        """
+        From the documentation of the used sequence function:
+
+         Prepares the AWGs for a readout pulse shape and timing measurement.
+
+        The sequence consists of two readout pulses sandwitching two ramsey pulses
+        inbetween. The delay between the first readout pulse and first ramsey pulse
+        is swept, to measure the ac stark shift and dephasing from any residual
+        photons.
+
+        Important: This sequence includes two readouts per segment. For this reason
+        the calibration points are also duplicated.
+
+        Args:
+            delay_to_relax: delay between the end of the first readout
+                            pulse and the start of the first ramsey pulse.
+
+            pulse_pars: Pulse dictionary for the ramsey pulse.
+            RO_pars: Pulse dictionary for the readout pulse.
+            delay_buffer: delay between the start of the last ramsey pulse and the
+                          start of the second readout pulse.
+            ramsey_times: delays between ramsey pulses
+            cal_points: True for default calibration points, False for no
+                              calibration points or a list of two lists, containing
+                              the indices of the calibration segments for the ground
+                              and excited state.
+        """
+
+
+        if label is None:
+            label = 'readout_RO_photons' + self.msmt_suffix
+        if MC is None:
+            MC = self.MC
+
+        self.prepare_for_timedomain()
+        MC.set_sweep_function(awg_swf.readout_photons_in_resonator_swf(
+            delay_to_relax=delay_to_relax,
+            delay_buffer=delay_buffer,
+            ramsey_times=ramsey_times,
+            pulse_pars=self.get_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            cal_points=cal_points,
+            verbose=verbose,
+            artificial_detuning=artificial_detuning,
+            upload=upload))
+        MC.set_sweep_points(ramsey_times)
+        MC.set_sweep_function_2D(awg_swf.readout_photons_in_resonator_soft_swf(
+            awg_swf.readout_photons_in_resonator_swf(
+                delay_to_relax=delay_to_relax,
+                delay_buffer=delay_buffer,
+                ramsey_times=ramsey_times,
+                pulse_pars=self.get_drive_pars(),
+                RO_pars=self.get_RO_pars(),
+                cal_points=cal_points,
+                verbose=verbose,
+                artificial_detuning=artificial_detuning,
+                upload=upload)))
+        MC.set_sweep_points_2D(delay_to_relax)
+
+        d = det.UHFQC_integrated_average_detector(
+            self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
+            channels=self.int_avg_det.channels,
+            integration_length=self.RO_acq_integration_length(),
+            values_per_point=2, values_per_point_suffex=['_test', '_measure'])
         MC.set_detector_function(d)
         MC.run_2D(label)
 
