@@ -16,8 +16,6 @@ def single_flux_pulse_seq(qubit_indices: tuple,
         k.prepz(idx)  # to ensure enough separation in timing
         k.prepz(idx)  # to ensure enough separation in timing
 
-    for i in range(7):
-        k.gate('CW_00', [i])
 
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
     k.gate('fl_cw_02', [qubit_indices[0], qubit_indices[1]])
