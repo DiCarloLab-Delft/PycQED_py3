@@ -5,6 +5,7 @@ import scipy
 import time
 import logging
 from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
 #np.set_printoptions(threshold=np.inf)
 
 
@@ -32,7 +33,7 @@ U_target = qtp.Qobj([[1, 0, 0, 0, 0, 0, 0, 0, 0],
                      [0, 0, 0, 0, 0, 0, 0, 0, 1]],
                     type='oper',
                     dims=[[3, 3], [3, 3]])
-#U_target._type = 'oper'
+
 U_target_diffdims = qtp.Qobj([[1, 0, 0, 0, 0, 0, 0, 0, 0],
                      [0, 1, 0, 0, 0, 0, 0, 0, 0],
                      [0, 0, -1, 0, 0, 0, 0, 0, 0],
@@ -207,7 +208,7 @@ def phases_from_superoperator(U):
     """
     if U.type=='oper':
         phi_00 = np.rad2deg(np.angle(U[0, 0]))  # expected to equal 0 because of our
-        # choice for the energy, not because of rotating frame. But not guaranteed including the coupling
+        										# choice for the energy, not because of rotating frame. But not guaranteed including the coupling
         phi_01 = np.rad2deg(np.angle(U[1, 1]))
         phi_10 = np.rad2deg(np.angle(U[3, 3]))
         phi_11 = np.rad2deg(np.angle(U[4, 4]))
@@ -570,6 +571,7 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0):
 
         # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
         f_pulse_final = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=f_pulse,omega_0=omega_0,fluxbias=fluxbias_q0,positive_branch=True)
+        f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=omega_0)
 
         amp_final = fluxlutman.calc_freq_to_amp(f_pulse_final,state='01')
 
@@ -586,6 +588,7 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0):
 
 
         f_pulse_A = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=f_pulse_A,omega_0=omega_0,fluxbias=fluxbias_q0,positive_branch=True)
+        f_pulse_A = np.clip(f_pulse_A,a_min=None,a_max=omega_0) 
         amp_A = fluxlutman.calc_freq_to_amp(f_pulse_A,state='01')
 
 
@@ -593,6 +596,7 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0):
         f_pulse_B = np.clip(f_pulse_B,a_min=None,a_max=omega_0)
 
         f_pulse_B = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=f_pulse_B,omega_0=omega_0,fluxbias=fluxbias_q0,positive_branch=False)
+        f_pulse_B = np.clip(f_pulse_B,a_min=None,a_max=omega_0) 
         amp_B = fluxlutman.calc_freq_to_amp(f_pulse_B,state='01',positive_branch=False)
 
 
@@ -610,8 +614,6 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final):
     T2_q0_amplitude_dependent = noise_parameters_CZ.T2_q0_amplitude_dependent()
     T2_q1 = noise_parameters_CZ.T2_q1()
 
-    def Tphi_from_T1andT2(T1,T2):
-        return 1/(-1/(2*T1)+1/T2)
 
     # time-independent jump operators on q1
     if T2_q1 != 0:                                        # we use 0 to mean that it is infinite
@@ -626,11 +628,15 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final):
     # time-dependent jump operators on q0
     if T2_q0_amplitude_dependent[0] != -1:
 
-        def expT2(x,gc,amp,tau):
-            return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data
-
         T2_q0_vec=expT2(f_pulse_final,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
+
+        # plot(x_plot_vec=[f_pulse_final/1e9],
+        #                   y_plot_vec=[T2_q0_vec*1e6],
+        #                   title='T2 vs frequency from fit',
+        #                   xlabel='Frequency_q0 (GHz)', ylabel='T2 (mu s)')
+
         T2_q0_vec=T2_q0_vec * noise_parameters_CZ.T2_scaling()            # to vary T2 levels and plot performance vs T2
+
         if T1_q0 != 0:
             Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
         else:
@@ -823,7 +829,7 @@ def dressed_frequencies(fluxlutman, noise_parameters_CZ):
     #w_q1 = fluxlutman.q_freq_10()
     w_q1 = (H_0_diag[3,3]-H_0_diag[0,0]) / (2*np.pi)
 
-    return w_q0, w_q1
+    return np.real(w_q0), np.real(w_q1)
 
 
 def shift_due_to_fluxbias_q0_singlefrequency(f_pulse,omega_0,fluxbias,positive_branch):
@@ -839,6 +845,13 @@ def shift_due_to_fluxbias_q0_singlefrequency(f_pulse,omega_0,fluxbias,positive_b
                           # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
 
     return f_pulse_final
+
+
+def Tphi_from_T1andT2(T1,T2):
+    return 1/(-1/(2*T1)+1/T2)
+
+def expT2(x,gc,amp,tau):
+    return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data of T2
 
 
 def matrix_change_of_variables(H_0):
@@ -927,6 +940,13 @@ def average_phases(phases,weights):
     return np.rad2deg(angle) % 360
 
 
+def verify_CPTP(U):
+	# args: U(Qobj): superoperator or unitary
+	# returns: trace dist of the partial trace that should be the identity, i.e. trace dist should be zero for TP maps
+	choi = qtp.to_choi(U)
+	candidate_identity = choi.ptrace([0,1])    # 3 since we have a qutrit
+	ptrace = qtp.tracedist(candidate_identity,qtp.tensor(qtp.qeye(3),qtp.qeye(3)))
+	return ptrace
 
 
 

@@ -120,6 +120,10 @@ def compute_propagator_parallelizable(arglist):
 
     t_final = tlist_new[-1]+sim_step_new
 
+    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp],
+    #                          title='Pulse with (possibly) single qubit rotations',
+    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
+
 
     amp = amp * noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
 
@@ -130,9 +134,24 @@ def compute_propagator_parallelizable(arglist):
     else:
         amp_final = amp
 
+    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final],
+    #                          title='Pulse with distortions, absolute',
+    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
+    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp],
+    #                          title='Pulse with distortions, difference',
+    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
+
 
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
     amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
+
+    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp_final_new],
+    #                          title='Pulse with distortions and shift due to fluxbias_q0, difference',
+    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
+    # amp_final = amp_final_new
+    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[f_pulse_final/1e9],
+    #                          title='Pulse with distortions and shift due to fluxbias_q0',
+    #                            xlabel='Time (ns)',ylabel='Frequency (GHz)')
 
 
     ### Obtain jump operators, possibly time-dependent (incoherent part of the noise)
@@ -142,6 +161,7 @@ def compute_propagator_parallelizable(arglist):
     ### Compute propagator
     U_final = czf.time_evolution_new(c_ops=c_ops, noise_parameters_CZ=noise_parameters_CZ, 
                                  fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new)
+    #print(czf.verify_CPTP(U_superop_average))
 
 
     if arglist['cluster']:
@@ -329,6 +349,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                     U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
                 U_final_vec[i] = U_final_vec[i] * weights[i]
             U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting average propagator
+            #print(czf.verify_CPTP(U_superop_average))
 
 
             t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
@@ -349,6 +370,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
         qoi_plot = np.array(qoi_plot)
+
+        ## Plot to study the convergence properties of averaging over a Gaussian
+        # for i in range(len(qoi_plot[0])):
+        #     czf.plot(x_plot_vec=[n_sampling_gaussian_vec],
+        #                   y_plot_vec=[qoi_plot[:,i]],
+        #                   title='Study of convergence of average',
+        #                   xlabel='n_sampling_gaussian points',ylabel=self.value_names[i])
 
 
         return qoi_plot[0,0], qoi_plot[0,1], qoi_plot[0,2], qoi_plot[0,3], qoi_plot[0,4], qoi_plot[0,5], qoi_plot[0,6], \
