@@ -91,3 +91,13 @@ class Test_int_to_base(unittest.TestCase):
         self.assertEqual(gen.int2base(0, base=3, fixed_length=3), '000')
 
         self.assertEqual(gen.int2base(0, base=3), '0')
+
+
+class Test_RepresentsInt(unittest.TestCase):
+
+    def test_RepresentsInt(self):
+        self.assertTrue(gen.RepresentsInt('5'))
+        self.assertFalse(gen.RepresentsInt('5.0'))
+        self.assertFalse(gen.RepresentsInt('5.13'))
+
+
