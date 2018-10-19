@@ -69,7 +69,7 @@ Important clifford indices:
         Y90  : Cl 21
         X180 : Cl 3
         Y180 : Cl 6
-        CZ   : 4368
+        CZ   : 3792
 
 """
 # set as a module wide variable instead of argument to function for speed

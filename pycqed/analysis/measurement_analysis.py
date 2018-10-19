@@ -10619,12 +10619,10 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
             std_amps_ex = np.std(amps_all[::2,:],axis=0)
             std_amps_gr = np.std(amps_all[1::2,:],axis=0)
             thetas_plot = np.linspace(thetas[0],thetas[-1], 128)
-
             ft_dic ={'excited':[amps_avg_ex +c*std_amps_ex for c in range(-1,2)],
                      'ground' :[amps_avg_gr +c*std_amps_gr for c in range(-1,2)]}
             plt_dic ={'excited': {'amplitudes':[],'fit_params':[]},
                       'ground':  {'amplitudes':[],'fit_params':[]}}
-
             for key in ft_dic.keys():
                 for it, fit_amps in enumerate(ft_dic[key]):
                     amps_fit = ft_dic[key][it]
@@ -10677,8 +10675,8 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                 ax.set_title(r"Cphase $= {:0.2f}\pm {:0.2f}$ deg, "
                              '\n@ {:0.4f}ns ; {:0.4f}V \n date_time: {}'.format(
                     avg_cphases*180/np.pi, std_cphases*180/np.pi,
-                    self.sweep_points_2D[0][0]*1e9,
-                    self.sweep_points_2D[1][0],
+                    self.sweep_points_2D[1][0]*1e9,
+                    self.sweep_points_2D[0][0],
                     self.timestamp_string),fontsize=fontsize)
             else:
                 ax.set_title('Single Cosine fits \n' + self.timestamp_string,
@@ -10708,8 +10706,10 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                 ax.set_title(plot_title)
 
             if save_plot:
-                self.fig.savefig(self.folder +
-                            '\\Phase_fits_{}.png'.format(self.timestamp_string))
+                self.save_fig(self.fig, ('Phase_fits_{}'.format(
+                    self.timestamp_string)))
+                # self.fig.savefig(self.folder +
+                #             '\\Phase_fits_{}.png'.format(self.timestamp_string))
                                  #,dpi=600.)
             plt.show()
 

@@ -91,10 +91,10 @@ def Pulsed_spec_ro_markers_seq(spec_pars, RO_pars,
     # next trigger comes in. Assumes 200us trigger period, also works for
     # faster trigger rates.
     # period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
-    period = RO_pars['length'] + RO_pars['pulse_delay']
+    period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
     nr_of_pulse_reps = int((200e-6-10e-6)//period)
-
     pulse_list = [spec_pars, RO_pars]*nr_of_pulse_reps
+
     el = multi_pulse_elt(0, station, pulse_list)
     el_list.append(el)
     seq.append_element(el, trigger_wait=True)
@@ -467,9 +467,11 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
         else:
             X90_separation = tau - DRAG_length
             if cpmg_scheme:
-                print('cpmg')
-                echo_pulse_delay = (X90_separation - nr_echo_pulses*DRAG_length) / \
-                                   nr_echo_pulses
+                if i==0:
+                    print('cpmg')
+                echo_pulse_delay = (X90_separation -
+                                    nr_echo_pulses*DRAG_length) / \
+                                    nr_echo_pulses
                 if echo_pulse_delay < 0:
                     pulse_pars_x2['pulse_delay'] = tau
                     pulse_dict_list = [pulses['X90'], pulse_pars_x2, RO_pars]
@@ -487,7 +489,8 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                     pulse_pars_x2['pulse_delay'] = start_end_delay
                     pulse_dict_list += [pulse_pars_x2, RO_pars]
             else:
-                print('UDD')
+                if i==0:
+                    print('UDD')
                 pulse_positions_func = \
                     lambda idx, N: np.sin(np.pi*idx/(2*N+2))**2
                 pulse_delays_func = (lambda idx, N: X90_separation*(

@@ -1758,7 +1758,7 @@ def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9,
         return seq_name
 
 
-def Chevron_length_seq_new(lengths, flux_pulse_amp,
+def Chevron_length_seq_new(lengths, flux_pulse_amp, frequency,
                        qbc_name, qbt_name, qbr_name,
                        CZ_pulse_name, operation_dict,
                        upload_all=True,
@@ -1793,6 +1793,7 @@ def Chevron_length_seq_new(lengths, flux_pulse_amp,
     max_length = np.max(lengths)
 
     CZ_pulse['amplitude'] = flux_pulse_amp
+    CZ_pulse['frequency'] = frequency
 
     if upload_all:
         upload_AWGs = 'all'
@@ -1835,6 +1836,82 @@ def Chevron_length_seq_new(lengths, flux_pulse_amp,
     else:
         return seq_name
 
+
+def Chevron_frequency_seq(frequencies, length, flux_pulse_amp,
+                           qbc_name, qbt_name, qbr_name,
+                           CZ_pulse_name, operation_dict,
+                           upload_all=True,
+                           verbose=False, cal_points=False,
+                           upload=True, return_seq=False):
+
+    '''
+    chevron sequence (sweep of the flux pulse length)
+
+    Timings of sequence
+                                  <-- length -->
+    qb_control:    |X180|  ---   |  fluxpulse   |
+
+    qb_target:     |X180|  --------------------------------------  |RO|
+
+    args:
+        lengths: np.array containing the lengths of the fluxpulses
+        flux_pulse_amp: namplitude of the fluxpulse
+        qb_name_c: control qubit name
+        qb_name_t: target qubit name
+        CZ_pulse_name: name of CZ pulse in the pulse dict
+        operation_dict: contains operation dicts of both qubits
+
+    '''
+
+    seq_name = 'Chevron_frequency_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    RO_pulse = operation_dict['RO ' + qbr_name]
+    CZ_pulse = operation_dict[CZ_pulse_name]
+
+    CZ_pulse['amplitude'] = flux_pulse_amp
+    CZ_pulse['pulse_length'] = length
+
+    if upload_all:
+        upload_AWGs = 'all'
+        upload_channels = 'all'
+    else:
+        upload_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG')]
+        upload_channels = [CZ_pulse['channel']]
+
+    for i, frequency in enumerate(frequencies):
+        CZ_pulse['frequency'] = frequency
+
+        if cal_points and (i == (len(frequencies)-4) or i == (len(frequencies)-3)):
+            el = multi_pulse_elt(i, station, [RO_pulse])
+        elif cal_points and (i == (len(frequencies)-2) or i == (len(frequencies)-1)):
+            CZ_pulse['amplitude'] = 0
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X180 ' + qbc_name],
+                                  operation_dict['X180s ' + qbt_name],
+                                  CZ_pulse,
+                                  RO_pulse])
+        else:
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X180 ' + qbc_name],
+                                  operation_dict['X180s ' + qbt_name],
+                                  CZ_pulse,
+                                  RO_pulse])
+
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list,
+                                    AWGs=upload_AWGs,
+                                    channels=upload_channels,
+                                    verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
 
 def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
                                 qb_target, spacing=50e-9,
@@ -2139,6 +2216,9 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
 
     flux_amplitude = flux_params[1]
     flux_length = flux_params[0]
+    frequency = 0
+    if len(flux_params) > 2:
+        frequency = flux_params[2]
 
     RO_pulse = operation_dict['RO ' + qbr_name]
     RO_pulse['pulse_delay'] = max_flux_length
@@ -2158,6 +2238,8 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     CZ_pulse['amplitude'] = flux_amplitude
     CZ_pulse['pulse_length'] = flux_length
     CZ_pulse['channel'] = CZ_pulse_channel
+    if frequency > 0:
+        CZ_pulse['frequency'] = frequency
 
     pulse_list.append(X180_control)
     pulse_list.append(X90_target)
@@ -2218,6 +2300,81 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
         return seq_name
 
 
+def CZ_bleed_through_phase_seq(phases, qb_name, CZ_pulse_name, CZ_separation,
+                               operation_dict, maximum_CZ_separation=None,
+                               verbose=False, upload=True, return_seq=False,
+                               upload_channels='all', cal_points=True):
+    '''
+    Performs a Ramsey with interleaved Flux pulse
+
+    Timings of sequence
+                         CZ_separation             sweep end time
+            |fluxpulse| <-------------> |fluxpulse|<-------->
+        |X90|  --------------------------------------------- |X90|  ---  |RO|
+
+    Args:
+        end_times: numpy array of delays after second CZ pulse
+        qb: qubit object (must have the methods get_operation_dict(),
+            get_drive_pars() etc.
+        CZ_pulse_name: str of the form
+            'CZ ' + qb_target.name + ' ' + qb_control.name
+        X90_separation: float (separation of the two pi/2 pulses for Ramsey
+        verbose: bool
+        upload: bool
+        return_seq: bool
+
+    Returns:
+        if return_seq:
+          seq: qcodes sequence
+          el_list: list of pulse elements
+        else:
+            seq_name: string
+    '''
+    if maximum_CZ_separation is None:
+        maximum_CZ_separation = CZ_separation
+
+    seq_name = 'CZ Bleed Through phase sweep'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    CZ_pulse = deepcopy(operation_dict[CZ_pulse_name])
+    CZ_pulse['pulse_delay'] = CZ_separation
+
+    X90_2 = deepcopy(operation_dict['X90 ' + qb_name])
+    X90_2['pulse_delay'] = maximum_CZ_separation - CZ_separation
+    RO_pars = deepcopy(operation_dict['RO ' + qb_name])
+
+
+    for i, theta in enumerate(phases):
+        if theta == phases[-4]:
+            CZ_pulse['amplitude'] = 0
+
+        if cal_points and (theta == phases[-4] or theta == phases[-3]):
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['I ' + qb_name],
+                                  RO_pars])
+        elif cal_points and (theta == phases[-2] or theta == phases[-1]):
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X180 ' + qb_name],
+                                  RO_pars])
+        else:
+            X90_2['phase'] = theta*180/np.pi
+
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X90 ' + qb_name],
+                                  operation_dict[CZ_pulse_name],
+                                  CZ_pulse,
+                                  X90_2,
+                                  RO_pars])
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose,
+                                    channels=upload_channels)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
 
 
 

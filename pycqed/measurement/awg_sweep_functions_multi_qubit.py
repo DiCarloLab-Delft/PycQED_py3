@@ -352,7 +352,7 @@ class two_qubit_randomized_benchmarking_one_length(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.two_qubit_randomized_benchmarking(
+            sqs2.two_qubit_randomized_benchmarking_seq(
                 qb1n=self.qb1n, qb2n=self.qb2n,
                 operation_dict=self.operation_dict,
                 nr_cliffords_value=self.nr_cliffords_value,
@@ -512,13 +512,15 @@ class parity_correction(swf.Hard_Sweep):
 
 
 class calibrate_n_qubits(swf.Hard_Sweep):
-    def __init__(self, sweep_params, qubit_names, operation_dict,
+    def __init__(self, sweep_params, sweep_points,
+                 qubit_names, operation_dict,
                  cal_points=True, no_cal_points=4,
                  parameter_name='sample', unit='#',
                  upload=False, return_seq=False):
 
         super().__init__()
         self.sweep_params = sweep_params
+        self.sweep_points = sweep_points
         self.qubit_names = qubit_names
         self.operation_dict = operation_dict
         self.cal_points = cal_points
@@ -534,7 +536,6 @@ class calibrate_n_qubits(swf.Hard_Sweep):
                                          sweep_points=self.sweep_points,
                                          qb_names=self.qubit_names,
                                          operation_dict=self.operation_dict,
-                                         thresholded=False,
                                          cal_points=self.cal_points,
                                          no_cal_points=self.no_cal_points,
                                          upload=self.upload,

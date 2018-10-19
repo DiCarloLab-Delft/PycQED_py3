@@ -1206,6 +1206,63 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
                                    qb_name=self.name)
 
+    def measure_ramsey_dyn_decoupling(self, times=None, artificial_detuning=0,
+                                      label='', MC=None, analyze=True,
+                                      close_fig=True, cal_points=True,
+                                      upload=True, nr_echo_pulses=4,
+                                      seq_func=None, cpmg_scheme=True):
+
+        if times is None:
+            raise ValueError("Unspecified times for measure_ramsey")
+        if np.any(times > 1e-3):
+            logging.warning('The values in the times array might be too large.'
+                            'The units should be seconds.')
+
+        if artificial_detuning is None:
+            logging.warning('Artificial detuning is 0.')
+        if np.abs(artificial_detuning) < 1e3:
+            logging.warning('The artificial detuning is too small. The units'
+                            'should be Hz.')
+
+        if seq_func is None:
+            seq_func = sq.Ramsey_seq
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        # Define the measurement label
+        if label == '':
+            label = 'Ramsey' + self.msmt_suffix
+
+        if cal_points:
+            step = np.abs(times[-1]-times[-2])
+            sweep_points = np.concatenate(
+                [times, [times[-1]+step,  times[-1]+2*step,
+                         times[-1]+3*step, times[-1]+4*step]])
+        else:
+            sweep_points = times
+
+        Rams_swf = awg_swf.Ramsey_decoupling_swf(
+            seq_func=seq_func,
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+            artificial_detuning=artificial_detuning, cal_points=cal_points,
+            upload=upload, nr_echo_pulses=nr_echo_pulses, cpmg_scheme=cpmg_scheme)
+        MC.set_sweep_function(Rams_swf)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run(label)
+
+        if analyze:
+            RamseyA = ma.Ramsey_Analysis(
+                auto=True,
+                label=label,
+                qb_name=self.name,
+                NoCalPoints=4,
+                artificial_detuning=artificial_detuning,
+                close_fig=close_fig)
+
+
     def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
                        n=1, upload=True, last_ge_pulse=True, no_cal_points=6):
@@ -2001,7 +2058,7 @@ class QuDev_transmon(Qubit):
 
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
                            no_fits=False, upload=True, preselection_pulse=True,
-                           thresholded=False, RO_comm=3/225e6):
+                           thresholded=False, RO_comm=3/225e6, RO_slack=150e-9):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -2048,7 +2105,7 @@ class QuDev_transmon(Qubit):
 
         RO_spacing = self.UHFQC.quex_wint_delay()*2/1.8e9
         RO_spacing += self.RO_acq_integration_length()
-        RO_spacing += 50e-9  # for slack
+        RO_spacing += RO_slack # for slack
         RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
 
         MC.set_sweep_function(awg_swf2.n_qubit_off_on(
@@ -2649,9 +2706,14 @@ class QuDev_transmon(Qubit):
 
         if label is None:
             if for_ef:
-                label = 'Rabi_2nd' + self.msmt_suffix
+                label = 'Rabi_2nd'
             else:
-                label = 'Rabi' + self.msmt_suffix
+                label = 'Rabi'
+
+            if n != 1:
+                label += '-n{}'.format(n)
+
+            label += self.msmt_suffix
 
         #Perform Rabi
         if for_ef is False:
@@ -3995,16 +4057,17 @@ def add_CZ_pulse(qbc, qbt):
                                 initial_value=qbt.name,
                                 vals=vals.Enum(qbt.name))
         qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
-                                initial_value='BufferedSquarePulse',
-                                vals=vals.Enum('BufferedSquarePulse'))
+                                initial_value='BufferedCZPulse',
+                                vals=vals.Enum('BufferedSquarePulse',
+                                               'BufferedCZPulse'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
         qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
                                 initial_value=0, vals=vals.Numbers())
-        # qbc.add_pulse_parameter(op_name, ps_name + '_freq', 'frequency',
-        #                         initial_value=0, vals=vals.Numbers())
-        # qbc.add_pulse_parameter(op_name, ps_name + '_phase', 'phase',
-        #                         initial_value=0, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_freq', 'frequency',
+                                initial_value=0, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_phase', 'phase',
+                                initial_value=0, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_length', 'pulse_length',
                                 initial_value=0, vals=vals.Numbers(0))
         qbc.add_pulse_parameter(op_name, ps_name + '_buf_start',
@@ -4018,6 +4081,9 @@ def add_CZ_pulse(qbc, qbt):
         qbc.add_pulse_parameter(op_name, ps_name + '_dynamic_phases',
                                 'basis_rotation', initial_value={},
                                 vals=vals.Dict())
+        qbc.add_pulse_parameter(op_name, ps_name + '_gaussian_filter_sigma',
+                                'gaussian_filter_sigma', initial_value=0,
+                                vals=vals.Numbers(0))
 
 
 
