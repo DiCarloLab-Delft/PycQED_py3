@@ -55,7 +55,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numDacBits = 12
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
-        self.device_descriptor.numTriggers = 8
+        self.device_descriptor.numTriggers = 14
         # Commented out until bug fixed
         self.device_descriptor.numCodewords = 16384 # TODO [versloot] get from device,
                                                     # is based on IORear_markerTrigger or IORead_DIO
@@ -65,9 +65,11 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 5.0)
 
         self.codeword_protocols = {
-            # Name          Ch1,    Ch2,    Ch3,    Ch4
-            'Flux' :        [0x03,  0x0C,   0x30,   0xC0],
-            'Microwave' :   [0x3F,  0x3F,   0x3F,   0x3F]
+            # Name              Ch1,    Ch2,    Ch3,    Ch4
+            'Flux' :            [0x03,  0x0C,   0x30,   0xC0],
+            'Microwave' :       [0x3F,  0x3F,   0x3F,   0x3F],
+            'Flux_DIO' :        [0x03,  0x0C,   0x30,   0xC0],
+            'Microwave_DIO' :   [0xFF,  0xFF,   0xFF,   0xFF]
         }
 
         # FIXME: not in [V]
