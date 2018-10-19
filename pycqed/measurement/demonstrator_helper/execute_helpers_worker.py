@@ -22,7 +22,7 @@ try:
     st.add_component(MC_demo)
 
 except KeyError:
-    MC_demo = Instrument.find_instrument('QInfinity_MC')
+    MC_demo = qc.Instrument.find_instrument('QInfinity_MC')
 
 
 
