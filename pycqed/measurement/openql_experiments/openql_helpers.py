@@ -13,6 +13,7 @@ from openql.openql import Program, Kernel, Platform
 
 output_dir = join(dirname(__file__), 'output')
 ql.set_option('output_dir', output_dir)
+ql.set_option('scheduler', 'ALAP')
 
 
 def create_program(pname: str, platf_cfg: str, nregisters: int=0):
