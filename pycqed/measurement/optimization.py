@@ -242,6 +242,24 @@ def SPSA(fun, x0,
     fun(res[0][0])
     return res[0]
 
+def generate_new_training_set(new_train_values, new_target_values,
+                              training_grid=None, target_values=None):
+    if training_grid is None:
+        training_grid =new_train_values
+        target_values = new_target_values
+
+    else:
+        if np.shape(new_train_values)[1] != np.shape(training_grid)[1] or \
+           np.shape(new_target_values)[1] != np.shape(target_values)[1]:
+            print('Shape missmatch between new training values and existing ones!'
+                  ' Returning None.')
+            return None,None
+
+        training_grid = np.append(training_grid,new_train_values,axis=0)
+        target_values = np.append(target_values,new_target_values,axis=0)
+
+    return training_grid,target_values
+
 def center_and_scale(X_in,y_in):
     '''
     Preprocessing of Data. Mainly transform the data to mean 0 and interval [-1,1]

@@ -70,7 +70,7 @@ class MeasurementAnalysis(object):
             self.folder = a_tools.get_folder(**kw)
         else:
             self.folder = folder
-        self.load_hdf5data(**kw)
+        self.load_hdf5data()
         self.fit_results = []
         self.cmap_chosen = cmap_chosen
         self.no_of_columns = no_of_columns
@@ -119,10 +119,8 @@ class MeasurementAnalysis(object):
     def load_hdf5data(self, folder=None, file_only=False, **kw):
         if folder is None:
             folder = self.folder
-
         self.h5filepath = a_tools.measurement_filename(folder)
         h5mode = kw.pop('h5mode', 'r+')
-
         self.data_file = h5py.File(self.h5filepath, h5mode)
         if not file_only:
             for k in list(self.data_file.keys()):
@@ -1038,6 +1036,7 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
         right_sb_amp = self.meas_vals2[ind_right_sb]
         self.supp_values = [left_sb_supp,lo_supp,right_sb_supp]
         self.opt_amp_vals = [left_sb_amp,lo_amp,right_sb_amp]
+
 class OptimizationAnalysis_v2(MeasurementAnalysis):
 
     def run_default_analysis(self, close_file=True, **kw):
@@ -1092,7 +1091,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
 
         self.train_NN(**kw)
 
-        if self.round > int(self.two_rounds) or self.round==0:     #only create figures in the last iteration
+        if self.round > int(self.two_rounds) or self.round == 0:     #only create figures in the last iteration
             if self.make_fig:
                 self.make_figures(**kw)
         if close_file:
@@ -1138,10 +1137,10 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             #create contour plot
         fig1 = plt.figure(figsize=(10,8))
         #Create data grid for contour plot
-        lower_x = np.min(self.sweep_points[0])-np.std(self.sweep_points[0])
-        upper_x = np.max(self.sweep_points[0])+np.std(self.sweep_points[0])
-        lower_y = np.min(self.sweep_points[1])-np.std(self.sweep_points[1])
-        upper_y = np.max(self.sweep_points[1])+np.std(self.sweep_points[1])
+        lower_x = np.min(self.sweep_points[0])-0.2*np.std(self.sweep_points[0])
+        upper_x = np.max(self.sweep_points[0])+0.2*np.std(self.sweep_points[0])
+        lower_y = np.min(self.sweep_points[1])-0.2*np.std(self.sweep_points[1])
+        upper_y = np.max(self.sweep_points[1])+0.2*np.std(self.sweep_points[1])
         x_mesh = (np.linspace(lower_x,upper_x,200)-input_means[0])/input_scale[0]
         y_mesh = (np.linspace(lower_y,upper_y,200)-input_means[1])/input_scale[1]
         Xm,Ym = np.meshgrid(x_mesh,y_mesh)
@@ -10522,7 +10521,8 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
 
         only_cos_fits = kw.pop('only_cos_fits', False)
         fit_statistics = kw.pop('fit_statistics',False)
-
+        fontsize = 14.
+        legend_fontsize=12.
         if cal_points is None:
             cal_points = self.cal_points
 
@@ -10534,10 +10534,10 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
         length_single = len(self.sweep_points)
         if fit_statistics:
             amps_all = np.zeros((len(self.sweep_points_2D[0]),length_single))
-            thetas_all = self.data[0,:length_single]
+            thetas_fit = self.data[0,:length_single]
         if plot:
             if only_cos_fits:
-                self.fig, self.ax = plt.subplots()
+                self.fig, self.ax = plt.subplots(figsize=(10,7))
                 ax = self.ax
             else:
                 self.fig, self.ax = plt.subplots(2, 1)
@@ -10584,14 +10584,14 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                     linewidth_inter = 2.
                     linewidth_meas = 1.
                     marker_size_meas = 2.
-                    marker_style_meas = 'x'
+                    marker_style_meas = 'D'
                     ax.plot(thetas, ampls,color=linecolor_meas,
                             linestyle=linestyle_meas,linewidth=linewidth_meas,
                             markersize=marker_size_meas,marker=marker_style_meas,
                             alpha=0.7)
-                    thetas_fit = np.linspace(thetas[0],thetas[-1], 128)
-                    ampls_fit = fit_res.eval(t=thetas_fit)
-                    ax.plot(thetas_fit, ampls_fit,color=linecolor_inter,
+                    thetas_plot = np.linspace(thetas[0],thetas[-1], 128)
+                    ampls_plot= fit_res.eval(t=thetas_plot)
+                    ax.plot(thetas_plot, ampls_plot,color=linecolor_inter,
                             linestyle=linestyle_inter,linewidth=linewidth_inter)
                 else:
                     amps_all[mod, :] = ampls
@@ -10599,115 +10599,93 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
         phase_list.pop(0)
         phase_list = np.array(phase_list)
         amplitude_list = np.array(amplitude_list)
-        cphase = phase_list[1]-phase_list[0]
+        #cphase = phase_list[1]-phase_list[0]
+
+        def fit_cos_and_extract_params(thetas_fit, amps_fit, thetas_eval):
+            fit = self.fit_single_cos(thetas_fit,amps_fit,
+                                      print_fit_results = False,
+                                      phase_guess = phase_guess,
+                                      cal_points = cal_points)
+            amps_eval = fit.eval(t=thetas_eval)
+            phase_fit = fit.best_values['phase']
+            amp_fit = fit.best_values['amplitude']
+
+            return amps_eval,[phase_fit,amp_fit]
 
         if plot and fit_statistics:
 
             amps_avg_ex = np.mean(amps_all[::2,:],axis=0)
             amps_avg_gr = np.mean(amps_all[1::2,:],axis=0)
-            fitted_phases_ex = phase_list[::2]
-            avg_phases_ex = np.mean(fitted_phases_ex)
-            std_phases_ex = np.std(fitted_phases_ex)
-            fitted_phases_gr = phase_list[1::2]
-            std_cphases = np.std(fitted_phases_ex-fitted_phases_gr)
-            avg_phases_gr = np.mean(fitted_phases_gr)
-            std_phases_gr = np.std(fitted_phases_gr)
-            fitted_amps_ex = amplitude_list[::2]
-            avg_amps_ex = np.mean(fitted_amps_ex)
-            std_amps_ex = np.std(fitted_amps_ex)
-            fitted_amps_gr = amplitude_list[1::2]
-            avg_amps_gr = np.mean(fitted_amps_gr)
-            std_amps_gr = np.std(fitted_amps_gr)
-            std_rel_amps = np.std(fitted_amps_ex-fitted_amps_gr)
-            fitted_offsets_ex = offset_list[::2]
-            avg_offsets_ex = np.mean(fitted_offsets_ex)
-            std_offsets_ex = np.std(fitted_offsets_ex)
-            fitted_offsets_gr = offset_list[1::2]
-            avg_offsets_gr = np.mean(fitted_offsets_gr)
-            std_offsets_gr = np.std(fitted_offsets_gr)
-            fitted_freqs_ex = frequency_list[::2]
-            avg_freqs_ex = np.mean(fitted_freqs_ex)
-            std_freqs_ex = np.std(fitted_freqs_ex)
-            fitted_freqs_gr = frequency_list[1::2]
-            avg_freqs_gr = np.mean(fitted_freqs_gr)
-            std_freqs_gr = np.std(fitted_freqs_gr)
+            std_amps_ex = np.std(amps_all[::2,:],axis=0)
+            std_amps_gr = np.std(amps_all[1::2,:],axis=0)
+            thetas_plot = np.linspace(thetas[0],thetas[-1], 128)
 
-            f_fit = avg_freqs_ex
-            avg_fit_ex = lambda t: avg_amps_ex * np.cos(
-                                    2 * np.pi * f_fit * t + avg_phases_ex)\
-                                    + avg_offsets_ex
-            f_fit = avg_freqs_gr
-            avg_fit_gr = lambda t: avg_amps_gr * np.cos(
-                                    2 * np.pi * f_fit * t + avg_phases_gr) \
-                                    + avg_offsets_gr
-            f_fit = avg_freqs_ex + std_freqs_ex
-            high_fit_ex = lambda t: (avg_amps_ex+std_amps_ex)*np.cos(
-                                    2 * np.pi * f_fit * t
-                                    + avg_phases_ex + std_phases_ex) \
-                                    + avg_offsets_ex+std_offsets_ex
-            f_fit = avg_freqs_ex - std_freqs_ex
-            low_fit_ex = lambda t: (avg_amps_ex-std_amps_ex) * np.cos(
-                                    2 * np.pi * f_fit * t
-                                    + avg_phases_ex - std_phases_ex) \
-                                    + avg_offsets_ex - std_offsets_ex
-            f_fit = avg_freqs_gr + std_freqs_gr
-            high_fit_gr = lambda t: (avg_amps_gr + std_amps_gr) * np.cos(
-                                    2 * np.pi * f_fit * t
-                                   + avg_phases_gr + std_phases_gr)\
-                                   + avg_offsets_gr + std_offsets_gr
-            f_fit = avg_freqs_gr - std_freqs_gr
-            low_fit_gr = lambda t: (avg_amps_gr-std_amps_gr) * np.cos(
-                                    2 * np.pi * f_fit * t
-                                   + avg_phases_gr - std_phases_gr) \
-                                   + avg_offsets_gr - std_offsets_gr
+            ft_dic ={'excited':[amps_avg_ex +c*std_amps_ex for c in range(-1,2)],
+                     'ground' :[amps_avg_gr +c*std_amps_gr for c in range(-1,2)]}
+            plt_dic ={'excited': {'amplitudes':[],'fit_params':[]},
+                      'ground':  {'amplitudes':[],'fit_params':[]}}
 
-            func_list = [avg_fit_ex,low_fit_ex,high_fit_ex,avg_fit_gr,low_fit_gr
-                         ,high_fit_gr]
-            thetas_plot = np.linspace(thetas_all[0],thetas_all[-1], 128)
-            ax.plot(thetas_all,amps_avg_ex,linestyle='',
-                    marker='d', color='black',
-                    markersize=3., label='Avg Data')
-            ax.plot(thetas_all, amps_avg_gr,linestyle='',
-                    marker='d', color='black',
-                    markersize=3.)
-            for i,func in enumerate(func_list):
-                amps_plot = func(thetas_plot)
-                linecolor= 'orange'
-                label=None
-                if (i == 1 or i == 4):
-                    label_0 = r"$1\sigma$ param "
-                    label= label_0 + '|e>' if i == 1 else label_0 + '|g>'
-                if(i == 0 or i == 3 ):
-                    label_1='Avg Param '
-                    label= label_1 + '|e>' if i == 0 else label_1 + '|g>'
-                if i>=(len(func_list)/2):
-                    linecolor = 'darkblue'
-                linestyle = '--'
-                linewidth = 1.5
-                if (i == 0 or i==3 ):
-                    linestyle = '-'
-                    linewidth = 2.5
-                ax.plot(thetas_plot,amps_plot,linestyle=linestyle,color=linecolor,
-                        linewidth=linewidth,label=label)
-            cphase = avg_phases_ex-avg_phases_gr
-            ax.legend(loc='best')
+            for key in ft_dic.keys():
+                for it, fit_amps in enumerate(ft_dic[key]):
+                    amps_fit = ft_dic[key][it]
+                    amps_eval,fit_params = fit_cos_and_extract_params(thetas_fit,
+                                                                      amps_fit,
+                                                                      thetas_plot)
+                    plt_dic[key]['amplitudes'].append(amps_eval)
+                    plt_dic[key]['fit_params'].append(fit_params)
+            cphases = []
+            pop_losses =[]
+            for it in range(len(plt_dic['excited']['fit_params'])):
+                cphases.append(plt_dic['excited']['fit_params'][it][0]
+                             - plt_dic['ground']['fit_params'][it][0])
+                amps_ex = plt_dic['excited']['fit_params'][it][1]
+                amps_gr = plt_dic['ground']['fit_params'][it][1]
+                pop_loss  = np.abs(amps_ex-amps_gr)/amps_gr
+                pop_losses.append(pop_loss)
+
+            std_cphases = 0.5*np.abs(cphases[0] - cphases[2])
+            avg_cphases = np.abs(cphases[1])
+            # avg_pop_loss = pop_losses[1]
+            # std_pop_loss = 0.5*(pop_losses[0]-pop_losses[2])
+
+            # PLOTTING
+            ax.errorbar(thetas_fit,amps_avg_ex,yerr=std_amps_ex,linestyle='',
+                    marker='D', color='black',
+                    markersize=4., label='Avg Data')
+            ax.errorbar(thetas_fit, amps_avg_gr,yerr=std_amps_gr,linestyle='',
+                    marker='D', color='black',
+                    markersize=4.)
+            for key in plt_dic.keys():
+                linecolor = 'orange' if key == 'excited' else 'darkblue'
+                state_label = ' |e>' if key == 'excited' else ' |g>'
+                for it, plot_amps in enumerate(plt_dic[key]['amplitudes']):
+                    linestyle = '-' if it == 1 else '--'
+                    linewidth = 2.5 if it == 1 else 1.5
+                    label = 'Avg. Parameter' + state_label if it == 1 \
+                            else r"$1\sigma$ Data fit" + state_label
+                    label = None if it == 2 else label
+                    ax.plot(thetas_plot, plt_dic[key]['amplitudes'][it],
+                            linestyle=linestyle,color=linecolor,
+                            linewidth=linewidth, label=label)
+            ax.legend(loc='best',fontsize=legend_fontsize)
 
         if extrapolate_phase:
             phase_list = self.unwrap_phases_extrapolation(phase_list)
 
         if plot:
             if len(self.sweep_points_2D[0]) == 2 or fit_statistics:
-                std_cphases = 0
                 ax.set_title(r"Cphase $= {:0.2f}\pm {:0.2f}$ deg, "
-                             '\n{:0.4f} ns{:0.4f} V \n {}'.format(
-                    cphase*180/np.pi, std_cphases*180/np.pi,
+                             '\n@ {:0.4f}ns ; {:0.4f}V \n date_time: {}'.format(
+                    avg_cphases*180/np.pi, std_cphases*180/np.pi,
                     self.sweep_points_2D[0][0]*1e9,
                     self.sweep_points_2D[1][0],
-                    self.timestamp_string))
+                    self.timestamp_string),fontsize=fontsize)
             else:
-                ax.set_title('Cosine fits \n' + self.timestamp_string)
-            ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
-            ax.set_ylabel('Response (arb. units)')
+                ax.set_title('Single Cosine fits \n' + self.timestamp_string,
+                              fontsize=fontsize)
+            ax.set_xlabel(r"Phase of $2^{nd}\, \pi/2$ pulse, $\theta$ [rad]",
+                          fontsize=fontsize)
+            ax.set_ylabel('Response (arb. units)',fontsize=fontsize)
 
             if not fit_statistics:
                 ax.legend(['data', 'fits |e>', 'fits |g>'])
@@ -10732,6 +10710,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
             if save_plot:
                 self.fig.savefig(self.folder +
                             '\\Phase_fits_{}.png'.format(self.timestamp_string))
+                                 #,dpi=600.)
             plt.show()
 
         self.fitted_phases = phase_list
@@ -10813,10 +10792,14 @@ class OptimizationAnalysis_Predictive2D:
         #Create data grid for contour plot in case of more than 3 sweep variables,
         #contour plots are only created for the first two variables, one plot for
         #each output variable.
-        lower_x = np.min(self.training_grid[:,0])-np.std(self.training_grid[:,0])
-        upper_x = np.max(self.training_grid[:,0])+np.std(self.training_grid[:,0])
-        lower_y = np.min(self.training_grid[:,1])-np.std(self.training_grid[:,1])
-        upper_y = np.max(self.training_grid[:,1])+np.std(self.training_grid[:,1])
+        lower_x = np.min(self.training_grid[:,0])-\
+                         0.2*np.std(self.training_grid[:,0])
+        upper_x = np.max(self.training_grid[:,0])+\
+                         0.2*np.std(self.training_grid[:,0])
+        lower_y = np.min(self.training_grid[:,1])-\
+                         0.2*np.std(self.training_grid[:,1])
+        upper_y = np.max(self.training_grid[:,1])+\
+                         0.2*np.std(self.training_grid[:,1])
         x_mesh = (np.linspace(lower_x,upper_x,200)-input_means[0])/input_scale[0]
         y_mesh = (np.linspace(lower_y,upper_y,200)-input_means[1])/input_scale[1]
         Xm,Ym = np.meshgrid(x_mesh,y_mesh)
