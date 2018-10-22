@@ -2152,6 +2152,7 @@ class QuDev_transmon(Qubit):
                 sample_0 = 0
                 sample_1 = 1
             ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name,
                                    rotate=rotate, no_fits=no_fits,
                                    channels=channels, nr_samples=nr_samples,
                                    sample_0=sample_0, sample_1=sample_1,

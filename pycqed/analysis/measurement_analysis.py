@@ -22,13 +22,13 @@ import importlib
 import math
 from time import time
 
-try:
-    import pygsti
-except ImportError as e:
-    if str(e).find('pygsti') >= 0:
-        logging.warning('Could not import pygsti')
-    else:
-        raise
+# try:
+#     import pygsti
+# except ImportError as e:
+#     if str(e).find('pygsti') >= 0:
+#         logging.warning('Could not import pygsti')
+#     else:
+#         raise
 
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
@@ -677,6 +677,10 @@ class MeasurementAnalysis(object):
 
         save = kw.get('save', False)
         font_size = kw.pop('font_size', None)
+        cal_zero_points = kw.pop('cal_zero_points', None)
+        cal_one_points = kw.pop('cal_one_points', None)
+        add_half_line = kw.pop('add_half_line', False)
+
         if font_size is not None:
             self.font_size = font_size
 
@@ -693,8 +697,42 @@ class MeasurementAnalysis(object):
                      transform=ax.transAxes)
 
         # Plot:
-        line = ax.plot(x, y, marker, markersize=self.marker_size,
-                       linewidth=self.line_width, label=label)
+        if cal_zero_points is None and cal_one_points is None:
+            line = ax.plot(x, y, marker, markersize=self.marker_size,
+                           linewidth=self.line_width, label=label)
+
+        else:
+            NoCalPoints = 0
+            if cal_zero_points is not None:
+                ax.plot(x[cal_zero_points], y[cal_zero_points], '.k')
+                ax.hlines(np.mean(y[cal_zero_points]),
+                          min(x), max(x),
+                          linestyles='--', color='C7')
+                ax.text(np.mean(x[cal_zero_points]),
+                        np.mean(y[cal_zero_points])+0.05, r'$|g\rangle$',
+                        fontsize=font_size, verticalalignment='bottom',
+                        horizontalalignment='center', color='k')
+                NoCalPoints += len(cal_zero_points)
+
+            if cal_one_points is not None:
+                ax.plot(x[cal_one_points], y[cal_one_points], '.k')
+                ax.hlines(np.mean(y[cal_one_points]),
+                          min(x), max(x),
+                          linestyles='--', color='C7')
+                ax.text(np.mean(x[cal_one_points]),
+                        np.mean(y[cal_one_points])-0.05, r'$|e\rangle$',
+                        fontsize=font_size, verticalalignment='top',
+                        horizontalalignment='center', color='k')
+                NoCalPoints += len(cal_one_points)
+
+            line = ax.plot(x[:-NoCalPoints], y[:-NoCalPoints],
+                           marker, markersize=self.marker_size,
+                           linewidth=self.line_width, label=label)
+
+        if add_half_line:
+            ax.hlines(0.5, min(x), max(x),
+                      linestyles='--', color='C7')
+
         if log:
             ax.set_yscale('log')
 
@@ -1490,7 +1528,7 @@ class TD_Analysis(MeasurementAnalysis):
 
         save_fig = kw.pop('save_fig', True)
         close_file = kw.pop('close_file', True)
-
+        add_half_line = kw.pop('add_half_line', False)
         super().run_default_analysis(show=show,
             close_file=False, **kw)
 
@@ -1521,15 +1559,19 @@ class TD_Analysis(MeasurementAnalysis):
             plot_title = kw.pop('plot_title', self.measurementstring
                                 + plot_title_suffix + '\n' +
                                self.timestamp_string)
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.normalized_values,
-                                            fig=self.fig, ax=self.ax,
-                                            xlabel=self.sweep_name,
-                                            x_unit=self.sweep_unit[0],
-                                            ylabel=ylabel,
-                                            marker='o-',
-                                            save=False,
-                                            plot_title=plot_title)
+            self.plot_results_vs_sweepparam(
+                x=self.sweep_points,
+                y=self.normalized_values,
+                cal_zero_points=self.cal_zero_points,
+                cal_one_points=self.cal_one_points,
+                fig=self.fig, ax=self.ax,
+                xlabel=self.sweep_name,
+                x_unit=self.sweep_unit[0],
+                ylabel=ylabel,
+                marker='o-',
+                save=False,
+                plot_title=plot_title,
+                add_half_line=add_half_line)
             if save_fig:
                 if not close_main_fig:
                     # Hacked in here, good idea to only show the main fig but
@@ -1659,17 +1701,8 @@ class TD_Analysis(MeasurementAnalysis):
             normalized_data_points = normalized_values[:-int(calsteps)]
             normalized_cal_vals = normalized_values[-int(calsteps):]
 
-        # Optionally, normalize to range [0,1]:
-        # If we are calibrating only to a pulse with no amplitude
-        # (i.e. do nothing), then manually
-        # normalize the y axis. (Needed for Rabi for example)
-        # if calsteps <= 2:
-        #     max_min_distance = max(normalized_values) - \
-        #                        min(normalized_values)
-        #     normalized_values = (normalized_values -
-        #                          min(normalized_values))/max_min_distance
-        #     normalized_data_points = normalized_values[:-int(calsteps)]
-        #     normalized_cal_vals = normalized_values[-int(calsteps):]
+        self.cal_one_points = cal_one_points
+        self.cal_zero_points = cal_zero_points
 
         return [normalized_values, normalized_data_points, normalized_cal_vals]
 
@@ -3919,8 +3952,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             pdf_max = (max(max(y0), max(y1)))
             (pylab.gca()).set_ylim(pdf_max / 1000, 2 * pdf_max)
 
-            plt.title('Histograms of {} shots, {}'.format(
-                min_len, self.timestamp_string))
+            plt.title('Histograms of {} shots\n{}-{}'.format(
+                min_len, self.timestamp_string, self.qb_name))
             plt.xlabel('DAQ voltage integrated (V)')
             plt.ylabel('Number of counts')
 
@@ -3936,6 +3969,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                       r'$\left| e \right\rangle$ prepared',
                        '$F_a$ = {:.4f}'.format(self.F_a),
                        '$F_d$ = {:.4f}'.format(F_d),
+                       # '$V_{\mathrm{th}}$ = ' + '{:.4f} V'.format(self.V_th_a),
                        'SNR = {:.2f}'.format(SNR),
                        '$p(e|0)$ = {:.4f}'.format(frac1_0),
                        '$p(g|\pi)$ = {:.4f}'.format(1-frac1_1)]
@@ -4526,6 +4560,9 @@ class Ramsey_Analysis(TD_Analysis):
         if (type(self.artificial_detuning) is list) and \
                 (len(self.artificial_detuning) > 1):
             kw['make_fig'] = False
+
+        if 'add_half_line' not in kw:
+            kw['add_half_line'] = True
 
         super(Ramsey_Analysis, self).__init__(**kw)
 

@@ -1367,8 +1367,8 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                     100 * self.proc_data_dict['fidelity']))]
         if d == 4:
             legend_entries += [
-                (empty_artist, r'Concurrence, $C = {:.1f}\%$'.format(
-                    100 * self.proc_data_dict['concurrence']))]
+                (empty_artist, r'Concurrence, $C = {:.2f}$'.format(
+                    self.proc_data_dict['concurrence']))]
         meas_string = self.base_analysis.\
             raw_data_dict['measurementstring']
         if isinstance(meas_string, list):

@@ -824,12 +824,12 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
             self.plot_SRB(
                 plot_errorbars=plot_errorbars,
                 save_fig=save_fig,  **kw)
-        else:
-            if make_fig_cross_talk:
-                self.plot_cross_talk(
-                    plot_errorbars=plot_errorbars,
-                    save_fig=save_fig,
-                    fig_title_suffix=fig_title_suffix, **kw)
+
+        if make_fig_cross_talk:
+            self.plot_cross_talk(
+                plot_errorbars=plot_errorbars,
+                save_fig=save_fig,
+                fig_title_suffix=fig_title_suffix, **kw)
 
         # if close_file:
         #     self.finish(**kw)
@@ -1317,7 +1317,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                         .format(n=len(self.qb_names)) + r'$\rangle$'
 
                 ylabel = self.ylabel_corr
-                plot_T1_lim = False
+                plot_T1_lim_temp = False
                 horizontal_alignment='right'
                 T1 = None
                 T2 = None
@@ -1327,7 +1327,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                     r'$\langle \sigma_{{z,{qb0}}} ' \
                     r'\rangle$'.format(qb0=var_name)
                 ylabel = self.ylabel_RB
-                plot_T1_lim = plot_T1_lim_base
+                plot_T1_lim_temp = plot_T1_lim_base
                 horizontal_alignment='right'
                 T1 = self.T1s[var_name]
                 T2 = self.T2s[var_name]
@@ -1351,7 +1351,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                     line=line,
                     var_name=var_name,
                     T1=T1, T2=T2, pulse_length=pulse_length,
-                    plot_T1_lim=plot_T1_lim,
+                    plot_T1_lim=plot_T1_lim_temp,
                     horizontal_alignment=horizontal_alignment, **kw)
 
             ax.set_title(subplot_title)
@@ -1520,16 +1520,17 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         textstr = ''
         for qb_name in self.qb_names:
             textstr += ('$r_{{{qb}}}$'.format(qb=qb_name) +
-                            ' = {:.3g} $\pm$ ({:.3g})%'.format(
+                            ' = {:.2f} $\pm$ ({:.1f})%'.format(
                         self.infidelities[qb_name]['val']*100,
                         self.infidelities[qb_name]['stderr']*100)
                         + '\n')
 
-        textstr += ('$r_{corr}$' + ' = {:.3g} $\pm$ ({:.3g})%'.format(
+        textstr += ('$r_{corr}$' + ' = {:.2f} $\pm$ ({:.1f})%'.format(
                 self.infidelities['corr']['val']*100,
                 self.infidelities['corr']['stderr']*100))
 
-        ax.text(0.27, 0.975, textstr, transform=ax.transAxes,
+        x_position = 0.2
+        ax.text(x_position, 0.975, textstr, transform=ax.transAxes,
                 verticalalignment='top', horizontalalignment='left',
                 fontsize=font_size)
 
@@ -1537,21 +1538,22 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         textstr = ''
         for qb_name in self.qb_names:
             textstr += (r'$\alpha_{{{qb}}}$'.format(qb=qb_name) +
-                        ' = {:.3g} $\pm$ ({:.3g})%'.format(
+                        ' = {:.1f} $\pm$ ({:.1f})%'.format(
                             self.fit_res_dict[qb_name].best_values['p']*100,
-                            self.fit_res_dict[qb_name].params['p'].stderr*100) + '\n')
+                            self.fit_res_dict[qb_name].params['p'].stderr*100)
+                        + '\n')
 
         textstr += (r'$\alpha_{corr}$' +
-                    ' = {:.3g} $\pm$ ({:.3g})%'.format(
+                    ' = {:.1f} $\pm$ ({:.1f})%'.format(
                         self.fit_res_dict['corr'].best_values['p']*100,
                         self.fit_res_dict['corr'].params['p'].stderr*100))
 
-        textstr += ('\n' + r'$\delta \alpha$' +
-                    ' = {:.3g} $\pm$ ({:.3g})%'.format(
+        textstr += ('\n' + '  ' + r'$\delta \alpha$' +
+                    ' = {:.1f} $\pm$ ({:.1f})%'.format(
                         self.delta_alpha['val']*100,
                         self.delta_alpha['stderr']*100))
 
-        ax.text(0.64, 0.975, textstr, transform=ax.transAxes,
+        ax.text(x_position+0.4, 0.975, textstr, transform=ax.transAxes,
                 verticalalignment='top', horizontalalignment='left',
                 fontsize=font_size)
 
@@ -2051,7 +2053,7 @@ def check_limits_gate_error(rc, p0, p_gate, d=2):
     x2 = 2*(d**2-1)*(1-p0)/(p0*(d**2)) + 4*np.sqrt(1-p0)*np.sqrt(d**2-1)/p0
     E = min(x1,x2)
 
-    return (rc>=(rc-E) and rc<=(rc+E))
+    return (rc>=(rc-E) and rc<=(rc+E)), E
 
 def plotting_function(x, y, fig, ax, marker='-o',
                       ticks_around=True, label=None, **kw):

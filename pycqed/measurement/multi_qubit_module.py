@@ -18,7 +18,6 @@ import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis.tomography as tomo
 from pycqed.measurement.optimization import nelder_mead, \
                                             generate_new_training_set
-import pycqed.instrument_drivers.meta_instrument.device_object as device
 import qcodes as qc
 station = qc.station
 
@@ -933,13 +932,11 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
 def measure_n_qubit_simultaneous_randomized_benchmarking(
         qubits, f_LO,
         nr_cliffords=None, nr_seeds=50,
-        CxC_RB=True, idx_for_RB=0,
         gate_decomp='HZ', interleaved_gate=None,
-        CZ_info_dict=None, interleave_CZ=True,
-        spacing=30e-9, cal_points=False,
-        thresholding=True,  V_th_a=None,
+        cal_points=False,
+        thresholded=True,
         experiment_channels=None,
-        nr_averages=1024, soft_avgs=1,
+        soft_avgs=1,
         MC=None, UHFQC=None, pulsar=None,
         label=None, verbose=False, run=True):
 
@@ -949,48 +946,25 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
     type(nr_seeds) == int
 
     Args:
-        qubit_list (list): list of qubit objects to perfomr RB on
+        qubits (list): list of qubit objects to perfomr RB on
         f_LO (float): readout LO frequency
         nr_cliffords (numpy.ndarray): numpy.arange(max_nr_cliffords), where
             max_nr_cliffords is the number of Cliffords in the longest seqeunce
             in the RB experiment
         nr_seeds (int): the number of times to repeat each Clifford sequence of
             length nr_cliffords[i]
-        CxC_RB (bool): whether to perform CxCxCx..xC RB or
-            (CxIx..xI, IxCx..XI, ..., IxIx..xC) RB
-        idx_for_RB (int): if CxC_RB==False, refers to the index of the
-            pulse_pars in pulse_pars_list which will undergo the RB protocol
-            (i.e. the position of the Z operator when we measure
-            ZIII..I, IZII..I, IIZI..I etc.)
         gate_decomposition (str): 'HZ' or 'XY'
         interleaved_gate (str): used for regular single qubit Clifford IRB
             string referring to one of the gates in the single qubit
             Clifford group
-        CZ_info_dict (dict): dict indicating which qbs in the CZ gates are the
-            control and the target. Can have the following forms:
-            either:    {'qbc': qb_control_name_CZ,
-                        'qbt': qb_target_name_CZ}
-            if only one CZ gate is interleaved;
-            or:       {'CZi': {'qbc': qb_control_name_CZ,
-                               'qbt': qb_target_name_CZ}}
-            if multiple CZ gates are interleaved; CZi = [CZ0, CZ1, ...] where
-            CZi is the c-phase gate between qbc->qbt.
-            (We start counting from zero because we are programmers.)
-        interleave_CZ (bool): Only used if CZ_info_dict != None
-            True -> interleave the CZ gate
-            False -> interleave the ICZ gate
-        spacing (float): length of spacer pulse before and after CZ's
-        thresholding (bool): whether to use the thresholding feature
+        thresholded (bool): whether to use the thresholding feature
             of the UHFQC
-        V_th_a (list or tuple): contains the SSRO assignment thresholds for
-            each qubit in qubits. These values must be correctly scaled!
         experiment_channels (list or tuple): all the qb UHFQC RO channels used
             in the experiment. Not always just the RO channels for the qubits
             passed in to this function. The user might be running an n qubit
             experiment but is now only measuring a subset of them. This function
             should not use the channels for the unused qubits as correlation
             channels because this will change the settings of that channel.
-        nr_averages (float): number of averages to use
         soft_avgs (int): number of soft averages to use
         MC: MeasurementControl object
         UHFQC: UHFQC object
@@ -1018,47 +992,23 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                         'in the qubits RO_acq_weight_function_I parameters.')
     print(experiment_channels)
     if label is None:
-        if CxC_RB:
-            label = 'qubits{}_CxC_RB_{}_{}_seeds_{}_cliffords'.format(
-                ''.join([qb.name[-1] for qb in qubits]),
-                gate_decomp, nr_seeds, nr_cliffords[-1] if
-                hasattr(nr_cliffords, '__iter__') else nr_cliffords)
-        else:
-            label = 'qubits{}_CxI_IxC_{}_RB_{}_{}_seeds_{}_cliffords'.format(
-                ''.join([qb.name[-1] for qb in qubits]),
-                idx_for_RB, gate_decomp,
-                nr_seeds, nr_cliffords[-1] if
-                hasattr(nr_cliffords, '__iter__') else nr_cliffords)
-
-    if CZ_info_dict is not None:
-        if interleave_CZ:
-            label += '_CZ'
-        else:
-            label += '_noCZ'
+        label = 'SRB_{}_{}_seeds_{}_cliffords_qubits{}'.format(
+            gate_decomp, nr_seeds, nr_cliffords[-1] if
+            hasattr(nr_cliffords, '__iter__') else nr_cliffords,
+            ''.join([qb.name[-1] for qb in qubits]))
 
     key = 'int'
-    if thresholding:
+    if thresholded:
         key = 'dig'
-        print(V_th_a)
-        if V_th_a is None:
-            logging.warning('Threshold values were not specified. Make sure '
-                            'you have set them!.')
-        else:
-            th_vals = {}
-            for qb in qubits:
-                UHFQC.set('quex_thres_{}_level'.format(
-                    qb.RO_acq_weight_function_I()), V_th_a[qb.name])
-                th_vals[qb.name] = UHFQC.get('quex_thres_{}_level'.format(
-                    qb.RO_acq_weight_function_I()))
-            print(th_vals)
-            label += '_thresh'
+        logging.warning('Make sure you have set them!.')
+        label += '_thresh'
 
+    nr_averages = max(qb.RO_acq_averages() for qb in qubits)
+    operation_dict = get_operation_dict(qubits)
+    qubit_names_list = [qb.name for qb in qubits]
     for qb in qubits:
-        qb.RO_acq_averages(nr_averages)
         qb.prepare_for_timedomain(multiplexed=True)
-
     multiplexed_pulse(qubits, f_LO, upload=True)
-    RO_pars = get_multiplexed_readout_pulse_dictionary(qubits)
 
     if len(qubits) == 2:
         if not hasattr(nr_cliffords, '__iter__'):
@@ -1067,24 +1017,21 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
         correlations = [(qubits[0].RO_acq_weight_function_I(),
                          qubits[1].RO_acq_weight_function_I())]
-
         det_func = get_multiplexed_readout_detector_functions(
             qubits, nr_averages=nr_averages, UHFQC=UHFQC,
             pulsar=pulsar, used_channels=experiment_channels,
             correlations=correlations)[key+'_corr_det']
-
         hard_sweep_points = np.arange(nr_seeds)
         hard_sweep_func = \
             awg_swf2.n_qubit_Simultaneous_RB_fixed_length(
+                qubit_names_list=qubit_names_list,
+                operation_dict=operation_dict,
+                nr_cliffords_value=nr_cliffords[0],
                 nr_seeds_array=np.arange(nr_seeds),
-                qubit_list=qubits, RO_pars=RO_pars,
-                nr_cliffords_value=nr_cliffords[0], CxC_RB=CxC_RB,
-                idx_for_RB=idx_for_RB, upload=False,
-                gate_decomposition=gate_decomp,  CZ_info_dict=CZ_info_dict,
+                upload=False,
+                gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate,
-                verbose=verbose, interleave_CZ=interleave_CZ,
-                spacing=spacing, cal_points=cal_points)
-
+                verbose=verbose, cal_points=cal_points)
         soft_sweep_points = nr_cliffords
         soft_sweep_func = \
             awg_swf2.n_qubit_Simultaneous_RB_sequence_lengths(
@@ -1097,30 +1044,22 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
         k = 4095//nr_seeds
         nr_shots = 4095 - 4095 % nr_seeds
-        # k = 3200//nr_seeds
-        # nr_shots = 3200 - 3200 % nr_seeds
-
         det_func = get_multiplexed_readout_detector_functions(
             qubits, UHFQC=UHFQC, pulsar=pulsar,
             nr_shots=nr_shots)[key+'_log_det']
 
-        #
         hard_sweep_points = np.tile(np.arange(nr_seeds), k)
-
-        # hard_sweep_points = np.arange(nr_seeds)
         hard_sweep_func = \
             awg_swf2.n_qubit_Simultaneous_RB_fixed_length(
+                qubit_names_list=qubit_names_list,
+                operation_dict=operation_dict,
+                nr_cliffords_value=nr_cliffords,
                 nr_seeds_array=np.arange(nr_seeds),
-                qubit_list=qubits, RO_pars=RO_pars,
-                nr_cliffords_value=nr_cliffords, CxC_RB=CxC_RB,
-                idx_for_RB=idx_for_RB, upload=True,
+                upload=True,
                 gate_decomposition=gate_decomp,
-                interleaved_gate=interleaved_gate, interleave_CZ=interleave_CZ,
-                verbose=verbose, CZ_info_dict=CZ_info_dict,
-                cal_points=cal_points)
-
+                interleaved_gate=interleaved_gate,
+                verbose=verbose, cal_points=cal_points)
         soft_sweep_points = np.arange(nr_averages//k)
-        # soft_sweep_points = np.arange(nr_averages)
         soft_sweep_func = swf.None_Sweep()
 
     if cal_points:
@@ -1144,18 +1083,6 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
     if len(qubits) == 2:
         ma.MeasurementAnalysis(label=label, TwoD=True, close_file=True)
-
-    # # reset all correlation channels in the UHFQC
-    # for ch in range(5):
-    #     UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
-    #     UHFQC.set('quex_corr_{}_source'.format(ch), 0)
-    #
-    # for qb in qubits:
-    #     if thresholding and V_th_a is not None:
-    #         # set back the original threshold values
-    #         UHFQC.set('quex_thres_{}_level'.format(
-    #             qb.RO_acq_weight_function_I()), th_vals[qb.name])
-
 
     return MC
 
@@ -1886,7 +1813,6 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                           'repeat': 1}),
             )
 
-     #   sf = calibrate_n_qubits(sweep_params=sweep_params,
         sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points,
                                 qubit_names=qubit_names,
@@ -2281,7 +2207,8 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
     ma.MeasurementAnalysis(TwoD=True)
 
 def measure_cphases_predictive(qbc, qbt, qbr, lengths, amps,
-                       phases=None, MC=None, cal_points=False, plot=False,
+                       phases=None, MC=None,
+                       cal_points=False, plot=False,
                        save_plot=True,
                        prepare_for_timedomain=True,
                        output_measured_values=False,
