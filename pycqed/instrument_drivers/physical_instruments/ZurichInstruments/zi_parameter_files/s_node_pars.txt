@@ -579,13 +579,13 @@
     "quex/rl/length",
     "int",
     0,
-    4095.0
+    1048576
   ],
   [
     "quex/rl/readout",
-    "int_8bit",
+    "int",
     0,
-    255
+    1023
   ],
   [
     "quex/rl/source",

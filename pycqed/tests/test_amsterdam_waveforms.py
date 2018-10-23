@@ -1,10 +1,8 @@
 import numpy as np
-import unittest
-import warnings
 from pycqed.measurement.waveform_control_CC import amsterdam_waveforms as awf
 
 
-class Test_Amsterdam_Waveforms(unittest.TestCase):
+class TestAmsterdamWaveforms:
 
     def test_amsterdam_waveform(self):
         unitlength = 10

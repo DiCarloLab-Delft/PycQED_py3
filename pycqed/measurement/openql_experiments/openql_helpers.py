@@ -1,15 +1,180 @@
-"""
-
-"""
 import re
 import numpy as np
-import json
-from shutil import copyfile
+from os.path import join, dirname
+from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
 from pycqed.utilities.general import is_more_rencent
+import openql.openql as ql
+from openql.openql import Program, Kernel, Platform
+
+
+output_dir = join(dirname(__file__), 'output')
+ql.set_option('output_dir', output_dir)
+
+
+def create_program(pname: str, platf_cfg: str, nregisters: int=0):
+    """
+    Wrapper around the constructor of openQL "Program" class.
+
+    Args:
+        pname       (str) : Name of the program
+        platf_cfg   (str) : location of the platform configuration used to
+            construct the OpenQL Platform used.
+        nregisters  (int) : the number of classical registers required in
+            the program.
+
+    In addition to instantiating the Program, this function
+        - creates a Platform based on the "platf_cfg" filename.
+        - Adds the platform as an attribute  "p.platf"
+        - Adds the output_dir as an attribute "p.output_dir"
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    nqubits = platf.get_qubit_number()
+    p = Program(pname,
+                platf,
+                nqubits,
+                nregisters)
+
+    p.platf = platf
+    p.output_dir = ql.get_option('output_dir')
+    p.nqubits = platf.get_qubit_number()
+    p.nregisters = nregisters
+    return p
+
+
+def create_kernel(kname: str, program):
+    """
+    Wrapper around constructor of openQL "Kernel" class.
+    """
+    k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
+    return k
+
+
+def compile(p):
+    """
+    Wrapper around OpenQL Program.compile() method.
+    """
+    with suppress_stdout():
+        p.compile()
+    # attribute is added to program to help finding the output files
+
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+#############################################################################
+# Calibration points
+#############################################################################
+def add_single_qubit_cal_points(p, qubit_idx,
+                                f_state_cal_pts: bool=False):
+    """
+    Adds single qubit calibration points to an OpenQL program
+
+    Args:
+        p
+        platf
+        qubit_idx
+    """
+
+    for i in np.arange(2):
+        k = create_kernel("cal_gr_"+str(i), program=p)
+        k.prepz(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    for i in np.arange(2):
+        k = create_kernel("cal_ex_"+str(i), program=p)
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+    if f_state_cal_pts:
+        for i in np.arange(2):
+            k = create_kernel("cal_f_"+str(i), program=p)
+            k.prepz(qubit_idx)
+            k.gate('rx180', [qubit_idx])
+            k.gate('rx12', [qubit_idx])
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+    return p
+
+
+def add_two_q_cal_points(p, q0: int, q1: int,
+                         reps_per_cal_pt: int =1):
+    """
+    Returns a list of kernels containing calibration points for two qubits
+
+    Args:
+        p               : OpenQL  program to add calibration points to
+        q0, q1          : ints of two qubits
+        reps_per_cal_pt : number of times to repeat each cal point
+    Returns:
+        kernel_list     : list containing kernels for the calibration points
+    """
+    kernel_list = []
+    combinations = (["00"]*reps_per_cal_pt +
+                    ["01"]*reps_per_cal_pt +
+                    ["10"]*reps_per_cal_pt +
+                    ["11"]*reps_per_cal_pt)
+    for i, comb in enumerate(combinations):
+        k = create_kernel('cal{}_{}'.format(i, comb), p)
+        k.prepz(q0)
+        k.prepz(q1)
+        if comb[0] == '1':
+            k.gate('rx180', [q0])
+        else:
+            k.gate('i', [q0])
+        if comb[1] == '1':
+            k.gate('rx180', [q1])
+        else:
+            k.gate('i', [q1])
+        # Used to ensure timing is aligned
+        k.gate('wait', [q0, q1], 0)
+        k.measure(q0)
+        k.measure(q1)
+        k.gate('wait', [q0, q1], 0)
+        kernel_list.append(k)
+        p.add_kernel(k)
+
+    return p
+
+
+def add_multi_q_cal_points(p, qubits: list,
+                           combinations: list):
+    """
+    Adds calibration points based on a list of state combinations
+    """
+    kernel_list = []
+    for i, comb in enumerate(combinations):
+        k = create_kernel('cal{}_{}'.format(i, comb), p)
+        for q in qubits:
+            k.prepz(q)
+
+        for j, q in enumerate(qubits):
+            if comb[j] == '1':
+                k.gate('rx180', [q])
+            elif comb[j] == '2':
+                k.gate('rx180', [q])
+                k.gate('rx12', [q])
+            else:
+                pass
+        # Used to ensure timing is aligned
+        k.gate('wait', qubits, 0)
+        for q in qubits:
+            k.measure(q)
+        k.gate('wait', qubits, 0)
+        kernel_list.append(k)
+        p.add_kernel(k)
+    return p
+
+
+#############################################################################
+# File modifications
+#############################################################################
 
 
 def clocks_to_s(time, clock_cycle=20e-9):
