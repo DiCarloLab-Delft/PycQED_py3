@@ -44,8 +44,20 @@ def _rotation_kraus(phi, theta):
     return [expm(-0.5j*pi*theta*(_pauli_x*cos(phi*pi) + _pauli_y*sin(phi*pi)))]
 
 
-def _cphase_kraus(theta):
-    return [np.diag((1., 1., 1., exp(1j*theta*pi)))]
+def _cphase_kraus(cz_dephase_var):
+    d = np.exp(-cz_dephase_var / 2)
+    d2 = np.exp(-cz_dephase_var / 4)
+    kraus0 = [
+        np.diag([1, 1, 1, np.exp(1j * np.pi)*d]),
+        np.diag([0, 0, 0, np.exp(1j * np.pi) * np.sqrt(1-d**2)])
+    ]
+    kraus1 = [
+        np.diag([1, 1, d2, d2]),
+        np.diag([0, 0, np.sqrt(1-d2**2), np.sqrt(1-d2**2)])
+    ]
+
+
+    return [kraus0[0]*kraus1[0], kraus0[0]*kraus1[1], kraus0[1]*kraus1[0], kraus0[1]*kraus1[1]]
 
 
 def _rotation_instruction(phi, theta):
@@ -83,10 +95,7 @@ def generate_config(filename: str,
                     mw_latency: int = 0,
                     fl_latency: int = 0,
                     init_duration: int = 200000,
-                    simulation_t1=3e7,
-                    simulation_t2=1e7,
-                    simulation_frac1_0=0.0001,
-                    simulation_frac1_1=0.9999):
+                    cz_dephase_var: int = 0):
     """
     Generates a configuration file for OpenQL for use with the CCLight.
     Args:
@@ -394,6 +403,7 @@ def generate_config(filename: str,
 
     # N.B. The codewords for CZ pulses need to be further specified.
     # I do not expect this to be correct for now.
+
     for ft in flux_tuples:
         if ft[0] in qubits_active and ft[1] in qubits_active:
             # FIXME add space back in
@@ -402,7 +412,7 @@ def generate_config(filename: str,
                 "latency": fl_latency,
                 "qubits": [ft[0], ft[1]],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-                "kraus_repr": _kraus_jsonify(_cphase_kraus(1.)),
+                "kraus_repr": _kraus_jsonify(_cphase_kraus(cz_dephase_var)),
                 "disable_optimization": True,
                 "type": "flux",
                 "cc_light_instr_type": "two_qubit_gate",
@@ -433,13 +443,30 @@ def generate_config(filename: str,
 
     cfg['simulation_settings'] = {'error_models': {}}
     for qubit in qubits:
-        cfg['simulation_settings']['error_models'][qubit] = {
-            'error_model': 't1t2',
-            't1': simulation_t1,
-            't2': simulation_t2,
-            'frac1_0': simulation_frac1_0,
-            'frac1_1': simulation_frac1_1,
-        }
+        if qubit == 'q0':
+            cfg['simulation_settings']['error_models'][qubit] = {
+                'error_model': 't1t2',
+                't1': 28000,
+                't2': 4200,
+                'frac1_0': 0.0001,
+                'frac1_1': 0.9999,
+            }
+        elif qubit == 'q2':
+            cfg['simulation_settings']['error_models'][qubit] = {
+                'error_model': 't1t2',
+                't1': 22000,
+                't2': 38000,
+                'frac1_0': 0.0001,
+                'frac1_1': 0.9999,
+            }
+        else:
+            cfg['simulation_settings']['error_models'][qubit] = {
+                'error_model': 't1t2',
+                't1': 1.,
+                't2': 1.,
+                'frac1_0': 0.0001,
+                'frac1_1': 0.9999,
+            }
 
     with open(filename, 'w') as f:
         json.dump(cfg, f, indent=4)
