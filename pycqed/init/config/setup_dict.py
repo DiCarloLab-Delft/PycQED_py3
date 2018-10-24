@@ -47,7 +47,6 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'Xiang_PC': 'D:\\data\\IntelDemo',
                  'Serwans_Laptop': 'W:/tnw/NS/qt/Serwan/MuxMon/',
                  'La_Ducati': 'D:\\Experiments\\1808_Cheesymon_NK_E3\\Data',
-
                  'La_Ducati_Jr': 'D:\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'Simulation_PC': r'D:\Experiments/testSingleShotFidelityAnalysis/Data',
                  # 'Ramiro_Desktop': r'D:\\PhD_RS\\data_local',
