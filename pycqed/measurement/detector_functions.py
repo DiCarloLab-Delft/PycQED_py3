@@ -323,9 +323,9 @@ class ZNB_VNA_detector(Hard_Detector):
         super(ZNB_VNA_detector, self).__init__()
         self.VNA = VNA
         self.value_names = ['ampl', 'phase',
-                            'real', 'imag', ]
+                            'real', 'imag', 'ampl_dB']
         self.value_units = ['', 'radians',
-                            '', '']
+                            '', '', 'dB']
 
     def get_values(self):
         '''
@@ -343,10 +343,10 @@ class ZNB_VNA_detector(Hard_Detector):
 
         complex_data = np.add(real_data, 1j*imag_data)
         ampl_linear = np.abs(complex_data)
-        # ampl_dB = 20*np.log10(ampl_linear)
+        ampl_dB = 20*np.log10(ampl_linear)
         phase_radians = np.arctan2(imag_data, real_data)
 
-        return ampl_linear, phase_radians, real_data, imag_data
+        return ampl_linear, phase_radians, real_data, imag_data, ampl_dB
 
 
 # Detectors for QuTech Control box modes
