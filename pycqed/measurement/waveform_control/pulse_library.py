@@ -396,15 +396,16 @@ class BufferedSquarePulse(Pulse):
 
 
 class BufferedCZPulse(Pulse):
-    def __init__(self, channel=None, channels=None,
-                 name='buffered square pulse', **kw):
+    def __init__(self, channel, aux_channels=None,
+                 name='buffered CZ pulse', **kw):
         super().__init__(name)
-        if channel is None and channels is None:
-            raise ValueError('Must specify either channel or channels')
-        elif channels is None:
-            self.channels.append(channel)
-        else:
-            self.channels = channels
+
+        self.channel = channel
+        self.aux_channels = aux_channels
+        self.channels = [self.channel]
+        if self.aux_channels is not None:
+            self.channels += aux_channels
+
         self.amplitude = kw.pop('amplitude', 0)
         self.frequency = kw.pop('frequency', 0)
         self.phase = kw.pop('phase', 0.)
@@ -429,9 +430,12 @@ class BufferedCZPulse(Pulse):
         return self
 
     def chan_wf(self, chan, tvals):
+        amp = self.amplitude
+        if chan != self.channel:
+            amp = 0.5*self.amplitude
         t_rel = tvals - tvals[0]
-        return self.amplitude * np.cos(2*np.pi*(self.frequency*t_rel +
-                                                self.phase / 360.)) * \
+        return amp * np.cos(2*np.pi*(self.frequency*t_rel +
+                                     self.phase / 360.)) * \
                (tvals >= tvals[0] + self.buffer_length_start) * \
                (tvals < tvals[0] + self.buffer_length_start + self.pulse_length)
 

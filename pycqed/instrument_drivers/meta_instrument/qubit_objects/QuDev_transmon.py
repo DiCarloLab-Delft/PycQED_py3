@@ -4063,6 +4063,9 @@ def add_CZ_pulse(qbc, qbt):
                                                'BufferedCZPulse'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
+        qbc.add_pulse_parameter(op_name, ps_name + '_aux_channels',
+                                'aux_channels',
+                                initial_value=[], vals=vals.Lists())
         qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
                                 initial_value=0, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_freq', 'frequency',
