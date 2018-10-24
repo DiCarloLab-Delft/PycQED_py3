@@ -7,7 +7,10 @@ import numpy as np
 import copy
 import logging
 from collections import OrderedDict
+<<<<<<< HEAD
 from inspect import signature
+=======
+>>>>>>> 7f3657fb9bab6bbfa56b797c8a2226ed8aee11f2
 import numbers
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
@@ -24,13 +27,15 @@ import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
 
+<<<<<<< HEAD
 from importlib import reload  # Useful for reloading while testing
 
+=======
+>>>>>>> 7f3657fb9bab6bbfa56b797c8a2226ed8aee11f2
 
 class BaseDataAnalysis(object):
     """
-    Abstract Base Class (not intended to be instantiated directly) for
-    analysis.
+    Abstract Base Class for analysis.
 
     Children inheriting from this method should specify the following methods
         - __init__      -> specify params to be extracted, set options
@@ -477,12 +482,40 @@ class BaseDataAnalysis(object):
         # initialize everything to an empty dict if not overwritten
         self.fit_dicts = OrderedDict()
 
+
     def run_fitting(self):
         '''
         This function does the fitting and saving of the parameters
         based on the fit_dict options.
-        Only model fitting is implemented here.
-        Minimizing fitting is being worked on.
+
+
+        There are two ways of fitting, specified in fit_dict['fitting_type']
+
+        - Using the model-fit procedure of lmfit, this is the default
+                fit_dict['fitting_type'] = 'model'
+        - Using the minimizer routine of lmfit, this needs to be specified by
+                fit_dict['fitting_type'] = 'minimize'
+
+
+        Initial guesses can be passed on in several different ways.
+
+        - as fit_dict['guess_pars'] directly as the model with guess parameters,
+                that needs to be made in the respective analysis and passed on
+                like fit_dict['guess_pars'] = model.make_params()
+                If this argument is passed on, no other guesses will be performed.
+                This is not implemented yet for the 'minimize' fitting type.
+
+        - as a guess function that will be run. This can be passed explicitly as
+                fit_dict['fit_guess_fn']
+                or also by giving the model specified in fit_dict['model'] an
+                argument .guess
+                The guess function can be given parameters in
+                fit_dict['guessfn_pars']
+
+        - as fit_dict['guess_dict'], which is a dictionary containing the guess
+                parameters. These guess parameters will converted into the parameter
+                objects required by either model fit or minimize.
+
         '''
         self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
@@ -499,12 +532,14 @@ class BaseDataAnalysis(object):
                 fit_fn = fit_dict.get('fit_fn', None)
                 model = fit_dict.get('model', lmfit.Model(fit_fn))
             fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-            if fit_guess_fn is None and fit_dict.get('fit_guess', False):
-                fit_guess_fn = model.guess
 
+            if fit_guess_fn is None:
+                if  fitting_type == 'model' and fit_dict.get('fit_guess', True):
+                    fit_guess_fn = model.guess
 
-            if guess_pars is None:
-                if fit_guess_fn is not None:
+            if guess_pars is None: # if you pass on guess_pars, immediately go to the fitting
+                if fit_guess_fn is not None: # Run the guess funtions here
+
                     if fitting_type is 'minimize':
                         guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
                         params = lmfit.Parameters()
@@ -525,11 +560,16 @@ class BaseDataAnalysis(object):
                         # A guess can also be specified as a dictionary.
                         # additionally this can be used to overwrite values
                         # from the guess functions.
+
+                        if guess_dict is not None:
+                             for gd_key, val in guess_dict.items():
+                                 for attr, attr_val in val.items():
+                                     # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
+                                     setattr(guess_pars[gd_key], attr, attr_val)
                 elif guess_dict is not None:
                     if fitting_type is 'minimize':
                         params = lmfit.Parameters()
                         for key, val in list(guess_dict.items()):
-                        # for key, val in guess_dict.items():
                             params.add(key)
                             for attr, attr_val in val.items():
                                 setattr(params[key], attr, attr_val)
@@ -540,19 +580,21 @@ class BaseDataAnalysis(object):
             else:
                 if fitting_type is 'minimize':
                     raise NotImplementedError('Conversion from guess_pars to params with lmfit.Parameters() needs to be implemented')
-            if fitting_type is 'model':
+                    # TODO: write a method that converts the type model.make_params() to a lmfit.Parameters() object
+            if fitting_type is 'model': # Perform the fitting
                 fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
                                                 params=guess_pars)
                 self.fit_res[key] = fit_dict['fit_res']
 
-            elif fitting_type is 'minimize':
+            elif fitting_type is 'minimize': # Perform the fitting
                 fit_dict['fit_res'] = lmfit.minimize(fcn=_complex_residual_function,
                         params=params,
                         args=(fit_fn, fit_xvals, fit_yvals))
-                fit_dict['fit_res'].initial_params = params
-                fit_dict['fit_res'].userkws = fit_xvals
-                fit_dict['fit_res'].fit_fn = fit_fn
+                fit_dict['fit_res'].initial_params = params # save the initial params
+                fit_dict['fit_res'].userkws = fit_xvals # save the x values
+                fit_dict['fit_res'].fit_fn = fit_fn # save the fit function
                 self.fit_res[key] = fit_dict['fit_res']
+
 
 
 
@@ -1216,11 +1258,14 @@ class BaseDataAnalysis(object):
         plot_numpoints = pdict.get('num_points', 1000)
 
 
-        if hasattr(pdict['fit_res'],'model'):
+        if hasattr(pdict['fit_res'], 'model'):
             model = pdict['fit_res'].model
-            assert (isinstance(model, lmfit.model.Model) or
-                        isinstance(model, lmfit.model.ModelResult),
-                'The passed item in "fit_res" needs to be a fitting model, but is {}'.format(type(model)))
+            if not (isinstance(model, lmfit.model.Model) or
+                    isinstance(model, lmfit.model.ModelResult)):
+                raise TypeError(
+                    'The passed item in "fit_res" needs to be'
+                    ' a fitting model, but is {}'.format(type(model)))
+
 
             if len(model.independent_vars) == 1:
                 independent_var = model.independent_vars[0]

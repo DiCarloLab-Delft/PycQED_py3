@@ -45,10 +45,10 @@ def generate_config(filename: str,
             "readout_mw_buffer": 0,
             "readout_flux_buffer": 0,
             "readout_readout_buffer": 0},
-        # initializing as an empty dict and then adding to it. 
+        # initializing as an empty dict and then adding to it.
         "instructions": {},
-        "resources": {}, 
-        "topology": {}, 
+        "resources": {},
+        "topology": {},
 
         "gate_decomposition": {
             "x %0": ["rx180 %0"],
@@ -95,7 +95,7 @@ def generate_config(filename: str,
             "type": "mw",
             "qumis_instr": "pulse",
             "qumis_instr_kw": {
-               "codeword": 0, 
+               "codeword": 0,
                "awg_nr": 2
             }
         }
@@ -110,8 +110,8 @@ def generate_config(filename: str,
             "type" : "readout",
             "qumis_instr": "trigger",
             "qumis_instr_kw": {
-                "trigger_bit": 7, 
-                "trigger_duration": 10 
+                "trigger_bit": 7,
+                "trigger_duration": 10
             }
         }
 

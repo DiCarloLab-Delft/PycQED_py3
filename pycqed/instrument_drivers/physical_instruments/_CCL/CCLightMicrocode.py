@@ -139,9 +139,8 @@ class CCLightMicrocode():
     def print_pure_cs_line(self, cs_line):
         (condition, op_type_left, cw_left, op_type_right, cw_right) = \
             self.disa_cs_line(cs_line)
-        print(self.CS_format.format(op_type_left, cw_left,
-                                    op_type_right, cw_right,
-                                    condition))
+        print(self.CS_format.format(condition, op_type_left, cw_left,
+                                    op_type_right, cw_right))
 
     def print_compact_cs_line(self, cs_line):
         (condition, op_type_left, cw_left, op_type_right, cw_right) = \
@@ -252,6 +251,18 @@ class CCLightMicrocode():
             bin_file.close()
         else:
             return bin_data
+
+    def read_bin(self, filename):
+        bin_file = open(filename, 'rb')
+        bin_data = bin_file.read()
+        bin_file.close()
+
+        cs_line_array = self.disa_bin_microcode(bin_data)
+
+        print("Condition  OpTypeLeft  CW_Left  OptypeRight  CW_Right")
+        for i in range(len(cs_line_array)):
+            self.print_pure_cs_line(cs_line_array[i])
+
 
     def insert_cs_line(self, line_number, condition, op_type_left,
                        cw_left, op_type_right=0, cw_right=0):

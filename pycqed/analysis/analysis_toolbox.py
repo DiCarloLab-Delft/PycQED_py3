@@ -1,14 +1,13 @@
 # some convenience tools
 #
-import logging
 import numpy as np
+import logging
 import os
 import time
 import datetime
 import warnings
 from copy import deepcopy
 from collections import OrderedDict as od
-from matplotlib import pyplot as plt
 from matplotlib import colors
 import pandas as pd
 from pycqed.utilities.get_default_datadir import get_default_datadir
@@ -22,6 +21,9 @@ from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
 from matplotlib import cm
+from pycqed.analysis import composite_analysis as RA
+
+from matplotlib.colors import LogNorm
 
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
@@ -33,16 +35,16 @@ print('Data directory set to:', datadir)
 
 
 def nearest_idx(array, value):
-    '''
+    """
     find the index of the value closest to the specified value.
-    '''
-    return np.abs(array-value).argmin()
+    """
+    return np.abs(array - value).argmin()
 
 
 def nearest_value(array, value):
-    '''
+    """
     find the value in the array that is closest to the specified value.
-    '''
+    """
     return array[nearest_idx(array, value)]
 
 
@@ -63,10 +65,10 @@ def verify_timestamp(timestamp):
 
 
 def is_older(ts0, ts1, or_equal=False):
-    '''
+    """
     returns True if timestamp ts0 is an earlier data than timestamp ts1,
     False otherwise.
-    '''
+    """
     if ts0 is None or ts1 is None:
         return True
     else:
@@ -75,20 +77,20 @@ def is_older(ts0, ts1, or_equal=False):
         dstamp1, tstamp1 = verify_timestamp(ts1)
         if not or_equal:
             # print 'isolder', (dstamp0+tstamp0) < (dstamp1+tstamp1)
-            return (dstamp0+tstamp0) < (dstamp1+tstamp1)
+            return (dstamp0 + tstamp0) < (dstamp1 + tstamp1)
         else:
-            return ((dstamp0+tstamp0) <= (dstamp1+tstamp1))
+            return ((dstamp0 + tstamp0) <= (dstamp1 + tstamp1))
 
 
 def is_equal(ts0, ts1, or_equal=False):
-    '''
+    """
     returns True if timestamp ts0 is an the same data as timestamp ts1,
     False otherwise.
-    '''
+    """
     dstamp0, tstamp0 = verify_timestamp(ts0)
     dstamp1, tstamp1 = verify_timestamp(ts1)
 
-    return (dstamp0+tstamp0) == (dstamp1+tstamp1)
+    return (dstamp0 + tstamp0) == (dstamp1 + tstamp1)
 
 
 def return_last_n_timestamps(n, contains=''):
@@ -108,7 +110,7 @@ def return_last_n_timestamps(n, contains=''):
 def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
                 return_timestamp=False, raise_exc=True,
                 folder=None, return_all=False):
-    '''
+    """
     finds the latest taken data with <contains> in its name.
     returns the full path of the data directory.
 
@@ -122,7 +124,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     this in: raise_exc = False, then a 'False' is returned.
     return_all = True: returns all the folders that satisfy
         the requirements (Cristian)
-    '''
+    """
     if (folder is None):
         search_dir = datadir
     else:
@@ -137,7 +139,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     daydirs.sort()
 
     measdirs = []
-    i = len(daydirs)-1
+    i = len(daydirs) - 1
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
         # this makes sure that (most) non day dirs do not get searched
@@ -156,7 +158,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
                     dstamp, tstamp = verify_timestamp(_timestamp)
                 except:
                     continue
-                timestamp = dstamp+tstamp
+                timestamp = dstamp + tstamp
                 if contains in d:
                     if older_than is not None:
                         if not is_older(timestamp, older_than,
@@ -181,15 +183,15 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
         if return_timestamp is False:
             return os.path.join(search_dir, daydir, measdir)
         else:
-            return str(daydir)+str(measdir[:6]), os.path.join(
+            return str(daydir) + str(measdir[:6]), os.path.join(
                 search_dir, daydir, measdir)
 
 
 def data_from_time(timestamp, folder=None):
-    '''
+    """
     returns the full path of the data specified by its timestamp in the
     form YYYYmmddHHMMSS.
-    '''
+    """
     if (folder is None):
         folder = datadir
     daydirs = os.listdir(folder)
@@ -218,9 +220,9 @@ def measurement_filename(directory=os.getcwd(), file_id=None, ext='hdf5'):
     dirname = os.path.split(directory)[1]
     if file_id is None:
         if dirname[6:9] == '_X_':
-            fn = dirname[0:7]+dirname[9:]+'.'+ext
+            fn = dirname[0:7] + dirname[9:] + '.' + ext
         else:
-            fn = dirname+'.'+ext
+            fn = dirname + '.' + ext
     if os.path.exists(os.path.join(directory, fn)):
         return os.path.join(directory, fn)
     else:
@@ -230,24 +232,24 @@ def measurement_filename(directory=os.getcwd(), file_id=None, ext='hdf5'):
 
 
 def get_start_stop_time(timestamp):
-    '''
+    """
     Retrieves start and stop time from HDF5 file timestamp.
-    '''
+    """
     from pycqed.analysis import measurement_analysis as MA
     ma = MA.MeasurementAnalysis(timestamp=timestamp)
-    timestring_start = a_tools.get_instrument_setting(
-        ma, 'MC', 'measurement_begintime')
-    timestring_stop = a_tools.get_instrument_setting(
-        ma, 'MC', 'measurement_endtime')
+    timestring_start = get_instrument_setting(ma, 'MC', 'measurement_begintime')
+    timestring_stop = get_instrument_setting(ma, 'MC', 'measurement_endtime')
     date_start, time_start = timestring_start.split(' ')
     date_stop, time_stop = timestring_stop.split(' ')
     timestamp_start = date_start.replace(
-        '-', '')+'_'+time_start.replace(':', '')
-    timestamp_stop = date_stop.replace('-', '')+'_'+time_stop.replace(':', '')
+        '-', '') + '_' + time_start.replace(':', '')
+    timestamp_stop = date_stop.replace('-', '') + '_' + time_stop.replace(':',
+                                                                          '')
     return timestamp_start, timestamp_stop
 
 
-def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_files=None):
+def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False,
+                                   max_files=None):
     from pycqed.analysis import measurement_analysis as MA
     if max_files is not None:
         get_timestamps = timestamps[:max_files]
@@ -280,17 +282,19 @@ def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_file
                         'This data file attribute does not exist or hasn''t been coded for extraction.')
 
             else:
-                if param.split('.')[0] in ma.data_file.get('Instrument settings', {}):
+                if param.split('.')[0] in ma.data_file.get(
+                        'Instrument settings', {}):
                     data[param].append(ma.data_file['Instrument settings'][
-                                       param.split('.')[0]].attrs[param.split('.')[1]])
+                                           param.split('.')[0]].attrs[
+                                           param.split('.')[1]])
                 elif param.split('.')[0] in ma.data_file.get('Analysis', {}):
                     temp = ma.data_file['Analysis']
-                    for ii in range(len(param.split('.'))-1):
+                    for ii in range(len(param.split('.')) - 1):
                         temp = temp[param.split('.')[ii]]
                     data[param].append(temp.attrs[param.split('.')[-1]])
                 elif param.split('.')[0] in list(ma.data_file.keys()):
                     temp = ma.data_file
-                    for ii in range(len(param.split('.'))-1):
+                    for ii in range(len(param.split('.')) - 1):
                         temp = temp[param.split('.')[ii]]
                     data[param].append(temp[param.split('.')[-1]])
                 else:
@@ -322,17 +326,18 @@ def get_data_from_ma_v1(ma, param_names):
                     'This data file attribute does not exist or hasn''t been coded for extraction.')
 
         else:
-            if param.split('.')[0] in ma.data_file.get('Instrument settings', {}):
+            if param.split('.')[0] in ma.data_file.get('Instrument settings',
+                                                       {}):
                 data[param] = ma.data_file['Instrument settings'][
                     param.split('.')[0]].attrs[param.split('.')[1]]
             elif param.split('.')[0] in ma.data_file.get('Analysis', {}):
                 temp = ma.data_file['Analysis']
-                for ii in range(len(param.split('.'))-1):
+                for ii in range(len(param.split('.')) - 1):
                     temp = temp[param.split('.')[ii]]
                 data[param] = temp.attrs[param.split('.')[-1]]
             elif param.split('.')[0] in list(ma.data_file.keys()):
                 temp = ma.data_file
-                for ii in range(len(param.split('.'))-1):
+                for ii in range(len(param.split('.')) - 1):
                     temp = temp[param.split('.')[ii]]
                 data[param] = temp[param.split('.')[-1]]
             else:
@@ -343,7 +348,6 @@ def get_data_from_ma_v1(ma, param_names):
 
 def get_data_from_ma_v2(ma, param_names, numeric_params=None):
     data = od([(param, None) for param in param_names])
-    # print 'boo7', data['amp']
     for param in param_names:
         if param == 'all_data':
             data[param] = ma.measured_values
@@ -359,7 +363,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
             for key in list(data[param].keys()):
                 if temp[key].attrs['vary']:
                     free_vars += 1
-            data[param].update({key+'_err': temp[key].attrs['stderr']
+            data[param].update({key + '_err': temp[key].attrs['stderr']
                                 for key in list(temp.keys()) if key != 'covar'})
             data[param].update({'chi_squared': temp.attrs['chisqr']})
 
@@ -372,55 +376,58 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                 tmp_var = None
             if tmp_var == 'TimeDomainDetector':
                 temp2 = ma.data_file['Instrument settings']['TD_Meas']
-                exec(
-                    ('cal_zero = %s' % (temp2.attrs['cal_zero_points'])), locals())
-                exec(
-                    ('cal_one = %s' % (temp2.attrs['cal_one_points'])), locals())
+                exec(('cal_zero = %s' % (temp2.attrs['cal_zero_points'])),
+                     locals())
+                exec(('cal_one = %s' % (temp2.attrs['cal_one_points'])),
+                     locals())
+                # noinspection PyUnresolvedReferences
                 dofs = int(temp2.attrs['NoSegments']) - \
-                    len(cal_zero) - len(cal_one)
+                       len(cal_zero) - len(cal_one)
             else:
                 dofs = len(ma.sweep_points)
-            dofs -= free_vars+1
+            dofs -= free_vars + 1
             data[param].update(
-                {'chi_squared_reduced': temp.attrs['chisqr']/dofs})
+                {'chi_squared_reduced': temp.attrs['chisqr'] / dofs})
             data[param].update({'chi_squared_dofs': dofs})
         elif '.' not in param:
             special_output = {'amp': 0, 'phase': 1, 'I': 2, 'Q': 3}
             special_output.update(
                 {'I_raw': 0, 'Q_raw': 1, 'I_cal': 2, 'Q_cal': 3})
             special_output.update({'I': 0, 'Q': 1})
-            # print special_output
-            # print 'boo8', ma.measured_values[special_output[param]]
             if param in special_output:
                 data[param] = ma.measured_values[special_output[param]]
             elif param in dir(ma):
                 data[param] = getattr(ma, param)
-            elif param in list(ma.data_file.get('Experimental Data', {}).keys()):
+            elif param in list(
+                    ma.data_file.get('Experimental Data', {}).keys()):
                 data[param] = np.double(
                     ma.data_file['Experimental Data'][param])
             elif param in list(ma.data_file.get('Analysis', {}).keys()):
                 data[param] = np.double(ma.data_file['Analysis'][param])
             else:
                 warnings.warn(
-                    'The data file attribute %s does not exist or hasn''t been coded for extraction.' % (param))
-            # print 'boo9', data['amp']
-
+                    'The data file attribute %s does not exist or hasn\'t '
+                    'been coded for extraction.' % (param))
         else:
-            if param.split('.')[0] in list(ma.data_file.get('Instrument settings', {}).keys()):
+            if param.split('.')[0] in list(
+                    ma.data_file.get('Instrument settings', {}).keys()):
                 data[param] = ma.data_file['Instrument settings'][
                     param.split('.')[0]].attrs[param.split('.')[1]]
             else:
                 extract_param = True
-                if param.split('.')[0] in list(ma.data_file.get('Analysis', {}).keys()):
+                if param.split('.')[0] in list(
+                        ma.data_file.get('Analysis', {}).keys()):
                     temp = ma.data_file['Analysis']
                 elif param.split('.')[0] in list(ma.data_file.keys()):
                     temp = ma.data_file
                 else:
                     extract_param = False
+                    print(ma.folder)
                     warnings.warn(
-                        'The data file attribute %s does not exist or hasn''t been coded for extraction.' % (param))
+                        'The data file attribute %s does not exist or hasn\'t '
+                        'been coded for extraction.' % (param))
                 if extract_param:
-                    for ii in range(len(param.split('.'))-1):
+                    for ii in range(len(param.split('.')) - 1):
                         temp = temp[param.split('.')[ii]]
                     param_end = param.split('.')[-1]
                     if param_end in list(temp.attrs.keys()):
@@ -430,7 +437,6 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
         if numeric_params is not None:
             if param in numeric_params:
                 data[param] = np.double(data[param])
-
     return data
 
 
@@ -445,7 +451,6 @@ def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
 
 def append_data_from_ma(ma, param_names, data, data_version=2,
                         numeric_params=None):
-
     new_data = get_data_from_ma(ma, param_names, data_version=data_version,
                                 numeric_params=numeric_params)
     for param in param_names:
@@ -510,7 +515,8 @@ def get_data_from_timestamp_list(timestamps,
                     else:
                         ana.get_naming_and_values()
 
-                    if 'datasaving_format' in ana.data_file['Experimental Data'].attrs:
+                    if 'datasaving_format' in ana.data_file[
+                        'Experimental Data'].attrs:
                         datasaving_format = ana.get_key('datasaving_format')
                     else:
                         print(
@@ -559,7 +565,7 @@ def get_data_from_timestamp_list(timestamps,
                     out_data[nparam] = np.array(
                         [np.double(val) for val in out_data[nparam]])
                 except ValueError as instance:
-                    raise(instance)
+                    raise (instance)
 
     out_data['timestamps'] = get_timestamps
 
@@ -573,9 +579,9 @@ def convert_instr_str_list_to_numeric_array(string_list):
 def get_plot_title_from_folder(folder):
     measurementstring = os.path.split(folder)[1]
     timestamp = os.path.split(os.path.split(folder)[0])[1] \
-        + '/' + measurementstring[:6]
+                + '/' + measurementstring[:6]
     measurementstring = measurementstring[7:]
-    default_plot_title = timestamp+'\n'+measurementstring
+    default_plot_title = timestamp + '\n' + measurementstring
     return default_plot_title
 
 
@@ -583,9 +589,9 @@ def file_in_folder(folder, timestamp):
     all_files = [f for f in os.listdir(folder) if timestamp in f]
     all_files.sort()
 
-    if (len(all_files) > 1):
-        print(
-            'More than one file satisfies the requirements! Import: '+all_files[0])
+    if len(all_files) > 1:
+        print('More than one file satisfies the requirements! Import: '
+              + all_files[0])
 
     return all_files[0]
 
@@ -612,10 +618,12 @@ def get_instrument_setting(analysis_object, instrument_name, parameter):
 
 
 def compare_instrument_settings_timestamp(timestamp_a, timestamp_b):
-    '''
-    Takes two analysis objects as input and prints the differences between the instrument settings.
-    Currently it only compares settings existing in object_a, this function can be improved to not care about the order of arguments.
-    '''
+    """
+    Takes two analysis objects as input and prints the differences between the
+    instrument settings. Currently it only compares settings existing in
+    object_a, this function can be improved to not care about the order of
+    arguments.
+    """
 
     h5mode = 'r+'
     h5filepath = measurement_filename(get_folder(timestamp_a))
@@ -658,10 +666,12 @@ def compare_instrument_settings_timestamp(timestamp_a, timestamp_b):
 
 
 def compare_instrument_settings(analysis_object_a, analysis_object_b):
-    '''
-    Takes two analysis objects as input and prints the differences between the instrument settings.
-    Currently it only compares settings existing in object_a, this function can be improved to not care about the order of arguments.
-    '''
+    """
+    Takes two analysis objects as input and prints the differences between the
+    instrument settings. Currently it only compares settings existing in
+    object_a, this function can be improved to not care about the order of
+    arguments.
+    """
     sets_a = analysis_object_a.data_file['Instrument settings']
     sets_b = analysis_object_b.data_file['Instrument settings']
 
@@ -709,7 +719,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         datetime_end = datetime_from_timestamp(timestamp_end)
     days_delta = (datetime_end.date() - datetime_start.date()).days
     all_timestamps = []
-    for day in reversed(list(range(days_delta+1))):
+    for day in reversed(list(range(days_delta + 1))):
         date = datetime_start + datetime.timedelta(days=day)
         datemark = timestamp_from_datetime(date)[:8]
         all_measdirs = [d for d in os.listdir(os.path.join(folder, datemark))]
@@ -737,19 +747,19 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         timestamps.reverse()
         all_timestamps += timestamps
     # Ensures the order of the timestamps is ascending
-    all_timestamps.reverse()
+    all_timestamps.sort()
     return all_timestamps
 
 
 def get_mean_df(label, starting_timestamp, ending_timestamp,
                 return_raw_dataframes=False):
-    '''
+    """
     Returns a dataframe containing the mean and standard error of mean (sem)
     of all datasets that match a certain label.
     Function assumes that the the datasets have identical sweep points.
 
     if return raw_dataframes
-    '''
+    """
     # Import within function statement to prevent circular import
     from pycqed.analysis import measurement_analysis as MA
     timestamps = get_timestamps_in_range(timestamp_start=starting_timestamp,
@@ -776,21 +786,21 @@ def get_mean_df(label, starting_timestamp, ending_timestamp,
             mean_df[par_name] = ana.sweep_points
     # Add the mean and sem to the dataframe
     for i, val_name in enumerate(ana.value_names):
-        mean_df[val_name+'_mean'] = dataframes[i].mean(axis=1)
-        mean_df[val_name+'_sem'] = dataframes[i].sem(axis=1)
+        mean_df[val_name + '_mean'] = dataframes[i].mean(axis=1)
+        mean_df[val_name + '_sem'] = dataframes[i].sem(axis=1)
 
     print('Found %s timestamps matching %s' % (len(timestamps), label))
     if return_raw_dataframes:
         return mean_df, dataframes
     return mean_df
+
+
 ######################################################################
 #    Analysis tools
 ######################################################################
 
-
 def get_folder(timestamp=None, older_than=None, label='',
                suppress_printing=True, **kw):
-
     if timestamp is not None:
         folder = data_from_time(timestamp)
         if not suppress_printing:
@@ -859,14 +869,14 @@ def smooth(x, window_len=11, window='hanning'):
         raise ValueError(
             "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
-    s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
+    s = np.r_[x[window_len - 1:0:-1], x, x[-1:-window_len:-1]]
 
     if window == 'flat':  # moving average
         w = np.ones(window_len, 'd')
 
     else:
-        w = eval('np.'+window+'(window_len)')
-    y = np.convolve(w/w.sum(), s, mode='valid')
+        w = eval('np.' + window + '(window_len)')
+    y = np.convolve(w / w.sum(), s, mode='valid')
 
     # Cut edges of y since a mirror image is used
     edge = (window_len - 1) / 2
@@ -877,7 +887,6 @@ def smooth(x, window_len=11, window='hanning'):
 def find_second_peak(sweep_pts=None, data_dist_smooth=None,
                      key=None, peaks=None, percentile=20, optimize=False,
                      verbose=False):
-
     """
     Used for qubit spectroscopy analysis. Find the second gf/2 peak/dip based on
     the location of the tallest peak found, given in peaks, which is the result
@@ -909,39 +918,40 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         kappa_guess_ef (float):     guess for the kappa of the gf/2 peak/dip
     """
 
-    tallest_peak = peaks[key] #the ge freq
-    tallest_peak_idx = peaks[key+'_idx']
-    tallest_peak_width = peaks[key+'_width']
+    tallest_peak = peaks[key]  # the ge freq
+    tallest_peak_idx = peaks[key + '_idx']
+    tallest_peak_width = peaks[key + '_width']
     if verbose:
-        print('Largest '+key+' is at ', tallest_peak)
+        print('Largest ' + key + ' is at ', tallest_peak)
 
     # Calculate how many data points away from the tallest peak
     # to look left and right. Should be 50MHz away.
-    freq_range = sweep_pts[-1]-sweep_pts[0]
+    freq_range = sweep_pts[-1] - sweep_pts[0]
     num_points = sweep_pts.size
-    n = int(50e6*num_points/freq_range)
-    m = int(50e6*num_points/freq_range)
+    n = int(50e6 * num_points / freq_range)
+    m = int(50e6 * num_points / freq_range)
 
     # Search for 2nd peak (f_ge) to the right of the first (tallest)
-    while(int(len(sweep_pts)-1) <= int(tallest_peak_idx+n) and
-                  n>0):
+    while (int(len(sweep_pts) - 1) <= int(tallest_peak_idx + n) and
+           n > 0):
         # Reduce n if outside of range
         n -= 1
-    if (int(tallest_peak_idx+n)) == sweep_pts.size:
+    if (int(tallest_peak_idx + n)) == sweep_pts.size:
         # If n points to the right of tallest peak is the range edge:
         n = 0
-    if not ((int(tallest_peak_idx+n)) >= sweep_pts.size):
+    if not ((int(tallest_peak_idx + n)) >= sweep_pts.size):
         if verbose:
-            print('Searching for the gf/2 {:} {:} points to the right of the largest'
-                  ' in the range {:.5}-{:.5}'.format(
-                  key,
-                  n,
-                  sweep_pts[int(tallest_peak_idx+n)],
-                  sweep_pts[-1]) )
+            print(
+                'Searching for the gf/2 {:} {:} points to the right of the largest'
+                ' in the range {:.5}-{:.5}'.format(
+                    key,
+                    n,
+                    sweep_pts[int(tallest_peak_idx + n)],
+                    sweep_pts[-1]))
 
         peaks_right = peak_finder(
-            sweep_pts[int(tallest_peak_idx+n)::],
-            data_dist_smooth[int(tallest_peak_idx+n)::],
+            sweep_pts[int(tallest_peak_idx + n)::],
+            data_dist_smooth[int(tallest_peak_idx + n)::],
             percentile=percentile,
             num_sigma_threshold=1,
             optimize=optimize,
@@ -951,16 +961,16 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         # The peak/dip found to the right of the tallest is assumed to be
         # the ge peak, which means that the tallest was in fact the gf/2 peak
         if verbose:
-            print('Right '+key+' is at ', peaks_right[key])
-        subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
-        val_right = subset_right[peaks_right[key+'_idx']]
+            print('Right ' + key + ' is at ', peaks_right[key])
+        subset_right = data_dist_smooth[int(tallest_peak_idx + n)::]
+        val_right = subset_right[peaks_right[key + '_idx']]
         f0_right = peaks_right[key]
-        kappa_guess_right = peaks_right[key+'_width']
+        kappa_guess_right = peaks_right[key + '_width']
         f0_gf_over_2_right = tallest_peak
         kappa_guess_ef_right = tallest_peak_width
     else:
         if verbose:
-            print('Right '+key+' is None')
+            print('Right ' + key + ' is None')
         val_right = 0
         f0_right = 0
         kappa_guess_right = 0
@@ -968,24 +978,24 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         kappa_guess_ef_right = tallest_peak_width
 
     # Search for 2nd peak (f_gf/2) to the left of the first (tallest)
-    while(int(tallest_peak_idx-m)<0 and m>0):
+    while (int(tallest_peak_idx - m) < 0 and m > 0):
         # Reduce m if outside of range
         m -= 1
-    if int(tallest_peak_idx-m) == 0:
+    if int(tallest_peak_idx - m) == 0:
         # If m points to the left of tallest peak is the range edge:
         m = 0
-    if not (int(tallest_peak_idx-m) <= 0):
+    if not (int(tallest_peak_idx - m) <= 0):
         if verbose:
             print('Searching for the gf/2 {:} {:} points to the left of the '
                   'largest, in the range {:.5}-{:.5}'.format(
-                  key,
-                  m,
-                  sweep_pts[0],
-                  sweep_pts[int(tallest_peak_idx-m-1)]) )
+                key,
+                m,
+                sweep_pts[0],
+                sweep_pts[int(tallest_peak_idx - m - 1)]))
 
         peaks_left = peak_finder(
-            sweep_pts[0:int(tallest_peak_idx-m)],
-            data_dist_smooth[0:int(tallest_peak_idx-m)],
+            sweep_pts[0:int(tallest_peak_idx - m)],
+            data_dist_smooth[0:int(tallest_peak_idx - m)],
             percentile=percentile,
             num_sigma_threshold=1,
             optimize=optimize,
@@ -995,16 +1005,16 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         # The peak/dip found to the left of the tallest is assumed to be
         # the gf/2 peak, which means that the tallest was indeed the ge peak
         if verbose:
-            print('Left '+key+' is at ', peaks_left[key])
-        subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
-        val_left = subset_left[peaks_left[key+'_idx']]
+            print('Left ' + key + ' is at ', peaks_left[key])
+        subset_left = data_dist_smooth[0:int(tallest_peak_idx - m)]
+        val_left = subset_left[peaks_left[key + '_idx']]
         f0_left = tallest_peak
         kappa_guess_left = tallest_peak_width
         f0_gf_over_2_left = peaks_left[key]
-        kappa_guess_ef_left = peaks_left[key+'_width']
+        kappa_guess_ef_left = peaks_left[key + '_width']
     else:
         if verbose:
-            print('Left '+key+' is None')
+            print('Left ' + key + ' is None')
         val_left = 0
         f0_left = tallest_peak
         kappa_guess_left = tallest_peak_width
@@ -1019,12 +1029,12 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
             # If the two peaks found are separated by at least 50MHz,
             # then both the ge and gf/2 have been found.
             if verbose:
-                print('Both f_ge and f_gf/2 '+key+'s have been found. '
-                      'f_ge was assumed to the LEFT of f_gf/2.')
+                print('Both f_ge and f_gf/2 ' + key + 's have been found. '
+                                                      'f_ge was assumed to the LEFT of f_gf/2.')
         else:
             # If not, then it is just some other signal.
-            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
-                                    'the next largest '+key+' found.')
+            logging.warning('The f_gf/2 ' + key + ' was not found. Fitting to '
+                                                  'the next largest ' + key + ' found.')
 
         f0 = f0_left
         kappa_guess = kappa_guess_left
@@ -1043,8 +1053,8 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
                       'f_ge was assumed to the RIGHT of f_gf/2.')
         else:
             # If not, then it is just some other signal.
-            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
-                                    'the next largest '+key+' found.')
+            logging.warning('The f_gf/2 ' + key + ' was not found. Fitting to '
+                                                  'the next largest ' + key + ' found.')
         f0 = f0_right
         kappa_guess = kappa_guess_right
         f0_gf_over_2 = f0_gf_over_2_right
@@ -1061,11 +1071,12 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
 
     return f0, f0_gf_over_2, kappa_guess, kappa_guess_ef
 
+
 def peak_finder_v2(x, y, perc=90, window_len=11):
-    '''
+    """
     Peak finder based on argrelextrema function from scipy
     only finds maximums, this can be changed to minimum by using -y instead of y
-    '''
+    """
     smoothed_y = smooth(y, window_len=window_len)
     percval = np.percentile(smoothed_y, perc)
     filtered_y = np.where(smoothed_y > percval, smoothed_y, percval)
@@ -1074,9 +1085,30 @@ def peak_finder_v2(x, y, perc=90, window_len=11):
     sort_mask = np.argsort(y[array_peaks])[::-1]
     return peaks_x[sort_mask]
 
+
+def peak_finder_v3(x, y, smoothing=True, window_len=31, perc=99.6, factor=1):
+    """
+    Peak finder based on argrelextrema function from scipy
+    only finds maximums, this can be changed to minimum by using factor=-1
+    """
+    if smoothing:
+        y = (smooth(y, window_len=window_len) - y)
+    else:
+        y = y - np.average(y)
+    y = factor * y
+    percval = np.percentile(y, perc)
+    filtered_y = np.where(y > percval, y, percval)
+    array_peaks = argrelextrema(filtered_y, np.greater)
+    peaks_x = x[array_peaks]
+    peaks_y = y[array_peaks]
+    sort_mask = np.argsort(y[array_peaks])[::-1]
+    return peaks_x, peaks_y, y
+
+
 def cut_edges(array, window_len=11):
-    array = array[(window_len//2):-(window_len//2)]
+    array = array[(window_len // 2):-(window_len // 2)]
     return array
+
 
 def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
                 key=None, optimize=False):
@@ -1102,13 +1134,14 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
     """
 
     # First search for peaks/dips
-    search_result = look_for_peaks_dips(x=x, y_smoothed=y, percentile=percentile,
+    search_result = look_for_peaks_dips(x=x, y_smoothed=y,
+                                        percentile=percentile,
                                         num_sigma_threshold=num_sigma_threshold,
                                         key=key, window_len=window_len)
 
     if optimize:
-    # Rerun if the found peak/dip is smaller/larger than the largest/
-    # smallest data point
+        # Rerun if the found peak/dip is smaller/larger than the largest/
+        # smallest data point
 
         y_for_test = deepcopy(y)
         # Figure out if the data set has peaks or dips
@@ -1124,7 +1157,7 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
                     np.abs(y[search_result['peak_idx']]):
                 key_1 = 'peak'
             elif np.abs(y[search_result['dip_idx']]) > \
-                 np.abs(y[search_result['peak_idx']]):
+                    np.abs(y[search_result['peak_idx']]):
                 key_1 = 'dip'
                 y_for_test = -y_for_test
             else:
@@ -1132,20 +1165,23 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
                               'or dips. Assume peaks.')
                 key_1 = 'peak'
 
-        if (y_for_test[search_result[key_1+'_idx']] < max(y_for_test)):
-            while ((y_for_test[search_result[key_1+'_idx']] < max(y_for_test)) and
-                    (num_sigma_threshold<100) and
-                        (len(search_result[key_1+'s_idx'])>1)):
+        if y_for_test[search_result[key_1 + '_idx']] < max(y_for_test):
+            while ((y_for_test[search_result[key_1 + '_idx']] < max(
+                    y_for_test)) and
+                   (num_sigma_threshold < 100) and
+                   (len(search_result[key_1 + 's_idx']) > 1)):
 
                 search_result_1 = deepcopy(search_result)
                 num_sigma_threshold += 1
 
-                search_result = look_for_peaks_dips(x=x,y_smoothed=y,
-                                    percentile=percentile,
-                                    num_sigma_threshold=(num_sigma_threshold),
-                                    key=key_1, window_len=window_len)
+                search_result = look_for_peaks_dips(x=x, y_smoothed=y,
+                                                    percentile=percentile,
+                                                    num_sigma_threshold=(
+                                                        num_sigma_threshold),
+                                                    key=key_1,
+                                                    window_len=window_len)
 
-                if search_result[key_1+'_idx'] is None:
+                if search_result[key_1 + '_idx'] is None:
                     search_result = search_result_1
                     break
 
@@ -1154,24 +1190,23 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
 
     return search_result
 
+
 def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
                         num_sigma_threshold=5, key=None):
-
-    '''
+    """
     Peak finding algorithm designed by Serwan
     1 smooth data
     2 Define the threshold based on background data
     3
 
     key:    'peak' or 'dip'; return only the peaks or the dips
-    '''
+    """
 
     # Smooth the data
     y_smoothed = smooth(y_smoothed, window_len=window_len)
 
     # Finding peaks
     # Defining the threshold
-
     percval = np.percentile(y_smoothed, percentile)
     y_background = y_smoothed[y_smoothed < percval]
     background_mean = np.mean(y_background)
@@ -1180,7 +1215,6 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
     threshold = background_mean + num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
-    #datthreshold = y_smoothed[thresholdlst]
 
     if thresholdlst.size is 0:
         kk = 0
@@ -1196,7 +1230,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
                 inpeak = True
                 peakfmin = kk
                 peakfmax = kk
-                kk = i+1
+                kk = i + 1
             else:
                 if kk == i:
                     peakfmax = kk
@@ -1213,30 +1247,29 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
                                      np.argmax(y_smoothed[elem[0]:elem[1]])]
                 else:
                     peak_indices += [elem[0]]
-                #peak_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
 
-        #eliminate duplicates
+        # eliminate duplicates
         peak_indices = np.unique(peak_indices)
 
-        #Take an approximate peak width for each peak index
-        for i,idx in enumerate(peak_indices):
-            if (idx+i+1)<x.size and (idx-i-1)>=0:
-                #ensure data points idx+i+1 and idx-i-1 are inside sweep pts
-                peak_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
-            elif (idx+i+1)>x.size and (idx-i-1)>=0:
-                peak_widths += [ (x[idx] - x[idx-i])/5 ]
-            elif (idx+i+1)<x.size and (idx-i-1)<0:
-                peak_widths += [ (x[idx+i] - x[idx])/5 ]
+        # Take an approximate peak width for each peak index
+        for i, idx in enumerate(peak_indices):
+            if (idx + i + 1) < x.size and (idx - i - 1) >= 0:
+                # ensure data points idx+i+1 and idx-i-1 are inside sweep pts
+                peak_widths += [(x[idx + i + 1] - x[idx - i - 1]) / 5]
+            elif (idx + i + 1) > x.size and (idx - i - 1) >= 0:
+                peak_widths += [(x[idx] - x[idx - i]) / 5]
+            elif (idx + i + 1) < x.size and (idx - i - 1) < 0:
+                peak_widths += [(x[idx + i] - x[idx]) / 5]
             else:
-                peak_widths += [ 5e6 ]
+                peak_widths += [5e6]
 
-        peaks = np.take(x, peak_indices)                   #Frequencies of peaks
-        peak_vals = np.take(y_smoothed, peak_indices)           #values of peaks
+        peaks = np.take(x, peak_indices)  # Frequencies of peaks
+        peak_vals = np.take(y_smoothed, peak_indices)  # values of peaks
         peak_index = peak_indices[np.argmax(peak_vals)]
         peak_width = peak_widths[np.argmax(peak_vals)]
-        peak = x[peak_index]                          #Frequency of highest peak
+        peak = x[peak_index]  # Frequency of highest peak
 
     else:
         peak = None
@@ -1247,7 +1280,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
 
     # Finding dip_index
     # Definining the threshold
-    percval = np.percentile(y_smoothed, 100-percentile)
+    percval = np.percentile(y_smoothed, 100 - percentile)
     y_background = y_smoothed[y_smoothed > percval]
     background_mean = np.mean(y_background)
     background_std = np.std(y_background)
@@ -1255,7 +1288,6 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
     threshold = background_mean - num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
-    #datthreshold = y_smoothed[thresholdlst]
 
     if thresholdlst.size is 0:
         kk = 0
@@ -1271,7 +1303,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
                 indip = True
                 dipfmin = kk
                 dipfmax = kk
-                kk = i+1
+                kk = i + 1
             else:
                 if kk == i:
                     dipfmax = kk
@@ -1288,25 +1320,25 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
                                     np.argmin(y_smoothed[elem[0]:elem[1]])]
                 else:
                     dip_indices += [elem[0]]
-                #dip_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
 
-        #eliminate duplicates
+        # eliminate duplicates
         dip_indices = np.unique(dip_indices)
 
-        #Take an approximate dip width for each dip index
-        for i,idx in enumerate(dip_indices):
-            if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points
-                                                          #idx+i+1 and idx-i-1
-                                                          #are inside sweep pts
-                dip_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
-            elif (idx+i+1)>x.size and (idx-i-1)>=0:
-                dip_widths += [ (x[idx] - x[idx-i])/5 ]
-            elif (idx+i+1)<x.size and (idx-i-1)<0:
-                dip_widths += [ (x[idx+i] - x[idx])/5 ]
+        # Take an approximate dip width for each dip index
+        for i, idx in enumerate(dip_indices):
+            if (idx + i + 1) < x.size and (
+                    idx - i - 1) >= 0:  # ensure data points
+                # idx+i+1 and idx-i-1
+                # are inside sweep pts
+                dip_widths += [(x[idx + i + 1] - x[idx - i - 1]) / 5]
+            elif (idx + i + 1) > x.size and (idx - i - 1) >= 0:
+                dip_widths += [(x[idx] - x[idx - i]) / 5]
+            elif (idx + i + 1) < x.size and (idx - i - 1) < 0:
+                dip_widths += [(x[idx + i] - x[idx]) / 5]
             else:
-                dip_widths += [ 5e6 ]
+                dip_widths += [5e6]
 
         dips = np.take(x, dip_indices)
         dip_vals = np.take(y_smoothed, dip_indices)
@@ -1322,33 +1354,33 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
         dip_width = None
 
     if key == 'peak':
-        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values': peak_vals,
                 'peak_width': peak_width, 'peak_widths': peak_widths,
                 'peaks': peaks, 'peaks_idx': peak_indices,
-                'dip': None, 'dip_idx': None, 'dip_values':[],
+                'dip': None, 'dip_idx': None, 'dip_values': [],
                 'dip_width': None, 'dip_widths': [],
                 'dips': [], 'dips_idx': []}
     elif key == 'dip':
-        return {'peak': None, 'peak_idx': None, 'peak_values':[],
+        return {'peak': None, 'peak_idx': None, 'peak_values': [],
                 'peak_width': None, 'peak_widths': [],
                 'peaks': [], 'peaks_idx': [],
-                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip': dip, 'dip_idx': dip_index, 'dip_values': dip_vals,
                 'dip_width': dip_width, 'dip_widths': dip_widths,
                 'dips': dips, 'dips_idx': dip_indices}
     else:
-        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values': peak_vals,
                 'peak_width': peak_width, 'peak_widths': peak_widths,
                 'peaks': peaks, 'peaks_idx': peak_indices,
-                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip': dip, 'dip_idx': dip_index, 'dip_values': dip_vals,
                 'dip_width': dip_width, 'dip_widths': dip_widths,
                 'dips': dips, 'dips_idx': dip_indices}
 
 
 def calculate_distance_ground_state(data_real, data_imag, percentile=70,
                                     normalize=False):
-    ''' Calculates the distance from the ground state by assuming that
+    """ Calculates the distance from the ground state by assuming that
         for the largest part of the data, the system is in its ground state
-    '''
+    """
     perc_real = np.percentile(data_real, percentile)
     perc_imag = np.percentile(data_imag, percentile)
 
@@ -1365,33 +1397,34 @@ def calculate_distance_ground_state(data_real, data_imag, percentile=70,
         data_dist /= np.max(data_dist)
     return data_dist
 
-# def rotate_data_to_zero(data_I, data_Q, NoCalPoints):
-
 
 def zigzag(seq, sample_0, sample_1, nr_samples):
-    '''
+    """
     Splits a sequence in two sequences, one containing the odd entries, the
     other containing the even entries.
     e.g. in-> [0,1,2,3,4,5] -> out0 = [0,2,4] , out1[1,3,5]
-    '''
+    """
     return seq[sample_0::nr_samples], seq[sample_1::nr_samples]
 
 
 def calculate_rotation_matrix(delta_I, delta_Q):
-    '''
+    """
     Calculates a matrix that rotates the data to lie along the Q-axis.
     Input can be either the I and Q coordinates of the zero cal_point or
     the difference between the 1 and 0 cal points.
-    '''
+    """
 
     angle = np.arctan2(delta_Q, delta_I)
     rotation_matrix = np.transpose(
-        np.matrix([[np.cos(angle), -1*np.sin(angle)],
+        np.matrix([[np.cos(angle), -1 * np.sin(angle)],
                    [np.sin(angle), np.cos(angle)]]))
     return rotation_matrix
 
 
 def normalize_TD_data(data, data_zero, data_one):
+    """
+    Normalizes measured data to refernce signals for zero and one
+    """
     return (data - data_zero) / (data_one - data_zero)
 
 
@@ -1414,10 +1447,10 @@ def normalize_2D_data(data_2D):
 
 
 def normalize_2D_data_on_elements(data_2D, elements):
-    '''
+    """
     Normalizes every row in a 2D array by normalizing on the mean
     of the elements specified in row_elements
-    '''
+    """
     for k in range(data_2D.shape[1]):
         data_2D[:, k] /= np.mean(data_2D[elements, k])
     return data_2D
@@ -1425,7 +1458,7 @@ def normalize_2D_data_on_elements(data_2D, elements):
 
 def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                               zero_coord=None, one_coord=None, **kw):
-    '''
+    """
     Rotates and normalizes data with respect to some reference coordinates.
     there are two ways to specify the reference coordinates.
         1. Explicitly defining the coordinates
@@ -1439,16 +1472,16 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                                   correspond to zero
         cal_one_points (range) : range specifying what indices in 'data'
                                  correspond to one
-    '''
+    """
     # Extract zero and one coordinates
 
-    if np.all([cal_zero_points==None, cal_one_points==None,
-               zero_coord==None, one_coord==None]):
+    if np.all([cal_zero_points == None, cal_one_points == None,
+               zero_coord == None, one_coord == None]):
         # no cal points were used
         normalized_data = rotate_and_normalize_data_no_cal_points(data=data,
                                                                   **kw)
-    elif np.all([cal_one_points==None, one_coord==None]) and \
-        (not np.all([cal_zero_points==None, zero_coord==None])):
+    elif np.all([cal_one_points == None, one_coord == None]) and \
+            (not np.all([cal_zero_points == None, zero_coord == None])):
         # only 2 cal points used; both are I pulses
         I_zero = np.mean(data[0][cal_zero_points])
         Q_zero = np.mean(data[1][cal_zero_points])
@@ -1458,7 +1491,6 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
         # Least squares fitting to the line through the data, that also
         # intercepts the calibration point
-
         from lmfit.models import LinearModel
 
         x = trans_data[0]
@@ -1476,20 +1508,21 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
         line_slope = fit_res.params['slope'].value
         line_intercept = fit_res.params['intercept'].value
-        #finx the x, y coordinates of the projected points
-        x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
-        y_proj= line_slope*(x_proj)+line_intercept
+        # finx the x, y coordinates of the projected points
+        x_proj = (x + line_slope * y - line_slope * line_intercept) / (
+                line_slope ** 2 + 1)
+        y_proj = line_slope * (x_proj) + line_intercept
 
-        #find the minimum (on th ey axis) point on the line
+        # find the minimum (on th ey axis) point on the line
         y_min_line = min(fit_res.best_fit)
         x_min_line = x[np.argmin(fit_res.best_fit)]
 
-        #find x,y coordinates with respect to end of line
+        # find x,y coordinates with respect to end of line
         x_data = np.abs(x_min_line - x_proj)
-        y_data = y_proj-y_min_line
+        y_data = y_proj - y_min_line
 
-        #find distance from points on line to end of line
-        rotated_data = np.sqrt(x_data**2+y_data**2)
+        # find distance from points on line to end of line
+        rotated_data = np.sqrt(x_data ** 2 + y_data ** 2)
 
         normalized_data = rotated_data
 
@@ -1519,18 +1552,18 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         trans_data = [data[0] - I_zero, data[1] - Q_zero]
 
         # Rotate the data
-        M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
+        M = calculate_rotation_matrix(I_one - I_zero, Q_one - Q_zero)
         outp = [np.asarray(elem)[0] for elem in M * trans_data]
         rotated_data_ch1 = outp[0]
 
         # Normalize the data
-        one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
-        normalized_data = rotated_data_ch1/one_zero_dist
+        one_zero_dist = np.sqrt((I_one - I_zero) ** 2 + (Q_one - Q_zero) ** 2)
+        normalized_data = rotated_data_ch1 / one_zero_dist
 
     return [normalized_data, zero_coord, one_coord]
 
-def rotate_and_normalize_data_no_cal_points(data, **kw):
 
+def rotate_and_normalize_data_no_cal_points(data, **kw):
     """
     Rotates and projects data based on principal component analysis.
     (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
@@ -1539,32 +1572,32 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     MeasurementAnalysis.measured_values.
     """
 
-    #translate each column in the data by its mean
+    # translate each column in the data by its mean
     mean_x = np.mean(data[0])
     mean_y = np.mean(data[1])
     trans_x = data[0] - mean_x
     trans_y = data[1] - mean_y
 
-    #compute the covariance 2x2 matrix
-    cov_matrix = np.cov(np.array([trans_x,trans_y]))
+    # compute the covariance 2x2 matrix
+    cov_matrix = np.cov(np.array([trans_x, trans_y]))
 
-    #find eigenvalues and eigenvectors of the covariance matrix
+    # find eigenvalues and eigenvectors of the covariance matrix
     [eigvals, eigvecs] = np.linalg.eig(cov_matrix)
 
-    #compute the transposed feature vector
-    row_feature_vector = np.array([(eigvecs[0,np.argmin(eigvals)],
-                                    eigvecs[1,np.argmin(eigvals)]),
-                                   (eigvecs[0,np.argmax(eigvals)],
-                                    eigvecs[1,np.argmax(eigvals)])])
-    #compute the row_data_trans matrix with (x,y) pairs in each column. Each
-    #row is a dimension (row1 = x_data, row2 = y_data)
-    row_data_trans = np.array([trans_x,trans_y])
-    #compute final, projected data; only the first row is of interest (it is the
-    #principal axis
+    # compute the transposed feature vector
+    row_feature_vector = np.array([(eigvecs[0, np.argmin(eigvals)],
+                                    eigvecs[1, np.argmin(eigvals)]),
+                                   (eigvecs[0, np.argmax(eigvals)],
+                                    eigvecs[1, np.argmax(eigvals)])])
+    # compute the row_data_trans matrix with (x,y) pairs in each column. Each
+    # row is a dimension (row1 = x_data, row2 = y_data)
+    row_data_trans = np.array([trans_x, trans_y])
+    # compute final, projected data; only the first row is of interest (it is the
+    # principal axis
     final_data = np.dot(row_feature_vector, row_data_trans)
-    normalized_data = final_data[1,:]
+    normalized_data = final_data[1, :]
 
-    #normalize data
+    # normalize data
     # max_min_distance = np.sqrt(max(final_data[1,:])**2 +
     #                            min(final_data[1,:])**2)
     # normalized_data = final_data[1,:]/max_min_distance
@@ -1573,9 +1606,10 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
 
     return normalized_data
 
+
 def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
                       cal_one_points=np.arange(-2, 0, 1), **kw):
-    '''
+    """
     Normalizes data according to calibration points
     Inputs:
         data (numpy array) : 1D dataset that has to be normalized
@@ -1583,15 +1617,15 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
                                   correspond to zero
         cal_one_points (range) : range specifying what indices in 'data'
                                  correspond to one
-    '''
+    """
     # Extract zero and one coordinates
     I_zero = np.mean(data[cal_zero_points])
     I_one = np.mean(data[cal_one_points])
     # Translate the date
     trans_data = data - I_zero
     # Normalize the data
-    one_zero_dist = I_one-I_zero
-    normalized_data = trans_data/one_zero_dist
+    one_zero_dist = I_one - I_zero
+    normalized_data = trans_data / one_zero_dist
 
     return normalized_data
 
@@ -1602,6 +1636,8 @@ def datetime_from_timestamp(timestamp):
             return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
         elif len(timestamp) == 15:
             return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+        else:
+            raise ValueError
     except Exception as e:
         print('Invalid timestamp :"{}"'.format(timestamp))
         raise e
@@ -1634,31 +1670,57 @@ def current_datemark():
 def current_timemark():
     return time.strftime('%H%M%S', time.localtime())
 
+
 ######################################################################
 #    Plotting tools
 ######################################################################
 
 
-def color_plot(x, y, z, fig, ax, cax=None,
+def color_plot(x, y, z, fig=None, ax=None, cax=None,
                show=False, normalize=False, log=False,
                transpose=False, add_colorbar=True, **kw):
-    '''
+    """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
     types of input.
-    '''
+    Args:
+        x (array [shape: n*1]):     x data
+        y (array [shape: m*1]):     y data
+        z (array [shape: n*m]):     z data
+        fig (Object):
+            figure object
+        log (string/bool):
+            True/False for z axis scaling, or any string containing any
+            combination of letters x, y, z for scaling of the according axis.
+            Remember to set the labels correctly.
+    """
+    if ax == None:
+        fig, ax = plt.subplots()
+
+    norm = None
+    try:
+        if log is True or 'z' in log:
+            norm = LogNorm()
+
+        if 'y' in log:
+            y = np.log10(y)
+
+        if 'x' in log:
+            x = np.log10(x)
+    except TypeError:  # log is not iterable
+        pass
 
     # calculate coordinates for corners of color blocks
     # x coordinates
-    x_vertices = np.zeros(np.array(x.shape)+1)
-    x_vertices[1:-1] = (x[:-1]+x[1:])/2.
-    x_vertices[0] = x[0] - (x[1]-x[0])/2.
-    x_vertices[-1] = x[-1] + (x[-1]-x[-2])/2.
+    x_vertices = np.zeros(np.array(x.shape) + 1)
+    x_vertices[1:-1] = (x[:-1] + x[1:]) / 2.
+    x_vertices[0] = x[0] - (x[1] - x[0]) / 2.
+    x_vertices[-1] = x[-1] + (x[-1] - x[-2]) / 2.
     # y coordinates
-    y_vertices = np.zeros(np.array(y.shape)+1)
-    y_vertices[1:-1] = (y[:-1]+y[1:])/2.
-    y_vertices[0] = y[0] - (y[1]-y[0])/2.
-    y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
+    y_vertices = np.zeros(np.array(y.shape) + 1)
+    y_vertices[1:-1] = (y[:-1] + y[1:]) / 2.
+    y_vertices[0] = y[0] - (y[1] - y[0]) / 2.
+    y_vertices[-1] = y[-1] + (y[-1] - y[-2]) / 2.
     cmap_chosen = kw.get('cmap_chosen', 'viridis')
 
     # This version (below) does not plot the last row, but it possibly fixes
@@ -1682,11 +1744,9 @@ def color_plot(x, y, z, fig, ax, cax=None,
     cmap = plt.get_cmap(kw.pop('cmap', cmap_chosen))
     # CMRmap is our old default
 
-    clim = kw.get('clim', [None, None])
-    if log:
-        norm = colors.LogNorm()
-    else:
-        norm = None
+    # Empty values in the array are filled with np.nan, this ensures
+    # the plot limits are set correctly.
+    clim = kw.get('clim', [np.nanmin(z), np.nanmax(z)])
 
     if transpose:
         print('Inverting x and y axis for colormap plot')
@@ -1700,7 +1760,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
                                  linewidth=0, rasterized=True,
                                  vmin=clim[0], vmax=clim[1])
 
-    plot_title = kw.pop('plot_title', None)
+    title = kw.pop('title', None)
 
     xlabel = kw.pop('xlabel', None)
     ylabel = kw.pop('ylabel', None)
@@ -1711,8 +1771,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
 
-    if plot_title is not None:
-        ax.set_title(plot_title, y=1.05, fontsize=18)
+    if title is not None:
+        ax.set_title(title)
 
     ax.get_yaxis().set_tick_params(direction='out')
     ax.get_xaxis().set_tick_params(direction='out')
@@ -1740,7 +1800,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     if add_colorbar:
         if cax is None:
             ax_divider = make_axes_locatable(ax)
-            cax = ax_divider.append_axes('right', size='10%', pad='5%')
+            cax = ax_divider.append_axes('right', size='5%', pad='2%')
         cbar = plt.colorbar(colormap, cax=cax, orientation='vertical')
         if zlabel is not None:
             cbar.set_label(zlabel)
@@ -1765,22 +1825,22 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
     # calculate coordinates for corners of color blocks
     # x coordinates
     xvals = np.array(xvals)
-    xvertices = np.zeros(np.array(xvals.shape)+1)
-    xvertices[1:-1] = (xvals[:-1]+xvals[1:])/2.
-    xvertices[0] = xvals[0] - (xvals[1]-xvals[0])/2
-    xvertices[-1] = xvals[-1] + (xvals[-1]-xvals[-2])/2
+    xvertices = np.zeros(np.array(xvals.shape) + 1)
+    xvertices[1:-1] = (xvals[:-1] + xvals[1:]) / 2.
+    xvertices[0] = xvals[0] - (xvals[1] - xvals[0]) / 2
+    xvertices[-1] = xvals[-1] + (xvals[-1] - xvals[-2]) / 2
     # y coordinates
     yvertices = []
     for xx in range(len(xvals)):
-        yvertices.append(np.zeros(np.array(yvals[xx].shape)+1))
-        yvertices[xx][1:-1] = (yvals[xx][:-1]+yvals[xx][1:])/2.
-        yvertices[xx][0] = yvals[xx][0] - (yvals[xx][1]-yvals[xx][0])/2
-        yvertices[xx][-1] = yvals[xx][-1] + (yvals[xx][-1]-yvals[xx][-2])/2
+        yvertices.append(np.zeros(np.array(yvals[xx].shape) + 1))
+        yvertices[xx][1:-1] = (yvals[xx][:-1] + yvals[xx][1:]) / 2.
+        yvertices[xx][0] = yvals[xx][0] - (yvals[xx][1] - yvals[xx][0]) / 2
+        yvertices[xx][-1] = yvals[xx][-1] + (yvals[xx][-1] - yvals[xx][-2]) / 2
 
     # various plot options
     # define colormap
     cmap = kw.pop('cmap', 'viridis')
-    #clim = kw.pop('clim', [None, None])
+    # clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:
         for xx in range(len(xvals)):
@@ -1788,10 +1848,10 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
     # logarithmic plot
     if log:
         for xx in range(len(xvals)):
-            zvals[xx] = np.log(zvals[xx])/np.log(10)
+            zvals[xx] = np.log(zvals[xx]) / np.log(10)
 
     # add blocks to plot
-    #hold = kw.pop('hold', False)
+    # hold = kw.pop('hold', False)
     for xx in range(len(xvals)):
         tempzvals = np.array([np.append(zvals[xx], np.array(0)),
                               np.append(zvals[xx], np.array(0))]).transpose()
@@ -1806,14 +1866,15 @@ def linecut_plot(x, y, z, fig, ax,
                  y_name='', y_unit='', log=True,
                  zlabel=None, legend=True,
                  line_offset=0, **kw):
-    '''
+    """
     Plots horizontal linecuts of a 2D plot.
     x and y must be 1D arrays.
     z must be a 2D array with shape(len(x),len(y)).
-    '''
+    """
     colormap = plt.cm.get_cmap('RdYlBu')
-    plt.gca().set_color_cycle([colormap(i) for i in np.linspace(
-                              0, 0.9, len(y))])
+    ax.set_prop_cycle('color', [colormap(i) for i in np.linspace(
+        0, 0.9, len(y))])
+
     for i in range(len(y)):
         label = '{}: {:.4g} {}'.format(
             y_name, y[i], y_unit)
@@ -1871,21 +1932,20 @@ def color_plot_interpolated(x, y, z, ax=None,
     return ax, CS
 
 
-def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
-
+def plot_errorbars(x, y, ax=None, linewidth=2, markersize=2, marker='none'):
     if ax is None:
         new_plot_created = True
         f, ax = plt.subplots()
     else:
         new_plot_created = False
 
-    standard_error = np.std(y)/np.sqrt(y.size)
+    standard_error = np.std(y) / np.sqrt(y.size)
 
-    ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt=marker,
-                     linewidth=linewidth, markersize=markersize)
+    ax.errorbar(x, y, yerr=standard_error, ecolor='k', fmt=marker,
+                linewidth=linewidth, markersize=markersize)
 
     if new_plot_created:
-        return f,ax
+        return f, ax
     else:
         return
 
@@ -1896,57 +1956,332 @@ def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
 
 
 def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
-                                   no_transitions=2, dim=None):
-    '''
+                                   no_transitions=2, dim=None, ng=0,
+                                   return_injs=False):
+    """
     Calculates transmon energy levels from the full transmon qubit Hamiltonian.
-    '''
+    """
     if dim is None:
-        dim = no_transitions*20
+        dim = no_transitions * 10
 
-    EJphi = EJ*np.sqrt(asym**2 + (1-asym**2)*np.cos(np.pi*reduced_flux)**2)
+    EJphi = EJ * np.sqrt(
+        asym ** 2 + (1 - asym ** 2) * np.cos(np.pi * reduced_flux) ** 2)
+    Ham = 4 * EC * np.diag(
+        np.arange(-dim - ng, dim - ng + 1) ** 2) - EJphi / 2 * \
+          (np.eye(2 * dim + 1, k=+1) + np.eye(2 * dim + 1, k=-1))
 
-    Ham = 4*EC*np.diag(np.arange(-dim, dim+1)**2) - EJphi/2 * \
-        (np.eye(2*dim+1, k=+1) + np.eye(2*dim+1, k=-1))
-    HamEigs = np.linalg.eigvalsh(Ham)
-    HamEigs.sort()
+    if return_injs:
+        HamEigs, HamEigVs = np.linalg.eigh(Ham)
+        # HamEigs.sort()
+        transitions = HamEigs[1:] - HamEigs[:-1]
+        charge_number_operator = np.diag(np.arange(-dim - ng, dim - ng + 1))
+        injs = np.zeros([dim, dim])
+        for i in range(dim):
+            for j in range(dim):
+                vect_i = np.matrix(HamEigVs[:, i])
+                vect_j = np.matrix(HamEigVs[:, j])
+                injs[i, j] = vect_i * (charge_number_operator * vect_j.getH())
+        return transitions[:no_transitions], injs
 
-    transitions = HamEigs[1:]-HamEigs[:-1]
+    else:
+        HamEigs = np.linalg.eigvalsh(Ham)
+        HamEigs.sort()
+        transitions = HamEigs[1:] - HamEigs[:-1]
+        return transitions[:no_transitions]
 
-    return transitions[:no_transitions]
+
+def calculate_transmon_and_resonator_transitions(EC, EJ, f_r, g_01,
+                                                 dim=None, ng=0, f_01=None,
+                                                 f_12=None,
+                                                 g_12_approximation=1):
+    """
+    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    """
+
+    # calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01, f_12], injs = calculate_transmon_transitions(EC, EJ, asym=0,
+                                                        reduced_flux=0,
+                                                        no_transitions=2,
+                                                        dim=dim, ng=ng,
+                                                        return_injs=True)
+
+    # problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    try:
+        E00 = 0
+        g_01 = np.abs(g_01)
+        H1 = np.array([[f_01, g_01],
+                       [g_01, f_r]])
+        E10, E01 = np.linalg.eigvalsh(H1)
+        g_12_transmon = abs(g_01 * injs[1, 2] / injs[0, 1])
+        g_12_resonator = abs(g_01 * np.sqrt(2))
+        # print('g_12_correction',g_12_transmon/g_12_resonator)
+        H2 = np.array([[f_01 + f_12, g_12_transmon, 0],
+                       [g_12_transmon, f_01 + f_r, g_12_resonator],
+                       [0, g_12_resonator, 2 * f_r]])
+        E20, E11, E02 = np.linalg.eigvalsh(H2)
+        # print(EC/1e6, EJ/1e9, f_r/1e9, g_01/1e6, f_01/1e9, f_12/1e9)
+    except np.linalg.LinAlgError:
+        print(EC / 1e6, EJ / 1e9, f_r / 1e9, g_01 / 1e6, f_01 / 1e9, f_12 / 1e9)
+
+    f_01_d = E10 - E00
+    f_12_d = E20 - E10
+    f_r_d = E01 - E00
+    f_01_res_shifted = E11 - E01
+    f_r_qubit_shifted = E11 - E10
+
+    return f_01_d, f_12_d, f_r_d, f_01_res_shifted, f_r_qubit_shifted
+
+
+def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
+                                         dim=None, ng=0, f_01=None, f_12=None,
+                                         g_12_approximation=1):
+    """
+    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    """
+
+    # calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01, f_12], injs = calculate_transmon_transitions(EC, EJ, asym=0,
+                                                        reduced_flux=0,
+                                                        no_transitions=2,
+                                                        dim=dim, ng=ng,
+                                                        return_injs=True)
+
+    # problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    try:
+        E000 = 0
+        g_1 = np.abs(g_1)
+        J_1 = np.abs(J_1)
+        H1 = np.array([[f_01, g_1, 0],
+                       [g_1, f_r, J_1],
+                       [0, J_1, f_PF]])
+        E100, E010, E001 = np.linalg.eigvalsh(H1)
+        g_2_trm = abs(g_1 * injs[1, 2] / injs[0, 1])
+        g_2_r_trm = abs(g_1 * np.sqrt(2))
+        g_2_r_PF = abs(J_1 * np.sqrt(2))
+        # print('g_12_correction',g_2_trm/g_2_r_trm)
+        H2 = np.zeros([6, 6])
+        H2[0, 0] = f_01 + f_12
+        H2[0, 1] = H2[1, 0] = g_2_trm
+
+        H2[1, 1] = f_01 + f_r
+        H2[1, 2] = H2[2, 1] = J_1
+        H2[1, 3] = H2[3, 1] = g_2_r_trm
+
+        H2[2, 2] = f_01 + f_PF
+        H2[2, 4] = H2[4, 2] = g_1
+
+        H2[3, 3] = 2 * f_r
+        H2[3, 4] = H2[4, 3] = g_2_r_PF
+
+        H2[4, 4] = f_r + f_PF
+        H2[4, 5] = H2[5, 4] = g_2_r_PF
+
+        H2[5, 5] = 2 * f_PF
+
+        E200, E110, E101, E020, E011, E002 = np.linalg.eigvalsh(H2)
+    except np.linalg.LinAlgError:
+        print(EC / 1e6, EJ / 1e9, f_r / 1e9, g_1 / 1e6, f_01 / 1e9, f_12 / 1e9)
+
+    f_q_01 = E100
+    f_q_12 = E200 - E100
+
+    f_r1 = E010
+    f_r2 = E001
+
+    f_disp_r1 = E110 - E100
+    f_disp_r2 = E101 - E100
+
+    f_nrsplt_r1 = E110 - E010
+    f_nrsplt_r2 = E101 - E001
+
+    return f_q_01, f_r1, f_r2, f_q_12, f_disp_r1, f_disp_r2, f_nrsplt_r1, f_nrsplt_r2
+
+
+def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR,
+                                             g_RR_PF, g_trm_bus,
+                                             dim=None, ng=0, f_01=None,
+                                             f_12=None):
+    """
+    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    """
+
+    # calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01, f_12], injs = calculate_transmon_transitions(EC, EJ, asym=0,
+                                                        reduced_flux=0,
+                                                        no_transitions=2,
+                                                        dim=dim, ng=ng,
+                                                        return_injs=True)
+
+    # problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    g_trm_RR = np.abs(g_trm_RR)
+    g_RR_PF = np.abs(g_RR_PF)
+    H1 = np.array([[f_01, g_trm_RR, 0, g_trm_bus],
+                   [g_trm_RR, f_r, g_RR_PF, 0],
+                   [0, g_RR_PF, f_PF, 0],
+                   [g_trm_bus, 0, 0, f_bus]])
+
+    E1000, E0100, E0010, E0001 = np.linalg.eigvalsh(H1)
+    g_2_trm_r = abs(g_trm_RR * injs[1, 2] / injs[0, 1])
+    g_2_r_trm = abs(g_trm_RR * np.sqrt(2))
+    g_2_r_PF = abs(g_RR_PF * np.sqrt(2))
+    g_2_bus_trm = abs(g_trm_bus * np.sqrt(2))
+    g_2_trm_bus = abs(g_trm_bus * injs[1, 2] / injs[0, 1])
+
+    H2 = np.zeros([10, 10])
+    H2[0, 0] = f_01 + f_12
+    H2[0, 1] = H2[1, 0] = g_2_trm_r
+    H2[0, 3] = H2[3, 0] = g_2_trm_bus
+
+    H2[1, 1] = f_01 + f_r
+    H2[1, 2] = H2[2, 1] = g_RR_PF
+    H2[1, 4] = H2[4, 1] = g_2_r_trm
+    H2[1, 6] = H2[6, 1] = g_trm_bus
+
+    H2[2, 2] = f_01 + f_PF
+    H2[2, 5] = H2[5, 2] = g_trm_RR
+    H2[2, 8] = H2[8, 2] = g_trm_bus
+
+    H2[3, 3] = f_bus + f_01
+    H2[3, 6] = H2[6, 3] = g_trm_RR
+    H2[3, 9] = H2[9, 3] = g_2_bus_trm
+
+    H2[4, 4] = 2 * f_r
+    H2[4, 5] = H2[5, 4] = g_2_r_PF
+
+    H2[5, 5] = f_r + f_PF
+    H2[5, 7] = H2[7, 5] = g_2_r_PF
+
+    H2[6, 6] = f_r + f_bus
+    H2[6, 8] = H2[8, 6] = g_RR_PF
+
+    H2[7, 7] = 2 * f_PF
+
+    H2[8, 8] = f_PF + f_bus
+
+    H2[9, 9] = f_bus + f_bus
+
+    E2000, E1100, E1010, E1001, E0200, E0110, E0101, E0020, E0011, E0002 = \
+        np.linalg.eigvalsh(H2)
+
+    f_q_01 = E1000
+    f_q_12 = E2000 - E1000
+
+    f_r1 = E0100
+    f_r2 = E0010
+    f_r3 = E0001
+
+    f_disp_r1 = E1100 - E1000
+    f_disp_r2 = E1010 - E1000
+    f_disp_r3 = E1001 - E1000
+
+    f_nrsplt_r1 = E1100 - E0100
+    f_nrsplt_r2 = E1010 - E0010
+    f_nrsplt_r3 = E1001 - E0010
+
+    return f_q_01, f_r1, f_r2, f_q_12, f_disp_r1, f_disp_r2, f_nrsplt_r1, f_nrsplt_r2
+
+
+def fit_EC_EJ_g_f_res_ng(flux_01, f_01, flux_12, f_12, flux_r, f_r, ng=0,
+                         asym=0):
+    """
+    Fits EC, EJ, g and f_res from a list of f01, f12 and f resonators
+    as a function of thier respective flux settings by numerical optimization.
+    for initial guess it takes the maximum of the inputs
+    """
+    from scipy import optimize
+    # initial guesses
+    g_01_ss_guess = 300e6
+    EC_guess = np.max(f_01) - np.max(f_12)
+    print('EC_guess', EC_guess / 1e6)
+    EJmax_guess = (np.max(f_01) + EC_guess) ** 2 / (8 * EC_guess)
+
+    f_r_guess = np.min(f_r)
+    asym_guess = 0.1
+
+    def g01(g_01_ss, EC, EJ, EJmax):
+        return (EJ / EC) ** (1 / 4) / (EJmax / EC) ** (1 / 4) * g_01_ss
+
+    def penaltyfn(params):
+        EC, EJmax, f_r_bare, g_01_ss, asym = params
+        # calculate f01s
+        f01s = []
+        for fl in flux_01:
+            EJ = EJmax * np.sqrt(
+                asym ** 2 + (1 - asym ** 2) * np.cos(np.pi * fl) ** 2)
+            g_01 = g01(g_01_ss, EC, EJ, EJmax)
+            f01s.append(
+                calculate_transmon_and_resonator_transitions(EC, EJ, f_r_bare,
+                                                             g_01, ng=ng)[0])
+        f01s = np.array(f01s)
+        # calculate f12s
+        f12s = []
+        for fl in flux_12:
+            EJ = EJmax * np.sqrt(
+                asym ** 2 + (1 - asym ** 2) * np.cos(np.pi * fl) ** 2)
+            g_01 = g01(g_01_ss, EC, EJ, EJmax)
+            f12s.append(
+                calculate_transmon_and_resonator_transitions(EC, EJ, f_r_bare,
+                                                             g_01, ng=ng)[1])
+        f12s = np.array(f12s)
+        # calculate f_rs
+        f_rs = []
+        for fl in flux_r:
+            EJ = EJmax * np.sqrt(
+                asym ** 2 + (1 - asym ** 2) * np.cos(np.pi * fl) ** 2)
+            g_01 = g01(g_01_ss, EC, EJ, EJmax)
+            f_rs.append(
+                calculate_transmon_and_resonator_transitions(EC, EJ, f_r_bare,
+                                                             g_01, ng=ng)[2])
+        f_rs = np.array(f_rs)
+
+        penalty_01 = f_01 - f01s
+        penalty_12 = f_12 - f12s
+        penalty_alpha = (f_01 - f_12) - (f01s - f12s)
+        penalty_r = f_r - f_rs
+        return np.concatenate(
+            (penalty_01, penalty_12, penalty_alpha * 20, penalty_r * 15))
+
+    (EC0, EJmax, fres, g_01_ss, asym), success = optimize.leastsq(
+        penaltyfn,
+        (EC_guess, EJmax_guess, f_r_guess, g_01_ss_guess, asym_guess))
+    print(success)
+    print('with', EC0, EJmax, fres, g_01_ss, asym)
+
+    return EC0, EJmax, fres, g_01_ss, asym
 
 
 def fit_EC_EJ(f01, f12):
-    '''
+    """
     Calculates EC and EJ from f01 and f12 by numerical optimization.
-    '''
+    """
     from scipy import optimize
     # initial guesses
-    EC0 = f01-f12
-    EJ0 = (f01+EC0)**2/(8*EC0)
+    EC0 = f01 - f12
+    EJ0 = (f01 + EC0) ** 2 / (8 * EC0)
 
-    penaltyfn = lambda Es: calculate_transmon_transitions(*Es)-[f01, f12]
+    penaltyfn = lambda Es: calculate_transmon_transitions(*Es) - [f01, f12]
     (EC, EJ), success = optimize.leastsq(penaltyfn, (EC0, EJ0))
     return EC, EJ
 
 
 def solve_quadratic_equation(a, b, c, verbose=False):
-    '''
+    """
     returns solutions to the quadratic equation. Will raise an error if the
     solution is negative
-    '''
-    d = b**2-4*a*c
+    """
+    d = b ** 2 - 4 * a * c
     if d < 0:
         if verbose:
             print("This equation has no real solution")
         return [np.NAN, np.NAN]
     elif d == 0:
-        x = (-b+np.sqrt(b**2-4*a*c))/2*a
+        x = (-b + np.sqrt(b ** 2 - 4 * a * c)) / 2 * a
         if verbose:
             print("This equation has one solution: ", x)
         return [x, x]
     else:
-        x1 = (-b+np.sqrt((b**2)-(4*(a*c))))/(2*a)
-        x2 = (-b-np.sqrt((b**2)-(4*(a*c))))/(2*a)
+        x1 = (-b + np.sqrt((b ** 2) - (4 * (a * c)))) / (2 * a)
+        x2 = (-b - np.sqrt((b ** 2) - (4 * (a * c)))) / (2 * a)
         if verbose:
             print("This equation has two solutions: ", x1, " or", x2)
         return [x1, x2]
@@ -2005,11 +2340,11 @@ def find_min(x, y, return_fit=False, perc=30):
     th_perc = np.percentile(y, perc)
     mask = np.where(y < th_perc, True, False)
     # function that multiplies all elements in vector
-    multiply_vec = lambda vec: reduce(lambda x, y: x*y, vec)
+    multiply_vec = lambda vec: reduce(lambda x, y: x * y, vec)
     # function that multiplies all elements in vector from idx_min
     idx_min = np.argmin(y)
     mask_ii = lambda ii: multiply_vec(
-        mask[min(idx_min, ii):max(idx_min, ii+1)])
+        mask[min(idx_min, ii):max(idx_min, ii + 1)])
     # function that returns mask_ii applied for all elements of the vector mask
     continuous_mask = np.array(
         [m for m in map(mask_ii, np.arange(len(mask)))], dtype=np.bool)
@@ -2021,7 +2356,7 @@ def find_min(x, y, return_fit=False, perc=30):
     my_fit_res = my_fit_model.fit(data=y_fit,
                                   x=x_fit,
                                   pars=my_fit_params)
-    x_min = -0.5*my_fit_res.best_values['b']/my_fit_res.best_values['a']
+    x_min = -0.5 * my_fit_res.best_values['b'] / my_fit_res.best_values['a']
     y_min = my_fit_model.func(x_min, **my_fit_res.best_values)
 
     if return_fit:
@@ -2036,20 +2371,20 @@ def get_color_order(i, max_num, cmap='viridis'):
     print('It is recommended to use the updated function "get_color_cycle".')
     if isinstance(cmap, str):
         cmap = cm.get_cmap(cmap)
-    return cmap((i/max_num) % 1)
+    return cmap((i / max_num) % 1)
 
 
 def get_color_order_hsv(i, max_num):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    return colors.hsv_to_rgb(2. * float(i) / (float(max_num) * 3.), 1., 1.)
 
 
 def get_color_list(max_num, cmap='viridis'):
-    '''
+    """
     Return an array of max_num colors take in even spacing from the
     color map cmap.
-    '''
+    """
     # Default matplotlib colormaps have a discrete set of colors
     if cmap == 'tab10':
         max_num = 10
@@ -2066,7 +2401,7 @@ def get_color_list(max_num, cmap='viridis'):
 
 
 def print_pars_table(n_ts=10, pars=None):
-    '''
+    """
     Prints out a table containing the value for the indicated parameters from the last N timestamps.
     Input:
         n_ts (int), number of time-stamps to include in the table (rows).
@@ -2077,23 +2412,24 @@ def print_pars_table(n_ts=10, pars=None):
         pars = ['IVVI.dac1', 'IVVI.dac2', 'IVVI.dac3']
         pars = ['Qubit.f_RO', 'Qubit.RO_acq_integration_length', 'Qubit.RO_pulse_power']
         pars = ['Qubit.spec_pow', 'Qubit.RO_power_cw']
-    '''
+    """
     ts_list = return_last_n_timestamps(n_ts)
     pdict = {}
     nparams = []
-    for i,p in enumerate(pars):
-        pdict.update({p:p})
-    opt_dict = {'scan_label':'','exact_label_match':True}
+    for i, p in enumerate(pars):
+        pdict.update({p: p})
+    opt_dict = {'scan_label': '', 'exact_label_match': True}
     # print(ts_list)
-    scans = RA.quick_analysis(t_start=ts_list[-1],t_stop=ts_list[0], options_dict=opt_dict,
-                      params_dict_TD=pdict,numeric_params=nparams)
+    scans = RA.quick_analysis(t_start=ts_list[-1], t_stop=ts_list[0],
+                              options_dict=opt_dict,
+                              params_dict_TD=pdict, numeric_params=nparams)
 
     pars_line = 'timestamp \t'
     for p in pars:
         pars_line = pars_line + p + '\t'
     print(pars_line)
-    for i,ts in enumerate(scans.TD_timestamps):
-        i_line = '%s \t'%ts
+    for i, ts in enumerate(scans.TD_timestamps):
+        i_line = '%s \t' % ts
         for p in pars:
-            i_line = i_line + scans.TD_dict[p][i]+'\t'
+            i_line = i_line + scans.TD_dict[p][i] + '\t'
         print(i_line)

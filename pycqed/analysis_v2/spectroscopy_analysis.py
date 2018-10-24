@@ -25,7 +25,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
     def __init__(self, t_start: str,
                  t_stop: str = None,
                  options_dict: dict = None,
-                 label: str = None,
+                 label: str = '',
                  extract_only: bool = False,
                  auto: bool = True,
                  do_fitting: bool = False):
@@ -215,7 +215,7 @@ class complex_spectroscopy(Spectroscopy):
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(self.proc_data_dict['plot_phase'],discont=3.141592653589793)
+            self.proc_data_dict['plot_phase'] = np.unwrap(self.proc_data_dict['plot_phase'],discont=np.pi)
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
@@ -230,7 +230,7 @@ class complex_spectroscopy(Spectroscopy):
         self.proc_data_dict['real_label'] = 'Real{S21} (V rms)'
         self.proc_data_dict['imag_label'] = 'Imag{S21} (V rms)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(self.proc_data_dict['plot_phase'],discont=3.141592653589793)
+            self.proc_data_dict['plot_phase'] = np.unwrap(self.proc_data_dict['plot_phase'],discont=np.pi)
             self.proc_data_dict['plot_xlabel'] = 'Frequency (Hz)'
         else:
             pass
@@ -297,7 +297,7 @@ class VNA_analysis(complex_spectroscopy):
     def __init__(self, t_start,
                  options_dict=None,
                  t_stop=None,
-                 do_fitting=False,
+                 do_fitting=True,
                  extract_only=False,
                  auto=True):
         super(VNA_analysis, self).__init__(t_start, t_stop=t_stop,

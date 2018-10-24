@@ -3,7 +3,6 @@ import numpy as np
 Library containing pulse shapes.
 '''
 from pycqed.measurement.waveform_control.pulse import Pulse, apply_modulation
-from pycqed.measurement.waveform_control_CC.waveform import martinis_flux_pulse
 from pycqed.utilities.general import int_to_bin
 
 class MW_IQmod_pulse(Pulse):
@@ -341,78 +340,7 @@ class SquareFluxPulse(Pulse):
 
 
 class MartinisFluxPulse(Pulse):
-
-    def __init__(self, channel=None, channels=None, name='Martinis flux pulse',
-                 **kw):
-        Pulse.__init__(self, name)
-        if channel is None and channels is None:
-            raise ValueError('Must specify either channel or channels')
-        elif channels is None:
-            self.channel = channel  # this is just for convenience, internally
-            # this is the part the sequencer element wants to communicate with
-            self.channels.append(channel)
-        else:
-            self.channels = channels
-
-        self.amplitude = kw.pop('amplitude', 1)
-
-        self.length = kw.pop('length', None)
-        self.lambda_coeffs = kw.pop('lambda_coeffs', None)
-
-        self.theta_f = kw.pop('theta_f', None)
-        self.g2 = kw.pop('g2', None)
-        self.E_c = kw.pop('E_c', None)
-        self.f_bus = kw.pop('f_bus', None)
-        self.f_01_max = kw.pop('f_01_max', None)
-        self.dac_flux_coefficient = kw.pop('dac_flux_coefficient', None)
-
-        self.kernel_path = kw.get('kernel_path', None)
-        if self.kernel_path is not None:
-            kernelvec = np.loadtxt(self.kernel_path)
-            self.kernel = np.zeros((len(kernelvec), len(kernelvec)))
-            for i in range(len(kernelvec)):
-                for j in range(len(kernelvec)):
-                    self.kernel[i, j] = kernelvec[i-j]
-            del(kernelvec)
-        else:
-            ValueError('Must specify kernel path')
-
-    def __call__(self, **kw):
-        self.amplitude = kw.pop('amplitude', self.amplitude)
-
-        self.pulse_buffer = kw.pop(
-            'pulse_buffer', self.pulse_buffer)
-
-        self.length = kw.pop(
-            'length', self.length)
-        self.lambda_coeffs = kw.pop('lambda_coeffs', self.lambda_coeffs)
-        self.theta_f = kw.pop('theta_f', self.theta_f)
-        self.g2 = kw.pop('g2', self.g2)
-        self.E_c = kw.pop('E_c', self.E_c)
-        self.f_bus = kw.pop('f_bus', self.f_bus)
-        self.f_01_max = kw.pop('f_01_max', self.f_01_max)
-        self.dac_flux_coefficient = kw.pop(
-            'dac_flux_coefficient', self.dac_flux_coefficient)
-
-        self.channel = kw.pop('channel', self.channel)
-        self.channels = kw.pop('channels', self.channels)
-        self.channels.append(self.channel)
-        return self
-
-    def chan_wf(self, chan, tvals):
-        t = tvals - tvals[0]
-        martinis_pulse = martinis_flux_pulse(
-            length=self.length,
-            lambda_coeffs=self.lambda_coeffs,
-            theta_f=self.theta_f, g2=self.g2,
-            E_c=self.E_c, f_bus=self.f_bus,
-            f_01_max=self.f_01_max,
-            dac_flux_coefficient=self.dac_flux_coefficient,
-            return_unit='V')
-
-        # amplitude is not used because of parameterization but
-        # we use the sign of the amplitude to set the flux compensation
-        return martinis_pulse*np.sign(self.amplitude)
+    pass
 
 
 class QWG_Codeword(Pulse):

@@ -50,6 +50,7 @@ from .SCPI import SCPI
 from qcodes.instrument.base import Instrument
 from qcodes import validators
 from qcodes.instrument.parameter import ManualParameter
+from datetime import datetime
 
 
 class QuTechVSMModule(SCPI):
@@ -60,7 +61,9 @@ class QuTechVSMModule(SCPI):
         self.channels = [1, 2, 3, 4]
 
         self.add_parameters()
+        self._sync_time_and_add_parameter()
         self.connect_message()
+
 
     def add_parameters(self):
         self.add_temperature_parameters()
@@ -183,6 +186,18 @@ class QuTechVSMModule(SCPI):
             #                        vals=validators.OnOff())
 
     def add_calibration_parameters(self):
+        # First add a function so a user can poll if calibration data has
+        # been set correctly in the VSM in order to correctly use the
+        # orthogonalized parameters
+        self.add_parameter(
+                            'getCalibrationDataAvailable',
+                            docstring='Use this to check if the calibration data has been '\
+                                      'set correctly in the VSM. Outputs an integer 0 (False), 1 (True)',
+                            get_cmd='CALIBRATIONDATAPATH' + '?',
+                            get_parser=int,
+                            vals=validators.Ints(0,1)
+                        )
+
         # Raw attenuationa and phase
         #  Two input pulses
         for pulse in ('gaussian', 'derivative'):
@@ -198,7 +213,7 @@ class QuTechVSMModule(SCPI):
                                   'input of channel {c} ' \
                                   'of module {m}.'.format(p=pulse, d=dac,
                                                           c=channel, m=mod)
-                        ch_name = 'mod{m}_ch{c}'.format(m=mod, c=channel)
+                        ch_name = '_mod{m}_ch{c}'.format(m=mod, c=channel)
                         ch_scpi = ':MODULE{m}:CHANNEL{c}'.format(m=mod,
                                                                  c=channel)
                         scpi_name = 'CALIBRATION' + ch_scpi + var_scpi
@@ -218,13 +233,14 @@ class QuTechVSMModule(SCPI):
         for pulse in ('gaussian', 'derivative'):
             for channel in self.channels:
                 for mod in self.modules:
-                    ch_name = '_mod{m}_ch{c}'.format(m=mod, c=channel)
+                    ch_name = 'mod{m}_ch{c}'.format(m=mod, c=channel)
                     ch_scpi = ':MODULE{m}:CHANNEL{c}'.format(m=mod, c=channel)
 
                     doc_var = 'Attenuation value (in dB) for the {p} ' \
                               'input of channel {c} ' \
-                              'of module {m}.'.format(p=pulse, c=channel, m=mod)
-                    var_name = ch_name + '_{p}_att_db'.format(p=pulse)
+                              'of module {m}.\nN.B. Safe range: '\
+                              '0.2<=v<=2.0'.format(p=pulse, c=channel, m=mod)
+                    var_name = '_'+ch_name + '_{p}_att_db'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:ATTENUATION:DB'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
                     self.add_parameter(var_name,
@@ -234,10 +250,11 @@ class QuTechVSMModule(SCPI):
                                        unit='dB',
                                        get_parser=float,
                                        vals=validators.Numbers())
-                    doc_var = 'Attenuation value (linear) for the {p} ' \
+                    doc_var = 'Amplitude value (linear) for the {p} ' \
                               'input of channel {c} ' \
                               'of module {m}.'.format(p=pulse, c=channel, m=mod)
-                    var_name = ch_name + '_{p}_att_lin'.format(p=pulse)
+                    var_name = ch_name + '_{p}_amp'.format(p=pulse)
+
                     var_scpi = ch_scpi + ':{p}:ATTENUATION:LIN'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
                     self.add_parameter(var_name,
@@ -245,12 +262,13 @@ class QuTechVSMModule(SCPI):
                                        get_cmd=scpi_name + '?',
                                        set_cmd=scpi_name + ' {}',
                                        get_parser=float,
-                                       vals=validators.Numbers())
+                                       vals=validators.Numbers(min_value=0.2,
+                                                               max_value=3.0))
 
                     doc_var = 'Phase value (in rad) for the {p} ' \
                               'input of channel {c} ' \
                               'of module {m}.'.format(p=pulse, c=channel, m=mod)
-                    var_name = ch_name + '_{p}_phs_rad'.format(p=pulse)
+                    var_name = '_' + ch_name + '_{p}_phs_rad'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:PHASE:RAD'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
                     self.add_parameter(var_name,
@@ -263,7 +281,7 @@ class QuTechVSMModule(SCPI):
                     doc_var = 'Phase value (in deg) for the {p} ' \
                               'input of channel {c} ' \
                               'of module {m}.'.format(p=pulse, c=channel, m=mod)
-                    var_name = ch_name + '_{p}_phs_deg'.format(p=pulse)
+                    var_name = ch_name + '_{p}_phase'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:PHASE:DEG'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
                     self.add_parameter(var_name,
@@ -272,8 +290,16 @@ class QuTechVSMModule(SCPI):
                                        set_cmd=scpi_name + ' {}',
                                        unit='deg',
                                        get_parser=float,
-                                       vals=validators.Numbers())
+                                       vals=validators.Numbers(-125,45))
 
+    def _sync_time_and_add_parameter(self):
+        doc_description = 'Parameter to sync the time from user computer to VSM'
+        self.add_parameter('sync_time',
+                           docstring=doc_description,
+                           set_cmd='SYSTEM'+':TIME {}',
+                           vals=validators.Strings())
+        current_time_str = datetime.now().strftime('%YT%mT%dT%HT%MT%S')
+        self.sync_time(current_time_str)
 
 
 class Dummy_QuTechVSMModule(QuTechVSMModule):
@@ -290,6 +316,7 @@ class Dummy_QuTechVSMModule(QuTechVSMModule):
         self.add_parameters()
         self._address = 'Dummy'
         self._terminator = '\n'
+        self._sync_time_and_add_parameter()
 
         self.IDN({'driver': str(self.__class__), 'model': self.name,
                   'serial': 'Dummy', 'vendor': '', 'firmware': ''})

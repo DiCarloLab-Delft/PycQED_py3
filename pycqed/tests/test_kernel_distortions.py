@@ -106,6 +106,11 @@ class Test_KernelObject(unittest.TestCase):
     #     pass
 
 
+    @classmethod
+    def tearDownClass(self):
+        self.k0.close()
+
+
 class Test_Kernel_functions(unittest.TestCase):
 
     def test_bounce(self):

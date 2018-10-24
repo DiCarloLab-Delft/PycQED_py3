@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+import cma
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement import CBox_sweep_functions as cbs
 from pycqed.measurement import detector_functions as det
@@ -37,7 +38,8 @@ def mixer_carrier_cancellation(SH, source, MC,
                                frequency: float=None,
                                SH_ref_level: float=-40,
                                init_stepsize: float=0.1,
-                               x0=(0.0, 0.0)):
+                               x0=(0.0, 0.0),
+                               label: str='Offset_calibration'):
     """
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is a generic version.
@@ -66,21 +68,23 @@ def mixer_carrier_cancellation(SH, source, MC,
     SH.ref_lvl(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency()),
-        Navg=5, delay=0.0, prepare_each_point=False)
+        Navg=5, delay=0.0, prepare_for_each_point=False)
 
-    ad_func_pars = {'adaptive_function': nelder_mead,
+    ad_func_pars = {'adaptive_function': cma.fmin,
                     'x0': x0,
-                    'initial_step': [init_stepsize, init_stepsize],
-                    'no_improv_break': 15,
-                    'minimize': True,
-                    'maxiter': 500}
+                    'sigma0':1,
+                    'options': {'maxiter': 500,    # maximum function cals
+                                # Scaling for individual sigma's
+                                'cma_stds': [init_stepsize]*2
+                                },
+                    'minimize': True}
     MC.set_sweep_functions([chI_par, chQ_par])
     MC.set_detector_function(detector)  # sets test_detector
     MC.set_adaptive_function_parameters(ad_func_pars)
-    MC.run(name='Offset_calibration', mode='adaptive')
-    a = ma.OptimizationAnalysis(label='Offset_calibration')
+    MC.run(name=label, mode='adaptive')
+    a = ma.OptimizationAnalysis(label=label)
     # v2 creates a pretty picture of the optimizations
-    ma.OptimizationAnalysis_v2(label='Offset_calibration')
+    ma.OptimizationAnalysis_v2(label=label)
 
     ch_1_min = a.optimization_result[0][0]
     ch_2_min = a.optimization_result[0][1]

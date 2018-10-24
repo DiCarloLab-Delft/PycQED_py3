@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import time
+import warnings
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -72,6 +73,10 @@ class Qubit(Instrument):
             spec_   : parameters relating to spectroscopy (single qubit CW)
             fl_     : parameters relating to flux control, this includes both
                       flux pulsing as well as flux offset (DC).
+            tim_    : parameters related to timing, used to set latencies,
+                        these are generally part of a device object (rather
+                        than the qubit objects) but are listed here for
+                        completeness.
             cfg_    : configuration, this can be info relevant for compilers
                       or configurations that determine how the qubit operates.
                       examples are cfg_qasm and cfg_f_qubit_calc_method.
@@ -266,9 +271,8 @@ class Qubit(Instrument):
         try:
             freq_res_par = self.freq_res
             freq_RO_par = self.ro_freq
-        except AttributeError:
-
-            logging.warning('Rename the f_res parameter to freq_res')
+        except:
+            warnings.warn("Deprecation warning: rename f_res to freq_res")
             freq_res_par = self.f_res
             freq_RO_par = self.f_RO
 
@@ -623,6 +627,13 @@ class Transmon(Qubit):
         self.add_parameter('E_j', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+        self.add_parameter('anharmonicity', unit='Hz',
+                           label='Anharmonicity',
+                           docstring='Anharmonicity, negative by convention',
+                           parameter_class=ManualParameter,
+                           # typical target value
+                           initial_value=-300e6,
+                           vals=vals.Numbers())
         self.add_parameter('T1', unit='s',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(0, 200e-6))
@@ -723,7 +734,7 @@ class Transmon(Qubit):
         if dac_voltage is not None and flux is not None:
             raise ValueError('Specify either dac voltage or flux but not both')
 
-        if self.f_qubit_calc_method() is 'latest':
+        if self.f_qubit_calc_method() == 'latest':
             f_qubit_estimate = self.f_qubit()
 
         elif self.f_qubit_calc_method() == 'dac':

@@ -105,7 +105,7 @@ class test_echo_analysis(unittest.TestCase):
     def test_echo_single_weight(self):
         a = ma.Echo_analysis(timestamp='20170607_211611')
         fpar = a.fit_res.best_values
-        self.assertAlmostEqual(fpar['tau']*1e6, 12.7, places=2)
+        self.assertAlmostEqual(fpar['tau']*1e6, 12.2, places=2)
 
 
 class test_allxy_analysis(unittest.TestCase):

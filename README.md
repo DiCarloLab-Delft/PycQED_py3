@@ -1,23 +1,32 @@
-# PycQED [![Build Status](https://travis-ci.org/DiCarloLab-Delft/PycQED_py3.svg?branch=master)](https://travis-ci.org/DiCarloLab-Delft/PycQED_py3) [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179) [![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger) [![Coverage](https://api.codacy.com/project/badge/Coverage/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=Badge_Coverage)
+# PycQED 
+[![Build Status](https://gitlab.com/dicarlolab/pycqed/badges/master/build.svg)](https://gitlab.com/dicarlolab/pycqed/pipelines)
+[![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179)
+[![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger)
+[![codecov](https://codecov.io/gl/dicarlolab/pycqed/branch/master/graph/badge.svg)](https://codecov.io/gl/dicarlolab/pycqed)
 
-A python based measurement environment for circuit-QED experiments by the [DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/), Delft University of Technology.
-This module is build on top of qcodes and is not intended as a stand-alone package.
+A Python-based measurement environment for circuit-QED experiments by the 
+[DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/),
+Delft University of Technology.
+This module is build on top of [QCoDeS](http://qcodes.github.io/Qcodes/) and 
+is not intended as a stand-alone 
+package.
 
 ## License
 This software is released under the [MIT License](LICENSE.md)
 
 ## Contributors
 Contributors (in alphabetical order):
-Serwan Asaad,
-Niels Bultink,
-Christian Dickel,
-Bart Dikken,
-Xiang Fu,
-Sjoerd de Jong,
-Gijs de Lange,
-Nathan Langford,
-Florian Luthi,
-Adriaan Rol,
+
+- Serwan Asaad
+- Niels Bultink
+- Christian Dickel
+- Bart Dikken
+- Xiang Fu
+- Sjoerd de Jong
+- Gijs de Lange
+- Nathan Langford
+- Florian Luthi
+- Adriaan Rol
 
 ## Contributing
 Please see [Contributing.md](.github/CONTRIBUTING.md)
@@ -30,15 +39,16 @@ Go to the directory where you cloned the repository (in the shell) and run
 For more details see the [installation instructions](docs/install.md).
 
 Test your installation using
-* `python pycqed/test.py`
+* `py.test pycqed/tests -v`
+(be sure that you are in the PycQED_py3 root folder)
 
 Or run a specific test using e.g.
-* `python pycqed/test.py -t test_cliffords.py`
-
+* `py.test pycqed/tests/test_cliffords.py -v`
+(be sure that you are in the PycQED_py3 root folder)
 
 ## Usage
 
-+ start up qcodes
++ start up QCoDeS
 + load corresponding [config file](init\config\)
 + set folder locations
 + create instruments
@@ -53,7 +63,7 @@ from init.your_initscript import *
 
 You are now ready to start your experiment.
 
-If you use this software in any of your publications we would appreciate it if you cite this repository using the [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179). 
+If you use this software in any of your publications we would appreciate it if you cite this repository using the [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179).
 
 ## Overview of the main modules
 Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things.
@@ -73,7 +83,7 @@ Mind however that the code is continuously under development so if you think som
 
 
 ### The init folder
-Contains script that are to be used when seting up an experiment. Used to store configuration info and create instruments.
+Contains script that are to be used when setting up an experiment. Used to store configuration info and create instruments.
 
 ###The instruments folder
 
@@ -141,8 +151,9 @@ The scripts that run an experiment. Dig around a bit here to get a feel of what 
 It is split into personal folders for messing around with your personal files and project folders where people working on the same project have their experimental scripts.
 
 ## Other useful stuff
-A little document containing some handy git commands.
-[Git tips & tricks ](docs/git_tips_and_tricks.md).
 
-Lecture series on scientific python
+A little document containing some handy git commands:
+[Git tips & tricks](docs/git_tips_and_tricks.md).
+
+Lecture series on scientific Python: 
 [Scientific Computing with Python](https://github.com/jrjohansson/scientific-python-lectures)

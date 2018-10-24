@@ -118,7 +118,7 @@ class ziShellEnvironment:
         print("Connecting to server on host {0}:{1} using API level {2}".format(
             host, port, api_level))
         self.daq = zi.ziDAQServer(host, port, api_level)
-        self.daq.setDebugLevel(0)
+        # self.daq.setDebugLevel(5)
 
     def autoconnect(self):
         if not self.daq:
@@ -745,7 +745,7 @@ class ziShellDevice:
         if not self.daq:
             raise(ziShellDAQError())
 
-        self.daq.setDebugLevel(0)
+        # self.daq.setDebugLevel(5)
         self.connected = False
 
         if self.device and self.interface:
@@ -890,6 +890,18 @@ class ziShellDevice:
         else:
             self.daq.vectorWrite('/' + self.device + '/' + path, value)
 
+    def sets(self, path, value, sync=False):
+        if not self.daq:
+            raise(ziShellDAQError())
+
+        path = path.lower()
+
+        # Handle absolute path
+        if path[0] == '/':
+            self.daq.setString(path, value)
+        else:
+            self.daq.setString('/' + self.device + '/' + path, value)
+
     def geti(self, path, deep=True):
         if not self.daq:
             raise(ziShellDAQError())
@@ -945,6 +957,27 @@ class ziShellDevice:
             return tmp[path][0]['vector']
         else:
             return None
+
+    def gets(self, path, deep=True):
+        if not self.daq:
+            raise(ziShellDAQError())
+
+        path = path.lower()
+        if path[0] != '/':
+            path = '/' + self.device + '/' + path
+
+        if deep:
+            self.daq.getAsEvent(path)
+            timeout = 1.0
+            while timeout > 0.0:
+                tmp = self.daq.poll(0.1, 500, 4, True)
+                if path in tmp:
+                    return tmp[path][0]
+                else:
+                    timeout -= 0.1
+            return None
+        else:
+            return self.daq.getString(path)
 
     def find(self, *args):
         if not self.daq:
@@ -1025,12 +1058,14 @@ class ziShellDevice:
 
         This function is tested to work and give the correct error messages
         when compilation fails.
+
+        N.B. the uploaded program will not work unless the
+        "configure_codeword_protocol" method is called on the HDAWG
         """
         t0 = time.time()
         success_and_ready = False
         # This check (and while loop) is added as a workaround for #9
         while not success_and_ready:
-            print('Disabling codeword triggering')
             self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 0)
             self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 0)
 
@@ -1065,7 +1100,6 @@ class ziShellDevice:
             if not comp_msg.endswith(succes_msg):
                 success = False
 
-            print('Reenabling codeword triggering')
             self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
             self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
 
@@ -1081,13 +1115,11 @@ class ziShellDevice:
             if self.geti('awgs/'+str(awg_nr)+'/ready')!= 1:
                 logging.warning('AWG not ready')
                 success_and_ready = False
-                print('not ready')
             else:
                 success_and_ready = True
-                print('ready')
 
-        print('AWG {} ready: {}'.format(awg_nr,
-                                     self.geti('awgs/'+str(awg_nr)+'/ready')))
+        # print('AWG {} ready: {}'.format(awg_nr,
+        #                              self.geti('awgs/'+str(awg_nr)+'/ready')))
         t1 = time.time()
         print(self.awgModule.get('awgModule/compiler/statusstring')
               ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))

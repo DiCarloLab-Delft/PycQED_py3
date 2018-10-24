@@ -97,14 +97,19 @@ class CCL(SCPI):
 
         self.qisa_opcode(qmap_fn)
 
-    def stop(self):
+    def stop(self, getOperationComplete=True):
         self.run(0),
         self.enable(0)
+        # Introduced to work around AWG8 triggering issue
+        if getOperationComplete:
+            self.getOperationComplete()
 
-    def start(self):
+    def start(self, getOperationComplete=True):
         self.enable(1)
         self.run(1)
-
+        # Introduced to work around AWG8 triggering issue
+        if getOperationComplete:
+            self.getOperationComplete()
 
     def add_standard_parameters(self):
         """
@@ -297,6 +302,8 @@ class CCL(SCPI):
             self.version_info = json.loads(id_string)
         except Exception as e:
             logging.warn('Error: failed to retrive IDN from CC-Light.', str(e))
+
+        self.version_info["Driver Version"] = self.driver_version
 
         return self.version_info
 
@@ -500,6 +507,9 @@ class dummy_CCL(CCL):
 
     def get_idn(self):
         return {'driver': str(self.__class__), 'name': self.name}
+
+    def getOperationComplete(self):
+        return True
 
     def add_standard_parameters(self):
         """

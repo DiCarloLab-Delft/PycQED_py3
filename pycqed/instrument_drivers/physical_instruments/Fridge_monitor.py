@@ -3,7 +3,7 @@ import logging
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
-from dateutil.parser import parse
+import dateutil.parser
 from time import time
 from datetime import datetime
 from urllib.request import urlopen
@@ -14,28 +14,87 @@ dcl = 'http://dicarlolab.tudelft.nl//wp-content/uploads/'
 address_dict = {'LaMaserati': dcl + 'LaMaseratiMonitor/',
                 'LaDucati': dcl + 'LaDucatiMonitor/',
                 'LaFerrari': dcl + 'LaFerrariMonitor/',
-                'LaAprilia': dcl + 'LaApriliaMonitor/'}
+                'LaAprilia': dcl + 'LaApriliaMonitor/',
+                'Bluefors': dcl + 'BlueforsMonitor/basic.html'}
 
-monitored_pars_dict = \
-    {'LaMaserati': {'temp': ['T_CP', 'T_CP (P)', 'T_3K', 'T_3K (P)',
-                             'T_Still', 'T_Still (P)', 'T_MClo',  'T_MClo (P)',
-                             'T_MChi', 'T_MChi (P)', 'T_50K (P)'],
-                    'press': ['P_5', 'P_Still', 'P_IVC', 'P_Probe',
-                              'P_OVC', 'P_4He', 'P_3He']},
-
-     'LaDucati': {'temp': ['T_Sorb', 'T_Still', 'T_MClo', 'T_MChi'],
-                  'press': ['P_5', 'P_Still', 'P_IVC', 'P_OVC',
-                            'P_4He', 'P_3He']},
-
-     'LaAprilia': {'temp': ['T_3K', 'T_Still', 'T_CP',
-                            'T_MChi', 'T_MClo', 'T_MCloCMN '],
-                   'press': ['P_5', 'P_Still', 'P_IVC', 'P_OVC',
-                             'P_4He', 'P_3He']},
-
-     'LaFerrari': {'temp': ['T_Sorb', 'T_Still', 'T_MChi', 'T_MCmid',
-                            'T_MClo', 'T_MCStage'],
-                   'press': ['P_5', 'P_Still', 'P_IVC', 'P_OVC', 'P_4He',
-                             'P_3He']}}
+monitored_pars_dict = {
+    'LaMaserati': {
+        'temp': [
+            'T_CP',
+            'T_CP (P)',
+            'T_3K',
+            'T_3K (P)',
+            'T_Still',
+            'T_Still (P)',
+            'T_MClo',
+            'T_MClo (P)',
+            'T_MChi',
+            'T_MChi (P)',
+            'T_50K (P)'],
+        'press': [
+            'P_5',
+            'P_Still',
+            'P_IVC',
+            'P_Probe',
+            'P_OVC',
+            'P_4He',
+            'P_3He']},
+    'LaDucati': {
+        'temp': [
+            'T_Sorb',
+            'T_Still',
+            'T_MClo',
+            'T_MChi'],
+        'press': [
+            'P_5',
+            'P_Still',
+            'P_IVC',
+            'P_OVC',
+            'P_4He',
+            'P_3He']},
+    'LaAprilia': {
+        'temp': [
+            'T_3K',
+            'T_Still',
+            'T_CP',
+            'T_MChi',
+            'T_MClo',
+            'T_MCloCMN '],
+        'press': [
+            'P_5',
+            'P_Still',
+            'P_IVC',
+            'P_OVC',
+            'P_4He',
+            'P_3He']},
+    'LaFerrari': {
+        'temp': [
+            'T_Sorb',
+            'T_Still',
+            'T_MChi',
+            'T_MCmid',
+            'T_MClo',
+            'T_MCStage'],
+        'press': [
+            'P_5',
+            'P_Still',
+            'P_IVC',
+            'P_OVC',
+            'P_4He',
+            'P_3He']},
+    'Bluefors': {
+        'temp': [
+            'T_50K_Flange',
+            'T_4K_Flange',
+            'T_Still',
+            'T_MC'],
+        'press': [
+            'P_VC',
+            'P_Still',
+            'P_Injection',
+            'P_Circ._scroll',
+            'P_dump',
+            'P_aux._manifold']}}
 
 
 class Fridge_Monitor(Instrument):
@@ -49,7 +108,7 @@ class Fridge_Monitor(Instrument):
 
         self.add_parameter(
             'fridge_name', initial_value=fridge_name,
-            vals=vals.Enum('LaMaserati', 'LaDucati', 'LaFerrari', 'LaAprilia'),
+            vals=vals.Enum(*list(monitored_pars_dict)),
             parameter_class=ManualParameter)
 
         self.add_parameter('last_mon_update',
@@ -112,13 +171,15 @@ class Fridge_Monitor(Instrument):
         time_since_update = time() - self._last_temp_update
         if time_since_update > (self.update_interval()):
             self.temp_dict = {}
+            self.press_dict = {}
             try:
                 s = urlopen(self.url, timeout=5)
-                source = s.read()
+                source = s.read().decode()
+                self.source = source
                 s.close()
                 # Extract the last update time of the fridge website
-                upd_time = parse(re.findall(
-                    'Current time: (.*)<br>Last', str(source))[0])
+                upd_time_str = re.findall('Current time: ([^<]*)<br>', source)[0].strip()
+                upd_time = dateutil.parser.parse(upd_time_str)
                 if (datetime.now() - upd_time).seconds > 360:
                     logging.warning(
                         "{} is not updating!".format(self.fridge_name()))
@@ -127,12 +188,12 @@ class Fridge_Monitor(Instrument):
                 self.last_mon_update(upd_time.strftime('%Y-%m-%d %H:%M:%S'))
                 # Extract temperature names with temperature from source code
                 temperaturegroups = re.findall(
-                    r'<br>(T_[\w_]+(?: \(P\))?) = ([\S\.]+)', str(source))
+                    r'<br>(T_[\w_.]+(?: \(P\))?) = ([\S\.]+)', source)
 
                 self.temp_dict = {elem[0]: float(
                     elem[1]) for elem in temperaturegroups}
                 pressuregroups = re.findall(
-                    r'<br>(P_[\w_]+(?: \(P\))?) = ([\S\.]+)', str(source))
+                    r'<br>(P_[\w_.]+(?: \(P\))?) = ([\S\.]+)', source)
                 self.press_dict = {elem[0]: float(
                     elem[1]) for elem in pressuregroups}
 
