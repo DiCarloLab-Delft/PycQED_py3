@@ -1922,7 +1922,45 @@ class CCLight_Transmon(Qubit):
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
         if analyze:
-            ma.TwoD_Analysis(label=label, plot_all=False, auto=True)
+            ma.TwoD_Analysis(label=label, plot_all=True, auto=True)
+
+    def measure_SSRO_frequency_power_sweep_TWPA(self, pump_source,freqs, powers,
+                                               nr_shots=4092*4, nested_MC=None, analyze=True):
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        self.prepare_for_timedomain()
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+        old_ro_prepare_state = self.cfg_prepare_ro_awg()
+        self.ro_acq_digitized(False)
+        self.cfg_prepare_ro_awg(False)
+
+
+        d = det.Function_Detector(
+            self.measure_ssro,
+            msmt_kw={
+                'nr_shots': nr_shots,
+                'analyze': True, 'SNR_detector': True,
+                'cal_residual_excitation': True,
+                'prepare': False,
+                'disable_metadata': True
+            },
+            result_keys=['SNR', 'F_d', 'F_a']
+        )
+        nested_MC.set_sweep_function(pump_source.frequency)
+        nested_MC.set_sweep_points(freqs)
+        nested_MC.set_detector_function(d)
+        nested_MC.set_sweep_function_2D(pump_source.power)
+        nested_MC.set_sweep_points_2D(powers)
+        label = 'SSRO_freq_amp_sweep' + self.msmt_suffix
+        nested_MC.run(label, mode='2D')
+
+        self.cfg_prepare_ro_awg(old_ro_prepare_state)
+
+        if analyze:
+            ma.TwoD_Analysis(label=label, plot_all=True, auto=True)
+
+
 
     def measure_SSRO_pulse_length_sweep(self, lengths=np.arange(100e-9, 1501e-9, 100e-9),
                                         nr_shots=4092*4, nested_MC=None, analyze=True, label_suffix: str=''):
@@ -3486,6 +3524,7 @@ class CCLight_Transmon(Qubit):
         readout_pulse_length += self.ro_pulse_down_length1()
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
 
+        self.ro_pulse_type('up_down_down')
         # calibrate optimal weights
         self.calibrate_optimal_weights(verify=False)
 
