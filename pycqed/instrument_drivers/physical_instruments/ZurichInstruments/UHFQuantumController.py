@@ -71,6 +71,7 @@ class UHFQC(Instrument):
         self._d_file_name = os.path.join(
             dir_path, 'zi_parameter_files', 'd_node_pars.txt')
 
+        init = True # gets set to False if param files cannot be loaded
         try:
             f = open(self._s_file_name).read()
             s_node_pars = json.loads(f)
