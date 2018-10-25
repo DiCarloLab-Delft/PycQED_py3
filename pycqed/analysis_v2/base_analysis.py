@@ -7,10 +7,7 @@ import numpy as np
 import copy
 import logging
 from collections import OrderedDict
-<<<<<<< HEAD
 from inspect import signature
-=======
->>>>>>> 7f3657fb9bab6bbfa56b797c8a2226ed8aee11f2
 import numbers
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
@@ -27,11 +24,7 @@ import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
 
-<<<<<<< HEAD
 from importlib import reload  # Useful for reloading while testing
-
-=======
->>>>>>> 7f3657fb9bab6bbfa56b797c8a2226ed8aee11f2
 
 class BaseDataAnalysis(object):
     """
