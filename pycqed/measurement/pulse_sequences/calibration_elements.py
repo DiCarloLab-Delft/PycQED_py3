@@ -207,13 +207,11 @@ def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
     else:
         return seq_name
 
-def readout_photons_in_resonator_seq(delay_ro_relax, delay_buffer, ramsey_times,
+def readout_photons_in_resonator_seq(delay_to_relax, delay_buffer, ramsey_times,
                             RO_pars, pulse_pars, cal_points=((-4, -3), (-2, -1)),
                             verbose=False, upload=True, return_seq=False,
                             artificial_detuning=None):
     """
-    Prepares the AWGs for a readout pulse shape and timing measurement.
-
     The sequence consists of two readout pulses sandwitching two ramsey pulses
     inbetween. The delay between the first readout pulse and first ramsey pulse
     is swept, to measure the ac stark shift and dephasing from any residual
@@ -247,15 +245,10 @@ def readout_photons_in_resonator_seq(delay_ro_relax, delay_buffer, ramsey_times,
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
-    readout_x1 = deepcopy(RO_pars)
-    readout_x1['refpoint'] = 'end'
+    ramsey_x1 = deepcopy(pulses['X90'])
+    ramsey_x1['pulse_delay'] = delay_to_relax
     readout_x2 = deepcopy(RO_pars)
-    readout_x2['refpoint'] = 'start'
-    ramsey_x1 = deepcopy(pulse_pars)
-    ramsey_x1['refpoint'] = 'start'
-    ramsey_x2 = deepcopy(pulse_pars)
-    ramsey_x2['refpoint'] = 'start'
-    pulse_length = ramsey_x2['nr_sigma']*ramsey_x2['sigma']
+    readout_x2['pulse_delay'] = delay_buffer
 
     for i, tau in enumerate(ramsey_times):
         if i in cal_points[0] or i - len(ramsey_times) in cal_points[0]:
@@ -273,16 +266,16 @@ def readout_photons_in_resonator_seq(delay_ro_relax, delay_buffer, ramsey_times,
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
         else:
+            ramsey_x2 = deepcopy(pulses['X90'])
+            ramsey_x2['refpoint'] = 'start'
+            ramsey_x2['pulse_delay'] = tau
             if artificial_detuning is not None:
-                Dphase = ((tau-ramsey_times[0]) * artificial_detuning * 360) % 360
-                ramsey_x2['phase'] = Dphase
+                Dphase = (tau * artificial_detuning * 360) % 360
+                ramsey_x2['phase'] += Dphase
 
-            readout_x2['pulse_delay'] = delay_ro_relax+ tau+ delay_buffer+ 2*pulse_length
-            ramsey_x1['pulse_delay'] = delay_ro_relax
-            ramsey_x2['pulse_delay'] = delay_ro_relax+ tau+ pulse_length
-
-            el = multi_pulse_elt(2 * i, station,
-                                 [readout_x1, ramsey_x1, ramsey_x2, readout_x2])
+            prep_pulse = [pulses['I'], pulses['X180']][i % 2]
+            el = multi_pulse_elt(2 * i, station, [prep_pulse, RO_pars,
+                                              ramsey_x1, ramsey_x2, readout_x2])
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
 

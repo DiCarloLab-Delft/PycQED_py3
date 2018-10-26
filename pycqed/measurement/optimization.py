@@ -1,7 +1,13 @@
 import copy
 import numpy as np
+import logging
+logger = logging.getLogger(__name__)
 
-from pycqed.analysis import machine_learning_toolbox as ml
+try:
+    from pycqed.analysis import machine_learning_toolbox as ml
+except ModuleNotFoundError:
+    logger.warning('Machine learning packages not loaded. '
+                   'Run from pycqed.analysis import machine_learning_toolbox to see errors.')
 
 from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 

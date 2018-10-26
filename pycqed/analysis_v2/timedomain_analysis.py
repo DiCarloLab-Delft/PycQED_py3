@@ -10,7 +10,7 @@ from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.analysis_v2.readout_analysis as roa
-import pycqed.analysis_v2.tomography_qudev as tomo
+#import pycqed.analysis_v2.tomography_qudev as tomo
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from copy import deepcopy
 try:
@@ -127,7 +127,7 @@ def all_cal_points(d, nr_ch, reps=1):
 class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
     def process_data(self):
-        '''
+        """
         This takes care of rotating and normalizing the data if required.
         this should work for several input types.
             - I/Q values (2 quadratures + cal points)
@@ -139,7 +139,7 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
             cal_points (tuple) of indices of the calibration points
 
             zero_coord, one_coord
-        '''
+        """
 
         cal_points = self.options_dict.get('cal_points', None)
         zero_coord = self.options_dict.get('zero_coord', None)
@@ -1536,3 +1536,246 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             'blue': [[i/n, cols[i%n][2], cols[i%n][2]] for i in range(n+1)],
         }
         return mpl.colors.LinearSegmentedColormap('DMDefault', cdict)
+
+
+class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
+    """
+    DO NOT USE THIS CLASS, IT IS STILL IN DEVELOPMENT (2018.10.26)
+
+    Analyses the photonnumber in the RO based on the
+    readout_photons_in_resonator function
+    """
+
+    def __init__(self, t_start: str = None, t_stop: str = None,
+                 label: str = '', data_file_path: str = None,
+                 close_figs: bool = False, options_dict: dict = None,
+                 extract_only: bool = False, do_fitting: bool = False,
+                 auto: bool = True, numeric_params: dict = None,
+                 f_qubit: float = None, chi: float = None):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         close_figs=close_figs, label=label,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        if self.options_dict.get('TwoD', None) is None:
+            self.options_dict['TwoD'] = True
+
+        self.params_dict = {
+            'measurementstring': 'measurementstring',
+            'sweep_points': 'sweep_points',
+            'value_names': 'value_names',
+            'value_units': 'value_units',
+            'measured_values': 'measured_values'}
+
+        if numeric_params is None:
+            self.numeric_params = OrderedDict()
+
+        self.f_qubit = self.options_dict['f_qubit']
+        self.chi = self.options_dict['chi']
+
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        super().process_data()
+
+        self.proc_data_dict = OrderedDict()
+        self.proc_data_dict['delay_to_realx'] = np.copy(
+                                self.raw_data_dict['sweep_points_2D'])
+        self.proc_data_dict['ramsey_times'] = np.copy(
+                                self.raw_data_dict['sweep_points'])
+        self.proc_data_dict['qubit_state'] = np.copy(
+                                self.raw_data_dict['measured_values'])
+
+
+    #I STILL NEED to pass Chi
+    def prepare_fitting(self):
+        self.proc_data_dict['photon_number'] = []
+        self.proc_data_dict['fit_results'] = []
+
+        if (self.f_qubit is None) and (self.chi is None):
+            self.proc_data_dict['f_and_chi_defined'] = True
+        else:
+            self.proc_data_dict['f_and_chi_defined'] = False
+            logging.warning('Qubit frequency or Chi are not defined.\n'+
+                        '\tThe shifted qubit frequency will be returned.')
+
+        for i,tau in enumerate(self.proc_data_dict['delay_to_realx']):
+
+            self.fit_results.append(self.fit_Ramsey(
+                                    self.proc_data_dict['ramsey_times'],
+                                    self.proc_data_dict['qubit_state'][i],
+                                    kw=self.options_dict))
+
+            shifted_freq = self.proc_data_dict['fit_results'
+                                                ][i].params['frequency'].value
+            if self.proc_data_dict['f_and_chi_defined']:
+                    self.proc_data_dict['photon_number'].append(
+                                (shifted_freq-self.f_qubit)/(2*self.chi))
+            else:
+                    self.proc_data_dict['photon_number'].append(shifted_freq)
+        self.fit_results_dict[label] = fit_res
+
+
+    def run_fitting(self):
+        print_fit_results = self.params_dict.pop('print_fit_results',False)
+
+        exp_dec_mod = lmfit.Model(fit_mods.ExpDecayFunc)
+        exp_dec_mod.set_param_hint('n',
+                                      value=1,
+                                      vary=True)
+        exp_dec_mod.set_param_hint('offset',
+                                   value=0,
+                                   vary=True)
+        exp_dec_mod.set_param_hint('Tau',
+                                   value=1e-6,
+                                   vary=True)
+        exp_dec_mod.set_param_hint('amplitude',
+                                   value=1,
+                                   vary=True)
+        self.fit_res = exp_dec_mod.fit(self.proc_data_dict['photon_number'],
+                                       t=self.proc_data_dict['delay_to_realx'])
+        if print_fit_results:
+            print(fit_res.fit_report())
+
+
+
+
+    def fit_Ramsey(self, x, y, **kw):
+
+        print_ramsey_fit_results = kw.pop('print_ramsey_fit_results',False)
+        damped_osc_mod = lmfit.Model(fit_mods.ExpDampOscFunc)
+        average = np.mean(y)
+
+        ft_of_data = np.fft.fft(y)
+        index_of_fourier_maximum = np.argmax(np.abs(
+            ft_of_data[1:len(ft_of_data) // 2])) + 1
+        max_ramsey_delay = x[-1] - x[0]
+
+        fft_axis_scaling = 1 / (max_ramsey_delay)
+        freq_est = fft_axis_scaling * index_of_fourier_maximum
+        est_number_of_periods = index_of_fourier_maximum
+
+        if ((average > 0.7*max(y)) or
+                (est_number_of_periods < 2) or
+                est_number_of_periods > len(ft_of_data)/2.):
+            print('the trace is too short to find multiple periods')
+
+            if print_ramsey_fit_results:
+                print('Setting frequency to 0 and ' +
+                      'fitting with decaying exponential.')
+            damped_osc_mod.set_param_hint('frequency',
+                                          value=freq_est,
+                                          vary=False)
+            damped_osc_mod.set_param_hint('phase',
+                                          value=0,
+                                          vary=False)
+        else:
+            damped_osc_mod.set_param_hint('frequency',
+                                          value=freq_est,
+                                          vary=True,
+                                          min=(1/(100 *x[-1])),
+                                          max=(20/x[-1]))
+
+            if (np.average(y[:4]) >
+                    np.average(y[4:8])):
+                phase_estimate = 0
+            else:
+                phase_estimate = np.pi
+            damped_osc_mod.set_param_hint('phase',
+                                          value=phase_estimate, vary=True)
+
+        amplitude_guess = 0.5
+        if np.all(np.logical_and(y > 0, y < 1)):
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=amplitude_guess,
+                                          min=0.4,
+                                          max=4.0,
+                                          vary=False)
+        else:
+            print('data is not normalized, varying amplitude')
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=amplitude_guess,
+                                          min=0.4,
+                                          max=4.0,
+                                          vary=False)
+        damped_osc_mod.set_param_hint('tau',
+                                      value=x[1]*10,
+                                      min=x[1],
+                                      max=x[1]*1000)
+        damped_osc_mod.set_param_hint('exponential_offset',
+                                      value=0.5,
+                                      min=0.4,
+                                      max=4.0,
+                                      vary=False)
+        damped_osc_mod.set_param_hint('oscillation_offset',
+                                      # expr=
+                                      # '{}-amplitude-exponential_offset'.format(
+                                      #     y[0]))
+                                      value=0,
+                                      vary=False)
+
+        self.fit_results_dict = {}
+        decay_labels = ['gaussian', 'exponential', ]
+        for label, n in zip(decay_labels, [2,1]):
+            damped_osc_mod.set_param_hint('n',
+                                          value=float('{:.1f}'.format(n)),
+                                          vary=False)
+            self.params = damped_osc_mod.make_params()
+
+            fit_res = damped_osc_mod.fit(data=y,
+                                         t=x,
+                                         params=self.params)
+
+            if fit_res.chisqr > .35:
+                logging.warning('Fit did not converge, varying phase')
+                fit_res_lst = []
+
+                for phase_estimate in np.linspace(0, 2*np.pi, 10):
+                    damped_osc_mod.set_param_hint('phase',
+                                                  value=phase_estimate)
+                    self.params = damped_osc_mod.make_params()
+
+                    fit_res_lst += [damped_osc_mod.fit(
+                        data=y,
+                        t=x,
+                        params=self.params)]
+
+                chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
+                fit_res = fit_res_lst[np.argmin(chisqr_lst)]
+
+            if print_ramsey_fit_results:
+                print(fit_res.fit_report())
+
+        return fit_res
+
+    def prepare_plots(self):
+            self.prepare_2D_sweep_plot()
+            self.prepare_photon_number_plot()
+    #NOT SURE ABOUT THIS
+    def prepare_photon_number_plot(self):
+        f_and_chi_defined = self.proc_data_dict.get('f_and_chi_defined', False)
+        if f_and_chi_defined:
+            ylabel = 'Average phototn number'
+        else:
+            ylabel = 'Shifted RO frequency'
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_fit
+            'fit_res': self.fit_res,
+            'xlabel': 'Delay after first RO-pulse',
+            'xunit': 's',
+            'yvals': self.proc_data_dict['yvals_osc_off'],
+            'ylabel': ylabel,
+            'yunit': ''}
+
+    def prepare_2D_sweep_plot(self):
+        self.plot_dicts['on'] = {
+            'plotfn': self.plot_color2D,
+            'ax_id': 'main',
+            'xvals': self.proc_data_dict['ramsey_times'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['delay_to_relax'],
+            'ylabel': self.raw_data_dict['ylabel'],
+            'yunit': self.proc_data_dict['yunit'],
+            'zvals': self.proc_data_dict['qubit_state'] }

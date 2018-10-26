@@ -17,6 +17,7 @@ from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis_v2 import timedomain_analysis as ta
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import add_suffix_to_dict_keys
@@ -1582,48 +1583,49 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
                                    qb_name=self.name)
 
-    def readout_RO_photons(self, delay_to_relax, delay_buffer, ramsey_times,
-                           cal_points=((-4, -3), (-2, -1)),
-                           verbose=False, upload=True, return_seq=False,
-                           artificial_detuning=None, analyze=True, label=None,
-                           close_fig=True, MC=None):
+    def measure_residual_readout_photons(
+            self, delays_to_relax, ramsey_times, delay_buffer=0,
+            cal_points=((-4, -3), (-2, -1)), verbose=False,
+            artificial_detuning=None, analyze=True,
+            label=None, close_fig=True, MC=None):
         """
         From the documentation of the used sequence function:
 
-         Prepares the AWGs for a readout pulse shape and timing measurement.
+        The sequence consists of two readout pulses sandwitching two ramsey
+        pulses inbetween. The delay between the first readout pulse and first
+        ramsey pulse is swept, to measure the ac stark shift and dephasing
+        from any residual photons.
 
-        The sequence consists of two readout pulses sandwitching two ramsey pulses
-        inbetween. The delay between the first readout pulse and first ramsey pulse
-        is swept, to measure the ac stark shift and dephasing from any residual
-        photons.
-
-        Important: This sequence includes two readouts per segment. For this reason
-        the calibration points are also duplicated.
+        Important: This sequence includes two readouts per segment. For this
+        reason the calibration points are also duplicated.
 
         Args:
-            delay_to_relax: delay between the end of the first readout
+            delays_to_relax: delay between the end of the first readout
                             pulse and the start of the first ramsey pulse.
 
             pulse_pars: Pulse dictionary for the ramsey pulse.
             RO_pars: Pulse dictionary for the readout pulse.
-            delay_buffer: delay between the start of the last ramsey pulse and the
-                          start of the second readout pulse.
             ramsey_times: delays between ramsey pulses
+            delay_buffer: delay between the start of the last ramsey pulse and
+                          the start of the second readout pulse.
             cal_points: True for default calibration points, False for no
-                              calibration points or a list of two lists, containing
-                              the indices of the calibration segments for the ground
-                              and excited state.
+                        calibration points or a list of two lists,
+                        containing the indices of the calibration
+                        segments for the ground and excited state.
         """
 
 
         if label is None:
-            label = 'readout_RO_photons' + self.msmt_suffix
+            label = 'residual_readout_photons' + self.msmt_suffix
         if MC is None:
             MC = self.MC
+        # duplicate sweep points for the two preparation states
+        ramsey_times = np.vstack((ramsey_times, ramsey_times)).\
+                       reshape((-1,), order='F')
 
         self.prepare_for_timedomain()
-        MC.set_sweep_function(awg_swf.readout_photons_in_resonator_swf(
-            delay_to_relax=delay_to_relax,
+        sf1 = awg_swf.readout_photons_in_resonator_swf(
+            delay_to_relax=delays_to_relax[0],
             delay_buffer=delay_buffer,
             ramsey_times=ramsey_times,
             pulse_pars=self.get_drive_pars(),
@@ -1631,20 +1633,12 @@ class QuDev_transmon(Qubit):
             cal_points=cal_points,
             verbose=verbose,
             artificial_detuning=artificial_detuning,
-            upload=upload))
+            upload=False)
+        MC.set_sweep_function(sf1)
         MC.set_sweep_points(ramsey_times)
-        MC.set_sweep_function_2D(awg_swf.readout_photons_in_resonator_soft_swf(
-            awg_swf.readout_photons_in_resonator_swf(
-                delay_to_relax=delay_to_relax,
-                delay_buffer=delay_buffer,
-                ramsey_times=ramsey_times,
-                pulse_pars=self.get_drive_pars(),
-                RO_pars=self.get_RO_pars(),
-                cal_points=cal_points,
-                verbose=verbose,
-                artificial_detuning=artificial_detuning,
-                upload=upload)))
-        MC.set_sweep_points_2D(delay_to_relax)
+        sf2 = awg_swf.readout_photons_in_resonator_soft_swf(sf1)
+        MC.set_sweep_function_2D(sf2)
+        MC.set_sweep_points_2D(delays_to_relax)
 
         d = det.UHFQC_integrated_average_detector(
             self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
@@ -1656,8 +1650,11 @@ class QuDev_transmon(Qubit):
 
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
-            ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            ma.MeasurementAnalysis(TwoD=True, qb_name=self.name)
+
+            # ta.ReadoutROPhotonsAnalysis(
+            #      close_figs=close_fig, options_dict={'TwoD': True}, do_fitting=True,
+            #      qb_name=self.name, f_qubit=self.f_qubit, chi)
 
     def calibrate_drive_mixer_carrier_NN(self,MC=None, update=True,make_fig=True,
                                  trigger_sep=5e-6,

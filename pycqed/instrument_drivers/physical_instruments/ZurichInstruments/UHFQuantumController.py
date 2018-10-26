@@ -1254,22 +1254,18 @@ class ziShellCompilationError(ziShellError):
 ####################
 # Helper Functions #
 ####################
-
 def gaussian_filter(wave, filter_sigma, nr_sigma, sampling_rate = 1.2e9):
 
     filter_samples = int(filter_sigma*nr_sigma*sampling_rate)
     filter_sample_idxs = np.arange(filter_samples)
-    filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
-                    (filter_sigma*sampling_rate)**2)
-    filter /= filter.sum()
-
-    waveFiltered = np.convolve(wave, filter, mode='full')
+    gauss_filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
+                        (filter_sigma*sampling_rate)**2)
+    gauss_filter /= gauss_filter.sum()
+    waveFiltered = np.convolve(wave, gauss_filter, mode='full')
     return  waveFiltered
 
 
-
 def IQ_split(wave, f_RO_mod, phi_skew=0, alpha = 1, sampling_rate = 1.2e9):
-
     Iwave = alpha * wave * np.cos(2 * np.pi *
                           np.arange(len(wave)) * f_RO_mod /sampling_rate +
                           phi_skew * np.pi / 180)
@@ -1279,10 +1275,11 @@ def IQ_split(wave, f_RO_mod, phi_skew=0, alpha = 1, sampling_rate = 1.2e9):
     return Iwave, Qwave
 
 
-
 def CLEAR_shape(  amp_base, length_total, delta_amp_segments,
                  length_segments, sampling_rate=1.2e9):
-
+    
+    delta_amp_segments = list(delta_amp_segments)
+    length_segments = list(length_segments)
     if len(delta_amp_segments) == len( length_segments) == 4:
         pass
     else:
@@ -1292,11 +1289,10 @@ def CLEAR_shape(  amp_base, length_total, delta_amp_segments,
 
     pulse_samples = (length_total)*sampling_rate
     segments_samples = list(map(lambda x: int(x*sampling_rate), length_segments))
-
     amp_pulse = np.concatenate(
         ((np.ones(segments_samples[0])*(amp_base+delta_amp_segments[0])),
          (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[1])),
-         (np.ones(pulse_samples-sum(segments_samples))*amp_base),
+         (np.ones(int(pulse_samples-sum(segments_samples)))*amp_base),
          (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[2])),
          (np.ones(segments_samples[3])*(amp_base+delta_amp_segments[3]))))
 

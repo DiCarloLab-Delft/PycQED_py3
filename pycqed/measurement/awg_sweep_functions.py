@@ -2506,12 +2506,12 @@ class Readout_pulse_scope_swf(swf.Hard_Sweep):
                 verbose=self.verbose)
 
 class readout_photons_in_resonator_swf(swf.Hard_Sweep):
-    def __init__(self, delay_ro_relax, delay_buffer, ramsey_times,
+    def __init__(self, delay_to_relax, delay_buffer, ramsey_times,
                  RO_pars, pulse_pars, cal_points=((-4, -3), (-2, -1)),
                  verbose=False, upload=True, return_seq=False,
                  artificial_detuning=None):
         super().__init__()
-        self.delay_ro_relax = delay_ro_relax
+        self.delay_to_relax = delay_to_relax
         self.delay_buffer = delay_buffer
         self.ramsey_times = ramsey_times
         self.pulse_pars = pulse_pars
@@ -2529,7 +2529,7 @@ class readout_photons_in_resonator_swf(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             csqs.readout_photons_in_resonator_seq(
-                delay_ro_relax=self. delay_ro_relax,
+                delay_to_relax=self.delay_to_relax,
                 pulse_pars=self.pulse_pars,
                 RO_pars=self.RO_pars,
                 delay_buffer=self.delay_buffer,
@@ -2550,6 +2550,7 @@ class readout_photons_in_resonator_soft_swf(swf.Soft_Sweep):
         self.unit = 's'
 
     def set_parameter(self, val):
+        self.hard_sweep.upload = True 
         self.hard_sweep.delay_to_relax = val
         self.hard_sweep.prepare()
 

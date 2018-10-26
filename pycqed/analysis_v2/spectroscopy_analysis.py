@@ -412,11 +412,12 @@ class ResonatorSpectroscopy(Spectroscopy):
             pass
 
     def prepare_fitting(self):
+        super().prepare_fitting()
         # Fitting function for one data trace. The fitted data can be
         # either complex, amp(litude) or phase. The fitting models are
         # HangerFuncAmplitude, HangerFuncComplex,
         # PolyBgHangerFuncAmplitude, SlopedHangerFuncAmplitude,
-        # SlopedHangerFuncComplex.
+        # SlopedHangerFuncComplex, hanger_with_pf.
         fit_options = self.options_dict.get('fit_options', None)
         subtract_background = self.options_dict.get(
             'subtract_background', False)
@@ -427,9 +428,11 @@ class ResonatorSpectroscopy(Spectroscopy):
         if subtract_background:
             self.do_subtract_background(thres=self.options_dict['background_thres'],
                                         back_dict=self.options_dict['background_dict'])
+
         if fitting_model == 'hanger':
             fit_fn = fit_mods.SlopedHangerFuncAmplitude
             fit_guess_fn = fit_mods.SlopedHangerFuncAmplitudeGuess
+            guess_pars = None
         elif fitting_model == 'simple_hanger':
             fit_fn = fit_mods.HangerFuncAmplitude
             raise NotImplementedError(
@@ -445,18 +448,35 @@ class ResonatorSpectroscopy(Spectroscopy):
                 'This functions guess function is not coded up yet')
             fit_fn = fit_mods.HangerFuncComplex
             # TODO HangerFuncComplexGuess
+        elif fitting_model == 'hanger_with_pf':
+            fit_fn = fit_mods.hanger_with_pf
+            fit_temp = fit_mods.fit_hanger_with_pf(fit_mods.HangerWithPfModel,
+                np.transpose([self.proc_data_dict['plot_frequency'], self.proc_data_dict['plot_amp']])
+            )
+            guess_pars = fit_temp.params
+            fit_guess_fn = None
 
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
-                                          'fit_guess_fn': fit_guess_fn,
-                                          'fit_yvals': {'data': self.proc_data_dict['plot_amp']},
-                                          'fit_xvals': {'f': self.proc_data_dict['plot_frequency']}
-                                          }
+            self.fit_dicts['reso_fit'] = {
+                              'fit_fn': fit_fn,
+                              'fit_guess_fn': fit_guess_fn,
+                              'guess_pars': guess_pars,
+                              'fit_yvals': {
+                                  'data': self.proc_data_dict['plot_amp']
+                                           },
+                              'fit_xvals': {
+                                  'f': self.proc_data_dict['plot_frequency']}
+                                         }
         else:
-            self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
-                                          'fit_guess_fn': fit_guess_fn,
-                                          'fit_yvals': [{'data': np.squeeze(tt)} for tt in self.plot_amp],
-                                          'fit_xvals': np.squeeze([{'f': tt[0]} for tt in self.plot_frequency])}
+            self.fit_dicts['reso_fit'] = {
+                              'fit_fn': fit_fn,
+                              'fit_guess_fn': fit_guess_fn,
+                              'guess_pars': guess_pars,
+                              'fit_yvals': [{'data': np.squeeze(tt)}
+                                               for tt in self.plot_amp],
+                              'fit_xvals': np.squeeze([{'f': tt[0]}
+                                               for tt in self.plot_frequency])}
+
 
     def do_subtract_background(self, thres=None, back_dict=None, ):
         if len(self.raw_data_dict['timestamps']) == 1:
@@ -516,27 +536,66 @@ class ResonatorSpectroscopy(Spectroscopy):
 
     def plot_fitting(self):
         if self.do_fitting:
+            fit_options = self.options_dict.get('fit_options', None)
+            if fit_options is None:
+                fitting_model = 'hanger'
+            else:
+                fitting_model = fit_options['model']
             for key, fit_dict in self.fit_dicts.items():
                 fit_results = fit_dict['fit_res']
                 ax = self.axs['amp']
                 if len(self.raw_data_dict['timestamps']) == 1:
-                    ax.plot(list(fit_dict['fit_xvals'].values())[0], fit_results.best_fit, 'r-', linewidth=1.5)
-                    textstr = 'f0 = %.5f $\pm$ %.1g GHz' % (
-                        fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
-                                                                                           'Q = %.4g $\pm$ %.0g' % (
-                                  fit_results.params['Q'].value, fit_results.params['Q'].stderr) + '\n' \
-                                                                                                   'Qc = %.4g $\pm$ %.0g' % (
-                                  fit_results.params['Qc'].value, fit_results.params['Qc'].stderr) + '\n' \
-                                                                                                     'Qi = %.4g $\pm$ %.0g' % (
-                                  fit_results.params['Qi'].value, fit_results.params['Qi'].stderr)
-                    box_props = dict(boxstyle='Square',
-                                     facecolor='white', alpha=0.8)
-                    self.box_props = {key: val for key,
-                                                   val in box_props.items()}
-                    self.box_props.update({'linewidth': 0})
-                    self.box_props['alpha'] = 0.
-                    ax.text(0.03, 0.95, textstr, transform=ax.transAxes,
-                            verticalalignment='top', bbox=self.box_props)
+                    if fitting_model == 'hanger':
+                        ax.plot(list(fit_dict['fit_xvals'].values())[0], fit_results.best_fit, 'r-', linewidth=1.5)
+                        textstr = 'f0 = %.5f $\pm$ %.1g GHz' % (
+                            fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
+                                                   'Q = %.4g $\pm$ %.0g' % (
+                                      fit_results.params['Q'].value, fit_results.params['Q'].stderr) + '\n' \
+                                                   'Qc = %.4g $\pm$ %.0g' % (
+                                      fit_results.params['Qc'].value, fit_results.params['Qc'].stderr) + '\n' \
+                                                   'Qi = %.4g $\pm$ %.0g' % (
+                                      fit_results.params['Qi'].value, fit_results.params['Qi'].stderr)
+                        box_props = dict(boxstyle='Square',
+                                         facecolor='white', alpha=0.8)
+                        self.box_props = {key: val for key,
+                                                       val in box_props.items()}
+                        self.box_props.update({'linewidth': 0})
+                        self.box_props['alpha'] = 0.
+                        ax.text(0.03, 0.95, textstr, transform=ax.transAxes,
+                                verticalalignment='top', bbox=self.box_props)
+                    elif fitting_model == 'simple_hanger':
+                        raise NotImplementedError(
+                            'This functions guess function is not coded up yet')
+                    elif fitting_model == 'lorentzian':
+                        raise NotImplementedError(
+                            'This functions guess function is not coded up yet')
+                    elif fitting_model == 'complex':
+                        raise NotImplementedError(
+                            'This functions guess function is not coded up yet')
+                    elif fitting_model == 'hanger_with_pf':
+                        ax.plot(list(fit_dict['fit_xvals'].values())[0],
+                                fit_results.best_fit, 'r-', linewidth=1.5)
+
+                        par = ["%.3f" %(fit_results.params['omega_ro'].value*1e-9),
+                               "%.3f" %(fit_results.params['omega_pf'].value*1e-9),
+                               "%.3f" %(fit_results.params['kappa_pf'].value*1e-6),
+                               "%.3f" %(fit_results.params['J'].value*1e-6),
+                               "%.3f" %(fit_results.params['gamma_ro'].value*1e-6)]
+                        textstr = str('f_ro = '+par[0]+' GHz'
+                                  +'\n\nf_pf = '+par[1]+' GHz'
+                                  +'\n\nkappa = '+par[2]+' MHz'
+                                  +'\n\nJ = '+par[3]+' MHz'
+                                  +'\n\ngamma_ro = '+par[4]+' MHz')
+                        box_props = dict(boxstyle='Square',
+                                         facecolor='white', alpha=0.8)
+                        self.box_props = {key: val for key,
+                                                       val in box_props.items()}
+                        self.box_props.update({'linewidth': 0})
+                        self.box_props['alpha'] = 0.
+                        ax.text(1.1, 0.95, textstr, transform=ax.transAxes,
+                                verticalalignment='top', bbox=self.box_props,
+                                fontsize=11)
+
                 else:
                     reso_freqs = [fit_results[tt].params['f0'].value *
                                   1e9 for tt in range(len(self.raw_data_dict['timestamps']))]

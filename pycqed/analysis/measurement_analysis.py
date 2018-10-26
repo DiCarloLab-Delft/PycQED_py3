@@ -1,5 +1,6 @@
 import os
 import logging
+logger = logging.getLogger(__name__)
 import numpy as np
 import pickle
 from collections import OrderedDict
@@ -37,7 +38,11 @@ from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
 from math import floor
 from pycqed.measurement import optimization as opt
-from pycqed.analysis import machine_learning_toolbox as mlt
+try:
+    from pycqed.analysis import machine_learning_toolbox as mlt
+except ModuleNotFoundError:
+    logger.warning('Machine learning packages not loaded. '
+                   'Run from pycqed.analysis import machine_learning_toolbox to see errors.')
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png,
