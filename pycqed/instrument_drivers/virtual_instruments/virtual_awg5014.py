@@ -140,7 +140,7 @@ class VirtualAWG5014(Tektronix_AWG5014):
     def is_awg_ready(self):
         return True
 
-    def plot_waveforms(self, seg=0, cids='all',xlim='All',costum_ylabels=None):
+    def plot_waveforms(self, seg=0, cids='all', xlim='All', costum_ylabels=None):
         if cids == 'all':
             cids = []
             for i in range(1, 5):
@@ -177,8 +177,6 @@ class VirtualAWG5014(Tektronix_AWG5014):
             # ax.set_ylabel(cid,rotation=0,fontsize=8)
             # ax.set_yticklabels(ax.get_yticks(),fontsize=5)
             ax.yaxis.set_label_coords(-.15, 0.5)
-            if xlim != 'All':
-                ax.set_xlim(xlim)
             # if costum_ylabels is None:
             #     ax.set_ylabel(cid,rotation=0)
             # else:

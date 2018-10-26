@@ -1053,7 +1053,7 @@ class ziShellDevice:
             # Success is set to False when either a timeout or a bad compilation
             # message is encountered.
             success = True
-            # while ("compilation not completft1ed"):
+            # while ("compilation not completed"):
             while len(self.awgModule.get('awgModule/compiler/sourcestring')
                       ['compiler']['sourcestring'][0]) > 0:
                 time.sleep(0.01)
@@ -1106,8 +1106,16 @@ class ziShellDevice:
             self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
             self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
 
+            # # if not comp_msg.endswith(succes_msg):
+            # if not success:
+            #     print("Compilation failed, printing program:")
+            #     for i, line in enumerate(program_string.splitlines()):
+            #         print(i+1, '\t', line)
+            #     print('\n')
+            #     raise ziShellCompilationError(comp_msg)
 
-        # This check (and while loop) is added as a workaround for #9
+
+            # This check (and while loop) is added as a workaround for #9
             if self.geti('awgs/'+str(awg_nr)+'/ready')!= 1:
                 logging.warning('AWG not ready')
                 success_and_ready = False

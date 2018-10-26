@@ -1230,6 +1230,63 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
                                    qb_name=self.name)
 
+    def measure_ramsey_dyn_decoupling(self, times=None, artificial_detuning=0,
+                                      label='', MC=None, analyze=True,
+                                      close_fig=True, cal_points=True,
+                                      upload=True, nr_echo_pulses=4,
+                                      seq_func=None, cpmg_scheme=True):
+
+        if times is None:
+            raise ValueError("Unspecified times for measure_ramsey")
+        if np.any(times > 1e-3):
+            logging.warning('The values in the times array might be too large.'
+                            'The units should be seconds.')
+
+        if artificial_detuning is None:
+            logging.warning('Artificial detuning is 0.')
+        if np.abs(artificial_detuning) < 1e3:
+            logging.warning('The artificial detuning is too small. The units'
+                            'should be Hz.')
+
+        if seq_func is None:
+            seq_func = sq.Ramsey_seq
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        # Define the measurement label
+        if label == '':
+            label = 'Ramsey' + self.msmt_suffix
+
+        if cal_points:
+            step = np.abs(times[-1]-times[-2])
+            sweep_points = np.concatenate(
+                [times, [times[-1]+step,  times[-1]+2*step,
+                         times[-1]+3*step, times[-1]+4*step]])
+        else:
+            sweep_points = times
+
+        Rams_swf = awg_swf.Ramsey_decoupling_swf(
+            seq_func=seq_func,
+            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+            artificial_detuning=artificial_detuning, cal_points=cal_points,
+            upload=upload, nr_echo_pulses=nr_echo_pulses, cpmg_scheme=cpmg_scheme)
+        MC.set_sweep_function(Rams_swf)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run(label)
+
+        if analyze:
+            RamseyA = ma.Ramsey_Analysis(
+                auto=True,
+                label=label,
+                qb_name=self.name,
+                NoCalPoints=4,
+                artificial_detuning=artificial_detuning,
+                close_fig=close_fig)
+
+
     def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
                        n=1, upload=True, last_ge_pulse=True, no_cal_points=6):
@@ -1661,25 +1718,32 @@ class QuDev_transmon(Qubit):
                                  amplitude=0.1,
                                  estimator='GRNN_neupy',
                                  n_meas=100,two_rounds=False,
-                                 hidden_layers = [30,30],**kwargs):
+                                 hyper_parameter_dict=None,**kwargs):
         '''
         Prospect function to handle simultaneous optimization of carrier and
         skewness calibration.
         By default used for mixer carrier suppression.
         The carrier suppression makes use of the measure_soft_static method in MC
         '''
-
+        if hyper_parameter_dict is None:
+            logging.warning('\n No hyperparameters passed to predictive mixer '
+                            'calibration routine. Default values for the estimator'
+                            'will be used!\n')
+            hyper_parameter_dict = {'hidden_layers':[10],
+                                    'learning_rate': 1e-3,
+                                    'regularization_coefficient': 0.,
+                                    'std_scaling':0.6,
+                                    'learning_steps':5000,
+                                    'cv_n_fold':5,
+                                    'polynomial_dimension':2}
         if MC is None:
             MC = self.MC
+
         std_devs = kwargs.pop('std_devs',[0.2,0.2])
-        alpha = kwargs.pop('alpha',1e-3)
-        beta = kwargs.pop('beta',0.)
-        gamma = kwargs.pop('gamma',0.6)
-        n_fold = kwargs.get('n_fold',5)
-        iters = kwargs.pop('iters',5000)
         c = kwargs.pop('second_round_std_scale',0.3)
         first_round_limits = kwargs.pop('first_round_limits',[-1.,0.5,-1.,0.5])
-        ch_1_min =0.         #might be redundant
+
+        ch_1_min =0.
         ch_2_min =0.
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
             if(len(std_devs) != 2 ):
@@ -1718,30 +1782,21 @@ class QuDev_transmon(Qubit):
             MC.set_sweep_functions(S)
             MC.set_sweep_points(meas_grid.T)
             MC.set_detector_function(det.IndexDetector(detector, 0))
-            ad_func_pars = {'hidden_layers': hidden_layers,
-                            'iters':iters,
-                            'alphas': alpha,
-                            'minimize': True,
-                            'estimator': est,
-                            'iters': iters,
-                            'beta': beta,
-                            'gamma': gamma,
-                            'ndim': 2,
-                            'nfold':n_fold}
+
             self.AWG.start()
             MC.run(name='drive_carrier_calibration' + self.msmt_suffix)
             self.AWG.stop()
             a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
-                                          meas_grid=meas_grid,
-                                          ad_func_pars=ad_func_pars,
-                                          round=runs,make_fig=make_fig)
+                                          meas_grid=meas_grid.T,
+                                          estimator=est,
+                                          hyper_parameter_dict=hyper_parameter_dict,
+                                          round=runs, make_fig=make_fig)
             ch_1_min = a.optimization_result[0]
             ch_2_min = a.optimization_result[1]
 
         if update:
             self.pulse_I_offset(ch_1_min)
             self.pulse_Q_offset(ch_2_min)
-
         return ch_1_min,ch_2_min,a
 
 
@@ -1852,11 +1907,10 @@ class QuDev_transmon(Qubit):
                                                 update=True,
                                                 make_fig=True,
                                                 meas_grid=None,
-                                                n_meas=100,
+                                                n_meas=150,
                                                 trigger_sep=4e-6,
                                                 two_rounds=False,
                                                 estimator='GRNN_neupy',
-                                                hidden_layers = [30,30],
                                                 **kwargs):
         '''
         Running a complete drive mixer calibration with spectrum measurements before
@@ -1864,6 +1918,8 @@ class QuDev_transmon(Qubit):
         the dB values of Power ratio between before and after spectrum.
         For detailed info inspect implementations of the below used methods.
         '''
+
+
         self.RO_acq_integration_length(0.5e-6)
         print('RO_acq_int_len set to: ',self.RO_acq_integration_length())
         ma1 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
@@ -1894,7 +1950,7 @@ class QuDev_transmon(Qubit):
                                           amplitude=0.1,trigger_sep=5e-6,
                                           two_rounds=False,
                                           estimator='GRNN_neupy',
-                                          hidden_layers=[30, 30],
+                                          hyper_parameter_dict=None,
                                           first_round_limits=[0.6, 1.2, -50, 35],
                                           **kwargs):
         if not len(first_round_limits)==4:
@@ -1902,14 +1958,22 @@ class QuDev_transmon(Qubit):
                           '<calibrate_drive_mixer_skewness_NN> needs to be a list '
                           'or 1D array of length 4.\n'
                           'found length',len(first_round_limits),' object instead!--')
+
+        if hyper_parameter_dict is None:
+            logging.warning('\n No hyperparameters passed to predictive mixer '
+                            'calibration routine. Default values for the estimator'
+                            'will be used!\n')
+            hyper_parameter_dict={'hidden_layers':[10],
+                                 'learning_rate': 1e-3,
+                                 'regularization_coefficient': 0.,
+                                 'std_scaling':0.6,
+                                 'learning_steps':5000,
+                                 'cv_n_fold':5,
+                                 'polynomial_dimension':2}
         if MC is None:
             MC = self.MC
-        alpha = kwargs.get('alpha',1e-2)
-        beta = kwargs.get('beta',0.)
-        gamma = kwargs.get('gamma',0.5)
+
         std_devs = kwargs.get('std_devs',[0.3,10.])
-        n_fold = kwargs.get('n_fold',5)
-        iters = kwargs.get('iters',3000)
         c = kwargs.pop('second_round_std_scale',0.4)
         #Could make sample size variable (maxiter) for better adapting)
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
@@ -1960,22 +2024,14 @@ class QuDev_transmon(Qubit):
             MC.set_sweep_functions([s1, s2])
             MC.set_sweep_points(meas_grid.T)
             MC.set_detector_function(detector)
-            ad_func_pars = {'hidden_layers': hidden_layers,
-                            'alpha': alpha,
-                            'minimize': True,
-                            'estimator': est,
-                            'iters': iters,
-                            'beta': beta,
-                            'gamma': gamma,
-                            'ndim':2,
-                            'nfold':n_fold}
             MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
 
             a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
-                                          ad_func_pars=ad_func_pars,
-                                          meas_grid=meas_grid,
-                                          two_rounds = two_rounds,
-                                          round=runs,make_fig=make_fig)
+                                      hyper_parameter_dict=hyper_parameter_dict,
+                                      meas_grid=meas_grid.T,
+                                      estimator=est,
+                                      two_rounds = two_rounds,
+                                      round=runs,make_fig=make_fig)
 
             alpha_ = a.optimization_result[0]
             phi_ = a.optimization_result[1]
@@ -2099,7 +2155,7 @@ class QuDev_transmon(Qubit):
 
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
                            no_fits=False, upload=True, preselection_pulse=True,
-                           thresholded=False, RO_comm=3/225e6):
+                           thresholded=False, RO_comm=3/225e6, RO_slack=150e-9):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -2146,7 +2202,7 @@ class QuDev_transmon(Qubit):
 
         RO_spacing = self.UHFQC.quex_wint_delay()*2/1.8e9
         RO_spacing += self.RO_acq_integration_length()
-        RO_spacing += 50e-9  # for slack
+        RO_spacing += RO_slack # for slack
         RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
 
         MC.set_sweep_function(awg_swf2.n_qubit_off_on(
@@ -2193,6 +2249,7 @@ class QuDev_transmon(Qubit):
                 sample_0 = 0
                 sample_1 = 1
             ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name,
                                    rotate=rotate, no_fits=no_fits,
                                    channels=channels, nr_samples=nr_samples,
                                    sample_0=sample_0, sample_1=sample_1,
@@ -2747,9 +2804,14 @@ class QuDev_transmon(Qubit):
 
         if label is None:
             if for_ef:
-                label = 'Rabi_2nd' + self.msmt_suffix
+                label = 'Rabi_2nd'
             else:
-                label = 'Rabi' + self.msmt_suffix
+                label = 'Rabi'
+
+            if n != 1:
+                label += '-n{}'.format(n)
+
+            label += self.msmt_suffix
 
         #Perform Rabi
         if for_ef is False:
@@ -4094,9 +4156,13 @@ def add_CZ_pulse(qbc, qbt):
                                 vals=vals.Enum(qbt.name))
         qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
                                 initial_value='BufferedCZPulse',
-                                vals=vals.Enum('BufferedCZPulse'))
+                                vals=vals.Enum('BufferedSquarePulse',
+                                               'BufferedCZPulse'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
+        qbc.add_pulse_parameter(op_name, ps_name + '_aux_channels',
+                                'aux_channels',
+                                initial_value=[], vals=vals.Lists())
         qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
                                 initial_value=0, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_freq', 'frequency',
@@ -4116,6 +4182,9 @@ def add_CZ_pulse(qbc, qbt):
         qbc.add_pulse_parameter(op_name, ps_name + '_dynamic_phases',
                                 'basis_rotation', initial_value={},
                                 vals=vals.Dict())
+        qbc.add_pulse_parameter(op_name, ps_name + '_gaussian_filter_sigma',
+                                'gaussian_filter_sigma', initial_value=0,
+                                vals=vals.Numbers(0))
 
 
 

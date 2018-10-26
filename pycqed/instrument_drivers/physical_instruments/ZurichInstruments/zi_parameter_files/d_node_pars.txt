@@ -1,5 +1,109 @@
 [
   [
+    "awgs/0/sequencer/status",
+    "float"
+  ],
+  [
+    "awgs/0/sequencer/pc",
+    "float"
+  ],
+  [
+    "awgs/0/dio/data",
+    "vector_g"
+  ],
+  [
+    "awgs/0/sequencer/next",
+    "float"
+  ],
+  [
+    "awgs/0/waveform/data",
+    "vector_gs"
+  ],
+  [
+    "awgs/0/sweep/awgtrigs/2",
+    "float"
+  ],
+  [
+    "awgs/0/elf/data",
+    "vector_gs"
+  ],
+  [
+    "awgs/0/elf/length",
+    "float"
+  ],
+  [
+    "awgs/0/triggers/1/state",
+    "float"
+  ],
+  [
+    "awgs/0/sweep/awgtrigs/1",
+    "float"
+  ],
+  [
+    "awgs/0/sweep/awgtrigs/3",
+    "float"
+  ],
+  [
+    "awgs/0/elf/progress",
+    "float"
+  ],
+  [
+    "awgs/0/ready",
+    "float"
+  ],
+  [
+    "awgs/0/waveform/memoryusage",
+    "float"
+  ],
+  [
+    "awgs/0/outputs/0/enables/1",
+    "float"
+  ],
+  [
+    "awgs/0/triggers/0/state",
+    "float"
+  ],
+  [
+    "awgs/0/outputs/1/enables/0",
+    "float"
+  ],
+  [
+    "awgs/0/outputs/1/enables/1",
+    "float"
+  ],
+  [
+    "awgs/0/elf/checksum",
+    "float"
+  ],
+  [
+    "awgs/0/waveform/index",
+    "float"
+  ],
+  [
+    "awgs/0/outputs/0/enables/0",
+    "float"
+  ],
+  [
+    "awgs/0/auxtriggers/0/state",
+    "float"
+  ],
+  [
+    "awgs/0/sweep/awgtrigs/0",
+    "float"
+  ],
+  [
+    "awgs/0/waveform/descriptors",
+    "vector_g"
+  ],
+  [
+    "awgs/0/elf/memoryusage",
+    "float"
+  ],
+  [
+    "awgs/0/sequencer/continue",
+    "float"
+  ],
+  [
     "awgs/0/auxtriggers/1/state",
     "float"
   ],
@@ -8,123 +112,15 @@
     "vector_g"
   ],
   [
-    "awgs/0/sequencer/memoryusage",
-    "float"
-  ],
-  [
-    "awgs/0/elf/data",
-    "vector_gs"
+    "awgs/0/sequencer/program",
+    "vector_g"
   ],
   [
     "awgs/0/sequencer/assembly",
     "vector_g"
   ],
   [
-    "awgs/0/waveform/descriptors",
-    "vector_g"
-  ],
-  [
-    "awgs/0/sequencer/pc",
-    "float"
-  ],
-  [
-    "awgs/0/triggers/0/state",
-    "float"
-  ],
-  [
-    "awgs/0/elf/length",
-    "float"
-  ],
-  [
-    "awgs/0/sequencer/next",
-    "float"
-  ],
-  [
-    "awgs/0/waveform/memoryusage",
-    "float"
-  ],
-  [
-    "awgs/0/sweep/awgtrigs/1",
-    "float"
-  ],
-  [
-    "awgs/0/outputs/1/enables/1",
-    "float"
-  ],
-  [
-    "awgs/0/triggers/1/state",
-    "float"
-  ],
-  [
-    "awgs/0/sweep/awgtrigs/2",
-    "float"
-  ],
-  [
-    "awgs/0/outputs/0/enables/0",
-    "float"
-  ],
-  [
-    "awgs/0/sequencer/program",
-    "vector_g"
-  ],
-  [
-    "awgs/0/ready",
-    "float"
-  ],
-  [
-    "awgs/0/dio/data",
-    "vector_g"
-  ],
-  [
-    "awgs/0/elf/memoryusage",
-    "float"
-  ],
-  [
-    "awgs/0/outputs/1/enables/0",
-    "float"
-  ],
-  [
-    "awgs/0/sweep/awgtrigs/0",
-    "float"
-  ],
-  [
-    "awgs/0/elf/progress",
-    "float"
-  ],
-  [
-    "awgs/0/sequencer/continue",
-    "float"
-  ],
-  [
-    "awgs/0/outputs/0/enables/1",
-    "float"
-  ],
-  [
-    "awgs/0/auxtriggers/0/state",
-    "float"
-  ],
-  [
-    "awgs/0/waveform/index",
-    "float"
-  ],
-  [
-    "awgs/0/waveform/data",
-    "vector_gs"
-  ],
-  [
-    "awgs/0/sequencer/status",
-    "float"
-  ],
-  [
-    "awgs/0/elf/checksum",
-    "float"
-  ],
-  [
-    "awgs/0/sweep/awgtrigs/3",
-    "float"
-  ],
-  [
-    "sigins/0/max",
+    "awgs/0/sequencer/memoryusage",
     "float"
   ],
   [
@@ -132,7 +128,7 @@
     "float"
   ],
   [
-    "sigins/1/max",
+    "sigins/1/min",
     "float"
   ],
   [
@@ -144,11 +140,11 @@
     "float"
   ],
   [
-    "sigins/1/min",
+    "sigins/1/max",
     "float"
   ],
   [
-    "sigouts/0/over",
+    "sigins/0/max",
     "float"
   ],
   [
@@ -156,35 +152,35 @@
     "float"
   ],
   [
+    "sigouts/0/over",
+    "float"
+  ],
+  [
+    "quex/wint/weights/0/imag",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/8/real",
+    "vector_gs"
+  ],
+  [
     "quex/wint/weights/0/real",
     "vector_gs"
   ],
   [
-    "quex/rl/data/3",
+    "quex/rl/data/7",
     "vector_g"
   ],
   [
-    "quex/wint/weights/5/imag",
+    "quex/wint/weights/6/imag",
     "vector_gs"
   ],
   [
-    "quex/wint/weights/7/imag",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/8/imag",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/6/real",
-    "vector_gs"
-  ],
-  [
-    "quex/rl/data/6",
+    "quex/rl/data/8",
     "vector_g"
   ],
   [
-    "quex/wint/weights/0/imag",
+    "quex/sl/statemap",
     "vector_gs"
   ],
   [
@@ -192,39 +188,27 @@
     "vector_gs"
   ],
   [
-    "quex/wint/weights/5/real",
+    "quex/wint/weights/8/imag",
     "vector_gs"
   ],
   [
-    "quex/iavg/data/0",
+    "quex/wint/weights/1/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/6/real",
+    "vector_gs"
+  ],
+  [
+    "quex/rl/data/2",
     "vector_g"
-  ],
-  [
-    "quex/wint/weights/8/real",
-    "vector_gs"
   ],
   [
     "quex/rl/data/1",
     "vector_g"
   ],
   [
-    "quex/rl/data/7",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/4",
-    "vector_g"
-  ],
-  [
-    "quex/wint/weights/4/real",
-    "vector_gs"
-  ],
-  [
     "quex/wint/weights/2/imag",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/3/imag",
     "vector_gs"
   ],
   [
@@ -232,12 +216,8 @@
     "vector_gs"
   ],
   [
-    "quex/rl/data/0",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/2",
-    "vector_g"
+    "quex/wint/weights/3/real",
+    "vector_gs"
   ],
   [
     "quex/rl/data/5",
@@ -248,7 +228,7 @@
     "vector_gs"
   ],
   [
-    "quex/wint/weights/6/imag",
+    "quex/wint/weights/9/real",
     "vector_gs"
   ],
   [
@@ -256,40 +236,64 @@
     "vector_g"
   ],
   [
+    "quex/rl/data/0",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/9",
+    "vector_g"
+  ],
+  [
+    "quex/wint/weights/3/imag",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/9/imag",
+    "vector_gs"
+  ],
+  [
+    "quex/rl/data/4",
+    "vector_g"
+  ],
+  [
+    "quex/iavg/data/0",
+    "vector_g"
+  ],
+  [
+    "quex/wint/weights/7/imag",
+    "vector_gs"
+  ],
+  [
+    "quex/rl/data/6",
+    "vector_g"
+  ],
+  [
+    "quex/wint/weights/4/real",
+    "vector_gs"
+  ],
+  [
     "quex/wint/weights/2/real",
     "vector_gs"
   ],
   [
-    "quex/wint/weights/3/real",
+    "quex/wint/weights/5/imag",
     "vector_gs"
   ],
   [
-    "quex/wint/weights/1/real",
-    "vector_gs"
-  ],
-  [
-    "quex/sl/statemap",
-    "vector_gs"
-  ],
-  [
-    "quex/rl/data/8",
+    "quex/rl/data/3",
     "vector_g"
   ],
   [
-    "dios/0/input",
-    "vector_s"
+    "quex/wint/weights/5/real",
+    "vector_gs"
   ],
   [
     "dios/0/auxdrive",
     "float"
   ],
   [
-    "triggers/in/2/autothreshold",
-    "float"
-  ],
-  [
-    "triggers/in/1/autothreshold",
-    "float"
+    "dios/0/input",
+    "vector_s"
   ],
   [
     "triggers/in/3/autothreshold",
@@ -297,6 +301,14 @@
   ],
   [
     "triggers/in/0/autothreshold",
+    "float"
+  ],
+  [
+    "triggers/in/1/autothreshold",
+    "float"
+  ],
+  [
+    "triggers/in/2/autothreshold",
     "float"
   ]
 ]

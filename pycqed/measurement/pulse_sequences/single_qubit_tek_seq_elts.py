@@ -91,10 +91,10 @@ def Pulsed_spec_ro_markers_seq(spec_pars, RO_pars,
     # next trigger comes in. Assumes 200us trigger period, also works for
     # faster trigger rates.
     # period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
-    period = RO_pars['length'] + RO_pars['pulse_delay']
+    period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
     nr_of_pulse_reps = int((200e-6-10e-6)//period)
-
     pulse_list = [spec_pars, RO_pars]*nr_of_pulse_reps
+
     el = multi_pulse_elt(0, station, pulse_list)
     el_list.append(el)
     seq.append_element(el, trigger_wait=True)
@@ -467,9 +467,11 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
         else:
             X90_separation = tau - DRAG_length
             if cpmg_scheme:
-                print('cpmg')
-                echo_pulse_delay = (X90_separation - nr_echo_pulses*DRAG_length) / \
-                                   nr_echo_pulses
+                if i==0:
+                    print('cpmg')
+                echo_pulse_delay = (X90_separation -
+                                    nr_echo_pulses*DRAG_length) / \
+                                    nr_echo_pulses
                 if echo_pulse_delay < 0:
                     pulse_pars_x2['pulse_delay'] = tau
                     pulse_dict_list = [pulses['X90'], pulse_pars_x2, RO_pars]
@@ -487,7 +489,8 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                     pulse_pars_x2['pulse_delay'] = start_end_delay
                     pulse_dict_list += [pulse_pars_x2, RO_pars]
             else:
-                print('UDD')
+                if i==0:
+                    print('UDD')
                 pulse_positions_func = \
                     lambda idx, N: np.sin(np.pi*idx/(2*N+2))**2
                 pulse_delays_func = (lambda idx, N: X90_separation*(
@@ -1111,30 +1114,11 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                 cl_seq,
                 gate_decomp=gate_decomposition)
 
-            # pulse_keys_list.append(pulse_keys)
-
             pulse_list = [pulses[x] for x in pulse_keys]
-            # print('\n',pulse_keys)
-            # a = [j for j in pulse_keys if 'Z' not in j]
-            # print(len(pulse_keys))
-            # print(len(a))
             pulse_list += [RO_pars]
-            # find index of first pulse in pulse_list that is not a Z pulse
-            # copy this pulse and set extra wait
-
-            # try:
-            #     first_x_pulse = next(j for j in pulse_list if 'Z' not in j['pulse_type'])
-            #     first_x_pulse_idx = pulse_list.index(first_x_pulse)
-            #     #print('first_x_pulse_idx = ', first_x_pulse_idx)
-            # except:
-            #     first_x_pulse_idx = 0
-            # pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
-            # pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-
-        # print(pulse_keys)
 
         # If the element is too long, add in an extra wait elt
         # to skip a trigger
@@ -1147,7 +1131,6 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
         return seq, el_list
     else:
         return seq, el_list
-        # return pulse_keys_list
 
 
 def Freq_XY(freqs, pulse_pars, RO_pars,

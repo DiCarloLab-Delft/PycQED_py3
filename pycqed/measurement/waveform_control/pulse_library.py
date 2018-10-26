@@ -1,15 +1,15 @@
-import numpy as np
-import scipy.signal as signal
-'''
+"""
 Library containing pulse shapes.
-'''
+"""
+
+import numpy as np
+import scipy as sp
 from pycqed.measurement.waveform_control.pulse import Pulse, apply_modulation
 from pycqed.measurement.waveform_control_CC.waveform import martinis_flux_pulse
 from pycqed.utilities.general import int_to_bin
 
 class MW_IQmod_pulse(Pulse):
-
-    '''
+    """
     Block pulse on the I channel modulated with IQ modulation.
 
     kwargs:
@@ -23,7 +23,7 @@ class MW_IQmod_pulse(Pulse):
     transformation:
     [I_mod] = [cos(wt+phi)   0] [I_env]
     [Q_mod]   [-sin(wt+phi)  0] [0]
-    '''
+    """
 
     def __init__(self, name, I_channel, Q_channel, **kw):
         super().__init__(name)
@@ -359,6 +359,7 @@ class BufferedSquarePulse(Pulse):
         self.pulse_length = kw.pop('pulse_length', 0)
         self.buffer_length_start = kw.pop('buffer_length_start', 0)
         self.buffer_length_end = kw.pop('buffer_length_end', 0)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma', 0)
         self.length = self.pulse_length + self.buffer_length_start + \
                       self.buffer_length_end
 
@@ -369,6 +370,8 @@ class BufferedSquarePulse(Pulse):
                                           self.buffer_length_start)
         self.buffer_length_end = kw.pop('buffer_length_end',
                                         self.buffer_length_end)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma',
+                                            self.gaussian_filter_sigma)
         self.length = self.pulse_length + self.buffer_length_start + \
                       self.buffer_length_end
         self.channels = kw.pop('channels', self.channels)
@@ -376,21 +379,33 @@ class BufferedSquarePulse(Pulse):
         return self
 
     def chan_wf(self, chan, tvals):
-        return np.ones_like(tvals)*self.amplitude * \
-               (tvals >= tvals[0] + self.buffer_length_start) * \
-               (tvals < tvals[0] + self.buffer_length_start + self.pulse_length)
+        if self.gaussian_filter_sigma == 0:
+            wave = np.ones_like(tvals)*self.amplitude
+            wave *= (tvals >= tvals[0] + self.buffer_length_start)
+            wave *= (tvals < tvals[0] + self.buffer_length_start +
+                     self.pulse_length)
+            return wave
+        else:
+            tstart = tvals[0] + self.buffer_length_start
+            tend = tvals[0] + self.buffer_length_start + self.pulse_length
+            scaling = 1/np.sqrt(2)/self.gaussian_filter_sigma
+            wave = 0.5*(sp.special.erf((tvals - tstart)*scaling) -
+                        sp.special.erf((tvals - tend)*scaling))*self.amplitude
+            return wave
+
 
 
 class BufferedCZPulse(Pulse):
-    def __init__(self, channel=None, channels=None,
-                 name='buffered square pulse', **kw):
+    def __init__(self, channel, aux_channels=None,
+                 name='buffered CZ pulse', **kw):
         super().__init__(name)
-        if channel is None and channels is None:
-            raise ValueError('Must specify either channel or channels')
-        elif channels is None:
-            self.channels.append(channel)
-        else:
-            self.channels = channels
+
+        self.channel = channel
+        self.aux_channels = aux_channels
+        self.channels = [self.channel]
+        if self.aux_channels is not None:
+            self.channels += aux_channels
+
         self.amplitude = kw.pop('amplitude', 0)
         self.frequency = kw.pop('frequency', 0)
         self.phase = kw.pop('phase', 0.)
@@ -415,8 +430,12 @@ class BufferedCZPulse(Pulse):
         return self
 
     def chan_wf(self, chan, tvals):
-        return self.amplitude * np.cos(2*np.pi*(self.frequency*tvals +
-                                                self.phase / 360.)) * \
+        amp = self.amplitude
+        if chan != self.channel:
+            amp = 0.5*self.amplitude
+        t_rel = tvals - tvals[0]
+        return amp * np.cos(2*np.pi*(self.frequency*t_rel +
+                                     self.phase / 360.)) * \
                (tvals >= tvals[0] + self.buffer_length_start) * \
                (tvals < tvals[0] + self.buffer_length_start + self.pulse_length)
 

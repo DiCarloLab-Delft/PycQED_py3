@@ -190,7 +190,7 @@ class n_qubit_reset(swf.Hard_Sweep):
                                verbose=self.verbose)
 
 
-class two_qubit_Simultaneous_RB_sequence_lengths(swf.Soft_Sweep):
+class n_qubit_Simultaneous_RB_sequence_lengths(swf.Soft_Sweep):
     def __init__(self, sweep_control='soft',
                  n_qubit_RB_sweepfunction=None):
         super().__init__()
@@ -209,33 +209,26 @@ class two_qubit_Simultaneous_RB_sequence_lengths(swf.Soft_Sweep):
         self.n_qubit_RB_sweepfunction.prepare()
 
 
-class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
+class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
 
-    def __init__(self, qubit_list, RO_pars,
+    def __init__(self, qubit_names_list, operation_dict,
                  nr_seeds_array, #array
                  nr_cliffords_value, #int
                  gate_decomposition='HZ', interleaved_gate=None,
                  upload=True, return_seq=False, seq_name=None,
-                 CxC_RB=True, idx_for_RB=0, interleave_CZ=True,
-                 verbose=False, CZ_info_dict=None, spacing=30e-9,
-                 cal_points=False):
+                 verbose=False, cal_points=False):
 
         super().__init__()
-        self.qubit_list = qubit_list
-        self.RO_pars = RO_pars
+        self.qubit_names_list = qubit_names_list
+        self.operation_dict = operation_dict
         self.upload = upload
         self.nr_cliffords_value = nr_cliffords_value
         self.nr_seeds_array = nr_seeds_array
-        self.CxC_RB = CxC_RB
         self.seq_name = seq_name
         self.return_seq = return_seq
         self.gate_decomposition = gate_decomposition
         self.interleaved_gate = interleaved_gate
-        self.idx_for_RB = idx_for_RB
         self.verbose = verbose
-        self.CZ_info_dict = CZ_info_dict
-        self.interleave_CZ = interleave_CZ
-        self.spacing = spacing
         self.cal_points = cal_points
 
         self.parameter_name = 'Nr of Seeds'
@@ -245,20 +238,15 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs2.n_qubit_simultaneous_randomized_benchmarking_seq(
-                self.qubit_list, self.RO_pars,
+                self.qubit_names_list, self.operation_dict,
                 nr_cliffords_value=self.nr_cliffords_value,
                 gate_decomposition=self.gate_decomposition,
                 interleaved_gate=self.interleaved_gate,
                 nr_seeds=self.nr_seeds_array,
-                CxC_RB=self.CxC_RB,
-                idx_for_RB=self.idx_for_RB,
                 seq_name=self.seq_name,
                 return_seq=self.return_seq,
                 verbose=self.verbose,
                 upload=self.upload,
-                interleave_CZ=self.interleave_CZ,
-                CZ_info_dict=self.CZ_info_dict,
-                spacing=self.spacing,
                 cal_points=self.cal_points)
 
 
@@ -300,6 +288,69 @@ class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
                 seq_name=self.seq_name,
                 return_seq=self.return_seq,
                 verbose=self.verbose)
+
+
+class two_qubit_randomized_benchmarking_nr_cliffords(swf.Soft_Sweep):
+
+    def __init__(self, sweep_control='soft',
+                 two_qubit_RB_sweepfunction=None):
+        super().__init__()
+
+        self.sweep_control = sweep_control
+        self.two_qubit_RB_sweepfunction = two_qubit_RB_sweepfunction
+        self.name = 'Two_Qubit_Randomized_Benchmarking_nr_cliffords'
+        self.parameter_name = 'Nr of Cliffords'
+        self.unit = '#'
+
+
+    def set_parameter(self, val):
+        self.two_qubit_RB_sweepfunction.nr_cliffords_value = val
+        self.two_qubit_RB_sweepfunction.upload = True
+        self.two_qubit_RB_sweepfunction.prepare()
+
+
+class two_qubit_randomized_benchmarking_one_length(swf.Hard_Sweep):
+
+    def __init__(self, qb1n, qb2n, operation_dict,
+                 nr_cliffords_value,
+                 CZ_pulse_name=None,
+                 net_clifford=0,
+                 clifford_decomposition_name='HZ',
+                 interleaved_gate=None,
+                 seq_name=None, upload=True,
+                 return_seq=False, verbose=False):
+
+        super().__init__()
+        self.qb1n = qb1n
+        self.qb2n = qb2n
+        self.operation_dict = operation_dict
+        self.nr_cliffords_value = nr_cliffords_value
+        self.CZ_pulse_name = CZ_pulse_name
+        self.net_clifford = net_clifford
+        self.clifford_decomposition_name = clifford_decomposition_name
+        self.interleaved_gate = interleaved_gate
+        self.seq_name = seq_name
+        self.upload = upload
+        self.return_seq = return_seq
+        self.verbose = verbose
+
+        self.parameter_name = 'Nr of Seeds'
+        self.unit = '#'
+        self.name = 'Two_Qubit_Randomized_Benchmarking_one_length'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.two_qubit_randomized_benchmarking_seq(
+                qb1n=self.qb1n, qb2n=self.qb2n,
+                operation_dict=self.operation_dict,
+                nr_cliffords_value=self.nr_cliffords_value,
+                nr_seeds=self.sweep_points,
+                CZ_pulse_name=self.CZ_pulse_name,
+                net_clifford=self.net_clifford,
+                clifford_decomposition_name=self.clifford_decomposition_name,
+                interleaved_gate=self.interleaved_gate,
+                seq_name=self.seq_name, upload=self.upload,
+                return_seq=self.return_seq, verbose=self.verbose)
 
 
 class two_qubit_AllXY(swf.Hard_Sweep):
@@ -449,13 +500,15 @@ class parity_correction(swf.Hard_Sweep):
 
 
 class calibrate_n_qubits(swf.Hard_Sweep):
-    def __init__(self, sweep_params, qubit_names, operation_dict,
+    def __init__(self, sweep_params, sweep_points,
+                 qubit_names, operation_dict,
                  cal_points=True, no_cal_points=4,
                  parameter_name='sample', unit='#',
                  upload=False, return_seq=False):
 
         super().__init__()
         self.sweep_params = sweep_params
+        self.sweep_pts = sweep_points
         self.qubit_names = qubit_names
         self.operation_dict = operation_dict
         self.cal_points = cal_points
@@ -468,10 +521,9 @@ class calibrate_n_qubits(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs2.general_multi_qubit_seq(sweep_params=self.sweep_params,
-                                         sweep_points=self.sweep_points,
+                                         sweep_points=self.sweep_pts,
                                          qb_names=self.qubit_names,
                                          operation_dict=self.operation_dict,
-                                         thresholded=False,
                                          cal_points=self.cal_points,
                                          no_cal_points=self.no_cal_points,
                                          upload=self.upload,

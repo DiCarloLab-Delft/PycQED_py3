@@ -133,7 +133,6 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
         search_dir = folder
 
     daydirs = os.listdir(search_dir)
-
     if len(daydirs) == 0:
         logging.warning('No data found in datadir')
         return None
@@ -197,7 +196,6 @@ def data_from_time(timestamp, folder=None):
     if (folder is None):
         folder = datadir
     daydirs = os.listdir(folder)
-
     if len(daydirs) == 0:
         raise Exception('No data in the data directory specified')
 
@@ -225,6 +223,7 @@ def measurement_filename(directory=os.getcwd(), file_id=None, ext='hdf5'):
             fn = dirname[0:7]+dirname[9:]+'.'+ext
         else:
             fn = dirname+'.'+ext
+
     if os.path.exists(os.path.join(directory, fn)):
         return os.path.join(directory, fn)
     else:
@@ -801,7 +800,6 @@ def get_mean_df(label, starting_timestamp, ending_timestamp,
 
 def get_folder(timestamp=None, older_than=None, label='',
                suppress_printing=True, **kw):
-
     if timestamp is not None:
         folder = data_from_time(timestamp)
         if not suppress_printing:
