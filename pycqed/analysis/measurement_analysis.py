@@ -451,10 +451,12 @@ class MeasurementAnalysis(object):
                              show=False, transpose=False,
                              plot_args=None, **kw):
 
+        new_sweep_points = kw.pop('new_sweep_points', None)
+
         if plot_args is None:
             plot_args = {}
         if TwoD is False:
-            self.get_naming_and_values()
+            self.get_naming_and_values(new_sweep_points=new_sweep_points)
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
             # Preallocate the array of axes in the figure
             # Creates either a 2x2 grid or a vertical list
@@ -517,7 +519,7 @@ class MeasurementAnalysis(object):
                 plt.show()
 
         elif TwoD is True:
-            self.get_naming_and_values_2D()
+            self.get_naming_and_values_2D(new_sweep_points=new_sweep_points)
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
             self.sweep_points_2D = kw.pop(
                 'sweep_points_2D', self.sweep_points_2D)
@@ -602,7 +604,7 @@ class MeasurementAnalysis(object):
         if close_file:
             self.data_file.close()
 
-    def get_naming_and_values(self):
+    def get_naming_and_values(self, new_sweep_points=None):
         '''
         Works both for the 'old' 1D sweeps and the new datasaving format.
         The new datasaving format also works for nD sweeps but the loading is
@@ -676,9 +678,14 @@ class MeasurementAnalysis(object):
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
 
+        if new_sweep_points is not None:
+            self.sweep_points_from_file = self.sweep_points
+            self.sweep_points = new_sweep_points
+
+
     def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
-                                   log=False, ticks_around=True, label=None,
-                                   **kw):
+                                       log=False, ticks_around=True, label=None,
+                                       **kw):
 
         save = kw.get('save', False)
         font_size = kw.pop('font_size', None)
@@ -844,7 +851,7 @@ class MeasurementAnalysis(object):
 
         return
 
-    def get_naming_and_values_2D(self):
+    def get_naming_and_values_2D(self, new_sweep_points=None):
         '''
         This should also be adjusted for 2D.
         Data should directly be turned into a convenient
@@ -941,6 +948,10 @@ class MeasurementAnalysis(object):
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
 
+        if new_sweep_points is not None:
+            self.sweep_points_from_file = self.sweep_points
+            self.sweep_points(new_sweep_points)
+
     def get_best_fit_results(self, peak=False, weighted=False):
         if len(self.data_file['Analysis']) is 1:
             return list(self.data_file['Analysis'].values())[0]
@@ -976,6 +987,10 @@ class MeasurementAnalysis(object):
             print('Best key: ', best_key)
             best_fit_results = self.data_file['Analysis'][best_key]
             return best_fit_results
+
+    def set_sweep_points(self, sweep_points):
+        assert (len(sweep_points) == len(self.sweep_points))
+        self.sweep_points = sweep_points
 
 class Mixer_calibration_evaluation(MeasurementAnalysis):
 
@@ -2925,6 +2940,8 @@ class QScale_Analysis(TD_Analysis):
                                      close_main_fig=True,
                                      save_fig=False, **kw)
 
+        plot_title_suffix = kw.pop('plot_title_suffix', '')
+
         # Only the unfolding part here is unique to this analysis
         self.sweep_points_xX = self.sweep_points[
                                :len(self.sweep_points)-self.NoCalPoints:3]
@@ -2947,13 +2964,13 @@ class QScale_Analysis(TD_Analysis):
 
         if self.make_fig_qscale:
             fig, ax = self.default_ax()
-            self.make_figures(fig=fig, ax=ax, **kw)
+            self.make_figures(fig=fig, ax=ax,
+                              plot_title_suffix =plot_title_suffix, **kw)
 
             if show:
                 plt.show()
 
             if kw.pop('save_fig', True):
-                plot_title_suffix = kw.pop('plot_title_suffix', '')
                 self.save_fig(fig,
                               figname=self.measurementstring + '_Qscale_fit' +
                                       plot_title_suffix, **kw)
@@ -2963,7 +2980,8 @@ class QScale_Analysis(TD_Analysis):
 
         return self.fit_res
 
-    def make_figures(self, fig=None, ax=None, **kw):
+    def make_figures(self, fig=None, ax=None,
+                     plot_title_suffix ='', **kw):
 
         # Unique in that it has hardcoded names and points to plot
         show_guess = kw.pop('show_guess', False)
@@ -3000,6 +3018,10 @@ class QScale_Analysis(TD_Analysis):
                  verticalalignment='top',
                  horizontalalignment='center', bbox=self.box_props)
 
+        plot_title = kw.pop('plot_title', self.measurementstring
+                            + plot_title_suffix + '\n' +
+                            self.timestamp_string)
+
         self.plot_results_vs_sweepparam(self.sweep_points_xX, self.corr_data_xX,
                                         fig, ax,
                                         marker='ob',
@@ -3016,7 +3038,8 @@ class QScale_Analysis(TD_Analysis):
                                         label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$',
                                         ticks_around=True,
                                         xlabel=r'$q_{scales}$',
-                                        ylabel=ylabel)
+                                        ylabel=ylabel,
+                                        plot_title=plot_title)
         ax.legend(loc='best', prop={'size': self.font_size})
         # c = ['b', 'g', 'r']
         c = ['g', 'r']
@@ -10562,7 +10585,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                 plot_title=None, **kw):
 
         only_cos_fits = kw.pop('only_cos_fits', False)
-        fit_statistics = kw.pop('fit_statistics',False)
+        fit_statistics = kw.pop('fit_statistics', False)
         fontsize = 14.
         legend_fontsize=12.
         if cal_points is None:
@@ -10713,12 +10736,12 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
             phase_list = self.unwrap_phases_extrapolation(phase_list)
 
         if plot:
-            if len(self.sweep_points_2D[0]) == 2 or fit_statistics:
+            if fit_statistics:
                 ax.set_title(r"Cphase $= {:0.2f}\pm {:0.2f}$ deg, "
                              '\n@ {:0.4f}ns ; {:0.4f}V \n date_time: {}'.format(
                     avg_cphases*180/np.pi, std_cphases*180/np.pi,
-                    self.sweep_points_2D[1][0]*1e9,
-                    self.sweep_points_2D[0][0],
+                    self.sweep_points_2D[0][0]*1e9,
+                    self.sweep_points_2D[1][0],
                     self.timestamp_string),fontsize=fontsize)
             else:
                 ax.set_title('Single Cosine fits \n' + self.timestamp_string,
@@ -10900,8 +10923,8 @@ class OptimizationAnalysis_Predictive2D:
                 ax.scatter(self.training_grid[:,0],self.training_grid[:,1],
                             marker='o',c='r',label='training data',s=8)
                 ax.tick_params(axis='both',which='minor',labelsize=14)
-                ax.set_ylabel(self.ma.parameter_labels[1],fontsize=fontsize)
-                ax.set_xlabel(self.ma.parameter_labels[2],fontsize=fontsize)
+                ax.set_ylabel(self.ma.parameter_labels[2],fontsize=fontsize)
+                ax.set_xlabel(self.ma.parameter_labels[1],fontsize=fontsize)
                 cbar = plt.colorbar(CP,ax=ax,orientation='vertical')
                 cbar.ax.set_ylabel(self.target_value_names[tot],fontsize=fontsize)
                 ax.set_title('{} fitted landscape'.format(self.target_value_names[tot]))
@@ -10925,12 +10948,12 @@ class OptimizationAnalysis_Predictive2D:
                 'o', markersize=5, c='w')
         plot_title = self.ma.timestamp_string + '_' +self.ma.measurementstring
         ax2.set_title('Population loss Interpolated')
-        textstr = '%s ( %s )' % (self.ma.parameter_names[2],
-                                 self.ma.parameter_units[2])
-        set_xlabel(ax1, textstr)
-        set_xlabel(ax2, textstr)
         textstr = '%s ( %s )' % (self.ma.parameter_names[1],
                                  self.ma.parameter_units[1])
+        set_xlabel(ax1, textstr)
+        set_xlabel(ax2, textstr)
+        textstr = '%s ( %s )' % (self.ma.parameter_names[2],
+                                 self.ma.parameter_units[2])
         set_ylabel(ax1, textstr)
         set_ylabel(ax2, textstr)
         ax1.set_title(r"$|\phi_C/\pi-1|$ Interpolated")
@@ -10996,6 +11019,9 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
 
         if kw.pop('show', False):
             plt.show()
+
+        if kw.pop('close_fig', True):
+            plt.close(self.fig)
 
         if kw.pop('close_file', True):
             self.data_file.close()

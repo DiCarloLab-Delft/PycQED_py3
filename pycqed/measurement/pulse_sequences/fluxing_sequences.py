@@ -1641,6 +1641,10 @@ def dynamic_phase_meas_seq(thetas, qb_name, CZ_pulse_name,
     flux_pulse = deepcopy(operation_dict[CZ_pulse_name])
     X90_2 = deepcopy(operation_dict['X90 ' + qb_name])
     RO_pars = deepcopy(operation_dict['RO ' + qb_name])
+    #
+    # # putting control qb in |e> state:
+    # qbc_name = operation_dict[CZ_pulse_name]['target_qubit']
+    # X180_qbc = operation_dict['X180s ' + qbc_name]
 
     # Used for checking dynamic phase compensation
     # if flux_pulse['amplitude'] != 0:
@@ -1667,6 +1671,7 @@ def dynamic_phase_meas_seq(thetas, qb_name, CZ_pulse_name,
         else:
             el = multi_pulse_elt(i, station,
                                  [operation_dict['X90 ' + qb_name],
+                                  # X180_qbc,
                                   flux_pulse, X90_2,
                                   RO_pars])
         el_list.append(el)
@@ -1799,8 +1804,11 @@ def Chevron_length_seq_new(lengths, flux_pulse_amp, frequency,
         upload_AWGs = 'all'
         upload_channels = 'all'
     else:
-        upload_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG')]
-        upload_channels = [CZ_pulse['channel']]
+        upload_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG')] + \
+                      [station.pulsar.get(ch + '_AWG') for ch in
+                       CZ_pulse['aux_channels_dict']]
+        upload_channels = [CZ_pulse['channel']] + \
+                          list(CZ_pulse['aux_channels_dict'])
 
     for i, length in enumerate(lengths):
         RO_pulse['pulse_delay'] = max_length - length
@@ -1810,6 +1818,8 @@ def Chevron_length_seq_new(lengths, flux_pulse_amp, frequency,
             el = multi_pulse_elt(i, station, [RO_pulse])
         elif cal_points and (i == (len(lengths)-2) or i == (len(lengths)-1)):
             CZ_pulse['amplitude'] = 0
+            for ch in CZ_pulse['aux_channels_dict']:
+                CZ_pulse['aux_channels_dict'][ch] = 0
             el = multi_pulse_elt(i, station,
                                  [operation_dict['X180 ' + qbc_name],
                                   operation_dict['X180s ' + qbt_name],
@@ -2273,6 +2283,8 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
         elif cal_points and (i == (len(phases)-2)
                              or i == (len(phases)-1)):
             CZ_pulse['amplitude'] = 0
+            for ch in CZ_pulse['aux_channels_dict']:
+                CZ_pulse['aux_channels_dict'][ch] = 0
             el = multi_pulse_elt(i, station,
                                  [X180_control,
                                   X90_target,buffer_pulse,
@@ -2287,8 +2299,8 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        print('uploading channels: ',upload_channels)
-        print('of AWGs: ',upload_AWGs)
+        print('uploading channels: ', upload_channels)
+        print('of AWGs: ', upload_AWGs)
         station.pulsar.program_awgs(seq, *el_list,
                                     AWGs=upload_AWGs,
                                     channels=upload_channels,

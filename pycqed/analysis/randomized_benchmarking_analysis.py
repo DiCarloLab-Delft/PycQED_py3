@@ -288,9 +288,11 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                 # Hacked in here, good idea to only show the main fig but can
                 # be optimized somehow
                 self.save_fig(self.fig, ylabel='Amplitude (normalized)',
+                              xlabel='Nr. of Cliffords, m',
                               close_fig=False, **kw)
             else:
-                self.save_fig(self.fig, ylabel='Amplitude (normalized)', **kw)
+                self.save_fig(self.fig, ylabel='Amplitude (normalized)',
+                              xlabel='Nr. of Cliffords, m', **kw)
 
     def fit_data(self, data, numCliff,
                  print_fit_results=False,
@@ -2112,12 +2114,12 @@ def plotting_function(x, y, fig, ax, marker='-o',
     if ylabel is not None:
         set_ylabel(ax, ylabel, unit=y_unit)
 
-    majorLocator = MultipleLocator(50)
-    majorFormatter = FormatStrFormatter('%d')
-    minorLocator = MultipleLocator(10)
-    ax.xaxis.set_major_locator(majorLocator)
-    ax.xaxis.set_major_formatter(majorFormatter)
-    ax.xaxis.set_minor_locator(minorLocator)
+    # majorLocator = MultipleLocator(50)
+    # majorFormatter = FormatStrFormatter('%d')
+    # minorLocator = MultipleLocator(10)
+    # ax.xaxis.set_major_locator(majorLocator)
+    # ax.xaxis.set_major_formatter(majorFormatter)
+    # ax.xaxis.set_minor_locator(minorLocator)
 
     ax.set_ylim([-0.15, 1.15])
     majorLocator = MultipleLocator(0.2)

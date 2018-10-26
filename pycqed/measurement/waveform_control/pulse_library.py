@@ -396,15 +396,15 @@ class BufferedSquarePulse(Pulse):
 
 
 class BufferedCZPulse(Pulse):
-    def __init__(self, channel, aux_channels=None,
+    def __init__(self, channel, aux_channels_dict=None,
                  name='buffered CZ pulse', **kw):
         super().__init__(name)
 
         self.channel = channel
-        self.aux_channels = aux_channels
+        self.aux_channels_dict = aux_channels_dict
         self.channels = [self.channel]
-        if self.aux_channels is not None:
-            self.channels += aux_channels
+        if self.aux_channels_dict is not None:
+            self.channels += list(self.aux_channels_dict)
 
         self.amplitude = kw.pop('amplitude', 0)
         self.frequency = kw.pop('frequency', 0)
@@ -413,6 +413,7 @@ class BufferedCZPulse(Pulse):
         self.pulse_length = kw.pop('pulse_length', 0)
         self.buffer_length_start = kw.pop('buffer_length_start', 0)
         self.buffer_length_end = kw.pop('buffer_length_end', 0)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma', 0)
         self.length = self.pulse_length + self.buffer_length_start + \
                       self.buffer_length_end
 
@@ -423,6 +424,8 @@ class BufferedCZPulse(Pulse):
                                           self.buffer_length_start)
         self.buffer_length_end = kw.pop('buffer_length_end',
                                         self.buffer_length_end)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma',
+                                            self.gaussian_filter_sigma)
         self.length = self.pulse_length + self.buffer_length_start + \
                       self.buffer_length_end
         self.channels = kw.pop('channels', self.channels)
@@ -432,13 +435,22 @@ class BufferedCZPulse(Pulse):
     def chan_wf(self, chan, tvals):
         amp = self.amplitude
         if chan != self.channel:
-            amp = 0.5*self.amplitude
-        t_rel = tvals - tvals[0]
-        return amp * np.cos(2*np.pi*(self.frequency*t_rel +
-                                     self.phase / 360.)) * \
-               (tvals >= tvals[0] + self.buffer_length_start) * \
-               (tvals < tvals[0] + self.buffer_length_start + self.pulse_length)
+            amp = self.aux_channels_dict[chan]
 
+        if self.gaussian_filter_sigma == 0:
+            wave = np.ones_like(tvals)*amp
+            wave *= (tvals >= tvals[0] + self.buffer_length_start)
+            wave *= (tvals < tvals[0] + self.buffer_length_start +
+                     self.pulse_length)
+        else:
+            tstart = tvals[0] + self.buffer_length_start
+            tend = tvals[0] + self.buffer_length_start + self.pulse_length
+            scaling = 1/np.sqrt(2)/self.gaussian_filter_sigma
+            wave = 0.5*(sp.special.erf((tvals - tstart)*scaling) -
+                        sp.special.erf((tvals - tend)*scaling))*amp
+        t_rel = tvals - tvals[0]
+        wave *= np.cos(2*np.pi*(self.frequency*t_rel + self.phase / 360.))
+        return wave
 
 class MartinisFluxPulse(Pulse):
 
