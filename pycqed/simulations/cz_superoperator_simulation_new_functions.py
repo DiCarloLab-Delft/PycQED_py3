@@ -79,7 +79,7 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
 
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
-        J * (a.dag() + a) * (b + b.dag())
+        J * (a.dag() - a) * (-b + b.dag())
     H = H * (2*np.pi)
     return H
 

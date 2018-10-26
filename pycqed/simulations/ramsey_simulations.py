@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import logging
 
 from pycqed.simulations import cz_superoperator_simulation_withdistortions_newdevice_singlequbitphases_newcode_fluxnoise2 as czu
-from pycqed.tests import test_ramsey_simulations as tests
 
 
 def time_evolution(H_vec, c_ops, sim_step):
@@ -164,6 +163,19 @@ class ramsey_experiment(det.Soft_Detector):
                 sim_step = t/len(positive)
 
                 c_ops=[]
+                # sigmaZinqutrit = qtp.Qobj([[1,0,0],
+                #                     [0,-1,0],
+                #                     [0,0,0]])
+                # Tphi01_q0 = 1e-6
+                # collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
+                # c_ops.append(collapse*np.sqrt(1/(2*Tphi01_q0)))
+
+                # a_qubit = qtp.Qobj([[0,1,0],
+                #                     [0,0,0],
+                #                     [0,0,0]])
+                # T1_q0 = 2e-6
+                # collapse=qtp.tensor(qtp.qeye(3),a_qubit)
+                # c_ops.append(collapse*np.sqrt(1/(T1_q0)))
 
                 U_final = time_evolution(H, c_ops, sim_step)
                 if U_final.type == 'oper':
