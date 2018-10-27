@@ -1760,7 +1760,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
         else:
             ylabel = 'Shifted RO frequency'
         self.plot_dicts['main'] = {
-            'plotfn': self.plot_fit
+            'plotfn': self.plot_fit,
             'fit_res': self.fit_res,
             'xlabel': 'Delay after first RO-pulse',
             'xunit': 's',

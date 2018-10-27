@@ -1778,10 +1778,47 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                        analyze=True, update=False,
                        UHFQC=None, pulsar=None, **kw):
 
-    # sweep_points_dict of the form:
-    # {msmt_name: sweep_points_array}
-    # where msmt_name must be one of the following:
-    # ['rabi', 'ramsey', 'qscale', 'T1', 'T2'}
+    """
+    Args:
+        qubits: list of qubits
+        f_LO: multiplexed RO LO freq
+        sweep_points_dict:  dict of the form {msmt_name: sweep_points_array}
+            where msmt_name must be one of the following:
+            ['rabi', 'n_rabi', 'ramsey', 'qscale', 'T1', 'T2'}
+        sweep_params: this function defines this variable for each msmt. But
+            see the seqeunce function mqs.general_multi_qubit_seq for details
+        artificial_detuning: for ramsey and T2 (echo) measurements. It is
+            ignored for the other measurements
+        cal_points: whether to prepare cal points or not
+        no_cal_points: how many cal points to prepare
+        upload: whether to upload to AWGs
+        MC: MC object
+        soft_avgs:  soft averages
+        n_rabi_pulses: for the n_rabi measurement
+        thresholded: whether to threshold the results (NOT IMPLEMENTED)
+        analyze: whether to analyze
+        update: whether to update relevant parameters based on analysis
+        UHFQC: UHFQC object
+        pulsar: pulsar
+
+    Kwargs:
+        This function can also add dynamical decoupling (DD) pulses with the
+        following parameters:
+
+        nr_echo_pulses (int, default=0): number of DD pulses; if 0 then this
+            function will not add DD pulses
+        UDD_scheme (bool, default=True): if True, it uses the Uhrig DD scheme,
+            else it uses the CPMG scheme
+        idx_DD_start (int, default:-1): index of the first DD pulse in the
+            waveform for a single qubit. For example, is we have n=3 qubits,
+            and have 4 pulses per qubit, and we want to inset DD pulses
+            between the first and second pulse, then idx_DD_start = 1.
+            For a Ramsey experiment (2 pulses per qubit), idx_DD_start = -1
+            (default value) and the DD pulses are inserted between the
+            two pulses.
+
+        You can also add the kwargs used in the standard TD analysis functions.
+    """
 
     if MC is None:
         MC = qubits[0].MC
@@ -1838,8 +1875,8 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                     step = np.abs(spts[-1]-spts[-2])
                     if no_cal_points == 4:
                         sweep_points_dict[key] = np.concatenate(
-                            [spts, [spts[-1]+step, spts[-1]+2*step, spts[-1]+3*step,
-                                    spts[-1]+4*step]])
+                            [spts, [spts[-1]+step, spts[-1]+2*step,
+                                    spts[-1]+3*step, spts[-1]+4*step]])
                     elif no_cal_points == 2:
                         sweep_points_dict[key] = np.concatenate(
                             [spts, [spts[-1]+step, spts[-1]+2*step]])
@@ -1864,7 +1901,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                 cal_points=cal_points,
                                 upload=upload,
                                 parameter_name='amplitude',
-                                unit='V')
+                                unit='V', **kw)
 
         MC.soft_avg(soft_avgs)
         MC.set_sweep_function(sf)
@@ -1912,7 +1949,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                          cal_points=cal_points,
                                          upload=upload,
                                          parameter_name='amplitude',
-                                         unit='V')
+                                         unit='V', **kw)
 
         MC.soft_avg(soft_avgs)
         MC.set_sweep_function(sf)
@@ -1968,7 +2005,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                 cal_points=cal_points,
                                 upload=upload,
                                 parameter_name='time',
-                                unit='s')
+                                unit='s', **kw)
 
         MC.soft_avg(soft_avgs)
         MC.set_sweep_function(sf)
@@ -2050,7 +2087,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                 cal_points=cal_points,
                                 upload=upload,
                                 parameter_name='qscale_factor',
-                                unit='')
+                                unit='', **kw)
 
         MC.soft_avg(soft_avgs)
         MC.set_sweep_function(sf)
@@ -2096,7 +2133,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                 cal_points=cal_points,
                                 upload=upload,
                                 parameter_name='time',
-                                unit='s')
+                                unit='s', **kw)
 
         MC.soft_avg(soft_avgs)
         MC.set_sweep_function(sf)
@@ -2148,7 +2185,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                 cal_points=cal_points,
                                 upload=upload,
                                 parameter_name='time',
-                                unit='s')
+                                unit='s', **kw)
 
         MC.soft_avg(soft_avgs)
         MC.set_sweep_function(sf)

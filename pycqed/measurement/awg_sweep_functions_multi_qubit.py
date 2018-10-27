@@ -503,6 +503,7 @@ class calibrate_n_qubits(swf.Hard_Sweep):
     def __init__(self, sweep_params, sweep_points,
                  qubit_names, operation_dict,
                  cal_points=True, no_cal_points=4,
+                 nr_echo_pulses=0, idx_DD_start=-1, UDD_scheme=True,
                  parameter_name='sample', unit='#',
                  upload=False, return_seq=False):
 
@@ -514,6 +515,9 @@ class calibrate_n_qubits(swf.Hard_Sweep):
         self.operation_dict = operation_dict
         self.cal_points = cal_points
         self.no_cal_points = no_cal_points
+        self.nr_echo_pulses = nr_echo_pulses
+        self.idx_DD_start = idx_DD_start
+        self.UDD_scheme = UDD_scheme
         self.upload = upload
         self.return_seq = return_seq
         self.parameter_name = parameter_name
@@ -527,6 +531,9 @@ class calibrate_n_qubits(swf.Hard_Sweep):
                                          operation_dict=self.operation_dict,
                                          cal_points=self.cal_points,
                                          no_cal_points=self.no_cal_points,
+                                         nr_echo_pulses=self.nr_echo_pulses,
+                                         idx_DD_start=self.idx_DD_start,
+                                         UDD_scheme=self.UDD_scheme,
                                          upload=self.upload,
                                          return_seq=self.return_seq)
 
