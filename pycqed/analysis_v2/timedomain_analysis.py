@@ -1544,14 +1544,19 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     Analyses the photonnumber in the RO based on the
     readout_photons_in_resonator function
+
+    function specific options for options dict:
+    f_qubit
+    chi
+    artif_detuning
+    print_fit_results
     """
 
-    def __init__(self, t_start: str = None, t_stop: str = None,
-                 label: str = '', data_file_path: str = None,
-                 close_figs: bool = False, options_dict: dict = None,
-                 extract_only: bool = False, do_fitting: bool = False,
-                 auto: bool = True, numeric_params: dict = None,
-                 f_qubit: float = None, chi: float = None):
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 close_figs: bool=False, options_dict: dict=None,
+                 extract_only: bool=False, do_fitting: bool=False,
+                 auto: bool=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
@@ -1563,85 +1568,130 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
         self.params_dict = {
             'measurementstring': 'measurementstring',
             'sweep_points': 'sweep_points',
+            'sweep_points_2D': 'sweep_points_2D',
             'value_names': 'value_names',
             'value_units': 'value_units',
             'measured_values': 'measured_values'}
 
-        if numeric_params is None:
-            self.numeric_params = OrderedDict()
+        self.numeric_params = self.options_dict.get('numeric_params',
+                                                   OrderedDict())
 
-        self.f_qubit = self.options_dict['f_qubit']
-        self.chi = self.options_dict['chi']
+        self.f_qubit = self.options_dict.get('f_qubit', None)
+        self.chi = self.options_dict.get('chi', None)
+        self.artif_detuning = self.options_dict.get('artif_detuning',
+                                                     0) - self.f_qubit
 
         if auto:
             self.run_analysis()
 
     def process_data(self):
-        super().process_data()
-
+        #print(len(self.raw_data_dict['measured_values'][0][0]))
+        #print(len(self.raw_data_dict['measured_values_ord_dict']['raw w0 _measure'][0]))
         self.proc_data_dict = OrderedDict()
-        self.proc_data_dict['delay_to_realx'] = np.copy(
-                                self.raw_data_dict['sweep_points_2D'])
-        self.proc_data_dict['ramsey_times'] = np.copy(
-                                self.raw_data_dict['sweep_points'])
-        self.proc_data_dict['qubit_state'] = np.copy(
-                                self.raw_data_dict['measured_values'])
+        self.proc_data_dict['qubit_state'] = [[],[]]
+        #THIS NEEDS TOO Be FIXED!!!
+        self.proc_data_dict['delay_to_relax'] = self.raw_data_dict[
+                                                    'sweep_points_2D'][0]
+        self.proc_data_dict['ramsey_times'] = []
 
+        for i,x in enumerate(np.transpose(self.raw_data_dict[
+                        'measured_values_ord_dict']['raw w0 _measure'][0])):
+            self.proc_data_dict['qubit_state'][0].append([])
+            self.proc_data_dict['qubit_state'][1].append([])
+
+            for j,y in enumerate(np.transpose(self.raw_data_dict[
+                    'measured_values_ord_dict']['raw w0 _measure'][0])[i]):
+
+                if j%2 == 0:
+                    self.proc_data_dict['qubit_state'][0][i].append(y)
+
+                else:
+                    self.proc_data_dict['qubit_state'][1][i].append(y)
+        for i,x in enumerate( self.raw_data_dict['sweep_points'][0]):
+            if i % 2 == 0:
+                self.proc_data_dict['ramsey_times'].append(x)
 
     #I STILL NEED to pass Chi
     def prepare_fitting(self):
-        self.proc_data_dict['photon_number'] = []
+        self.proc_data_dict['photon_number'] = [[],[]]
         self.proc_data_dict['fit_results'] = []
+        self.proc_data_dict['ramsey_fit_results'] = [[],[]]
 
-        if (self.f_qubit is None) and (self.chi is None):
+        if not ((self.f_qubit is None) and (self.chi is None)):
             self.proc_data_dict['f_and_chi_defined'] = True
         else:
             self.proc_data_dict['f_and_chi_defined'] = False
-            logging.warning('Qubit frequency or Chi are not defined.\n'+
-                        '\tThe shifted qubit frequency will be returned.')
+            logging.warning('Qubit frequency, artificial detuning or Chi '
+                            'are not defined.'+
+                        'The shifted qubit frequency will be returned.')
 
-        for i,tau in enumerate(self.proc_data_dict['delay_to_realx']):
+        for i,tau in enumerate(self.proc_data_dict['delay_to_relax']):
+            
+            self.proc_data_dict['ramsey_fit_results'][0].append(self.fit_Ramsey(
+                            self.proc_data_dict['ramsey_times'][:-4],
+                            self.proc_data_dict['qubit_state'][0][i][:-4]/
+                            max(self.proc_data_dict['qubit_state'][0][i][:-4]),
+                            kw=self.options_dict))
 
-            self.fit_results.append(self.fit_Ramsey(
-                                    self.proc_data_dict['ramsey_times'],
-                                    self.proc_data_dict['qubit_state'][i],
-                                    kw=self.options_dict))
+            self.proc_data_dict['ramsey_fit_results'][1].append(self.fit_Ramsey(
+                            self.proc_data_dict['ramsey_times'][:-4],
+                            self.proc_data_dict['qubit_state'][1][i][:-4]/
+                            max(self.proc_data_dict['qubit_state'][1][i][:-4]),
+                            kw=self.options_dict))
 
-            shifted_freq = self.proc_data_dict['fit_results'
-                                                ][i].params['frequency'].value
+            shifted_freq1 = self.proc_data_dict['ramsey_fit_results'
+                                         ][0][i].params['frequency'].value
+            shifted_freq2 = self.proc_data_dict['ramsey_fit_results'
+                                         ][1][i].params['frequency'].value
             if self.proc_data_dict['f_and_chi_defined']:
-                    self.proc_data_dict['photon_number'].append(
-                                (shifted_freq-self.f_qubit)/(2*self.chi))
+                self.proc_data_dict['photon_number'][0].append(
+                           np.abs((shifted_freq1-
+                                self.f_qubit-self.artif_detuning)/(2*self.chi)))
+                self.proc_data_dict['photon_number'][1].append(
+                           np.abs( (shifted_freq2-
+                                self.f_qubit-self.artif_detuning)/(2*self.chi)))
             else:
-                    self.proc_data_dict['photon_number'].append(shifted_freq)
-        self.fit_results_dict[label] = fit_res
-
+                self.proc_data_dict['photon_number'][0].append(shifted_freq1)
+                self.proc_data_dict['photon_number'][1].append(shifted_freq2)
 
     def run_fitting(self):
         print_fit_results = self.params_dict.pop('print_fit_results',False)
 
         exp_dec_mod = lmfit.Model(fit_mods.ExpDecayFunc)
         exp_dec_mod.set_param_hint('n',
-                                      value=1,
-                                      vary=True)
+                                   value=1,
+                                   vary=False)
         exp_dec_mod.set_param_hint('offset',
                                    value=0,
+                                   min=0,
                                    vary=True)
-        exp_dec_mod.set_param_hint('Tau',
-                                   value=1e-6,
+        exp_dec_mod.set_param_hint('tau',
+                                   value=self.proc_data_dict['delay_to_relax'][-1],
+                                   min=1e-11,
                                    vary=True)
         exp_dec_mod.set_param_hint('amplitude',
                                    value=1,
+                                   min=0,
                                    vary=True)
-        self.fit_res = exp_dec_mod.fit(self.proc_data_dict['photon_number'],
-                                       t=self.proc_data_dict['delay_to_realx'])
+        params = exp_dec_mod.make_params()
+        self.fit_res = OrderedDict()
+        self.fit_res['ground_state'] = exp_dec_mod.fit(
+                                data=self.proc_data_dict['photon_number'][0],
+                                params=params,
+                                t=self.proc_data_dict['delay_to_relax'])
+        self.fit_res['excited_state'] = exp_dec_mod.fit(
+                                data=self.proc_data_dict['photon_number'][1],
+                                params=params,
+                                t=self.proc_data_dict['delay_to_relax'])
         if print_fit_results:
-            print(fit_res.fit_report())
-
-
-
+            print(self.fit_res['ground_state'].fit_report())
+            print(self.fit_res['excited_state'].fit_report())
 
     def fit_Ramsey(self, x, y, **kw):
+
+        x = np.array(x)
+
+        y = np.array(y)
 
         print_ramsey_fit_results = kw.pop('print_ramsey_fit_results',False)
         damped_osc_mod = lmfit.Model(fit_mods.ExpDampOscFunc)
@@ -1652,7 +1702,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
             ft_of_data[1:len(ft_of_data) // 2])) + 1
         max_ramsey_delay = x[-1] - x[0]
 
-        fft_axis_scaling = 1 / (max_ramsey_delay)
+        fft_axis_scaling = 1 / max_ramsey_delay
         freq_est = fft_axis_scaling * index_of_fourier_maximum
         est_number_of_periods = index_of_fourier_maximum
 
@@ -1666,10 +1716,10 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
                       'fitting with decaying exponential.')
             damped_osc_mod.set_param_hint('frequency',
                                           value=freq_est,
-                                          vary=False)
+                                          vary=True)
             damped_osc_mod.set_param_hint('phase',
                                           value=0,
-                                          vary=False)
+                                          vary=True)
         else:
             damped_osc_mod.set_param_hint('frequency',
                                           value=freq_est,
@@ -1686,60 +1736,68 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
                                           value=phase_estimate, vary=True)
 
         amplitude_guess = 0.5
-        if np.all(np.logical_and(y > 0, y < 1)):
+        if np.all(np.logical_and(y >= 0, y <= 1)):
             damped_osc_mod.set_param_hint('amplitude',
                                           value=amplitude_guess,
-                                          min=0.4,
+                                          min=0.00,
                                           max=4.0,
-                                          vary=False)
+                                          vary=True)
+
         else:
             print('data is not normalized, varying amplitude')
             damped_osc_mod.set_param_hint('amplitude',
-                                          value=amplitude_guess,
-                                          min=0.4,
+                                          value=max(y),
+                                          min=0.00,
                                           max=4.0,
-                                          vary=False)
+                                          vary=True)
+
         damped_osc_mod.set_param_hint('tau',
-                                      value=x[1]*10,
-                                      min=x[1],
-                                      max=x[1]*1000)
+                                      value=10e-6,
+                                      min=0,
+                                      max=10e-9*1000)
         damped_osc_mod.set_param_hint('exponential_offset',
-                                      value=0.5,
-                                      min=0.4,
+                                      value=0,
+                                      min=0.,
                                       max=4.0,
-                                      vary=False)
+                                      vary=True)
         damped_osc_mod.set_param_hint('oscillation_offset',
                                       # expr=
                                       # '{}-amplitude-exponential_offset'.format(
                                       #     y[0]))
                                       value=0,
-                                      vary=False)
+                                      vary=True)
 
-        self.fit_results_dict = {}
         decay_labels = ['gaussian', 'exponential', ]
         for label, n in zip(decay_labels, [2,1]):
             damped_osc_mod.set_param_hint('n',
                                           value=float('{:.1f}'.format(n)),
                                           vary=False)
-            self.params = damped_osc_mod.make_params()
+            self.proc_data_dict['params'] = damped_osc_mod.make_params()
 
             fit_res = damped_osc_mod.fit(data=y,
                                          t=x,
-                                         params=self.params)
+                                         params= self.proc_data_dict['params'])
 
             if fit_res.chisqr > .35:
                 logging.warning('Fit did not converge, varying phase')
                 fit_res_lst = []
 
                 for phase_estimate in np.linspace(0, 2*np.pi, 10):
-                    damped_osc_mod.set_param_hint('phase',
-                                                  value=phase_estimate)
-                    self.params = damped_osc_mod.make_params()
 
-                    fit_res_lst += [damped_osc_mod.fit(
-                        data=y,
-                        t=x,
-                        params=self.params)]
+                    for i, del_amp in enumerate(np.linspace(
+                                                -max(y)/10, max(y)/10, 10)):
+                        damped_osc_mod.set_param_hint('phase',
+                                                      value=phase_estimate,
+                                                      vary=False)
+                        damped_osc_mod.set_param_hint('amplitude',
+                                                      value=max(y)+ del_amp)
+                        self.proc_data_dict['params'] = \
+                                                damped_osc_mod.make_params()
+
+                        fit_res_lst += [damped_osc_mod.fit(
+                            data=y,
+                            t=x,
+                            params= self.proc_data_dict['params'])]
 
                 chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
                 fit_res = fit_res_lst[np.argmin(chisqr_lst)]
@@ -1752,30 +1810,236 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
     def prepare_plots(self):
             self.prepare_2D_sweep_plot()
             self.prepare_photon_number_plot()
-    #NOT SURE ABOUT THIS
+            self.prepare_ramsey_plots()
+
+    def prepare_2D_sweep_plot(self):
+        self.plot_dicts['off_full_data'] = {
+            'title': 'Raw data |g>',
+            'plotfn': self.plot_colorxy,
+            'xvals': self.proc_data_dict['ramsey_times'],
+            'xlabel': 'Ramsey delays',
+            'xunit': 's',
+            'yvals': self.proc_data_dict['delay_to_relax'],
+            'ylabel': 'Delay after first RO-pulse',
+            'yunit': 's',
+            'zvals': np.array(self.proc_data_dict['qubit_state'][0]) }
+
+        self.plot_dicts['on_full_data'] = {
+            'title': 'Raw data |e>',
+            'plotfn': self.plot_colorxy,
+            'xvals': self.proc_data_dict['ramsey_times'],
+            'xlabel': 'Ramsey delays',
+            'xunit': 's',
+            'yvals': self.proc_data_dict['delay_to_relax'],
+            'ylabel': 'Delay after first RO-pulse',
+            'yunit': 's',
+            'zvals': np.array(self.proc_data_dict['qubit_state'][1])  }
+
+
+
+    def prepare_ramsey_plots(self):
+        x_fit = np.linspace(self.proc_data_dict['ramsey_times'][0],
+                            max(self.proc_data_dict['ramsey_times']),101)
+        for i in range(len(self.proc_data_dict['ramsey_fit_results'][0])):
+
+            self.plot_dicts['off_'+str(i)] = {
+                'title': 'Ramsey w t_delay = '+\
+                         str(self.proc_data_dict['delay_to_relax'][i])+ \
+                         ' s, in |g> state',
+                'ax_id':'ramsey_off_'+str(i),
+                'plotfn': self.plot_line,
+                'xvals': self.proc_data_dict['ramsey_times'],
+                'xlabel': 'Ramsey delays',
+                'xunit': 's',
+                'yvals': np.array(self.proc_data_dict['qubit_state'][0][i]/
+                             max(self.proc_data_dict['qubit_state'][0][i][:-4])),
+                'ylabel': 'Measured qubit state',
+                'yunit': '',
+                'marker': 'o',
+                'setlabel': '|g> data_'+str(i),
+                'do_legend': True }
+
+            self.plot_dicts['off_fit_'+str(i)] = {
+                'title': 'Ramsey w t_delay = '+ \
+                         str(self.proc_data_dict['delay_to_relax'][i])+\
+                         ' s, in |g> state',
+                'ax_id':'ramsey_off_'+str(i),
+                'plotfn': self.plot_line,
+                'xvals': x_fit,
+                'yvals':  self.proc_data_dict['ramsey_fit_results'][0][i].eval(
+                        self.proc_data_dict['ramsey_fit_results'][0][i].params,
+                        t=x_fit),
+                'linestyle': '-',
+                'marker': '',
+                'setlabel': '|g> fit_'+str(i),
+                'do_legend': True  }
+
+            self.plot_dicts['hidden_g_'+str(i)] = {
+                'ax_id':'ramsey_off_'+str(i),
+                'plotfn': self.plot_line,
+                'xvals': [0],
+                'yvals': [0],
+                'color': 'w',
+                'setlabel': 'Residual photon count = '
+                             ''+str("%.3f" %
+                                    self.proc_data_dict['photon_number'][1][i]),
+                'do_legend': True }
+
+
+            self.plot_dicts['on_'+str(i)] = {
+                'title': 'Ramsey w t_delay = '+ \
+                         str(self.proc_data_dict['delay_to_relax'][i])+ \
+                         ' s, in |e> state',
+                'ax_id':'ramsey_on_'+str(i),
+                'plotfn': self.plot_line,
+                'xvals': self.proc_data_dict['ramsey_times'],
+                'xlabel': 'Ramsey delays',
+                'xunit': 's',
+                'yvals':  np.array(self.proc_data_dict['qubit_state'][1][i]/
+                             max(self.proc_data_dict['qubit_state'][1][i][:-4])),
+                'ylabel': 'Measured qubit state',
+                'yunit': '',
+                'marker': 'o',
+                'setlabel': '|e> data_'+str(i),
+                'do_legend': True }
+
+            self.plot_dicts['on_fit_'+str(i)] = {
+                'title': 'Ramsey w t_delay = '+ \
+                         str(self.proc_data_dict['delay_to_relax'][i])+ \
+                         ' s, in |e> state',
+                'ax_id':'ramsey_on_'+str(i),
+                'plotfn': self.plot_line,
+                'xvals': x_fit,
+                'yvals':  self.proc_data_dict['ramsey_fit_results'][1][i].eval(
+                    self.proc_data_dict['ramsey_fit_results'][1][i].params,
+                    t=x_fit),
+                'linestyle': '-',
+                'marker': '',
+                'setlabel': '|e> fit_'+str(i),
+                'do_legend': True }
+
+            self.plot_dicts['hidden_e_'+str(i)] = {
+                'ax_id':'ramsey_on_'+str(i),
+                'plotfn': self.plot_line,
+                'xvals': [0],
+                'yvals': [0],
+                'color': 'w',
+                'setlabel': 'Residual photon count = '
+                            ''+str("%.3f" %
+                                   self.proc_data_dict['photon_number'][1][i]),
+                'do_legend': True }
+
+
     def prepare_photon_number_plot(self):
         f_and_chi_defined = self.proc_data_dict.get('f_and_chi_defined', False)
         if f_and_chi_defined:
-            ylabel = 'Average phototn number'
+            ylabel = 'Average photon number'
+            yunit = ''
         else:
             ylabel = 'Shifted RO frequency'
-        self.plot_dicts['main'] = {
-            'plotfn': self.plot_fit
-            'fit_res': self.fit_res,
-            'xlabel': 'Delay after first RO-pulse',
-            'xunit': 's',
-            'yvals': self.proc_data_dict['yvals_osc_off'],
-            'ylabel': ylabel,
-            'yunit': ''}
+            yunit = 'Hz'
+        x_fit = np.linspace(min(self.proc_data_dict['delay_to_relax']),
+                            max(self.proc_data_dict['delay_to_relax']),101)
+        minmax_data = [min(min(self.proc_data_dict['photon_number'][0]),
+                           min(self.proc_data_dict['photon_number'][1])),
+                       max(max(self.proc_data_dict['photon_number'][0]),
+                           max(self.proc_data_dict['photon_number'][1]))]
+        minmax_data[0] -= minmax_data[0]/5
+        minmax_data[1] += minmax_data[1]/5
 
-    def prepare_2D_sweep_plot(self):
-        self.plot_dicts['on'] = {
-            'plotfn': self.plot_color2D,
-            'ax_id': 'main',
-            'xvals': self.proc_data_dict['ramsey_times'],
-            'xlabel': self.raw_data_dict['xlabel'][0],
-            'xunit': self.raw_data_dict['xunit'][0][0],
-            'yvals': self.proc_data_dict['delay_to_relax'],
-            'ylabel': self.raw_data_dict['ylabel'],
-            'yunit': self.proc_data_dict['yunit'],
-            'zvals': self.proc_data_dict['qubit_state'] }
+        self.proc_data_dict['photon_number'][1],
+
+        self.fit_res['excited_state'].eval(
+            self.fit_res['excited_state'].params,
+            t=x_fit)
+        self.plot_dicts['Photon number count '] = {
+            'plotfn': self.plot_line,
+            'xlabel': 'Delay after first RO-pulse',
+            'ax_id': 'Photon number count ',
+            'xunit': 's',
+            'xvals': self.proc_data_dict['delay_to_relax'],
+            'yvals': self.proc_data_dict['photon_number'][0],
+            'ylabel': ylabel,
+            'yunit': yunit,
+            'yrange': minmax_data,
+            'title': 'Residual photon number',
+            'color': 'b',
+            'linestyle': '',
+            'marker': 'o',
+            'setlabel': '|g> data',
+            'func': 'semilogy',
+            'do_legend': True}
+
+        self.plot_dicts['main2'] = {
+            'plotfn': self.plot_line,
+            'xunit': 's',
+            'xvals': x_fit,
+            'yvals': self.fit_res['ground_state'].eval(
+                self.fit_res['ground_state'].params,
+                t=x_fit),
+            'yrange': minmax_data,
+            'ax_id': 'Photon number count ',
+            'color': 'b',
+            'linestyle': '-',
+            'marker': '',
+            'setlabel': '|g> fit',
+            'func': 'semilogy',
+            'do_legend': True}
+
+        self.plot_dicts['main3'] = {
+            'plotfn': self.plot_line,
+            'xunit': 's',
+            'xvals': self.proc_data_dict['delay_to_relax'],
+            'yvals': self.proc_data_dict['photon_number'][1],
+            'yrange': minmax_data,
+            'ax_id': 'Photon number count ',
+            'color': 'r',
+            'linestyle': '',
+            'marker': 'o',
+            'setlabel': '|e> data',
+            'func': 'semilogy',
+            'do_legend': True}
+
+        self.plot_dicts['main4'] = {
+            'plotfn': self.plot_line,
+            'xunit': 's',
+            'ax_id': 'Photon number count ',
+            'xvals': x_fit,
+            'yvals': self.fit_res['excited_state'].eval(
+                self.fit_res['excited_state'].params,
+                t=x_fit),
+            'yrange': minmax_data,
+            'ylabel': ylabel,
+            'color': 'r',
+            'linestyle': '-',
+            'marker': '',
+            'setlabel': '|e> fit',
+            'func': 'semilogy',
+            'do_legend': True}
+
+        self.plot_dicts['hidden_1'] = {
+            'ax_id': 'Photon number count ',
+            'plotfn': self.plot_line,
+            'yrange': minmax_data,
+            'xvals': [0],
+            'yvals': [0],
+            'color': 'w',
+            'setlabel': 'tau_g = '
+                        ''+str("%.3f" %
+                        (self.fit_res['ground_state'].params['tau'].value*1e9))+''
+                        ' ns',
+            'do_legend': True }
+
+
+        self.plot_dicts['hidden_2'] = {
+            'ax_id': 'Photon number count ',
+            'plotfn': self.plot_line,
+            'yrange': minmax_data,
+            'xvals': [0],
+            'yvals': [0],
+            'color': 'w',
+            'setlabel': 'tau_e = '
+                        ''+str("%.3f" %
+                        (self.fit_res['excited_state'].params['tau'].value*1e9))+''
+                        ' ns',
+            'do_legend': True }

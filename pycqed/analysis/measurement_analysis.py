@@ -892,10 +892,12 @@ class MeasurementAnalysis(object):
             self.value_units = self.get_key('value_units')
 
             self.data = self.get_values('Data').transpose()
-            print(np.shape(self.data)) ##############################
+
             x = self.data[0]
             y = self.data[1]
-            cols = np.unique(x).shape[0]
+
+            # cols = np.unique(x).shape[0]
+            cols = np.nonzero(y != y[0])[0][0]
 
             # Adding np.nan for prematurely interupted experiments
             nr_missing_values = 0

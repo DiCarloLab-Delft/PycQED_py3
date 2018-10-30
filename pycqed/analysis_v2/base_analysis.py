@@ -268,7 +268,6 @@ class BaseDataAnalysis(object):
             - using json
             - single timestamp only
         """
-
         if self.data_file_path is not None:
             extension = self.data_file_path.split('.')[-1]
             if extension == 'json':

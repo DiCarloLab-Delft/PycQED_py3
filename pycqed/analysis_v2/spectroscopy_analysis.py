@@ -379,7 +379,6 @@ class VNA_analysis(complex_spectroscopy):
                                           'fit_guess_fn': fit_guess_fn,
                                           'fit_yvals': [{'data': np.squeeze(tt)} for tt in self.plot_amp],
                                           'fit_xvals': np.squeeze([{'f': tt[0]} for tt in self.plot_frequency])}
-
     def analyze_fit_results(self):
         pass
 
@@ -398,15 +397,26 @@ class ResonatorSpectroscopy(Spectroscopy):
                                                     do_fitting=do_fitting)
         self.do_fitting = do_fitting
         self.fitparams_guess = self.options_dict.get('fitparams_guess', {})
+        self.simultan = self.options_dict.get('simultan', False)
+
+        if self.simultan:
+            if not (len(t_start) == 2 and t_stop is None):
+                raise ValueError('Exactly two timestamps need to be passed for'
+                             ' simultan resonator spectroscopy in ground '
+                             'and excited state as: t_start = [t_on, t_off]')
+
+
         if auto is True:
             self.run_analysis()
+
 
     def process_data(self):
         super(ResonatorSpectroscopy, self).process_data()
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. *
+                              self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
@@ -449,14 +459,30 @@ class ResonatorSpectroscopy(Spectroscopy):
             fit_fn = fit_mods.HangerFuncComplex
             # TODO HangerFuncComplexGuess
         elif fitting_model == 'hanger_with_pf':
-            fit_fn = fit_mods.hanger_with_pf
-            fit_temp = fit_mods.fit_hanger_with_pf(fit_mods.HangerWithPfModel,
-                np.transpose([self.proc_data_dict['plot_frequency'], self.proc_data_dict['plot_amp']])
-            )
-            guess_pars = fit_temp.params
-            fit_guess_fn = None
+            if self.simultan:
+                fit_fn = fit_mods.simultan_hanger_with_pf
+                self.sim_fit = fit_mods.fit_hanger_with_pf(
+                            fit_mods.SimHangerWithPfModel,[
+                            np.transpose([self.proc_data_dict['plot_frequency'][0],
+                                          self.proc_data_dict['plot_amp'][0]]),
+                            np.transpose([self.proc_data_dict['plot_frequency'][1],
+                                          self.proc_data_dict['plot_amp'][1]])],
+                            simultan=True)
+                guess_pars = None
+                fit_guess_fn = None
+                self.chi = (self.sim_fit[0].params['omega_ro']-
+                            self.sim_fit[1].params['omega_ro'])/2
+            else:
+                fit_fn = fit_mods.hanger_with_pf
+                fit_temp = fit_mods.fit_hanger_with_pf(
+                            fit_mods.HangerWithPfModel,
+                            np.transpose([self.proc_data_dict['plot_frequency'],
+                                          self.proc_data_dict['plot_amp']]))
+                guess_pars = fit_temp.params
+                self.proc_data_dict['fit_params'] = fit_temp.params
+                fit_guess_fn = None
 
-        if len(self.raw_data_dict['timestamps']) == 1:
+        if (len(self.raw_data_dict['timestamps']) == 1) or self.simultan:
             self.fit_dicts['reso_fit'] = {
                               'fit_fn': fit_fn,
                               'fit_guess_fn': fit_guess_fn,
@@ -477,6 +503,9 @@ class ResonatorSpectroscopy(Spectroscopy):
                               'fit_xvals': np.squeeze([{'f': tt[0]}
                                                for tt in self.plot_frequency])}
 
+    def run_fitting(self):
+        if not self.simultan:
+            super().run_fitting()
 
     def do_subtract_background(self, thres=None, back_dict=None, ):
         if len(self.raw_data_dict['timestamps']) == 1:
@@ -532,7 +561,46 @@ class ResonatorSpectroscopy(Spectroscopy):
                     [np.array([np.divide(np.squeeze(self.plot_amp[tt]), divide_vals)])]).transpose()
 
     def prepare_plots(self):
-        super(ResonatorSpectroscopy, self).prepare_plots()
+        if not self.simultan:
+            super(ResonatorSpectroscopy, self).prepare_plots()
+        else:
+            proc_data_dict = self.proc_data_dict
+            plotsize = self.options_dict.get('plotsize')
+
+            plot_fn = self.plot_line
+            self.plot_dicts['amp1'] = {'plotfn': plot_fn,
+                                      'ax_id': 'amp',
+                                      'xvals': proc_data_dict['plot_frequency'][0],
+                                      'yvals': proc_data_dict['plot_amp'][0],
+                                      'title': 'Spectroscopy amplitude: '
+                                               '%s' % (self.timestamps[0]),
+                                      'xlabel': proc_data_dict['freq_label'],
+                                      'ylabel': proc_data_dict['amp_label'],
+                                      'yrange': proc_data_dict['amp_range'],
+                                      'plotsize': plotsize,
+                                      'color': 'b',
+                                      'linestyle': '',
+                                      'marker': 'o'
+                                      }
+            self.plot_dicts['amp2'] = {'plotfn': plot_fn,
+                                       'ax_id': 'amp',
+                                       'xvals': proc_data_dict['plot_frequency'][1],
+                                       'yvals': proc_data_dict['plot_amp'][1],
+                                       'color': 'r',
+                                       'linestyle': '',
+                                       'marker': 'o'
+                                       }
+            self.plot_dicts['phase'] = {'plotfn': plot_fn,
+                                        'xvals': proc_data_dict['plot_frequency'],
+                                        'yvals': proc_data_dict['plot_phase'],
+                                        'title': 'Spectroscopy phase: '
+                                                 '%s' % (self.timestamps[0]),
+                                        'xlabel': proc_data_dict['freq_label'],
+                                        'ylabel': proc_data_dict['phase_label'],
+                                        'yrange': proc_data_dict['phase_range'],
+                                        'plotsize': plotsize
+                                        }
+
 
     def plot_fitting(self):
         if self.do_fitting:
@@ -542,19 +610,27 @@ class ResonatorSpectroscopy(Spectroscopy):
             else:
                 fitting_model = fit_options['model']
             for key, fit_dict in self.fit_dicts.items():
-                fit_results = fit_dict['fit_res']
+                if not self.simultan:
+                    fit_results = fit_dict['fit_res']
+                else:
+                    fit_results = self.sim_fit
                 ax = self.axs['amp']
-                if len(self.raw_data_dict['timestamps']) == 1:
+                if len(self.raw_data_dict['timestamps']) == 1 or self.simultan:
                     if fitting_model == 'hanger':
-                        ax.plot(list(fit_dict['fit_xvals'].values())[0], fit_results.best_fit, 'r-', linewidth=1.5)
+                        ax.plot(list(fit_dict['fit_xvals'].values())[0],
+                                fit_results.best_fit, 'r-', linewidth=1.5)
                         textstr = 'f0 = %.5f $\pm$ %.1g GHz' % (
-                            fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
-                                                   'Q = %.4g $\pm$ %.0g' % (
-                                      fit_results.params['Q'].value, fit_results.params['Q'].stderr) + '\n' \
-                                                   'Qc = %.4g $\pm$ %.0g' % (
-                                      fit_results.params['Qc'].value, fit_results.params['Qc'].stderr) + '\n' \
-                                                   'Qi = %.4g $\pm$ %.0g' % (
-                                      fit_results.params['Qi'].value, fit_results.params['Qi'].stderr)
+                              fit_results.params['f0'].value,
+                              fit_results.params['f0'].stderr) + '\n' \
+                                           'Q = %.4g $\pm$ %.0g' % (
+                              fit_results.params['Q'].value,
+                              fit_results.params['Q'].stderr) + '\n' \
+                                           'Qc = %.4g $\pm$ %.0g' % (
+                              fit_results.params['Qc'].value,
+                              fit_results.params['Qc'].stderr) + '\n' \
+                                           'Qi = %.4g $\pm$ %.0g' % (
+                              fit_results.params['Qi'].value,
+                              fit_results.params['Qi'].stderr)
                         box_props = dict(boxstyle='Square',
                                          facecolor='white', alpha=0.8)
                         self.box_props = {key: val for key,
@@ -573,21 +649,59 @@ class ResonatorSpectroscopy(Spectroscopy):
                         raise NotImplementedError(
                             'This functions guess function is not coded up yet')
                     elif fitting_model == 'hanger_with_pf':
-                        ax.plot(list(fit_dict['fit_xvals'].values())[0],
-                                fit_results.best_fit, 'r-', linewidth=1.5)
+                        if not self.simultan:
+                            ax.plot(list(fit_dict['fit_xvals'].values())[0],
+                                    fit_results.best_fit, 'r-', linewidth=1.5)
 
-                        par = ["%.3f" %(fit_results.params['omega_ro'].value*1e-9),
-                               "%.3f" %(fit_results.params['omega_pf'].value*1e-9),
-                               "%.3f" %(fit_results.params['kappa_pf'].value*1e-6),
-                               "%.3f" %(fit_results.params['J'].value*1e-6),
-                               "%.3f" %(fit_results.params['gamma_ro'].value*1e-6)]
-                        textstr = str('f_ro = '+par[0]+' GHz'
-                                  +'\n\nf_pf = '+par[1]+' GHz'
-                                  +'\n\nkappa = '+par[2]+' MHz'
-                                  +'\n\nJ = '+par[3]+' MHz'
-                                  +'\n\ngamma_ro = '+par[4]+' MHz')
-                        box_props = dict(boxstyle='Square',
-                                         facecolor='white', alpha=0.8)
+                            par = ["%.3f" %(fit_results.params['omega_ro'].value*1e-9),
+                                   "%.3f" %(fit_results.params['omega_pf'].value*1e-9),
+                                   "%.3f" %(fit_results.params['kappa_pf'].value*1e-6),
+                                   "%.3f" %(fit_results.params['J'].value*1e-6),
+                                   "%.3f" %(fit_results.params['gamma_ro'].value*1e-6)]
+                            textstr = str('f_ro = '+par[0]+' GHz'
+                                      +'\n\nf_pf = '+par[1]+' GHz'
+                                      +'\n\nkappa = '+par[2]+' MHz'
+                                      +'\n\nJ = '+par[3]+' MHz'
+                                      +'\n\ngamma_ro = '+par[4]+' MHz')
+                        else:
+                            x_fit_0 = np.linspace(min(
+                                self.proc_data_dict['plot_frequency'][0][0],
+                                self.proc_data_dict['plot_frequency'][1][0]),
+                                max(self.proc_data_dict['plot_frequency'][0][-1],
+                                    self.proc_data_dict['plot_frequency'][1][-1]),
+                                len(self.proc_data_dict['plot_frequency'][0]))
+                            x_fit_1 = np.linspace(min(
+                                self.proc_data_dict['plot_frequency'][0][0],
+                                self.proc_data_dict['plot_frequency'][1][0]),
+                                max(self.proc_data_dict['plot_frequency'][0][-1],
+                                    self.proc_data_dict['plot_frequency'][1][-1]),
+                                len(self.proc_data_dict['plot_frequency'][1]))
+
+                            ax.plot(x_fit_0,
+                                    fit_results[0].best_fit,
+                                    'b--', linewidth=1.5)
+                            ax.plot(x_fit_1,
+                                    fit_results[1].best_fit,
+                                    'r--', linewidth=1.5)
+                            ax.plot(x_fit_0,
+                                    fit_results[1].best_fit-
+                                    fit_results[0].best_fit,
+                                    'g--', linewidth=1.5)
+
+                            par = ["%.3f" %(fit_results[0].params['omega_ro'].value*1e-9),
+                                   "%.3f" %(fit_results[0].params['omega_pf'].value*1e-9),
+                                   "%.3f" %(fit_results[0].params['kappa_pf'].value*1e-6),
+                                   "%.3f" %(fit_results[0].params['J'].value*1e-6),
+                                   "%.3f" %(fit_results[0].params['gamma_ro'].value*1e-6),
+                                   "%.3f" %(fit_results[1].params['gamma_ro'].value*1e-6)]
+                            textstr = str('f_ro = '+par[0]+' GHz'
+                                          +'\n\nf_pf = '+par[1]+' GHz'
+                                          +'\n\nkappa = '+par[2]+' MHz'
+                                          +'\n\nJ = '+par[3]+' MHz'
+                                          +'\n\ngamma_ro |g> = '+par[4]+' MHz'
+                                          +'\n\ngamma_ro |e> = '+par[5]+' MHz')
+                            box_props = dict(boxstyle='Square',
+                                             facecolor='white', alpha=0.8)
                         self.box_props = {key: val for key,
                                                        val in box_props.items()}
                         self.box_props.update({'linewidth': 0})
@@ -595,7 +709,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                         ax.text(1.1, 0.95, textstr, transform=ax.transAxes,
                                 verticalalignment='top', bbox=self.box_props,
                                 fontsize=11)
-
+                        plt.show()
                 else:
                     reso_freqs = [fit_results[tt].params['f0'].value *
                                   1e9 for tt in range(len(self.raw_data_dict['timestamps']))]
@@ -634,13 +748,13 @@ class ResonatorDacSweep(ResonatorSpectroscopy):
         super(ResonatorDacSweep, self).process_data()
         # self.plot_xvals = self.options_dict.get('xvals',np.array([[tt] for tt in range(len(self.raw_data_dict['timestamps']))]))
         conversion_factor = self.options_dict.get('conversion_factor', 1)
-        print(self.raw_data_dict['dac_value'])
+
         # self.plot_xvals =
         self.plot_xlabel = self.options_dict.get('xlabel', 'Gate voltage (V)')
         self.plot_xwidth = self.options_dict.get('xwidth', None)
         for tt in range(len(self.plot_xvals)):
             print(self.plot_xvals[tt][0])
-        print(self.plot_xvals)
+
         if self.plot_xwidth == 'auto':
             x_diff = np.diff(np.ravel(self.plot_xvals))
             dx1 = np.concatenate(([x_diff[0]], x_diff))

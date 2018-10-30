@@ -1704,14 +1704,13 @@ class QuDev_transmon(Qubit):
             values_per_point=2, values_per_point_suffex=['_test', '_measure'])
         MC.set_detector_function(d)
         MC.run_2D(label)
-
+        self.artificial_detuning = artificial_detuning
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
-            ma.MeasurementAnalysis(TwoD=True, qb_name=self.name)
-
-            # ta.ReadoutROPhotonsAnalysis(
-            #      close_figs=close_fig, options_dict={'TwoD': True}, do_fitting=True,
-            #      qb_name=self.name, f_qubit=self.f_qubit, chi)
+            ta.ReadoutROPhotonsAnalysis(t_start=None,
+                  close_figs=close_fig, options_dict={'f_qubit': self.f_qubit,
+                  'chi': self.chi, 'do_analysis': True,
+                  'artif_detuning': self.artificial_detuning }, do_fitting=True)
 
     def calibrate_drive_mixer_carrier_NN(self,MC=None, update=True,make_fig=True,
                                  trigger_sep=5e-6,
