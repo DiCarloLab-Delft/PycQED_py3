@@ -330,7 +330,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             if self.noise_parameters_CZ.cluster():
-                y_list_of_lists = map_jobqueue_repeat(compute_propagator_parallelizable, input_to_parallelize)          # function defined in notebook cluster
+                y_list_of_lists = map_jobqueue_repeat(compute_propagator_parallelizable, 35, input_to_parallelize)          # function defined in notebook cluster
 
                 y_list_of_lists = np.array(y_list_of_lists)
                 U_final_vec = y_list_of_lists[:,0]

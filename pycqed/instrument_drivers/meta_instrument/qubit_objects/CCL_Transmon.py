@@ -385,12 +385,12 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('mw_vsm_G_amp',
                            label='VSM amp Gaussian component',
-                           vals=vals.Numbers(0.2, 3.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_D_amp',
                            label='VSM amp Derivative component',
-                           vals=vals.Numbers(0.2, 3.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_G_phase',
@@ -452,7 +452,7 @@ class CCLight_Transmon(Qubit):
     def add_spec_parameters(self):
         self.add_parameter('spec_vsm_amp',
                            label='VSM amplitude for spec pulses',
-                           vals=vals.Numbers(0.2, 3.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
 
@@ -1121,7 +1121,7 @@ class CCLight_Transmon(Qubit):
         """
         if amps is None:
             if self.cfg_with_vsm():
-                amps = np.linspace(0.2, 2, 31)
+                amps = np.linspace(0.1, 1, 31)
             else:
                 amps = np.linspace(0, 1, 31)
 
@@ -1163,7 +1163,7 @@ class CCLight_Transmon(Qubit):
         """
         using_VSM = self.cfg_with_vsm()
         if using_VSM and motzois is None:
-            motzois = gen_sweep_pts(start=0.2, stop=2.0, num=31)
+            motzois = gen_sweep_pts(start=0.1, stop=1.0, num=31)
         elif motzois is None:
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
@@ -1231,8 +1231,8 @@ class CCLight_Transmon(Qubit):
 
             # Calibrate Gaussian component mixer
             if 'G' in mixer_channels:
-                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
-                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0.2)
+                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 1.0)
+                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0.1)
                 offset_I, offset_Q = mixer_carrier_cancellation(
                     SH=self.instr_SH.get_instr(),
                     source=self.instr_LO_mw.get_instr(),
@@ -1244,8 +1244,8 @@ class CCLight_Transmon(Qubit):
                     self.mw_mixer_offs_GQ(offset_Q)
             if 'D' in mixer_channels:
                 # Calibrate Derivative component mixer
-                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0.2)
-                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0.1)
+                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 1.0)
 
                 offset_I, offset_Q = mixer_carrier_cancellation(
                     SH=self.instr_SH.get_instr(),
