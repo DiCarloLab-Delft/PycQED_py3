@@ -607,7 +607,7 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0):
 
 
 
-def return_jump_operators(noise_parameters_CZ, f_pulse_final):
+def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
 
     T1_q0 = noise_parameters_CZ.T1_q0()
     T1_q1 = noise_parameters_CZ.T1_q1()
@@ -628,7 +628,13 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final):
     # time-dependent jump operators on q0
     if T2_q0_amplitude_dependent[0] != -1:
 
-        T2_q0_vec=expT2(f_pulse_final,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
+        f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=fluxlutman.q_freq_01())
+        sensitivity = calc_sensitivity(f_pulse_final,fluxlutman.q_freq_01())
+        for i in range(len(sensitivity)):
+            if sensitivity[i] < 1e-1:
+                sensitivity[i] = 1e-1
+        inverse_sensitivity = 1/sensitivity
+        T2_q0_vec=linear_with_offset(inverse_sensitivity,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1])
 
         # plot(x_plot_vec=[f_pulse_final/1e9],
         #                   y_plot_vec=[T2_q0_vec*1e6],
@@ -847,11 +853,20 @@ def shift_due_to_fluxbias_q0_singlefrequency(f_pulse,omega_0,fluxbias,positive_b
     return f_pulse_final
 
 
+def calc_sensitivity(freq,freq_sweetspot):
+    # returns sensitivity in Phi_0 units and w_q0_sweetspot, times usual units
+    return freq_sweetspot*np.pi/2 * np.sqrt(1-(freq/freq_sweetspot)**4)/freq
+
+
 def Tphi_from_T1andT2(T1,T2):
     return 1/(-1/(2*T1)+1/T2)
 
-def expT2(x,gc,amp,tau):
-    return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data of T2
+
+def linear_with_offset(x, a, b):
+    '''
+    A linear signal with a fixed offset.
+    '''
+    return a * x + b
 
 
 def matrix_change_of_variables(H_0):

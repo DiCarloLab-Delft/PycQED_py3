@@ -155,7 +155,7 @@ def compute_propagator_parallelizable(arglist):
 
 
     ### Obtain jump operators, possibly time-dependent (incoherent part of the noise)
-    c_ops = czf.return_jump_operators(noise_parameters_CZ=noise_parameters_CZ, f_pulse_final=f_pulse_final)
+    c_ops = czf.return_jump_operators(noise_parameters_CZ=noise_parameters_CZ, f_pulse_final=f_pulse_final, fluxlutman=fluxlutman)
 
 
     ### Compute propagator
