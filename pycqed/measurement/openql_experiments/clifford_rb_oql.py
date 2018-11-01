@@ -153,7 +153,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                         recovery_clifford = Cl(net_clifford)*recovery_to_idx_clifford
                         cl_seq_decomposed_with_net = cl_seq_decomposed+[recovery_clifford.gate_decomposition]
                         k = oqh.create_kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
-                            n_cl, seed, net_clifford, interleaving_cl), p)
+                            int(n_cl), seed, net_clifford, interleaving_cl), p)
                         if initialize:
                             for qubit_idx in qubit_map.values():
                                 k.prepz(qubit_idx)
@@ -174,7 +174,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                 elif simultaneous_single_qubit_RB: 
                     for net_clifford in net_cliffords:
                         k = oqh.create_kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
-                            n_cl, seed, net_clifford, interleaving_cl), p)
+                            int(n_cl), seed, net_clifford, interleaving_cl), p)
                         if initialize:
                             for qubit_idx in qubit_map.values():
                                 k.prepz(qubit_idx)
