@@ -532,12 +532,31 @@ def ErfWindow(t, t_start, t_end, t_rise, amplitude, offset):
 
 def hanger_with_pf(f, phi, J, kappa_pf, omega_ro, omega_pf, gamma_ro, A):
 
-    S12 = A * np.abs(  np.cos(phi) - np.exp(1j*phi)*kappa_pf*(gamma_ro-2j*(f-omega_ro))/
-                       (4*J*J+(kappa_pf-2j*(f-omega_pf))*(gamma_ro-2j*(f-omega_ro)))  )
+    S12 = A * np.abs(  np.cos(phi) - np.exp(1j*phi)*kappa_pf*
+                       (gamma_ro-2j*(f-omega_ro))/
+                       (4*J*J+(kappa_pf-2j*(f-omega_pf))*
+                        (gamma_ro-2j*(f-omega_ro)))  )
 
     return S12
 
-def fit_hanger_with_pf(model, data, repeat=True):
+
+def simultan_hanger_with_pf(f, phi, J, kappa_pf, omega_ro_0, omega_ro_1,
+                            omega_pf, gamma_ro, A):
+    f0 = f[:int(len(f)/2)]
+    f1 = f[int(len(f)/2):]
+    S12_0 = A * np.abs(  np.cos(phi) - np.exp(1j*phi)*kappa_pf*
+                       (gamma_ro-2j*(f0-omega_ro_0))/
+                       (4*J*J+(kappa_pf-2j*(f0-omega_pf))*
+                        (gamma_ro-2j*(f0-omega_ro_0)))  )
+
+    S12_1 = A * np.abs(  np.cos(phi) - np.exp(1j*phi)*kappa_pf*
+                       (gamma_ro-2j*(f1-omega_ro_1))/
+                       (4*J*J+(kappa_pf-2j*(f1-omega_pf))*
+                        (gamma_ro-2j*(f1-omega_ro_1)))  )
+
+    return np.hstack((S12_0, S12_1))
+
+def fit_hanger_with_pf(model, data, simultan=False):
     """
     model: a lmfit model of the pf_ro_S12 function
     data: of the shape [[freq,|S12|],[freq,|S12|],...] where freq should be in GHz
@@ -577,16 +596,12 @@ def fit_hanger_with_pf(model, data, repeat=True):
 
         model.set_param_hint('A', value=A_guess, min = 0, max = 1)
         model.set_param_hint('phi', value=4 , min = 0, max = 2*np.pi)
-        model.set_param_hint('J', value=J_guess)
-        model.set_param_hint('kappa_pf', value=kappa_pf_guess)
-        model.set_param_hint('omega_pf', value=omega_pf_guess)
+        model.set_param_hint('J', value=J_guess, min=0, max=0.015)
+        model.set_param_hint('kappa_pf', value=kappa_pf_guess, min=0, max=0.05)
+        model.set_param_hint('omega_pf', value=omega_pf_guess, min=0)
         model.set_param_hint('gamma_ro', value=0.0001, vary = False)
 
-        if simultan:
-            model.set_param_hint('omega_ro_0', value=omega_ro_guess)
-            model.set_param_hint('omega_ro_1', value=omega_ro_guess-0.005)
-        else:
-            model.set_param_hint('omega_ro', value=omega_ro_guess)
+        model.set_param_hint('omega_ro', value=omega_ro_guess)
 
         params = model.make_params()
 
@@ -595,17 +610,46 @@ def fit_hanger_with_pf(model, data, repeat=True):
     if simultan:
         data_loc_0 = np.copy(data[0][:-2])
         data_loc_1 = np.copy(data[1][:-2])
+
+        fit0 = fit_hanger_with_pf(HangerWithPfModel, np.transpose(
+            [data_loc_0[:,0], data_loc_0[:,1]]), simultan=False)
+        fit1 = fit_hanger_with_pf(HangerWithPfModel, np.transpose(
+            [data_loc_1[:,0], data_loc_1[:,1]]), simultan=False)
+
+        if not len(data_loc_1) == len(data_loc_0):
+            if len(data_loc_1) < len(data_loc_0):
+                data_loc_0 = data_loc_0[:len(data_loc_1)]
+            else:
+                data_loc_1 = data_loc_1[:len(data_loc_0)]
+
         data_loc_0[:,0] *= 1e-9
         data_loc_1[:,0] *= 1e-9
-        data_loc_0 = np.hstack((data_loc_0, np.zeros([len(data_loc_0),1])))
-        data_loc_1 = np.hstack((data_loc_1, np.zeros([len(data_loc_1),1])))
         data_loc = np.vstack((data_loc_0, data_loc_1))
 
-        guess = hanger_with_pf_guess(model,np.transpose(
-            [data_loc_0[:,0], data_loc_0[:,1]/max(data_loc_0[:,1])]))
+        phi_guess = (fit0.params['phi'].value+fit1.params['phi'].value)/2
+        J_guess = (fit0.params['J'].value+fit1.params['J'].value)/2*1e-9
+        kap_guess = (fit0.params['kappa_pf'].value+
+                     fit1.params['kappa_pf'].value)/2*1e-9
+        omega_pf_guess = (fit0.params['omega_pf'].value+
+                          fit1.params['omega_pf'].value)/2*1e-9
+
+        model.set_param_hint('A', value=1, min = 0, max = 1)
+        model.set_param_hint('A', value=1, min = 0, max = 1)
+        model.set_param_hint('phi', value=phi_guess , min = 0, max = 2*np.pi)
+        model.set_param_hint('J', value=J_guess, min=0, max=0.015)
+        model.set_param_hint('kappa_pf', value=kap_guess, min=0, max=0.05)
+        model.set_param_hint('omega_pf', value=omega_pf_guess, min=0)
+        model.set_param_hint('gamma_ro', value=0.0001, vary = False)
+
+        model.set_param_hint('omega_ro_0', value=
+                                 fit0.params['omega_ro'].value*1e-9, min=0)
+        model.set_param_hint('omega_ro_1', value=
+                                 fit1.params['omega_ro'].value*1e-9, min=0)
+
+        guess = model.make_params()
 
         fit_out = model.fit( data_loc[:,1]/max(data_loc[:,1]),
-                             guess, f=data_loc[:,0], count=data_loc[:,2])
+                             guess, f=data_loc[:,0])
         tol = 0.4
 
     else:
@@ -613,80 +657,49 @@ def fit_hanger_with_pf(model, data, repeat=True):
         data_loc[:,0] *= 1e-9
 
         guess = hanger_with_pf_guess(model,np.transpose(
-            [data_loc[:,0],data_loc[:,1]/max(data_loc[:,1])]))
+                [data_loc[:,0],data_loc[:,1]/max(data_loc[:,1])]))
 
-        fit_out=model.fit( data_loc[:,1]/
+        fit_out = model.fit( data_loc[:,1]/
                            max(data_loc[:,1]),guess,f=data_loc[:,0],)
         tol = 0.1
-
-    if fit_out.chisqr > tol:
-        fit_lst = []
-        for phase in np.linspace(0, 2*np.pi, 20):
-            if simultan:
-                fit_lst.append(model.fit( data_loc[:,1]/max(data_loc[:,1]),
-                      guess, f=data_loc[:,0], count=data_loc[:,2], phi=phase,))
-
-            else:
-                 fit_lst.append(model.fit( data_loc[:,1]/max(data_loc[:,1]),
-                                           guess, f=data_loc[:,0], phi=phase,))
-
-        chisqr_lst = [fit.chisqr for fit in fit_lst]
-
-
-        fit_out = fit_lst[np.argmin(chisqr_lst)]
-    if fit_out.chisqr > tol:
-        fit_lst = []
-        for shift_pf in np.linspace(-0.01, 0.01, 5):
-            for shift_ro in np.linspace(-0.01, 0.01, 5):
-                for phase in np.linspace(0, 2*np.pi, 6):
-                    if simultan:
-                        fit_lst.append(model.fit( data_loc[:,1]/max(data_loc[:,1]),guess,
-                              f=data_loc[:,0],phi=phase, count=data_loc[:,2],
-                              omega_pf=float(guess['omega_pf'])+shift_pf,
-                              omega_ro_0=float(guess['omega_ro_0'])+shift_ro,
-                              omega_ro_1=float(guess['omega_ro_1'])+shift_ro))
-
-                    else:
-                        fit_lst.append(model.fit( data_loc[:,1]/max(data_loc[:,1]),guess,
-                                  f=data_loc[:,0],phi=phase,
-                                  omega_pf=float(guess['omega_pf'])+shift_pf,
-                                  omega_ro=float(guess['omega_ro'])+shift_ro))
-
-        chisqr_lst = [fit.chisqr for fit in fit_lst]
-
-        fit_out = fit_lst[np.argmin(chisqr_lst)]
-
-    if fit_out.chisqr > tol:
-        fit_lst = []
-        for shift_pf in np.linspace(-0.01, 0.01, 5):
-            for shift_ro in np.linspace(-0.01, 0.01, 5):
-                for phase in np.linspace(0, 2*np.pi, 6):
-                    for kappa_shift in np.linspace(-15,15,4):
-                        for J_shift in  np.linspace(-2,4,4):
-                            if simultan:
-                                fit_lst.append(model.fit( data_loc[:,1]/max(data_loc[:,1]),guess,
-                                  f=data_loc[:,0], count=data_loc[:,2],
-                                  phi=phase,omega_pf=float(guess['omega_pf'])+shift_pf,
-                                  omega_ro_0=float(guess['omega_ro_0'])+shift_ro,
-                                  omega_ro_1=float(guess['omega_ro_1'])+shift_ro,
-                                  kappa_pf=float(guess['kappa_pf'])+kappa_shift,
-                                  J=float(guess['J'])+J_shift))
-                            else:
-                                fit_lst.append(model.fit( data_loc[:,1]/max(data_loc[:,1]),guess,
-                                  f=data_loc[:,0],phi=phase,omega_pf=float(guess['omega_pf'])+shift_pf,
-                                  omega_ro=float(guess['omega_ro'])+shift_ro,
-                                  kappa_pf=float(guess['kappa_pf'])+kappa_shift,
-                                  J=float(guess['J'])+J_shift))
-        chisqr_lst = [fit.chisqr for fit in fit_lst]
     
+    if fit_out.chisqr > tol:
+        fit_lst = []
+        for shift_pf in np.linspace(-0.01, 0.01, 5):
+            for shift_ro in np.linspace(-0.01, 0.01, 5):
+                for phase in np.linspace(0, 2*np.pi, 6):
+                    for kappa_shift in np.linspace(-0.015,0.015,4):
+                        for J_shift in  np.linspace(-0.002,0.004,4):
+                            if simultan:
+                                fit_lst.append(model.fit( data_loc[:,1]/
+                                max(data_loc[:,1]),guess,
+                                f=data_loc[:,0],
+                                phi=phase,omega_pf=float(guess['omega_pf'])+shift_pf,
+                                omega_ro_0=float(guess['omega_ro_0'])+shift_ro,
+                                omega_ro_1=float(guess['omega_ro_1'])+shift_ro,
+                                kappa_pf=float(guess['kappa_pf'])+kappa_shift,
+                                J=float(guess['J'])+J_shift))
+                            else:
+                                fit_lst.append(model.fit( data_loc[:,1]/max(
+                                data_loc[:,1]),guess,f=data_loc[:,0],phi=phase,
+                                omega_pf=float(guess['omega_pf'])+shift_pf,
+                                omega_ro=float(guess['omega_ro'])+shift_ro,
+                                kappa_pf=float(guess['kappa_pf'])+kappa_shift,
+                                J=float(guess['J'])+J_shift))
+
+            if fit_lst[-1].chisqr <= tol: break
+
+        chisqr_lst = [fit.chisqr for fit in fit_lst]
+
         fit_out = fit_lst[np.argmin(chisqr_lst)]
 
 
+    fit_out.params['J'].max = 15e6
+    fit_out.params['kappa_pf'].max = 50e6
     fit_out.params['omega_pf'].value *= 1e9
     fit_out.params['kappa_pf'].value *= 1e9
     fit_out.params['J'].value *= 1e9
     fit_out.params['gamma_ro'].value *= 1e9
-    fit_out.params['gamma_ro'].vary = True
     fit_out.params['A'].value *= max(data_loc[:,1])
     if simultan:
         fit_out.params['omega_ro_0'].value *= 1e9
@@ -695,28 +708,23 @@ def fit_hanger_with_pf(model, data, repeat=True):
         fit_out.params['omega_ro'].value *= 1e9
 
     if fit_out.chisqr > tol:
-            logging.warning('The fit did not converge properly: chi^2 = '+str(fit_out.chisqr))
+            logging.warning('The fit did not converge properly: chi^2 = '
+                            ''+str(fit_out.chisqr))
 
     #Unpack simultan fits
     if simultan:
-        fit0 = HangerWithPfModel
-        fit0.set_param_hint('A', value=1)
-        fit0.set_param_hint('phi', value=4)
-        fit0.set_param_hint('J', value=8e6)
-        fit0.set_param_hint('kappa_pf', value=40e6)
-        fit0.set_param_hint('omega_pf', value=7e9)
-        fit0.set_param_hint('gamma_ro', value=1e6, vary = False)
-        fit0.set_param_hint('omega_ro', value=7e9)
-        params = fit0.make_params()
-        fit0 = fit0.fit(data[0][:, 0], params, f=data[0][:, 1])
-
         fit0.params['omega_pf'].value = fit_out.params['omega_pf'].value
         fit0.params['kappa_pf'].value = fit_out.params['kappa_pf'].value
+        fit0.params['J'].max = fit_out.params['J'].max
         fit0.params['J'].value = fit_out.params['J'].value
         fit0.params['gamma_ro'].value = fit_out.params['gamma_ro'].value
         fit0.params['omega_ro'].value = fit_out.params['omega_ro_0'].value
 
-        fit1 = fit0
+        fit1.params['omega_pf'].value = fit_out.params['omega_pf'].value
+        fit1.params['kappa_pf'].value = fit_out.params['kappa_pf'].value
+        fit1.params['J'].max = fit_out.params['J'].max
+        fit1.params['J'].value = fit_out.params['J'].value
+        fit1.params['gamma_ro'].value = fit_out.params['gamma_ro'].value
         fit1.params['omega_ro'].value = fit_out.params['omega_ro_1'].value
 
         fit_out = [fit0, fit1]
@@ -1229,7 +1237,7 @@ ErfWindowModel = lmfit.Model(ErfWindow)
 GaussianModel = lmfit.Model(Gaussian)
 HangerWithPfModel = lmfit.Model(hanger_with_pf)
 SimHangerWithPfModel = lmfit.Model(simultan_hanger_with_pf,
-                                   independent_vars=['f', 'count'])
+                                   independent_vars=['f'])
 
 # 2D models
 Gaus2D_model = lmfit.Model(gaussian_2D, independent_vars=['x', 'y'])

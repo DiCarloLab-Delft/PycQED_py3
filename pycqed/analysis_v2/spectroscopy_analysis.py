@@ -575,20 +575,25 @@ class ResonatorSpectroscopy(Spectroscopy):
                                       'title': 'Spectroscopy amplitude: '
                                                '%s' % (self.timestamps[0]),
                                       'xlabel': proc_data_dict['freq_label'],
+                                      'xunit': 'Hz',
                                       'ylabel': proc_data_dict['amp_label'],
                                       'yrange': proc_data_dict['amp_range'],
                                       'plotsize': plotsize,
                                       'color': 'b',
                                       'linestyle': '',
-                                      'marker': 'o'
-                                      }
+                                      'marker': 'o',
+                                      'setlabel': '|g> data',
+                                      'do_legend': True
+                                       }
             self.plot_dicts['amp2'] = {'plotfn': plot_fn,
                                        'ax_id': 'amp',
                                        'xvals': proc_data_dict['plot_frequency'][1],
                                        'yvals': proc_data_dict['plot_amp'][1],
                                        'color': 'r',
                                        'linestyle': '',
-                                       'marker': 'o'
+                                       'marker': 'o',
+                                       'setlabel': '|e> data',
+                                       'do_legend': True
                                        }
             self.plot_dicts['phase'] = {'plotfn': plot_fn,
                                         'xvals': proc_data_dict['plot_frequency'],
@@ -678,30 +683,53 @@ class ResonatorSpectroscopy(Spectroscopy):
                                 len(self.proc_data_dict['plot_frequency'][1]))
 
                             ax.plot(x_fit_0,
-                                    fit_results[0].best_fit,
-                                    'b--', linewidth=1.5)
+                                    fit_results[0].eval(
+                                        fit_results[0].params,
+                                        f=x_fit_0),
+                                    'b--', linewidth=1.5, label='|g> fit')
                             ax.plot(x_fit_1,
-                                    fit_results[1].best_fit,
-                                    'r--', linewidth=1.5)
-                            ax.plot(x_fit_0,
-                                    fit_results[1].best_fit-
-                                    fit_results[0].best_fit,
-                                    'g--', linewidth=1.5)
-
-                            par = ["%.3f" %(fit_results[0].params['omega_ro'].value*1e-9),
+                                    fit_results[1].eval(
+                                        fit_results[1].params,
+                                        f=x_fit_1),
+                                    'r--', linewidth=1.5, label='|e> fit')
+                            ax.plot(x_fit_0,np.abs(
+                                fit_results[1].eval(
+                                    fit_results[1].params,
+                                    f=x_fit_1)- fit_results[0].eval(
+                                    fit_results[0].params,
+                                    f=x_fit_1)),
+                                    'g--', linewidth=1.5, label='Difference')
+                            f_RO = x_fit_0[np.argmax(np.abs(fit_results[1].eval(
+                                            fit_results[1].params,
+                                            f=x_fit_0)-
+                                            fit_results[0].eval(
+                                                fit_results[0].params,
+                                               f=x_fit_0)))]
+                            ax.plot([f_RO, f_RO],
+                                    [0,max(max(self.raw_data_dict['amp'][0]),
+                                           max(self.raw_data_dict['amp'][1]))],
+                                    'k--', linewidth=1.5)
+                            ax.legend()
+                            par = ["%.3f" %(fit_results[0].params['gamma_ro'].value*1e-6),
                                    "%.3f" %(fit_results[0].params['omega_pf'].value*1e-9),
                                    "%.3f" %(fit_results[0].params['kappa_pf'].value*1e-6),
                                    "%.3f" %(fit_results[0].params['J'].value*1e-6),
-                                   "%.3f" %(fit_results[0].params['gamma_ro'].value*1e-6),
-                                   "%.3f" %(fit_results[1].params['gamma_ro'].value*1e-6)]
-                            textstr = str('f_ro = '+par[0]+' GHz'
-                                          +'\n\nf_pf = '+par[1]+' GHz'
-                                          +'\n\nkappa = '+par[2]+' MHz'
+                                   "%.3f" %(fit_results[0].params['omega_ro'].value*1e-9),
+                                   "%.3f" %(fit_results[1].params['omega_ro'].value*1e-9),
+                                   "%.3f" %((fit_results[1].params['omega_ro'].value-
+                                             fit_results[0].params['omega_ro'].value)
+                                             /2*1e-6)]
+                            textstr = str('\n\nkappa = '+par[2]+' MHz'
                                           +'\n\nJ = '+par[3]+' MHz'
-                                          +'\n\ngamma_ro |g> = '+par[4]+' MHz'
-                                          +'\n\ngamma_ro |e> = '+par[5]+' MHz')
-                            box_props = dict(boxstyle='Square',
-                                             facecolor='white', alpha=0.8)
+                                          +'\n\nchi = '+par[6]+' MHz'
+                                          +'\n\nf_pf = '+par[1]+' GHz'
+                                          +'\n\nf_rr |g> = '+par[4]+' GHz'
+                                          +'\n\nf_rr |e> = '+par[5]+' GHz'
+                                          +'\n\nf_RO = '+"%.3f" %(f_RO*1e-9)+''
+                                          ' GHz'
+                                         )
+                        box_props = dict(boxstyle='Square',
+                                         facecolor='white', alpha=0.8)
                         self.box_props = {key: val for key,
                                                        val in box_props.items()}
                         self.box_props.update({'linewidth': 0})
@@ -709,7 +737,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                         ax.text(1.1, 0.95, textstr, transform=ax.transAxes,
                                 verticalalignment='top', bbox=self.box_props,
                                 fontsize=11)
-                        plt.show()
+
                 else:
                     reso_freqs = [fit_results[tt].params['f0'].value *
                                   1e9 for tt in range(len(self.raw_data_dict['timestamps']))]
