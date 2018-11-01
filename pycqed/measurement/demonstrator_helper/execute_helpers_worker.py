@@ -8,7 +8,7 @@ import qcodes as qc
 import pycqed.measurement.openql_experiments.generate_qi_cfg as gcfg_qi
 
 
-from QIProductionWorkers.CCLightWorker import CCLightWorker
+from QICCLightWorker import CCLightWorker
 
 try:
     MC_demo = measurement_control.MeasurementControl(
@@ -37,5 +37,4 @@ gcfg_qi.generate_config(filename=config_fn,
 # worker = CCLightWorker(name='Starmon', nr_qubits=2,
 #                        is_simulator=False, openql_config_path=config_fn)
 
-worker = CCLightWorker(name='Octoqubit', nr_qubits=2,
-                       is_simulator=False, openql_config_path=config_fn)
+worker = worker.CCLightWorker(name='Octoqubit')
