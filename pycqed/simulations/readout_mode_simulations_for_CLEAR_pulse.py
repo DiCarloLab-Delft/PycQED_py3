@@ -11,7 +11,7 @@ which calculate the parameters for the CLEAR pulse
 
 def get_CLEAR_parameters(omega_pf, omega_ro_mid, omega_drive, kappa_pf, J, chi,
              amp_base, length_total,  pf_0=0, ro_0=0, integration_time=None,
-             sampling_rate=1.2e9, delta_amp_segments=None,
+             sampling_rate=1.8e9, delta_amp_segments=None,
              length_segments=None,  sigma = 10e-9,
              conversion_factor=1e6, niter=50, T=0.2, nr_sigma=2):
     '''
@@ -59,7 +59,7 @@ def get_CLEAR_parameters(omega_pf, omega_ro_mid, omega_drive, kappa_pf, J, chi,
 def solve_read_out_differential_equations(omega_pf, omega_ro_mid, omega_drive, kappa_pf,
                   J, chi, amp_base, length_total, delta_amp_segments,
                   length_segments,  sigma, pf_0=0, ro_0=0,
-                  integration_time=4e-7, sampling_rate=1.2e9, nr_sigma=1):
+                  integration_time=4e-7, sampling_rate=1.8e9, nr_sigma=1):
     '''
     detuning_ropf is the detuning between of the pf from the ro-frequency in Hz
     delt_drive is the detuning of the drive frequency from the ro frequency in Hz
@@ -68,8 +68,6 @@ def solve_read_out_differential_equations(omega_pf, omega_ro_mid, omega_drive, k
     duration = length_total+integration_time
 
     t = np.arange(0., duration, 1/sampling_rate)
-    
-    print(delta_amp_segments)
 
     solution = sp_int.odeint(helper_funct,[
                      np.real(ro_0), np.imag(ro_0), np.real(pf_0),
@@ -117,14 +115,12 @@ def integration_value_function( x, params):
         plt.semilogy(ro_mode_1/max_ro_photon_number )
     else:
         plt.semilogy(ro_mode_2/max_ro_photon_number )
-        
-    print(max(int1, int2))
 
     return max(int1, int2)
 
 
 def gauss_CLEAR_pulse_value_at_t(t, amp_base, length_total, delta_amp_segments,
-                               length_segments, sigma, nr_sigma, sampling_rate=1.2e9):
+                               length_segments, sigma, nr_sigma, sampling_rate=1.8e9):
     '''
     returns the amplitude of the gauss filtered CLEAR envelope at a given time
     '''

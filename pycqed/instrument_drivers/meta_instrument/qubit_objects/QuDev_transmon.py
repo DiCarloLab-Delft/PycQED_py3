@@ -25,6 +25,7 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
     import Qubit
 from pycqed.measurement import optimization as opti
 from pycqed.measurement import mc_parameter_wrapper
+import pycqed.analysis_v2.spectroscopy_analysis as sa
 
 
 class QuDev_transmon(Qubit):
@@ -97,6 +98,8 @@ class QuDev_transmon(Qubit):
                            label='Qubit spectroscopy power')
         self.add_parameter('f_RO', unit='Hz', parameter_class=ManualParameter,
                            label='Readout frequency')
+        self.add_parameter('chi', unit='Hz', parameter_class=ManualParameter,
+                           label='Chi')
         self.add_parameter('drive_LO_pow', unit='dBm',
                            parameter_class=ManualParameter,
                            label='Qubit drive pulse mixer LO power')
@@ -3516,6 +3519,7 @@ class QuDev_transmon(Qubit):
         if not update:
             logging.info("Does not automatically update the RO resonator "
                          "parameters. Set update=True if you want this!")
+
         if freqs is None:
             if self.f_RO() is not None:
                 f_span = kw.pop('f_span', 20e6)
@@ -3526,6 +3530,7 @@ class QuDev_transmon(Qubit):
             else:
                 raise ValueError("Unspecified frequencies for find_resonator_"
                                  "frequency and no previous value exists")
+
         if np.any(freqs < 500e6):
             logging.warning('Some of the values in the freqs array might be '
                             'too small. The units should be Hz.')
@@ -3558,6 +3563,11 @@ class QuDev_transmon(Qubit):
                 self.name, MAon.timestamp_string, MAoff.timestamp_string))
             plt.legend()
             MAoff.save_fig(plt.gcf(), 'chishift', ylabel='trans-amp')
+            sa.ResonatorSpectroscopy(t_start=[MAoff.timestamp_string,
+                      MAon.timestamp_string], do_fitting=True,
+                      options_dict={'simultan': True,'scan_label':'',
+                       'fit_options': dict(model='hanger_with_pf'),
+                       'qb_chi': self.chi})
         return fmax
 
 

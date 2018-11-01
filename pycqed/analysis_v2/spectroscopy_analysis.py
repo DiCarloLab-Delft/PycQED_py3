@@ -472,6 +472,8 @@ class ResonatorSpectroscopy(Spectroscopy):
                 fit_guess_fn = None
                 self.chi = (self.sim_fit[0].params['omega_ro']-
                             self.sim_fit[1].params['omega_ro'])/2
+                if self.options_dict['qb']:
+                    self.options_dict['qb_chi'] = self.chi
             else:
                 fit_fn = fit_mods.hanger_with_pf
                 fit_temp = fit_mods.fit_hanger_with_pf(
@@ -668,6 +670,10 @@ class ResonatorSpectroscopy(Spectroscopy):
                                       +'\n\nkappa = '+par[2]+' MHz'
                                       +'\n\nJ = '+par[3]+' MHz'
                                       +'\n\ngamma_ro = '+par[4]+' MHz')
+                            ax.plot([0],
+                                    [0],
+                                    'w',
+                                    label=textstr)
                         else:
                             x_fit_0 = np.linspace(min(
                                 self.proc_data_dict['plot_frequency'][0][0],
@@ -709,7 +715,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                                     [0,max(max(self.raw_data_dict['amp'][0]),
                                            max(self.raw_data_dict['amp'][1]))],
                                     'k--', linewidth=1.5)
-                            ax.legend()
+
                             par = ["%.3f" %(fit_results[0].params['gamma_ro'].value*1e-6),
                                    "%.3f" %(fit_results[0].params['omega_pf'].value*1e-9),
                                    "%.3f" %(fit_results[0].params['kappa_pf'].value*1e-6),
@@ -719,24 +725,28 @@ class ResonatorSpectroscopy(Spectroscopy):
                                    "%.3f" %((fit_results[1].params['omega_ro'].value-
                                              fit_results[0].params['omega_ro'].value)
                                              /2*1e-6)]
-                            textstr = str('\n\nkappa = '+par[2]+' MHz'
-                                          +'\n\nJ = '+par[3]+' MHz'
-                                          +'\n\nchi = '+par[6]+' MHz'
-                                          +'\n\nf_pf = '+par[1]+' GHz'
-                                          +'\n\nf_rr |g> = '+par[4]+' GHz'
-                                          +'\n\nf_rr |e> = '+par[5]+' GHz'
-                                          +'\n\nf_RO = '+"%.3f" %(f_RO*1e-9)+''
+                            textstr = str('\nkappa = '+par[2]+' MHz'
+                                          +'\nJ = '+par[3]+' MHz'
+                                          +'\nchi = '+par[6]+' MHz'
+                                          +'\nf_pf = '+par[1]+' GHz'
+                                          +'\nf_rr |g> = '+par[4]+' GHz'
+                                          +'\nf_rr |e> = '+par[5]+' GHz'
+                                          +'\nf_RO = '+"%.3f" %(f_RO*1e-9)+''
                                           ' GHz'
                                          )
+                            ax.plot([0],
+                                    [0],
+                                    'w',
+                                    label=textstr)
+                            ax.legend(bbox_to_anchor=(1.05, 1), loc=2,
+                                      borderaxespad=0.)
                         box_props = dict(boxstyle='Square',
                                          facecolor='white', alpha=0.8)
                         self.box_props = {key: val for key,
                                                        val in box_props.items()}
                         self.box_props.update({'linewidth': 0})
                         self.box_props['alpha'] = 0.
-                        ax.text(1.1, 0.95, textstr, transform=ax.transAxes,
-                                verticalalignment='top', bbox=self.box_props,
-                                fontsize=11)
+
 
                 else:
                     reso_freqs = [fit_results[tt].params['f0'].value *
