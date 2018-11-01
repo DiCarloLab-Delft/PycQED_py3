@@ -223,8 +223,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         """
         super().__init__()
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
-                            'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state']
-        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%']
+                            'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
+                            'cond_phase02']
+        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg']
         self.fluxlutman = fluxlutman
         self.noise_parameters_CZ = noise_parameters_CZ
         self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
@@ -353,9 +354,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
-            w_q0, w_q1 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
+            w_q0, w_q1, alpha_q0 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
 
-            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1)
+            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
             if self.noise_parameters_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
                                                                                         # then we optimize the search via higher-order cost function
                 cost_func_val = (-np.log10(1-qoi['avgatefid_compsubspace_pc']))**4
@@ -364,7 +365,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
             quantities_of_interest = [cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, 
                              qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], 
-                             qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100]
+                             qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100,
+                             qoi['cond_phase02']]
             qoi_vec=np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
 
@@ -380,6 +382,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
         return qoi_plot[0,0], qoi_plot[0,1], qoi_plot[0,2], qoi_plot[0,3], qoi_plot[0,4], qoi_plot[0,5], qoi_plot[0,6], \
-               qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10]
+               qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10], qoi_plot[0,11]
 
            

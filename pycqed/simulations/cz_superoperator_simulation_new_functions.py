@@ -724,7 +724,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
     return U_final
     
 
-def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1):
+def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, alpha_q0):
     """
     Calculates the quantities of interest from the propagator (either unitary or superoperator)
 
@@ -745,7 +745,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1):
     #print('avgatefid_compsubspace',avgatefid_compsubspace)
 
 
-    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=0, alpha_q1=0, J=0)
+    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=0, J=0)
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
     avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_new,L1)
@@ -754,6 +754,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1):
     phases = phases_from_superoperator(U_final_new)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
     phase_q0 = (phases[1]-phases[0]) % 360
     phase_q1 = (phases[2]-phases[0]) % 360
+    cond_phase02 = (phases[4]-2*phase_q0+phases[0]) % 360
 
     # We now correct only for the phase of qubit left (q1), in the rotating frame
     avgatefid_compsubspace_pc_onlystaticqubit = pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U_final_new,L1,phases)
@@ -762,7 +763,8 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1):
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid,
             'avgatefid_compsubspace_pc': avgatefid_compsubspace, 'phase_q0': phase_q0, 'phase_q1': phase_q1,
             'avgatefid_compsubspace': avgatefid_compsubspace_notphasecorrected,
-            'avgatefid_compsubspace_pc_onlystaticqubit': avgatefid_compsubspace_pc_onlystaticqubit, 'population_02_state': population_02_state}
+            'avgatefid_compsubspace_pc_onlystaticqubit': avgatefid_compsubspace_pc_onlystaticqubit, 'population_02_state': population_02_state,
+            'cond_phase02': cond_phase02}
 
 
 
@@ -835,7 +837,10 @@ def dressed_frequencies(fluxlutman, noise_parameters_CZ):
     #w_q1 = fluxlutman.q_freq_10()
     w_q1 = (H_0_diag[3,3]-H_0_diag[0,0]) / (2*np.pi)
 
-    return np.real(w_q0), np.real(w_q1)
+    #alpha_q0 = fluxlutman.calc_amp_to_freq(0,'02')-2*w_q0 
+    alpha_q0 = (H_0_diag[2,2]-H_0_diag[0,0]) / (2*np.pi) - 2*w_q0
+
+    return np.real(w_q0), np.real(w_q1), np.real(alpha_q0)
 
 
 def shift_due_to_fluxbias_q0_singlefrequency(f_pulse,omega_0,fluxbias,positive_branch):
