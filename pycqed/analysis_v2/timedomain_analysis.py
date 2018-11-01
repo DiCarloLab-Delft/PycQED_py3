@@ -1952,7 +1952,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
         self.fit_res['excited_state'].eval(
             self.fit_res['excited_state'].params,
             t=x_fit)
-        self.plot_dicts['Photon number count '] = {
+        self.plot_dicts['Photon number count'] = {
             'plotfn': self.plot_line,
             'xlabel': 'Delay after first RO-pulse',
             'ax_id': 'Photon number count ',

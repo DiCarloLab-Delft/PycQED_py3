@@ -3048,11 +3048,11 @@ class QuDev_transmon(Qubit):
 
         #Analysis
         if analyze:
-            pulse_delay = self.gauss_sigma() * self.nr_sigma()
+            pulse_length = self.gauss_sigma() * self.nr_sigma()
             if interleaved_gate is None:
                 rbma.RandomizedBenchmarking_Analysis(label=label,
                                  qb_name=self.name,
-                                 T1=T1, T2=T2, pulse_delay=pulse_delay,
+                                 T1=T1, T2=T2, pulse_length=pulse_length,
                                  gate_decomp=gate_decomposition)
             else:
                 rbma.Interleaved_RB_Analysis(
@@ -4159,9 +4159,9 @@ def add_CZ_pulse(qbc, qbt):
                                                'BufferedCZPulse'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
-        qbc.add_pulse_parameter(op_name, ps_name + '_aux_channels',
-                                'aux_channels',
-                                initial_value=[], vals=vals.Lists())
+        qbc.add_pulse_parameter(op_name, ps_name + '_aux_channels_dict',
+                                'aux_channels_dict',
+                                initial_value={}, vals=vals.Dict())
         qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
                                 initial_value=0, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_freq', 'frequency',

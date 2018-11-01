@@ -620,20 +620,38 @@ def get_required_upload_information(pulses : list, station):
             if not 'channel' in key:
                 continue
             channel = pulse[key]
-            if not 'AWG' in channel:
-                continue
-            AWG = channel.split('_')[0]
-            if AWG==master_AWG:
-                for c in station.pulsar.channels:
-                    if master_AWG in c and c not in required_channels:
-                        required_channels.append(c)
+            if isinstance(channel, dict):
+                # the the CZ pulse has aux_channels_dict parameter
+                for ch in channel:
+                    if not 'AWG' in ch:
+                        continue
+                    AWG = ch.split('_')[0]
+                    if AWG == master_AWG:
+                        for c in station.pulsar.channels:
+                            if master_AWG in c and c not in required_channels:
+                                required_channels.append(c)
+                            if AWG in used_AWGs and AWG not in required_AWGs:
+                                required_AWGs.append(AWG)
+                            continue
                     if AWG in used_AWGs and AWG not in required_AWGs:
                         required_AWGs.append(AWG)
+                    if not ch in required_channels:
+                        required_channels.append(ch)
+            else:
+                if not 'AWG' in channel:
                     continue
-            if AWG in used_AWGs and AWG not in required_AWGs:
-                required_AWGs.append(AWG)
-            if not channel in required_channels:
-                required_channels.append(channel)
+                AWG = channel.split('_')[0]
+                if AWG == master_AWG:
+                    for c in station.pulsar.channels:
+                        if master_AWG in c and c not in required_channels:
+                            required_channels.append(c)
+                        if AWG in used_AWGs and AWG not in required_AWGs:
+                            required_AWGs.append(AWG)
+                        continue
+                if AWG in used_AWGs and AWG not in required_AWGs:
+                    required_AWGs.append(AWG)
+                if not channel in required_channels:
+                    required_channels.append(channel)
 
     return required_channels, required_AWGs
 

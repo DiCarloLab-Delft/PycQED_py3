@@ -1947,6 +1947,9 @@ def general_multi_qubit_seq(
         operation_dict,   # of all qubits
         cal_points=True,
         no_cal_points=4,
+        nr_echo_pulses=0,
+        idx_DD_start=-1,
+        UDD_scheme=True,
         upload=False,
         return_seq=False,
         verbose=False):
@@ -2109,6 +2112,14 @@ def general_multi_qubit_seq(
                     n = params_dict['repeat']
                     pulse_list = n*pulse_list
 
+        if nr_echo_pulses != 0:
+            pulse_list = get_DD_pulse_list(operation_dict, qb_names,
+                                           DD_time=sweep_points[i],
+                                           pulse_dict_list=pulse_list,
+                                           nr_echo_pulses=nr_echo_pulses,
+                                           idx_DD_start=idx_DD_start,
+                                           UDD_scheme=UDD_scheme)
+
         if not np.any([p['operation_type'] == 'RO' for p in pulse_list]):
             # print('in add mux')
             pulse_list += [operation_dict['RO mux']]
@@ -2124,3 +2135,84 @@ def general_multi_qubit_seq(
         return seq, el_list
     else:
         return seq
+
+
+def get_DD_pulse_list(operation_dict, qb_names, DD_time,
+                      pulse_dict_list=None, idx_DD_start=-1,
+                      nr_echo_pulses=4, UDD_scheme=True):
+
+    n = len(qb_names)
+    if pulse_dict_list is None:
+        pulse_dict_list = []
+    elif len(pulse_dict_list) < 2*n:
+        raise ValueError('The pulse_dict_list must have at least two entries.')
+
+    idx_DD_start *= n
+    pulse_dict_list_end = pulse_dict_list[idx_DD_start::]
+    pulse_dict_list = pulse_dict_list[0:idx_DD_start]
+
+    X180_pulse_dict = operation_dict['X180 ' + qb_names[0]]
+    DRAG_length = X180_pulse_dict['nr_sigma']*X180_pulse_dict['sigma']
+    X90_separation = DD_time - DRAG_length
+
+    if UDD_scheme:
+        pulse_positions_func = \
+            lambda idx, N: np.sin(np.pi*idx/(2*N+2))**2
+        pulse_delays_func = (lambda idx, N: X90_separation*(
+                pulse_positions_func(idx, N) -
+                pulse_positions_func(idx-1, N)) -
+                ((0.5 if idx == 1 else 1)*DRAG_length))
+
+        if nr_echo_pulses*DRAG_length > X90_separation:
+            pass
+        else:
+            for p_nr in range(nr_echo_pulses):
+                for qb_name in qb_names:
+                    if qb_name == qb_names[0]:
+                        DD_pulse_dict = deepcopy(operation_dict[
+                                                     'X180 ' + qb_name])
+                        DD_pulse_dict['refpoint'] = 'end'
+                        DD_pulse_dict['pulse_delay'] = pulse_delays_func(
+                            p_nr+1, nr_echo_pulses)
+                    else:
+                        DD_pulse_dict = deepcopy(operation_dict[
+                                                     'X180s ' + qb_name])
+                    pulse_dict_list.append(DD_pulse_dict)
+
+            for j in range(n):
+                if j == 0:
+                    pulse_dict_list_end[j]['refpoint'] = 'end'
+                    pulse_dict_list_end[j]['pulse_delay'] = pulse_delays_func(
+                        1, nr_echo_pulses)
+                else:
+                    pulse_dict_list_end[j]['pulse_delay'] = 0
+    else:
+        echo_pulse_delay = (X90_separation -
+                            nr_echo_pulses*DRAG_length) / \
+                           nr_echo_pulses
+        if echo_pulse_delay < 0:
+            pass
+        else:
+            start_end_delay = echo_pulse_delay/2
+            for p_nr in range(nr_echo_pulses):
+                for qb_name in qb_names:
+                    if qb_name == qb_names[0]:
+                        DD_pulse_dict = deepcopy(operation_dict[
+                                                     'X180 ' + qb_name])
+                        DD_pulse_dict['refpoint'] = 'end'
+                        DD_pulse_dict['pulse_delay'] = \
+                            (start_end_delay if p_nr == 0 else echo_pulse_delay)
+                    else:
+                        DD_pulse_dict = deepcopy(operation_dict[
+                                                     'X180s ' + qb_name])
+                    pulse_dict_list.append(DD_pulse_dict)
+            for j in range(n):
+                if j == 0:
+                    pulse_dict_list_end[j]['refpoint'] = 'end'
+                    pulse_dict_list_end[j]['pulse_delay'] = start_end_delay
+                else:
+                    pulse_dict_list_end[j]['pulse_delay'] = 0
+
+    pulse_dict_list += pulse_dict_list_end
+
+    return pulse_dict_list
