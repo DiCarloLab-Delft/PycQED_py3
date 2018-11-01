@@ -249,7 +249,7 @@ class Base_MW_LutMan(Base_LutMan):
             self.AWG.get_instr().set(cw, waveform)
 
     def load_phase_pulses_to_AWG_lookuptable(self,
-                                             phases):
+                                             phases=np.arange(0, 360, 20)):
         """
         Loads rPhi90 pulses onto the AWG lookuptable.
         """
@@ -259,7 +259,9 @@ class Base_MW_LutMan(Base_LutMan):
         lm = self.LutMap()
         for i, (phase) in enumerate(phases):
             lm[i+9] = {"name": "rPhi90",    "theta": 90,
-                       "phi": phase, "type": "ge"},
+                       "phi": phase, "type": "ge"}
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
 
     def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
                                                mod_freqs: list=None):

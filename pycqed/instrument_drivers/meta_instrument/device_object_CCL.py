@@ -601,9 +601,11 @@ class DeviceCCL(Instrument):
         is a conditional oscillation.
         """
 
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         for q in [q0, q1]:
-            fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-            # fl_lutman.cfg_operating_mode('CW_single_01')
+            # This can be 
+            mw_lutman = self.find_instrument(q).instr_mw_lutman.get_instr()
+            mw_lutman.load_phase_pulses_to_AWG_lookuptable()
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()

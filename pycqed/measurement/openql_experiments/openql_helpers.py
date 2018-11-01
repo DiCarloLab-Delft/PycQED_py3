@@ -51,6 +51,9 @@ def create_kernel(kname: str, program):
     """
     Wrapper around constructor of openQL "Kernel" class.
     """
+    kname = kname.translate ({ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
+    kname = 'k_'+kname # prefix with k_
+
     k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
     return k
 
