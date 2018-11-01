@@ -107,14 +107,13 @@ def generate_config(filename: str,
     documentation under "configuration_specification".
     """
     # notation is (phi, theta) in fractions of pi
-    standard_rotations = list(np.array(
-        [(0, 0),
-         (0, 180),
-         (90, 180),
-         (0, 90),
-         (90, 90),
-         (0, -90),
-         (90, -90), ])/180)
+    standard_rotations = [#(0, 0),
+         (0/180, 180/180),
+         (90/180, 180/180),
+         (0/180, 90/180),
+         (90/180, 90/180),
+         (0/180, -90/180),
+         (90/180, -90/180)]
 
     angles_pi = {
         'x': [0.67, -0.23, -0.08, 0.08],
@@ -130,6 +129,10 @@ def generate_config(filename: str,
     # sorry
     rotations = list(sorted(set(
         concat(concat(concat(rotations))))))
+
+    rotations = [r for r in rotations if r not in standard_rotations]
+
+
 
     rotations = standard_rotations + rotations
 
@@ -466,7 +469,7 @@ def generate_config(filename: str,
 
     rot_dict = {}
     for i, r in enumerate(rotations):
-        rot_dict[i] = {'theta': r[1]*180, 'phi':r[0]*180, "type": "ge",
-                       "name": i}
+        rot_dict[i+1] = {'theta': r[1]*180, 'phi':r[0]*180, "type": "ge",
+                       "name": rots_instr[i]}
 
     return rot_dict
