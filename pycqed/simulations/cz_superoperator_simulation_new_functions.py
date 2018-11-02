@@ -969,9 +969,76 @@ def verify_CPTP(U):
 	return ptrace
 
 
+def return_instrument_args(fluxlutman,noise_parameters_CZ):
+
+    fluxlutman_args = {'sampling_rate': fluxlutman.sampling_rate(),
+                           'cz_length': fluxlutman.cz_length(),
+                           'q_J2': fluxlutman.q_J2(),
+                           'czd_double_sided': fluxlutman.czd_double_sided(),
+                           'cz_lambda_2': fluxlutman.cz_lambda_2(),
+                           'cz_lambda_3': fluxlutman.cz_lambda_3(),
+                           'cz_theta_f': fluxlutman.cz_theta_f(),
+                           'czd_length_ratio': fluxlutman.czd_length_ratio(),
+                           'q_polycoeffs_freq_01_det': fluxlutman.q_polycoeffs_freq_01_det(),
+                           'q_polycoeffs_anharm': fluxlutman.q_polycoeffs_anharm(),
+                           'q_freq_01': fluxlutman.q_freq_01(),
+                           'q_freq_10': fluxlutman.q_freq_10()}
+
+    noise_parameters_CZ_args = {'Z_rotations_length': noise_parameters_CZ.Z_rotations_length(),
+                                'voltage_scaling_factor': noise_parameters_CZ.voltage_scaling_factor(),
+                                'distortions': noise_parameters_CZ.distortions(),
+                                'T1_q0': noise_parameters_CZ.T1_q0(),
+                                'T1_q1': noise_parameters_CZ.T1_q1(),
+                                'T2_q0_amplitude_dependent': noise_parameters_CZ.T2_q0_amplitude_dependent(),
+                                'T2_q1': noise_parameters_CZ.T2_q1(),
+                                'w_q1_sweetspot': noise_parameters_CZ.w_q1_sweetspot(),
+                                'alpha_q1': noise_parameters_CZ.alpha_q1(),
+                                'w_bus': noise_parameters_CZ.w_bus(),
+                                'dressed_compsub': noise_parameters_CZ.dressed_compsub(),
+                                'sigma_q0': noise_parameters_CZ.sigma_q0(),
+                                'sigma_q1': noise_parameters_CZ.sigma_q1(),
+                                'T2_scaling': noise_parameters_CZ.T2_scaling(),
+                                'look_for_minimum': noise_parameters_CZ.look_for_minimum(),
+                                'n_sampling_gaussian_vec': noise_parameters_CZ.n_sampling_gaussian_vec(),
+                                'cluster': noise_parameters_CZ.cluster()}
+
+    return fluxlutman_args, noise_parameters_CZ_args
 
 
+def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args):
 
+    fluxlutman.sampling_rate(fluxlutman_args['sampling_rate'])
+    fluxlutman.cz_length(fluxlutman_args['cz_length'])
+    fluxlutman.q_J2(fluxlutman_args['q_J2'])
+    fluxlutman.czd_double_sided(fluxlutman_args['czd_double_sided'])
+    fluxlutman.cz_lambda_2(fluxlutman_args['cz_lambda_2'])
+    fluxlutman.cz_lambda_3(fluxlutman_args['cz_lambda_3'])
+    fluxlutman.cz_theta_f(fluxlutman_args['cz_theta_f'])
+    fluxlutman.czd_length_ratio(fluxlutman_args['czd_length_ratio'])
+    fluxlutman.q_polycoeffs_freq_01_det(fluxlutman_args['q_polycoeffs_freq_01_det'])
+    fluxlutman.q_polycoeffs_anharm(fluxlutman_args['q_polycoeffs_anharm'])
+    fluxlutman.q_freq_01(fluxlutman_args['q_freq_01'])
+    fluxlutman.q_freq_10(fluxlutman_args['q_freq_10'])
+
+    noise_parameters_CZ.Z_rotations_length(noise_parameters_CZ_args['Z_rotations_length'])
+    noise_parameters_CZ.voltage_scaling_factor(noise_parameters_CZ_args['voltage_scaling_factor'])
+    noise_parameters_CZ.distortions(noise_parameters_CZ_args['distortions'])
+    noise_parameters_CZ.T1_q0(noise_parameters_CZ_args['T1_q0'])
+    noise_parameters_CZ.T1_q1(noise_parameters_CZ_args['T1_q1'])
+    noise_parameters_CZ.T2_q0_amplitude_dependent(noise_parameters_CZ_args['T2_q0_amplitude_dependent'])
+    noise_parameters_CZ.T2_q1(noise_parameters_CZ_args['T2_q1'])
+    noise_parameters_CZ.w_q1_sweetspot(noise_parameters_CZ_args['w_q1_sweetspot'])
+    noise_parameters_CZ.alpha_q1(noise_parameters_CZ_args['alpha_q1'])
+    noise_parameters_CZ.w_bus(noise_parameters_CZ_args['w_bus'])
+    noise_parameters_CZ.dressed_compsub(noise_parameters_CZ_args['dressed_compsub'])
+    noise_parameters_CZ.sigma_q0(noise_parameters_CZ_args['sigma_q0'])
+    noise_parameters_CZ.sigma_q1(noise_parameters_CZ_args['sigma_q1'])
+    noise_parameters_CZ.T2_scaling(noise_parameters_CZ_args['T2_scaling'])
+    noise_parameters_CZ.look_for_minimum(noise_parameters_CZ_args['look_for_minimum'])
+    noise_parameters_CZ.n_sampling_gaussian_vec(noise_parameters_CZ_args['n_sampling_gaussian_vec'])
+    noise_parameters_CZ.cluster(noise_parameters_CZ_args['cluster'])
+
+    return fluxlutman, noise_parameters_CZ
 
 
 
