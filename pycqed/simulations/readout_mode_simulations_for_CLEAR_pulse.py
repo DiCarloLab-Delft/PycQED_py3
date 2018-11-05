@@ -81,16 +81,16 @@ def integration_value_function( x, params):
     pulse_par = [amp_base, length_total, segment_delta,
                  length_segments, sigma, norm]
     ro_mode_1 = solve_read_out_differential_equations(omega_pf,
-                                                      omega_ro_mid, omega_drive, kappa_pf, J, chi,
-                                                      pf_0 = pf_0, ro_0 = ro_0,
-                                                      integration_time = integration_time,
-                                                      sampling_rate = sampling_rate,  pulse_par=pulse_par)
+                      omega_ro_mid, omega_drive, kappa_pf, J, chi,
+                      pf_0 = pf_0, ro_0 = ro_0,
+                      integration_time = integration_time,
+                      sampling_rate = sampling_rate,  pulse_par=pulse_par)
 
     ro_mode_2 = solve_read_out_differential_equations(omega_pf,
-                                                      omega_ro_mid, omega_drive, kappa_pf, J, -1*chi,
-                                                      pf_0 = pf_0, ro_0 = ro_0,
-                                                      integration_time = integration_time,
-                                                      sampling_rate = sampling_rate, pulse_par=pulse_par)
+                      omega_ro_mid, omega_drive, kappa_pf, J, -1*chi,
+                      pf_0 = pf_0, ro_0 = ro_0,
+                      integration_time = integration_time,
+                      sampling_rate = sampling_rate, pulse_par=pulse_par)
 
     max_ro_photon_number = max(max(ro_mode_1), max(ro_mode_2))
 
