@@ -1632,7 +1632,10 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
     return normalized_data
 
 
-def datetime_from_timestamp(timestamp):
+def datetime_from_timestamp(timestamp: str):
+    """
+    Converst a timestamp instring in a datetime object. 
+    """
     try:
         if len(timestamp) == 14:
             return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
