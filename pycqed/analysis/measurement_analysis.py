@@ -7221,6 +7221,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                     self.fit_res.params['f0_gf_over_2'].value * scale,
                     self.fit_res.params['f0_gf_over_2'].stderr / 1e6,
                     old_freq_ef * scale,
+                    self.fit_res.init_values['f0_gf_over_2']*scale,
                     self.fit_res.params['kappa_gf_over_2'].value / 1e6,
                     self.fit_res.params['kappa_gf_over_2'].stderr / 1e6)
             except (TypeError, KeyError, ValueError):

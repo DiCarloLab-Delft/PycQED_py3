@@ -1096,18 +1096,6 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 gate_decomp=gate_decomp,
                 add_correction=True)
 
-    # # reset all correlation channels in the UHFQC
-    # for ch in range(5):
-    #     UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
-    #     UHFQC.set('quex_corr_{}_source'.format(ch), 0)
-    #
-    # for qb in qubits:
-    #     if thresholding and V_th_a is not None:
-    #         # set back the original threshold values
-    #         UHFQC.set('quex_thres_{}_level'.format(
-    #             qb.RO_acq_weight_function_I()), th_vals[qb.name])
-
-
     return MC
 
 
@@ -1420,13 +1408,13 @@ def cphase_gate_tuneup(qb_control, qb_target,
 
 
 def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
-                                  std_deviations: list = [20e-9,0.03],
+                                  std_deviations: list = [20e-9,0.02],
                                   phases = None, MC = None,
                                   estimator = 'GRNN_neupy',
                                   hyper_parameter_dict : dict = None,
                                   sampling_numbers: list = [70,30],
                                   max_measurements = 2,
-                                  tol = [0.016,0.05],
+                                  tol = [0.016,0.07],
                                   timestamps : list = None,
                                   update = False,
                                   full_output = True,
@@ -1843,20 +1831,26 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         nr_averages=nr_averages)[key + '_avg_det']
 
     RO_channels_dict = {}
-    for qb in qubits:
-        RO_channels_dict[qb.name] = [qb.RO_acq_weight_function_I()]
+    for i, qb in enumerate(qubits):
         if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
-            RO_channels_dict[qb.name] += [qb.RO_acq_weight_function_Q()]
+            RO_channels_dict[qb.name] = [2*i]
+            RO_channels_dict[qb.name] += [2*i+1]
+        else:
+            RO_channels_dict[qb.name] = [i]
         qb.prepare_for_timedomain(multiplexed=True)
 
+    print(RO_channels_dict)
     qubit_names = [qb.name for qb in qubits]
 
-    if len(qubit_names) > 5:
+    if len(qubit_names) == 1:
+        msmt_suffix = qubits[0].msmt_suffix
+    elif len(qubit_names) > 5:
         msmt_suffix = '_{}qubits'.format(len(qubit_names))
     else:
         msmt_suffix = '_qbs{}'.format(''.join([i[-1] for i in qubit_names]))
 
     if cal_points:
+        print(sweep_points_dict)
         for key, spts in sweep_points_dict.items():
             if spts is None:
                 if key == 'n_rabi':
@@ -1987,6 +1981,8 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
             raise ValueError('Specify an artificial_detuning for the Ramsey '
                              'measurement.')
         sweep_points = sweep_points_dict['ramsey']
+        drag_pulse_length = qubits[0].nr_sigma()*qubits[0].gauss_sigma()
+        zz_coupling = 470e3
         if sweep_params is None:
             sweep_params = (
                 ('X90', {}),
@@ -1996,7 +1992,11 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                         'pulse_delay': (lambda sp: sp),
                         'phase': (lambda sp:
                                   ((sp-sweep_points[0]) * artificial_detuning *
-                                   360) % 360)}})
+                                   360) % 360),
+                       # 'basis_rotation': (lambda sp: 2*np.pi*zz_coupling *
+                       #                               (sp+drag_pulse_length)*180/np.pi)
+                    }}),
+
             )
         sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points,
@@ -2249,6 +2249,41 @@ def measure_cz_frequency_sweep(qbc, qbt, qbr, frequencies, length, amplitude,
 
     ma.MeasurementAnalysis()
 
+
+def measure_fgge_frequency_sweep(qbc, qbt, qbm, fgge_pulse_name,
+                                 mod_frequencies, length, amplitude,
+                                 cal_points=True, upload=True,
+                                 verbose=False, return_seq=False,
+                                 MC=None, soft_averages=1):
+
+    if MC is None:
+        MC = qbm.MC
+
+    operation_dict = get_operation_dict([qbc, qbt])
+
+    for qb in [qbc, qbt, qbm]:
+        qb.prepare_for_timedomain()
+
+    sf1 = awg_swf2.fgge_frequency_hard_swf(
+        mod_frequencies=mod_frequencies,
+        length=length,
+        amplitude=amplitude,
+        qbt_name=qbt.name,
+        qbm_name=qbm.name,
+        fgge_pulse_name=fgge_pulse_name,
+        operation_dict=operation_dict,
+        verbose=verbose, cal_points=cal_points,
+        upload=upload, return_seq=return_seq)
+    MC.soft_avg(soft_averages)
+    MC.set_sweep_function(sf1)
+    MC.set_sweep_points(mod_frequencies)
+
+    MC.set_detector_function(qbm.int_avg_det)
+    MC.run('fgge_Frequency_Sweep_{}{}'.format(qbc.name, qbt.name))
+
+    ma.MeasurementAnalysis()
+
+
 def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
                     cal_points=True, upload=True,
                     verbose=False, return_seq=False,
@@ -2284,9 +2319,11 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
     if len(amplitudes) > 1:
         sf2 = awg_swf.Chevron_ampl_swf_new(hard_sweep=sf1)
         sweep_points_2D = amplitudes
+        exp_metadata = {'CZ_frequency': frequencies[0]}
     elif len(frequencies) > 1:
         sf2 = awg_swf.Chevron_freq_swf_new(hard_sweep=sf1)
         sweep_points_2D = frequencies
+        exp_metadata = {'CZ_amplitude': amplitudes[0]}
     else:
         raise ValueError('At least amplitudes or frequencies must have len > 1')
 
@@ -2294,11 +2331,13 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
     MC.set_sweep_function_2D(sf2)
     MC.set_sweep_points_2D(sweep_points_2D)
     MC.set_detector_function(qbr.int_avg_det)
-    MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name))
+    MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name),
+              exp_metadata=exp_metadata)
 
     ma.MeasurementAnalysis(TwoD=True)
 
 def measure_cphase(qbc, qbt, qbr, lengths, amps,
+                       CZ_pulse_name=None,
                        phases=None, MC=None,
                        cal_points=False, plot=False,
                        save_plot=True,
@@ -2347,7 +2386,8 @@ def measure_cphase(qbc, qbt, qbr, lengths, amps,
 
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
-    CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
+    if CZ_pulse_name is None:
+        CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
     CZ_pulse_channel = qbc.flux_pulse_channel()
     max_flux_length = np.max(lengths)
 
@@ -2399,7 +2439,7 @@ def measure_cphase(qbc, qbt, qbr, lengths, amps,
 
 def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
                        phases=None, MC=None, cal_points=False, plot=False,
-                       save_plot=True,
+                       save_plot=True, CZ_pulse_name=None,
                        prepare_for_timedomain=True,
                        output_measured_values=False,
                        upload=True,**kw):
@@ -2442,7 +2482,8 @@ def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
 
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
-    CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
+    if CZ_pulse_name is None:
+        CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
     CZ_pulse_channel = qbc.flux_pulse_channel()
     max_flux_length = length
 
@@ -2529,4 +2570,151 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases,
     ma.MeasurementAnalysis(TwoD=True)
 
 
+def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,
+                             artificial_detuning=0, interleave=True,
+                             label='', MC=None, analyze=True, close_fig=True,
+                             cal_points=True, upload=True):
+    if times is None:
+        raise ValueError("Unspecified times for measure_ramsey")
+    if artificial_detuning is None:
+        logging.warning('Artificial detuning is 0.')
+    if np.abs(artificial_detuning) < 1e3:
+        logging.warning('The artificial detuning is too small. The units'
+                        'should be Hz.')
+    if np.any(times > 1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
 
+    for qb in [pulsed_qubit, measured_qubit]:
+        qb.prepare_for_timedomain()
+    if MC is None:
+        MC = measured_qubit.MC
+
+    # Define the measurement label
+    if label == '':
+        label = 'Ramsey_add_pulse_{}'.format(pulsed_qubit.name) + \
+                measured_qubit.msmt_suffix
+
+    step = np.abs(times[1]-times[0])
+    if interleave:
+        times = np.repeat(times, 2)
+
+    if cal_points:
+        sweep_points = np.concatenate(
+            [times, [times[-1]+step,  times[-1]+2*step,
+                     times[-1]+3*step, times[-1]+4*step]])
+    else:
+        sweep_points = times
+
+    Rams_swf = awg_swf2.Ramsey_add_pulse_swf(
+        measured_qubit_name=measured_qubit.name,
+        pulsed_qubit_name=pulsed_qubit.name,
+        operation_dict=get_operation_dict([measured_qubit, pulsed_qubit]),
+        artificial_detuning=artificial_detuning,
+        cal_points=cal_points,
+        upload=upload)
+    MC.set_sweep_function(Rams_swf)
+    MC.set_sweep_points(sweep_points)
+    MC.set_detector_function(measured_qubit.int_avg_det)
+    MC.run(label)
+
+    if analyze:
+        ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                               qb_name=measured_qubit.name)
+
+
+def measure_ramsey_add_pulse_sweep_phase(
+        measured_qubit, pulsed_qubit, phases,
+        interleave=True, label='', MC=None,
+        analyze=True, close_fig=True,
+        cal_points=True, upload=True):
+
+    for qb in [pulsed_qubit, measured_qubit]:
+        qb.prepare_for_timedomain()
+    if MC is None:
+        MC = measured_qubit.MC
+
+    # Define the measurement label
+    if label == '':
+        label = 'Ramsey_add_pulse_{}_Sweep_phases'.format(pulsed_qubit.name) + \
+                measured_qubit.msmt_suffix
+
+    step = np.abs(phases[1]-phases[0])
+    if interleave:
+        phases = np.repeat(phases, 2)
+
+    if cal_points:
+        sweep_points = np.concatenate(
+            [phases, [phases[-1]+step,  phases[-1]+2*step,
+                      phases[-1]+3*step, phases[-1]+4*step]])
+    else:
+        sweep_points = phases
+
+    Rams_swf = awg_swf2.Ramsey_add_pulse_sweep_phase_swf(
+        measured_qubit_name=measured_qubit.name,
+        pulsed_qubit_name=pulsed_qubit.name,
+        operation_dict=get_operation_dict([measured_qubit, pulsed_qubit]),
+        cal_points=cal_points,
+        upload=upload)
+    MC.set_sweep_function(Rams_swf)
+    MC.set_sweep_points(sweep_points)
+    MC.set_detector_function(measured_qubit.int_avg_det)
+    MC.run(label)
+
+    if analyze:
+        ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                               qb_name=measured_qubit.name)
+
+
+def measure_chevron_fgge(qbc, qbt, qbm, lengths, amplitudes,
+                         mod_frequencies, fgge_pulse_name=None,
+                         cal_points=True, upload=True,
+                         verbose=False, return_seq=False,
+                         MC=None):
+
+    if MC is None:
+        MC = qbt.MC
+    if fgge_pulse_name is None:
+        fgge_pulse_name = 'fgge {} {}'.format(qbt.name, qbc.name)
+
+    operation_dict = get_operation_dict([qbc, qbt])
+    for qb in [qbc, qbt, qbm]:
+        qb.prepare_for_timedomain()
+
+    if np.any(np.asarray(mod_frequencies) > 1e9):
+        logging.warning('mod_frequencies are too large. I will assume they are '
+                        'pulse frequencies and I will subtract qbc drive LO.')
+    # mod_frequencies = pulse_frequencies - (qbc.f_qubit() - qbc.f_pulse_mod())
+
+    sf1 = awg_swf2.FGGE_length_swf(
+        lengths=lengths,
+        amplitude=amplitudes[0],
+        mod_frequency=mod_frequencies[0],
+        qbt_name=qbt.name,
+        qbm_name=qbm.name,
+        fgge_pulse_name=fgge_pulse_name,
+        operation_dict=operation_dict,
+        verbose=verbose, cal_points=cal_points,
+        upload=False, return_seq=return_seq)
+    MC.set_sweep_function(sf1)
+    MC.set_sweep_points(lengths)
+
+    if len(amplitudes) > 1:
+        sf2 = awg_swf2.FGGE_amplitude_swf(hard_sweep=sf1)
+        sweep_points_2D = amplitudes
+        exp_metadata = {'fgge_mod_frequency': mod_frequencies[0]}
+    elif len(mod_frequencies) > 1:
+        sf2 = awg_swf2.FGGE_frequency_swf(hard_sweep=sf1)
+        sweep_points_2D = mod_frequencies
+        exp_metadata = {'fgge_amplitude': amplitudes[0]}
+    else:
+        raise ValueError('At least amplitudes or frequencies must have len > 1')
+
+
+    MC.set_sweep_function_2D(sf2)
+    MC.set_sweep_points_2D(sweep_points_2D)
+    MC.set_detector_function(qbm.int_avg_det)
+    MC.run_2D('Chevron_fgge_{}{}'.format(qbc.name, qbt.name),
+              exp_metadata=exp_metadata)
+
+    ma.MeasurementAnalysis(TwoD=True)

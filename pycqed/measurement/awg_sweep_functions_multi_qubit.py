@@ -499,9 +499,66 @@ class parity_correction(swf.Hard_Sweep):
                 )
 
 
+class Ramsey_add_pulse_swf(swf.Hard_Sweep):
+
+    def __init__(self, measured_qubit_name,
+                 pulsed_qubit_name, operation_dict,
+                 artificial_detuning=None,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.measured_qubit_name = measured_qubit_name
+        self.pulsed_qubit_name = pulsed_qubit_name
+        self.operation_dict = operation_dict
+        self.upload = upload
+        self.cal_points = cal_points
+        self.artificial_detuning = artificial_detuning
+
+        self.name = 'Ramsey Add Pulse'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2. Ramsey_add_pulse_seq(
+                times=self.sweep_points,
+                measured_qubit_name=self.measured_qubit_name,
+                pulsed_qubit_name=self.pulsed_qubit_name,
+                operation_dict=self.operation_dict,
+                artificial_detuning=self.artificial_detuning,
+                cal_points=self.cal_points)
+
+
+class Ramsey_add_pulse_sweep_phase_swf(swf.Hard_Sweep):
+
+    def __init__(self, measured_qubit_name,
+                 pulsed_qubit_name, operation_dict,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.measured_qubit_name = measured_qubit_name
+        self.pulsed_qubit_name = pulsed_qubit_name
+        self.operation_dict = operation_dict
+        self.upload = upload
+        self.cal_points = cal_points
+
+        self.name = 'Ramsey Add Pulse Sweep Phases'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2. Ramsey_add_pulse_sweep_phase_seq(
+                phases=self.sweep_points,
+                measured_qubit_name=self.measured_qubit_name,
+                pulsed_qubit_name=self.pulsed_qubit_name,
+                operation_dict=self.operation_dict,
+                cal_points=self.cal_points)
+
+
 class calibrate_n_qubits(swf.Hard_Sweep):
     def __init__(self, sweep_params, sweep_points,
-                 qubit_names, operation_dict,
+                 qubit_names, operation_dict, qb_names_DD=None,
                  cal_points=True, no_cal_points=4,
                  nr_echo_pulses=0, idx_DD_start=-1, UDD_scheme=True,
                  parameter_name='sample', unit='#',
@@ -512,6 +569,7 @@ class calibrate_n_qubits(swf.Hard_Sweep):
         self.sweep_params = sweep_params
         self.sweep_pts = sweep_points
         self.qubit_names = qubit_names
+        self.qb_names_DD = qb_names_DD
         self.operation_dict = operation_dict
         self.cal_points = cal_points
         self.no_cal_points = no_cal_points
@@ -528,6 +586,7 @@ class calibrate_n_qubits(swf.Hard_Sweep):
             sqs2.general_multi_qubit_seq(sweep_params=self.sweep_params,
                                          sweep_points=self.sweep_pts,
                                          qb_names=self.qubit_names,
+                                         qb_names_DD=self.qb_names_DD,
                                          operation_dict=self.operation_dict,
                                          cal_points=self.cal_points,
                                          no_cal_points=self.no_cal_points,
@@ -538,21 +597,144 @@ class calibrate_n_qubits(swf.Hard_Sweep):
                                          return_seq=self.return_seq)
 
 
-class calibrate_n_qubits_change_sweep_points(swf.Soft_Sweep):
+class FGGE_length_swf(swf.Hard_Sweep):
+    def __init__(self, qbt_name, qbm_name, fgge_pulse_name, lengths,
+                 amplitude, operation_dict, mod_frequency, upload=False,
+                 cal_points=True, return_seq=False, verbose=False):
 
-    def __init__(self, hard_sweep, sweep_control='soft', upload=True):
-
-
-        self.sweep_control = sweep_control
-        self.hard_sweep = hard_sweep
+        super().__init__()
+        self.name = 'FGGE Length Sweep'
+        self.qbm_name = qbm_name
+        self.qbt_name = qbt_name
+        self.fgge_pulse_name = fgge_pulse_name
+        self.lengths = lengths
+        self.amplitude = amplitude
+        self.operation_dict = operation_dict
+        self.mod_frequency = mod_frequency
+        self.cal_points = cal_points
         self.upload = upload
-        self.name = 'n_Qubit_Time_Domain_Change_Sweep_Points'
-        self.parameter_name = self.hard_sweep.parameter_name
-        self.unit = self.hard_sweep.unit
+        self.return_seq = return_seq
+        self.parameter_name = 'Pulse length'
+        self.unit = 's'
+        self.verbose = verbose
 
-    def set_parameter(self, val):
-        self.hard_sweep.sweep_pts = val
+    def prepare(self,  upload_all=True, **kw):
+        if self.upload:
+            sqs2.fgge_gate_length_seq(lengths=self.lengths,
+                                      qbt_name=self.qbt_name,
+                                      qbm_name=self.qbm_name,
+                                      fgge_pulse_name=self.fgge_pulse_name,
+                                      amplitude=self.amplitude,
+                                      mod_frequency=self.mod_frequency,
+                                      operation_dict=self.operation_dict,
+                                      upload=True,
+                                      upload_all=upload_all,
+                                      return_seq=self.return_seq,
+                                      cal_points=self.cal_points,
+                                      verbose=self.verbose)
+
+
+class FGGE_amplitude_swf(swf.Soft_Sweep):
+
+    def __init__(self, hard_sweep):
+        '''
+        Sweep function class (soft sweep) for 2D Chevron experiment where
+        the amplitude of the fluxpulse is swept. Used in combination with
+        the Chevron_length_hard_swf class.
+
+        Args:
+           qb_control (QuDev_Transmon): control qubit (fluxed qubit)
+           qb_target (QuDev_Transmon): target qubit (non-fluxed qubit)
+           hard_sweep: hard sweep function (fast axis sweep function)
+        '''
+        super().__init__()
+        self.name = 'FGGE Amplitude Sweep'
+        self.parameter_name = 'Pulse amplitude'
+        self.unit = 'V'
+        self.hard_sweep = hard_sweep
+        self.is_first_sweeppoint = True
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.hard_sweep.amplitude = val
         self.hard_sweep.upload = True
-        self.hard_sweep.prepare()
+        self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
+        self.is_first_sweeppoint = False
+
+    def finish(self):
+        pass
 
 
+class FGGE_frequency_swf(swf.Soft_Sweep):
+
+    def __init__(self, hard_sweep):
+        '''
+        Sweep function class (soft sweep) for 2D Chevron experiment where
+        the amplitude of the fluxpulse is swept. Used in combination with
+        the Chevron_length_hard_swf class.
+
+        Args:
+           qb_control (QuDev_Transmon): control qubit (fluxed qubit)
+           qb_target (QuDev_Transmon): target qubit (non-fluxed qubit)
+           hard_sweep: hard sweep function (fast axis sweep function)
+        '''
+        super().__init__()
+        self.name = 'FGGE Frequency Sweep'
+        self.parameter_name = 'Pulse frequency'
+        self.unit = 'Hz'
+        self.hard_sweep = hard_sweep
+        self.is_first_sweeppoint = True
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.hard_sweep.mod_frequency = val
+        self.hard_sweep.upload = True
+        self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
+        self.is_first_sweeppoint = False
+
+    def finish(self):
+        pass
+
+
+class fgge_frequency_hard_swf(swf.Hard_Sweep):
+
+    def __init__(self, mod_frequencies, length, amplitude,
+                 qbt_name, qbm_name,
+                 fgge_pulse_name, operation_dict,
+                 verbose=False, cal_points=False,
+                 upload=True, return_seq=False):
+
+        super().__init__()
+        self.length = length
+        self.amplitude = amplitude
+        self.mod_frequencies = mod_frequencies
+        self.qbt_name = qbt_name
+        self.qbm_name = qbm_name
+        self.fgge_pulse_name = fgge_pulse_name
+        self.operation_dict = operation_dict
+        self.upload = upload
+        self.cal_points = cal_points
+        self.verbose = verbose
+        self.return_seq = return_seq
+
+        self.name = 'Chevron flux pulse frequency sweep'
+        self.parameter_name = 'Fluxpulse frequency'
+        self.unit = 'Hz'
+
+    def prepare(self, upload_all=True, **kw):
+        if self.upload:
+            sqs2.fgge_frequency_seq(
+                mod_frequencies=self.mod_frequencies,
+                length=self.length,
+                amplitude=self.amplitude,
+                qbt_name=self.qbt_name,
+                qbm_name=self.qbm_name,
+                upload_all=upload_all,
+                fgge_pulse_name=self.fgge_pulse_name,
+                operation_dict=self.operation_dict,
+                verbose=self.verbose, cal_points=self.cal_points,
+                upload=self.upload, return_seq=self.return_seq)

@@ -1557,6 +1557,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
                  close_figs: bool=False, options_dict: dict=None,
                  extract_only: bool=False, do_fitting: bool=False,
                  auto: bool=True):
+
         super().__init__(t_start=t_start, t_stop=t_stop,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
@@ -1564,6 +1565,8 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
                          extract_only=extract_only, do_fitting=do_fitting)
         if self.options_dict.get('TwoD', None) is None:
             self.options_dict['TwoD'] = True
+
+
 
         self.params_dict = {
             'measurementstring': 'measurementstring',
@@ -1660,7 +1663,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
         exp_dec_mod = lmfit.Model(fit_mods.ExpDecayFunc)
         exp_dec_mod.set_param_hint('n',
                                    value=1,
-                                   vary=False)
+                                   vary=True)
         exp_dec_mod.set_param_hint('offset',
                                    value=0,
                                    min=0,

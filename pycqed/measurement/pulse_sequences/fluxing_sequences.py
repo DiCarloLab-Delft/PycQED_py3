@@ -1658,6 +1658,9 @@ def dynamic_phase_meas_seq(thetas, qb_name, CZ_pulse_name,
     for i, theta in enumerate(thetas):
         if theta == thetas[-4]:
             flux_pulse['amplitude'] = 0
+            if 'aux_channels_dict' in flux_pulse:
+                for ch in flux_pulse['aux_channels_dict']:
+                    flux_pulse['aux_channels_dict'][ch] = 0
 
         X90_2['phase'] = theta*180/np.pi
         if cal_points and (theta == thetas[-4] or theta == thetas[-3]):
@@ -1923,6 +1926,7 @@ def Chevron_frequency_seq(frequencies, length, flux_pulse_amp,
     else:
         return seq_name
 
+
 def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
                                 qb_target, spacing=50e-9,
                                 cal_points=False, verbose=False,
@@ -2181,7 +2185,7 @@ def fluxpulse_scope_sequence(delays, qb, verbose=False,
 
 
 def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
-                              qbc_name, qbt_name,qbr_name,
+                              qbc_name, qbt_name, qbr_name,
                               operation_dict,
                               CZ_pulse_name,
                               CZ_pulse_channel,
@@ -2194,14 +2198,15 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     '''
     chevron like sequence (sweep of the flux pulse length)
     where the phase is measures.
-    The sequence function is programmed, such that it either can take lengths, amplitudes or phases to sweep.
+    The sequence function is programmed, such that it either can take lengths,
+    amplitudes or phases to sweep.
 
     Timings of sequence
                                          <-- length -->
                                           or amplitude
     qb_control:    |X180|  ----------   |  fluxpulse   |
 
-    qb_target:     ------- |X90|  ------------------------------|X90|--------  |RO|
+    qb_target:     ------- |X90|  ------------------------------|X90|------|RO|
                                 <------>                       X90_phase
                                 spacing
     args:
@@ -2212,11 +2217,12 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
         X90_phase: float, phase of the second X90 pulse in rad
         spacing: float
         measurement_mode (str): either 'excited_state', 'ground_state'
-        reference_measurement (bool): if True, a reference measurement with the
-                                      control qubit in ground state is added in the
-                                      same hard sweep. IMPORTANT: you need to double
-                                      the hard sweep points!
-                                      e.g. thetas = np.concatenate((thetas,thetas))
+        reference_measurement (bool):
+            if True, a reference measurement with the
+            control qubit in ground state is added in the
+            same hard sweep. IMPORTANT: you need to double
+            the hard sweep points!
+            e.g. thetas = np.concatenate((thetas,thetas))
     '''
 
     seq_name = 'Chevron_length_sequence'
@@ -2389,4 +2395,67 @@ def CZ_bleed_through_phase_seq(phases, qb_name, CZ_pulse_name, CZ_separation,
         return seq_name
 
 
+def fgge_cphase_seq(phases, flux_params, max_flux_length,
+                    qbc_name, qbt_name, qbr_name,
+                    operation_dict,
+                    CZ_pulse_name,
+                    verbose=False,cal_points=False,
+                    upload=True, return_seq=False,
+                    reference_measurements=False,
+                    first_data_point = True):
 
+    seq_name = 'FGGE cphase seq phases sweep'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    CZ_pulse = deepcopy(operation_dict[CZ_pulse_name])
+    X90_target_2 = deepcopy(operation_dict['X90 ' + qbt_name])
+
+    if not first_data_point:
+        reduced_pulse_list = [buffer_pulse,CZ_pulse]
+        upload_channels,upload_AWGs = get_required_upload_information \
+            (reduced_pulse_list,station)
+        if X90_target['I_channel'].split('_')[0] in upload_AWGs:
+            upload_channels.append(X90_target['I_channel'])
+            upload_channels.append(X90_target['Q_channel'])
+
+
+    else:
+        upload_channels,upload_AWGs = get_required_upload_information(
+            pulse_list, station)
+
+    for i, phase in enumerate(phases):
+        if cal_points and (i == (len(phases)-4)
+                           or i == (len(phases)-3)):
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['I ' + qbr_name],
+                                  operation_dict['RO ' + qbr_name]])
+        elif cal_points and (i == (len(phases)-2)
+                             or i == (len(phases)-1)):
+            CZ_pulse['amplitude'] = 0
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X180 ' + qbr_name],
+                                  operation_dict['RO ' + qbr_name]])
+        else:
+            X90_target_2['phase'] = phase*180/np.pi
+            if reference_measurements and i >= int(len(phases)/2):
+                X180_target['amplitude'] = 0
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X180 ' + qbt_name],
+                                  operation_dict['X90 ' + qbt_name],
+                                  CZ_pulse, X90_target_2,
+                                  operation_dict['RO ' + qbr_name]])
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        print('uploading channels: ', upload_channels)
+        print('of AWGs: ', upload_AWGs)
+        station.pulsar.program_awgs(seq, *el_list,
+                                    AWGs=upload_AWGs,
+                                    channels=upload_channels,
+                                    verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name

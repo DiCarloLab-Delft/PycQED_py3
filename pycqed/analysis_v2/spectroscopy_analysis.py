@@ -472,8 +472,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                 fit_guess_fn = None
                 self.chi = (self.sim_fit[0].params['omega_ro']-
                             self.sim_fit[1].params['omega_ro'])/2
-                if self.options_dict['qb']:
-                    self.options_dict['qb_chi'] = self.chi
+
             else:
                 fit_fn = fit_mods.hanger_with_pf
                 fit_temp = fit_mods.fit_hanger_with_pf(
@@ -705,12 +704,13 @@ class ResonatorSpectroscopy(Spectroscopy):
                                     fit_results[0].params,
                                     f=x_fit_1)),
                                     'g--', linewidth=1.5, label='Difference')
-                            f_RO = x_fit_0[np.argmax(np.abs(fit_results[1].eval(
+                            self.f_RO = x_fit_0[np.argmax(np.abs(fit_results[1].eval(
                                             fit_results[1].params,
                                             f=x_fit_0)-
                                             fit_results[0].eval(
                                                 fit_results[0].params,
                                                f=x_fit_0)))]
+                            f_RO = self.f_RO
                             ax.plot([f_RO, f_RO],
                                     [0,max(max(self.raw_data_dict['amp'][0]),
                                            max(self.raw_data_dict['amp'][1]))],
@@ -725,16 +725,16 @@ class ResonatorSpectroscopy(Spectroscopy):
                                    "%.3f" %((fit_results[1].params['omega_ro'].value-
                                              fit_results[0].params['omega_ro'].value)
                                              /2*1e-6)]
-                            textstr = str('\nkappa = '+par[2]+' MHz'
-                                          +'\nJ = '+par[3]+' MHz'
-                                          +'\nchi = '+par[6]+' MHz'
-                                          +'\nf_pf = '+par[1]+' GHz'
-                                          +'\nf_rr |g> = '+par[4]+' GHz'
-                                          +'\nf_rr |e> = '+par[5]+' GHz'
-                                          +'\nf_RO = '+"%.3f" %(f_RO*1e-9)+''
+                            textstr = str('\n\nkappa = '+par[2]+' MHz'
+                                          +'\n\nJ = '+par[3]+' MHz'
+                                          +'\n\nchi = '+par[6]+' MHz'
+                                          +'\n\nf_pf = '+par[1]+' GHz'
+                                          +'\n\nf_rr |g> = '+par[4]+' GHz'
+                                          +'\n\nf_rr |e> = '+par[5]+' GHz'
+                                          +'\n\nf_RO = '+"%.3f" %(f_RO*1e-9)+''
                                           ' GHz'
                                          )
-                            ax.plot([0],
+                            ax.plot([f_RO],
                                     [0],
                                     'w',
                                     label=textstr)

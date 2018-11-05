@@ -434,23 +434,87 @@ class BufferedCZPulse(Pulse):
 
     def chan_wf(self, chan, tvals):
         amp = self.amplitude
+        buffer_start = self.buffer_length_start
+        buffer_end = self.buffer_length_end
+        pulse_length = self.pulse_length
         if chan != self.channel:
             amp = self.aux_channels_dict[chan]
+            buffer_start -= 5e-9
+            buffer_end -= 5e-9
+            pulse_length += 10e-9
 
         if self.gaussian_filter_sigma == 0:
             wave = np.ones_like(tvals)*amp
-            wave *= (tvals >= tvals[0] + self.buffer_length_start)
-            wave *= (tvals < tvals[0] + self.buffer_length_start +
-                     self.pulse_length)
+            wave *= (tvals >= tvals[0] + buffer_start)
+            wave *= (tvals < tvals[0] + buffer_start + pulse_length)
         else:
-            tstart = tvals[0] + self.buffer_length_start
-            tend = tvals[0] + self.buffer_length_start + self.pulse_length
+            tstart = tvals[0] + buffer_start
+            tend = tvals[0] + buffer_start + pulse_length
             scaling = 1/np.sqrt(2)/self.gaussian_filter_sigma
             wave = 0.5*(sp.special.erf((tvals - tstart)*scaling) -
                         sp.special.erf((tvals - tend)*scaling))*amp
         t_rel = tvals - tvals[0]
         wave *= np.cos(2*np.pi*(self.frequency*t_rel + self.phase / 360.))
         return wave
+
+
+class GaussFilteredCosIQPulse(Pulse):
+    def __init__(self, I_channel, Q_channel,
+                 name='gauss filtered cos IQ pulse', **kw):
+        super().__init__(name)
+
+        self.I_channel = I_channel
+        self.Q_channel = Q_channel
+        self.channels = [self.I_channel, self.Q_channel]
+
+        self.amplitude = kw.pop('amplitude', 0)
+        self.mod_frequency = kw.pop('mod_frequency', 0)
+        self.phase = kw.pop('phase', 0.)
+        self.phi_skew = kw.pop('phi_skew', 0.)
+        self.alpha = kw.pop('alpha', 1.)
+
+        self.pulse_length = kw.pop('pulse_length', 0)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma', 0)
+        self.nr_sigma = kw.pop('nr_sigma', 5)
+        self.length = self.pulse_length + \
+                      self.gaussian_filter_sigma*self.nr_sigma
+
+    def __call__(self, **kw):
+        self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.mod_frequency = kw.pop('mod_frequency', self.mod_frequency)
+        self.pulse_length = kw.pop('pulse_length', self.pulse_length)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma',
+                                            self.gaussian_filter_sigma)
+        self.nr_sigma = kw.pop('nr_sigma', self.nr_sigma)
+        self.length = self.pulse_length + \
+                      self.gaussian_filter_sigma*self.nr_sigma
+        self.channels = kw.pop('channels', self.channels)
+        self.channels.append(self.I_channel)
+        self.channels.append(self.Q_channel)
+        return self
+
+    def chan_wf(self, chan, tvals):
+        if self.gaussian_filter_sigma == 0:
+            wave = np.ones_like(tvals)*self.amplitude
+            wave *= (tvals >= tvals[0])
+            wave *= (tvals < tvals[0] + self.pulse_length)
+        else:
+            tstart = tvals[0] + self.gaussian_filter_sigma*self.nr_sigma
+            tend = tstart + self.pulse_length
+            scaling = 1/np.sqrt(2)/self.gaussian_filter_sigma
+            wave = 0.5*(sp.special.erf((tvals - tstart)*scaling) -
+                        sp.special.erf((tvals - tend)*scaling))*self.amplitude
+
+        I_mod, Q_mod = apply_modulation(wave, np.zeros_like(wave), tvals,
+                                        mod_frequency=self.mod_frequency,
+                                        phase=self.phase,
+                                        phi_skew=self.phi_skew,
+                                        alpha=self.alpha)
+        if chan == self.I_channel:
+            return I_mod
+        if chan == self.Q_channel:
+            return Q_mod
+
 
 class MartinisFluxPulse(Pulse):
 

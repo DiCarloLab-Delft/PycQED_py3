@@ -1711,9 +1711,13 @@ class QuDev_transmon(Qubit):
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
             ta.ReadoutROPhotonsAnalysis(t_start=None,
-                  close_figs=close_fig, options_dict={'f_qubit': self.f_qubit,
-                  'chi': self.chi, 'do_analysis': True,
-                  'artif_detuning': self.artificial_detuning }, do_fitting=True)
+                close_figs=close_fig, options_dict={
+                    'f_qubit': self.f_qubit(),
+                    'chi': self.chi(),
+                    'do_analysis': True,
+                    'shape': self.ro_pulse_shape(),
+                    'artif_detuning': self.artificial_detuning},
+                do_fitting=True)
 
     def calibrate_drive_mixer_carrier_NN(self,MC=None, update=True,make_fig=True,
                                  trigger_sep=5e-6,
@@ -3563,11 +3567,14 @@ class QuDev_transmon(Qubit):
                 self.name, MAon.timestamp_string, MAoff.timestamp_string))
             plt.legend()
             MAoff.save_fig(plt.gcf(), 'chishift', ylabel='trans-amp')
-            sa.ResonatorSpectroscopy(t_start=[MAoff.timestamp_string,
+        if kw.pop('analyze', True):
+            SA = sa.ResonatorSpectroscopy(t_start=[MAoff.timestamp_string,
                       MAon.timestamp_string], do_fitting=True,
                       options_dict={'simultan': True,'scan_label':'',
-                       'fit_options': dict(model='hanger_with_pf'),
-                       'qb_chi': self.chi})
+                       'fit_options': dict(model='hanger_with_pf')})
+        if kw.pop('update', True):
+            self.chi(SA.chi)
+            self.f_RO(SA.f_RO)
         return fmax
 
 
