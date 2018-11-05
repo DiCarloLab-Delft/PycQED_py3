@@ -277,6 +277,7 @@ class DeviceCCL(Instrument):
             # set RO modulation to use common LO frequency
             qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
             qb._prep_ro_pulse(upload=False)
+        # only call it once with upload after setting all pulses.
         qb._prep_ro_pulse(upload=True)
 
     def _prep_ro_integration_weights(self):
@@ -604,7 +605,7 @@ class DeviceCCL(Instrument):
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         for q in [q0, q1]:
             # This can be 
-            mw_lutman = self.find_instrument(q).instr_mw_lutman.get_instr()
+            mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
             mw_lutman.load_phase_pulses_to_AWG_lookuptable()
 
         if prepare_for_timedomain:
