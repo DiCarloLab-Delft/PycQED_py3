@@ -470,8 +470,24 @@ class ResonatorSpectroscopy(Spectroscopy):
                             simultan=True)
                 guess_pars = None
                 fit_guess_fn = None
+
+
+                x_fit_0 = self.proc_data_dict['plot_frequency'][0]
+
                 self.chi = (self.sim_fit[0].params['omega_ro']-
                             self.sim_fit[1].params['omega_ro'])/2
+                self.f_RO = x_fit_0[np.argmax(np.abs(self.sim_fit[1].eval(
+                                                    self.sim_fit[1].params,
+                                                    f=x_fit_0)-
+                                                    self.sim_fit[0].eval(
+                                                    self.sim_fit[0].params,
+                                                    f=x_fit_0)))]
+                self.f_RO_res = (self.sim_fit[0].params['omega_ro']+
+                                 self.sim_fit[1].params['omega_ro'])/2
+                self.f_PF = self.sim_fit[0].params['omega_pf']
+                self.kappa = self.sim_fit[0].params['kappa_pf']
+                self.J_ = self.sim_fit[0].params['J']
+
             else:
                 fit_fn = fit_mods.hanger_with_pf
                 fit_temp = fit_mods.fit_hanger_with_pf(
@@ -728,15 +744,18 @@ class ResonatorSpectroscopy(Spectroscopy):
                                           +'\n\nf_RO = '+"%.3f" %(f_RO*1e-9)+''
                                           ' GHz'
                                          )
+                            ax.plot([f_RO],
+                                    [0],
+                                    'w--', label=textstr)
                         box_props = dict(boxstyle='Square',
                                          facecolor='white', alpha=0.8)
                         self.box_props = {key: val for key,
                                                        val in box_props.items()}
                         self.box_props.update({'linewidth': 0})
                         self.box_props['alpha'] = 0.
-                        ax.text(1.1, 0.95, textstr, transform=ax.transAxes,
-                                verticalalignment='top', bbox=self.box_props,
-                                fontsize=11)
+                        # ax.text(1.1, 0.95, textstr, transform=ax.transAxes,
+                        #         verticalalignment='top', bbox=self.box_props,
+                        #         fontsize=11)
 
                 else:
                     reso_freqs = [fit_results[tt].params['f0'].value *

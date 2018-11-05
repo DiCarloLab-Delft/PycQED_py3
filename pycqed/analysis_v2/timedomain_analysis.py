@@ -1540,9 +1540,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
 
 class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
     """
-    DO NOT USE THIS CLASS, IT IS STILL IN DEVELOPMENT (2018.10.26)
-
-    Analyses the photonnumber in the RO based on the
+    Analyses the photon number in the RO based on the
     readout_photons_in_resonator function
 
     function specific options for options dict:
@@ -1564,7 +1562,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
                          extract_only=extract_only, do_fitting=do_fitting)
         if self.options_dict.get('TwoD', None) is None:
             self.options_dict['TwoD'] = True
-
+        self.label = label
         self.params_dict = {
             'measurementstring': 'measurementstring',
             'sweep_points': 'sweep_points',
@@ -1589,7 +1587,6 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
         #print(len(self.raw_data_dict['measured_values_ord_dict']['raw w0 _measure'][0]))
         self.proc_data_dict = OrderedDict()
         self.proc_data_dict['qubit_state'] = [[],[]]
-        #THIS NEEDS TOO Be FIXED!!!
         self.proc_data_dict['delay_to_relax'] = self.raw_data_dict[
                                                     'sweep_points_2D'][0]
         self.proc_data_dict['ramsey_times'] = []
@@ -1666,7 +1663,8 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
                                    min=0,
                                    vary=True)
         exp_dec_mod.set_param_hint('tau',
-                                   value=self.proc_data_dict['delay_to_relax'][-1],
+                                   value=self.proc_data_dict[
+                                                'delay_to_relax'][-1],
                                    min=1e-11,
                                    vary=True)
         exp_dec_mod.set_param_hint('amplitude',
@@ -1813,7 +1811,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
             self.prepare_ramsey_plots()
 
     def prepare_2D_sweep_plot(self):
-        self.plot_dicts['off_full_data'] = {
+        self.plot_dicts['off_full_data_'+self.label] = {
             'title': 'Raw data |g>',
             'plotfn': self.plot_colorxy,
             'xvals': self.proc_data_dict['ramsey_times'],
@@ -1824,7 +1822,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
             'yunit': 's',
             'zvals': np.array(self.proc_data_dict['qubit_state'][0]) }
 
-        self.plot_dicts['on_full_data'] = {
+        self.plot_dicts['on_full_data_'+self.label] = {
             'title': 'Raw data |e>',
             'plotfn': self.plot_colorxy,
             'xvals': self.proc_data_dict['ramsey_times'],
@@ -1882,7 +1880,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'color': 'w',
                 'setlabel': 'Residual photon count = '
                              ''+str("%.3f" %
-                                    self.proc_data_dict['photon_number'][1][i]),
+                                    self.proc_data_dict['photon_number'][0][i]),
                 'do_legend': True }
 
 
