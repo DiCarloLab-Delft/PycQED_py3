@@ -2097,18 +2097,11 @@ def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
     return f_q_01, f_r1, f_r2, f_q_12, f_disp_r1, f_disp_r2, f_nrsplt_r1, f_nrsplt_r2
 
 
-<<<<<<< Updated upstream
-def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR,
-                                             g_RR_PF, g_trm_bus,
-                                             dim=None, ng=0, f_01=None,
-                                             f_12=None):
-    """
-=======
+
 def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR, g_RR_PF, g_trm_bus,
                                    dim=None, ng=0):
-    '''
->>>>>>> Stashed changes
-    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    """
+    Calculates transmon and resonator energy levels and resonator from the full Hamiltonian.
     """
 
     # calculate the bare transmon transitions, hardcoded to three levels only
