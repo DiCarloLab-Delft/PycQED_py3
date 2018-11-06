@@ -1540,8 +1540,6 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
 
 class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
     """
-    DO NOT USE THIS CLASS, IT IS STILL IN DEVELOPMENT (2018.10.26)
-
     Analyses the photonnumber in the RO based on the
     readout_photons_in_resonator function
 
@@ -1660,32 +1658,45 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
     def run_fitting(self):
         print_fit_results = self.params_dict.pop('print_fit_results',False)
 
-        exp_dec_mod = lmfit.Model(fit_mods.ExpDecayFunc)
-        exp_dec_mod.set_param_hint('n',
-                                   value=1,
-                                   vary=True)
-        exp_dec_mod.set_param_hint('offset',
-                                   value=0,
-                                   min=0,
-                                   vary=True)
-        exp_dec_mod.set_param_hint('tau',
-                                   value=self.proc_data_dict['delay_to_relax'][-1],
-                                   min=1e-11,
-                                   vary=True)
-        exp_dec_mod.set_param_hint('amplitude',
-                                   value=1,
-                                   min=0,
-                                   vary=True)
-        params = exp_dec_mod.make_params()
-        self.fit_res = OrderedDict()
-        self.fit_res['ground_state'] = exp_dec_mod.fit(
-                                data=self.proc_data_dict['photon_number'][0],
-                                params=params,
-                                t=self.proc_data_dict['delay_to_relax'])
-        self.fit_res['excited_state'] = exp_dec_mod.fit(
-                                data=self.proc_data_dict['photon_number'][1],
-                                params=params,
-                                t=self.proc_data_dict['delay_to_relax'])
+        for n in [1,2]:
+            exp_dec_mod = lmfit.Model(fit_mods.ExpDecayFunc)
+            exp_dec_mod.set_param_hint('n',
+                                       value=n,
+                                       vary=False)
+            exp_dec_mod.set_param_hint('offset',
+                                       value=0,
+                                       min=0,
+                                       vary=True)
+            exp_dec_mod.set_param_hint('tau',
+                                       value=self.proc_data_dict['delay_to_relax'][-1],
+                                       min=1e-11,
+                                       vary=True)
+            exp_dec_mod.set_param_hint('amplitude',
+                                       value=1,
+                                       min=0,
+                                       vary=True)
+            params = exp_dec_mod.make_params()
+            self.fit_res = OrderedDict()
+            self.fit_res['ground_state_'+str(n)] = exp_dec_mod.fit(
+                                    data=self.proc_data_dict['photon_number'][0],
+                                    params=params,
+                                    t=self.proc_data_dict['delay_to_relax'])
+            self.fit_res['excited_state_'+str(n)] = exp_dec_mod.fit(
+                                    data=self.proc_data_dict['photon_number'][1],
+                                    params=params,
+                                    t=self.proc_data_dict['delay_to_relax'])
+        if (self.fit_res['ground_state_1'].chisqr <
+                self.fit_res['ground_state_2'].chisqr):
+            self.fit_res['ground_state'] = self.fit_res['ground_state_1'].chisqr
+        else:
+            self.fit_res['ground_state'] = self.fit_res['ground_state_2'].chisqr
+
+        if (self.fit_res['excited_state_1'].chisqr <
+                self.fit_res['excited_state_2'].chisqr):
+            self.fit_res['excited_state'] = self.fit_res['excited_state_1'].chisqr
+        else:
+            self.fit_res['excited_state'] = self.fit_res['excited_state_2'].chisqr
+
         if print_fit_results:
             print(self.fit_res['ground_state'].fit_report())
             print(self.fit_res['excited_state'].fit_report())
@@ -1816,7 +1827,8 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
             self.prepare_ramsey_plots()
 
     def prepare_2D_sweep_plot(self):
-        self.plot_dicts['off_full_data'] = {
+        shape = self.options_dict.get['shape','']
+        self.plot_dicts['off_full_data_'+str(shape)] = {
             'title': 'Raw data |g>',
             'plotfn': self.plot_colorxy,
             'xvals': self.proc_data_dict['ramsey_times'],
@@ -1827,7 +1839,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
             'yunit': 's',
             'zvals': np.array(self.proc_data_dict['qubit_state'][0]) }
 
-        self.plot_dicts['on_full_data'] = {
+        self.plot_dicts['on_full_data_'+str(shape)] = {
             'title': 'Raw data |e>',
             'plotfn': self.plot_colorxy,
             'xvals': self.proc_data_dict['ramsey_times'],
@@ -1950,12 +1962,11 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
         minmax_data[0] -= minmax_data[0]/5
         minmax_data[1] += minmax_data[1]/5
 
-        self.proc_data_dict['photon_number'][1],
-
+        shape = self.options_dict.get['shape','']
         self.fit_res['excited_state'].eval(
             self.fit_res['excited_state'].params,
             t=x_fit)
-        self.plot_dicts['Photon number count'] = {
+        self.plot_dicts['Photon number count_'+str(shape)] = {
             'plotfn': self.plot_line,
             'xlabel': 'Delay after first RO-pulse',
             'ax_id': 'Photon number count ',

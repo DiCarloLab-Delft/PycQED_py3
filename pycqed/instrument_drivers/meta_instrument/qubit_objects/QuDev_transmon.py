@@ -55,6 +55,16 @@ class QuDev_transmon(Qubit):
         self.add_parameter('f_RO_resonator', label='RO resonator frequency',
                            unit='Hz', initial_value=0,
                            parameter_class=ManualParameter)
+        self.add_parameter('f_RO_purcell', label='RO purcell filter frequency',
+                           unit='Hz', initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_purcell_kappa', label='Purcell filter kappa',
+                           unit='Hz', initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_J_coupling', label='J coupling of RO resonator'
+                                                  'and purcell filter',
+                           unit='Hz', initial_value=0,
+                           parameter_class=ManualParameter)
         self.add_parameter('Q_RO_resonator', label='RO resonator Q factor',
                            initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('ssro_contrast', unit='arb.', initial_value=0,
@@ -3523,7 +3533,6 @@ class QuDev_transmon(Qubit):
         if not update:
             logging.info("Does not automatically update the RO resonator "
                          "parameters. Set update=True if you want this!")
-
         if freqs is None:
             if self.f_RO() is not None:
                 f_span = kw.pop('f_span', 20e6)
@@ -3534,7 +3543,6 @@ class QuDev_transmon(Qubit):
             else:
                 raise ValueError("Unspecified frequencies for find_resonator_"
                                  "frequency and no previous value exists")
-
         if np.any(freqs < 500e6):
             logging.warning('Some of the values in the freqs array might be '
                             'too small. The units should be Hz.')
@@ -3549,33 +3557,38 @@ class QuDev_transmon(Qubit):
         cdatoff = MAoff.measured_values[0] * \
                   np.exp(1j * np.pi * MAoff.measured_values[1] / 180)
         fmax = freqs[np.argmax(np.abs(cdaton - cdatoff))]
-        if update:
-            self.f_RO(fmax)
-        if kw.pop('plot', True):
-            plt.plot(freqs / 1e9, np.abs(cdatoff),
-                     label='qubit in $|g\\rangle$')
-            plt.plot(freqs / 1e9, np.abs(cdaton),
-                     label='qubit in $|e\\rangle$')
-            plt.plot(freqs / 1e9, np.abs(cdaton - cdatoff),
-                     label='difference')
-            plt.vlines(fmax / 1e9, 0,
-                       max(np.abs(cdatoff).max(), np.abs(cdaton).max()),
-                       label='$\\nu_{{RO}} = {:.4f}$ GHz'.format(fmax / 1e9))
-            plt.xlabel(r'Frequency, $f$ (GHz)')
-            plt.ylabel(r'Transmission amplitude, $|S_{21}|$ (arb.)')
-            plt.title(r'{} $\chi$ shift. {} and {}'.format(
-                self.name, MAon.timestamp_string, MAoff.timestamp_string))
-            plt.legend()
-            MAoff.save_fig(plt.gcf(), 'chishift', ylabel='trans-amp')
-        if kw.pop('analyze', True):
+
+        if kw.get('analyze', True):
             SA = sa.ResonatorSpectroscopy(t_start=[MAoff.timestamp_string,
-                      MAon.timestamp_string], do_fitting=True,
-                      options_dict={'simultan': True,'scan_label':'',
-                       'fit_options': dict(model='hanger_with_pf')})
-        if kw.pop('update', True):
-            self.chi(SA.chi)
-            self.f_RO(SA.f_RO)
-        return fmax
+                                                   MAon.timestamp_string],
+                                          options_dict=dict(simultan=True,
+                                                            fit_options = dict(
+                                                            model='hanger_with_pf'),
+                                                            scan_label=''),
+                                          do_fitting=True)
+            if update:
+                self.f_RO = SA.f_RO
+                self.chi = SA.chi
+                self.f_RO_resonator = SA.f_RO_resonator
+                self.f_RO_purcell = SA.f_PF
+                self.RO_purcell_kappa = SA.kappa
+                self.RO_J_coupling = SA.J_
+                if kw.pop('get_CLEAR_params', False):
+                    if self.ro_CLEAR_segment_length is None:
+                        self.ro_CLEAR_segment_length = self.RO_pulse_length/10
+                    if kw.get('max_amp_difference', False) :
+                        '''this gives the ratio of the maximal hight for'''
+                        '''the segments to the base amplitude'''
+                        max_diff = kw.pop('max_amp_difference')
+                    else:
+                        max_diff = 3
+                    self.ro_CLEAR_delta_amp_segment = sim_CLEAR.get_CLEAR_amplitudes(
+                        self.f_RO_purcell, self.f_RO_resonator,self.f_RO,
+                        self.RO_purcell_kappa, self.RO_J_coupling, self.chi, 1,
+                        self.RO_pulse_length,
+                        length_segments=self.ro_CLEAR_segment_length,
+                        sigma=self.ro_pulse_filter_sigma,
+                        max_amp_diff=max_diff) * self.RO_amp
 
 
     def measure_dispersive_shift(self, freqs, MC=None, analyze=True, **kw):
