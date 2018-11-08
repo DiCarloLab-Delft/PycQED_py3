@@ -1000,7 +1000,9 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ):
                                 'T2_scaling': noise_parameters_CZ.T2_scaling(),
                                 'look_for_minimum': noise_parameters_CZ.look_for_minimum(),
                                 'n_sampling_gaussian_vec': noise_parameters_CZ.n_sampling_gaussian_vec(),
-                                'cluster': noise_parameters_CZ.cluster()}
+                                'cluster': noise_parameters_CZ.cluster(),
+                                'detuning': noise_parameters_CZ.detuning(),
+                                'initial_state': noise_parameters_CZ.initial_state()}
 
     return fluxlutman_args, noise_parameters_CZ_args
 
@@ -1037,8 +1039,83 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     noise_parameters_CZ.look_for_minimum(noise_parameters_CZ_args['look_for_minimum'])
     noise_parameters_CZ.n_sampling_gaussian_vec(noise_parameters_CZ_args['n_sampling_gaussian_vec'])
     noise_parameters_CZ.cluster(noise_parameters_CZ_args['cluster'])
+    noise_parameters_CZ.detuning(noise_parameters_CZ_args['detuning'])
+    noise_parameters_CZ.initial_state(noise_parameters_CZ_args['initial_state'])
 
     return fluxlutman, noise_parameters_CZ
+
+
+def plot_spectrum(fluxlutman,noise_parameters_CZ):
+    eig_vec=[]
+    amp_vec=np.arange(.4,.5,.01)
+    for amp in amp_vec:
+        H=calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
+        eigs=H.eigenenergies()
+        eig_vec.append(eigs)
+    eig_vec=np.array(eig_vec)/1e9/(2*np.pi)
+    eig_plot=[]
+    for j in range(len(eig_vec[0])):
+        eig_plot.append(eig_vec[:,j])
+    plot(x_plot_vec=[amp_vec],
+                          y_plot_vec=eig_plot,
+                          title='Spectrum',
+                          xlabel='Amplitude (V)',ylabel='Frequency (GHz)')
+
+
+
+
+
+## functions for Ramsey/Rabi simulations
+
+def calc_populations_new(rho_out,population_states):
+
+    populations = {'population_02': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[0]))).data[0,0]),
+                   'population_11': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[1]))).data[0,0])}
+
+    return populations
+
+
+def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ):
+
+    if initial_state == '11_dressed':
+        freq = fluxlutman.q_freq_01() + noise_parameters_CZ.detuning()
+        amp = fluxlutman.calc_freq_to_amp(freq)
+        H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
+        eigs,eigvectors = H.eigenstates()
+        psi_in = eigvectors[4]
+
+        population_states = [eigvectors[5],eigvectors[4]]
+
+    elif initial_state == '11_bare':
+        amp = 0
+        H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
+        eigs,eigvectors = H.eigenstates()
+        psi_in = eigvectors[4]
+
+        population_states = [eigvectors[5],eigvectors[4]]
+
+    else:
+        print('invalid keyword for initial state')
+
+    rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
+    rho_out = U * rho_in
+    populations = calc_populations_new(rho_out,population_states)
+    return populations
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

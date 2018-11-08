@@ -27,8 +27,8 @@ class NoiseParametersCZ(Instrument):
                            label='T2 static qubit',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
-        self.add_parameter('T2_q0_amplitude_dependent', unit='Hz, a.u., s',
-                           label='fitcoefficients giving T2echo_q0 as a function of frequency_q0: gc, amp, tau. Function is gc+gc*amp*np.exp(-x/tau)',
+        self.add_parameter('T2_q0_amplitude_dependent',
+                           label='fitcoefficients giving T2_q0 or Tphi_q0 as a function of inverse sensitivity (in units of w_q0/Phi_0): a, b. Function is ax+b',
                            parameter_class=ManualParameter,
                            vals=vals.Arrays())   # , initial_value=np.array([-1,-1,-1])
         # for flux noise simulations
@@ -89,6 +89,18 @@ class NoiseParametersCZ(Instrument):
                            label='scaling factor for T2_q0_amplitude_dependent',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+
+
+        # for ramsey/Rabi simulations
+
+        self.add_parameter('detuning', unit='Hz',
+                           label='detuning of w_q0 from its sweet spot value',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('initial_state',
+                           label='determines initial state for ramsey_simulations_new',
+                           parameter_class=ManualParameter,
+                           vals=vals.Strings(), initial_value='changeme')
 
 
         
