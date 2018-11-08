@@ -23,13 +23,13 @@ import importlib
 import math
 from time import time
 
-# try:
-#     import pygsti
-# except ImportError as e:
-#     if str(e).find('pygsti') >= 0:
-#         logging.warning('Could not import pygsti')
-#     else:
-#         raise
+try:
+    import pygsti
+except ImportError as e:
+    if str(e).find('pygsti') >= 0:
+        logging.warning('Could not import pygsti')
+    else:
+        raise
 
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
@@ -699,6 +699,7 @@ class MeasurementAnalysis(object):
         self.plot_title = kw.get('plot_title',
                                  self.measurementstring + '\n' +
                                  self.timestamp_string)
+
         plot_the_title = kw.get('plot_the_title', True)
 
         # ax.set_title(self.plot_title)

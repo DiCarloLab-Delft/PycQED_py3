@@ -1389,9 +1389,9 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             'colormap': cmap,
             'bar_widthx': 0.5,
             'bar_widthy': 0.5,
-            'xtick_loc': np.arange(d),
+            'xtick_loc': np.arange(d)-0.25,
             'xtick_labels': xtick_labels,
-            'ytick_loc': np.arange(d),
+            'ytick_loc': np.arange(d)+0.25,
             'ytick_labels': ytick_labels,
             'ctick_loc': np.linspace(0, 1, 5),
             'ctick_labels': ['$0$', r'$\frac{1}{2}\pi$', r'$\pi$',
@@ -1482,7 +1482,8 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             'xtick_labels': np.array(labels)[order],
             'bar_kws': dict(zorder=10),
             'setlabel': 'Fit to experiment',
-            'do_legend': True
+            'do_legend': True,
+            'xtick_rotation': 90
         }
 
         rho_target = self.raw_data_dict['exp_metadata'].get('rho_target', None)
