@@ -1,11 +1,11 @@
 from __future__ import print_function
 
+import re
 import h5py
 import numpy as np
 from ..waveform_control import element
 from ..waveform_control import pulse
 from ..waveform_control import sequence
-# from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 from importlib import reload
@@ -64,20 +64,20 @@ def create_experiment_list_pyGSTi(filename):
     sequence is also a nested list, []
 
     """
-    import re
     experiments = open(filename)
     sequences = experiments.read().split("\n")
     experimentlist = []
     for i in range(len(sequences)):
         clean_seq = sequences[i].strip()
         gateseq = []
-        if "{}" in clean_seq:   # special case (no fiducials &no germs)
+        if "{}" in clean_seq or clean_seq=='':   # special case (no fiducials &no germs)
             gateseq.insert(0, "RO")
             experimentlist.append(gateseq)
         if "(" in clean_seq:
             fiducial = []
             germs = []
             measfiducial = []
+
             if "^" in clean_seq:
                 power = int(re.findall("\d+", clean_seq)[0])
                 result = re.split("[(]|\)\^\d", clean_seq)
@@ -108,6 +108,7 @@ def create_experiment_list_pyGSTi(filename):
                         measfiducial.append("X90")
                     elif regsplit3[i] == "Gy":
                         measfiducial.append("Y90")
+
             else:
                 power = 1
                 result = re.split("[()]", clean_seq)
@@ -138,6 +139,7 @@ def create_experiment_list_pyGSTi(filename):
                         measfiducial.append("X90")
                     elif regsplit3[i] == "Gy":
                         measfiducial.append("Y90")
+
             if len(fiducial) != 0:
                 gateseq.append(fiducial)
             if len(germs) != 0:
@@ -161,9 +163,12 @@ def create_experiment_list_pyGSTi(filename):
             gateseq.append(["RO"])
             gateseq = list(flatten_list(gateseq))
             experimentlist.append(gateseq)
+
     if len(experimentlist) < (len(sequences)-2):
-        print("Lenght list of experiments too short, probably something wrong")
+        print("Lenght list of experiments too short, "
+              "probably something wrong")
     experiments.close()
+
     return experimentlist
 
 
@@ -512,19 +517,26 @@ def write_experiment_runs_to_text_files(starttime,endtime,maxlength,filename_gat
                                       number_of_gateseq, zero_one_inverted='automatic')
 
 
-def write_experiment_runs_to_text_files_conv_vs_restless(starttime,endtime,maxlength,filename_gateseq,number_of_gateseq):
+def write_experiment_runs_to_text_files_conv_vs_restless(starttime, endtime,
+                                                         maxlength,
+                                                         filename_gateseq,
+                                                         number_of_gateseq):
 
     """
     Function for writing experiment runs to text files. At the moment only
-    works for an experiment which is repeated for same parameters several times in time. It also assumes that one starts with conventional tuning, then restless etc. It's specialised for only experiment and is more of a One-fit.
-    ----------------------------------------------------------------------------------------
+    works for an experiment which is repeated for same parameters several times
+    in time. It also assumes that one starts with conventional tuning, then
+    restless etc. It's specialised for only experiment and is more of a One-fit.
+    ----------------------------------------------------------------------------
     Parameters:
 
     starttime:string
-    Formatted in the standard form as used in PycQED_py3, in the form of e.g. 20160614_000000.
+    Formatted in the standard form as used in PycQED_py3, in the form of
+    e.g. 20160614_000000.
 
     endtime:string
-    Formatted in the standard form as used in PycQED_py3, in the form of e.g.20160615_235959
+    Formatted in the standard form as used in PycQED_py3, in the form of
+    e.g.20160615_235959
 
     maxlength: integer
     Maximum length of germ power sequence
@@ -542,11 +554,14 @@ def write_experiment_runs_to_text_files_conv_vs_restless(starttime,endtime,maxle
     from importlib import reload
     import h5py
     reload(_gst)
-    experiment_timestamp_strings = a_tools.get_timestamps_in_range(starttime, endtime, label = 'GST')
+    experiment_timestamp_strings = a_tools.get_timestamps_in_range(starttime,
+                                                                   endtime,
+                                                                   label='GST')
     file_path_names = []
 
     for i in range(len(experiment_timestamp_strings)):
-        file_path_names.append(a_tools.data_from_time(experiment_timestamp_strings[i]))
+        file_path_names.append(a_tools.data_from_time(
+            experiment_timestamp_strings[i]))
     file_path_names_conventional = file_path_names[0::2]
     file_path_names_restless = file_path_names[1::2]
 
@@ -554,16 +569,121 @@ def write_experiment_runs_to_text_files_conv_vs_restless(starttime,endtime,maxle
         fn = file_path_names_conventional[i]
         suffix = fn[len(a_tools.datadir)+10:]
         filename_input = file_path_names_conventional[i]+'\\'+suffix+'.hdf5'
-        filename_output = 'GST_data_paper_L%s_conv_%s_run%s_17june' %(maxlength,suffix, i) +'.txt'
+        filename_output = 'GST_data_paper_L%s_conv_%s_run%s_17june' %(
+            maxlength,suffix, i) +'.txt'
         _gst.write_textfile_data_for_GST_input_adapt_develop(filename_input,
                                        filename_output,filename_gateseq,
-                                      number_of_gateseq,zero_one_inverted = 'automatic')
+                                       number_of_gateseq,
+                                       zero_one_inverted='automatic')
 
     for i in range(len(file_path_names_restless)):
         fn = file_path_names_restless[i]
         suffix = fn[len(a_tools.datadir)+10:]
         filename_input = file_path_names_restless[i]+'\\'+suffix+'.hdf5'
-        filename_output = 'GST_data_paper_L%s_rest_%s_run%s_17june' %(maxlength,suffix, i) +'.txt'
+        filename_output = 'GST_data_paper_L%s_rest_%s_run%s_17june' %(
+            maxlength,suffix, i) +'.txt'
         _gst.write_textfile_data_for_GST_input_adapt_develop(filename_input,
                                        filename_output,filename_gateseq,
-                                      number_of_gateseq,zero_one_inverted = 'automatic')
+                                       number_of_gateseq,
+                                       zero_one_inverted='automatic')
+
+
+def create_experiment_list_pyGSTi_qudev(filename, pygstiGateList=None):
+    """
+    Extracting list of experiments from .txt file
+
+    Parameters:
+
+    filename: string
+        Name of the .txt file. File must be formatted in the way as done by
+        pyGSTi.
+        One gatesequence per line, formatted as e.g.:Gx(Gy)^2Gx.
+
+    Returns:
+
+    Nested list containing all gate sequences for experiment. Every gate
+    sequence is also a nested list, []
+
+    """
+    if pygstiGateList is None:
+        experiments = open(filename)
+        sequences = experiments.read().split("\n")
+    else:
+        sequences = pygstiGateList
+    experimentlist = []
+    for i in range(len(sequences)):
+        clean_seq = sequences[i].strip()
+        gateseq = []
+
+        if "{}" in clean_seq or clean_seq == '':
+            gateseq.insert(0, "RO")
+            experimentlist.append(gateseq)
+
+        if "(" in clean_seq:
+            prepfiducial = []
+            germs = []
+            measfiducial = []
+
+            if "^" in clean_seq:
+                power = int(re.findall("\d+", clean_seq)[0])
+                result = re.split("[(]|\)\^\d", clean_seq)
+            else:
+                power = 1
+                result = re.split("[()]", clean_seq)
+
+            append_pycqed_gate(result[0], prepfiducial)
+            append_pycqed_gate(result[1], germs)
+            append_pycqed_gate(result[2], measfiducial)
+
+            if len(prepfiducial) != 0:
+                gateseq.append(prepfiducial)
+            if len(germs) != 0:
+                gateseq.append(germs*power)
+            if len(measfiducial) != 0:
+                gateseq.append(measfiducial)
+
+            gateseq.append(["RO"])
+            gateseq = list(flatten_list(gateseq))
+            experimentlist.append(gateseq)
+        elif ("Gi" in clean_seq) or ("Gx" in clean_seq) or ("Gy" in clean_seq) \
+                or ("Gcphase" in clean_seq):
+            loopseq = []
+            append_pycqed_gate(clean_seq, loopseq)
+
+            gateseq.append(loopseq)
+            gateseq.append(["RO"])
+            gateseq = list(flatten_list(gateseq))
+            experimentlist.append(gateseq)
+
+    if pygstiGateList is None:
+        print(len(experimentlist))
+        print(len(sequences))
+        if len(experimentlist) < (len(sequences)-2):
+            print("Lenght list of experiments too short, "
+                  "probably something wrong")
+        experiments.close()
+    else:
+        if len(experimentlist) != len(sequences):
+            print(len(experimentlist))
+            print(len(sequences))
+            print("Lenght list of experiments too short, "
+                  "probably something wrong")
+
+    return experimentlist
+
+
+def append_pycqed_gate(pygsti_gate_str, gate_list):
+
+    regsplit = re.findall("G[xyic]", pygsti_gate_str)
+    for i in range(len(regsplit)):
+        if regsplit[i] == "Gi":
+            gate_list.append("I")
+        elif regsplit[i] == "Gx":
+            gate_list.append("X90")
+        elif regsplit[i] == "Gy":
+            gate_list.append("Y90")
+        elif regsplit[i] == "Gc":
+            gate_list.append("CZ")
+        else:
+            raise ValueError('Unknown pygsti gate type "{}"'.format(
+                pygsti_gate_str))

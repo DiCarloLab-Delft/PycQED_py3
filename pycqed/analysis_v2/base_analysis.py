@@ -712,6 +712,8 @@ class BaseDataAnalysis(object):
         plot_yunit = pdict.get('yunit', None)
         plot_xtick_loc = pdict.get('xtick_loc', None)
         plot_ytick_loc = pdict.get('ytick_loc', None)
+        plot_xtick_rotation = pdict.get('xtick_rotation', None)
+        plot_ytick_rotation = pdict.get('ytick_rotation', None)
         plot_xtick_labels = pdict.get('xtick_labels', None)
         plot_ytick_labels = pdict.get('ytick_labels', None)
         plot_title = pdict.get('title', None)
@@ -753,6 +755,12 @@ class BaseDataAnalysis(object):
             axs.xaxis.set_ticks(plot_xtick_loc)
         if plot_ytick_loc is not None:
             axs.yaxis.set_ticks(plot_ytick_loc)
+        if plot_xtick_rotation is not None:
+            for tick in axs.get_xticklabels():
+                tick.set_rotation(plot_xtick_rotation)
+        if plot_ytick_rotation is not None:
+            for tick in axs.get_yticklabels():
+                tick.set_rotation(plot_ytick_rotation)
 
         if plot_title is not None:
             axs.set_title(plot_title)
@@ -791,6 +799,8 @@ class BaseDataAnalysis(object):
         plot_barkws = pdict.get('bar_kws', {})
         plot_barwidthx = pdict.get('bar_widthx', None)
         plot_barwidthy = pdict.get('bar_widthy', None)
+        plot_xtick_rotation = pdict.get('xtick_rotation', None)
+        plot_ytick_rotation = pdict.get('ytick_rotation', None)
         plot_xtick_loc = pdict.get('xtick_loc', None)
         plot_ytick_loc = pdict.get('ytick_loc', None)
         plot_xtick_labels = pdict.get('xtick_labels', None)
@@ -841,6 +851,12 @@ class BaseDataAnalysis(object):
             axs.xaxis.set_ticks(plot_xtick_loc)
         if plot_ytick_loc is not None:
             axs.yaxis.set_ticks(plot_ytick_loc)
+        if plot_xtick_rotation is not None:
+            for tick in axs.get_xticklabels():
+                tick.set_rotation(plot_xtick_rotation)
+        if plot_ytick_rotation is not None:
+            for tick in axs.get_yticklabels():
+                tick.set_rotation(plot_ytick_rotation)
 
         if plot_xrange is not None:
             axs.set_xlim(*plot_xrange)
