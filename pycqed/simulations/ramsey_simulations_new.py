@@ -135,7 +135,7 @@ def compute_propagator(arglist):
     U_final = czf.time_evolution_new(c_ops=c_ops, noise_parameters_CZ=noise_parameters_CZ, 
                                  fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new)
     #print(czf.verify_CPTP(U_superop_average))
-    U_final = czf.rotating_frame_transformation_propagator_new(U=U_final, t=t_final, H=czf.calc_hamiltonian(amp_final[0],fluxlutman,noise_parameters_CZ))
+    U_final = czf.rotating_frame_transformation_propagator_new(U=U_final, t=t_final, H=czf.calc_hamiltonian(amp[0],fluxlutman,noise_parameters_CZ))
 
     return [U_final, t_final]
 
