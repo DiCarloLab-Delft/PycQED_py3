@@ -413,7 +413,12 @@ def idle_error_rate_seq(nr_of_idle_gates,
             p.add_kernel(k)
         sweep_points.append(N)
 
-    p.set_sweep_points(sweep_points, num_sweep_points=len(sweep_points))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(sweep_points)
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(sweep_points, num_sweep_points=len(sweep_points))
     p.sweep_points = sweep_points
     p = oqh.compile(p)
     return p
@@ -859,5 +864,10 @@ def ef_rabi_seq(q0: int,
         cal_pts_idx = []
 
     p.sweep_points = np.concatenate([amps, cal_pts_idx])
-    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(p.sweep_points)
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
