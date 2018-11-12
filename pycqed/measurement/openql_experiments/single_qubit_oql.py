@@ -184,7 +184,12 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
              ['ry90', 'ry90']]
 
     # this should be implicit
-    p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(np.arange(len(allXY), dtype=float))
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
 
     for i, xy in enumerate(allXY):
         if double_points:
