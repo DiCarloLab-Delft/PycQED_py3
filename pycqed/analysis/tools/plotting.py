@@ -358,7 +358,7 @@ def set_axeslabel_color(ax, color):
 
     This is useful when e.g., making a presentation on a dark background
     '''
-    ax.tick_params(color=color)
+    ax.tick_params(color=color, which='both')  # both major and minor ticks
     plt.setp(ax.get_xticklabels(), color=color)
     plt.setp(ax.get_yticklabels(), color=color)
     plt.setp(ax.yaxis.get_label(), color=color)
