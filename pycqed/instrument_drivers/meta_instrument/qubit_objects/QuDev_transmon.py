@@ -150,7 +150,7 @@ class QuDev_transmon(Qubit):
         self.add_parameter('RO_acq_shots', initial_value=4094,
                            docstring='Number of single shot measurements to do'
                                      'in single shot experiments.',
-                           vals=vals.Ints(0, 4095),
+                           vals=vals.Ints(0, 1048576),
                            parameter_class=ManualParameter)
 
         self.add_parameter('RO_IQ_angle', initial_value=0,
@@ -225,7 +225,7 @@ class QuDev_transmon(Qubit):
                            docstring='Length of the ring up and ring down'
                                      'segments of the CLEAR pulse.',
                            label='CLEAR-segment length',
-                           vals=vals.Numbers(),
+                           vals=vals.Lists(vals.Numbers()),
                            parameter_class=ManualParameter)
         # add pulsed spectroscopy pulse parameters
         self.add_operation('Spec')
@@ -1546,6 +1546,8 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        name_extra = kw.get('name_extra', None)
+
         self.prepare_for_timedomain()
         npoints = self.inp_avg_det.nr_samples
         if 'off' in cases:
@@ -1557,7 +1559,10 @@ class QuDev_transmon(Qubit):
             MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
                                             endpoint=False))
             MC.set_detector_function(self.inp_avg_det)
-            MC.run(name='timetrace_off' + self.msmt_suffix)
+            if name_extra is not None:
+                MC.run(name='timetrace_off_' + name_extra + self.msmt_suffix)
+            else:
+                MC.run(name='timetrace_off' + self.msmt_suffix)
             if analyze:
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
@@ -1570,7 +1575,10 @@ class QuDev_transmon(Qubit):
             MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
                                             endpoint=False))
             MC.set_detector_function(self.inp_avg_det)
-            MC.run(name='timetrace_on' + self.msmt_suffix)
+            if name_extra is not None:
+                MC.run(name='timetrace_on_' + name_extra + self.msmt_suffix)
+            else:
+                MC.run(name='timetrace_on' + self.msmt_suffix)
             if analyze:
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
@@ -2124,10 +2132,20 @@ class QuDev_transmon(Qubit):
 
     def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
+        # I agree (Christian, 07.11.2018 -- around 1 year later)
         if measure:
             self.measure_transients(MC, analyze=True, **kw)
-        MAon = ma.MeasurementAnalysis(label='timetrace_on_'+self.name)
-        MAoff = ma.MeasurementAnalysis(label='timetrace_off_'+self.name)
+
+        name_extra = kw.get('name_extra', None)
+
+        if name_extra is not None:
+            MAon = ma.MeasurementAnalysis(label='timetrace_on_' + name_extra
+                                                + '_' +self.name)
+            MAoff = ma.MeasurementAnalysis(label='timetrace_off_' + name_extra
+                                                 + '_' +self.name)
+        else:
+            MAon = ma.MeasurementAnalysis(label='timetrace_on_'+self.name)
+            MAoff = ma.MeasurementAnalysis(label='timetrace_off_'+self.name)
         don = MAon.measured_values[0] + 1j * MAon.measured_values[1]
         doff = MAoff.measured_values[0] + 1j * MAoff.measured_values[1]
         if update:
@@ -2171,7 +2189,8 @@ class QuDev_transmon(Qubit):
 
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
                            no_fits=False, upload=True, preselection_pulse=True,
-                           thresholded=False, RO_comm=3/225e6, RO_slack=150e-9):
+                           thresholded=False, RO_comm=3/225e6, RO_slack=150e-9,
+                           RO_shots=50000):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -2208,7 +2227,11 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         label = 'SSRO_fidelity'
+        if thresholded:
+            label += '_thresh'
+
         prev_shots = self.RO_acq_shots()
+        self.RO_acq_shots(RO_shots)
         if preselection_pulse:
             self.RO_acq_shots(4*(self.RO_acq_shots()//4))
         else:
@@ -3567,12 +3590,12 @@ class QuDev_transmon(Qubit):
                                                             scan_label=''),
                                           do_fitting=True)
             if update:
-                self.f_RO = SA.f_RO
-                self.chi = SA.chi
-                self.f_RO_resonator = SA.f_RO_resonator
-                self.f_RO_purcell = SA.f_PF
-                self.RO_purcell_kappa = SA.kappa
-                self.RO_J_coupling = SA.J_
+                self.f_RO(SA.f_RO)
+                self.chi(SA.chi)
+                self.f_RO_resonator(SA.f_RO_res)
+                self.f_RO_purcell(SA.f_PF)
+                self.RO_purcell_kappa(SA.kappa)
+                self.RO_J_coupling(SA.J_)
                 if kw.pop('get_CLEAR_params', False):
                     if self.ro_CLEAR_segment_length is None:
                         self.ro_CLEAR_segment_length = self.RO_pulse_length/10

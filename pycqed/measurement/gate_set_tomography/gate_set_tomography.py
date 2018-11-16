@@ -7,44 +7,44 @@ from ..waveform_control import element
 from ..waveform_control import pulse
 from ..waveform_control import sequence
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
-from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
+# from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 from importlib import reload
 reload(pulse)
 from ..waveform_control import pulse_library
 reload(pulse_library)
 station = None
 reload(element)
-
-def GST_from_textfile(pulse_pars, RO_pars, filename,
-                      upload=True, seq_name=None,
-                      verbose=False):
-    '''
-    Input pars:
-        pulse_pars:     dict containing the pulse parameters
-        RO_pars:        dict containing the RO parameters
-        filename:       name of a pygsti generated text file
-        upload:         upload to AWG or not, if returns seq, el_list
-    '''
-    if seq_name is None:
-        seq_name = 'GST_seq'
-    seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
-    el_list = []
-    # Create a dict with the parameters for all the pulses
-    pulse_dict = get_pulse_dict_from_pars(pulse_pars)
-    pulse_dict['RO'] = RO_pars
-    pulse_combinations = create_experiment_list_pyGSTi_general(filename)
-    for i, pulse_comb in enumerate(pulse_combinations):
-        pulse_list = []
-        for pulse_key in pulse_comb:
-            pulse_list += [pulse_dict[pulse_key]]
-        el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-
-    if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-    return seq, el_list
+#
+# def GST_from_textfile(pulse_pars, RO_pars, filename,
+#                       upload=True, seq_name=None,
+#                       verbose=False):
+#     '''
+#     Input pars:
+#         pulse_pars:     dict containing the pulse parameters
+#         RO_pars:        dict containing the RO parameters
+#         filename:       name of a pygsti generated text file
+#         upload:         upload to AWG or not, if returns seq, el_list
+#     '''
+#     if seq_name is None:
+#         seq_name = 'GST_seq'
+#     seq = sequence.Sequence(seq_name)
+#     station.pulsar.update_channel_settings()
+#     el_list = []
+#     # Create a dict with the parameters for all the pulses
+#     pulse_dict = get_pulse_dict_from_pars(pulse_pars)
+#     pulse_dict['RO'] = RO_pars
+#     pulse_combinations = create_experiment_list_pyGSTi_general(filename)
+#     for i, pulse_comb in enumerate(pulse_combinations):
+#         pulse_list = []
+#         for pulse_key in pulse_comb:
+#             pulse_list += [pulse_dict[pulse_key]]
+#         el = multi_pulse_elt(i, station, pulse_list)
+#         el_list.append(el)
+#         seq.append_element(el, trigger_wait=True)
+#
+#     if upload:
+#         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+#     return seq, el_list
 
 
 def create_experiment_list_pyGSTi(filename):
@@ -588,9 +588,12 @@ def write_experiment_runs_to_text_files_conv_vs_restless(starttime, endtime,
                                        zero_one_inverted='automatic')
 
 
-def create_experiment_list_pyGSTi_qudev(filename, pygstiGateList=None):
+def create_experiment_list_pyGSTi_qudev(filename, qb_names=[''],
+                                        pygstiGateList=None):
     """
     Extracting list of experiments from .txt file
+    !!!! For 2 qbs, this function assumes qb_names[0] is the control qb and
+    qb_names[1] is the target. !!!
 
     Parameters:
 
@@ -610,13 +613,20 @@ def create_experiment_list_pyGSTi_qudev(filename, pygstiGateList=None):
         sequences = experiments.read().split("\n")
     else:
         sequences = pygstiGateList
+
+    if len(qb_names) == 1:
+        RO_str = "RO " + qb_names[0]
+    else:
+        RO_str = "RO mux"
+
     experimentlist = []
     for i in range(len(sequences)):
+
         clean_seq = sequences[i].strip()
         gateseq = []
 
         if "{}" in clean_seq or clean_seq == '':
-            gateseq.insert(0, "RO")
+            gateseq.insert(0, RO_str)
             experimentlist.append(gateseq)
 
         if "(" in clean_seq:
@@ -631,9 +641,9 @@ def create_experiment_list_pyGSTi_qudev(filename, pygstiGateList=None):
                 power = 1
                 result = re.split("[()]", clean_seq)
 
-            append_pycqed_gate(result[0], prepfiducial)
-            append_pycqed_gate(result[1], germs)
-            append_pycqed_gate(result[2], measfiducial)
+            append_pycqed_gate(result[0], prepfiducial, qb_names)
+            append_pycqed_gate(result[1], germs, qb_names)
+            append_pycqed_gate(result[2], measfiducial, qb_names)
 
             if len(prepfiducial) != 0:
                 gateseq.append(prepfiducial)
@@ -642,48 +652,91 @@ def create_experiment_list_pyGSTi_qudev(filename, pygstiGateList=None):
             if len(measfiducial) != 0:
                 gateseq.append(measfiducial)
 
-            gateseq.append(["RO"])
+            gateseq.append([RO_str])
             gateseq = list(flatten_list(gateseq))
             experimentlist.append(gateseq)
         elif ("Gi" in clean_seq) or ("Gx" in clean_seq) or ("Gy" in clean_seq) \
-                or ("Gcphase" in clean_seq):
+                or ("Gz" in clean_seq) or ("Gcphase" in clean_seq):
             loopseq = []
-            append_pycqed_gate(clean_seq, loopseq)
+            append_pycqed_gate(clean_seq, loopseq, qb_names)
 
             gateseq.append(loopseq)
-            gateseq.append(["RO"])
+            gateseq.append([RO_str])
             gateseq = list(flatten_list(gateseq))
             experimentlist.append(gateseq)
 
     if pygstiGateList is None:
-        print(len(experimentlist))
-        print(len(sequences))
         if len(experimentlist) < (len(sequences)-2):
-            print("Lenght list of experiments too short, "
+            print(len(experimentlist))
+            print(len(sequences))
+            print("Length list of experiments too short, "
                   "probably something wrong")
         experiments.close()
     else:
         if len(experimentlist) != len(sequences):
             print(len(experimentlist))
             print(len(sequences))
-            print("Lenght list of experiments too short, "
+            print("Length list of experiments too short, "
                   "probably something wrong")
 
     return experimentlist
 
 
-def append_pycqed_gate(pygsti_gate_str, gate_list):
+def append_pycqed_gate(pygsti_gate_str, gate_list, qb_names=['']):
 
-    regsplit = re.findall("G[xyic]", pygsti_gate_str)
-    for i in range(len(regsplit)):
-        if regsplit[i] == "Gi":
-            gate_list.append("I")
-        elif regsplit[i] == "Gx":
-            gate_list.append("X90")
-        elif regsplit[i] == "Gy":
-            gate_list.append("Y90")
-        elif regsplit[i] == "Gc":
-            gate_list.append("CZ")
-        else:
-            raise ValueError('Unknown pygsti gate type "{}"'.format(
-                pygsti_gate_str))
+    if len(qb_names) == 1:
+        qb_name = qb_names[0]
+        regsplit = pygsti_gate_str.split('G')[1::]
+        for i in range(len(regsplit)):
+            if regsplit[i] == "i":
+                gate_list.append("I " + qb_name)
+            elif regsplit[i] == "x":
+                gate_list.append("X90 " + qb_name)
+            elif regsplit[i] == "y":
+                gate_list.append("Y90 " + qb_name)
+            elif regsplit[i] == "z":
+                gate_list.append("Z90 " + qb_name)
+            else:
+                raise ValueError('Unknown pygsti gate type "{}"'.format(
+                    pygsti_gate_str))
+
+    elif len(qb_names) == 2:
+        regsplit = pygsti_gate_str.split('G')[1::]
+        for i in range(len(regsplit)):
+            if regsplit[i] == "ii":
+                gate_list.append("I " + qb_names[0])
+                gate_list.append("Is " + qb_names[1])
+            elif regsplit[i] == "ix":
+                gate_list.append("I " + qb_names[0])
+                gate_list.append("X90s " + qb_names[1])
+            elif regsplit[i] == "iy":
+                gate_list.append("I " + qb_names[0])
+                gate_list.append("Y90s " + qb_names[1])
+            elif regsplit[i] == "iz":
+                gate_list.append("I " + qb_names[0])
+                gate_list.append("Z90s " + qb_names[1])
+            elif regsplit[i] == "xi":
+                gate_list.append("X90 " + qb_names[0])
+                gate_list.append("Is " + qb_names[1])
+            elif regsplit[i] == "yi":
+                gate_list.append("Y90 " + qb_names[0])
+                gate_list.append("Is " + qb_names[1])
+            elif regsplit[i] == "zi":
+                gate_list.append("Z90 " + qb_names[0])
+                gate_list.append("Is " + qb_names[1])
+            elif regsplit[i] == "xx":
+                gate_list.append("X90 " + qb_names[0])
+                gate_list.append("X90s " + qb_names[1])
+            elif regsplit[i] == "yy":
+                gate_list.append("Y90 " + qb_names[0])
+                gate_list.append("Y90s " + qb_names[1])
+            elif regsplit[i] == "zz":
+                gate_list.append("Z90 " + qb_names[0])
+                gate_list.append("Z90s " + qb_names[1])
+            elif regsplit[i] == "cphase":
+                gate_list.append("CZ {} {}".format(qb_names[1], qb_names[0]))
+            else:
+                raise ValueError('Unknown pygsti gate type "{}"'.format(
+                    pygsti_gate_str))
+    else:
+        raise ValueError('This functions works only up to 2 qubits.')

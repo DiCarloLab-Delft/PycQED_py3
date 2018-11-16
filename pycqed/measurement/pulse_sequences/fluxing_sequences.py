@@ -1796,8 +1796,8 @@ def Chevron_length_seq_new(lengths, flux_pulse_amp, frequency,
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    RO_pulse = operation_dict['RO ' + qbr_name]
-    CZ_pulse = operation_dict[CZ_pulse_name]
+    RO_pulse = deepcopy(operation_dict['RO ' + qbr_name])
+    CZ_pulse = deepcopy(operation_dict[CZ_pulse_name])
     max_length = np.max(lengths)
 
     CZ_pulse['amplitude'] = flux_pulse_amp
@@ -1812,6 +1812,7 @@ def Chevron_length_seq_new(lengths, flux_pulse_amp, frequency,
                        CZ_pulse['aux_channels_dict']]
         upload_channels = [CZ_pulse['channel']] + \
                           list(CZ_pulse['aux_channels_dict'])
+
 
     for i, length in enumerate(lengths):
         RO_pulse['pulse_delay'] = max_length - length
@@ -2236,21 +2237,21 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     if len(flux_params) > 2:
         frequency = flux_params[2]
 
-    RO_pulse = operation_dict['RO ' + qbr_name]
+    RO_pulse = deepcopy(operation_dict['RO ' + qbr_name])
     RO_pulse['pulse_delay'] = max_flux_length
 
-    X180_control = operation_dict['X180 ' + qbc_name]
+    X180_control = deepcopy(operation_dict['X180 ' + qbc_name])
 
-    buffer_pulse = operation_dict['flux ' + qbc_name]
+    buffer_pulse = deepcopy(operation_dict['flux ' + qbc_name])
     buffer_pulse['length'] = max_flux_length-flux_length
     buffer_pulse['amplitude'] = 0.
     #The virtual flux pulse is uploaded to the I_channel of control qb
     buffer_pulse['channel'] = CZ_pulse_channel
 
-    X90_target_2 = operation_dict['X90 ' + qbt_name]
-    X90_target  =operation_dict['X90s '+ qbt_name]
+    X90_target_2 = deepcopy(operation_dict['X90 ' + qbt_name])
+    X90_target = deepcopy(operation_dict['X90s '+ qbt_name])
 
-    CZ_pulse = operation_dict[CZ_pulse_name]
+    CZ_pulse = deepcopy(operation_dict[CZ_pulse_name])
     CZ_pulse['amplitude'] = flux_amplitude
     CZ_pulse['pulse_length'] = flux_length
     CZ_pulse['channel'] = CZ_pulse_channel

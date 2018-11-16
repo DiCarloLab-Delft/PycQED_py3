@@ -1291,7 +1291,13 @@ def CLEAR_shape(amp_base, length_total, delta_amp_segments,
                  length_segments, sampling_rate=1.8e9):
     
     delta_amp_segments = list(delta_amp_segments)
-    length_segments = [length_segments]*4
+    if type(length_segments) == float:
+        length_segments = [length_segments]*4
+    elif type(length_segments) == list:
+        pass
+    else:
+        raise TypeError('The type of length_segments needs to be list or float')
+
     if len(delta_amp_segments) == len( length_segments) == 4:
         pass
     else:

@@ -214,6 +214,7 @@ class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
     def __init__(self, qubit_names_list, operation_dict,
                  nr_seeds_array, #array
                  nr_cliffords_value, #int
+                 clifford_sequence_list=None,
                  gate_decomposition='HZ', interleaved_gate=None,
                  upload=True, return_seq=False, seq_name=None,
                  verbose=False, cal_points=False):
@@ -224,6 +225,7 @@ class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
         self.upload = upload
         self.nr_cliffords_value = nr_cliffords_value
         self.nr_seeds_array = nr_seeds_array
+        self.clifford_sequence_list = clifford_sequence_list
         self.seq_name = seq_name
         self.return_seq = return_seq
         self.gate_decomposition = gate_decomposition
@@ -243,6 +245,7 @@ class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
                 gate_decomposition=self.gate_decomposition,
                 interleaved_gate=self.interleaved_gate,
                 nr_seeds=self.nr_seeds_array,
+                clifford_sequence_list=self.clifford_sequence_list,
                 seq_name=self.seq_name,
                 return_seq=self.return_seq,
                 verbose=self.verbose,
@@ -253,9 +256,9 @@ class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
 class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars_list, RO_pars, nr_cliffords_value,
+                 clifford_sequence_list=None,
                  gate_decomposition='HZ', interleaved_gate=None,
                  upload=True, return_seq=False, seq_name=None,
-                 CxC_RB=True, idx_for_RB=0,
                  verbose=False):
 
         super().__init__()
@@ -263,12 +266,11 @@ class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
         self.RO_pars = RO_pars
         self.upload = upload
         self.nr_cliffords_value = nr_cliffords_value
-        self.CxC_RB = CxC_RB
+        self.clifford_sequence_list = clifford_sequence_list
         self.seq_name = seq_name
         self.return_seq = return_seq
         self.gate_decomposition = gate_decomposition
         self.interleaved_gate = interleaved_gate
-        self.idx_for_RB = idx_for_RB
         self.verbose = verbose
 
         self.parameter_name = 'samples'
@@ -283,8 +285,7 @@ class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
                 gate_decomposition=self.gate_decomposition,
                 interleaved_gate=self.interleaved_gate,
                 nr_seeds=np.array([1]),
-                CxC_RB=self.CxC_RB,
-                idx_for_RB=self.idx_for_RB,
+                clifford_sequence_list=self.clifford_sequence_list,
                 seq_name=self.seq_name,
                 return_seq=self.return_seq,
                 verbose=self.verbose)
@@ -738,3 +739,61 @@ class fgge_frequency_hard_swf(swf.Hard_Sweep):
                 operation_dict=self.operation_dict,
                 verbose=self.verbose, cal_points=self.cal_points,
                 upload=self.upload, return_seq=self.return_seq)
+
+
+class GST_experiment_sublist_swf(swf.Soft_Sweep):
+
+    def __init__(self, hard_swf, pygsti_sublistOfExperiments):
+
+        super().__init__()
+        self.hard_swf = hard_swf
+        self.pygsti_sublistOfExperiments = pygsti_sublistOfExperiments
+        self.is_first_sweeppoint = True
+
+        self.name = 'pyGSTi experiment sublist sweep'
+        self.parameter_name = 'Points'
+        self.unit = '#'
+
+    def set_parameter(self, val, **kw):
+
+        self.hard_swf.pygsti_listOfExperiments = \
+        self.pygsti_sublistOfExperiments[val]
+        self.hard_swf.upload = True
+        self.hard_swf.prepare(upload_all=self.is_first_sweeppoint)
+        self.is_first_sweeppoint = False
+
+class GST_swf(swf.Hard_Sweep):
+
+    def __init__(self, qb_names, pygsti_listOfExperiments,
+                 operation_dict,
+                 preselection=True, ro_spacing=1e-6, seq_name=None,
+                 upload=True, return_seq=False, verbose=False):
+
+        super().__init__()
+        self.qb_names = qb_names
+        self.pygsti_listOfExperiments = pygsti_listOfExperiments
+        self.operation_dict = operation_dict
+        self.preselection = preselection
+        self.ro_spacing = ro_spacing
+        self.seq_name = seq_name
+        self.upload = upload
+        self.return_seq = return_seq
+        self.verbose = verbose
+
+        self.name = 'pyGSTi experiment list sweep'
+        self.parameter_name = 'Segment number'
+        self.unit = '#'
+
+    def prepare(self, upload_all=True, **kw):
+        if self.upload:
+            sqs2.pygsti_seq(
+                qb_names=self.qb_names,
+                pygsti_listOfExperiments=self.pygsti_listOfExperiments,
+                operation_dict=self.operation_dict,
+                preselection=self.preselection,
+                ro_spacing=self.ro_spacing,
+                seq_name=self.seq_name,
+                upload=True,
+                upload_all=upload_all,
+                return_seq=self.return_seq,
+                verbose=self.verbose)

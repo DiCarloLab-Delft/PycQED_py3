@@ -1029,7 +1029,7 @@ class ziShellDevice:
         N.B. the uploaded program will not work unless the
         "configure_codeword_protocol" method is called on the HDAWG
         """
-
+        print('YES')
         t0 = time.time()
         success_and_ready = False
         # This check (and while loop) is added as a workaround for #9
@@ -1075,6 +1075,7 @@ class ziShellDevice:
 
             if not success:
                 print(repr(program_string))
+                t_start = time.time()
                 for i in range(5):
                     self.awgModule.set('awgModule/compiler/sourcestring',
                                        program_string + ''.join(i*[' ']))
@@ -1084,16 +1085,16 @@ class ziShellDevice:
                         comp_msg = (self.awgModule.get(
                             'awgModule/compiler/statusstring')['compiler']
                                     ['statusstring'][0])
-                        if (time.time()-t0 >= timeout):
-                            success = False
-                            # print('Timeout encountered during compilation.')
-                            raise TimeoutError()
-                            break
+                        # if (time.time()-t0 >= timeout):
+                        #     success = False
+                        #     # print('Timeout encountered during compilation.')
+                        #     raise TimeoutError()
+                        #     break
 
                         if comp_msg.endswith(succes_msg):
                             success = True
                             break
-
+                print(time.time()-t_start)
                 # if not comp_msg.endswith(succes_msg):
                 if not success:
                     print("Compilation failed, printing program:")

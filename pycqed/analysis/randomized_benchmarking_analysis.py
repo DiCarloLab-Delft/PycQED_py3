@@ -941,7 +941,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
             self.msmt_strings += [self.measurementstring]
             self.data_files += [self.data_file]
-
+        print(self.data_dict_raw['data'])
         # get RO channels and fit data
         self.n_cl = self.data_dict_raw['n_cl']
         for var_name, dset in self.data_dict_raw['data'].items():

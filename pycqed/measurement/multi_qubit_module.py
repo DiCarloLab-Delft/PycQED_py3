@@ -7,6 +7,8 @@ import copy
 import datetime
 import os
 import lmfit
+from copy import deepcopy
+import pygsti
 
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.awg_sweep_functions as awg_swf
@@ -21,6 +23,8 @@ import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis.tomography as tomo
 from pycqed.measurement.optimization import nelder_mead, \
                                             generate_new_training_set
+from pygsti import construction as constr
+
 import qcodes as qc
 station = qc.station
 
@@ -935,13 +939,13 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
 
 
 def measure_n_qubit_simultaneous_randomized_benchmarking(
-        qubits, f_LO,
+        qubits, f_LO, clifford_sequence_list=None,
         nr_cliffords=None, nr_seeds=50,
         gate_decomp='HZ', interleaved_gate=None,
-        cal_points=False,
+        cal_points=False, nr_averages=None,
         thresholded=True,
         experiment_channels=None,
-        soft_avgs=1,
+        soft_avgs=1, analyze_RB=True,
         MC=None, UHFQC=None, pulsar=None,
         label=None, verbose=False, run=True):
 
@@ -1008,7 +1012,8 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         logging.warning('Make sure you have set them!.')
         label += '_thresh'
 
-    nr_averages = max(qb.RO_acq_averages() for qb in qubits)
+    if nr_averages is None:
+        nr_averages = max(qb.RO_acq_averages() for qb in qubits)
     operation_dict = get_operation_dict(qubits)
     qubit_names_list = [qb.name for qb in qubits]
     for qb in qubits:
@@ -1033,6 +1038,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 operation_dict=operation_dict,
                 nr_cliffords_value=nr_cliffords[0],
                 nr_seeds_array=np.arange(nr_seeds),
+                clifford_sequence_list=clifford_sequence_list,
                 upload=False,
                 gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate,
@@ -1043,29 +1049,52 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
             n_qubit_RB_sweepfunction=hard_sweep_func)
 
     else:
-        if hasattr(nr_cliffords, '__iter__'):
-                    raise ValueError('For an experiment with more than two '
-                                     'qubits, nr_cliffords must int or float.')
+        # if hasattr(nr_cliffords, '__iter__'):
+        #             raise ValueError('For an experiment with more than two '
+        #                              'qubits, nr_cliffords must int or float.')
 
-        k = 4095//nr_seeds
-        nr_shots = 4095 - 4095 % nr_seeds
+        nr_shots = nr_averages*nr_seeds
         det_func = get_multiplexed_readout_detector_functions(
             qubits, UHFQC=UHFQC, pulsar=pulsar,
             nr_shots=nr_shots)[key+'_log_det']
 
-        hard_sweep_points = np.tile(np.arange(nr_seeds), k)
+        hard_sweep_points = np.tile(np.arange(nr_seeds), nr_averages)
+        # hard_sweep_points = np.arange(nr_shots)
         hard_sweep_func = \
             awg_swf2.n_qubit_Simultaneous_RB_fixed_length(
                 qubit_names_list=qubit_names_list,
                 operation_dict=operation_dict,
-                nr_cliffords_value=nr_cliffords,
+                nr_cliffords_value=nr_cliffords[0],
                 nr_seeds_array=np.arange(nr_seeds),
-                upload=True,
+                clifford_sequence_list=clifford_sequence_list,
+                upload=False,
                 gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate,
                 verbose=verbose, cal_points=cal_points)
-        soft_sweep_points = np.arange(nr_averages//k)
-        soft_sweep_func = swf.None_Sweep()
+        soft_sweep_points = nr_cliffords
+        soft_sweep_func = \
+            awg_swf2.n_qubit_Simultaneous_RB_sequence_lengths(
+                n_qubit_RB_sweepfunction=hard_sweep_func)
+
+        # k = 4095//nr_seeds
+        # nr_shots = 4095 - 4095 % nr_seeds
+        # det_func = get_multiplexed_readout_detector_functions(
+        #     qubits, UHFQC=UHFQC, pulsar=pulsar,
+        #     nr_shots=nr_shots)[key+'_log_det']
+        #
+        # hard_sweep_points = np.tile(np.arange(nr_seeds), k)
+        # hard_sweep_func = \
+        #     awg_swf2.n_qubit_Simultaneous_RB_fixed_length(
+        #         qubit_names_list=qubit_names_list,
+        #         operation_dict=operation_dict,
+        #         nr_cliffords_value=nr_cliffords,
+        #         nr_seeds_array=np.arange(nr_seeds),
+        #         upload=True,
+        #         gate_decomposition=gate_decomp,
+        #         interleaved_gate=interleaved_gate,
+        #         verbose=verbose, cal_points=cal_points)
+        # soft_sweep_points = np.arange(nr_averages//k)
+        # soft_sweep_func = swf.None_Sweep()
 
     if cal_points:
         step = np.abs(hard_sweep_points[-1] - hard_sweep_points[-2])
@@ -1414,7 +1443,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
                                   hyper_parameter_dict : dict = None,
                                   sampling_numbers: list = [70,30],
                                   max_measurements = 2,
-                                  tol = [0.016,0.07],
+                                  tol = [0.016,0.05],
                                   timestamps : list = None,
                                   update = False,
                                   full_output = True,
@@ -1526,7 +1555,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
 
         # if not (iteration == 0 and timestamps_iter):
         print('\n{} samples before Iteration {}'.format(data_size,
-                                                       iteration+1))
+                                                       iteration))
         if iteration >= len(sampling_numbers):
             sampling_number = sampling_numbers[-1]
         else:
@@ -1543,7 +1572,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
                                          std_amp,
                                          sampling_number)
         print('measuring {} samples in iteration {} \n'.\
-              format(sampling_number, iteration+1))
+              format(sampling_number, iteration))
 
         cphases, population_losses, flux_pulse_ma = \
                     measure_cphase(qbc, qbt, qbr,
@@ -1608,7 +1637,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
         #check success of iteration step
         if cphase_testing_agent.converged:
             print('Cphase optimization converged in iteration {}.'.\
-                  format(iteration+1))
+                  format(iteration))
 
         elif iteration+1 >= max_measurements:
             cphase_testing_agent.converged = True
@@ -1850,8 +1879,10 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         msmt_suffix = '_qbs{}'.format(''.join([i[-1] for i in qubit_names]))
 
     if cal_points:
+        sweep_points_dict = deepcopy(sweep_points_dict)
         print(sweep_points_dict)
         for key, spts in sweep_points_dict.items():
+            print(key, spts)
             if spts is None:
                 if key == 'n_rabi':
                     sweep_points_dict[key] = {}
@@ -2718,3 +2749,227 @@ def measure_chevron_fgge(qbc, qbt, qbm, lengths, amplitudes,
               exp_metadata=exp_metadata)
 
     ma.MeasurementAnalysis(TwoD=True)
+
+
+def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
+                   upload=True, nr_shots_per_seg=2**12,
+                   thresholded=True, analyze_shots=True, analyze_pygsti=True,
+                   preselection=True, ro_spacing=1e-6, label=None,
+                   MC=None, UHFQC=None, pulsar=None, run=True, **kw):
+
+    if UHFQC is None:
+        UHFQC = qubits[0].UHFQC
+        print("Unspecified UHFQC instrument. Using {}.UHFQC.".format(
+            qubits[0].name))
+    if pulsar is None:
+        pulsar = qubits[0].AWG
+        print("Unspecified pulsar instrument. Using {}.AWG.".format(
+            qubits[0].name))
+    if MC is None:
+        MC = qubits[0].MC
+        print("Unspecified MC object. Using {}.MC.".format(
+            qubits[0].name))
+
+    if len(qubits) == 2:
+        logging.warning('Make sure the first qubit in the list is the '
+                        'control qubit!')
+    # Generate list of experiments with pyGSTi
+    qb_names = [qb.name for qb in qubits]
+
+    maxLengths = kw.pop('maxLengths', [1, 2])
+    linear_GST = kw.pop('linear_GST', True)
+    if pygsti_gateset is not None:
+        prep_fiducials = pygsti_gateset.prepStrs
+        meas_fiducials = pygsti_gateset.effectStrs
+        germs = pygsti_gateset.germs
+        gs_target = pygsti_gateset.gs_target
+        if linear_GST:
+            listOfExperiments = pygsti.construction.list_lgst_gatestrings(
+                prep_fiducials, meas_fiducials, gs_target)
+        else:
+            listOfExperiments = constr.make_lsgst_experiment_list(
+                gs_target, prep_fiducials, meas_fiducials, germs, maxLengths)
+    else:
+        prep_fiducials = kw.pop('prep_fiducials', None)
+        meas_fiducials = kw.pop('meas_fiducials', None)
+        germs = kw.pop('germs', None)
+        gs_target = kw.pop('gs_target', None)
+        listOfExperiments = kw.pop('listOfExperiments', None)
+        # if np.any(np.array([prep_fiducials, meas_fiducials, germs,
+        #                     gs_target]) == None):
+        #     raise ValueError('Please provide either pyGSTi gate set or the '
+        #                      'kwargs "prep_fiducials", "meas_fiducials", '
+        #                      '"germs", "gs_target".')
+        # listOfExperiments = constr.make_lsgst_experiment_list(
+        #     gs_target, prep_fiducials, meas_fiducials, germs, maxLengths)
+
+    nr_exp = len(listOfExperiments)
+
+    # Set label
+    if label is None:
+        label = ''
+        if pygsti_gateset is not None:
+            if linear_GST:
+                label += 'Linear'
+            else:
+                label += 'LongSeq'
+        if len(qubits) == 1:
+            label += 'GST_{}{}'.format(
+                '-'.join([s[1::] for s in gs_target.gates]),
+                qubits[0].msmt_suffix)
+        else:
+            label += 'GST_{}_qbs{}'.format(
+                '-'.join([s[1::] for s in gs_target.gates]),
+                ''.join([qb.name[-1] for qb in qubits]))
+
+    # Set detector function
+    key = 'int'
+    if thresholded:
+        key = 'dig'
+        print('This is a thresholded measurement. Make sure you '
+              'have set the threshold values!')
+        label += '_thresh'
+
+    # Prepare qubits and readout pulse
+    for qb in qubits:
+        qb.prepare_for_timedomain(multiplexed=True)
+    multiplexed_pulse(qubits, f_LO, upload=True)
+
+    MC_run_mode = '1D'
+    # Check if there are too many experiments to do
+    max_exp_len = kw.pop('max_exp_len', 800)
+    if nr_exp > max_exp_len:
+        nr_subexp = nr_exp // max_exp_len
+        pygsti_sublistOfExperiments = [listOfExperiments[
+                                       i*max_exp_len:(i+1)*max_exp_len] for
+                                       i in range(nr_subexp)]
+        pygsti_sublistOfExperiments += [listOfExperiments[
+                                        -(nr_exp - max_exp_len*nr_subexp)::]]
+
+        # Set detector function
+        nr_shots = nr_shots_per_seg*max_exp_len*(2 if preselection else 1)
+        det_func = get_multiplexed_readout_detector_functions(
+            qubits, UHFQC=UHFQC, pulsar=pulsar,
+            nr_shots=nr_shots)[key+'_log_det']
+        # Define hard sweep
+        hard_sweep_points = np.tile(np.arange(max_exp_len),
+                                    nr_shots_per_seg*(2 if preselection else 1))
+        hard_sweep_func = \
+            awg_swf2.GST_swf(qb_names,
+                             pygsti_listOfExperiments=
+                                pygsti_sublistOfExperiments[0],
+                             operation_dict=get_operation_dict(qubits),
+                             preselection=preselection,
+                             ro_spacing=ro_spacing,
+                             upload=False)
+
+        # Define hard sweep
+        soft_sweep_points = np.arange(len(pygsti_sublistOfExperiments))
+        soft_sweep_func = awg_swf2.GST_experiment_sublist_swf(
+            hard_sweep_func,
+            pygsti_sublistOfExperiments)
+        MC_run_mode = '2D'
+    else:
+        # Set detector function
+        nr_shots = nr_shots_per_seg*nr_exp*(2 if preselection else 1)
+        det_func = get_multiplexed_readout_detector_functions(
+            qubits, UHFQC=UHFQC, pulsar=pulsar,
+            nr_shots=nr_shots)[key+'_log_det']
+        # Define hard sweep
+        hard_sweep_points = np.tile(np.arange(nr_exp),
+                                    nr_shots_per_seg*(2 if preselection else 1))
+        hard_sweep_func = \
+            awg_swf2.GST_swf(qb_names,
+                             pygsti_listOfExperiments=listOfExperiments,
+                             operation_dict=get_operation_dict(qubits),
+                             preselection=preselection,
+                             ro_spacing=ro_spacing,
+                             upload=upload)
+
+    MC.set_sweep_function(hard_sweep_func)
+    MC.set_sweep_points(hard_sweep_points)
+    if MC_run_mode == '2D':
+        MC.set_sweep_function_2D(soft_sweep_func)
+        MC.set_sweep_points_2D(soft_sweep_points)
+    MC.set_detector_function(det_func)
+
+    exp_metadata = {'pygsti_gateset': pygsti_gateset,
+                    'linear_GST': linear_GST,
+                    'preselection': preselection,
+                    'thresholded': thresholded,
+                    'nr_shots_per_seg': nr_shots_per_seg}
+    reduction_type = kw.pop('reduction_type', None)
+    if reduction_type is not None:
+        exp_metadata.update({'reduction_type': reduction_type})
+    if nr_exp > max_exp_len:
+        exp_metadata.update({'max_exp_len': max_exp_len})
+    if not linear_GST:
+        exp_metadata.update({'maxLengths': maxLengths})
+    if preselection:
+        exp_metadata.update({'ro_spacing': ro_spacing})
+    if run:
+        MC.run(name=label, mode=MC_run_mode, exp_metadata=exp_metadata)
+
+    # Analysis
+    if analyze_shots:
+        if thresholded:
+            MA = ma.MeasurementAnalysis(TwoD=(MC_run_mode == '2D'))
+        else:
+            thresholds = {qb.name: 1.5*UHFQC.get(
+                          'quex_thres_{}_level'.format(
+                              qb.RO_acq_weight_function_I())) for qb in qubits}
+            channel_map = {qb.name: det_func.value_names[0] for qb in qubits}
+            MA = ra.MultiQubit_SingleShot_Analysis(options_dict=dict(
+                    TwoD=(MC_run_mode == '2D'),
+                    n_readouts=(2 if preselection else 1)*nr_exp,
+                    thresholds=thresholds,
+                    channel_map=channel_map
+            ))
+
+        if analyze_pygsti:
+            # Create experiment dataset
+            basis_states = [''.join(s) for s in
+                            list(itertools.product(['0', '1'],
+                                                   repeat=len(qubits)))]
+            dataset = pygsti.objects.DataSet(outcomeLabels=basis_states)
+            if thresholded:
+                if len(qubits) == 1:
+                    shots = MA.measured_values[0]
+                    if preselection:
+                        shots = shots[1::2]
+                    for i, gs in enumerate(listOfExperiments):
+                        gs_shots = shots[i::nr_exp]
+                        dataset[gs] = {'0': len(gs_shots[gs_shots == 0]),
+                                       '1': len(gs_shots[gs_shots == 1])}
+            else:
+                nr_shots_MA = len(MA.proc_data_dict[
+                                      'shots_thresholded'][qb_names[0]])
+                shots = MA.proc_data_dict['probability_table']*nr_shots_MA
+                if preselection:
+                    shots = shots[1::2]
+                for i, gs in enumerate(listOfExperiments):
+                    for j, state in enumerate(basis_states):
+                        dataset[gs].update({basis_states[j]: shots[i, j]})
+
+            dataset.done_adding_data()
+            print(dataset)
+            # Get results
+            if linear_GST:
+                results = pygsti.do_linear_gst(dataset, gs_target,
+                                               prep_fiducials, meas_fiducials,
+                                               verbosity=3)
+            else:
+                results = pygsti.do_long_sequence_gst(dataset, gs_target,
+                                                      prep_fiducials,
+                                                      meas_fiducials,
+                                                      germs, maxLengths,
+                                                      verbosity=3)
+            # Save analysis report
+            filename = os.path.abspath(os.path.join(
+                MA.folder, label))
+            pygsti.report.create_standard_report(
+                results,
+                filename=filename,
+                title=label, verbosity=2)
+
+    return MC

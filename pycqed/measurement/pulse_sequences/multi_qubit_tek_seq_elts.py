@@ -12,6 +12,8 @@ import pycqed.measurement.waveform_control.fluxpulse_predistortion as \
     fluxpulse_predistortion
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     get_pulse_dict_from_pars
+from pycqed.measurement.gate_set_tomography.gate_set_tomography import \
+    create_experiment_list_pyGSTi_qudev as get_exp_list
 
 station = None
 kernel_dir = 'kernels/'
@@ -1104,6 +1106,7 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
                                                      operation_dict,
                                                      nr_cliffords_value, #scalar
                                                      nr_seeds,           #array
+                                                     clifford_sequence_list=None,
                                                      net_clifford=0,
                                                      gate_decomposition='HZ',
                                                      interleaved_gate=None,
@@ -1173,12 +1176,13 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
                 pulse_list.append(operation_dict[pkws])
 
         else:
-            clifford_sequence_list = []
-            for index in range(n):
-                clifford_sequence_list.append(
-                    rb.randomized_benchmarking_sequence(
-                    nr_cliffords_value, desired_net_cl=net_clifford,
-                    interleaved_gate=interleaved_gate))
+            if clifford_sequence_list is None:
+                clifford_sequence_list = []
+                for index in range(n):
+                    clifford_sequence_list.append(
+                        rb.randomized_benchmarking_sequence(
+                        nr_cliffords_value, desired_net_cl=net_clifford,
+                        interleaved_gate=interleaved_gate))
 
             pulse_keys = rb.decompose_clifford_seq_n_qubits(
                 clifford_sequence_list,
@@ -1195,19 +1199,21 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
             for k in range(n):
                 pulse_keys_by_qubit.append([x for l in pulse_keys_w_suffix[k::n]
                                             for x in l])
-            # make all qb sequences the same length
-            max_len = 0
-            for pl in pulse_keys_by_qubit:
-                if len(pl) > max_len:
-                    max_len = len(pl)
-            for ii, pl in enumerate(pulse_keys_by_qubit):
-                if len(pl) < max_len:
-                    pl += (max_len-len(pl))*['I ' + qubit_names_list[ii]]
+            # # make all qb sequences the same length
+            # max_len = 0
+            # for pl in pulse_keys_by_qubit:
+            #     if len(pl) > max_len:
+            #         max_len = len(pl)
+            # for ii, pl in enumerate(pulse_keys_by_qubit):
+            #     if len(pl) < max_len:
+            #         pl += (max_len-len(pl))*['I ' + qubit_names_list[ii]]
 
             pulse_list = []
-            for j in range(len(pulse_keys_by_qubit[0])):
+            max_len = max([len(pl) for pl in pulse_keys_by_qubit])
+            for j in range(max_len):
                 for k in range(n):
-                    pulse_list.append(deepcopy(operation_dict[
+                    if j < len(pulse_keys_by_qubit[k]):
+                        pulse_list.append(deepcopy(operation_dict[
                                                    pulse_keys_by_qubit[k][j]]))
 
             # Make the correct pulses simultaneous
@@ -1868,13 +1874,13 @@ def n_qubit_ref_seq(qubit_names, operation_dict, ref_desc, upload=True,
             ref_desc: Description of the calibration sequence. Dictionary
                 name of the state as key, and list of pulses names as values.
     """
-
-    operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
+    RO_str = 'RO ' + qubit_names[0] if len(qubit_names) == 1 else 'RO mux'
+    operation_dict['RO mux_presel'] = operation_dict[RO_str].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing
     operation_dict['RO mux_presel']['refpoint'] = 'start'
     operation_dict['RO presel_dummy'] = {
         'pulse_type': 'SquarePulse',
-        'channel': operation_dict['RO mux']['acq_marker_channel'],
+        'channel': operation_dict[RO_str]['acq_marker_channel'],
         'amplitude': 0.0,
         'length': ro_spacing,
         'pulse_delay': 0}
@@ -1901,12 +1907,13 @@ def n_qubit_ref_seq(qubit_names, operation_dict, ref_desc, upload=True,
 
     for i, calibration_sequence in enumerate(calibration_sequences):
         pulse_list = []
-        calibration_sequence.append('RO mux')
+        calibration_sequence.append(RO_str)
         if preselection:
             calibration_sequence.append('RO mux_presel')
             calibration_sequence.append('RO presel_dummy')
         pulse_list.extend(
             [operation_dict[pulse] for pulse in calibration_sequence])
+        print(calibration_sequence)
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
                                        name='Cal_{}'.format(i)))
 
@@ -2455,3 +2462,73 @@ def fgge_frequency_seq(mod_frequencies, length, amplitude,
         return seq_name
 
 
+def pygsti_seq(qb_names, pygsti_listOfExperiments, operation_dict,
+               preselection=True, ro_spacing=1e-6,
+               seq_name=None, upload=True, upload_all=True,
+               return_seq=False, verbose=False):
+
+    if seq_name is None:
+        seq_name = 'GST_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    tup_lst = [g.tup for g in pygsti_listOfExperiments]
+    str_lst = []
+    for t1 in tup_lst:
+        s = ''
+        for t in t1:
+            s += str(t)
+        str_lst += [s]
+    experiment_lists = get_exp_list(filename='',
+                                    pygstiGateList=str_lst,
+                                    qb_names=qb_names)
+
+    if preselection:
+        RO_str = 'RO' if len(qb_names) == 1 else 'RO mux'
+        operation_dict[RO_str+'_presel'] = \
+            operation_dict[experiment_lists[0][-1]].copy()
+        operation_dict[RO_str+'_presel']['pulse_delay'] = -ro_spacing
+        operation_dict[RO_str+'_presel']['refpoint'] = 'start'
+        operation_dict[RO_str+'presel_dummy'] = {
+            'pulse_type': 'SquarePulse',
+            'channel': operation_dict[
+                experiment_lists[0][-1]]['acq_marker_channel'],
+            'amplitude': 0.0,
+            'length': ro_spacing,
+            'pulse_delay': 0}
+
+    if upload_all:
+        upload_AWGs = 'all'
+    else:
+        upload_AWGs = ['AWG1']
+        for qbn in qb_names:
+            X90_pulse = deepcopy(operation_dict['X90 ' + qbn])
+            upload_AWGs += [station.pulsar.get(X90_pulse['I_channel'] + '_AWG'),
+                           station.pulsar.get(X90_pulse['Q_channel'] + '_AWG')]
+        CZ_pulse_name = 'CZ {} {}'.format(qb_names[1], qb_names[0])
+        if len([i for i in experiment_lists if CZ_pulse_name in i]) > 0:
+            CZ_pulse = operation_dict[CZ_pulse_name]
+            upload_AWGs += [station.pulsar.get(CZ_pulse['channel'] + '_AWG')]
+            for ch in CZ_pulse['aux_channels_dict']:
+                upload_AWGs += [station.pulsar.get(ch + '_AWG')]
+        upload_AWGs = list(set(upload_AWGs))
+    print(upload_AWGs)
+    for i, exp_lst in enumerate(experiment_lists):
+        pulse_lst = [operation_dict[p] for p in exp_lst]
+        if preselection:
+            pulse_lst.append(operation_dict[RO_str+'_presel'])
+            pulse_lst.append(operation_dict[RO_str+'presel_dummy'])
+        el = multi_pulse_elt(i, station, pulse_lst)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list,
+                                    AWGs=upload_AWGs,
+                                    channels='all',
+                                    verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name

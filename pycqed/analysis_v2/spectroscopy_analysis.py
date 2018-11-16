@@ -472,19 +472,19 @@ class ResonatorSpectroscopy(Spectroscopy):
                 fit_guess_fn = None
                 x_fit_0 = self.proc_data_dict['plot_frequency'][0]
 
-                self.chi = (self.sim_fit[0].params['omega_ro']-
-                            self.sim_fit[1].params['omega_ro'])/2
+                self.chi = (self.sim_fit[0].params['omega_ro'].value -
+                            self.sim_fit[1].params['omega_ro'].value)/2
                 self.f_RO = x_fit_0[np.argmax(np.abs(self.sim_fit[1].eval(
-                    self.sim_fit[1].params,
-                    f=x_fit_0)-
+                                                         self.sim_fit[1].params,
+                                                         f=x_fit_0)-
                                                      self.sim_fit[0].eval(
                                                          self.sim_fit[0].params,
                                                          f=x_fit_0)))]
-                self.f_RO_res = (self.sim_fit[0].params['omega_ro']+
-                                 self.sim_fit[1].params['omega_ro'])/2
-                self.f_PF = self.sim_fit[0].params['omega_pf']
-                self.kappa = self.sim_fit[0].params['kappa_pf']
-                self.J_ = self.sim_fit[0].params['J']
+                self.f_RO_res = (self.sim_fit[0].params['omega_ro'].value+
+                                 self.sim_fit[1].params['omega_ro'].value)/2
+                self.f_PF = self.sim_fit[0].params['omega_pf'].value
+                self.kappa = self.sim_fit[0].params['kappa_pf'].value
+                self.J_ = self.sim_fit[0].params['J'].value
 
             else:
                 fit_fn = fit_mods.hanger_with_pf
@@ -586,8 +586,11 @@ class ResonatorSpectroscopy(Spectroscopy):
                                       'ax_id': 'amp',
                                       'xvals': proc_data_dict['plot_frequency'][0],
                                       'yvals': proc_data_dict['plot_amp'][0],
-                                      'title': 'Spectroscopy amplitude: '
-                                               '%s' % (self.timestamps[0]),
+                                      'title': 'Spectroscopy amplitude: \n'
+                                               '%s-%s' % (
+                                          self.raw_data_dict[
+                                              'measurementstring'][0],
+                                          self.timestamps[0]),
                                       'xlabel': proc_data_dict['freq_label'],
                                       'xunit': 'Hz',
                                       'ylabel': proc_data_dict['amp_label'],
