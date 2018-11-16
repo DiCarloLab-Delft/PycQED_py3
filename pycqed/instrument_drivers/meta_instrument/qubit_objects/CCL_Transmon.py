@@ -385,12 +385,12 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('mw_vsm_G_amp',
                            label='VSM amp Gaussian component',
-                           vals=vals.Numbers(0.1, 1.0),
+                           vals=vals.Numbers(0.1, 2.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_D_amp',
                            label='VSM amp Derivative component',
-                           vals=vals.Numbers(0.1, 1.0),
+                           vals=vals.Numbers(0.1, 2.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_G_phase',
@@ -1331,8 +1331,8 @@ class CCLight_Transmon(Qubit):
             # module 8 is hardcoded for use mixer calls (signal hound)
             VSM.set('mod8_marker_source'.format(ch_in), 'int')
             VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
-            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 1.0)
+            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 1.0)
         else:
             mixer_channels = ['G']
 
