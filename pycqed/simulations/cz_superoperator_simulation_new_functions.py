@@ -607,7 +607,7 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0):
 
 
 
-def return_jump_operators(noise_parameters_CZ, f_pulse_final):
+def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
 
     T1_q0 = noise_parameters_CZ.T1_q0()
     T1_q1 = noise_parameters_CZ.T1_q1()
@@ -628,7 +628,13 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final):
     # time-dependent jump operators on q0
     if T2_q0_amplitude_dependent[0] != -1:
 
-        T2_q0_vec=expT2(f_pulse_final,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
+        f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=fluxlutman.q_freq_01())
+        sensitivity = calc_sensitivity(f_pulse_final,fluxlutman.q_freq_01())
+        for i in range(len(sensitivity)):
+            if sensitivity[i] < 1e-1:
+                sensitivity[i] = 1e-1
+        inverse_sensitivity = 1/sensitivity
+        T2_q0_vec=linear_with_offset(inverse_sensitivity,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1])
 
         # plot(x_plot_vec=[f_pulse_final/1e9],
         #                   y_plot_vec=[T2_q0_vec*1e6],
@@ -718,7 +724,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
     return U_final
     
 
-def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1):
+def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, alpha_q0):
     """
     Calculates the quantities of interest from the propagator (either unitary or superoperator)
 
@@ -739,7 +745,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1):
     #print('avgatefid_compsubspace',avgatefid_compsubspace)
 
 
-    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=0, alpha_q1=0, J=0)
+    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=0, J=0)
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
     avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_new,L1)
@@ -748,6 +754,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1):
     phases = phases_from_superoperator(U_final_new)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
     phase_q0 = (phases[1]-phases[0]) % 360
     phase_q1 = (phases[2]-phases[0]) % 360
+    cond_phase02 = (phases[4]-2*phase_q0+phases[0]) % 360
 
     # We now correct only for the phase of qubit left (q1), in the rotating frame
     avgatefid_compsubspace_pc_onlystaticqubit = pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U_final_new,L1,phases)
@@ -756,7 +763,8 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1):
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid,
             'avgatefid_compsubspace_pc': avgatefid_compsubspace, 'phase_q0': phase_q0, 'phase_q1': phase_q1,
             'avgatefid_compsubspace': avgatefid_compsubspace_notphasecorrected,
-            'avgatefid_compsubspace_pc_onlystaticqubit': avgatefid_compsubspace_pc_onlystaticqubit, 'population_02_state': population_02_state}
+            'avgatefid_compsubspace_pc_onlystaticqubit': avgatefid_compsubspace_pc_onlystaticqubit, 'population_02_state': population_02_state,
+            'cond_phase02': cond_phase02}
 
 
 
@@ -829,7 +837,10 @@ def dressed_frequencies(fluxlutman, noise_parameters_CZ):
     #w_q1 = fluxlutman.q_freq_10()
     w_q1 = (H_0_diag[3,3]-H_0_diag[0,0]) / (2*np.pi)
 
-    return np.real(w_q0), np.real(w_q1)
+    #alpha_q0 = fluxlutman.calc_amp_to_freq(0,'02')-2*w_q0 
+    alpha_q0 = (H_0_diag[2,2]-H_0_diag[0,0]) / (2*np.pi) - 2*w_q0
+
+    return np.real(w_q0), np.real(w_q1), np.real(alpha_q0)
 
 
 def shift_due_to_fluxbias_q0_singlefrequency(f_pulse,omega_0,fluxbias,positive_branch):
@@ -847,11 +858,20 @@ def shift_due_to_fluxbias_q0_singlefrequency(f_pulse,omega_0,fluxbias,positive_b
     return f_pulse_final
 
 
+def calc_sensitivity(freq,freq_sweetspot):
+    # returns sensitivity in Phi_0 units and w_q0_sweetspot, times usual units
+    return freq_sweetspot*np.pi/2 * np.sqrt(1-(freq/freq_sweetspot)**4)/freq
+
+
 def Tphi_from_T1andT2(T1,T2):
     return 1/(-1/(2*T1)+1/T2)
 
-def expT2(x,gc,amp,tau):
-    return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data of T2
+
+def linear_with_offset(x, a, b):
+    '''
+    A linear signal with a fixed offset.
+    '''
+    return a * x + b
 
 
 def matrix_change_of_variables(H_0):
@@ -947,6 +967,150 @@ def verify_CPTP(U):
 	candidate_identity = choi.ptrace([0,1])    # 3 since we have a qutrit
 	ptrace = qtp.tracedist(candidate_identity,qtp.tensor(qtp.qeye(3),qtp.qeye(3)))
 	return ptrace
+
+
+def return_instrument_args(fluxlutman,noise_parameters_CZ):
+
+    fluxlutman_args = {'sampling_rate': fluxlutman.sampling_rate(),
+                           'cz_length': fluxlutman.cz_length(),
+                           'q_J2': fluxlutman.q_J2(),
+                           'czd_double_sided': fluxlutman.czd_double_sided(),
+                           'cz_lambda_2': fluxlutman.cz_lambda_2(),
+                           'cz_lambda_3': fluxlutman.cz_lambda_3(),
+                           'cz_theta_f': fluxlutman.cz_theta_f(),
+                           'czd_length_ratio': fluxlutman.czd_length_ratio(),
+                           'q_polycoeffs_freq_01_det': fluxlutman.q_polycoeffs_freq_01_det(),
+                           'q_polycoeffs_anharm': fluxlutman.q_polycoeffs_anharm(),
+                           'q_freq_01': fluxlutman.q_freq_01(),
+                           'q_freq_10': fluxlutman.q_freq_10()}
+
+    noise_parameters_CZ_args = {'Z_rotations_length': noise_parameters_CZ.Z_rotations_length(),
+                                'voltage_scaling_factor': noise_parameters_CZ.voltage_scaling_factor(),
+                                'distortions': noise_parameters_CZ.distortions(),
+                                'T1_q0': noise_parameters_CZ.T1_q0(),
+                                'T1_q1': noise_parameters_CZ.T1_q1(),
+                                'T2_q0_amplitude_dependent': noise_parameters_CZ.T2_q0_amplitude_dependent(),
+                                'T2_q1': noise_parameters_CZ.T2_q1(),
+                                'w_q1_sweetspot': noise_parameters_CZ.w_q1_sweetspot(),
+                                'alpha_q1': noise_parameters_CZ.alpha_q1(),
+                                'w_bus': noise_parameters_CZ.w_bus(),
+                                'dressed_compsub': noise_parameters_CZ.dressed_compsub(),
+                                'sigma_q0': noise_parameters_CZ.sigma_q0(),
+                                'sigma_q1': noise_parameters_CZ.sigma_q1(),
+                                'T2_scaling': noise_parameters_CZ.T2_scaling(),
+                                'look_for_minimum': noise_parameters_CZ.look_for_minimum(),
+                                'n_sampling_gaussian_vec': noise_parameters_CZ.n_sampling_gaussian_vec(),
+                                'cluster': noise_parameters_CZ.cluster(),
+                                'detuning': noise_parameters_CZ.detuning(),
+                                'initial_state': noise_parameters_CZ.initial_state()}
+
+    return fluxlutman_args, noise_parameters_CZ_args
+
+
+def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args):
+
+    fluxlutman.sampling_rate(fluxlutman_args['sampling_rate'])
+    fluxlutman.cz_length(fluxlutman_args['cz_length'])
+    fluxlutman.q_J2(fluxlutman_args['q_J2'])
+    fluxlutman.czd_double_sided(fluxlutman_args['czd_double_sided'])
+    fluxlutman.cz_lambda_2(fluxlutman_args['cz_lambda_2'])
+    fluxlutman.cz_lambda_3(fluxlutman_args['cz_lambda_3'])
+    fluxlutman.cz_theta_f(fluxlutman_args['cz_theta_f'])
+    fluxlutman.czd_length_ratio(fluxlutman_args['czd_length_ratio'])
+    fluxlutman.q_polycoeffs_freq_01_det(fluxlutman_args['q_polycoeffs_freq_01_det'])
+    fluxlutman.q_polycoeffs_anharm(fluxlutman_args['q_polycoeffs_anharm'])
+    fluxlutman.q_freq_01(fluxlutman_args['q_freq_01'])
+    fluxlutman.q_freq_10(fluxlutman_args['q_freq_10'])
+
+    noise_parameters_CZ.Z_rotations_length(noise_parameters_CZ_args['Z_rotations_length'])
+    noise_parameters_CZ.voltage_scaling_factor(noise_parameters_CZ_args['voltage_scaling_factor'])
+    noise_parameters_CZ.distortions(noise_parameters_CZ_args['distortions'])
+    noise_parameters_CZ.T1_q0(noise_parameters_CZ_args['T1_q0'])
+    noise_parameters_CZ.T1_q1(noise_parameters_CZ_args['T1_q1'])
+    noise_parameters_CZ.T2_q0_amplitude_dependent(noise_parameters_CZ_args['T2_q0_amplitude_dependent'])
+    noise_parameters_CZ.T2_q1(noise_parameters_CZ_args['T2_q1'])
+    noise_parameters_CZ.w_q1_sweetspot(noise_parameters_CZ_args['w_q1_sweetspot'])
+    noise_parameters_CZ.alpha_q1(noise_parameters_CZ_args['alpha_q1'])
+    noise_parameters_CZ.w_bus(noise_parameters_CZ_args['w_bus'])
+    noise_parameters_CZ.dressed_compsub(noise_parameters_CZ_args['dressed_compsub'])
+    noise_parameters_CZ.sigma_q0(noise_parameters_CZ_args['sigma_q0'])
+    noise_parameters_CZ.sigma_q1(noise_parameters_CZ_args['sigma_q1'])
+    noise_parameters_CZ.T2_scaling(noise_parameters_CZ_args['T2_scaling'])
+    noise_parameters_CZ.look_for_minimum(noise_parameters_CZ_args['look_for_minimum'])
+    noise_parameters_CZ.n_sampling_gaussian_vec(noise_parameters_CZ_args['n_sampling_gaussian_vec'])
+    noise_parameters_CZ.cluster(noise_parameters_CZ_args['cluster'])
+    noise_parameters_CZ.detuning(noise_parameters_CZ_args['detuning'])
+    noise_parameters_CZ.initial_state(noise_parameters_CZ_args['initial_state'])
+
+    return fluxlutman, noise_parameters_CZ
+
+
+def plot_spectrum(fluxlutman,noise_parameters_CZ):
+    eig_vec=[]
+    amp_vec=np.arange(.4,.5,.01)
+    for amp in amp_vec:
+        H=calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
+        eigs=H.eigenenergies()
+        eig_vec.append(eigs)
+    eig_vec=np.array(eig_vec)/1e9/(2*np.pi)
+    eig_plot=[]
+    for j in range(len(eig_vec[0])):
+        eig_plot.append(eig_vec[:,j])
+    plot(x_plot_vec=[amp_vec],
+                          y_plot_vec=eig_plot,
+                          title='Spectrum',
+                          xlabel='Amplitude (V)',ylabel='Frequency (GHz)')
+
+
+
+
+
+## functions for Ramsey/Rabi simulations
+
+def calc_populations_new(rho_out,population_states):
+
+    populations = {'population_02': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[0]))).data[0,0]),
+                   'population_11': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[1]))).data[0,0])}
+
+    return populations
+
+
+def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ):
+
+    if initial_state == '11_dressed':
+        freq = fluxlutman.q_freq_01() + noise_parameters_CZ.detuning()
+        amp = fluxlutman.calc_freq_to_amp(freq)
+        H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
+        eigs,eigvectors = H.eigenstates()
+        psi_in = eigvectors[4]
+
+        population_states = [eigvectors[5],eigvectors[4]]
+
+    elif initial_state == '11_bare':
+        amp = 0
+        H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
+        eigs,eigvectors = H.eigenstates()
+        psi_in = eigvectors[4]
+
+        population_states = [eigvectors[5],eigvectors[4]]
+
+    else:
+        print('invalid keyword for initial state')
+
+    rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
+    rho_out = U * rho_in
+    populations = calc_populations_new(rho_out,population_states)
+    return populations
+
+
+
+
+
+
+
+
+
+
 
 
 

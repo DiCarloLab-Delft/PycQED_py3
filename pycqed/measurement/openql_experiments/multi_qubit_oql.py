@@ -492,6 +492,7 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
     p = oqh.compile(p)
     return p
 
+
 def fluxed_ramsey(qubit_idx: int, wait_time: float,
                   flux_cw: str='fl_cw_02',
                   platf_cfg: str=''):
@@ -540,6 +541,8 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
     return p
 
 # FIMXE: merge into the real chevron seq
+
+
 def Chevron_hack(qubit_idx: int, qubit_idx_spec,
                  buffer_time, buffer_time2, platf_cfg: str):
     """
@@ -628,11 +631,11 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         raise ValueError("target_qubit_sequence not recognized")
     k.gate('rx180', [qubit_idx])
 
-    if buffer_nanoseconds>0:
+    if buffer_nanoseconds > 0:
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
     k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
 
-    if buffer_nanoseconds2>0:
+    if buffer_nanoseconds2 > 0:
         k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.gate('rx180', [qubit_idx])
 
@@ -758,7 +761,7 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate(after_pulse_q1, [q1])
             # possibly wait
             if wait_after_flux is not None:
-                k.gate("wait", [q0,q1], round(wait_after_flux*1e9))
+                k.gate("wait", [q0, q1], round(wait_after_flux*1e9))
             # tomo pulses
             k.gate(p_q0, [q1])
             k.gate(p_q1, [q0])
@@ -1048,13 +1051,13 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             k.gate('rx90', [q0])
             if not CZ_disabled:
                 for j in range(nr_of_repeated_gates):
-                    if wait_time_between>0:
+                    if wait_time_between > 0:
                         k.gate('wait', [2, 0], wait_time_between)
                     k.gate(flux_codeword, [2, 0])
             else:
                 for j in range(nr_of_repeated_gates):
                     k.gate('wait', [2, 0], wait_time_between + CZ_duration)
-            if wait_time_after>0:
+            if wait_time_after > 0:
                 k.gate('wait', [2, 0], (wait_time_after))
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
@@ -1069,7 +1072,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
 
             k.measure(q0)
             k.measure(q1)
-            k.gate('wait', [q1,q0], 0)
+            k.gate('wait', [q1, q0], 0)
             # Implements a barrier to align timings
             # k.gate('wait', [q0, q1], 0)
             # hardcoded barrier because of openQL #104
@@ -1087,7 +1090,12 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
 
     p.sweep_points = np.concatenate(
         [np.repeat(angles, len(cases)), cal_pts_idx])
-    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(p.sweep_points)
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
 
 
@@ -1615,5 +1623,10 @@ def sliding_flux_pulses_seq(
         cal_pts_idx = []
 
     p.sweep_points = np.concatenate([angles, cal_pts_idx])
-    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(p.sweep_points)
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
