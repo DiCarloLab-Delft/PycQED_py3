@@ -238,6 +238,22 @@ def CosFunc(t, amplitude, frequency, phase, offset):
 def ExpDecayFunc(t, tau, amplitude, offset, n):
     return amplitude * np.exp(-(t / tau) ** n) + offset
 
+def ExpDecayPmod(t, T2echo, delta, n0, chi, kappa, phase, amplitude, offset):
+    """
+    specific form of exponential decay used for residual resonator photon readout
+    """
+
+    return amplitude * (1 - np.imag(np.exp(-t*(1/T2echo + 2j*np.pi*delta)+1j*(
+        phase-2*n0*chi*(1-np.exp(-t*(kappa + 2j*chi)))/(kappa + 2j*chi)))))+offset
+
+def CombinedOszExpDecayFunc(t, tau, tau_gauss, phase, n0, chi, delta, amplitude,
+                         oscillation_offset, offset):
+    """
+    Combination of gaussian and exponential decay
+    """
+    return amplitude * np.exp(-(t / tau)-(t / tau_gauss))*(np.cos(
+        2 * np.pi * (n0*2*chi/(2*np.pi)+delta) * t + phase) +
+        oscillation_offset) + offset
 
 def idle_error_rate_exp_decay(N, N1, N2, A, offset):
     """

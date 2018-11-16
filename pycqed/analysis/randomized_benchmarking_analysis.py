@@ -25,6 +25,7 @@ golden_ratio = (1+np.sqrt(5))/2
 params = {'figure.figsize': (fig_size_dim, fig_size_dim/golden_ratio),
           'figure.dpi': 300,
           'savefig.dpi': 300,
+          'font.size': font_size,
           'figure.titlesize': font_size,
           'legend.fontsize': font_size,
           'axes.labelsize': font_size,
@@ -184,36 +185,35 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
         else:
             fit_res = self.fit_res
 
-        textstr = ('$F_{Cl}$'+' = {:.6g} $\pm$ ({:.4g})%'.format(
-            fit_res.params['fidelity_per_Clifford'].value*100,
-            fit_res.params['fidelity_per_Clifford'].stderr*100) +
-                   '\n$1-F_{Cl}$'+'  = {:.4g} $\pm$ ({:.4g})%'.format(
+        textstr = ('$r_{\mathrm{Cl}}$' + ' = {:.3f}% $\pm$ {:.2f}%'.format(
             (1-fit_res.params['fidelity_per_Clifford'].value)*100,
-            (fit_res.params['fidelity_per_Clifford'].stderr)*100) +
-                   '\nOffset = {:.4g} $\pm$ ({:.3g})'.format(
-                       (fit_res.params['offset'].value),
-                       (fit_res.params['offset'].stderr)))
+            (fit_res.params['fidelity_per_Clifford'].stderr)*100))
         if F_T1 is not None and plot_T1_lim:
-            textstr += ('\n$F_{Cl}^{T_1}$  = ' +
-                        '{:.6g}%'.format(F_T1*100))
+            textstr += ('\n$r_{\mathrm{coh-lim}}$  = ' +
+                        '{:.3f}%'.format((1-F_T1)*100))
+        textstr += ('\n' + r'$\langle \sigma_z \rangle _{m=0}$ = ' +
+                    '{:.2f} $\pm$ {:.2f}'.format(
+            fit_res.params['Amplitude'].value + fit_res.params['offset'].value,
+            np.sqrt(fit_res.params['offset'].stderr**2 +
+                    fit_res.params['Amplitude'].stderr**2)))
 
         horizontal_alignment = kw.pop('horizontal_alignment', 'right')
-        horiz_place = 0.975
+        horiz_place = 0.45
         if horizontal_alignment == 'left':
             horiz_place = 0.025
 
         vertical_alignment = kw.pop('horizontal_alignment', 'top')
-        vert_place = 0.975
+        vert_place = 0.95
         if vertical_alignment == 'bottom':
             vert_place = 0.025
 
         ax.text(horiz_place, vert_place, textstr, transform=ax.transAxes,
-                fontsize=self.font_size, verticalalignment=vertical_alignment,
-                horizontalalignment=horizontal_alignment, bbox=self.box_props)
+                verticalalignment=vertical_alignment,
+                horizontalalignment='left')
 
     def make_figures(self, close_main_fig, **kw):
 
-        xlabel = 'Number of Cliffords, m'
+        xlabel = 'Number of Cliffords, $m$'
         # ylabel = r'Probability, $P$ $\left(|g \rangle \right)$'
         ylabel = r'Expectation value $\langle \sigma_z \rangle$'
         self.fig, self.ax = self.default_ax()
@@ -273,8 +273,9 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                              linewidth=self.line_width,
                              label='decoherence-limit')
 
-        # self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),
-        #                fontsize=self.font_size)
+
+        if kw.pop('add_legend', True):
+            self.ax.legend(loc='lower left', frameon=False)
 
         # Add a textbox
         if kw.pop('add_textbox_RB', True):
@@ -940,7 +941,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
             self.msmt_strings += [self.measurementstring]
             self.data_files += [self.data_file]
-
+        print(self.data_dict_raw['data'])
         # get RO channels and fit data
         self.n_cl = self.data_dict_raw['n_cl']
         for var_name, dset in self.data_dict_raw['data'].items():

@@ -7,6 +7,8 @@ import copy
 import datetime
 import os
 import lmfit
+from copy import deepcopy
+import pygsti
 
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.awg_sweep_functions as awg_swf
@@ -21,6 +23,8 @@ import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis.tomography as tomo
 from pycqed.measurement.optimization import nelder_mead, \
                                             generate_new_training_set
+from pygsti import construction as constr
+
 import qcodes as qc
 station = qc.station
 
@@ -935,13 +939,13 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
 
 
 def measure_n_qubit_simultaneous_randomized_benchmarking(
-        qubits, f_LO,
+        qubits, f_LO, clifford_sequence_list=None,
         nr_cliffords=None, nr_seeds=50,
         gate_decomp='HZ', interleaved_gate=None,
-        cal_points=False,
+        cal_points=False, nr_averages=None,
         thresholded=True,
         experiment_channels=None,
-        soft_avgs=1,
+        soft_avgs=1, analyze_RB=True,
         MC=None, UHFQC=None, pulsar=None,
         label=None, verbose=False, run=True):
 
@@ -1008,7 +1012,8 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         logging.warning('Make sure you have set them!.')
         label += '_thresh'
 
-    nr_averages = max(qb.RO_acq_averages() for qb in qubits)
+    if nr_averages is None:
+        nr_averages = max(qb.RO_acq_averages() for qb in qubits)
     operation_dict = get_operation_dict(qubits)
     qubit_names_list = [qb.name for qb in qubits]
     for qb in qubits:
@@ -1033,6 +1038,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 operation_dict=operation_dict,
                 nr_cliffords_value=nr_cliffords[0],
                 nr_seeds_array=np.arange(nr_seeds),
+                clifford_sequence_list=clifford_sequence_list,
                 upload=False,
                 gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate,
@@ -1043,29 +1049,52 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
             n_qubit_RB_sweepfunction=hard_sweep_func)
 
     else:
-        if hasattr(nr_cliffords, '__iter__'):
-                    raise ValueError('For an experiment with more than two '
-                                     'qubits, nr_cliffords must int or float.')
+        # if hasattr(nr_cliffords, '__iter__'):
+        #             raise ValueError('For an experiment with more than two '
+        #                              'qubits, nr_cliffords must int or float.')
 
-        k = 4095//nr_seeds
-        nr_shots = 4095 - 4095 % nr_seeds
+        nr_shots = nr_averages*nr_seeds
         det_func = get_multiplexed_readout_detector_functions(
             qubits, UHFQC=UHFQC, pulsar=pulsar,
             nr_shots=nr_shots)[key+'_log_det']
 
-        hard_sweep_points = np.tile(np.arange(nr_seeds), k)
+        hard_sweep_points = np.tile(np.arange(nr_seeds), nr_averages)
+        # hard_sweep_points = np.arange(nr_shots)
         hard_sweep_func = \
             awg_swf2.n_qubit_Simultaneous_RB_fixed_length(
                 qubit_names_list=qubit_names_list,
                 operation_dict=operation_dict,
-                nr_cliffords_value=nr_cliffords,
+                nr_cliffords_value=nr_cliffords[0],
                 nr_seeds_array=np.arange(nr_seeds),
-                upload=True,
+                clifford_sequence_list=clifford_sequence_list,
+                upload=False,
                 gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate,
                 verbose=verbose, cal_points=cal_points)
-        soft_sweep_points = np.arange(nr_averages//k)
-        soft_sweep_func = swf.None_Sweep()
+        soft_sweep_points = nr_cliffords
+        soft_sweep_func = \
+            awg_swf2.n_qubit_Simultaneous_RB_sequence_lengths(
+                n_qubit_RB_sweepfunction=hard_sweep_func)
+
+        # k = 4095//nr_seeds
+        # nr_shots = 4095 - 4095 % nr_seeds
+        # det_func = get_multiplexed_readout_detector_functions(
+        #     qubits, UHFQC=UHFQC, pulsar=pulsar,
+        #     nr_shots=nr_shots)[key+'_log_det']
+        #
+        # hard_sweep_points = np.tile(np.arange(nr_seeds), k)
+        # hard_sweep_func = \
+        #     awg_swf2.n_qubit_Simultaneous_RB_fixed_length(
+        #         qubit_names_list=qubit_names_list,
+        #         operation_dict=operation_dict,
+        #         nr_cliffords_value=nr_cliffords,
+        #         nr_seeds_array=np.arange(nr_seeds),
+        #         upload=True,
+        #         gate_decomposition=gate_decomp,
+        #         interleaved_gate=interleaved_gate,
+        #         verbose=verbose, cal_points=cal_points)
+        # soft_sweep_points = np.arange(nr_averages//k)
+        # soft_sweep_func = swf.None_Sweep()
 
     if cal_points:
         step = np.abs(hard_sweep_points[-1] - hard_sweep_points[-2])
@@ -1095,18 +1124,6 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 use_latest_data=True,
                 gate_decomp=gate_decomp,
                 add_correction=True)
-
-    # # reset all correlation channels in the UHFQC
-    # for ch in range(5):
-    #     UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
-    #     UHFQC.set('quex_corr_{}_source'.format(ch), 0)
-    #
-    # for qb in qubits:
-    #     if thresholding and V_th_a is not None:
-    #         # set back the original threshold values
-    #         UHFQC.set('quex_thres_{}_level'.format(
-    #             qb.RO_acq_weight_function_I()), th_vals[qb.name])
-
 
     return MC
 
@@ -1420,7 +1437,7 @@ def cphase_gate_tuneup(qb_control, qb_target,
 
 
 def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
-                                  std_deviations: list = [20e-9,0.03],
+                                  std_deviations: list = [20e-9,0.02],
                                   phases = None, MC = None,
                                   estimator = 'GRNN_neupy',
                                   hyper_parameter_dict : dict = None,
@@ -1538,7 +1555,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
 
         # if not (iteration == 0 and timestamps_iter):
         print('\n{} samples before Iteration {}'.format(data_size,
-                                                       iteration+1))
+                                                       iteration))
         if iteration >= len(sampling_numbers):
             sampling_number = sampling_numbers[-1]
         else:
@@ -1555,7 +1572,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
                                          std_amp,
                                          sampling_number)
         print('measuring {} samples in iteration {} \n'.\
-              format(sampling_number, iteration+1))
+              format(sampling_number, iteration))
 
         cphases, population_losses, flux_pulse_ma = \
                     measure_cphase(qbc, qbt, qbr,
@@ -1620,7 +1637,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
         #check success of iteration step
         if cphase_testing_agent.converged:
             print('Cphase optimization converged in iteration {}.'.\
-                  format(iteration+1))
+                  format(iteration))
 
         elif iteration+1 >= max_measurements:
             cphase_testing_agent.converged = True
@@ -1843,21 +1860,29 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         nr_averages=nr_averages)[key + '_avg_det']
 
     RO_channels_dict = {}
-    for qb in qubits:
-        RO_channels_dict[qb.name] = [qb.RO_acq_weight_function_I()]
+    for i, qb in enumerate(qubits):
         if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
-            RO_channels_dict[qb.name] += [qb.RO_acq_weight_function_Q()]
+            RO_channels_dict[qb.name] = [2*i]
+            RO_channels_dict[qb.name] += [2*i+1]
+        else:
+            RO_channels_dict[qb.name] = [i]
         qb.prepare_for_timedomain(multiplexed=True)
 
+    print(RO_channels_dict)
     qubit_names = [qb.name for qb in qubits]
 
-    if len(qubit_names) > 5:
+    if len(qubit_names) == 1:
+        msmt_suffix = qubits[0].msmt_suffix
+    elif len(qubit_names) > 5:
         msmt_suffix = '_{}qubits'.format(len(qubit_names))
     else:
         msmt_suffix = '_qbs{}'.format(''.join([i[-1] for i in qubit_names]))
 
     if cal_points:
+        sweep_points_dict = deepcopy(sweep_points_dict)
+        print(sweep_points_dict)
         for key, spts in sweep_points_dict.items():
+            print(key, spts)
             if spts is None:
                 if key == 'n_rabi':
                     sweep_points_dict[key] = {}
@@ -1987,6 +2012,8 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
             raise ValueError('Specify an artificial_detuning for the Ramsey '
                              'measurement.')
         sweep_points = sweep_points_dict['ramsey']
+        drag_pulse_length = qubits[0].nr_sigma()*qubits[0].gauss_sigma()
+        zz_coupling = 470e3
         if sweep_params is None:
             sweep_params = (
                 ('X90', {}),
@@ -1996,7 +2023,11 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                         'pulse_delay': (lambda sp: sp),
                         'phase': (lambda sp:
                                   ((sp-sweep_points[0]) * artificial_detuning *
-                                   360) % 360)}})
+                                   360) % 360),
+                       # 'basis_rotation': (lambda sp: 2*np.pi*zz_coupling *
+                       #                               (sp+drag_pulse_length)*180/np.pi)
+                    }}),
+
             )
         sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points,
@@ -2249,6 +2280,41 @@ def measure_cz_frequency_sweep(qbc, qbt, qbr, frequencies, length, amplitude,
 
     ma.MeasurementAnalysis()
 
+
+def measure_fgge_frequency_sweep(qbc, qbt, qbm, fgge_pulse_name,
+                                 mod_frequencies, length, amplitude,
+                                 cal_points=True, upload=True,
+                                 verbose=False, return_seq=False,
+                                 MC=None, soft_averages=1):
+
+    if MC is None:
+        MC = qbm.MC
+
+    operation_dict = get_operation_dict([qbc, qbt])
+
+    for qb in [qbc, qbt, qbm]:
+        qb.prepare_for_timedomain()
+
+    sf1 = awg_swf2.fgge_frequency_hard_swf(
+        mod_frequencies=mod_frequencies,
+        length=length,
+        amplitude=amplitude,
+        qbt_name=qbt.name,
+        qbm_name=qbm.name,
+        fgge_pulse_name=fgge_pulse_name,
+        operation_dict=operation_dict,
+        verbose=verbose, cal_points=cal_points,
+        upload=upload, return_seq=return_seq)
+    MC.soft_avg(soft_averages)
+    MC.set_sweep_function(sf1)
+    MC.set_sweep_points(mod_frequencies)
+
+    MC.set_detector_function(qbm.int_avg_det)
+    MC.run('fgge_Frequency_Sweep_{}{}'.format(qbc.name, qbt.name))
+
+    ma.MeasurementAnalysis()
+
+
 def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
                     cal_points=True, upload=True,
                     verbose=False, return_seq=False,
@@ -2284,9 +2350,11 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
     if len(amplitudes) > 1:
         sf2 = awg_swf.Chevron_ampl_swf_new(hard_sweep=sf1)
         sweep_points_2D = amplitudes
+        exp_metadata = {'CZ_frequency': frequencies[0]}
     elif len(frequencies) > 1:
         sf2 = awg_swf.Chevron_freq_swf_new(hard_sweep=sf1)
         sweep_points_2D = frequencies
+        exp_metadata = {'CZ_amplitude': amplitudes[0]}
     else:
         raise ValueError('At least amplitudes or frequencies must have len > 1')
 
@@ -2294,11 +2362,13 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
     MC.set_sweep_function_2D(sf2)
     MC.set_sweep_points_2D(sweep_points_2D)
     MC.set_detector_function(qbr.int_avg_det)
-    MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name))
+    MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name),
+              exp_metadata=exp_metadata)
 
     ma.MeasurementAnalysis(TwoD=True)
 
 def measure_cphase(qbc, qbt, qbr, lengths, amps,
+                       CZ_pulse_name=None,
                        phases=None, MC=None,
                        cal_points=False, plot=False,
                        save_plot=True,
@@ -2347,7 +2417,8 @@ def measure_cphase(qbc, qbt, qbr, lengths, amps,
 
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
-    CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
+    if CZ_pulse_name is None:
+        CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
     CZ_pulse_channel = qbc.flux_pulse_channel()
     max_flux_length = np.max(lengths)
 
@@ -2399,7 +2470,7 @@ def measure_cphase(qbc, qbt, qbr, lengths, amps,
 
 def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
                        phases=None, MC=None, cal_points=False, plot=False,
-                       save_plot=True,
+                       save_plot=True, CZ_pulse_name=None,
                        prepare_for_timedomain=True,
                        output_measured_values=False,
                        upload=True,**kw):
@@ -2442,7 +2513,8 @@ def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
 
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
-    CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
+    if CZ_pulse_name is None:
+        CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
     CZ_pulse_channel = qbc.flux_pulse_channel()
     max_flux_length = length
 
@@ -2529,4 +2601,375 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases,
     ma.MeasurementAnalysis(TwoD=True)
 
 
+def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,
+                             artificial_detuning=0, interleave=True,
+                             label='', MC=None, analyze=True, close_fig=True,
+                             cal_points=True, upload=True):
+    if times is None:
+        raise ValueError("Unspecified times for measure_ramsey")
+    if artificial_detuning is None:
+        logging.warning('Artificial detuning is 0.')
+    if np.abs(artificial_detuning) < 1e3:
+        logging.warning('The artificial detuning is too small. The units'
+                        'should be Hz.')
+    if np.any(times > 1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
 
+    for qb in [pulsed_qubit, measured_qubit]:
+        qb.prepare_for_timedomain()
+    if MC is None:
+        MC = measured_qubit.MC
+
+    # Define the measurement label
+    if label == '':
+        label = 'Ramsey_add_pulse_{}'.format(pulsed_qubit.name) + \
+                measured_qubit.msmt_suffix
+
+    step = np.abs(times[1]-times[0])
+    if interleave:
+        times = np.repeat(times, 2)
+
+    if cal_points:
+        sweep_points = np.concatenate(
+            [times, [times[-1]+step,  times[-1]+2*step,
+                     times[-1]+3*step, times[-1]+4*step]])
+    else:
+        sweep_points = times
+
+    Rams_swf = awg_swf2.Ramsey_add_pulse_swf(
+        measured_qubit_name=measured_qubit.name,
+        pulsed_qubit_name=pulsed_qubit.name,
+        operation_dict=get_operation_dict([measured_qubit, pulsed_qubit]),
+        artificial_detuning=artificial_detuning,
+        cal_points=cal_points,
+        upload=upload)
+    MC.set_sweep_function(Rams_swf)
+    MC.set_sweep_points(sweep_points)
+    MC.set_detector_function(measured_qubit.int_avg_det)
+    MC.run(label)
+
+    if analyze:
+        ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                               qb_name=measured_qubit.name)
+
+
+def measure_ramsey_add_pulse_sweep_phase(
+        measured_qubit, pulsed_qubit, phases,
+        interleave=True, label='', MC=None,
+        analyze=True, close_fig=True,
+        cal_points=True, upload=True):
+
+    for qb in [pulsed_qubit, measured_qubit]:
+        qb.prepare_for_timedomain()
+    if MC is None:
+        MC = measured_qubit.MC
+
+    # Define the measurement label
+    if label == '':
+        label = 'Ramsey_add_pulse_{}_Sweep_phases'.format(pulsed_qubit.name) + \
+                measured_qubit.msmt_suffix
+
+    step = np.abs(phases[1]-phases[0])
+    if interleave:
+        phases = np.repeat(phases, 2)
+
+    if cal_points:
+        sweep_points = np.concatenate(
+            [phases, [phases[-1]+step,  phases[-1]+2*step,
+                      phases[-1]+3*step, phases[-1]+4*step]])
+    else:
+        sweep_points = phases
+
+    Rams_swf = awg_swf2.Ramsey_add_pulse_sweep_phase_swf(
+        measured_qubit_name=measured_qubit.name,
+        pulsed_qubit_name=pulsed_qubit.name,
+        operation_dict=get_operation_dict([measured_qubit, pulsed_qubit]),
+        cal_points=cal_points,
+        upload=upload)
+    MC.set_sweep_function(Rams_swf)
+    MC.set_sweep_points(sweep_points)
+    MC.set_detector_function(measured_qubit.int_avg_det)
+    MC.run(label)
+
+    if analyze:
+        ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                               qb_name=measured_qubit.name)
+
+
+def measure_chevron_fgge(qbc, qbt, qbm, lengths, amplitudes,
+                         mod_frequencies, fgge_pulse_name=None,
+                         cal_points=True, upload=True,
+                         verbose=False, return_seq=False,
+                         MC=None):
+
+    if MC is None:
+        MC = qbt.MC
+    if fgge_pulse_name is None:
+        fgge_pulse_name = 'fgge {} {}'.format(qbt.name, qbc.name)
+
+    operation_dict = get_operation_dict([qbc, qbt])
+    for qb in [qbc, qbt, qbm]:
+        qb.prepare_for_timedomain()
+
+    if np.any(np.asarray(mod_frequencies) > 1e9):
+        logging.warning('mod_frequencies are too large. I will assume they are '
+                        'pulse frequencies and I will subtract qbc drive LO.')
+    # mod_frequencies = pulse_frequencies - (qbc.f_qubit() - qbc.f_pulse_mod())
+
+    sf1 = awg_swf2.FGGE_length_swf(
+        lengths=lengths,
+        amplitude=amplitudes[0],
+        mod_frequency=mod_frequencies[0],
+        qbt_name=qbt.name,
+        qbm_name=qbm.name,
+        fgge_pulse_name=fgge_pulse_name,
+        operation_dict=operation_dict,
+        verbose=verbose, cal_points=cal_points,
+        upload=False, return_seq=return_seq)
+    MC.set_sweep_function(sf1)
+    MC.set_sweep_points(lengths)
+
+    if len(amplitudes) > 1:
+        sf2 = awg_swf2.FGGE_amplitude_swf(hard_sweep=sf1)
+        sweep_points_2D = amplitudes
+        exp_metadata = {'fgge_mod_frequency': mod_frequencies[0]}
+    elif len(mod_frequencies) > 1:
+        sf2 = awg_swf2.FGGE_frequency_swf(hard_sweep=sf1)
+        sweep_points_2D = mod_frequencies
+        exp_metadata = {'fgge_amplitude': amplitudes[0]}
+    else:
+        raise ValueError('At least amplitudes or frequencies must have len > 1')
+
+
+    MC.set_sweep_function_2D(sf2)
+    MC.set_sweep_points_2D(sweep_points_2D)
+    MC.set_detector_function(qbm.int_avg_det)
+    MC.run_2D('Chevron_fgge_{}{}'.format(qbc.name, qbt.name),
+              exp_metadata=exp_metadata)
+
+    ma.MeasurementAnalysis(TwoD=True)
+
+
+def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
+                   upload=True, nr_shots_per_seg=2**12,
+                   thresholded=True, analyze_shots=True, analyze_pygsti=True,
+                   preselection=True, ro_spacing=1e-6, label=None,
+                   MC=None, UHFQC=None, pulsar=None, run=True, **kw):
+
+    if UHFQC is None:
+        UHFQC = qubits[0].UHFQC
+        print("Unspecified UHFQC instrument. Using {}.UHFQC.".format(
+            qubits[0].name))
+    if pulsar is None:
+        pulsar = qubits[0].AWG
+        print("Unspecified pulsar instrument. Using {}.AWG.".format(
+            qubits[0].name))
+    if MC is None:
+        MC = qubits[0].MC
+        print("Unspecified MC object. Using {}.MC.".format(
+            qubits[0].name))
+
+    if len(qubits) == 2:
+        logging.warning('Make sure the first qubit in the list is the '
+                        'control qubit!')
+    # Generate list of experiments with pyGSTi
+    qb_names = [qb.name for qb in qubits]
+
+    maxLengths = kw.pop('maxLengths', [1, 2])
+    linear_GST = kw.pop('linear_GST', True)
+    if pygsti_gateset is not None:
+        prep_fiducials = pygsti_gateset.prepStrs
+        meas_fiducials = pygsti_gateset.effectStrs
+        germs = pygsti_gateset.germs
+        gs_target = pygsti_gateset.gs_target
+        if linear_GST:
+            listOfExperiments = pygsti.construction.list_lgst_gatestrings(
+                prep_fiducials, meas_fiducials, gs_target)
+        else:
+            listOfExperiments = constr.make_lsgst_experiment_list(
+                gs_target, prep_fiducials, meas_fiducials, germs, maxLengths)
+    else:
+        prep_fiducials = kw.pop('prep_fiducials', None)
+        meas_fiducials = kw.pop('meas_fiducials', None)
+        germs = kw.pop('germs', None)
+        gs_target = kw.pop('gs_target', None)
+        listOfExperiments = kw.pop('listOfExperiments', None)
+        # if np.any(np.array([prep_fiducials, meas_fiducials, germs,
+        #                     gs_target]) == None):
+        #     raise ValueError('Please provide either pyGSTi gate set or the '
+        #                      'kwargs "prep_fiducials", "meas_fiducials", '
+        #                      '"germs", "gs_target".')
+        # listOfExperiments = constr.make_lsgst_experiment_list(
+        #     gs_target, prep_fiducials, meas_fiducials, germs, maxLengths)
+
+    nr_exp = len(listOfExperiments)
+
+    # Set label
+    if label is None:
+        label = ''
+        if pygsti_gateset is not None:
+            if linear_GST:
+                label += 'Linear'
+            else:
+                label += 'LongSeq'
+        if len(qubits) == 1:
+            label += 'GST_{}{}'.format(
+                '-'.join([s[1::] for s in gs_target.gates]),
+                qubits[0].msmt_suffix)
+        else:
+            label += 'GST_{}_qbs{}'.format(
+                '-'.join([s[1::] for s in gs_target.gates]),
+                ''.join([qb.name[-1] for qb in qubits]))
+
+    # Set detector function
+    key = 'int'
+    if thresholded:
+        key = 'dig'
+        print('This is a thresholded measurement. Make sure you '
+              'have set the threshold values!')
+        label += '_thresh'
+
+    # Prepare qubits and readout pulse
+    for qb in qubits:
+        qb.prepare_for_timedomain(multiplexed=True)
+    multiplexed_pulse(qubits, f_LO, upload=True)
+
+    MC_run_mode = '1D'
+    # Check if there are too many experiments to do
+    max_exp_len = kw.pop('max_exp_len', 800)
+    if nr_exp > max_exp_len:
+        nr_subexp = nr_exp // max_exp_len
+        pygsti_sublistOfExperiments = [listOfExperiments[
+                                       i*max_exp_len:(i+1)*max_exp_len] for
+                                       i in range(nr_subexp)]
+        pygsti_sublistOfExperiments += [listOfExperiments[
+                                        -(nr_exp - max_exp_len*nr_subexp)::]]
+
+        # Set detector function
+        nr_shots = nr_shots_per_seg*max_exp_len*(2 if preselection else 1)
+        det_func = get_multiplexed_readout_detector_functions(
+            qubits, UHFQC=UHFQC, pulsar=pulsar,
+            nr_shots=nr_shots)[key+'_log_det']
+        # Define hard sweep
+        hard_sweep_points = np.tile(np.arange(max_exp_len),
+                                    nr_shots_per_seg*(2 if preselection else 1))
+        hard_sweep_func = \
+            awg_swf2.GST_swf(qb_names,
+                             pygsti_listOfExperiments=
+                                pygsti_sublistOfExperiments[0],
+                             operation_dict=get_operation_dict(qubits),
+                             preselection=preselection,
+                             ro_spacing=ro_spacing,
+                             upload=False)
+
+        # Define hard sweep
+        soft_sweep_points = np.arange(len(pygsti_sublistOfExperiments))
+        soft_sweep_func = awg_swf2.GST_experiment_sublist_swf(
+            hard_sweep_func,
+            pygsti_sublistOfExperiments)
+        MC_run_mode = '2D'
+    else:
+        # Set detector function
+        nr_shots = nr_shots_per_seg*nr_exp*(2 if preselection else 1)
+        det_func = get_multiplexed_readout_detector_functions(
+            qubits, UHFQC=UHFQC, pulsar=pulsar,
+            nr_shots=nr_shots)[key+'_log_det']
+        # Define hard sweep
+        hard_sweep_points = np.tile(np.arange(nr_exp),
+                                    nr_shots_per_seg*(2 if preselection else 1))
+        hard_sweep_func = \
+            awg_swf2.GST_swf(qb_names,
+                             pygsti_listOfExperiments=listOfExperiments,
+                             operation_dict=get_operation_dict(qubits),
+                             preselection=preselection,
+                             ro_spacing=ro_spacing,
+                             upload=upload)
+
+    MC.set_sweep_function(hard_sweep_func)
+    MC.set_sweep_points(hard_sweep_points)
+    if MC_run_mode == '2D':
+        MC.set_sweep_function_2D(soft_sweep_func)
+        MC.set_sweep_points_2D(soft_sweep_points)
+    MC.set_detector_function(det_func)
+
+    exp_metadata = {'pygsti_gateset': pygsti_gateset,
+                    'linear_GST': linear_GST,
+                    'preselection': preselection,
+                    'thresholded': thresholded,
+                    'nr_shots_per_seg': nr_shots_per_seg}
+    reduction_type = kw.pop('reduction_type', None)
+    if reduction_type is not None:
+        exp_metadata.update({'reduction_type': reduction_type})
+    if nr_exp > max_exp_len:
+        exp_metadata.update({'max_exp_len': max_exp_len})
+    if not linear_GST:
+        exp_metadata.update({'maxLengths': maxLengths})
+    if preselection:
+        exp_metadata.update({'ro_spacing': ro_spacing})
+    if run:
+        MC.run(name=label, mode=MC_run_mode, exp_metadata=exp_metadata)
+
+    # Analysis
+    if analyze_shots:
+        if thresholded:
+            MA = ma.MeasurementAnalysis(TwoD=(MC_run_mode == '2D'))
+        else:
+            thresholds = {qb.name: 1.5*UHFQC.get(
+                          'quex_thres_{}_level'.format(
+                              qb.RO_acq_weight_function_I())) for qb in qubits}
+            channel_map = {qb.name: det_func.value_names[0] for qb in qubits}
+            MA = ra.MultiQubit_SingleShot_Analysis(options_dict=dict(
+                    TwoD=(MC_run_mode == '2D'),
+                    n_readouts=(2 if preselection else 1)*nr_exp,
+                    thresholds=thresholds,
+                    channel_map=channel_map
+            ))
+
+        if analyze_pygsti:
+            # Create experiment dataset
+            basis_states = [''.join(s) for s in
+                            list(itertools.product(['0', '1'],
+                                                   repeat=len(qubits)))]
+            dataset = pygsti.objects.DataSet(outcomeLabels=basis_states)
+            if thresholded:
+                if len(qubits) == 1:
+                    shots = MA.measured_values[0]
+                    if preselection:
+                        shots = shots[1::2]
+                    for i, gs in enumerate(listOfExperiments):
+                        gs_shots = shots[i::nr_exp]
+                        dataset[gs] = {'0': len(gs_shots[gs_shots == 0]),
+                                       '1': len(gs_shots[gs_shots == 1])}
+            else:
+                nr_shots_MA = len(MA.proc_data_dict[
+                                      'shots_thresholded'][qb_names[0]])
+                shots = MA.proc_data_dict['probability_table']*nr_shots_MA
+                if preselection:
+                    shots = shots[1::2]
+                for i, gs in enumerate(listOfExperiments):
+                    for j, state in enumerate(basis_states):
+                        dataset[gs].update({basis_states[j]: shots[i, j]})
+
+            dataset.done_adding_data()
+            print(dataset)
+            # Get results
+            if linear_GST:
+                results = pygsti.do_linear_gst(dataset, gs_target,
+                                               prep_fiducials, meas_fiducials,
+                                               verbosity=3)
+            else:
+                results = pygsti.do_long_sequence_gst(dataset, gs_target,
+                                                      prep_fiducials,
+                                                      meas_fiducials,
+                                                      germs, maxLengths,
+                                                      verbosity=3)
+            # Save analysis report
+            filename = os.path.abspath(os.path.join(
+                MA.folder, label))
+            pygsti.report.create_standard_report(
+                results,
+                filename=filename,
+                title=label, verbosity=2)
+
+    return MC

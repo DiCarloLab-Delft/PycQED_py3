@@ -2225,6 +2225,7 @@ class Chevron_frequency_hard_swf(swf.Hard_Sweep):
                 verbose=self.verbose, cal_points=self.cal_points,
                 upload=self.upload, return_seq=self.return_seq)
 
+
 class Chevron_ampl_swf_new(swf.Soft_Sweep):
 
     def __init__(self, hard_sweep):

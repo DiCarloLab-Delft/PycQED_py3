@@ -882,7 +882,8 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                     else:
                         mask = np.logical_and(mask, res_g[qubit][seg])
                 table[readout_n, state_n] = np.count_nonzero(mask)
-
+        print(n_readouts)
+        print(n_shots)
         return table*n_readouts/n_shots
 
     @staticmethod

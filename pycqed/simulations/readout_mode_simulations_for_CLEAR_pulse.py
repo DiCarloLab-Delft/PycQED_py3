@@ -158,8 +158,8 @@ def analytical_CLEAR(t, amp_base, length_total, delta_amp_segments,
             (sp_spc.erf((length_segments[2]-length_total+t)/np.sqrt(2)/sigma)-
              sp_spc.erf((-length_total+t)/np.sqrt(2)/sigma))+
             (amp_base+delta_amp_segments[2])*
-            (sp_spc.erf((length_segments[2]+length_segments[3]-
-                         length_total+t)/np.sqrt(2)/sigma)-
+            (sp_spc.erf((length_segments[2]+length_segments[3]
+                         -length_total+t)/np.sqrt(2)/sigma)-
              sp_spc.erf((length_segments[2]-length_total+t)/np.sqrt(2)/sigma))+
             (amp_base)*
             (sp_spc.erf((-length_segments[0]-length_segments[1]+t)/np.sqrt(2)/sigma)-
@@ -169,8 +169,8 @@ def analytical_CLEAR(t, amp_base, length_total, delta_amp_segments,
             (sp_spc.erf((t-length_segments[0])/np.sqrt(2)/sigma)-
              sp_spc.erf((t-length_segments[0]-length_segments[1])/np.sqrt(2)/sigma))+
             (amp_base+delta_amp_segments[0])*
-            (sp_spc.erf((t)/np.sqrt(2)/sigma)-sp_spc.erf(
-                (t-length_segments[0])/np.sqrt(2)/sigma)))
+            (sp_spc.erf((t)/np.sqrt(2)/sigma)-sp_spc.erf((t-
+                                      length_segments[0])/np.sqrt(2)/sigma)))
 
     return amp/norm
 
@@ -179,11 +179,11 @@ def gauss_CLEAR_pulse( amp_base, length_total, delta_amp_segments,
                        length_segments, sigma, nr_sigma, sampling_rate=1.2e9):
 
 
-    amp_pulse = uhfqc.CLEAR_shape(amp_base, length_total, delta_amp_segments,
-                                  length_segments, sampling_rate = sampling_rate)
+    amp_pulse = CLEAR_shape(amp_base, length_total, delta_amp_segments,
+                            length_segments, sampling_rate = sampling_rate)
 
-    amp_filtered = uhfqc.gaussian_filter( amp_pulse, sigma, nr_sigma,
-                                          sampling_rate = sampling_rate)
+    amp_filtered = gaussian_filter( amp_pulse, sigma, nr_sigma,
+                                    sampling_rate = sampling_rate)
 
     return amp_filtered
 

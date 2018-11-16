@@ -23,13 +23,13 @@ import importlib
 import math
 from time import time
 
-# try:
-#     import pygsti
-# except ImportError as e:
-#     if str(e).find('pygsti') >= 0:
-#         logging.warning('Could not import pygsti')
-#     else:
-#         raise
+try:
+    import pygsti
+except ImportError as e:
+    if str(e).find('pygsti') >= 0:
+        logging.warning('Could not import pygsti')
+    else:
+        raise
 
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
@@ -699,6 +699,7 @@ class MeasurementAnalysis(object):
         self.plot_title = kw.get('plot_title',
                                  self.measurementstring + '\n' +
                                  self.timestamp_string)
+
         plot_the_title = kw.get('plot_the_title', True)
 
         # ax.set_title(self.plot_title)
@@ -796,6 +797,27 @@ class MeasurementAnalysis(object):
             return line
         else:
             return
+
+    def add_textbox(self, textstring, fig=None, ax=None, **kw):
+
+        x_pos = kw.pop('x_pos', 0.5)
+        y_pos = kw.pop('y_pos ', 0)
+        horizontalalignment = kw.pop('horizontalalignment', 'center')
+        verticalalignment = kw.pop('verticalalignment', 'top')
+        font_size = kw.pop('font_size', self.font_size)
+        box_props = kw.pop('box_props', self.box_props)
+        if fig is None:
+            fig = self.fig
+        if ax is None:
+            ax = self.ax
+
+        fig.text(x_pos, y_pos, textstring,
+                 # transform=ax.transAxes,
+                 fontsize=font_size,
+                 verticalalignment=verticalalignment,
+                 horizontalalignment=horizontalalignment,
+                 bbox=box_props)
+
 
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.',
                              **kw):
@@ -2208,10 +2230,11 @@ class Rabi_Analysis(TD_Analysis):
                        ' $\pm$ (%.3g) ' % (self.rabi_amplitudes['piHalfPulse_std']) +
                        self.parameter_units[0] + old_vals)
 
-            self.fig.text(0.5, 0, textstr,
-                          transform=self.ax.transAxes, fontsize=self.font_size,
-                          verticalalignment='top',
-                          horizontalalignment='center', bbox=self.box_props)
+            self.add_textbox(textstr, fig=self.fig, ax=self.ax)
+            # self.fig.text(0.5, 0, textstr,
+            #               transform=self.ax.transAxes, fontsize=self.font_size,
+            #               verticalalignment='top',
+            #               horizontalalignment='center', bbox=self.box_props)
 
             # Used for plotting the fit (line 1776)
             best_vals = self.fit_result.best_values
@@ -3015,10 +3038,7 @@ class QScale_Analysis(TD_Analysis):
         else:
             ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
 
-        fig.text(0.5, 0, textstr, fontsize=self.font_size,
-                 transform=ax.transAxes,
-                 verticalalignment='top',
-                 horizontalalignment='center', bbox=self.box_props)
+        self.add_textbox(textstr, fig=fig, ax=ax)
 
         plot_title = kw.pop('plot_title', self.measurementstring
                             + plot_title_suffix + '\n' +
@@ -3028,12 +3048,14 @@ class QScale_Analysis(TD_Analysis):
                                         fig, ax,
                                         marker='ob',
                                         label=r'$X_{\frac{\pi}{2}}X_{\pi}$',
-                                        ticks_around=True)
+                                        ticks_around=True,
+                                        plot_title='')
         self.plot_results_vs_sweepparam(self.sweep_points_xY, self.corr_data_xY,
                                         fig, ax,
                                         marker='og',
                                         label=r'$X_{\frac{\pi}{2}}Y_{\pi}$',
-                                        ticks_around=True)
+                                        ticks_around=True,
+                                        plot_title='')
         self.plot_results_vs_sweepparam(self.sweep_points_xmY,
                                         self.corr_data_xmY, fig, ax,
                                         marker='or',
@@ -3890,7 +3912,7 @@ class SSRO_Analysis(MeasurementAnalysis):
             # plotting s-curves
             fig, ax = plt.subplots(figsize=(7, 4))
             ax.set_title('S-curves (not binned) and fits, determining fidelity '
-                         'and threshold optimum, %s shots' % min_len)
+                         '\nand threshold optimum, %s shots' % min_len)
             ax.set_xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
             ax.set_ylabel('Fraction of counts')  # , fontsize=14)
             ax.set_ylim((-.01, 1.01))
@@ -3932,7 +3954,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                 plt.clf()
 
             # plotting the histograms
-            fig, axes = plt.subplots(figsize=(7, 4))
+            fig, axes = plt.subplots(figsize=(10, 4))
             n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=40,
                                             label='1 I', histtype='step',
                                             color='red', normed=False)
@@ -4508,12 +4530,7 @@ class T1_Analysis(TD_Analysis):
                        units +
                        ' $\pm$ {:.5f} '.format(T1_err_micro_sec) +
                        units + old_vals)
-
-            self.fig.text(0.5, 0, textstr, transform=self.ax.transAxes,
-                          fontsize=self.font_size,
-                          verticalalignment='top',
-                          horizontalalignment='center',
-                          bbox=self.box_props)
+            self.add_textbox(textstr, fig=self.fig, ax=self.ax)
 
             if show_guess:
                 self.ax.plot(
@@ -4773,11 +4790,7 @@ class Ramsey_Analysis(TD_Analysis):
             textstr += T2_star_str
             textstr += ('\nartificial detuning = %.2g MHz'
                         % (art_det * 1e-6))
-
-            fig.text(0.5, 0, textstr, fontsize=self.font_size,
-                     transform=ax.transAxes,
-                     verticalalignment='top',
-                     horizontalalignment='center', bbox=self.box_props)
+            self.add_textbox(textstr, fig=fig, ax=ax)
 
             x = np.linspace(self.sweep_points[0],
                             self.sweep_points[-self.NoCalPoints-1],
@@ -7221,6 +7234,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                     self.fit_res.params['f0_gf_over_2'].value * scale,
                     self.fit_res.params['f0_gf_over_2'].stderr / 1e6,
                     old_freq_ef * scale,
+                    self.fit_res.init_values['f0_gf_over_2']*scale,
                     self.fit_res.params['kappa_gf_over_2'].value / 1e6,
                     self.fit_res.params['kappa_gf_over_2'].stderr / 1e6)
             except (TypeError, KeyError, ValueError):
@@ -7260,9 +7274,10 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                     self.fit_res.params['kappa'].value / 1e6,
                     self.fit_res.params['kappa'].stderr / 1e6)
 
-        fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,
-                      fontsize=self.font_size, verticalalignment='top',
-                      horizontalalignment='center', bbox=self.box_props)
+        self.add_textbox(label, fig_dist, ax_dist)
+        # fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,
+        #               fontsize=self.font_size, verticalalignment='top',
+        #               horizontalalignment='center', bbox=self.box_props)
 
         if print_fit_results is True:
             print(self.fit_res.fit_report())
@@ -11013,9 +11028,10 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
 
         textstr += 'dyn_phase_{} = {:0.3f} deg'.format(self.qb_name,
                                                        self.dyn_phase)
-        self.fig.text(0.5, -0.05, textstr, transform=self.ax.transAxes,
-                      fontsize=self.font_size, verticalalignment='top',
-                      horizontalalignment='center', bbox=self.box_props)
+        self.add_textbox(textstr, self.fig, self.ax)
+        # self.fig.text(0.5, -0.05, textstr, transform=self.ax.transAxes,
+        #               fontsize=self.font_size, verticalalignment='top',
+        #               horizontalalignment='center', bbox=self.box_props)
 
         plt.savefig(self.folder+'\\cos_fit.png', dpi=300, bbox_inches='tight')
 

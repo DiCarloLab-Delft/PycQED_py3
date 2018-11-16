@@ -470,24 +470,23 @@ class ResonatorSpectroscopy(Spectroscopy):
                             simultan=True)
                 guess_pars = None
                 fit_guess_fn = None
-
-
                 x_fit_0 = self.proc_data_dict['plot_frequency'][0]
 
-                self.chi = (self.sim_fit[0].params['omega_ro']-
-                            self.sim_fit[1].params['omega_ro'])/2
+                self.chi = (self.sim_fit[0].params['omega_ro'].value -
+                            self.sim_fit[1].params['omega_ro'].value)/2
                 self.f_RO = x_fit_0[np.argmax(np.abs(self.sim_fit[1].eval(
-                                                    self.sim_fit[1].params,
-                                                    f=x_fit_0)-
-                                                    self.sim_fit[0].eval(
-                                                    self.sim_fit[0].params,
-                                                    f=x_fit_0)))]
-                self.f_RO_res = (self.sim_fit[0].params['omega_ro']+
-                                 self.sim_fit[1].params['omega_ro'])/2
-                self.f_PF = self.sim_fit[0].params['omega_pf']
-                self.kappa = self.sim_fit[0].params['kappa_pf']
-                self.J_ = self.sim_fit[0].params['J']
+                                                         self.sim_fit[1].params,
+                                                         f=x_fit_0)-
+                                                     self.sim_fit[0].eval(
+                                                         self.sim_fit[0].params,
+                                                         f=x_fit_0)))]
+                self.f_RO_res = (self.sim_fit[0].params['omega_ro'].value+
+                                 self.sim_fit[1].params['omega_ro'].value)/2
+                self.f_PF = self.sim_fit[0].params['omega_pf'].value
+                self.kappa = self.sim_fit[0].params['kappa_pf'].value
+                self.J_ = self.sim_fit[0].params['J'].value
 
+               
             else:
                 fit_fn = fit_mods.hanger_with_pf
                 fit_temp = fit_mods.fit_hanger_with_pf(
@@ -588,8 +587,11 @@ class ResonatorSpectroscopy(Spectroscopy):
                                       'ax_id': 'amp',
                                       'xvals': proc_data_dict['plot_frequency'][0],
                                       'yvals': proc_data_dict['plot_amp'][0],
-                                      'title': 'Spectroscopy amplitude: '
-                                               '%s' % (self.timestamps[0]),
+                                      'title': 'Spectroscopy amplitude: \n'
+                                               '%s-%s' % (
+                                          self.raw_data_dict[
+                                              'measurementstring'][0],
+                                          self.timestamps[0]),
                                       'xlabel': proc_data_dict['freq_label'],
                                       'xunit': 'Hz',
                                       'ylabel': proc_data_dict['amp_label'],
@@ -684,6 +686,10 @@ class ResonatorSpectroscopy(Spectroscopy):
                                       +'\n\nkappa = '+par[2]+' MHz'
                                       +'\n\nJ = '+par[3]+' MHz'
                                       +'\n\ngamma_ro = '+par[4]+' MHz')
+                            ax.plot([0],
+                                    [0],
+                                    'w',
+                                    label=textstr)
                         else:
                             x_fit_0 = np.linspace(min(
                                 self.proc_data_dict['plot_frequency'][0][0],
@@ -715,17 +721,18 @@ class ResonatorSpectroscopy(Spectroscopy):
                                     fit_results[0].params,
                                     f=x_fit_1)),
                                     'g--', linewidth=1.5, label='Difference')
-                            f_RO = x_fit_0[np.argmax(np.abs(fit_results[1].eval(
+                            self.f_RO = x_fit_0[np.argmax(np.abs(fit_results[1].eval(
                                             fit_results[1].params,
                                             f=x_fit_0)-
                                             fit_results[0].eval(
                                                 fit_results[0].params,
                                                f=x_fit_0)))]
+                            f_RO = self.f_RO
                             ax.plot([f_RO, f_RO],
                                     [0,max(max(self.raw_data_dict['amp'][0]),
                                            max(self.raw_data_dict['amp'][1]))],
                                     'k--', linewidth=1.5)
-                            ax.legend()
+
                             par = ["%.3f" %(fit_results[0].params['gamma_ro'].value*1e-6),
                                    "%.3f" %(fit_results[0].params['omega_pf'].value*1e-9),
                                    "%.3f" %(fit_results[0].params['kappa_pf'].value*1e-6),
@@ -753,9 +760,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                                                        val in box_props.items()}
                         self.box_props.update({'linewidth': 0})
                         self.box_props['alpha'] = 0.
-                        # ax.text(1.1, 0.95, textstr, transform=ax.transAxes,
-                        #         verticalalignment='top', bbox=self.box_props,
-                        #         fontsize=11)
+
 
                 else:
                     reso_freqs = [fit_results[tt].params['f0'].value *
