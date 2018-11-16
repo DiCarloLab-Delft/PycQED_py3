@@ -691,7 +691,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         times = times[:-4]
     for t in times:
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi-flux-pi', p)
+        k = oqh.create_kernel('pi_flux_pi', p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         k.gate('fl_cw_02', [2, 0])
