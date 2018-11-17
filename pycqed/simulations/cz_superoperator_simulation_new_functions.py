@@ -705,13 +705,14 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
     for i in range(len(amp)):
         H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ) + correction_to_H
         H=S.dag()*H*S
+        S_H = qtp.tensor(qtp.qeye(3),qtp.qeye(3))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])
         if c_ops != []:
             c_ops_temp=[]
             for c in range(len(c_ops)):
                 if isinstance(c_ops[c],list):
-                    c_ops_temp.append(c_ops[c][0]*c_ops[c][1][i])    # c_ops are already in the H_0 basis
+                    c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_H.dag())    # c_ops are already in the H_0 basis
                 else:
-                    c_ops_temp.append(c_ops[c])
+                    c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
             liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*sim_step).expm()
         else:
             liouville_exp_t=(-1j*H*sim_step).expm()
@@ -742,6 +743,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
     L2 = seepage_from_superoperator(U_final)
     avgatefid = pro_avfid_superoperator_phasecorrected(U_final,phases)
     avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)     # leakage has to be taken into account, see Woods & Gambetta
+    coherent_leakage11 = np.abs(U_final[40,22])
     #print('avgatefid_compsubspace',avgatefid_compsubspace)
 
 
@@ -764,7 +766,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
             'avgatefid_compsubspace_pc': avgatefid_compsubspace, 'phase_q0': phase_q0, 'phase_q1': phase_q1,
             'avgatefid_compsubspace': avgatefid_compsubspace_notphasecorrected,
             'avgatefid_compsubspace_pc_onlystaticqubit': avgatefid_compsubspace_pc_onlystaticqubit, 'population_02_state': population_02_state,
-            'cond_phase02': cond_phase02}
+            'cond_phase02': cond_phase02, 'coherent_leakage11': coherent_leakage11}
 
 
 
