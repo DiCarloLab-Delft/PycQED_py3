@@ -171,7 +171,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
         collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
         c_ops.append(collapse*np.sqrt(1/(2*Tphi12_q1)))
 
-        Tphi02_q1=Tphi01_q1/2
+        Tphi02_q1=Tphi01_q1/4
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,0,0],
                                     [0,0,-1]])
@@ -192,7 +192,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
         collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
         c_ops.append([collapse,np.sqrt(1/(2*Tphi12_q0_vec))])
 
-        Tphi02_q0_vec=Tphi01_q0_vec/2
+        Tphi02_q0_vec=Tphi01_q0_vec/4
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,0,0],
                                     [0,0,-1]])
