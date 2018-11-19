@@ -84,7 +84,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
                 ch_range = a.data_file[self.ch_range_key].attrs['value']
             waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
             amp = ch_amp*ch_range/2*waveform_amp
-            # amp = ch_amp
+
             data = a.measured_values[self.ch_idx_cos] + 1j * \
                 a.measured_values[self.ch_idx_sin]
             # hacky but required for data saving
@@ -141,6 +141,8 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         '/parameters/awgs_0_outputs_1_amplitude',
             ch_range_key: str='Snapshot/instruments/AWG8_8005'
         '/parameters/sigouts_0_range',
+            waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
+                 '/parameters/sq_amp',
             polycoeffs_freq_conv: Union[list, str] =
         'Snapshot/instruments/FL_LutMan_QR/parameters/polycoeffs_freq_conv/value',
             ch_idx_cos: int=0,
@@ -148,6 +150,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             input_wf_key: str=None,
             options_dict: dict=None,
             close_figs: bool=True,
+            extract_only: bool = False,
             auto=True):
         """
         Cryoscope analysis for an arbitrary waveform.
@@ -161,6 +164,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         # ch_range_keycan also be set to `None`, then the value will
         # default to 1 (no rescaling)
         self.ch_range_key = ch_range_key
+        self.waveform_amp_key = waveform_amp_key
 
         self.derivative_window_length = derivative_window_length
         self.norm_window_size = norm_window_size
@@ -170,7 +174,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         self.ch_idx_sin = ch_idx_sin
 
         super().__init__(
-            t_start=t_start, t_stop=t_stop, label=label,
+            t_start=t_start, t_stop=t_stop, label=label,extract_only=extract_only,
             options_dict=options_dict, close_figs=close_figs)
         if auto:
             self.run_analysis()
@@ -206,7 +210,9 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
                     ch_range = 2  # corresponds to a scale factor of 1
                 else:
                     ch_range = a.data_file[self.ch_range_key].attrs['value']
-                amp = ch_amp*ch_range/2
+                waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
+                amp = ch_amp*ch_range/2*waveform_amp
+
                 # read conversion polynomial from the datafile if not provided as input
                 if isinstance(self.polycoeffs_freq_conv, str):
                     self.polycoeffs_freq_conv = np.array(
