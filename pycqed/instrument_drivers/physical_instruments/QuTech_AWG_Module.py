@@ -56,9 +56,10 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 14
-        # Commented out until bug fixed
-        self.device_descriptor.numCodewords = 16384 # TODO [versloot] get from device,
-                                                    # is based on IORear_markerTrigger or IORead_DIO
+
+        self._nr_codeword_bits_cmd = "SYSTem:CODEwordsbits?";
+        self.device_descriptor.numCodewordsBits = int(self.ask(self._nr_codeword_bits_cmd))
+        self.device_descriptor.numCodewords = pow(2, self.device_descriptor.numCodewordsBits)
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
@@ -66,7 +67,7 @@ class QuTech_AWG_Module(SCPI):
 
         self.codeword_protocols = {
             # Name              Ch1,    Ch2,    Ch3,    Ch4
-            'Flux' :            [0x03,  0x0C,   0x30,   0xC0],
+            'Flux' :            [0x03,  0x0C,   0x30,   0x0],
             'Microwave' :       [0x3F,  0x3F,   0x3F,   0x3F],
             'Flux_DIO' :        [0x03,  0x0C,   0x30,   0xC0],
             'Microwave_DIO' :   [0xFF,  0xFF,   0xFF,   0xFF]
@@ -136,6 +137,11 @@ class QuTech_AWG_Module(SCPI):
                            set_cmd='AWGC:RMO ' + '{}',
                            vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'))
         # NB: setting mode "CON" (valid SCPI abbreviation) reads back as "CONt"
+
+        self.add_parameter('dio_mode',
+                           get_cmd='SYSTem:DIO:MODE?',
+                           set_cmd='SYSTem:DIO:MODE ' + '{}',
+                           vals=vals.Enum('MASter', 'SLAve'))
 
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
@@ -236,7 +242,7 @@ class QuTech_AWG_Module(SCPI):
                                label=('Channel {}, set bit selection for this channel').format(ch),
                                get_cmd=dac_bit_select_cmd + '?',
                                set_cmd=dac_bit_select_cmd + ' {}',
-                               vals=vals.Ints(0, 1<<self.device_descriptor.numTriggers),
+                               vals=vals.Ints(0, self.device_descriptor.numCodewords),
                                get_parser=np.uint32,
                                docstring='Codeword bit select for a channel\n' \
                                  +'Set: \n' \
@@ -274,7 +280,7 @@ class QuTech_AWG_Module(SCPI):
                                docstring=doc_trgs_log_inp)
 
 
-        # Signle paramaters
+        # Single paramaters
         self.add_parameter('status_frontIO_temperature',
                            unit='C',
                            label=('FrontIO temperature'),
@@ -322,6 +328,14 @@ class QuTech_AWG_Module(SCPI):
                            docstring='Reads the current system status. E.q. channel ' \
                              +'status: on or off, overflow, underdrive.\n' \
                              +'Return:\n     JSON object with system status')
+
+        self.add_parameter('get_max_codeword_bits',
+                           unit='',
+                           label=('Max codeword bits'),
+                           get_cmd=self._nr_codeword_bits_cmd,
+                           vals=vals.Strings(),
+                           get_parser=int,
+                           docstring='Reads the maximal number of codeword bits for all channels')
 
         self.add_parameter('codeword_protocol',
                            unit='',
