@@ -80,6 +80,8 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
         J * (a.dag() - a) * (-b + b.dag())
+        #J * np.sqrt(2) * (qtp.tensor(qtp.basis(3,0),qtp.basis(3,2))*qtp.tensor(qtp.basis(3,1),qtp.basis(3,1)).dag()+\
+        #    qtp.tensor(qtp.basis(3,1),qtp.basis(3,1))*qtp.tensor(qtp.basis(3,0),qtp.basis(3,2)).dag())
     H = H * (2*np.pi)
     return H
 
@@ -171,7 +173,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
         collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
         c_ops.append(collapse*np.sqrt(1/(2*Tphi12_q1)))
 
-        Tphi02_q1=Tphi01_q1/4
+        Tphi02_q1=Tphi01_q1/2
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,0,0],
                                     [0,0,-1]])
@@ -192,7 +194,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
         collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
         c_ops.append([collapse,np.sqrt(1/(2*Tphi12_q0_vec))])
 
-        Tphi02_q0_vec=Tphi01_q0_vec/4
+        Tphi02_q0_vec=Tphi01_q0_vec/2
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,0,0],
                                     [0,0,-1]])
@@ -1069,10 +1071,27 @@ def plot_spectrum(fluxlutman,noise_parameters_CZ):
 
 ## functions for Ramsey/Rabi simulations
 
+def calc_populations(U):
+
+    hadamard_singleq = qtp.Qobj([[1,1,0],
+                                    [1,-1,0],
+                                    [0,0,0]])/np.sqrt(2)
+    hadamard_q0 = qtp.tensor(qtp.qeye(3),hadamard_singleq)
+
+    if U.type == 'oper':
+        U_pi2_pulsed = hadamard_q0 * U * hadamard_q0
+        populations = {'population_lower_state': np.abs(U_pi2_pulsed[0,0])**2, 'population_higher_state': np.abs(U_pi2_pulsed[0,1])**2}
+    elif U.type == 'super':
+        U_pi2_pulsed = qtp.to_super(hadamard_q0) * U * qtp.to_super(hadamard_q0)
+        populations = {'population_lower_state': np.real(U_pi2_pulsed[0,0]), 'population_higher_state': np.real(U_pi2_pulsed[0,10])}
+
+    return populations
+
+
 def calc_populations_new(rho_out,population_states):
 
-    populations = {'population_02': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[0]))).data[0,0]),
-                   'population_11': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[1]))).data[0,0])}
+    populations = {'population_higher_state': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[0]))).data[0,0]),
+                   'population_lower_state': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[1]))).data[0,0])}
 
     return populations
 
@@ -1088,6 +1107,10 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
 
         population_states = [eigvectors[5],eigvectors[4]]
 
+        rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
+        rho_out = U * rho_in
+        populations = calc_populations_new(rho_out,population_states)
+
     elif initial_state == '11_bare':
         amp = 0
         H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
@@ -1096,12 +1119,17 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
 
         population_states = [eigvectors[5],eigvectors[4]]
 
+        rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
+        rho_out = U * rho_in
+        populations = calc_populations_new(rho_out,population_states)
+
+    elif initial_state == 'ramsey_q0':
+        populations = calc_populations(U)
+
     else:
         print('invalid keyword for initial state')
 
-    rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
-    rho_out = U * rho_in
-    populations = calc_populations_new(rho_out,population_states)
+    
     return populations
 
 
