@@ -1084,6 +1084,7 @@ class multi_sweep_function(Soft_Sweep):
         for sweep_function in self.sweep_functions:
             sweep_function.set_parameter(val)
 
+
 class two_par_joint_sweep(Soft_Sweep):
     """
     Allows jointly sweeping two parameters while preserving their
@@ -1113,7 +1114,7 @@ class two_par_joint_sweep(Soft_Sweep):
         self.par_A.set(val)
         self.par_B.set(val*self.par_ratio)
         if self.retrieve_value:
-            self.par_A()  # only get first one to prevent overhead
+            self.operationComplete()  # only get first one to prevent overhead
 
 
 class FLsweep(Soft_Sweep):
@@ -1176,7 +1177,7 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.qubit = qubit
         self.freqs = freqs
         self.par = par
-        self.nested_MC = nested_MC        
+        self.nested_MC = nested_MC
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
