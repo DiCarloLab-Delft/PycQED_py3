@@ -2204,7 +2204,7 @@ class CCLight_Transmon(Qubit):
                                           analyze, close_fig, real_imag,
                                           prepare_for_timedomain)
 
-    def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.2, 2.0, 31),
+    def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.1, 1.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True, all_modules=False):
         if MC is None:
