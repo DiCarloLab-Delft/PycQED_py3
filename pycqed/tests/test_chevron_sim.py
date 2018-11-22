@@ -1,25 +1,24 @@
 import numpy as np
-from unittest import TestCase
 
 from pycqed.simulations import chevron_sim as chs
 
 
-class TestChevronSim(TestCase):
+class TestChevronSim:
 
     @classmethod
-    def setUpClass(self):
-        self.e_min = -0.0322
-        self.e_max = 0.0322
-        self.e_points = 20
-        self.time_stop = 60
-        self.time_step = 4
-        self.bias_tee = lambda self, t, a, b, c: t*a**2+t*b+c
+    def setup_class(cls):
+        cls.e_min = -0.0322
+        cls.e_max = 0.0322
+        cls.e_points = 20
+        cls.time_stop = 60
+        cls.time_step = 4
+        cls.bias_tee = lambda self, t, a, b, c: t * a ** 2 + t * b + c
 
         # self.distortion = lambda t: self.lowpass_s(t, 2)
-        self.distortion = lambda self, t: self.bias_tee(t, 0., 2e-5, 1)
+        cls.distortion = lambda self, t: self.bias_tee(t, 0., 2e-5, 1)
 
-        self.time_vec = np.arange(0., self.time_stop, self.time_step)
-        self.freq_vec = np.linspace(self.e_min, self.e_max, self.e_points)
+        cls.time_vec = np.arange(0., cls.time_stop, cls.time_step)
+        cls.freq_vec = np.linspace(cls.e_min, cls.e_max, cls.e_points)
 
     def test_output_shape(self):
         """
@@ -34,5 +33,4 @@ class TestChevronSim(TestCase):
                              self.time_stop,
                              self.time_step,
                              self.distortion)
-        self.assertEqual(np.shape(result),
-                         (len(self.freq_vec), len(self.time_vec)+1))
+        assert np.shape(result) == (len(self.freq_vec), len(self.time_vec)+1)

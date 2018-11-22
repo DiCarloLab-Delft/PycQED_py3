@@ -1,11 +1,15 @@
 import unittest
 import pycqed as pq
 import numpy as np
+import matplotlib.pyplot as plt
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
 
 
 class Test_flipping_analysis(unittest.TestCase):
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
 
     @classmethod
     def setUpClass(self):

@@ -56,7 +56,33 @@ class NoiseParametersCZ(Instrument):
         self.add_parameter('alpha_q1', unit='Hz',
                            label='anharmonicity of the static qubit',
                            parameter_class=ManualParameter,
-                           vals=vals.Numbers(), initial_value=-262e6)     
+                           vals=vals.Numbers(), initial_value=-262e6)
+        # for flux noise simulations
+        self.add_parameter('sigma', unit='flux quanta',
+                           label='standard deviation of the Gaussian from which we sample the flux bias',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=4e-4)
+        self.add_parameter('timestamp', unit='n.a.',
+                           label='timestamp of the file from which we have extracted the optimum lambda2 and theta_f',
+                           parameter_class=ManualParameter,
+                           vals=vals.Strings())
+        self.add_parameter('quantities_optimum',
+                           label='quantities in timestamp corresponding to the optimum avgatefidcompsub_pc',
+                           parameter_class=ManualParameter,
+                           vals=vals.Arrays())
+        self.add_parameter('w_q1_sweetspot',
+                           label='NB: different from the operating point in general',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('Z_rotations_length', unit='s',
+                           label='duration of the single qubit Z rotations at the end of the pulse',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=0)
+        self.add_parameter('dressed_compsub',
+                           label='true if we use the definition of the comp subspace that uses the dressed 00,01,10,11 states',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool())
+
 
         # for qdots simulations
         self.add_parameter('detuning', unit='meV',

@@ -5,6 +5,7 @@ using linear filtering (scipy.signal.lfilter).
 It is based on the kernel_object.DistortionsKernel
 """
 import numpy as np
+from scipy import signal
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
@@ -179,6 +180,13 @@ class LinDistortionKernel(Instrument):
                         y_sig = kf.first_order_bounce_corr(
                             sig=y_sig, delay=filt['params']['tau'],
                             amp=filt['params']['amp'], awg_sample_rate=2.4e9)
+
+                elif model == 'FIR':
+                    if ('real-time' in filt.keys() and filt['real-time']):
+                        raise KeyError('Real-time for {} model implemented'.format(model))
+                    else:
+                        fir_filter_coeffs = filt['params']['weights']
+                        y_sig = signal.lfilter(fir_filter_coeffs,1,y_sig)
 
                 else:
                     raise KeyError('Model {} not recognized'.format(model))

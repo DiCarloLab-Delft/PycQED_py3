@@ -7,7 +7,6 @@ import numpy as np
 import copy
 import logging
 from collections import OrderedDict
-from inspect import signature
 import numbers
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
@@ -24,10 +23,10 @@ import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
 
+
 class BaseDataAnalysis(object):
     """
-    Abstract Base Class (not intended to be instantiated directly) for
-    analysis.
+    Abstract Base Class for analysis.
 
     Children inheriting from this method should specify the following methods
         - __init__      -> specify params to be extracted, set options
@@ -1241,12 +1240,13 @@ class BaseDataAnalysis(object):
         plot_linestyle_init = pdict.get('init_linestyle', '--')
         plot_numpoints = pdict.get('num_points', 1000)
 
-
-        if hasattr(pdict['fit_res'],'model'):
+        if hasattr(pdict['fit_res'], 'model'):
             model = pdict['fit_res'].model
-            assert (isinstance(model, lmfit.model.Model) or
-                        isinstance(model, lmfit.model.ModelResult),
-                'The passed item in "fit_res" needs to be a fitting model, but is {}'.format(type(model)))
+            if not (isinstance(model, lmfit.model.Model) or
+                    isinstance(model, lmfit.model.ModelResult)):
+                raise TypeError(
+                    'The passed item in "fit_res" needs to be'
+                    ' a fitting model, but is {}'.format(type(model)))
 
             if len(model.independent_vars) == 1:
                 independent_var = model.independent_vars[0]

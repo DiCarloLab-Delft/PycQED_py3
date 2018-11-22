@@ -11,6 +11,7 @@ from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
 from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+import time
 
 
 class Base_Flux_LutMan(Base_LutMan):
@@ -323,8 +324,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 positive_branch=positive_branch) for e in eps])
 
         polycoeffs_A = self.get_polycoeffs_state(state=state_A)
-        polycoeffs_B = self.get_polycoeffs_state(state=state_B)
-        polycoeffs = polycoeffs_B - polycoeffs_A
+        if state_B is not None:
+            polycoeffs_B = self.get_polycoeffs_state(state=state_B)
+            polycoeffs = polycoeffs_B - polycoeffs_A
+        else:
+            polycoeffs = copy(polycoeffs_A)
+            polycoeffs[-1] = 0
 
         p = np.poly1d(polycoeffs)
         sols = (p-eps).roots
@@ -376,11 +381,22 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         awg_nr = awg_ch//2
         ch_pair = awg_ch % 2
 
-        channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
-            awg_nr, ch_pair))
+        for i in range(5):
+            channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
+                awg_nr, ch_pair))
+            if channel_amp is not None:
+                break
+            time.sleep(0.5)
+
 
         # channel range of 5 corresponds to -2.5V to +2.5V
-        channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
+        for i in range(5):
+            channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
+            if channel_range_pp is not None:
+                break
+            time.sleep(0.5)
+
+
         # direct_mode = AWG.get('sigouts_{}_direct'.format(awg_ch))
         scalefactor = channel_amp*(channel_range_pp/2)
         return scalefactor
@@ -515,6 +531,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             unit='dac value * samples',
             vals=vals.MultiType(vals.Numbers(), NP_NANs()),
             parameter_class=ManualParameter)
+        self.add_parameter('disable_cz_only_z',
+                           initial_value=False,
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter)
 
         self.add_parameter('czd_double_sided',
                            initial_value=False,
@@ -929,7 +949,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         cost_val = cv_2 + cv_4+cv_5
 
     #     if print_result:
-    #         print("Cost function value")
+    #         print("Cost function value")''
 
     # #         print("cv_1 net_zero_character: {:.6f}".format(cv_1))
     #         print("cv_2 phase corr pulse  : {:.6f}".format(cv_2))
@@ -961,11 +981,17 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         else:
             corr_pulse = np.zeros(corr_samples)
 
-        corr_pulse += phase_corr_sine_series([self.cz_phase_corr_amp()],
-                                             corr_samples)
+        if self.czd_double_sided():
+            corr_pulse += phase_corr_sine_series([self.cz_phase_corr_amp()],
+                                                     corr_samples)
+        else: 
+            corr_pulse += phase_corr_sine_series_half([self.cz_phase_corr_amp()],
+                                         corr_samples)
 
-        modified_wf = np.concatenate([base_wf, corr_pulse])
-
+        if self.disable_cz_only_z():
+            modified_wf = np.concatenate([base_wf*0, corr_pulse])
+        else:
+            modified_wf = np.concatenate([base_wf, corr_pulse])
         return modified_wf
 
     #################################
@@ -1526,4 +1552,19 @@ def phase_corr_sine_series(a_i, nr_samples):
 
     for i, a in enumerate(a_i):
         s += a*np.sin((i+1)*x)
+    return s
+
+def phase_corr_sine_series_half(a_i, nr_samples):
+    """
+    Phase correction pulse as a fourier sine series.
+
+    The integeral (sum) of this waveform is
+    gauranteed to be equal to zero (within rounding error)
+    by the choice of function.
+    """
+    x = np.linspace(0, 2*np.pi, nr_samples)
+    s = np.zeros(nr_samples)
+
+    for i, a in enumerate(a_i):
+        s += a*np.sin(((i+1)*x)/2)
     return s
