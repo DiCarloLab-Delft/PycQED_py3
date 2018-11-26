@@ -632,8 +632,9 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
         MC.set_detector_function(self.get_correlation_detector())
-        MC.run('conditional_oscillation{}{}'.format(self.msmt_suffix, label),
-               disable_snapshot_metadata=disable_metadata)
+        MC.run('conditional_oscillation_{}_{}_{}{}'.format(q0, q1, 
+                self.msmt_suffix, label),
+                disable_snapshot_metadata=disable_metadata)
 
         a = ma2.Conditional_Oscillation_Analysis(
             options_dict={'ch_idx_osc': self.qubits().index(q0),
@@ -645,6 +646,40 @@ class DeviceCCL(Instrument):
             print(info_msg)
 
         return a
+
+
+    def measure_two_qubit_grovers_repeated(
+            self, qubits:list, nr_of_grover_iterations=40, 
+            prepare_for_timedomain=True, MC=None):
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        for q in qubits: 
+            assert q in self.qubits()
+
+        q0idx = self.find_instrument(qubits[-1]).cfg_qubit_nr()
+        q1idx = self.find_instrument(qubits[-2]).cfg_qubit_nr()
+
+        p = mqo.grovers_two_qubits_repeated(
+            qubits=[q1idx, q0idx], 
+            nr_of_grover_iterations=nr_of_grover_iterations,
+            platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.get_correlation_detector()
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_of_grover_iterations))
+        MC.set_detector_function(d)
+        MC.run('Grovers_two_qubit_repeated_{}_{}{}'.format(qubits[-2], qubits[-1], 
+            self.msmt_suffix))
+
+        a = ma.MeasurementAnalysis()
+        return a
+
+
 
     def measure_two_qubit_tomo_bell(self, q0: str, q1: str,
                                     bell_state=0, wait_after_flux=None,
