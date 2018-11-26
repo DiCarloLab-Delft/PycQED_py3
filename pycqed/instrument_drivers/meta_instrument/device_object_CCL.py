@@ -606,6 +606,11 @@ class DeviceCCL(Instrument):
         for q in [q0, q1]:
             # This can be 
             mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+
+            lm = mw_lutman.LutMap()
+            # we hardcode the X on the ef transition to CW 31 here. 
+            lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+            # load_phase_pulses will also upload other waveforms
             mw_lutman.load_phase_pulses_to_AWG_lookuptable()
 
         if prepare_for_timedomain:

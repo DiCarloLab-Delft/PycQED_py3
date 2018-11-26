@@ -1078,11 +1078,15 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
 
             p.add_kernel(k)
     if add_cal_points:
-        p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1)
+        p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1, 
+                                     f_state_cal_pts=True, 
+                                     f_state_cal_pt_cw=31) 
+            # hardcoded requires ef pulses to be prepared 
     p = oqh.compile(p)
 
     if add_cal_points:
-        cal_pts_idx = [361, 362, 363, 364]
+        cal_pts_idx = [361, 362, 363, 364, 
+                       365, 366, 367]
     else:
         cal_pts_idx = []
 

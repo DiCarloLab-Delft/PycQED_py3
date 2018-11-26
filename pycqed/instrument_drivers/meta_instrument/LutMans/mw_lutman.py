@@ -38,6 +38,7 @@ def mw_lutmap_is_valid(lutmap: dict) -> bool:
     Return:
         valid (bool):
     """
+    # FIXME: make this part of the validator for the LutMap parameter.
     for key, value in lutmap.items():
         if not isinstance(key, int):
             raise TypeError

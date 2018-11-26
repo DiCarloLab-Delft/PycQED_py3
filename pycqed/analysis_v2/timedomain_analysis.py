@@ -857,8 +857,9 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         ch_idx_osc = self.options_dict.get('ch_idx_osc', 1)
         normalize_to_cal_points = self.options_dict.get('normalize_to_cal_points', True)
         cal_points = [
-                        [[-4, -3], [-2, -1]],
-                        [[-4, -2], [-3, -1]],
+                        # calibration point indices are when ignoring the f-state cal pts
+                        [[-7, -6], [-5, -4]],
+                        [[-7, -5], [-6, -4]],
                        ]
 
 
@@ -896,16 +897,16 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.fit_dicts['cos_fit_off'] = {
             'model': cos_mod0,
             'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
-            'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-2]},
-            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off'][:-2]}}
+            'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-4]},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off'][:-4]}}
 
         cos_mod1 = lmfit.Model(fit_mods.CosFunc)
         cos_mod1.guess = fit_mods.Cos_guess.__get__(cos_mod1, cos_mod1.__class__)
         self.fit_dicts['cos_fit_on'] = {
             'model': cos_mod1,
             'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
-            'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-2]},
-            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-2]}}
+            'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-3]},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-3]}}
 
     def analyze_fit_results(self):
         fr_0 = self.fit_res['cos_fit_off'].params
