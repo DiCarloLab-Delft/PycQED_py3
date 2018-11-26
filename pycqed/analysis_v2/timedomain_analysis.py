@@ -390,10 +390,10 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         return scale_factor
 
     def _get_scale_factor_line(self):
-        # 1/period of the oscillation corresponds to the (fractional)
-        # over/under rotation error per gate
+        # 2/period (ref is 180 deg) of the oscillation corresponds 
+        # to the (fractional) over/under rotation error per gate
         frequency = self.fit_dicts['line_fit']['fit_res'].params['frequency']
-        scale_factor = (1+frequency)**2
+        scale_factor = (1+2*frequency)**2
         # no phase sign check is needed here as this is contained in the
         # sign of the coefficient
 
