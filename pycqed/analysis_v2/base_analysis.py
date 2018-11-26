@@ -141,7 +141,6 @@ class BaseDataAnalysis(object):
         else:
             self.labels = scan_label
 
-
         # Initialize to None such that the attribute always exists.
         self.data_file_path = None
         if t_start is None and t_stop is None and data_file_path is None:
@@ -225,7 +224,8 @@ class BaseDataAnalysis(object):
             self.plot(key_list='auto')  # make the plots
 
         if self.options_dict.get('save_figs', False):
-            self.save_figures(close_figs=self.options_dict.get('close_figs', True))
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True))
 
     def get_timestamps(self):
         """
@@ -403,12 +403,16 @@ class BaseDataAnalysis(object):
 
         for key in key_list:
             if self.presentation_mode:
-                savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
+                savename = os.path.join(
+                    savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
-                savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.svg')
-                self.figs[key].savefig(savename, bbox_inches='tight', fmt='svg')
+                savename = os.path.join(
+                    savedir, savebase + key + tstag + 'presentation' + '.svg')
+                self.figs[key].savefig(
+                    savename, bbox_inches='tight', fmt='svg')
             else:
-                savename = os.path.join(savedir, savebase + key + tstag + '.' + fmt)
+                savename = os.path.join(
+                    savedir, savebase + key + tstag + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
                 plt.close(self.figs[key])
@@ -471,7 +475,6 @@ class BaseDataAnalysis(object):
         # initialize everything to an empty dict if not overwritten
         self.fit_dicts = OrderedDict()
 
-
     def run_fitting(self):
         '''
         This function does the fitting and saving of the parameters
@@ -521,11 +524,11 @@ class BaseDataAnalysis(object):
                 model = fit_dict.get('model', lmfit.Model(fit_fn))
             fit_guess_fn = fit_dict.get('fit_guess_fn', None)
             if fit_guess_fn is None:
-                if  fitting_type == 'model' and fit_dict.get('fit_guess', True):
+                if fitting_type == 'model' and fit_dict.get('fit_guess', True):
                     fit_guess_fn = model.guess
 
-            if guess_pars is None: # if you pass on guess_pars, immediately go to the fitting
-                if fit_guess_fn is not None: # Run the guess funtions here
+            if guess_pars is None:  # if you pass on guess_pars, immediately go to the fitting
+                if fit_guess_fn is not None:  # Run the guess funtions here
                     if fitting_type is 'minimize':
                         guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
                         params = lmfit.Parameters()
@@ -541,12 +544,12 @@ class BaseDataAnalysis(object):
                             for gd_key, val in list(guess_pars.items()):
                                 model.set_param_hint(gd_key, **val)
                             guess_pars = model.make_params()
-                                                ####
+                            ####
                         if guess_dict is not None:
-                             for gd_key, val in guess_dict.items():
-                                 for attr, attr_val in val.items():
-                                     # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
-                                     setattr(guess_pars[gd_key], attr, attr_val)
+                            for gd_key, val in guess_dict.items():
+                                for attr, attr_val in val.items():
+                                    # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
+                                    setattr(guess_pars[gd_key], attr, attr_val)
                         ####
                 elif guess_dict is not None:
                     if fitting_type is 'minimize':
@@ -562,24 +565,23 @@ class BaseDataAnalysis(object):
                         guess_pars = model.make_params()
             else:
                 if fitting_type is 'minimize':
-                    raise NotImplementedError('Conversion from guess_pars to params with lmfit.Parameters() needs to be implemented')
+                    raise NotImplementedError(
+                        'Conversion from guess_pars to params with lmfit.Parameters() needs to be implemented')
                     # TODO: write a method that converts the type model.make_params() to a lmfit.Parameters() object
-            if fitting_type is 'model': # Perform the fitting
+            if fitting_type is 'model':  # Perform the fitting
                 fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
                                                 params=guess_pars)
                 self.fit_res[key] = fit_dict['fit_res']
 
-            elif fitting_type is 'minimize': # Perform the fitting
+            elif fitting_type is 'minimize':  # Perform the fitting
                 fit_dict['fit_res'] = lmfit.minimize(fcn=_complex_residual_function,
-                        params=params,
-                        args=(fit_fn, fit_xvals, fit_yvals))
-                fit_dict['fit_res'].initial_params = params # save the initial params
-                fit_dict['fit_res'].userkws = fit_xvals # save the x values
-                fit_dict['fit_res'].fit_fn = fit_fn # save the fit function
+                                                     params=params,
+                                                     args=(fit_fn, fit_xvals, fit_yvals))
+                # save the initial params
+                fit_dict['fit_res'].initial_params = params
+                fit_dict['fit_res'].userkws = fit_xvals  # save the x values
+                fit_dict['fit_res'].fit_fn = fit_fn  # save the fit function
                 self.fit_res[key] = fit_dict['fit_res']
-
-
-
 
     def save_fit_results(self):
         """
@@ -591,7 +593,8 @@ class BaseDataAnalysis(object):
             # Find the file to save to
             fn = self.options_dict.get('analysis_result_file', False)
             if fn == False:
-                fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
+                fn = a_tools.measurement_filename(
+                    a_tools.get_folder(self.timestamps[0]))
 
             try:
                 os.mkdir(os.path.dirname(fn))
@@ -650,6 +653,8 @@ class BaseDataAnalysis(object):
             for k in param.__dict__:
                 if not k.startswith('_') and k not in ['from_internal', ]:
                     dic['params'][param_name][k] = getattr(param, k)
+            # "value" does not exist in param.__dict__ but is an attr
+            dic['params'][param_name]['value'] = getattr(param, 'value')
         return dic
 
     def plot(self, key_list=None, axs_dict=None,
@@ -778,7 +783,8 @@ class BaseDataAnalysis(object):
             for ii, this_yvals in enumerate(plot_yvals):
                 p_out.append(pfunc(plot_centers, this_yvals, width=plot_xwidth,
                                    color=gco(ii, len(plot_yvals) - 1),
-                                   label='%s%s' % (dataset_desc, dataset_label[ii]),
+                                   label='%s%s' % (
+                                       dataset_desc, dataset_label[ii]),
                                    **plot_barkws))
 
         else:
@@ -960,7 +966,7 @@ class BaseDataAnalysis(object):
                           color=gco(ii, len(slice_idxs) - 1))
         if plot_xrange is None:
             xmin, xmax = np.min(plot_xvals) - plot_xvals_step / \
-                         2., np.max(plot_xvals) + plot_xvals_step / 2.
+                2., np.max(plot_xvals) + plot_xvals_step / 2.
         else:
             xmin, xmax = plot_xrange
         axs.set_xlim(xmin, xmax)
@@ -1133,8 +1139,8 @@ class BaseDataAnalysis(object):
             if plot_xwidth is not None:
                 xmin, xmax = min([min(xvals) - plot_xwidth[tt] / 2
                                   for tt, xvals in enumerate(plot_xvals)]), \
-                             max([max(xvals) + plot_xwidth[tt] / 2
-                                  for tt, xvals in enumerate(plot_xvals)])
+                    max([max(xvals) + plot_xwidth[tt] / 2
+                         for tt, xvals in enumerate(plot_xvals)])
             else:
                 xmin = np.min(plot_xvals) - plot_xvals_step / 2
                 xmax = np.max(plot_xvals) + plot_xvals_step / 2
@@ -1282,21 +1288,21 @@ class BaseDataAnalysis(object):
                 pdict['yvals'] = output
 
         if plot_normed:
-            pdict['yvals']=pdict['yvals']/pdict['yvals'][0]
+            pdict['yvals'] = pdict['yvals']/pdict['yvals'][0]
 
         self.plot_line(pdict, axs)
 
         if plot_init:
             pdict_init = copy.copy(pdict)
             pdict_init['linestyle'] = plot_linestyle_init
-            if hasattr(pdict_init['fit_res'],'model'):
+            if hasattr(pdict_init['fit_res'], 'model'):
                 # The initial guess
                 pdict_init['yvals'] = model.eval(
                     **pdict_init['fit_res'].init_values,
                     **{independent_var: pdict_init['xvals']})
             else:
                 output = fit_fn(**pdict_init['fit_res'].initial_params,
-                            **{independent_var: pdict_init['xvals']})
+                                **{independent_var: pdict_init['xvals']})
                 output_mod_fn = pdict_init.get('output_mod_fn', None)
                 if output_mod_fn is not None:
                     pdict_init['yvals'] = output_mod_fn(output)
@@ -1305,7 +1311,6 @@ class BaseDataAnalysis(object):
 
             pdict_init['setlabel'] += ' init'
             self.plot_line(pdict_init, axs)
-
 
     def plot_text(self, pdict, axs):
         """
@@ -1397,11 +1402,11 @@ class BaseDataAnalysis(object):
 
     def plot_vlines_auto(self, pdict, axs):
         xs = pdict.get('xdata')
-        for i,x in enumerate(xs):
+        for i, x in enumerate(xs):
             d = {}
             for k in pdict:
                 lk = k[:-1]
-                #if lk in signature(axs.axvline).parameters:
+                # if lk in signature(axs.axvline).parameters:
                 if k not in ['xdata', 'plotfn', 'ax_id', 'do_legend']:
                     try:
                         d[lk] = pdict[k][i]
@@ -1422,7 +1427,6 @@ class BaseDataAnalysis(object):
         ax.set_title(title)
         set_xlabel(ax, xlabel, xunit)
         set_ylabel(ax, ylabel, yunit)
-
 
 
 def plot_scatter_errorbar(self, ax_id, xdata, ydata,

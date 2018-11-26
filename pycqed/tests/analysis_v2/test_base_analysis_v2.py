@@ -1,4 +1,5 @@
 import unittest
+import h5py
 import json
 import numpy as np
 import os
@@ -6,6 +7,7 @@ import pycqed as pq
 import matplotlib.pyplot as plt
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
+import pycqed.analysis_v2.measurement_analysis as ma2
 
 
 class Test_base_analysis(unittest.TestCase):
@@ -17,6 +19,27 @@ class Test_base_analysis(unittest.TestCase):
     @classmethod
     def tearDownClass(self):
         plt.close('all')
+
+    def test_save_fit_results(self):
+        # strictly speaking an integration test as it relies on the cond
+        # oscillation analysis, but the only thing tested here is
+        # if the value of the fit_result is saved.
+        ts = '20181126_131143'
+        a = ma2.Conditional_Oscillation_Analysis(t_start=ts)
+
+        exp_val = a.fit_res['cos_fit_off'].params['amplitude'].value
+
+        fn = a_tools.measurement_filename(a_tools.data_from_time(ts))
+        with h5py.File(fn, 'r') as file:
+            saved_val = float(file['Analysis']['cos_fit_off']['params']
+                              ['amplitude'].attrs['value'])
+
+        a.fit_res = {}
+        a.save_fit_results()
+
+        assert exp_val == saved_val
+
+
 
 
     def test_save_load_json(self):
