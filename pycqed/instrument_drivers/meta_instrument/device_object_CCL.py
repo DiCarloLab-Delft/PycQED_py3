@@ -762,7 +762,7 @@ class DeviceCCL(Instrument):
             MC = self.instr_MC.get_instr()
 
         assert q0 in self.qubits()
-        assert q1 in self.qubits2_prep()
+        assert q1 in self.qubits()
 
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
@@ -1184,7 +1184,7 @@ class DeviceCCL(Instrument):
                 calls self.prepare_for_timedomain on start
 
         Note: the amplitude and (expected) detuning of the flux pulse is saved
-         in experimental metadata. 
+         in experimental metadata.
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1211,11 +1211,11 @@ class DeviceCCL(Instrument):
                                                  regenerate_waveforms=True)
             elif pulse_shape == 'single_sided_square':
                 flux_cw = 'fl_cw_05'
-                
+
                 dac_scalefactor = fl_lutman.get_amp_to_dac_val_scalefactor()
                 dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
                     sq_eps, state_A='01', state_B=None, positive_branch=True)
-               
+
                 sq_pulse = dacval* \
                     np.ones(int(value*fl_lutman.sampling_rate()))
 
@@ -1232,7 +1232,7 @@ class DeviceCCL(Instrument):
                 neg_dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
                     sq_eps, state_A='01', state_B=None, positive_branch=False)
 
-                
+
                 sq_pulse_half = np.ones(int(value/2*fl_lutman.sampling_rate()))
 
                 sq_pulse = np.concatenate(

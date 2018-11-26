@@ -382,6 +382,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
     def __init__(self, name, **kw):
         self._num_channels = 8
         super().__init__(name, **kw)
+        self.sampling_rate(2.4e9)
 
     def _add_channel_params(self):
         super()._add_channel_params()

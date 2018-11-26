@@ -11,8 +11,7 @@ import scipy
 import matplotlib.pyplot as plt
 import logging
 
-from pycqed.simulations import cz_superoperator_simulation_withdistortions_newdevice_singlequbitphases_newcode_fluxnoise2 as czu
-from pycqed.tests import test_ramsey_simulations as tests
+from pycqed.simulations import cz_superoperator_simulation_new_functions as czf
 
 
 def time_evolution(H_vec, c_ops, sim_step):
@@ -127,7 +126,7 @@ class ramsey_experiment(det.Soft_Detector):
             if sigma != 0:
                 samplingpoints_gaussian = np.linspace(-5*sigma,5*sigma,n_sampling_gaussian)    # after 5 sigmas we cut the integral
                 delta_x = samplingpoints_gaussian[1]-samplingpoints_gaussian[0]
-                values_gaussian = czu.gaussian(samplingpoints_gaussian,mean=0,sigma=sigma)
+                values_gaussian = czf.gaussian(samplingpoints_gaussian,mean=0,sigma=sigma)
             else:
                 samplingpoints_gaussian = np.array([0])
                 delta_x = 1
@@ -159,11 +158,24 @@ class ramsey_experiment(det.Soft_Detector):
                 for pos in positive:
                     f_q0_biased = freq_shift_from_fluxbias(f_q0_detuned,f_q0_sweetspot,fluxbias_q0,positive_arc=pos)
                     freq_rotating_frame_detuned = f_q0_biased-f_q0_sweetspot-detuning
-                    H.append(czu.coupled_transmons_hamiltonian_new(w_q0=freq_rotating_frame_detuned, w_q1=0, alpha_q0=-2*freq_rotating_frame_detuned, alpha_q1=0, J=0))
+                    H.append(czf.coupled_transmons_hamiltonian_new(w_q0=freq_rotating_frame_detuned, w_q1=0, alpha_q0=-2*freq_rotating_frame_detuned, alpha_q1=0, J=0))
                                                                     # convenient way of getting the uncpupled Hamiltonian for one qubit
                 sim_step = t/len(positive)
 
                 c_ops=[]
+                # sigmaZinqutrit = qtp.Qobj([[1,0,0],
+                #                     [0,-1,0],
+                #                     [0,0,0]])
+                # Tphi01_q0 = 1e-6
+                # collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
+                # c_ops.append(collapse*np.sqrt(1/(2*Tphi01_q0)))
+
+                # a_qubit = qtp.Qobj([[0,1,0],
+                #                     [0,0,0],
+                #                     [0,0,0]])
+                # T1_q0 = 2e-6
+                # collapse=qtp.tensor(qtp.qeye(3),a_qubit)
+                # c_ops.append(collapse*np.sqrt(1/(T1_q0)))
 
                 U_final = time_evolution(H, c_ops, sim_step)
                 if U_final.type == 'oper':
@@ -184,7 +196,7 @@ class ramsey_experiment(det.Soft_Detector):
 
         ### Plot to study the convergence properties of averaging over a Gaussian
         # for i in range(len(qoi_plot[0])):
-        #     czu.plot(x_plot_vec=[n_sampling_gaussian_vec],
+        #     czf.plot(x_plot_vec=[n_sampling_gaussian_vec],
         #                   y_plot_vec=[qoi_plot[:,i]],
         #                   title='Study of convergence of average',
         #                   xlabel='n_sampling_gaussian points',ylabel=self.value_names[i])

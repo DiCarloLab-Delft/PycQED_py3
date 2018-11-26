@@ -385,12 +385,12 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('mw_vsm_G_amp',
                            label='VSM amp Gaussian component',
-                           vals=vals.Numbers(0.2, 3.0),
+                           vals=vals.Numbers(0.1, 2.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_D_amp',
                            label='VSM amp Derivative component',
-                           vals=vals.Numbers(0.2, 3.0),
+                           vals=vals.Numbers(0.1, 2.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_G_phase',
@@ -452,7 +452,7 @@ class CCLight_Transmon(Qubit):
     def add_spec_parameters(self):
         self.add_parameter('spec_vsm_amp',
                            label='VSM amplitude for spec pulses',
-                           vals=vals.Numbers(0.2, 3.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
 
@@ -848,7 +848,7 @@ class CCLight_Transmon(Qubit):
         """
         if CW:
             ro_amp=self.ro_pulse_amp_CW()
-        else: 
+        else:
             ro_amp=self.ro_pulse_amp()
 
         if 'UHFQC' not in self.instr_acquisition():
@@ -1120,7 +1120,7 @@ class CCLight_Transmon(Qubit):
         """
         if amps is None:
             if self.cfg_with_vsm():
-                amps = np.linspace(0.2, 2, 31)
+                amps = np.linspace(0.1, 1, 31)
             else:
                 amps = np.linspace(0, 1, 31)
 
@@ -1162,7 +1162,7 @@ class CCLight_Transmon(Qubit):
         """
         using_VSM = self.cfg_with_vsm()
         if using_VSM and motzois is None:
-            motzois = gen_sweep_pts(start=0.2, stop=2.0, num=31)
+            motzois = gen_sweep_pts(start=0.1, stop=1.0, num=31)
         elif motzois is None:
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
@@ -1230,8 +1230,8 @@ class CCLight_Transmon(Qubit):
 
             # Calibrate Gaussian component mixer
             if 'G' in mixer_channels:
-                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
-                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0.2)
+                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 1.0)
+                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0.1)
                 offset_I, offset_Q = mixer_carrier_cancellation(
                     SH=self.instr_SH.get_instr(),
                     source=self.instr_LO_mw.get_instr(),
@@ -1243,8 +1243,8 @@ class CCLight_Transmon(Qubit):
                     self.mw_mixer_offs_GQ(offset_Q)
             if 'D' in mixer_channels:
                 # Calibrate Derivative component mixer
-                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0.2)
-                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0.1)
+                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 1.0)
 
                 offset_I, offset_Q = mixer_carrier_cancellation(
                     SH=self.instr_SH.get_instr(),
@@ -1331,8 +1331,8 @@ class CCLight_Transmon(Qubit):
             # module 8 is hardcoded for use mixer calls (signal hound)
             VSM.set('mod8_marker_source'.format(ch_in), 'int')
             VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
-            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 1.0)
+            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 1.0)
         else:
             mixer_channels = ['G']
 
@@ -1557,7 +1557,8 @@ class CCLight_Transmon(Qubit):
                              close_fig=close_fig, normalize=True)
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
-                                             analyze: bool =True, close_fig: bool=True):
+                                             analyze: bool =True, close_fig: bool=True,
+                                             fluxChan=None,):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1580,7 +1581,10 @@ class CCLight_Transmon(Qubit):
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
-            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            if fluxChan==None:
+                dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            else:
+                dac_par = fluxcontrol.parameters[(fluxChan)]
 
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
@@ -1917,7 +1921,45 @@ class CCLight_Transmon(Qubit):
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
         if analyze:
-            ma.TwoD_Analysis(label=label, plot_all=False, auto=True)
+            ma.TwoD_Analysis(label=label, plot_all=True, auto=True)
+
+    def measure_SSRO_frequency_power_sweep_TWPA(self, pump_source,freqs, powers,
+                                               nr_shots=4092*4, nested_MC=None, analyze=True):
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        self.prepare_for_timedomain()
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+        old_ro_prepare_state = self.cfg_prepare_ro_awg()
+        self.ro_acq_digitized(False)
+        self.cfg_prepare_ro_awg(False)
+
+
+        d = det.Function_Detector(
+            self.measure_ssro,
+            msmt_kw={
+                'nr_shots': nr_shots,
+                'analyze': True, 'SNR_detector': True,
+                'cal_residual_excitation': True,
+                'prepare': False,
+                'disable_metadata': True
+            },
+            result_keys=['SNR', 'F_d', 'F_a']
+        )
+        nested_MC.set_sweep_function(pump_source.frequency)
+        nested_MC.set_sweep_points(freqs)
+        nested_MC.set_detector_function(d)
+        nested_MC.set_sweep_function_2D(pump_source.power)
+        nested_MC.set_sweep_points_2D(powers)
+        label = 'SSRO_freq_amp_sweep' + self.msmt_suffix
+        nested_MC.run(label, mode='2D')
+
+        self.cfg_prepare_ro_awg(old_ro_prepare_state)
+
+        if analyze:
+            ma.TwoD_Analysis(label=label, plot_all=True, auto=True)
+
+
 
     def measure_SSRO_pulse_length_sweep(self, lengths=np.arange(100e-9, 1501e-9, 100e-9),
                                         nr_shots=4092*4, nested_MC=None, analyze=True, label_suffix: str=''):
@@ -3481,6 +3523,7 @@ class CCLight_Transmon(Qubit):
         readout_pulse_length += self.ro_pulse_down_length1()
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
 
+        self.ro_pulse_type('up_down_down')
         # calibrate optimal weights
         self.calibrate_optimal_weights(verify=False)
 

@@ -184,7 +184,12 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
              ['ry90', 'ry90']]
 
     # this should be implicit
-    p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(np.arange(len(allXY), dtype=float))
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
 
     for i, xy in enumerate(allXY):
         if double_points:
@@ -408,7 +413,12 @@ def idle_error_rate_seq(nr_of_idle_gates,
             p.add_kernel(k)
         sweep_points.append(N)
 
-    p.set_sweep_points(sweep_points, num_sweep_points=len(sweep_points))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(sweep_points)
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(sweep_points, num_sweep_points=len(sweep_points))
     p.sweep_points = sweep_points
     p = oqh.compile(p)
     return p
@@ -691,7 +701,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         times = times[:-4]
     for t in times:
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi-flux-pi', p)
+        k = oqh.create_kernel('pi_flux_pi', p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         k.gate('fl_cw_02', [2, 0])
@@ -834,7 +844,7 @@ def ef_rabi_seq(q0: int,
         # cw_idx corresponds to special hardcoded pulses in the lutman
         cw_idx = i + 9
 
-        k = oqh.create_kernel("ef_A{}".format(amp), p)
+        k = oqh.create_kernel("ef_A{}".format(int(abs(1000*amp))), p)
         k.prepz(q0)
         k.gate('rx180', [q0])
         k.gate('cw_{:02}'.format(cw_idx), [q0])
@@ -854,5 +864,10 @@ def ef_rabi_seq(q0: int,
         cal_pts_idx = []
 
     p.sweep_points = np.concatenate([amps, cal_pts_idx])
-    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(p.sweep_points)
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p

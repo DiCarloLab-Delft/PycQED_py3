@@ -64,7 +64,7 @@ from pycqed.analysis_v2.timing_cal_analysis import Timing_Cal_Flux_Coarse, Timin
 from pycqed.analysis_v2.coherence_analysis import CoherenceTimesAnalysis, \
     CoherenceTimesAnalysisSingle, AliasedCoherenceTimesAnalysisSingle
 from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy
-from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency
+from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency, FrequencySusceptibility
 from pycqed.analysis_v2.quantum_efficiency_analysis import QuantumEfficiencyAnalysis, DephasingAnalysisSingleScans, DephasingAnalysisSweep, SSROAnalysisSingleScans, SSROAnalysisSweep, QuantumEfficiencyAnalysisTWPA
 from pycqed.analysis_v2.cross_dephasing_analysis import CrossDephasingAnalysis
 from pycqed.analysis_v2.randomized_benchmarking_analysis import (
