@@ -1274,7 +1274,7 @@ def gaussian_filter(wave, filter_sigma, nr_sigma, sampling_rate=1.8e9):
                           (filter_sigma*sampling_rate)**2)
     gauss_filter /= gauss_filter.sum()
     waveFiltered = np.convolve(wave, gauss_filter, mode='full')
-    return  waveFiltered
+    return waveFiltered
 
 
 def IQ_split(wave, f_RO_mod, phi_skew=0, alpha=1, sampling_rate=1.8e9):

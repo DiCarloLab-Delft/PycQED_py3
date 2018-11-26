@@ -175,7 +175,9 @@ def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
     readout_x2['pulse_delay'] = RO_separation
     readout_x2['refpoint'] = 'start'
     probe_pulse = deepcopy(pulses['X180'])
-    prep_pulses = [pulses[pulse_name] for pulse_name in prep_pulses]
+    prep_pulses = [deepcopy(pulses[pulse_name]) for pulse_name in prep_pulses]
+    for pulse in prep_pulses:
+        pulse['pulse_delay'] = -2*np.abs(min_delay)
     for i, tau in enumerate(delays):
         if i in cal_points[0] or i - len(delays) in cal_points[0]:
             el = multi_pulse_elt(2 * i, station, [pulses['I'], RO_pars])

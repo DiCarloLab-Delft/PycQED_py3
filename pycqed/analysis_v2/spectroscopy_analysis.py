@@ -472,8 +472,8 @@ class ResonatorSpectroscopy(Spectroscopy):
                 fit_guess_fn = None
                 x_fit_0 = self.proc_data_dict['plot_frequency'][0]
 
-                self.chi = (self.sim_fit[0].params['omega_ro'].value -
-                            self.sim_fit[1].params['omega_ro'].value)/2
+                self.chi = (self.sim_fit[1].params['omega_ro'].value -
+                            self.sim_fit[0].params['omega_ro'].value)/2
                 self.f_RO = x_fit_0[np.argmax(np.abs(self.sim_fit[1].eval(
                                                          self.sim_fit[1].params,
                                                          f=x_fit_0)-

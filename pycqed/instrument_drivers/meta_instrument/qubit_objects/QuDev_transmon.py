@@ -1729,10 +1729,12 @@ class QuDev_transmon(Qubit):
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
             kappa = list(map(lambda w:0.5*(self.RO_purcell_kappa() - np.real(
-                np.sqrt(-16*self.RO_J_coupling()^2 +(self.RO_purcell_kappa()-
-                  2j*(w-self.f_R()))) )),
-                                    [self.f_RO_resonator() + self.chi(),
-                                     self.f_RO_resonator() - self.chi()]))
+                np.sqrt(-16*self.RO_J_coupling()*self.RO_J_coupling() +
+                        (self.RO_purcell_kappa()-2j*(np.abs(w-self.f_RO_purcell())))*
+                        (self.RO_purcell_kappa()-2j*(np.abs(w-self.f_RO_purcell())))
+                        ))),
+                             [self.f_RO_resonator() - self.chi(),
+                              self.f_RO_resonator() + self.chi()]))
             if not (self.T2_star_ef() == 0):
                 T2star = self.T2_star_ef()
             else:
@@ -1742,13 +1744,13 @@ class QuDev_transmon(Qubit):
                     T2star = self.T2_star()
             ta.ReadoutROPhotonsAnalysis(t_start=None,
                   close_figs=close_fig, options_dict={
-					  'f_qubit': self.f_qubit(),
-	                  'chi': self.chi(), 
-					  'kappa-effactive': kappa,
-	                  'T2echo': T2star , 
-					  'do_analysis': True,
-	                  'artif_detuning': self.artificial_detuning() }, 
-				  do_fitting=True)
+                      'f_qubit': self.f_qubit(),
+                      'chi': self.chi(),
+                      'kappa-effective': kappa,
+                      'T2echo': T2star ,
+                      'do_analysis': True,
+                      'artif_detuning': self.artificial_detuning() },
+                  do_fitting=True)
 
     def calibrate_drive_mixer_carrier_NN(self,MC=None, update=True,make_fig=True,
                                  trigger_sep=5e-6,

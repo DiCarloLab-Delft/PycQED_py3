@@ -560,7 +560,8 @@ def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
     return ro_spacing
 
 
-def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
+def measure_multiplexed_readout(qubits, f_LO, nreps=1, liveplot=False,
+                                shots=5000,
                                 RO_spacing=None, preselection=True, MC=None,
                                 thresholds=None, thresholded=False,
                                 analyse=True):
@@ -594,14 +595,14 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
     m = 2 ** (len(qubits))
     if preselection:
         m *= 2
-    shots = 4094 - 4094 % m
+    # shots = 4094 - 4094 % m
+    shots *= m
     if thresholded:
         df = get_multiplexed_readout_detector_functions(qubits,
                  nr_shots=shots)['dig_log_det']
     else:
         df = get_multiplexed_readout_detector_functions(qubits,
                  nr_shots=shots)['int_log_det']
-
 
 
     MC.live_plot_enabled(liveplot)
@@ -615,15 +616,17 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
         [qb.name for qb in qubits])))
 
     if analyse and thresholds is not None:
-        channel_map = {qb.name: df.value_names[0] for qb in qubits}
-
+        channel_map = {qb.name: qb.int_log_det.value_names[0] for qb in qubits}
+        print('MRO channel map ', channel_map)
         ra.Multiplexed_Readout_Analysis(options_dict=dict(
             n_readouts=(2 if preselection else 1)*2**len(qubits),
             thresholds=thresholds,
-            channel_map=channel_map
+            channel_map=channel_map,
+            use_preselection=preselection
         ))
 
 def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
+                         shots=5000,
                          MC=None, upload=True, sequence='reset_g'):
     """possible sequences: 'reset_g', 'reset_e', 'idle', 'flip'"""
     for qb in qubits:
@@ -643,13 +646,15 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
         qubit_names=qb_names,
         operation_dict=operation_dict,
         reset_cycle_time=reset_cycle_time,
+        use_preselection=False,
         #sequence=sequence,
         nr_resets=nr_resets,
         upload=upload)
 
     m = 2 ** (len(qubits))
     m *= (nr_resets + 1)
-    shots = 4094 - 4094 % m
+    # shots = 4094 - 4094 % m
+    shots *= m
     df = get_multiplexed_readout_detector_functions(qubits,
              nr_shots=shots)['int_log_det']
 
@@ -673,9 +678,11 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
     MC.soft_avg(prev_avg)
 
 
-def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
+def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
+                              CZ_pulses, nreps=1,
                              upload=True, MC=None, prep_sequence=None,
-                             nr_echo_pulses=4, cpmg_scheme=True,
+                             nr_echo_pulses=0, cpmg_scheme=True,
+                             nr_shots=5000,
                              tomography_basis=(
                                  'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                              reset=True, preselection=False, ro_spacing=1e-6):
@@ -700,6 +707,7 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
         qb.prepare_for_timedomain(multiplexed=True)
 
     sf = awg_swf2.parity_correction(qb0.name, qb1.name, qb2.name,
+                                    CZ_pulses=CZ_pulses,
                                     operation_dict=get_operation_dict(qubits),
                                     feedback_delay=feedback_delay,
                                     prep_sequence=prep_sequence, reset=reset,
@@ -711,17 +719,21 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
                                     ro_spacing=ro_spacing)
 
     nr_readouts = (3 if preselection else 2)*len(tomography_basis)**2
-    nr_shots = 4095 - 4095 % nr_readouts
+    if not reset:
+        nr_readouts = (2 if preselection else 1)*len(tomography_basis)**2
+
+    nr_shots *= nr_readouts
     df = get_multiplexed_readout_detector_functions(
         qubits, nr_shots=nr_shots)['int_log_det']
 
     MC.set_sweep_function(sf)
-    MC.set_sweep_points(np.tile(np.arange(nr_readouts)/2,
-                                [nr_shots//nr_readouts]))
+    # MC.set_sweep_points(np.tile(np.arange(nr_readouts)/2,
+    #                             [nr_shots//nr_readouts]))
+    MC.set_sweep_points(np.arange(nr_shots))
     MC.set_sweep_function_2D(swf.None_Sweep())
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
-
+    #
     MC.run_2D(name='two_qubit_parity{}-{}'.format(
         '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])))
 
@@ -782,9 +794,10 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
 
     # from this point on number of segments is fixed
     sf = awg_swf2.n_qubit_seq_sweep(seq_len=n_segments)
-    if shots is None:
-        shots = 4094 - 4094 % n_segments
-    # shots = 600000
+    shots *= n_segments
+    # if shots is None:
+    #     shots = 4094 - 4094 % n_segments
+    # # shots = 600000
 
     if thresholded:
         df = get_multiplexed_readout_detector_functions(qubits,
@@ -1038,7 +1051,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 operation_dict=operation_dict,
                 nr_cliffords_value=nr_cliffords[0],
                 nr_seeds_array=np.arange(nr_seeds),
-                clifford_sequence_list=clifford_sequence_list,
+                # clifford_sequence_list=clifford_sequence_list,
                 upload=False,
                 gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate,
@@ -1066,7 +1079,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 operation_dict=operation_dict,
                 nr_cliffords_value=nr_cliffords[0],
                 nr_seeds_array=np.arange(nr_seeds),
-                clifford_sequence_list=clifford_sequence_list,
+                # clifford_sequence_list=clifford_sequence_list,
                 upload=False,
                 gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate,
@@ -2897,7 +2910,8 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
                     'linear_GST': linear_GST,
                     'preselection': preselection,
                     'thresholded': thresholded,
-                    'nr_shots_per_seg': nr_shots_per_seg}
+                    'nr_shots_per_seg': nr_shots_per_seg,
+                    'nr_exp': nr_exp}
     reduction_type = kw.pop('reduction_type', None)
     if reduction_type is not None:
         exp_metadata.update({'reduction_type': reduction_type})

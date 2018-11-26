@@ -226,10 +226,12 @@ class ZI_HDAWG8(ZI_base_instrument):
         # TODO: add docstrings to make it more clear
         ok = True
         print("Switching to internal clock")
-        self.set('system_extclk', 0)
+        # self.set('system_extclk', 0)
+        self._dev.seti('system/clocks/referenceclock/source', 0)
         time.sleep(1)
         print("Switching to external clock")
-        self.set('system_extclk', 1)
+        # self.set('system_extclk', 1)
+        self._dev.seti('system/clocks/referenceclock/source', 1)
         time.sleep(1)
         print("Calibrating internal DIO delays...")
         for i in [1, 0, 2, 3]:  # strange order is necessary
@@ -265,9 +267,11 @@ class ZI_HDAWG8(ZI_base_instrument):
             if not ok:
                 print("  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps.")
                 self._dev.seti('awgs/*/enable', 0)
-                self._dev.seti('system/extclk', 0)
+                self._dev.seti('system/clocks/referenceclock/source', 0)
+                # self._dev.seti('system/extclk', 0)
                 time.sleep(1)
-                self._dev.seti('system/extclk', 1)
+                self._dev.seti('system/clocks/referenceclock/source', 1)
+                # self._dev.seti('system/extclk', 1)
                 time.sleep(1)
                 self._dev.seti('awgs/*/enable', 1)
                 timeout -= 1

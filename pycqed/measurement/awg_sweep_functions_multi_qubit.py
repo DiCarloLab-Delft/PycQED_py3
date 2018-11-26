@@ -196,8 +196,8 @@ class n_qubit_Simultaneous_RB_sequence_lengths(swf.Soft_Sweep):
         super().__init__()
 
         self.sweep_control = sweep_control
-        # self.sweep_points = nr_cliffords
         self.n_qubit_RB_sweepfunction = n_qubit_RB_sweepfunction
+        self.is_first_sweeppoint = True
         self.name = 'two_qubit_Simultaneous_RB_sequence_lengths'
         self.parameter_name = 'Nr of Cliffords'
         self.unit = '#'
@@ -206,7 +206,9 @@ class n_qubit_Simultaneous_RB_sequence_lengths(swf.Soft_Sweep):
     def set_parameter(self, val):
         self.n_qubit_RB_sweepfunction.nr_cliffords_value = val
         self.n_qubit_RB_sweepfunction.upload = True
-        self.n_qubit_RB_sweepfunction.prepare()
+        self.n_qubit_RB_sweepfunction.prepare(
+            upload_all=self.is_first_sweeppoint)
+        self.is_first_sweeppoint = False
 
 
 class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
@@ -214,7 +216,7 @@ class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
     def __init__(self, qubit_names_list, operation_dict,
                  nr_seeds_array, #array
                  nr_cliffords_value, #int
-                 clifford_sequence_list=None,
+                 # clifford_sequence_list=None,
                  gate_decomposition='HZ', interleaved_gate=None,
                  upload=True, return_seq=False, seq_name=None,
                  verbose=False, cal_points=False):
@@ -225,7 +227,7 @@ class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
         self.upload = upload
         self.nr_cliffords_value = nr_cliffords_value
         self.nr_seeds_array = nr_seeds_array
-        self.clifford_sequence_list = clifford_sequence_list
+        # self.clifford_sequence_list = clifford_sequence_list
         self.seq_name = seq_name
         self.return_seq = return_seq
         self.gate_decomposition = gate_decomposition
@@ -237,7 +239,7 @@ class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
         self.unit = '#'
         self.name = 'two_qubit_Simultaneous_RB_fixed_length'
 
-    def prepare(self, **kw):
+    def prepare(self, upload_all=True,  **kw):
         if self.upload:
             sqs2.n_qubit_simultaneous_randomized_benchmarking_seq(
                 self.qubit_names_list, self.operation_dict,
@@ -245,11 +247,12 @@ class n_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
                 gate_decomposition=self.gate_decomposition,
                 interleaved_gate=self.interleaved_gate,
                 nr_seeds=self.nr_seeds_array,
-                clifford_sequence_list=self.clifford_sequence_list,
+                # clifford_sequence_list=self.clifford_sequence_list,
                 seq_name=self.seq_name,
                 return_seq=self.return_seq,
                 verbose=self.verbose,
-                upload=self.upload,
+                upload=True,
+                upload_all=upload_all,
                 cal_points=self.cal_points)
 
 
@@ -460,6 +463,7 @@ class three_qubit_GHZ_tomo(swf.Hard_Sweep):
 
 class parity_correction(swf.Hard_Sweep):
     def __init__(self, q0n, q1n, q2n, operation_dict, feedback_delay,
+                 CZ_pulses,
                  prep_sequence=None, nr_echo_pulses=4, cpmg_scheme=True,
                  tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                  reset=True, upload=True, verbose=False, preselection=False,
@@ -468,6 +472,7 @@ class parity_correction(swf.Hard_Sweep):
         self.q0n = q0n
         self.q1n = q1n
         self.q2n = q2n
+        self.CZ_pulses = CZ_pulses
         self.operation_dict = operation_dict
         self.feedback_delay = feedback_delay
         self.tomography_basis = tomography_basis
@@ -485,18 +490,32 @@ class parity_correction(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.parity_correction_seq(
-                self.q0n, self.q1n, self.q2n,
-                self.operation_dict,
-                feedback_delay=self.feedback_delay,
-                prep_sequence=self.prep_sequence,
-                tomography_basis=self.tomography_basis,
-                reset=self.reset,
-                verbose=self.verbose,
-                preselection=self.preselection,
-                ro_spacing=self.ro_spacing,
-                nr_echo_pulses=self.nr_echo_pulses,
-                cpmg_scheme=self.cpmg_scheme
+            if self.reset:
+                sqs2.parity_correction_seq(
+                    self.q0n, self.q1n, self.q2n,
+                    self.operation_dict,
+                    CZ_pulses=self.CZ_pulses,
+                    feedback_delay=self.feedback_delay,
+                    prep_sequence=self.prep_sequence,
+                    tomography_basis=self.tomography_basis,
+                    reset=self.reset,
+                    verbose=self.verbose,
+                    preselection=self.preselection,
+                    ro_spacing=self.ro_spacing,
+                    nr_echo_pulses=self.nr_echo_pulses,
+                    cpmg_scheme=self.cpmg_scheme
+                    )
+            else:
+                sqs2.parity_correction_no_reset_seq(
+                    self.q0n, self.q1n, self.q2n,
+                    self.operation_dict,
+                    CZ_pulses=self.CZ_pulses,
+                    feedback_delay=self.feedback_delay,
+                    prep_sequence=self.prep_sequence,
+                    tomography_basis=self.tomography_basis,
+                    verbose=self.verbose,
+                    preselection=self.preselection,
+                    ro_spacing=self.ro_spacing,
                 )
 
 

@@ -1082,8 +1082,8 @@ class Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
         super().__init__()
 
         self.sweep_control = sweep_control
-        # self.sweep_points = nr_cliffords
         self.RB_sweepfunction = RB_sweepfunction
+        self.is_first_sweeppoint = True
         self.name = 'Randomized_Benchmarking_nr_cliffords'
         self.parameter_name = 'Nr of Cliffords'
         self.unit = '#'
@@ -1092,7 +1092,9 @@ class Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
     def set_parameter(self, val):
         self.RB_sweepfunction.nr_cliffords_value = val
         self.RB_sweepfunction.upload = True
-        self.RB_sweepfunction.prepare()
+        self.RB_sweepfunction.prepare(upload_all=self.is_first_sweeppoint)
+        self.is_first_sweeppoint = False
+
 
 class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
 
@@ -1118,7 +1120,7 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
         self.unit = '#'
         self.name = 'Randomized_Benchmarking_one_length'
 
-    def prepare(self, **kw):
+    def prepare(self, upload_all=True, **kw):
         if self.upload:
             sqs.Randomized_Benchmarking_seq_one_length(
                 self.pulse_pars, self.RO_pars,
@@ -1126,6 +1128,8 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
                 gate_decomposition=self.gate_decomposition,
                 interleaved_gate=self.interleaved_gate,
                 nr_seeds=self.sweep_points,
+                upload_all=upload_all,
+                upload=True,
                 cal_points=self.cal_points,
                 seq_name=self.seq_name)
 
