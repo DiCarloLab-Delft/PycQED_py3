@@ -1090,7 +1090,12 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
 
     p.sweep_points = np.concatenate(
         [np.repeat(angles, len(cases)), cal_pts_idx])
-    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(p.sweep_points)
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
 
 
@@ -1618,5 +1623,10 @@ def sliding_flux_pulses_seq(
         cal_pts_idx = []
 
     p.sweep_points = np.concatenate([angles, cal_pts_idx])
-    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    try:
+        p.set_sweep_points(p.sweep_points)
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p

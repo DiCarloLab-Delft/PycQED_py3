@@ -1,12 +1,8 @@
+from pycqed.measurement import measurement_control as mc
 
-"""
-October 2018
-Francesco Battistel
-
-Rearranging code for CZ simulations. Files without "_new" in pycqed/simulations are old and not supported anymore.
-Needs to be copied into notebook to work
-
-"""
+import adaptive
+from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
+from pycqed.instrument_drivers.virtual_instruments import noise_parameters_CZ_new as npCZ
 
 from pycqed.simulations import cz_superoperator_simulation_new_functions as czf
 import numpy as np
@@ -19,30 +15,86 @@ import qutip as qtp
 
 
 
-def compute_propagator_parallelizable(arglist):
-    # arglist = [samplepoint_q0,samplepoint_q1,fluxlutman_args,noise_parameters_CZ_args,fitted_stepresponse_ty,instrument_number,cluster]
+
+
+def f_to_parallelize_new(arglist):
+
+    fitted_stepresponse_ty = arglist['fitted_stepresponse_ty']
+    fluxlutman_args = arglist['fluxlutman_args']       # [sampling_rate, cz_length, q_J2, czd_double_sided, cz_lambda_2, cz_lambda_3,
+                                                           #        cz_theta_f, czd_length_ratio]
+    noise_parameters_CZ_args = arglist['noise_parameters_CZ_args']       # [Z_rotations_length, voltage_scaling_factor, distortions, T1_q0, T1_q1, T2_q0_sweetspot, T2_q0_interaction_point,
+                                                                             #      T2_q0_amplitude_dependent, T2_q1]
+    number = arglist['number']
+    adaptive_pars = arglist['adaptive_pars']
+
+
+    MC = mc.MeasurementControl('MC'+'{}'.format(number), live_plot_enabled=False)
+    from qcodes import station
+    station = station.Station()
+    station.add_component(MC)
+    MC.station =station
+
+    
+    fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman'+'{}'.format(number))
+    station.add_component(fluxlutman)
+    noise_parameters_CZ = npCZ.NoiseParametersCZ('noise_parameters_CZ'+'{}'.format(number))
+    station.add_component(noise_parameters_CZ)
+
+    fluxlutman, noise_parameters_CZ = czf.return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args)
+
+
+    d=CZ_trajectory_superoperator(fluxlutman=fluxlutman, noise_parameters_CZ=noise_parameters_CZ,
+                                                         fitted_stepresponse_ty=fitted_stepresponse_ty)
+    MC.set_detector_function(d)
+
+
+    if adaptive_pars['mode']=='adaptive': 
+        MC.set_sweep_functions([fluxlutman.cz_theta_f, fluxlutman.cz_lambda_2])
+        MC.set_adaptive_function_parameters({'adaptive_function': adaptive.Learner2D, 
+                                         'goal':lambda l: l.npoints>adaptive_pars['n_points'], 
+                                         'bounds':[(adaptive_pars['theta_f_min'], adaptive_pars['theta_f_max']), (adaptive_pars['lambda2_min'], adaptive_pars['lambda2_max'])]})
+
+        if noise_parameters_CZ.cluster():
+            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='adaptive')
+                #mode='2D')
+        else:
+        	dat = MC.run('2D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='adaptive')
+                #mode='2D')
+    elif adaptive_pars['mode']=='1D':
+        MC.set_sweep_functions([fluxlutman.cz_theta_f])
+        MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'], adaptive_pars['theta_f_max'],100))
+        if noise_parameters_CZ.cluster():
+            dat = MC.run('1D simulation_new_cluster2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D')
+                #mode='2D')
+        else:
+            dat = MC.run('1D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D')
+                #mode='2D')
+
+
+    fluxlutman.close()
+    noise_parameters_CZ.close()
+    MC.close()
+
+
+
+
+
+def compute_propagator(arglist):
+    # arglist = [samplepoint_q0,samplepoint_q1,fluxlutman_args,noise_parameters_CZ_args,fitted_stepresponse_ty]
 
     fluxbias_q0 = arglist['fluxbias_q0']
     fluxbias_q1 = arglist['fluxbias_q1']
     fitted_stepresponse_ty = arglist['fitted_stepresponse_ty']
-        
-    if arglist['cluster']:
-    
-        fluxlutman_args = arglist['fluxlutman_args']       # [sampling_rate, cz_length, q_J2, czd_double_sided, cz_lambda_2, cz_lambda_3,
-                                                           #        cz_theta_f, czd_length_ratio]
-        noise_parameters_CZ_args = arglist['noise_parameters_CZ_args']       # [Z_rotations_length, voltage_scaling_factor, distortions, T1_q0, T1_q1, T2_q0_sweetspot, T2_q0_interaction_point,
-                                                                             #      T2_q0_amplitude_dependent, T2_q1]
-        number = arglist['number']
-
-
-        fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman_'+'{}'.format(number))
-        noise_parameters_CZ = npCZ.NoiseParametersCZ('noise_parameters_CZ_'+'{}'.format(number))
-
-        fluxlutman, noise_parameters_CZ = czf.return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args)
-    else:
-        fluxlutman = arglist['fluxlutman']
-        noise_parameters_CZ = arglist['noise_parameters_CZ']
-
+    fluxlutman = arglist['fluxlutman']
+    noise_parameters_CZ = arglist['noise_parameters_CZ']
 
 
     sim_step=1/fluxlutman.sampling_rate()
@@ -137,11 +189,6 @@ def compute_propagator_parallelizable(arglist):
                                  fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new)
     #print(czf.verify_CPTP(U_superop_average))
 
-
-    if arglist['cluster']:
-        fluxlutman.close()
-        noise_parameters_CZ.close()
-
     return [U_final, t_final]
 
 
@@ -198,8 +245,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         super().__init__()
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
-                            'cond_phase02']
-        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg']
+                            'cond_phase02', 'coherent_leakage11', 'offset_difference', 'missing_fraction']
+        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%']
         self.fluxlutman = fluxlutman
         self.noise_parameters_CZ = noise_parameters_CZ
         self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
@@ -207,11 +254,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
     def acquire_data_point(self, **kw):
 
-        ### Extract relevant parameters to recreate the instrument locally (necessary for parallelization since intruments cannot be pickled)
+        #czf.plot_spectrum(fluxlutman=self.fluxlutman,noise_parameters_CZ=self.noise_parameters_CZ)
         
-        fluxlutman_args, noise_parameters_CZ_args = return_instrument_args(self.fluxlutman,self.noise_parameters_CZ)
-
-
         ### Discretize average (integral) over a Gaussian distribution
         mean = 0
         sigma_q0 = self.noise_parameters_CZ.sigma_q0()
@@ -253,24 +297,11 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 for j_q1 in range(len(samplingpoints_gaussian_q1)): 
                     fluxbias_q1 = samplingpoints_gaussian_q1[j_q1]                 # q1 spectator qubit
 
-                    number=number+1
-
-                    if self.noise_parameters_CZ.cluster():
-                        input_point = {'fluxbias_q0': fluxbias_q0,                  # need to pass it like this to the cluster
-                                       'fluxbias_q1': fluxbias_q1,
-                                       'fluxlutman_args': fluxlutman_args,
-                                       'noise_parameters_CZ_args': noise_parameters_CZ_args,
-                                       'fitted_stepresponse_ty': self.fitted_stepresponse_ty,
-                                       'number': number,
-                                       'cluster': self.noise_parameters_CZ.cluster()}
-                    else:
-                        input_point = {'fluxbias_q0': fluxbias_q0,                  # need to pass it like this to the cluster
-                                       'fluxbias_q1': fluxbias_q1,
-                                       'fluxlutman': self.fluxlutman,
-                                       'noise_parameters_CZ': self.noise_parameters_CZ,
-                                       'fitted_stepresponse_ty': self.fitted_stepresponse_ty,
-                                       'number': number,
-                                       'cluster': self.noise_parameters_CZ.cluster()}
+                    input_point = {'fluxbias_q0': fluxbias_q0,                  # need to pass it like this to the cluster
+                                   'fluxbias_q1': fluxbias_q1,
+                                   'fluxlutman': self.fluxlutman,
+                                   'noise_parameters_CZ': self.noise_parameters_CZ,
+                                   'fitted_stepresponse_ty': self.fitted_stepresponse_ty}
 
                     weight = values_gaussian_q0[j_q0]*delta_x_q0 * values_gaussian_q1[j_q1]*delta_x_q1
                     weights.append(weight)
@@ -278,19 +309,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                     input_to_parallelize.append(input_point)
 
 
-            if self.noise_parameters_CZ.cluster():
-                y_list_of_lists = map_jobqueue_repeat(compute_propagator_parallelizable, 35, input_to_parallelize)          # function defined in notebook cluster
-
-                y_list_of_lists = np.array(y_list_of_lists)
-                U_final_vec = y_list_of_lists[:,0]
-                t_final_vec = y_list_of_lists[:,1]
-            else:
-                U_final_vec = []
-                t_final_vec = []
-                for input_arglist in input_to_parallelize:
-                    result_list = compute_propagator_parallelizable(input_arglist)
-                    U_final_vec.append(result_list[0])
-                    t_final_vec.append(result_list[1])
+            U_final_vec = []
+            t_final_vec = []
+            for input_arglist in input_to_parallelize:
+                result_list = compute_propagator(input_arglist)
+                U_final_vec.append(result_list[0])
+                t_final_vec.append(result_list[1])
 
 
             for i in range(len(U_final_vec)):
@@ -314,9 +338,41 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             quantities_of_interest = [cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, 
                              qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], 
                              qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100,
-                             qoi['cond_phase02']]
+                             qoi['cond_phase02'], qoi['coherent_leakage11']*100, qoi['offset_difference']*100, qoi['missing_fraction']*100]
             qoi_vec=np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
+
+
+            '''leakage_vec=[]
+            infid_vec=[]
+            leakage_dephased_vec=[]
+            infid_dephased_vec=[]
+            dimensions = U_superop_average.dims
+            U_temp = U_superop_average.full()
+            U_temp[22,40]=0
+            U_temp[38,40]=0
+            U_temp[22,20]=0
+            U_temp[38,20]=0
+            U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
+            for n in range(1,201,2):
+            	U_superop_n=U_superop_average**n
+            	U_superop_dephased_n = U_superop_dephased**n
+            	qoi=czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+            	qoi_dephased=czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+            	leakage_vec.append(qoi['L1'])
+            	infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
+            	leakage_dephased_vec.append(qoi_dephased['L1'])
+            	infid_dephased_vec.append(1-qoi_dephased['avgatefid_compsubspace_pc'])
+
+            czf.plot(x_plot_vec=[np.arange(1,200,2)],
+                          #y_plot_vec=[leakage_vec,infid_vec,leakage_dephased_vec,infid_dephased_vec],
+                          y_plot_vec=[np.array(leakage_vec)*100,np.array(leakage_dephased_vec)*100],
+                          title='Repeated $CZ$ gates',
+                          xlabel='Number of CZ gates',ylabel='Leakage (%)',
+                          legend_labels=['Using directly the $CZ$ from the simulations','Depolarizing the leakage subspace'])
+
+            print(leakage_vec)
+            print(leakage_dephased_vec)'''
 
 
         qoi_plot = np.array(qoi_plot)
@@ -330,6 +386,18 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
         return qoi_plot[0,0], qoi_plot[0,1], qoi_plot[0,2], qoi_plot[0,3], qoi_plot[0,4], qoi_plot[0,5], qoi_plot[0,6], \
-               qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10], qoi_plot[0,11]
+               qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10], qoi_plot[0,11], qoi_plot[0,12], qoi_plot[0,13], qoi_plot[0,14]
 
-           
+
+
+
+
+
+
+
+
+
+
+
+
+

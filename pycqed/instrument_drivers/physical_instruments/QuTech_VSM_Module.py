@@ -263,7 +263,7 @@ class QuTechVSMModule(SCPI):
                                        set_cmd=scpi_name + ' {}',
                                        get_parser=float,
                                        vals=validators.Numbers(min_value=0.1,
-                                                               max_value=1.0))
+                                                               max_value=2.0))
 
                     doc_var = 'Phase value (in rad) for the {p} ' \
                               'input of channel {c} ' \
