@@ -195,12 +195,12 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
     if Tphi01_q1 != 0:                                 # we automatically put also the decoherence for 12 and 02
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,-1,0],
-                                    [0,0,0]])
+                                    [0,0,1]])
         collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
         c_ops.append(collapse*np.sqrt(1/(2*Tphi01_q1)))
 
         Tphi12_q1=Tphi01_q1
-        sigmaZinqutrit = qtp.Qobj([[0,0,0],
+        sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,1,0],
                                     [0,0,-1]])
         collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
@@ -208,7 +208,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
 
         Tphi02_q1=Tphi01_q1/4
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
-                                    [0,0,0],
+                                    [0,1,0],
                                     [0,0,-1]])
         collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
         c_ops.append(collapse*np.sqrt(1/(2*Tphi02_q1)))
@@ -216,12 +216,12 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
     if Tphi01_q0_vec != []:                                 # we automatically put also the decoherence for 12 and 02
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,-1,0],
-                                    [0,0,0]])
+                                    [0,0,1]])
         collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
         c_ops.append([collapse,np.sqrt(1/(2*Tphi01_q0_vec))])
 
         Tphi12_q0_vec=Tphi01_q0_vec
-        sigmaZinqutrit = qtp.Qobj([[0,0,0],
+        sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,1,0],
                                     [0,0,-1]])
         collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
@@ -229,7 +229,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
 
         Tphi02_q0_vec=Tphi01_q0_vec/4
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
-                                    [0,0,0],
+                                    [0,1,0],
                                     [0,0,-1]])
         collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
         c_ops.append([collapse,np.sqrt(1/(2*Tphi02_q0_vec))])
