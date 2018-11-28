@@ -1574,7 +1574,7 @@ class DeviceCCL(Instrument):
             nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
                                    15., 20., 25.]), nr_seeds=100,
             interleaving_cliffords=[None],
-            label='TwoQubit_CharBench_{}seeds_{}_{}',
+            label='TwoQubit_CharBench_{}seeds_icl{}_{}_{}',
             recompile: bool ='as needed', cal_points=True):
 
         # Settings that have to be preserved, change is required for
@@ -1751,7 +1751,8 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed*nr_seeds))
 
         MC.set_detector_function(d)
-        MC.run(label.format(nr_seeds, qubits[0], qubits[1]),
+        MC.run(label.format(nr_seeds, interleaving_cliffords,
+                            qubits[0], qubits[1]),
                exp_metadata={'bins': sweep_points})
         # N.B. if interleaving cliffords are used, this won't work
         # FIXME: write a proper analysis for simultaneous RB
