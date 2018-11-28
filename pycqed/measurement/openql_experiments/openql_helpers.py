@@ -143,14 +143,20 @@ def add_two_q_cal_points(p, q0: int, q1: int,
         elif comb[0] == '1':
             k.gate('rx180', [q0])
         elif comb[0] =='2': 
-            k.gate('rx12', [q0])
+            k.gate('rx180', [q0])
+            # FIXME: this is a workaround
+            #k.gate('rx12', [q0])
+            k.gate('cw_31', [q0])
 
         if comb[1] =='0':
             k.gate('i', [q1])
         elif comb[1] == '1':
             k.gate('rx180', [q1])
         elif comb[1] =='2': 
-            k.gate('rx12', [q1])
+            k.gate('rx180', [q1])
+            # FIXME: this is a workaround
+            #k.gate('rx12', [q1])
+            k.gate('cw_31', [q1])
 
 
         # Used to ensure timing is aligned

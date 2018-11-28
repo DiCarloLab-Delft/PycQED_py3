@@ -612,6 +612,7 @@ class DeviceCCL(Instrument):
             lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
             # load_phase_pulses will also upload other waveforms
             mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+            mw_lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
