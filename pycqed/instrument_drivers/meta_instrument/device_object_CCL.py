@@ -604,15 +604,16 @@ class DeviceCCL(Instrument):
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         for q in [q0, q1]:
-            # This can be 
+            # This can be
             mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
 
             lm = mw_lutman.LutMap()
-            # we hardcode the X on the ef transition to CW 31 here. 
+            # we hardcode the X on the ef transition to CW 31 here.
             lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
             # load_phase_pulses will also upload other waveforms
             mw_lutman.load_phase_pulses_to_AWG_lookuptable()
-            mw_lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+            mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                regenerate_waveforms=True)
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
@@ -638,9 +639,9 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
         MC.set_detector_function(self.get_correlation_detector())
-        MC.run('conditional_oscillation_{}_{}_{}{}'.format(q0, q1, 
-                self.msmt_suffix, label),
-                disable_snapshot_metadata=disable_metadata)
+        MC.run('conditional_oscillation_{}_{}_{}{}'.format(q0, q1,
+                                                           self.msmt_suffix, label),
+               disable_snapshot_metadata=disable_metadata)
 
         a = ma2.Conditional_Oscillation_Analysis(
             options_dict={'ch_idx_osc': self.qubits().index(q0),
@@ -653,9 +654,8 @@ class DeviceCCL(Instrument):
 
         return a
 
-
     def measure_two_qubit_grovers_repeated(
-            self, qubits:list, nr_of_grover_iterations=40, 
+            self, qubits: list, nr_of_grover_iterations=40,
             prepare_for_timedomain=True, MC=None):
 
         if prepare_for_timedomain:
@@ -663,14 +663,14 @@ class DeviceCCL(Instrument):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        for q in qubits: 
+        for q in qubits:
             assert q in self.qubits()
 
         q0idx = self.find_instrument(qubits[-1]).cfg_qubit_nr()
         q1idx = self.find_instrument(qubits[-2]).cfg_qubit_nr()
 
         p = mqo.grovers_two_qubits_repeated(
-            qubits=[q1idx, q0idx], 
+            qubits=[q1idx, q0idx],
             nr_of_grover_iterations=nr_of_grover_iterations,
             platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -679,13 +679,11 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_of_grover_iterations))
         MC.set_detector_function(d)
-        MC.run('Grovers_two_qubit_repeated_{}_{}{}'.format(qubits[-2], qubits[-1], 
-            self.msmt_suffix))
+        MC.run('Grovers_two_qubit_repeated_{}_{}{}'.format(qubits[-2], qubits[-1],
+                                                           self.msmt_suffix))
 
         a = ma.MeasurementAnalysis()
         return a
-
-
 
     def measure_two_qubit_tomo_bell(self, q0: str, q1: str,
                                     bell_state=0, wait_after_flux=None,
@@ -705,7 +703,7 @@ class DeviceCCL(Instrument):
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
 
         p = mqo.two_qubit_tomo_bell(bell_state, q0idx, q1idx,
-            wait_after_flux=wait_after_flux,
+                                    wait_after_flux=wait_after_flux,
                                     platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
@@ -714,7 +712,8 @@ class DeviceCCL(Instrument):
         # 36 tomo rotations + 7*4 calibration points
         MC.set_sweep_points(np.arange(36+7*4))
         MC.set_detector_function(d)
-        MC.run('TwoQubitBellTomo_{}_{}{}'.format(q0, q1, self.msmt_suffix)+label)
+        MC.run('TwoQubitBellTomo_{}_{}{}'.format(
+            q0, q1, self.msmt_suffix)+label)
         if analyze:
             a = tomo.Tomo_Multiplexed(
                 label='Tomo',
@@ -1222,10 +1221,10 @@ class DeviceCCL(Instrument):
                 dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
                     sq_eps, state_A='01', state_B=None, positive_branch=True)
 
-                sq_pulse = dacval* \
+                sq_pulse = dacval * \
                     np.ones(int(value*fl_lutman.sampling_rate()))
 
-                fl_lutman.custom_wf(sq_pulse )
+                fl_lutman.custom_wf(sq_pulse)
                 fl_lutman.load_waveform_realtime('custom_wf',
                                                  regenerate_waveforms=True)
             elif pulse_shape == 'double_sided_square':
@@ -1237,7 +1236,6 @@ class DeviceCCL(Instrument):
 
                 neg_dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
                     sq_eps, state_A='01', state_B=None, positive_branch=False)
-
 
                 sq_pulse_half = np.ones(int(value/2*fl_lutman.sampling_rate()))
 
@@ -1570,6 +1568,93 @@ class DeviceCCL(Instrument):
                exp_metadata={'bins': sweep_points})
         # N.B. if measurement was interrupted this wont work
         ma2.UnitarityBenchmarking_TwoQubit_Analysis(nseeds=nr_seeds)
+
+    def measure_two_qubit_character_benchmarking(
+            self, qubits, MC,
+            nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
+                                   15., 20., 25.]), nr_seeds=100,
+            interleaving_cliffords=[None],
+            label='TwoQubit_CharBench_{}seeds_{}_{}',
+            recompile: bool ='as needed', cal_points=True):
+
+        # Settings that have to be preserved, change is required for
+        # 2-state readout and postprocessing
+        old_weight_type = self.ro_acq_weight_type()
+        old_digitized = self.ro_acq_digitized()
+        self.ro_acq_weight_type('SSB')
+        self.ro_acq_digitized(False)
+
+        self.prepare_for_timedomain()
+
+        MC.soft_avg(1)
+        # set back the settings
+        self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_digitized(old_digitized)
+
+        for q in qubits:
+            q_instr = self.find_instrument(q)
+            mw_lutman = q_instr.instr_LutMan_MW.get_instr()
+            mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        MC.soft_avg(1)
+
+        programs = []
+        t0 = time.time()
+        print('Generating {} Character benchmarking programs'.format(nr_seeds))
+        qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+        for i in range(nr_seeds):
+            # check for keyboard interrupt q because generating can be slow
+            check_keyboard_interrupt()
+            sweep_points = np.concatenate(
+                [np.repeat(nr_cliffords, 16),
+                 [nr_cliffords[-1]+.5]*7])
+
+            p = cl_oql.character_benchmarking(
+                qubits=qubit_idxs,
+                nr_cliffords=nr_cliffords,
+                nr_seeds=1,
+                program_name='Char_RB_s{}_ncl{}_icl{}_{}_{}'.format(
+                    i,
+                    list(map(int, nr_cliffords)),
+                    interleaving_cliffords,
+                    qubits[0], qubits[1]),
+                platf_cfg=self.cfg_openql_platform_fn(),
+                interleaving_cliffords=interleaving_cliffords,
+                recompile=recompile)
+
+            p.sweep_points = sweep_points
+            programs.append(p)
+            print('Generated {} Character benchmarking programs in {:.1f}s'.format(
+                i+1, time.time()-t0), end='\r')
+        print('Succesfully generated {} Character benchmarking programs in {:.1f}s'.format(
+            nr_seeds, time.time()-t0))
+
+        d = self.get_int_logging_detector(qubits=qubits)
+
+        counter_param = ManualParameter('name_ctr', initial_value=0)
+        prepare_function_kwargs = {
+            'counter_param': counter_param,
+            'programs': programs,
+            'CC': self.instr_CC.get_instr()}
+
+        d.prepare_function = oqh.load_range_of_oql_programs
+        d.prepare_function_kwargs = prepare_function_kwargs
+        # d.nr_averages = 128
+
+        reps_per_seed = 4094//len(sweep_points)
+        d.nr_shots = reps_per_seed*len(sweep_points)
+
+        s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed*nr_seeds))
+
+        MC.set_detector_function(d)
+        MC.run(label.format(nr_seeds, qubits[0], qubits[1]),
+               exp_metadata={'bins': sweep_points})
+        # N.B. if measurement was interrupted this wont work
+        # TODO make analysis for character benchmarking
+        # ma2.UnitarityBenchmarking_TwoQubit_Analysis(nseeds=nr_seeds)
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
             self, qubits, MC,
