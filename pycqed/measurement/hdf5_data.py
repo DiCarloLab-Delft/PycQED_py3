@@ -18,16 +18,16 @@ import logging
 
 
 class DateTimeGenerator:
-    '''
+    """
     Class to generate filenames / directories based on the date and time.
-    '''
+    """
 
     def __init__(self):
         pass
 
     def create_data_dir(self, datadir: str, name: str=None, ts=None,
                         datesubdir: bool=True, timesubdir: bool=True):
-        '''
+        """
         Create and return a new data directory.
 
         Input:
@@ -40,7 +40,7 @@ class DateTimeGenerator:
 
         Output:
             The directory to place the new file in
-        '''
+        """
 
         path = datadir
         if ts is None:
@@ -81,7 +81,7 @@ class DateTimeGenerator:
         return path, tsd
 
     def new_filename(self, data_obj, folder):
-        '''Return a new filename, based on name and timestamp.'''
+        """Return a new filename, based on name and timestamp."""
         path, tstr = self.create_data_dir(folder,
                                           name=data_obj._name,
                                           ts=data_obj._localtime)
@@ -121,9 +121,9 @@ class Data(h5py.File):
 
 
 def encode_to_utf8(s):
-    '''
+    """
     Required because h5py does not support python3 strings
-    '''
+    """
     # converts byte type to string because of h5py datasaving
     if isinstance(s, str):
         s = s.encode('utf-8')
