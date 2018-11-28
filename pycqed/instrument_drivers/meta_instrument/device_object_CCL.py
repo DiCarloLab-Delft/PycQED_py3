@@ -1650,7 +1650,8 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed*nr_seeds))
 
         MC.set_detector_function(d)
-        MC.run(label.format(nr_seeds, qubits[0], qubits[1]),
+        MC.run(label.format(nr_seeds, interleaving_cliffords,
+                            qubits[0], qubits[1]),
                exp_metadata={'bins': sweep_points})
         # N.B. if measurement was interrupted this wont work
         # TODO make analysis for character benchmarking
@@ -1751,8 +1752,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed*nr_seeds))
 
         MC.set_detector_function(d)
-        MC.run(label.format(nr_seeds, interleaving_cliffords,
-                            qubits[0], qubits[1]),
+        MC.run(label.format(nr_seeds, qubits[0], qubits[1]),
                exp_metadata={'bins': sweep_points})
         # N.B. if interleaving cliffords are used, this won't work
         # FIXME: write a proper analysis for simultaneous RB

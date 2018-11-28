@@ -315,7 +315,6 @@ def character_benchmarking(
                         cl_seq_decomposed.append(Cl(cl).gate_decomposition)
 
                 for pauli in paulis:
-                    print(pauli)
                     # merge the pauli with the first element of the cl seq.
                     cl0 = Cl(common_cliffords[pauli])
                     # N.B. multiplication order is opposite of order in time
