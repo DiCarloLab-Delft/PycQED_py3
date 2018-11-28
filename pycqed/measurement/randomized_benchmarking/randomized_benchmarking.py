@@ -8,19 +8,19 @@ from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 
 
-def calculate_net_clifford(rb_clifford_indices, 
+def calculate_net_clifford(rb_clifford_indices,
                            Clifford=tqc.SingleQubitClifford):
     '''
     Calculate the net-clifford from a list of cliffords indices.
 
-    Args: 
+    Args:
         rb_clifford_indices: list or array of integers specifying the cliffords.
-        Clifford : Clifford object used to determine what 
-            inversion technique to use and what indices are valid. 
-            Valid choices are `SingleQubitClifford` and `TwoQubitClifford` 
+        Clifford : Clifford object used to determine what
+            inversion technique to use and what indices are valid.
+            Valid choices are `SingleQubitClifford` and `TwoQubitClifford`
 
-    Returns: 
-        net_clifford: a `Clifford` object containing the net-clifford. 
+    Returns:
+        net_clifford: a `Clifford` object containing the net-clifford.
             the Clifford index is contained in the Clifford.idx attribute.
 
     Note: the order corresponds to the order in a pulse sequence but is
@@ -39,7 +39,6 @@ def calculate_net_clifford(rb_clifford_indices,
         # the new operator is applied on the left side.
         net_clifford = cliff*net_clifford
     return net_clifford
-
 
 
 def calculate_recovery_clifford(cl_in, desired_cl=0):
@@ -81,9 +80,9 @@ def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
     return tape
 
 
-def randomized_benchmarking_sequence_old(n_cl:int,
-                                     desired_net_cl:int =0,
-                                     seed:int=None):
+def randomized_benchmarking_sequence_old(n_cl: int,
+                                         desired_net_cl: int =0,
+                                         seed: int=None):
     '''
     Generates a sequence of "n_cl" random single qubit Cliffords followed
     by a a recovery Clifford to make the net result correspond
@@ -122,10 +121,11 @@ def randomized_benchmarking_sequence_old(n_cl:int,
 # More advanced sequences are avaliable using this method.
 ##############################################################################
 
+
 def randomized_benchmarking_sequence(
         n_cl: int,
-        desired_net_cl:int = 0,
-        number_of_qubits:int = 1,
+        desired_net_cl: int = 0,
+        number_of_qubits: int = 1,
         max_clifford_idx: int = 11520,
         interleaving_cl: int = None,
         seed: int=None):
@@ -161,7 +161,7 @@ def randomized_benchmarking_sequence(
     if number_of_qubits == 1:
         Cl = tqc.SingleQubitClifford
         group_size = np.min([24, max_clifford_idx])
-    elif number_of_qubits ==2:
+    elif number_of_qubits == 2:
         Cl = tqc.TwoQubitClifford
         group_size = np.min([11520, max_clifford_idx])
     else:
@@ -191,5 +191,3 @@ def randomized_benchmarking_sequence(
         rb_clifford_indices = np.append(rb_clifford_indices,
                                         recovery_clifford.idx)
     return rb_clifford_indices
-
-
