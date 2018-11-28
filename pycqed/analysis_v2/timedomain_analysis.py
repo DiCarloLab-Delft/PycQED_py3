@@ -959,8 +959,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
 
         # self.proc_data_dict['osc_amp'] = (osc_amp, osc_amp_stderr)
         self.proc_data_dict['missing_fraction'] = (
-            np.mean(self.proc_data_dict['yvals_spec_on'][:-2]) -
-            np.mean(self.proc_data_dict['yvals_spec_off'][:-2]))
+            np.mean(self.proc_data_dict['yvals_spec_on'][:-3]) -
+            np.mean(self.proc_data_dict['yvals_spec_off'][:-4]))
 
     def prepare_plots(self):
         self._prepare_main_oscillation_figure()
