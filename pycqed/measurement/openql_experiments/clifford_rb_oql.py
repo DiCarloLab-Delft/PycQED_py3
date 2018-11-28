@@ -315,12 +315,12 @@ def character_benchmarking(
                         cl_seq_decomposed.append(Cl(cl).gate_decomposition)
 
                 for pauli in paulis:
-                    cl0 = Cl(common_cliffords[pauli])
+                    print(pauli)
                     # merge the pauli with the first element of the cl seq.
-                    print(cl0)
-                    print(cl_seq)
-                    print(cl_seq[0])
-                    combined_cl0 = cl0*Cl(cl_seq[0])  # TODO double multiplication order
+                    cl0 = Cl(common_cliffords[pauli])
+                    # N.B. multiplication order is opposite of order in time
+                    # -> the first element in time (cl0) is on the right
+                    combined_cl0 = Cl(cl_seq[0])*cl0
                     char_bench_seq_decomposed = \
                         [combined_cl0.gate_decomposition] + cl_seq_decomposed
 
@@ -330,16 +330,17 @@ def character_benchmarking(
 
                     for qubit_idx in qubit_map.values():
                         k.prepz(qubit_idx)
-                        for gates in char_bench_seq_decomposed:
-                            for g, q in gates:
-                                if isinstance(q, str):
-                                    k.gate(g, [qubit_map[q]])
-                                elif isinstance(q, list):
-                                    # proper codeword
-                                    k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
-                        for qubit_idx in qubit_map.values():
-                            k.measure(qubit_idx)
-                        p.add_kernel(k)
+                    for gates in char_bench_seq_decomposed:
+                        for g, q in gates:
+                            if isinstance(q, str):
+                                k.gate(g, [qubit_map[q]])
+                            elif isinstance(q, list):
+                                # proper codeword
+                                k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
+                    for qubit_idx in qubit_map.values():
+                        k.measure(qubit_idx)
+
+                    p.add_kernel(k)
 
         if cal_points:
             if f_state_cal_pts:
