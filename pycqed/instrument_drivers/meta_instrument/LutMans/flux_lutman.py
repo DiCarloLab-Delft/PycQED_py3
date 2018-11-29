@@ -984,7 +984,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if self.czd_double_sided():
             corr_pulse += phase_corr_sine_series([self.cz_phase_corr_amp()],
                                                      corr_samples)
-        else: 
+        else:
             corr_pulse += phase_corr_sine_series_half([self.cz_phase_corr_amp()],
                                          corr_samples)
 
@@ -1381,7 +1381,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         ax.plot([amp_J2], [f_11_02],
                 color='C4', marker='o', label='11-02')
         ax.text(amp_J2, f_11_02,
-                '({:.3f},{:.2f})'.format(amp_J2, f_11_02*1e-9),
+                '({:.4f},{:.2f})'.format(amp_J2, f_11_02*1e-9),
                 color='C4',
                 ha='left', va='bottom', clip_on=True)
 
@@ -1390,7 +1390,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         ax.plot([amp_J1], [f_10_01],
                 color='C5', marker='o', label='10-01')
         ax.text(amp_J1, f_10_01,
-                '({:.3f},{:.2f})'.format(amp_J1, f_10_01*1e-9),
+                '({:.4f},{:.2f})'.format(amp_J1, f_10_01*1e-9),
                 color='C5', ha='left', va='bottom', clip_on=True)
 
         # 3. Adding legend etc.

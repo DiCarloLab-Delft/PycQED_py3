@@ -629,8 +629,8 @@ class DeviceCCL(Instrument):
                disable_snapshot_metadata=disable_metadata)
 
         a = ma2.Conditional_Oscillation_Analysis(
-            options_dict={'ch_idx_osc': self.qubits().index(q0),
-                          'ch_idx_spec': self.qubits().index(q1)},
+            options_dict={'ch_idx_osc': 0,
+                          'ch_idx_spec': 1},
             extract_only=extract_only)
 
         if verbose:
@@ -1364,11 +1364,11 @@ class DeviceCCL(Instrument):
                 nr_cliffords=nr_cliffords,
                 nr_seeds=1,
                 platf_cfg=self.cfg_openql_platform_fn(),
-                program_name='TwoQ_RB_int_cl_s{}_ncl{}_icl{}_netcl{}_{}_{}_double'.format(
-                    i,
-                    list(map(int, nr_cliffords)),
-                    interleaving_cliffords,
-                    list(map(int, net_cliffords)),
+                program_name='TwoQ_RB_int_cl_s{}_ncl_icl_netcl_{}_{}_double'.format(
+                    int(i),
+                    #list(map(int, nr_cliffords)),
+                    #interleaving_cliffords,
+                    #list(map(int, net_cliffords)),
                     qubits[0], qubits[1]),
                 interleaving_cliffords=interleaving_cliffords,
                 cal_points=cal_points,
@@ -1537,7 +1537,7 @@ class DeviceCCL(Instrument):
         self.ro_acq_weight_type('SSB')
         self.ro_acq_digitized(False)
 
-        self.prepare_for_timedomain()
+        self.prepare_for_timedomain(qubits=qubits)
 
         MC.soft_avg(1)
         # set back the settings
