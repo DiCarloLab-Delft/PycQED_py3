@@ -567,7 +567,14 @@ class DeviceCCL(Instrument):
             #     'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
             #     qb.mw_vsm_delay())
 
-    def prepare_for_timedomain(self, qubits):
+    def prepare_for_timedomain(self, qubits:list):
+        """
+        Prepare setup for a timedomain experiment: 
+
+        Args: 
+            qubits: list of str
+                list of qubit names that have to be prepared 
+        """
         self.prepare_readout(qubits=qubits)
         if self.find_instrument(qubits[0]).instr_LutMan_Flux() != None:
             self.prepare_fluxing()
