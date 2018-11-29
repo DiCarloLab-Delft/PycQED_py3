@@ -1607,8 +1607,8 @@ class DeviceCCL(Instrument):
             # check for keyboard interrupt q because generating can be slow
             check_keyboard_interrupt()
             sweep_points = np.concatenate(
-                [np.repeat(nr_cliffords, 16),
-                 [nr_cliffords[-1]+.5]*7])
+                [np.repeat(nr_cliffords, 4*len(interleaving_cliffords)),
+                 nr_cliffords[-1]+np.arange(7)*.05+.5])  # cal pts
 
             p = cl_oql.character_benchmarking(
                 qubits=qubit_idxs,
