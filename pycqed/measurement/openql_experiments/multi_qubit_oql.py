@@ -16,8 +16,6 @@ def single_flux_pulse_seq(qubit_indices: tuple,
         k.prepz(idx)  # to ensure enough separation in timing
         k.prepz(idx)  # to ensure enough separation in timing
 
-    for i in range(7):
-        k.gate('CW_00', [i])
 
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
     k.gate('fl_cw_02', [qubit_indices[0], qubit_indices[1]])
@@ -760,7 +758,7 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
     # # FIXME: needs to be added
     # print('Warning: not using compensation pulses.')
 
-    p = oqh.create_program("two_qubit_tomo_bell", platf_cfg)
+    p = oqh.create_program("two_qubit_tomo_bell_{}_{}".format(q1, q0), platf_cfg)
     for p_q1 in tomo_gates:
         for p_q0 in tomo_gates:
             k = oqh.create_kernel(
@@ -1111,11 +1109,15 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
 
             p.add_kernel(k)
     if add_cal_points:
-        p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1)
+        p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1, 
+                                     f_state_cal_pts=True, 
+                                     f_state_cal_pt_cw=31) 
+            # hardcoded requires ef pulses to be prepared 
     p = oqh.compile(p)
 
     if add_cal_points:
-        cal_pts_idx = [361, 362, 363, 364]
+        cal_pts_idx = [361, 362, 363, 364, 
+                       365, 366, 367]
     else:
         cal_pts_idx = []
 
@@ -1206,6 +1208,81 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
         p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1)
     p = oqh.compile(p)
     return p
+
+
+
+
+def grovers_two_qubits_repeated(qubits, platf_cfg: str,
+                                nr_of_grover_iterations: int):
+    """
+    Writes the QASM sequence for Grover's algorithm on two qubits.
+    Sequence:
+        q0: G0 -       - mY90 -    - mY90  - RO
+                 CZ             CZ
+        q1: G1 -       - mY90 -    - mY90  - RO
+    G0 and G1 are state preparation gates. Here G0 = 'ry90' and G1 = 'rym90'
+
+    Parameters:
+    -----------
+    qubits: list of int
+        List of the qubits (indices) to which the sequence is applied.
+    """
+    p = oqh.create_program("grovers_two_qubits_repeated", platf_cfg)
+    q0 = qubits[-1]
+    q1 = qubits[-2]
+
+    G0 = {"phi": 90, "theta": 90}
+    G1 = {"phi": 90, "theta": 90}
+    for i in range(nr_of_grover_iterations):
+        # k = p.new_kernel('Grover_iteration_{}'.format(i))
+        k = oqh.create_kernel('Grover_iteration_{}'.format(i), p)
+        k.prepz(q0)
+        k.prepz(q1)
+        # k.prepz()
+        k.gate('ry90', [q0])
+        k.gate('ry90', [q1])
+        # k.rotate(q0, **G0)
+        # k.rotate(q1, **G1)
+
+        for j in range(i):
+            # Oracle stage
+            k.gate('cz', [2, 0]) #hardcoded fixme 
+            # k.cz(q0, q1)
+            # Tagging stage
+            if (j % 2 == 0):
+                k.gate('rym90', [q0])                
+                k.gate('rym90', [q1])
+                # k.ry(q0, -90)
+                # k.ry(q1, -90)
+            else:
+                k.gate('ry90', [q0])                
+                k.gate('ry90', [q1])
+                # k.ry(q0, 90)
+                # k.ry(q1, 90)
+            k.gate('cz', [2, 0]) #hardcoded fixme 
+            # k.cz(q0, q1)
+            if (j % 2 == 0):
+                k.gate('ry90', [q0])                
+                k.gate('ry90', [q1])
+            else:
+                k.gate('rym90', [q0])                
+                k.gate('rym90', [q1])
+            # if (j % 2 == 0):
+            #     k.ry(q0, 90)
+            #     k.ry(q1, 90)
+            # else:
+            #     k.ry(q0, -90)
+            #     k.ry(q1, -90)
+        k.measure(q0)
+        k.measure(q1)
+        p.add_kernel(k)
+    p = oqh.compile(p)
+    # p.compile()
+    return p
+
+
+
+
 
 
 def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,

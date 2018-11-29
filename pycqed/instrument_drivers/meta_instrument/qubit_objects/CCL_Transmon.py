@@ -994,7 +994,6 @@ class CCLight_Transmon(Qubit):
 
         # 2. Prepares map and parameters for waveforms
         #    (except pi-pulse amp, which depends on VSM usage)
-        MW_LutMan.set_default_lutmap()
         MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
         MW_LutMan.mw_gauss_width(self.mw_gauss_width())
         MW_LutMan.channel_amp(self.mw_channel_amp())
@@ -2882,7 +2881,7 @@ class CCLight_Transmon(Qubit):
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
 
-    def measure_flipping(self, number_of_flips=np.arange(20), equator=True,
+    def measure_flipping(self, number_of_flips=np.arange(0, 40, 2), equator=True,
                          MC=None, analyze=True, close_fig=True, update=True,
                          ax='x', angle='180'):
 
