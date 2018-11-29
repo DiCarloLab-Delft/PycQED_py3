@@ -243,7 +243,7 @@ class complex_spectroscopy(Spectroscopy):
             self.plot_dicts['real'] = {'plotfn': plot_fn,
                                        'xvals': proc_data_dict['plot_frequency'],
                                        'yvals': proc_data_dict['plot_real'],
-                                       'title': 'S21 amp: %s' % (self.timestamps[0]),
+                                       'title': 'S21 real: %s' % (self.timestamps[0]),
                                        'xlabel': proc_data_dict['freq_label'],
                                        'ylabel': proc_data_dict['real_label'],
                                        'yrange': proc_data_dict['amp_range'],
@@ -254,11 +254,23 @@ class complex_spectroscopy(Spectroscopy):
             self.plot_dicts['imag'] = {'plotfn': plot_fn,
                                        'xvals': proc_data_dict['plot_frequency'],
                                        'yvals': proc_data_dict['plot_imag'],
-                                       'title': 'S21 phase: %s' % (self.timestamps[0]),
+                                       'title': 'S21 imaginary: %s' % (self.timestamps[0]),
                                        'xlabel': proc_data_dict['freq_label'],
                                        'ylabel': proc_data_dict['imag_label'],
                                        'yrange': proc_data_dict['amp_range'],
                                        'setlabel':'imag',
+                                       'plotsize': plotsize,
+                                       'do_legend':True
+                                       }
+            self.plot_dicts['plane'] = {'plotfn': plot_fn,
+                                       'xvals': proc_data_dict['plot_real'],
+                                       'yvals': proc_data_dict['plot_imag'],
+                                       'title': 'S21 parametric plot: %s' % (self.timestamps[0]),
+                                       'xlabel': proc_data_dict['real_label'],
+                                       'ylabel': proc_data_dict['imag_label'],
+                                       'yrange': proc_data_dict['amp_range'],
+                                       'xrange': proc_data_dict['amp_range'],
+                                       'setlabel':'plane',
                                        'plotsize': plotsize,
                                        'do_legend':True
                                        }
@@ -340,6 +352,17 @@ class VNA_analysis(complex_spectroscopy):
                 'plotfn': self.plot_fit,
                 'fit_res': self.fit_dicts['reso_fit']['fit_res'],
                 'output_mod_fn':lambda a: np.unwrap(np.angle(a)),
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'hanger',
+                'line_kws': {'color': 'r'},
+                'do_legend': True}
+
+            self.plot_dicts['reso_fit_phase'] = {
+                'ax_id': 'plane',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
+                'output_mod_fn': np.imag,
+                'output_mod_fn_x': np.real,
                 'plot_init': self.options_dict['plot_init'],
                 'setlabel': 'hanger',
                 'line_kws': {'color': 'r'},

@@ -1281,6 +1281,11 @@ class BaseDataAnalysis(object):
             else:
                 pdict['yvals'] = output
 
+            # plot parametrically
+            output_mod_fn_x = pdict.get('output_mod_fn_x', None)
+            if output_mod_fn_x is not None:
+                pdict['xvals'] = output_mod_fn_x(output)
+
         if plot_normed:
             pdict['yvals']=pdict['yvals']/pdict['yvals'][0]
 

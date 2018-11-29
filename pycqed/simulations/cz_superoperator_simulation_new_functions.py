@@ -57,6 +57,39 @@ where xy is the row and x'y' is the column
 '''
 
 
+hadamard_singleq = qtp.Qobj([[1,1,0],
+                                    [1,-1,0],
+                                    [0,0,1]])/np.sqrt(2)
+hadamard_q0 = qtp.tensor(qtp.qeye(3),hadamard_singleq)
+
+def qubit_to_2qutrit_unitary(U_2q,right_or_left):
+    U_temp = np.zeros([3,3],dtype=complex)
+    U_temp[2,2]=1
+    U_2q_matrix=U_2q.full()
+    for i in range(np.size(U_2q_matrix,axis=0)):
+        for j in range(np.size(U_2q_matrix,axis=1)):
+            U_temp[i,j]=U_2q_matrix[i,j]
+    U_temp=qtp.Qobj(U_temp,type='oper',dims=[[3],[3]])
+            
+    if right_or_left == 'right':
+        return qtp.tensor(qtp.qeye(3),U_temp)
+    elif right_or_left == 'left':
+        return qtp.tensor(U_temp,qtp.qeye(3))
+
+
+def bloch_sphere_rotation(angle, unit_vector):
+    ### Inputs:
+    # angle (float): rotation angle (in rad) around the axis specified by unit_vector
+    # unit_vector: real vector with unit norm specifying the axis of rotation. If it doesn't have unit norm,
+    #              then we normalize it
+    
+    unit_vector=unit_vector/np.linalg.norm(unit_vector)
+    
+    sigma_scalar_unit_vector = qtp.sigmax()*unit_vector[0]+qtp.sigmay()*unit_vector[1]+qtp.sigmaz()*unit_vector[2]
+    
+    return np.cos(angle/2)*qtp.qeye(2) - 1j * np.sin(angle/2) * sigma_scalar_unit_vector
+
+
 
 
 ##### Functions to construct hamiltonian, collapse operators, and compute single quantities of interest
@@ -80,6 +113,8 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
         J * (a.dag() - a) * (-b + b.dag())
+        #J * np.sqrt(2) * (qtp.tensor(qtp.basis(3,0),qtp.basis(3,2))*qtp.tensor(qtp.basis(3,1),qtp.basis(3,1)).dag()+\
+        #    qtp.tensor(qtp.basis(3,1),qtp.basis(3,1))*qtp.tensor(qtp.basis(3,0),qtp.basis(3,2)).dag())
     H = H * (2*np.pi)
     return H
 
@@ -160,20 +195,20 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
     if Tphi01_q1 != 0:                                 # we automatically put also the decoherence for 12 and 02
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,-1,0],
-                                    [0,0,0]])
+                                    [0,0,1]])
         collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
         c_ops.append(collapse*np.sqrt(1/(2*Tphi01_q1)))
 
         Tphi12_q1=Tphi01_q1
-        sigmaZinqutrit = qtp.Qobj([[0,0,0],
+        sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,1,0],
                                     [0,0,-1]])
         collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
         c_ops.append(collapse*np.sqrt(1/(2*Tphi12_q1)))
 
-        Tphi02_q1=Tphi01_q1/2
+        Tphi02_q1=Tphi01_q1/4
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
-                                    [0,0,0],
+                                    [0,1,0],
                                     [0,0,-1]])
         collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
         c_ops.append(collapse*np.sqrt(1/(2*Tphi02_q1)))
@@ -181,20 +216,20 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
     if Tphi01_q0_vec != []:                                 # we automatically put also the decoherence for 12 and 02
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,-1,0],
-                                    [0,0,0]])
+                                    [0,0,1]])
         collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
         c_ops.append([collapse,np.sqrt(1/(2*Tphi01_q0_vec))])
 
         Tphi12_q0_vec=Tphi01_q0_vec
-        sigmaZinqutrit = qtp.Qobj([[0,0,0],
+        sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,1,0],
                                     [0,0,-1]])
         collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
         c_ops.append([collapse,np.sqrt(1/(2*Tphi12_q0_vec))])
 
-        Tphi02_q0_vec=Tphi01_q0_vec/2
+        Tphi02_q0_vec=Tphi01_q0_vec/4
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
-                                    [0,0,0],
+                                    [0,1,0],
                                     [0,0,-1]])
         collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
         c_ops.append([collapse,np.sqrt(1/(2*Tphi02_q0_vec))])
@@ -532,6 +567,69 @@ def pro_avfid_superoperator_phasecorrected(U,phases):
         return np.real(qtp.average_gate_fidelity(U,target=U_target_diffdims))
 
 
+def offset_difference_and_missing_fraction(U):
+
+    X90 = bloch_sphere_rotation(np.pi/2, [1,0,0])
+    X90_q0 = qubit_to_2qutrit_unitary(X90,'right')
+    X180 = bloch_sphere_rotation(np.pi, [1,0,0])
+    X180_q1 = qubit_to_2qutrit_unitary(X180, 'left')
+
+    population_in_0_vec=[[],[],[],[]]  #[[q0 NOT pi pulsed],[q1 NOT pi pulsed],[q0 pi pulsed],[q1 pi pulsed]]
+    for pi_pulse in [False,True]:
+
+        n_samples=100
+        for phi in np.linspace(0,2*np.pi,n_samples,endpoint=False):
+            Uphi90 = bloch_sphere_rotation(np.pi/2, [np.cos(phi),np.sin(phi),0])
+            Uphi90_q0 = qubit_to_2qutrit_unitary(Uphi90, 'right')
+
+            pre_operations = X90_q0
+            post_operations = Uphi90_q0
+            if pi_pulse:
+                pre_operations=pre_operations*X180_q1
+                post_operations=post_operations*X180_q1
+            pre_operations=qtp.to_super(pre_operations)
+            post_operations=qtp.to_super(post_operations)
+            if U.type=='oper':
+                U=qtp.to_super(U)
+
+            U_tot = post_operations * U * pre_operations
+
+            population_in_0_q0 = U_tot[0,0]+U_tot[0,30]+U_tot[0,60]
+            population_in_0_q0=np.real(population_in_0_q0)
+
+            population_in_0_q1 = U_tot[0,0]+U_tot[0,10]+U_tot[0,20]
+            population_in_0_q1=np.real(population_in_0_q1)
+
+            if not pi_pulse:
+                population_in_0_vec[0].append(population_in_0_q0)
+                population_in_0_vec[1].append(population_in_0_q1)
+            else:
+                population_in_0_vec[2].append(population_in_0_q0)
+                population_in_0_vec[3].append(population_in_0_q1)
+
+    average_q0_NOTpipulsed = np.average(population_in_0_vec[0])
+    average_q0_pipulsed = np.average(population_in_0_vec[2])
+    offset_difference = average_q0_NOTpipulsed-average_q0_pipulsed
+
+    missing_fraction = 1-np.average(population_in_0_vec[3])
+
+    # plot(x_plot_vec=[np.linspace(0,2*np.pi,n_samples,endpoint=False)],
+    #                       y_plot_vec=[population_in_0_vec[0],population_in_0_vec[2]],
+    #                       title='Offset difference',
+    #                       xlabel='Phi (rad)', ylabel='Population in 0, q0', legend_labels=['q1 in 0','q1 in 1'])
+    # plot(x_plot_vec=[np.linspace(0,2*np.pi,n_samples,endpoint=False)],
+    #                       y_plot_vec=[population_in_0_vec[1],population_in_0_vec[3]],
+    #                       title='Missing fraction',
+    #                       xlabel='Phi (rad)', ylabel='Population in 0, q1', legend_labels=['q1 in 0','q1 in 1'])
+
+    return offset_difference, missing_fraction
+
+
+    
+
+
+
+
 
 
 ##### functions called by the main program
@@ -705,13 +803,14 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
     for i in range(len(amp)):
         H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ) + correction_to_H
         H=S.dag()*H*S
+        S_H = qtp.tensor(qtp.qeye(3),qtp.qeye(3))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])
         if c_ops != []:
             c_ops_temp=[]
             for c in range(len(c_ops)):
                 if isinstance(c_ops[c],list):
-                    c_ops_temp.append(c_ops[c][0]*c_ops[c][1][i])    # c_ops are already in the H_0 basis
+                    c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_H.dag())    # c_ops are already in the H_0 basis
                 else:
-                    c_ops_temp.append(c_ops[c])
+                    c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
             liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*sim_step).expm()
         else:
             liouville_exp_t=(-1j*H*sim_step).expm()
@@ -742,7 +841,9 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
     L2 = seepage_from_superoperator(U_final)
     avgatefid = pro_avfid_superoperator_phasecorrected(U_final,phases)
     avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)     # leakage has to be taken into account, see Woods & Gambetta
+    coherent_leakage11 = np.abs(U_final[40,22])
     #print('avgatefid_compsubspace',avgatefid_compsubspace)
+    offset_difference, missing_fraction = offset_difference_and_missing_fraction(U_final)
 
 
     H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=0, J=0)
@@ -764,7 +865,8 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
             'avgatefid_compsubspace_pc': avgatefid_compsubspace, 'phase_q0': phase_q0, 'phase_q1': phase_q1,
             'avgatefid_compsubspace': avgatefid_compsubspace_notphasecorrected,
             'avgatefid_compsubspace_pc_onlystaticqubit': avgatefid_compsubspace_pc_onlystaticqubit, 'population_02_state': population_02_state,
-            'cond_phase02': cond_phase02}
+            'cond_phase02': cond_phase02, 'coherent_leakage11': coherent_leakage11,
+            'offset_difference': offset_difference, 'missing_fraction': missing_fraction}
 
 
 
@@ -1067,10 +1169,22 @@ def plot_spectrum(fluxlutman,noise_parameters_CZ):
 
 ## functions for Ramsey/Rabi simulations
 
+def calc_populations(U):
+
+    if U.type == 'oper':
+        U_pi2_pulsed = hadamard_q0 * U * hadamard_q0
+        populations = {'population_lower_state': np.abs(U_pi2_pulsed[0,0])**2, 'population_higher_state': np.abs(U_pi2_pulsed[0,1])**2}
+    elif U.type == 'super':
+        U_pi2_pulsed = qtp.to_super(hadamard_q0) * U * qtp.to_super(hadamard_q0)
+        populations = {'population_lower_state': np.real(U_pi2_pulsed[0,0]), 'population_higher_state': np.real(U_pi2_pulsed[0,10])}
+
+    return populations
+
+
 def calc_populations_new(rho_out,population_states):
 
-    populations = {'population_02': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[0]))).data[0,0]),
-                   'population_11': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[1]))).data[0,0])}
+    populations = {'population_higher_state': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[0]))).data[0,0]),
+                   'population_lower_state': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[1]))).data[0,0])}
 
     return populations
 
@@ -1086,6 +1200,10 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
 
         population_states = [eigvectors[5],eigvectors[4]]
 
+        rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
+        rho_out = U * rho_in
+        populations = calc_populations_new(rho_out,population_states)
+
     elif initial_state == '11_bare':
         amp = 0
         H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
@@ -1094,12 +1212,17 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
 
         population_states = [eigvectors[5],eigvectors[4]]
 
+        rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
+        rho_out = U * rho_in
+        populations = calc_populations_new(rho_out,population_states)
+
+    elif initial_state == 'ramsey_q0':
+        populations = calc_populations(U)
+
     else:
         print('invalid keyword for initial state')
 
-    rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
-    rho_out = U * rho_in
-    populations = calc_populations_new(rho_out,population_states)
+    
     return populations
 
 
