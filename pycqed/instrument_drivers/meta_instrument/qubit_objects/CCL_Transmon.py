@@ -1357,7 +1357,7 @@ class CCLight_Transmon(Qubit):
                 Navg=5,
                 prepare_function=mw_lutman.load_waveform_realtime,
                 # Codeword 10 is hardcoded in the generate CCL config
-                prepare_function_kwargs={'waveform_name': 'square', 'wf_nr': 10})
+                prepare_function_kwargs={'waveform_key': 'square', 'wf_nr': 10})
             ad_func_pars = {'adaptive_function': cma.fmin,
                             'x0': x0,
                             'sigma0': 1,
