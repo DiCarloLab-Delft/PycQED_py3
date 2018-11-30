@@ -36,10 +36,21 @@ class Test_base_analysis(unittest.TestCase):
 
         a.fit_res = {}
         a.save_fit_results()
-
         assert exp_val == saved_val
 
+    def test_save_quantities_of_interest(self):
+        # Test based on test below to get a dummy dataset
+        ts='20161124_162604'
+        a = ba.BaseDataAnalysis()
+        a.proc_data_dict['quantities_of_interest'] = {'a': 5}
+        a.timestamps = [ts]
+        a.save_quantities_of_interest()
 
+        fn = a_tools.measurement_filename(a_tools.data_from_time(ts))
+        with h5py.File(fn, 'r') as file:
+            saved_val = float(file['Analysis']['quantities_of_interest'].attrs['a'])
+
+        assert saved_val == 5
 
 
     def test_save_load_json(self):
