@@ -147,6 +147,19 @@ def exponential_decay_correction_hw_friendly(ysig, tau: float, amp: float,
     return filtered_signal[:len(ysig)]
 
 
+def build_piecewise_kernel(x_list, x_start=4, x_pw=2):
+    """ Builds an FIR filter kernel, for which the first x_start coefficients
+        are freely choosable, and then the remaining coefficients are
+        repeated pairwise (for x_pw = 2). """
+    kernel = np.zeros(x_start + x_pw*(len(x_list) - x_start))
+
+    for i, x in enumerate(x_list[x_start:]):
+        kernel[x_pw*i + x_start : x_pw*i + x_start + x_pw] = x
+
+    kernel[0:x_start] = x_list[0:x_start]
+
+    return kernel
+
 # Delay a signal by d clock cycles.
 # This is done by adding d zero entries to the front of the signal array, and by removing the last d entries.
 def sigdelay(sig, d):
