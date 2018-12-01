@@ -642,7 +642,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
 
-        MC.set_detector_function(self.get_correlation_detector())
+        MC.set_detector_function(self.get_correlation_detector([q0, q1]))
         MC.run('conditional_oscillation_{}_{}_{}{}'.format(q0, q1,
                                                            self.msmt_suffix, label),
                disable_snapshot_metadata=disable_metadata)
@@ -1585,7 +1585,7 @@ class DeviceCCL(Instrument):
         self.ro_acq_weight_type('SSB')
         self.ro_acq_digitized(False)
 
-        self.prepare_for_timedomain()
+        self.prepare_for_timedomain(qubits=qubits)
 
         MC.soft_avg(1)
         # set back the settings
