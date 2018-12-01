@@ -853,8 +853,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             'normalize_to_cal_points', True)
         cal_points = [
             # calibration point indices are when ignoring the f-state cal pts
-            [[-7, -5], [-6, -4], [-3, -1]],  # oscillating qubit
             [[-7, -6], [-5, -4], [-2, -1]],  # spec qubit
+            [[-7, -5], [-6, -4], [-3, -1]],  # oscillating qubits
         ]
 
         for idx, type_str in zip([ch_idx_osc, ch_idx_spec], ['osc', 'spec']):
