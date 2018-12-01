@@ -81,8 +81,8 @@ class BaseDataAnalysis(object):
         Data and derived quantities:
             self.raw_data_dict          (dict)
             self.proc_data_dict         (dict)
+                self.proc_data_dict['quantities_of_interest'] (dict)
             self.fit_res                (dict)
-            self.quantities_of_interest (dict)
 
         Figures:
             axs (dict)
@@ -225,6 +225,7 @@ class BaseDataAnalysis(object):
             self.run_fitting()  # fitting to models
             self.save_fit_results()
             self.analyze_fit_results()  # analyzing the results of the fits
+        self.save_quantities_of_interest()
 
         self.prepare_plots()  # specify default plots
         if not self.extract_only:

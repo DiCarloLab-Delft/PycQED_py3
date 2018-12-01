@@ -40,7 +40,7 @@ class Test_base_analysis(unittest.TestCase):
 
     def test_save_quantities_of_interest(self):
         # Test based on test below to get a dummy dataset
-        ts='20161124_162604'
+        ts = '20161124_162604'
         a = ba.BaseDataAnalysis()
         a.proc_data_dict['quantities_of_interest'] = {'a': 5}
         a.timestamps = [ts]
