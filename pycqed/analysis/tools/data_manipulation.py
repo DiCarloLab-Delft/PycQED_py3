@@ -561,3 +561,65 @@ def filter_resonator_visibility(x, y, z, deg=True, cutoff_factor=0,
     restruct = np.abs(np.array(restruct))
 
     return restruct
+
+
+def populations_using_rate_equations(SI: np.array, SX: np.array,
+                                     V0: float, V1: float, V2: float):
+    """
+    Calculate populations using reference voltages.
+
+    Parameters:
+    -----------
+    SI : array 
+        signal value for signal with I (Identity) added
+    SX : array 
+        signal value for signal with X (π-pulse) added
+    V0 : float
+        Reference signal level for 0-state (calibration point).
+    V1 : float
+        Reference signal level for 1-state (calibration point).
+    V2 : float
+        Reference signal level for 2-state (calibration point).
+
+    
+    Returns:
+    --------
+    P0 : array
+        population of the |0> state
+    P1 : array
+        population of the |1> state
+    P2 : array
+        population of the |2> state
+    M_inv : 2D array  
+        Matrix inverse to find populations
+
+    Based on equation (S1) from Asaad & Dickel et al. npj Quant. Info. (2016)
+
+    To quantify leakage, we monitor the populations Pi of the three lowest
+    energy states (i ∈ {0, 1, 2}) and calculate the average
+    values <Pi>. To do this, we calibrate the average signal levels Vi for
+    the transmons in level i, and perform each measurement twice, the second
+    time with an added final π pulse on the 0–1 transition. This final π
+    pulse swaps P0 and P1, leaving P2 unaffected. Under the assumption that
+    higher levels are unpopulated (P0 +P1 +P2 = 1),
+
+        [V0 −V2,   V1 −V2] [P0]  = [S −V2]
+        [V1 −V2,   V0 −V2] [P1]  = [S' −V2]
+
+    where S (S') is the measured signal level without (with) final π pulse.
+    The populations are extracted by matrix inversion.
+    """
+    M = np.array([[V0-V2, V1-V2], [V1-V2, V0-V2]])
+    M_inv = np.linalg.inv(M)
+
+    P0 = np.zeros(len(SI))
+    P1 = np.zeros(len(SX))
+    for i, (sI, sX) in enumerate(zip(SI, SX)):
+        p0, p1 = np.dot(np.array([sI-V2, sX-V2]), M_inv)
+        p0, p1 = np.dot(M_inv, np.array([sI-V2, sX-V2]))
+        P0[i] = p0
+        P1[i] = p1
+
+    P2 = 1 - P0 - P1
+
+    return P0, P1, P2, M_inv

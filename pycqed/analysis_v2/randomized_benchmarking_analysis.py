@@ -9,6 +9,8 @@ import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 import logging
 from scipy.stats import sem
+from pycqed.analysis.tools.data_manipulation import \
+    populations_using_rate_equations
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, plot_fit
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pl
@@ -1516,55 +1518,6 @@ def plot_char_rb_quantities(ax, qoi, **kw):
         qoi['eps_CZ'].nominal_value*100, qoi['eps_CZ'].std_dev*100)
 
     ax.text(1.05, 0.0, alpha_msg, transform=ax.transAxes)
-
-
-def populations_using_rate_equations(SI: np.array, SX: np.array,
-                                     V0: float, V1: float, V2: float):
-    """
-    Calculate populations using reference voltages.
-
-    Args:
-        SI (array): signal value for signal with I (Identity) added
-        SX (array): signal value for signal with X (π-pulse) added
-        V0 (float):
-        V1 (float):
-        V2 (float):
-    returns:
-        P0 (array): population of the |0> state
-        P1 (array): population of the |1> state
-        P2 (array): population of the |2> state
-        M_inv (2D array) :  Matrix inverse to find populations
-
-    Based on equation (S1) from Asaad & Dickel et al. npj Quant. Info. (2016)
-
-    To quantify leakage, we monitor the populations Pi of the three lowest
-    energy states (i ∈ {0, 1, 2}) and calculate the average
-    values <Pi>. To do this, we calibrate the average signal levels Vi for
-    the transmons in level i, and perform each measurement twice, the second
-    time with an added final π pulse on the 0–1 transition. This final π
-    pulse swaps P0 and P1, leaving P2 unaffected. Under the assumption that
-    higher levels are unpopulated (P0 +P1 +P2 = 1),
-
-     [V0 −V2,   V1 −V2] [P0]  = [S −V2]
-     [V1 −V2,   V0 −V2] [P1]  = [S' −V2]
-
-    where S (S') is the measured signal level without (with) final π pulse.
-    The populations are extracted by matrix inversion.
-    """
-    M = np.array([[V0-V2, V1-V2], [V1-V2, V0-V2]])
-    M_inv = np.linalg.inv(M)
-
-    P0 = np.zeros(len(SI))
-    P1 = np.zeros(len(SX))
-    for i, (sI, sX) in enumerate(zip(SI, SX)):
-        p0, p1 = np.dot(np.array([sI-V2, sX-V2]), M_inv)
-        p0, p1 = np.dot(M_inv, np.array([sI-V2, sX-V2]))
-        P0[i] = p0
-        P1[i] = p1
-
-    P2 = 1 - P0 - P1
-
-    return P0, P1, P2, M_inv
 
 
 def logisticreg_classifier_machinelearning(shots_0, shots_1, shots_2):
