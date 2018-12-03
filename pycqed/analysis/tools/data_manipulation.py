@@ -612,14 +612,19 @@ def populations_using_rate_equations(SI: np.array, SX: np.array,
     M = np.array([[V0-V2, V1-V2], [V1-V2, V0-V2]])
     M_inv = np.linalg.inv(M)
 
-    P0 = np.zeros(len(SI))
-    P1 = np.zeros(len(SX))
+    # using lists instead of preallocated array allows this to work 
+    # with ufloats 
+    P0 = [] 
+    P1 = [] 
     for i, (sI, sX) in enumerate(zip(SI, SX)):
         p0, p1 = np.dot(np.array([sI-V2, sX-V2]), M_inv)
         p0, p1 = np.dot(M_inv, np.array([sI-V2, sX-V2]))
-        P0[i] = p0
-        P1[i] = p1
+        P0.append(p0)
+        P1.append(p1)
 
+    P0 = np.array(P0)
+    P1 = np.array(P1)
+    
     P2 = 1 - P0 - P1
 
     return P0, P1, P2, M_inv
