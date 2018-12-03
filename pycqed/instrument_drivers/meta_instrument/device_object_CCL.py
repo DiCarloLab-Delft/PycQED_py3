@@ -1818,25 +1818,54 @@ class DeviceCCL(Instrument):
         # a = self.check_mux_RO(update=update, update_threshold=update_threshold)
         return True
 
-    def calibrate_cz_single_q_phase(self, q0: str, q1: str,
+    def calibrate_cz_single_q_phase(self, q_osc: str, q_spec: str,
                                     amps,
                                     waveform='cz_z',
                                     update: bool = True,
                                     prepare_for_timedomain: bool=True, MC=None):
+        """
+        Calibrate single qubit phase corrections of CZ pulse. 
+        
+        Parameters
+        ----------
+        q_osc : str
+            Name of the "oscillating" qubit. The phase correction of this 
+            qubit will be calibrated.
+        q_spec: str
+            Name of the "spectator" qubit. This qubit is used as the control. 
+        amps: array_like 
+            Amplitudes of the phase correction to measure. 
+        waveform: str 
+            Name of the waveform used on the "oscillating" qubit. This waveform
+            will be reuploaded for each datapoint. Common names are "cz_z" and 
+            "idle_z"
+        
+        Returns
+        -------
+        succes: bool 
+            True if calibration succeeded, False if it failed. 
+
+        procedure works by performing a conditional oscillation experiment at 
+        a phase of 90 degrees. If the phase correction is correct, the "off" and
+        "on" curves (control qubit in 0 and 1) should interesect. The 
+        analysis looks for the intersect. 
+        """
+
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain()
+            self.prepare_for_timedomain(qubits = [q_osc, q_spec])
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        q0idx = self.find_instrument(q0).cfg_qubit_nr()
-        q1idx = self.find_instrument(q1).cfg_qubit_nr()
-        fl_lutman_q0 = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        q0idx = self.find_instrument(q_osc).cfg_qubit_nr()
+        q1idx = self.find_instrument(q_spec).cfg_qubit_nr()
+        fl_lutman_q0 = self.find_instrument(q_osc).instr_LutMan_Flux.get_instr()
 
-        p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                            platf_cfg=self.cfg_openql_platform_fn(),
-                                            CZ_disabled=False, add_cal_points=False,
-                                            angles=[90])
+        p = mqo.conditional_oscillation_seq(
+            q0idx, q1idx,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            CZ_disabled=False, add_cal_points=False,
+            angles=[90])
 
         CC = self.instr_CC.get_instr()
         CC.eqasm_program(p.filename)
@@ -1845,19 +1874,18 @@ class DeviceCCL(Instrument):
         s = swf.FLsweep(fl_lutman_q0, fl_lutman_q0.cz_phase_corr_amp,
                         waveform)
 
-        d = self.get_correlation_detector(qubits=[q0, q1],single_int_avg=True, seg_per_point=2)
+        d = self.get_correlation_detector(qubits=[q_osc, q_spec],
+            single_int_avg=True, seg_per_point=2)
         d.detector_control = 'hard'
-        # the order of self.qubits is used in the correlation detector
-        # and is required for the analysis
-        ch_idx = self.qubits().index(q0)
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.repeat(amps, 2))
         MC.set_detector_function(d)
-        MC.run('{}_CZphase'.format(q0))
+        MC.run('{}_CZphase'.format(q_osc))
 
-        a = ma2.Intersect_Analysis(options_dict={'ch_idx_A': ch_idx,
-                                                 'ch_idx_B': ch_idx})
+        # The correlation detector has q_osc on channel 0  
+        a = ma2.Intersect_Analysis(options_dict={'ch_idx_A': 0,
+                                                 'ch_idx_B': 0})
 
         phase_corr_amp = a.get_intersect()[0]
         if phase_corr_amp > np.max(amps) or phase_corr_amp < np.min(amps):
@@ -1865,7 +1893,7 @@ class DeviceCCL(Instrument):
             return False
         else:
             if update:
-                self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
+                self.find_instrument(q_osc).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
 
     def calibrate_flux_timing(self, q0: str, q1: str,
