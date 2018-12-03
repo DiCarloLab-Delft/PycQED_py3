@@ -569,11 +569,11 @@ class DeviceCCL(Instrument):
 
     def prepare_for_timedomain(self, qubits:list):
         """
-        Prepare setup for a timedomain experiment: 
+        Prepare setup for a timedomain experiment:
 
-        Args: 
+        Args:
             qubits: list of str
-                list of qubit names that have to be prepared 
+                list of qubit names that have to be prepared
         """
         self.prepare_readout(qubits=qubits)
         if self.find_instrument(qubits[0]).instr_LutMan_Flux() != None:
@@ -1572,9 +1572,9 @@ class DeviceCCL(Instrument):
 
     def measure_two_qubit_character_benchmarking(
             self, qubits, MC,
-            nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
-                                   15., 20., 25.]), nr_seeds=100,
-            interleaving_cliffords=[None],
+            nr_cliffords=np.array([1.,  2.,  3.,  5.,  6.,  7.,  9., 12.,
+                                   15., 19., 25., 31., 39., 49, 62, 79]),
+            nr_seeds=100, interleaving_cliffords=[None, -4368],
             label='TwoQubit_CharBench_{}seeds_icl{}_{}_{}',
             recompile: bool ='as needed', cal_points=True):
 
@@ -1655,8 +1655,8 @@ class DeviceCCL(Instrument):
                             qubits[0], qubits[1]),
                exp_metadata={'bins': sweep_points})
         # N.B. if measurement was interrupted this wont work
-        # TODO make analysis for character benchmarking
-        # ma2.UnitarityBenchmarking_TwoQubit_Analysis(nseeds=nr_seeds)
+        ma2.CharacterBenchmarking_TwoQubit_Analysis()
+
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
             self, qubits, MC,
