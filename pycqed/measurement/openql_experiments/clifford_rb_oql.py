@@ -4,7 +4,7 @@ OpenQL sequence.
 """
 
 from os.path import join
-
+import numpy as np
 from pycqed.measurement.randomized_benchmarking import \
     randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
@@ -289,10 +289,10 @@ def character_benchmarking(
     qubit_map = {'q0': qubits[0], 'q1': qubits[1]}
     Cl = TwoQubitClifford
 
-    paulis = ['II', 'IZ', 'ZI', 'ZZ',  # P00
-              'IX', 'IY', 'ZX', 'ZY',  # P01
-              'XI', 'XZ', 'YI', 'YZ',  # P10
-              'XX', 'XY', 'YX', 'YY']  # P11
+    paulis = {'00': ['II', 'IZ', 'ZI', 'ZZ'],
+              '01': ['IX', 'IY', 'ZX', 'ZY'],
+              '10': ['XI', 'XZ', 'YI', 'YZ'],
+              '11': ['XX', 'XY', 'YX', 'YY']}
 
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
@@ -317,7 +317,9 @@ def character_benchmarking(
                     else:
                         cl_seq_decomposed.append(Cl(cl).gate_decomposition)
 
-                for pauli in paulis:
+                for pauli_type in paulis:
+                    # select a random pauli from the different types
+                    pauli = paulis[pauli_type][np.random.randint(4)]
                     # merge the pauli with the first element of the cl seq.
                     cl0 = Cl(common_cliffords[pauli])
                     # N.B. multiplication order is opposite of order in time

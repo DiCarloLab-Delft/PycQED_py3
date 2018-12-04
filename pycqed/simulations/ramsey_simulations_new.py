@@ -118,7 +118,9 @@ def compute_propagator(arglist):
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
     if fluxlutman.czd_double_sided():
         amp_final=[amp_final[0],-amp_final[0]]
-        sim_step_new=sim_step_new/2
+    else:
+        amp_final=[amp_final[0],amp_final[0]]
+    sim_step_new=sim_step_new/2
     amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
 
     # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp_final_new],

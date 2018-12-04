@@ -15,6 +15,7 @@ import time
 import h5py
 import numpy as np
 import logging
+from uncertainties import UFloat
 # from pycqed.utilities.general import RepresentsInt
 
 
@@ -164,6 +165,13 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             entry_point.create_group(str(key))
             write_dict_to_hdf5(data_dict=item,
                                entry_point=entry_point[str(key)])
+        elif isinstance(item, UFloat):
+            entry_point.create_group(str(key))
+            new_item = {'nominal_value': item.nominal_value,
+                        'std_dev': item.std_dev}
+            write_dict_to_hdf5(data_dict=new_item,
+                               entry_point=entry_point[str(key)])
+
         elif isinstance(item, (list, tuple)):
             if len(item) > 0:
                 elt_type = type(item[0])

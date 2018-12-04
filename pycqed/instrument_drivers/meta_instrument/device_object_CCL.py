@@ -567,7 +567,14 @@ class DeviceCCL(Instrument):
             #     'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
             #     qb.mw_vsm_delay())
 
-    def prepare_for_timedomain(self, qubits):
+    def prepare_for_timedomain(self, qubits:list):
+        """
+        Prepare setup for a timedomain experiment:
+
+        Args:
+            qubits: list of str
+                list of qubit names that have to be prepared
+        """
         self.prepare_readout(qubits=qubits)
         if self.find_instrument(qubits[0]).instr_LutMan_Flux() != None:
             self.prepare_fluxing()
@@ -752,7 +759,7 @@ class DeviceCCL(Instrument):
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
 
-    def measure_single_qubit_parity(self, qD: str, qA: str, 
+    def measure_single_qubit_parity(self, qD: str, qA: str,
                                     number_of_repetitions: int = 1,
                                     initialization_msmt: bool=False,
                                     initial_states=[0, 1],
@@ -805,7 +812,7 @@ class DeviceCCL(Instrument):
             a = ma2.Multiplexed_Readout_Analysis()
         return a
 
-    def measure_two_qubit_parity(self, qD0: str,qD1: str, qA: str, 
+    def measure_two_qubit_parity(self, qD0: str,qD1: str, qA: str,
                                     number_of_repetitions: int = 1,
                                     initialization_msmt: bool=False,
                                     initial_states=[0, 1, 3, 2], #nb: this groups even and odd
@@ -1689,9 +1696,9 @@ class DeviceCCL(Instrument):
 
     def measure_two_qubit_character_benchmarking(
             self, qubits, MC,
-            nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
-                                   15., 20., 25.]), nr_seeds=100,
-            interleaving_cliffords=[None],
+            nr_cliffords=np.array([1.,  2.,  3.,  5.,  6.,  7.,  9., 12.,
+                                   15., 19., 25., 31., 39., 49, 62, 79]),
+            nr_seeds=100, interleaving_cliffords=[None, -4368],
             label='TwoQubit_CharBench_{}seeds_icl{}_{}_{}',
             recompile: bool ='as needed', cal_points=True):
 
@@ -1702,7 +1709,7 @@ class DeviceCCL(Instrument):
         self.ro_acq_weight_type('SSB')
         self.ro_acq_digitized(False)
 
-        self.prepare_for_timedomain()
+        self.prepare_for_timedomain(qubits=qubits)
 
         MC.soft_avg(1)
         # set back the settings
@@ -1724,8 +1731,8 @@ class DeviceCCL(Instrument):
             # check for keyboard interrupt q because generating can be slow
             check_keyboard_interrupt()
             sweep_points = np.concatenate(
-                [np.repeat(nr_cliffords, 16),
-                 [nr_cliffords[-1]+.5]*7])
+                [np.repeat(nr_cliffords, 4*len(interleaving_cliffords)),
+                 nr_cliffords[-1]+np.arange(7)*.05+.5])  # cal pts
 
             p = cl_oql.character_benchmarking(
                 qubits=qubit_idxs,
@@ -1772,8 +1779,8 @@ class DeviceCCL(Instrument):
                             qubits[0], qubits[1]),
                exp_metadata={'bins': sweep_points})
         # N.B. if measurement was interrupted this wont work
-        # TODO make analysis for character benchmarking
-        # ma2.UnitarityBenchmarking_TwoQubit_Analysis(nseeds=nr_seeds)
+        ma2.CharacterBenchmarking_TwoQubit_Analysis()
+
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
             self, qubits, MC,
@@ -1935,25 +1942,54 @@ class DeviceCCL(Instrument):
         # a = self.check_mux_RO(update=update, update_threshold=update_threshold)
         return True
 
-    def calibrate_cz_single_q_phase(self, q0: str, q1: str,
+    def calibrate_cz_single_q_phase(self, q_osc: str, q_spec: str,
                                     amps,
                                     waveform='cz_z',
                                     update: bool = True,
                                     prepare_for_timedomain: bool=True, MC=None):
+        """
+        Calibrate single qubit phase corrections of CZ pulse.
+
+        Parameters
+        ----------
+        q_osc : str
+            Name of the "oscillating" qubit. The phase correction of this
+            qubit will be calibrated.
+        q_spec: str
+            Name of the "spectator" qubit. This qubit is used as the control.
+        amps: array_like
+            Amplitudes of the phase correction to measure.
+        waveform: str
+            Name of the waveform used on the "oscillating" qubit. This waveform
+            will be reuploaded for each datapoint. Common names are "cz_z" and
+            "idle_z"
+
+        Returns
+        -------
+        succes: bool
+            True if calibration succeeded, False if it failed.
+
+        procedure works by performing a conditional oscillation experiment at
+        a phase of 90 degrees. If the phase correction is correct, the "off" and
+        "on" curves (control qubit in 0 and 1) should interesect. The
+        analysis looks for the intersect.
+        """
+
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain()
+            self.prepare_for_timedomain(qubits = [q_osc, q_spec])
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        q0idx = self.find_instrument(q0).cfg_qubit_nr()
-        q1idx = self.find_instrument(q1).cfg_qubit_nr()
-        fl_lutman_q0 = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        q0idx = self.find_instrument(q_osc).cfg_qubit_nr()
+        q1idx = self.find_instrument(q_spec).cfg_qubit_nr()
+        fl_lutman_q0 = self.find_instrument(q_osc).instr_LutMan_Flux.get_instr()
 
-        p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                            platf_cfg=self.cfg_openql_platform_fn(),
-                                            CZ_disabled=False, add_cal_points=False,
-                                            angles=[90])
+        p = mqo.conditional_oscillation_seq(
+            q0idx, q1idx,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            CZ_disabled=False, add_cal_points=False,
+            angles=[90])
 
         CC = self.instr_CC.get_instr()
         CC.eqasm_program(p.filename)
@@ -1962,19 +1998,18 @@ class DeviceCCL(Instrument):
         s = swf.FLsweep(fl_lutman_q0, fl_lutman_q0.cz_phase_corr_amp,
                         waveform)
 
-        d = self.get_correlation_detector(qubits=[q0, q1],single_int_avg=True, seg_per_point=2)
+        d = self.get_correlation_detector(qubits=[q_osc, q_spec],
+            single_int_avg=True, seg_per_point=2)
         d.detector_control = 'hard'
-        # the order of self.qubits is used in the correlation detector
-        # and is required for the analysis
-        ch_idx = self.qubits().index(q0)
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.repeat(amps, 2))
         MC.set_detector_function(d)
-        MC.run('{}_CZphase'.format(q0))
+        MC.run('{}_CZphase'.format(q_osc))
 
-        a = ma2.Intersect_Analysis(options_dict={'ch_idx_A': ch_idx,
-                                                 'ch_idx_B': ch_idx})
+        # The correlation detector has q_osc on channel 0
+        a = ma2.Intersect_Analysis(options_dict={'ch_idx_A': 0,
+                                                 'ch_idx_B': 0})
 
         phase_corr_amp = a.get_intersect()[0]
         if phase_corr_amp > np.max(amps) or phase_corr_amp < np.min(amps):
@@ -1982,7 +2017,7 @@ class DeviceCCL(Instrument):
             return False
         else:
             if update:
-                self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
+                self.find_instrument(q_osc).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
 
     def calibrate_flux_timing(self, q0: str, q1: str,

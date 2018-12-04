@@ -70,18 +70,25 @@ class BaseDataAnalysis(object):
         __init__ of the child classes:
             The __init__ of child classes  should implement the following
             functionality:
-                - call the ASB __init__ (this method)
+                - call the AbstractBaseClass __init__ (this method)
                 - define self.params_dict and self.numeric_params
                 - specify options specific to that analysis
                 - call self.run_analysis
 
+        Running analysis will add the following (important) attributes
+        to the analysis object:
 
-        This method sets several attributes of the analysis class.
-        These include assigning the arguments of this function to attributes.
-        Other arguments that get created are
+        Data and derived quantities:
+            self.raw_data_dict          (dict)
+            self.proc_data_dict         (dict)
+                self.proc_data_dict['quantities_of_interest'] (dict)
+            self.fit_res                (dict)
+
+        Figures:
             axs (dict)
             figs (dict)
             plot_dicts (dict)
+
 
         and a bunch of stuff specified in the options dict
         (TODO: should this not always be extracted from the
@@ -218,6 +225,7 @@ class BaseDataAnalysis(object):
             self.run_fitting()  # fitting to models
             self.save_fit_results()
             self.analyze_fit_results()  # analyzing the results of the fits
+        self.save_quantities_of_interest()
 
         self.prepare_plots()  # specify default plots
         if not self.extract_only:
@@ -585,7 +593,14 @@ class BaseDataAnalysis(object):
 
     def save_fit_results(self):
         """
-        Saves the fit results
+        Save fit_results that are part of self.fit_res.
+
+        Fit results from the self.fit_res dict are stored in the hdf5 file
+        under
+            Analysis/fr_key, where fr_key is the key in self.fit_res.
+
+        Fit results overwrite previously stored data if there is a conflict
+        in naming. This is so the most recent analysis ran is stored.
         """
 
         # Check weather there is any data to save
@@ -625,6 +640,54 @@ class BaseDataAnalysis(object):
 
                     d = self._convert_dict_rec(copy.deepcopy(fit_res))
                     write_dict_to_hdf5(d, entry_point=fr_group)
+
+    def save_quantities_of_interest(self):
+        """
+        Save quantities of interest.
+
+        If self.proc_data_dict['quantities_of_interest'] exists, and it is
+        a dictionary it will attempt to store the contents in the datafile in
+        "Analysis/quantities_of_interest"
+
+        Previously stored quantities of interest are overwritten.
+        """
+
+        # Check weather there is any data to save
+        if 'quantities_of_interest' in self.proc_data_dict and isinstance(
+                self.proc_data_dict['quantities_of_interest'], dict):
+            # Find the file to save to
+            fn = self.options_dict.get('analysis_result_file', False)
+            if not fn:
+                fn = a_tools.measurement_filename(
+                    a_tools.get_folder(self.timestamps[0]))
+
+            try:
+                os.mkdir(os.path.dirname(fn))
+            except FileExistsError:
+                pass
+
+            if self.verbose:
+                print('Saving quantities of interest to %s' % fn)
+
+            qoi = 'quantities_of_interest'
+            # Save data to file
+            with h5py.File(fn, 'a') as data_file:
+                try:
+                    analysis_group = data_file.create_group('Analysis')
+                except ValueError:
+                    # If the analysis group already exists, re-use it
+                    # (as not to overwrite previous/other fits)
+                    analysis_group = data_file['Analysis']
+                try:
+
+                    qoi_group = analysis_group.create_group(qoi)
+                except ValueError:
+                    # Delete the old group and create a new group (overwrite).
+                    del analysis_group[qoi]
+                    qoi_group = analysis_group.create_group(qoi)
+
+                write_dict_to_hdf5(self.proc_data_dict['quantities_of_interest'],
+                                   entry_point=qoi_group)
 
     @staticmethod
     def _convert_dict_rec(obj):

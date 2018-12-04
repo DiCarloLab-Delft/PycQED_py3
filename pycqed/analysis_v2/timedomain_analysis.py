@@ -1,12 +1,14 @@
 import lmfit
 import numpy as np
+from uncertainties import ufloat
+from scipy.stats import sem
 from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from copy import deepcopy
-from pycqed.analysis_v2.randomized_benchmarking_analysis import \
+from pycqed.analysis.tools.data_manipulation import \
     populations_using_rate_equations
 
 
@@ -185,12 +187,13 @@ class Grovers_TwoQubitAllStates_Analysis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='', data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True):
+                 close_figs: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
-                         extract_only=extract_only, do_fitting=do_fitting)
+                         close_figs=close_figs,
+                         extract_only=extract_only, do_fitting=True)
 
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
@@ -819,12 +822,13 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                  data_file_path: str=None,
                  label: str='',
                  options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True):
+                 close_figs: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
-                         extract_only=extract_only, do_fitting=do_fitting)
+                         close_figs=close_figs,
+                         extract_only=extract_only, do_fitting=True)
         self.single_timestamp = False
 
         self.params_dict = {'xlabel': 'sweep_name',
@@ -846,15 +850,21 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         off and on cases
         """
         self.proc_data_dict = OrderedDict()
+        # values stored in quantities of interest will be saved in the data file
+        self.proc_data_dict['quantities_of_interest'] = {}
+        qoi = self.proc_data_dict['quantities_of_interest']
         # The channel containing the data must be specified in the options dict
         ch_idx_spec = self.options_dict.get('ch_idx_spec', 0)
         ch_idx_osc = self.options_dict.get('ch_idx_osc', 1)
+        qoi['ch_idx_osc'] = ch_idx_osc
+        qoi['ch_idx_spec'] = ch_idx_spec
+
         normalize_to_cal_points = self.options_dict.get(
             'normalize_to_cal_points', True)
         cal_points = [
             # calibration point indices are when ignoring the f-state cal pts
-            [[-7, -5], [-6, -4], [-3, -1]],  # oscillating qubit
             [[-7, -6], [-5, -4], [-2, -1]],  # spec qubit
+            [[-7, -5], [-6, -4], [-3, -1]],  # oscillating qubits
         ]
 
         for idx, type_str in zip([ch_idx_osc, ch_idx_spec], ['osc', 'spec']):
@@ -902,7 +912,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 P0, P1, P2, M_inv = populations_using_rate_equations(
                     SI, SX, V0, V1, V2)
                 # Leakage based on the average of the oscillation
-                self.proc_data_dict['leak_avg'] = P2[0]  # list with 1 elt...
+                qoi['leak_avg'] = P2[0]  # list with 1 elt...
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
@@ -925,42 +935,75 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-3]}}
 
     def analyze_fit_results(self):
-        fr_0 = self.fit_res['cos_fit_off'].params
-        fr_1 = self.fit_res['cos_fit_on'].params
+        qoi = self.proc_data_dict['quantities_of_interest']
+        fr_0 = self.fit_res['cos_fit_off']
+        fr_1 = self.fit_res['cos_fit_on']
 
-        phi0 = np.rad2deg(fr_0['phase'].value)
-        phi1 = np.rad2deg(fr_1['phase'].value)
+        phi0 = ufloat(np.rad2deg(fr_0.params['phase'].value), 
+            np.rad2deg(fr_0.params['phase'].stderr))
 
-        phi0_stderr = np.rad2deg(fr_0['phase'].stderr)
-        phi1_stderr = np.rad2deg(fr_1['phase'].stderr)
+        phi1 = ufloat(np.rad2deg(fr_1.params['phase'].value), 
+            np.rad2deg(fr_1.params['phase'].stderr))
+        qoi['phi_0'] = phi0
+        qoi['phi_1'] = phi1
+        qoi['phi_cond'] = phi0-phi1
 
-        self.proc_data_dict['phi_0'] = phi0, phi0_stderr
-        self.proc_data_dict['phi_1'] = phi1, phi1_stderr
-        phi_cond_stderr = (phi0_stderr**2+phi1_stderr**2)**.5
-        self.proc_data_dict['phi_cond'] = (phi1 - phi0), phi_cond_stderr
+        qoi['osc_amp_0'] = ufloat(fr_0.params['amplitude'].value, 
+                                  fr_0.params['amplitude'].stderr)
 
-        osc_amp = np.mean([fr_0['amplitude'], fr_1['amplitude']])
-        osc_amp_stderr = np.sqrt(fr_0['amplitude'].stderr**2 +
-                                 fr_1['amplitude']**2)/2
+        qoi['osc_amp_1'] = ufloat(fr_1.params['amplitude'].value, 
+                                  fr_1.params['amplitude'].stderr)
 
-        self.proc_data_dict['osc_amp_0'] = (fr_0['amplitude'].value,
-                                            fr_0['amplitude'].stderr)
-        self.proc_data_dict['osc_amp_1'] = (fr_1['amplitude'].value,
-                                            fr_1['amplitude'].stderr)
 
-        self.proc_data_dict['osc_offs_0'] = (fr_0['offset'].value,
-                                             fr_0['offset'].stderr)
-        self.proc_data_dict['osc_offs_1'] = (fr_1['offset'].value,
-                                             fr_1['offset'].stderr)
+        qoi['osc_offs_0'] = ufloat(fr_0.params['offset'].value, 
+                                  fr_0.params['offset'].stderr)
 
-        offs_stderr = (fr_0['offset'].stderr**2+fr_1['offset'].stderr**2)**.5
-        self.proc_data_dict['offs_diff'] = (
-            fr_1['offset'].value - fr_0['offset'].value, offs_stderr)
+        qoi['osc_offs_1'] = ufloat(fr_1.params['offset'].value, 
+                                  fr_1.params['offset'].stderr)
+
+        qoi['offs_diff'] = qoi['osc_offs_1'] - qoi['osc_offs_0']
+        
+        
+        # phi0 = np.rad2deg(fr_0['phase'].value)
+        # phi1 = np.rad2deg(fr_1['phase'].value)
+
+        # phi0_stderr = np.rad2deg(fr_0['phase'].stderr)
+        # phi1_stderr = np.rad2deg(fr_1['phase'].stderr)
+
+        # self.proc_data_dict['phi_0'] = phi0, phi0_stderr
+        # self.proc_data_dict['phi_1'] = phi1, phi1_stderr
+        # phi_cond_stderr = (phi0_stderr**2+phi1_stderr**2)**.5
+        # self.proc_data_dict['phi_cond'] = (phi1 - phi0), phi_cond_stderr
+
+
+        # osc_amp = np.mean([fr_0['amplitude'], fr_1['amplitude']])
+        # osc_amp_stderr = np.sqrt(fr_0['amplitude'].stderr**2 +
+        #                          fr_1['amplitude']**2)/2
+
+        # self.proc_data_dict['osc_amp_0'] = (fr_0['amplitude'].value,
+        #                                     fr_0['amplitude'].stderr)
+        # self.proc_data_dict['osc_amp_1'] = (fr_1['amplitude'].value,
+        #                                     fr_1['amplitude'].stderr)
+
+        # self.proc_data_dict['osc_offs_0'] = (fr_0['offset'].value,
+        #                                      fr_0['offset'].stderr)
+        # self.proc_data_dict['osc_offs_1'] = (fr_1['offset'].value,
+        #                                      fr_1['offset'].stderr)
+
+        # offs_stderr = (fr_0['offset'].stderr**2+fr_1['offset'].stderr**2)**.5
+        # self.proc_data_dict['offs_diff'] = (
+        #     fr_1['offset'].value - fr_0['offset'].value, offs_stderr)
 
         # self.proc_data_dict['osc_amp'] = (osc_amp, osc_amp_stderr)
-        self.proc_data_dict['missing_fraction'] = (
-            np.mean(self.proc_data_dict['yvals_spec_on'][:-3]) -
-            np.mean(self.proc_data_dict['yvals_spec_off'][:-4]))
+        spec_on = ufloat(np.mean(self.proc_data_dict['yvals_spec_on'][:-3]), 
+                          sem(self.proc_data_dict['yvals_spec_on'][:-3]))
+        spec_off = ufloat(np.mean(self.proc_data_dict['yvals_spec_off'][:-3]), 
+                  sem(self.proc_data_dict['yvals_spec_off'][:-3]))
+        qoi['missing_fraction'] = spec_on-spec_off
+
+        # self.proc_data_dict['missing_fraction'] = (
+        #     np.mean(self.proc_data_dict['yvals_spec_on'][:-3]) -
+        #     np.mean(self.proc_data_dict['yvals_spec_off'][:-4]))
 
     def prepare_plots(self):
         self._prepare_main_oscillation_figure()
@@ -1021,31 +1064,23 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                     'y': y, 'color': 'C0', 'linestyle': 'dotted'}
             }
 
+            qoi = self.proc_data_dict['quantities_of_interest']
             phase_message = (
-                'Phase diff.: {:.1f} $\pm$ {:.1f} deg\n'
-                'Phase off: {:.1f} $\pm$ {:.1f}deg\n'
-                'Phase on: {:.1f} $\pm$ {:.1f}deg\n'
-                'Osc. amp. off: {:.4f} $\pm$ {:.4f}\n'
-                'Osc. amp. on: {:.4f} $\pm$ {:.4f}\n'
-                'Offs. diff.: {:.4f} $\pm$ {:.4f}\n'
-                'Osc. offs. off: {:.4f} $\pm$ {:.4f}\n'
-                'Osc. offs. on: {:.4f} $\pm$ {:.4f}'.format(
-                    self.proc_data_dict['phi_cond'][0],
-                    self.proc_data_dict['phi_cond'][1],
-                    self.proc_data_dict['phi_0'][0],
-                    self.proc_data_dict['phi_0'][1],
-                    self.proc_data_dict['phi_1'][0],
-                    self.proc_data_dict['phi_1'][1],
-                    self.proc_data_dict['osc_amp_0'][0],
-                    self.proc_data_dict['osc_amp_0'][1],
-                    self.proc_data_dict['osc_amp_1'][0],
-                    self.proc_data_dict['osc_amp_1'][1],
-                    self.proc_data_dict['offs_diff'][0],
-                    self.proc_data_dict['offs_diff'][1],
-                    self.proc_data_dict['osc_offs_0'][0],
-                    self.proc_data_dict['osc_offs_0'][1],
-                    self.proc_data_dict['osc_offs_1'][0],
-                    self.proc_data_dict['osc_offs_1'][1]))
+                'Phase diff.: {}  deg\n'
+                'Phase off: {} deg\n'
+                'Phase on: {} deg\n\n'
+                
+                'Offs. diff.: {} %\n'
+                'Osc. offs. off: {} \n'
+                'Osc. offs. on: {}\n\n'
+                
+                'Osc. amp. off: {} \n'
+                'Osc. amp. on: {} '.format(
+                    qoi['phi_cond'],
+                    qoi['phi_0'], qoi['phi_1'],
+                    qoi['offs_diff']*100,
+                    qoi['osc_offs_0'], qoi['osc_offs_1'],
+                    qoi['osc_amp_0'], qoi['osc_amp_1']))
             self.plot_dicts['phase_message'] = {
                 'ax_id': 'main',
                 'ypos': 0.9,
@@ -1087,14 +1122,17 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
 
         if self.do_fitting:
             leak_msg = (
-                'Missing fraction: {:.2f} % '.format(
-                    self.proc_data_dict['missing_fraction']*100))
+                'Missing fraction: {} % '.format(
+                    self.proc_data_dict['quantities_of_interest']\
+                        ['missing_fraction']*100))
             self.plot_dicts['leak_msg'] = {
                 'ax_id': 'spectator_qubit',
                 'ypos': 0.7,
+                'xpos': 1.05,
                 'plotfn': self.plot_text,
                 'box_props': 'fancy',
                 'line_kws': {'alpha': 0},
+                'horizontalalignment':'left',
                 'text_string': leak_msg}
             # offset as a guide for the eye
             y = self.fit_res['cos_fit_on'].params['offset'].value
