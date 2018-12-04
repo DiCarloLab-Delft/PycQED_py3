@@ -635,7 +635,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
 
-        MC.set_detector_function(self.get_correlation_detector())
+        MC.set_detector_function(self.get_correlation_detector(qubits=[q0, q1]))
         MC.run('conditional_oscillation_{}_{}_{}{}'.format(q0, q1,
                                                            self.msmt_suffix, label),
                disable_snapshot_metadata=disable_metadata)
@@ -752,19 +752,141 @@ class DeviceCCL(Instrument):
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
 
+    def measure_single_qubit_parity(self, qD: str, qA: str, 
+                                    number_of_repetitions: int = 1,
+                                    initialization_msmt: bool=False,
+                                    initial_states=[0, 1],
+                                    nr_shots: int=4088*4,
+                                    flux_codeword: str = 'fl_cw_01',
+                                    analyze: bool=True, close_fig: bool=True,
+                                    prepare_for_timedomain: bool=True, MC=None):
+        assert qD in self.qubits()
+        assert qA in self.qubits()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=[qD,qA])
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        qDidx = self.find_instrument(qD).cfg_qubit_nr()
+        qAidx = self.find_instrument(qA).cfg_qubit_nr()
+
+        p = mqo.single_qubit_parity_check(qDidx, qAidx,
+                                           self.cfg_openql_platform_fn(),
+                                           number_of_repetitions=number_of_repetitions,
+                                           initialization_msmt=initialization_msmt,
+                                           initial_states=initial_states,
+                                           flux_codeword=flux_codeword
+                                           )
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+
+
+
+        d = self.get_int_logging_detector(qubits=[qD,qA],
+                                          result_logging_mode='lin_trans')
+        d.nr_shots = 4088  # To ensure proper data binning
+
+
+        old_soft_avg = MC.soft_avg()
+        old_live_plot_enabled = MC.live_plot_enabled()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        name='Single_qubit_parity_{}_{}_{}'.format(qD, qA, self.msmt_suffix)
+        MC.run(name)
+
+        MC.soft_avg(old_soft_avg)
+        MC.live_plot_enabled(old_live_plot_enabled)
+        if analyze:
+            a = mra.two_qubit_ssro_fidelity(name)
+            a = ma2.Multiplexed_Readout_Analysis()
+        return a
+
+    def measure_two_qubit_parity(self, qD0: str,qD1: str, qA: str, 
+                                    number_of_repetitions: int = 1,
+                                    initialization_msmt: bool=False,
+                                    initial_states=[0, 1, 3, 2], #nb: this groups even and odd
+                                    nr_shots: int=4088*4,
+                                    flux_codeword0: str = 'fl_cw_03',
+                                    flux_codeword1: str = 'fl_cw_01',
+                                    analyze: bool=True, close_fig: bool=True,
+                                    prepare_for_timedomain: bool=True, MC=None,
+                                    echo: bool=True,
+                                    post_select_threshold: float=None):
+        assert qD0 in self.qubits()
+        assert qD1 in self.qubits()
+        assert qA in self.qubits()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=[qD1,qD0,qA])
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        qD0idx = self.find_instrument(qD0).cfg_qubit_nr()
+        qD1idx = self.find_instrument(qD1).cfg_qubit_nr()
+        qAidx = self.find_instrument(qA).cfg_qubit_nr()
+
+        p = mqo.two_qubit_parity_check(qD0idx, qD1idx,qAidx,
+                                           self.cfg_openql_platform_fn(),
+                                           number_of_repetitions=number_of_repetitions,
+                                           initialization_msmt=initialization_msmt,
+                                           initial_states=initial_states,
+                                           flux_codeword0=flux_codeword0,
+                                           flux_codeword1=flux_codeword1,
+                                           echo=echo
+                                           )
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+
+
+
+        d = self.get_int_logging_detector(qubits=[qD1, qD0, qA],
+                                          result_logging_mode='lin_trans')
+        d.nr_shots = 4088  # To ensure proper data binning
+
+        old_soft_avg = MC.soft_avg()
+        old_live_plot_enabled = MC.live_plot_enabled()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        name='Two_qubit_parity_{}_{}_{}_{}'.format(qD1,qD0,qA, self.msmt_suffix)
+        MC.run(name)
+        MC.soft_avg(old_soft_avg)
+        MC.live_plot_enabled(old_live_plot_enabled)
+        if analyze:
+            a = mra.two_qubit_ssro_fidelity(name)
+        #    a = ma2.Multiplexed_Readout_Analysis()
+            a = ma2.Singleshot_Readout_Analysis(
+                t_start=None, t_stop=None,
+                label='parity',
+                options_dict={'post_select': initialization_msmt,
+                              'nr_samples': 2+2*initialization_msmt,
+                              'post_select_threshold':self.find_instrument(qA).ro_acq_threshold()},
+                extract_only=False)
+        return a
+
+
+
     def measure_residual_ZZ_coupling(self, q0: str, q1: str,
                                      times=np.linspace(0, 10e-6, 26),
                                      analyze: bool=True, close_fig: bool=True,
                                      prepare_for_timedomain: bool=True, MC=None):
 
         # FIXME: this is not done yet, needs testing and finishing -Filip July 2018
+
+
+        assert q0 in self.qubits()
+        assert q1 in self.qubits()
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0,q1])
         if MC is None:
             MC = self.instr_MC.get_instr()
-
-        assert q0 in self.qubits()
-        assert q1 in self.qubits()
 
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
@@ -1368,7 +1490,8 @@ class DeviceCCL(Instrument):
             nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
                                    15., 20., 25., 30., 50.]), nr_seeds=100,
             interleaving_cliffords=[None], label='TwoQubit_RB_{}seeds_icl{}_{}_{}',
-            recompile: bool ='as needed', cal_points=True):
+            recompile: bool ='as needed', cal_points=True,
+            flux_codeword='fl_cw_01'):
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
@@ -1406,6 +1529,7 @@ class DeviceCCL(Instrument):
                 qubits=qubit_idxs,
                 nr_cliffords=nr_cliffords,
                 nr_seeds=1,
+                flux_codeword=flux_codeword,
                 platf_cfg=self.cfg_openql_platform_fn(),
                 program_name='TwoQ_RB_int_cl_s{}_ncl{}_icl{}_netcl{}_{}_{}'.format(
                     int(i),

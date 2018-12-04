@@ -16,6 +16,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                             nr_cliffords, nr_seeds: int,
                             net_cliffords: list=[0],
                             max_clifford_idx: int=11520,
+                            flux_codeword: str='fl_cw_01',
                             simultaneous_single_qubit_RB=False,
                             initialize: bool=True,
                             interleaving_cliffords=[None],
@@ -169,7 +170,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                     # This is a hack because we cannot
                                     # properly trigger CZ gates.
                                     k.gate("wait",  list(qubit_map.values()), 0)
-                                    k.gate(g, [2, 0]) #hardcoded sandwhiched with wait 0's for alignment
+                                    k.gate(flux_codeword, [2, 0]) #hardcoded sandwhiched with wait 0's for alignment
                                     k.gate("wait",  list(qubit_map.values()), 0)
 
                         # This hack is required to align multiplexed RO in openQL..
