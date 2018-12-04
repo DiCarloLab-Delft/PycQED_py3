@@ -133,15 +133,38 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=float)
 
         self.add_parameter('run_mode',
-                           get_cmd='AWGC:RMO?',
-                           set_cmd='AWGC:RMO ' + '{}',
-                           vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'))
+                            get_cmd='AWGC:RMO?',
+                            set_cmd='AWGC:RMO ' + '{}',
+                            vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'))
         # NB: setting mode "CON" (valid SCPI abbreviation) reads back as "CONt"
 
         self.add_parameter('dio_mode',
-                           get_cmd='SYSTem:DIO:MODE?',
-                           set_cmd='SYSTem:DIO:MODE ' + '{}',
-                           vals=vals.Enum('MASter', 'SLAve'))
+                            unit='',
+                            label='DIO input operation mode',
+                            get_cmd='SYSTem:DIO:MODE?',
+                            set_cmd='SYSTem:DIO:MODE ' + '{}',
+                            vals=vals.Enum('MASter', 'SLAve'),
+                            val_mapping={'master': 'MASter', 'slave': 'SLAve'},
+                            docstring='Get or set the DIO input operation mode\n' \
+                                'Paramaters:\n' \
+                                '\tmaster: Use DIO codeword (lower 14 bits) input from its own IORearDIO board\n' \
+                                    '\t\tEnables SE and DIFF inputs\n' \
+                                '\tslave; Use DIO codeword (upper 14 bits) input from the connected master IORearDIO board\n'
+                                    '\t\tDisables SE and DIFF inputs\n' )
+
+        self.add_parameter('dio_calibrate',
+                            unit='',
+                            label='Calibrate DIO signals',
+                            get_cmd='SYSTem:DIO:CALibrate',
+                            get_parser=self._int_to_array,
+                            docstring='Calibrate the DIO input signals\n' \
+                                'Will analyze the input signal for each DIO channel (used to transer codeword bits).\n' \
+                                'The signals are sampled and devided in sections. This function will search these sections\n' \
+                                'and find all \n' \
+                                '\tmaster: Use DIO codeword (lower 14 bits) input from its own IORearDIO board\n' \
+                                    '\t\tEnables SE and DIFF inputs\n' \
+                                '\tslave; Use DIO codeword (upper 14 bits) input from the connected master IORearDIO board\n'
+                                    '\t\tDisables SE and DIFF inputs\n' )
 
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
@@ -509,7 +532,11 @@ class QuTech_AWG_Module(SCPI):
         result = result.replace('\"\"', '\"') # SCPI/visa adds additional quotes
         return json.loads(result)
 
-
+    def _int_to_array(self, msg):
+        msg = msg.replace('\"', '') # SCPI/visa adds additional quotes
+        if not msg:
+            return []
+        return msg.split(',')
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
