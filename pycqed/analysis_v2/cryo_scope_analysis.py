@@ -265,8 +265,8 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
 
         # Storing specific quantities of interest 
         qoi['nyquist_order'] = self.nyquist_order
-        qoi['mean_detuning'] = ufloat(np.mean(self.ca.detuning), 
-                                      sem(self.ca.detuning))
+        qoi['mean_detuning'] = ufloat(np.mean(self.ca.real_detuning), 
+                                      sem(self.ca.real_detuning))
 
 
 
