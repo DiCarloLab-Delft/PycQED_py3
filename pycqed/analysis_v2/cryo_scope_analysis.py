@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from typing import Union
 from copy import deepcopy
+from scipy.stats import sem 
+from uncertainties import ufloat 
 from pycqed.analysis import analysis_toolbox as a_tools
 from collections import OrderedDict
 from pycqed.analysis import measurement_analysis as ma_old
@@ -238,6 +240,9 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
+        self.proc_data_dict['quantities_of_interest'] = {}
+        qoi = self.proc_data_dict['quantities_of_interest']
+
         self.proc_data_dict['derivative_window_length'] = \
             self.derivative_window_length
         self.proc_data_dict['norm_window_size'] = self.norm_window_size
@@ -257,6 +262,14 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             self.ca.nyquist_order = nyquist_order
         else:
             self.ca.nyquist_order = self.nyquist_order
+
+        # Storing specific quantities of interest 
+        qoi['nyquist_order'] = self.nyquist_order
+        qoi['mean_detuning'] = ufloat(np.mean(self.ca.real_detuning), 
+                                      sem(self.ca.real_detuning))
+
+
+
 
     def prepare_plots(self):
         # pass

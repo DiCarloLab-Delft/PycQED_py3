@@ -1,4 +1,6 @@
 import lmfit
+from uncertainties import ufloat
+import pandas as pd
 from copy import deepcopy
 from pycqed.analysis import analysis_toolbox as a_tools
 from collections import OrderedDict
@@ -7,7 +9,9 @@ import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 import logging
 from scipy.stats import sem
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+from pycqed.analysis.tools.data_manipulation import \
+    populations_using_rate_equations
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, plot_fit
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pl
 from matplotlib.colors import ListedColormap
@@ -1109,6 +1113,223 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
             'horizontalalignment': 'left'}
 
 
+class CharacterBenchmarking_TwoQubit_Analysis(ba.BaseDataAnalysis):
+    """
+    Analysis for character benchmarking.
+    """
+
+    def __init__(self, t_start: str=None, t_stop: str=None, label='',
+                 options_dict: dict=None, auto=True, close_figs=True,
+                 ch_idxs: list =[0, 2]):
+        if options_dict is None:
+            options_dict = dict()
+        super().__init__(
+            t_start=t_start, t_stop=t_stop, label=label,
+            options_dict=options_dict, close_figs=close_figs,
+            do_fitting=True)
+
+        self.d1 = 4
+        self.ch_idxs = ch_idxs
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.raw_data_dict = OrderedDict()
+        self.timestamps = a_tools.get_timestamps_in_range(
+            self.t_start, self.t_stop,
+            label=self.labels)
+
+        a = ma_old.MeasurementAnalysis(
+            timestamp=self.timestamps[0], auto=False, close_file=False)
+        a.get_naming_and_values()
+        bins = a.data_file['Experimental Data']['Experimental Metadata']['bins'].value
+        a.finish()
+
+        self.raw_data_dict['measurementstring'] = a.measurementstring
+        self.raw_data_dict['timestamp_string'] = a.timestamp_string
+        self.raw_data_dict['folder'] = a.folder
+        self.raw_data_dict['timestamps'] = self.timestamps
+
+        df = pd.DataFrame(
+            columns={'ncl', 'pauli', 'I_q0', 'Q_q0', 'I_q1', 'Q_q1',
+                     'interleaving_cl'})
+        df['ncl'] = bins
+
+        # Assumptions on the structure of the datafile are made here.
+        # For every Clifford, 4 random pauli's are sampled from the different
+        # sub sets:
+        paulis = ['II',  # 'IZ', 'ZI', 'ZZ',  # P00
+                  'IX',  # 'IY', 'ZX', 'ZY',  # P01
+                  'XI',  # 'XZ', 'YI', 'YZ',  # P10
+                  'XX']  # 'XY', 'YX', 'YY']  # P11
+
+        paulis_df = np.tile(paulis, 34)[:len(bins)]
+        # The calibration points do not correspond to a Pauli
+        paulis_df[-7:] = np.nan
+        df['pauli'] = paulis_df
+
+        # The four different random Pauli's are performed both with
+        # and without the interleaving CZ gate.
+        df['interleaving_cl'] = np.tile(
+            ['']*4 + ['CZ']*4, len(bins)//8+1)[:len(bins)]
+
+        # Data is grouped and single shots are averaged.
+        for i, ch in enumerate(['I_q0', 'Q_q0', 'I_q1', 'Q_q1']):
+            binned_yvals = np.reshape(
+                a.measured_values[i], (len(bins), -1), order='F')
+            yvals = np.mean(binned_yvals, axis=1)
+            df[ch] = yvals
+
+        self.raw_data_dict['df'] = df
+
+    def process_data(self):
+        self.proc_data_dict = OrderedDict()
+        df = self.raw_data_dict['df']
+        cal_points = [
+            # calibration point indices are when ignoring the f-state cal pts
+            [[-7, -5], [-6, -4], [-3, -1]],  # q0
+            [[-7, -5], [-6, -4], [-3, -1]],  # q0
+            [[-7, -6], [-5, -4], [-2, -1]],  # q1
+            [[-7, -6], [-5, -4], [-2, -1]],  # q1
+        ]
+
+        for ch, cal_pt in zip(['I_q0', 'Q_q0', 'I_q1', 'Q_q1'], cal_points):
+            df[ch+'_normed'] = a_tools.normalize_data_v3(
+                df[ch].values,
+                cal_zero_points=cal_pt[0],
+                cal_one_points=cal_pt[1])
+
+        df['P_|00>'] = (1-df['I_q0_normed'])*(1-df['Q_q1_normed'])
+
+        P00 = df.loc[df['pauli'].isin(['II', 'IZ', 'ZI', 'ZZ'])]\
+            .loc[df['interleaving_cl'] == ''].groupby('ncl').mean()
+        P01 = df.loc[df['pauli'].isin(['IX', 'IY', 'ZX', 'ZY'])]\
+            .loc[df['interleaving_cl'] == ''].groupby('ncl').mean()
+        P10 = df.loc[df['pauli'].isin(['XI', 'XZ', 'YI', 'YZ'])]\
+            .loc[df['interleaving_cl'] == ''].groupby('ncl').mean()
+        P11 = df.loc[df['pauli'].isin(['XX', 'XY', 'YX', 'YY'])]\
+            .loc[df['interleaving_cl'] == ''].groupby('ncl').mean()
+
+        P00_CZ = df.loc[df['pauli'].isin(['II', 'IZ', 'ZI', 'ZZ'])]\
+            .loc[df['interleaving_cl'] == 'CZ'].groupby('ncl').mean()
+        P01_CZ = df.loc[df['pauli'].isin(['IX', 'IY', 'ZX', 'ZY'])]\
+            .loc[df['interleaving_cl'] == 'CZ'].groupby('ncl').mean()
+        P10_CZ = df.loc[df['pauli'].isin(['XI', 'XZ', 'YI', 'YZ'])]\
+            .loc[df['interleaving_cl'] == 'CZ'].groupby('ncl').mean()
+        P11_CZ = df.loc[df['pauli'].isin(['XX', 'XY', 'YX', 'YY'])]\
+            .loc[df['interleaving_cl'] == 'CZ'].groupby('ncl').mean()
+
+        # Calculate the character function
+        # Eq. 7 of Xue et al. ArXiv 1811.04002v1
+        C1 = P00['P_|00>']-P01['P_|00>']+P10['P_|00>']-P11['P_|00>']
+        C2 = P00['P_|00>']+P01['P_|00>']-P10['P_|00>']-P11['P_|00>']
+        C12 = P00['P_|00>']-P01['P_|00>']-P10['P_|00>']+P11['P_|00>']
+        C1_CZ = P00_CZ['P_|00>']-P01_CZ['P_|00>'] + \
+            P10_CZ['P_|00>']-P11_CZ['P_|00>']
+        C2_CZ = P00_CZ['P_|00>']+P01_CZ['P_|00>'] - \
+            P10_CZ['P_|00>']-P11_CZ['P_|00>']
+        C12_CZ = P00_CZ['P_|00>']-P01_CZ['P_|00>'] - \
+            P10_CZ['P_|00>']+P11_CZ['P_|00>']
+
+        char_df = pd.DataFrame(
+            {'P00': P00['P_|00>'], 'P01': P01['P_|00>'],
+             'P10': P10['P_|00>'], 'P11': P11['P_|00>'],
+             'P00_CZ': P00_CZ['P_|00>'], 'P01_CZ': P01_CZ['P_|00>'],
+             'P10_CZ': P10_CZ['P_|00>'], 'P11_CZ': P11_CZ['P_|00>'],
+             'C1': C1, 'C2': C2, 'C12': C12,
+             'C1_CZ': C1_CZ, 'C2_CZ': C2_CZ, 'C12_CZ': C12_CZ})
+        self.proc_data_dict['char_df'] = char_df
+
+    def run_fitting(self):
+        super().run_fitting()
+
+        char_df = self.proc_data_dict['char_df']
+        # Eq. 8 of Xue et al. ArXiv 1811.04002v1
+        for char_key in ['C1', 'C2', 'C12', 'C1_CZ', 'C2_CZ', 'C12_CZ']:
+            char_mod = lmfit.Model(char_decay, independent_vars='m')
+            char_mod.set_param_hint('A', value=1, vary=True)
+            char_mod.set_param_hint('alpha', value=.95)
+            params = char_mod.make_params()
+            self.fit_res[char_key] = char_mod.fit(
+                data=char_df[char_key].values,
+                m=char_df.index, params=params)
+
+    def analyze_fit_results(self):
+        fr = self.fit_res
+        self.proc_data_dict['quantities_of_interest'] = {}
+        qoi = self.proc_data_dict['quantities_of_interest']
+        qoi['alpha1'] = ufloat(fr['C1'].params['alpha'].value,
+                               fr['C1'].params['alpha'].stderr)
+        qoi['alpha2'] = ufloat(fr['C2'].params['alpha'].value,
+                               fr['C2'].params['alpha'].stderr)
+        qoi['alpha12'] = ufloat(fr['C12'].params['alpha'].value,
+                                fr['C12'].params['alpha'].stderr)
+        # eq. 9 from Xue et al. ArXiv 1811.04002v1
+        qoi['alpha_char'] = 3/15*qoi['alpha1']+3/15*qoi['alpha2']\
+            + 9/15*qoi['alpha12']
+
+        qoi['alpha1_CZ_int'] = ufloat(fr['C1_CZ'].params['alpha'].value,
+                                      fr['C1_CZ'].params['alpha'].stderr)
+        qoi['alpha2_CZ_int'] = ufloat(fr['C2_CZ'].params['alpha'].value,
+                                      fr['C2_CZ'].params['alpha'].stderr)
+        qoi['alpha12_CZ_int'] = ufloat(fr['C12_CZ'].params['alpha'].value,
+                                       fr['C12_CZ'].params['alpha'].stderr)
+
+        qoi['alpha_char_CZ_int'] = 3/15*qoi['alpha1_CZ_int'] \
+            + 3/15*qoi['alpha2_CZ_int'] + 9/15*qoi['alpha12_CZ_int']
+
+        qoi['eps_ref'] = depolarizing_par_to_eps(qoi['alpha_char'], d=4)
+        qoi['eps_int'] = depolarizing_par_to_eps(qoi['alpha_char_CZ_int'], d=4)
+        # Interleaved error calculation  Magesan et al. PRL 2012
+        qoi['eps_CZ'] = 1-(1-qoi['eps_int'])/(1-qoi['eps_ref'])
+
+    def prepare_plots(self):
+        char_df = self.proc_data_dict['char_df']
+
+        fs = plt.rcParams['figure.figsize']
+
+        # self.figs['puali_decays']
+        self.plot_dicts['pauli_decays'] = {
+            'plotfn': plot_char_RB_pauli_decays,
+            'ncl': char_df.index.values,
+            'P00': char_df['P00'].values,
+            'P01': char_df['P01'].values,
+            'P10': char_df['P10'].values,
+            'P11': char_df['P11'].values,
+            'P00_CZ': char_df['P00_CZ'].values,
+            'P01_CZ': char_df['P01_CZ'].values,
+            'P10_CZ': char_df['P10_CZ'].values,
+            'P11_CZ': char_df['P11_CZ'].values,
+            'title': self.raw_data_dict['measurementstring']
+            + '\n'+self.raw_data_dict['timestamp_string']
+            + '\nPauli decays',
+        }
+        self.plot_dicts['char_decay'] = {
+            'plotfn': plot_char_RB_decay,
+            'ncl': char_df.index.values,
+            'C1': char_df['C1'].values,
+            'C2': char_df['C2'].values,
+            'C12': char_df['C12'].values,
+            'C1_CZ': char_df['C1_CZ'].values,
+            'C2_CZ': char_df['C2_CZ'].values,
+            'C12_CZ': char_df['C12_CZ'].values,
+            'fr_C1': self.fit_res['C1'],
+            'fr_C2': self.fit_res['C2'],
+            'fr_C12': self.fit_res['C12'],
+            'fr_C1_CZ': self.fit_res['C1_CZ'],
+            'fr_C2_CZ': self.fit_res['C2_CZ'],
+            'fr_C12_CZ': self.fit_res['C12_CZ'],
+            'title': self.raw_data_dict['measurementstring']
+            + '\n'+self.raw_data_dict['timestamp_string']
+            + '\nCharacter decay',
+        }
+        self.plot_dicts['quantities_msg'] = {
+            'plotfn': plot_char_rb_quantities,
+            'ax_id': 'char_decay',
+            'qoi': self.proc_data_dict['quantities_of_interest']}
+
+
+
 def plot_cal_points_hexbin(shots_0,
                            shots_1,
                            shots_2,
@@ -1201,53 +1422,102 @@ def plot_unitarity(ncl, P, title, ax=None, **kw):
     ax.set_title(title)
 
 
-def populations_using_rate_equations(SI: np.array, SX: np.array,
-                                     V0: float, V1: float, V2: float):
+def plot_char_RB_pauli_decays(ncl, P00, P01, P10, P11,
+                              P00_CZ, P01_CZ, P10_CZ, P11_CZ,
+                              title, ax, **kw):
     """
-    Calculate populations using reference voltages.
-
-    Args:
-        SI (array): signal value for signal with I (Identity) added
-        SX (array): signal value for signal with X (π-pulse) added
-        V0 (float):
-        V1 (float):
-        V2 (float):
-    returns:
-        P0 (array): population of the |0> state
-        P1 (array): population of the |1> state
-        P2 (array): population of the |2> state
-        M_inv (2D array) :  Matrix inverse to find populations
-
-    Based on equation (S1) from Asaad & Dickel et al. npj Quant. Info. (2016)
-
-    To quantify leakage, we monitor the populations Pi of the three lowest
-    energy states (i ∈ {0, 1, 2}) and calculate the average
-    values <Pi>. To do this, we calibrate the average signal levels Vi for
-    the transmons in level i, and perform each measurement twice, the second
-    time with an added final π pulse on the 0–1 transition. This final π
-    pulse swaps P0 and P1, leaving P2 unaffected. Under the assumption that
-    higher levels are unpopulated (P0 +P1 +P2 = 1),
-
-     [V0 −V2,   V1 −V2] [P0]  = [S −V2]
-     [V1 −V2,   V0 −V2] [P1]  = [S' −V2]
-
-    where S (S') is the measured signal level without (with) final π pulse.
-    The populations are extracted by matrix inversion.
+    Plots the raw recovery probabilities for a character RB experiment.
     """
-    M = np.array([[V0-V2, V1-V2], [V1-V2, V0-V2]])
-    M_inv = np.linalg.inv(M)
+    ax.plot(ncl, P00, c='C0', label=r'$P_{00}$', marker='o', ls='--')
+    ax.plot(ncl, P01, c='C1', label=r'$P_{01}$', marker='o', ls='--')
+    ax.plot(ncl, P10, c='C2', label=r'$P_{10}$', marker='o', ls='--')
+    ax.plot(ncl, P11, c='C3', label=r'$P_{11}$', marker='o', ls='--')
 
-    P0 = np.zeros(len(SI))
-    P1 = np.zeros(len(SX))
-    for i, (sI, sX) in enumerate(zip(SI, SX)):
-        p0, p1 = np.dot(np.array([sI-V2, sX-V2]), M_inv)
-        p0, p1 = np.dot(M_inv, np.array([sI-V2, sX-V2]))
-        P0[i] = p0
-        P1[i] = p1
+    ax.plot(ncl, P00_CZ, c='C0', label=r'$P_{00}$-int. CZ',
+            marker='d', alpha=.5, ls=':')
+    ax.plot(ncl, P01_CZ, c='C1', label=r'$P_{01}$-int. CZ',
+            marker='d', alpha=.5, ls=':')
+    ax.plot(ncl, P10_CZ, c='C2', label=r'$P_{10}$-int. CZ',
+            marker='d', alpha=.5, ls=':')
+    ax.plot(ncl, P11_CZ, c='C3', label=r'$P_{11}$-int. CZ',
+            marker='d', alpha=.5, ls=':')
 
-    P2 = 1 - P0 - P1
+    ax.set_xlabel('Number of Cliffords (#)')
+    ax.set_ylabel(r'$P |00\rangle$')
+    ax.legend(loc=(1.05, 0))
+    ax.set_ylim(-.05, 1.05)
+    ax.set_title(title)
 
-    return P0, P1, P2, M_inv
+
+def plot_char_RB_decay(ncl, C1, C2, C12,
+                       C1_CZ, C2_CZ, C12_CZ,
+                       fr_C1, fr_C2, fr_C12,
+                       fr_C1_CZ, fr_C2_CZ, fr_C12_CZ,
+                       title, ax, **kw):
+
+    ncl_fine = np.linspace(np.min(ncl), np.max(ncl), 101)
+
+    plot_fit(ncl_fine, fr_C1, ax, ls='-', c='C0')
+    ax.plot(ncl, C1, c='C0', label=r'$C_1$: $A_1\cdot {\alpha_{1|2}}^m$',
+            marker='o', ls='')
+    plot_fit(ncl_fine, fr_C2, ax, ls='-', c='C1')
+    ax.plot(ncl, C2, c='C1', label=r'$C_2$: $A_1\cdot {\alpha_{2|1}}^m$',
+            marker='o', ls='')
+    plot_fit(ncl_fine, fr_C12, ax, ls='-', c='C2')
+    ax.plot(ncl, C12, c='C2', label=r'$C_{12}$: $A_1\cdot {\alpha_{12}}^m$',
+            marker='o', ls='')
+
+    plot_fit(ncl_fine, fr_C1_CZ, ax, ls='--', c='C0', alpha=.5)
+    ax.plot(ncl, C1_CZ, c='C0',
+            label=r"$C_1^{int.}$: $A_1' \cdot {\alpha_{1|2}'}^m$",
+            marker='d', ls='', alpha=.5)
+    plot_fit(ncl_fine, fr_C2_CZ, ax, ls='--', c='C1', alpha=.5)
+    ax.plot(ncl, C2_CZ, c='C1',
+            label=r"$C_2^{int.}$: $A_2' \cdot {\alpha_{2|1}'}^m$",
+            marker='d', ls='', alpha=.5)
+    plot_fit(ncl_fine, fr_C12_CZ, ax, ls='--', c='C2', alpha=.5)
+    ax.plot(ncl, C12_CZ, c='C2',
+            label=r"$C_{12}^{int.}$: $A_{12}' \cdot {\alpha_{12}'}^m$",
+            marker='d', ls='', alpha=.5)
+
+    ax.set_xlabel('Number of Cliffords (#)')
+    ax.set_ylabel('Population')
+    ax.legend(title='Character decay',
+              ncol=2, loc=(1.05, 0.6))
+
+    ax.set_title(title)
+
+
+def plot_char_rb_quantities(ax, qoi, **kw):
+    """
+    Plots a text message of the main quantities extracted from char rb
+    """
+    def gen_val_str(alpha, alpha_p):
+
+        val_str = '   {:.3f}$\pm${:.3f}    {:.3f}$\pm${:.3f}'
+        return val_str.format(alpha.nominal_value, alpha.std_dev,
+                              alpha_p.nominal_value, alpha_p.std_dev)
+
+    alpha_msg = '            Reference         Interleaved'
+    alpha_msg += '\n'r'$\alpha_{1|2}$'+'\t'
+    alpha_msg += gen_val_str(qoi['alpha1'], qoi['alpha1_CZ_int'])
+    alpha_msg += '\n'r'$\alpha_{2|1}$'+'\t'
+    alpha_msg += gen_val_str(qoi['alpha2'], qoi['alpha2_CZ_int'])
+    alpha_msg += '\n'r'$\alpha_{12}$'+'\t'
+    alpha_msg += gen_val_str(qoi['alpha12'], qoi['alpha12_CZ_int'])
+    alpha_msg += '\n' + '_'*40+'\n'
+
+    alpha_msg += '\n'r'$\epsilon_{Ref.}$'+'\t'
+    alpha_msg += '{:.3f}$\pm${:.3f}%'.format(
+        qoi['eps_ref'].nominal_value*100, qoi['eps_ref'].std_dev*100)
+    alpha_msg += '\n'r'$\epsilon_{Int.}$'+'\t'
+    alpha_msg += '{:.3f}$\pm${:.3f}%'.format(
+        qoi['eps_int'].nominal_value*100, qoi['eps_int'].std_dev*100)
+    alpha_msg += '\n'r'$\epsilon_{CZ.}$'+'\t'
+    alpha_msg += '{:.3f}$\pm${:.3f}%'.format(
+        qoi['eps_CZ'].nominal_value*100, qoi['eps_CZ'].std_dev*100)
+
+    ax.text(1.05, 0.0, alpha_msg, transform=ax.transAxes)
 
 
 def logisticreg_classifier_machinelearning(shots_0, shots_1, shots_2):
@@ -1344,6 +1614,28 @@ def unitarity_decay(A, B, u, m):
     return A + B*u**m
 
 
+def char_decay(A, alpha, m):
+    """
+    From Helsen et al. A new class of efficient RB protocols.
+
+    Theory in Helsen et al. arXiv:1806.02048
+    Eq. 8 of Xue et al. ArXiv 1811.04002v1 (experimental implementation)
+
+    Parameters
+    ==========
+    A (float):
+        Scaling factor of the decay
+    alpha (float):
+        depolarizing parameter to be estimated
+    m (array)
+        number of cliffords
+
+    returns:
+       A * α**m
+    """
+    return A * alpha**m
+
+
 def format_value_string(par_name: str, lmfit_par, end_char=''):
     """Format an lmfit par to a  string of value with uncertainty."""
     val_string = par_name
@@ -1354,3 +1646,24 @@ def format_value_string(par_name: str, lmfit_par, end_char=''):
         val_string += r'$\pm$' + 'NaN'
     val_string += end_char
     return val_string
+
+
+def depolarizing_par_to_eps(alpha, d):
+    """
+    Convert depolarizing parameter to infidelity.
+
+    Dugas et al.  arXiv:1610.05296v2 contains a nice overview table of
+    common RB paramater conversions.
+
+    Parameters
+    ==========
+    alpha (float):
+        depolarizing parameter, also commonly referred to as lambda or p.
+    d (int):
+        dimension of the system, 2 for a single qubit, 4 for two-qubits.
+
+    Returns
+    =======
+        eps = (1-alpha)*(d-1)/d
+    """
+    return (1-alpha)*(d-1)/d

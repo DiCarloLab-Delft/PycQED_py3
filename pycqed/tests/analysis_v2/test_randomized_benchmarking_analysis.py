@@ -69,3 +69,20 @@ class Test_RBAnalysis(unittest.TestCase):
         self.assertAlmostEqual(u_dec['eps'].value, 0.1068, places=3)
 
 
+
+
+class Test_CharRBAnalysis():
+    def test_char_rb_extract_data(self):
+
+        ts = '20181129_170623'
+        a = ma.CharacterBenchmarking_TwoQubit_Analysis(t_start=ts)
+        df = a.raw_data_dict['df']
+        assert df.shape == (135, 12)
+        assert {'pauli', 'interleaving_cl', 'ncl'}<=set(df.keys())
+
+        char_df = a.proc_data_dict['char_df']
+        assert {'P00', 'P01', 'P10', 'P11',
+                'P00_CZ', 'P01_CZ', 'P10_CZ', 'P11_CZ',
+                'C1', 'C2', 'C12', 'C1_CZ', 'C2_CZ', 'C12_CZ'} \
+                    <= set(char_df.keys())
+

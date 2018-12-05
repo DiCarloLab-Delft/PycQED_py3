@@ -341,7 +341,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             sol = np.min(sols)
 
         # imaginary part is ignored, instead sticking to closest real value
-        return np.real(sol)
+        # float is because of a typecasting bug in np 1.12 (solved in 1.14)
+        return float(np.real(sol)) 
 
     def calc_net_zero_length_ratio(self):
         """
@@ -541,6 +542,16 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
 
+        self.add_parameter(
+            'czd_signs', initial_value=['+', '-'],
+            docstring='Used to determine the sign of the two parts of the '
+            'double sided CZ pulse. This should be a list of two elements,'
+            ' where "+" is a positive pulse, "-" a negative amplitude and "0" '
+            'a disabled pulse.', 
+            vals=vals.Lists(vals.Enum('+', '-', 0)),
+            parameter_class=ManualParameter)
+
+
         self.add_parameter('mcz_nr_of_repeated_gates',
                            initial_value=1, vals=vals.PermissiveInts(1, 40),
                            parameter_class=ManualParameter)
@@ -633,6 +644,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             return CZ
 
         else:
+            signs = self.czd_signs()
+
             # Simple double sided CZ pulse implemented in most basic form.
             # repeats the same CZ gate twice and sticks it together.
             length_ratio = self.calc_net_zero_length_ratio()
@@ -642,10 +655,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 theta_f=np.deg2rad(self.cz_theta_f()),
                 lambda_2=self.cz_lambda_2(), lambda_3=self.cz_lambda_3())
             CZ_eps_A = wfl.theta_to_eps(CZ_theta_A, g=self.q_J2())
+
             CZ_amp_A = self.calc_eps_to_amp(
-                CZ_eps_A, state_A='11', state_B='02', positive_branch=True)
+                CZ_eps_A, state_A='11', state_B='02', 
+                positive_branch=(signs[0]=='+'))
 
             CZ_A = dac_scalefactor*CZ_amp_A
+            if signs[0] == 0: 
+                CZ_A *=0 
 
             # Generate the second CZ pulse. If the params are np.nan, default
             # to the main parameter
@@ -663,16 +680,19 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             else:
                 d_lambda_3 = self.cz_lambda_3()
 
+
             CZ_theta_B = wfl.martinis_flux_pulse(
                 self.cz_length()*(1-length_ratio), theta_i=theta_i,
                 theta_f=np.deg2rad(d_theta_f),
                 lambda_2=d_lambda_2, lambda_3=d_lambda_3)
             CZ_eps_B = wfl.theta_to_eps(CZ_theta_B, g=self.q_J2())
             CZ_amp_B = self.calc_eps_to_amp(
-                CZ_eps_B, state_A='11', state_B='02', positive_branch=False)
+                CZ_eps_B, state_A='11', state_B='02', 
+                positive_branch=(signs[1]=='+'))
 
             CZ_B = dac_scalefactor*CZ_amp_B
-
+            if signs[1] == 0: 
+                CZ_B *= 0 
             # Combine both halves of the double sided CZ gate
             amp_rat = self.czd_amp_ratio()
             waveform = np.concatenate(
@@ -984,7 +1004,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if self.czd_double_sided():
             corr_pulse += phase_corr_sine_series([self.cz_phase_corr_amp()],
                                                      corr_samples)
-        else: 
+        else:
             corr_pulse += phase_corr_sine_series_half([self.cz_phase_corr_amp()],
                                          corr_samples)
 
@@ -1381,7 +1401,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         ax.plot([amp_J2], [f_11_02],
                 color='C4', marker='o', label='11-02')
         ax.text(amp_J2, f_11_02,
-                '({:.3f},{:.2f})'.format(amp_J2, f_11_02*1e-9),
+                '({:.4f},{:.2f})'.format(amp_J2, f_11_02*1e-9),
                 color='C4',
                 ha='left', va='bottom', clip_on=True)
 
@@ -1390,7 +1410,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         ax.plot([amp_J1], [f_10_01],
                 color='C5', marker='o', label='10-01')
         ax.text(amp_J1, f_10_01,
-                '({:.3f},{:.2f})'.format(amp_J1, f_10_01*1e-9),
+                '({:.4f},{:.2f})'.format(amp_J1, f_10_01*1e-9),
                 color='C5', ha='left', va='bottom', clip_on=True)
 
         # 3. Adding legend etc.

@@ -89,6 +89,13 @@ class MeasurementControl(Instrument):
                            initial_value=True)
 
         self.add_parameter(
+            'on_progress_callback', vals=vals.Callable(),
+            docstring='A callback to communicate progress. This should be a '
+            'Callable accepting ints between 0 and 100 indicating percdone.',
+            parameter_class=ManualParameter,
+            initial_value=None)
+
+        self.add_parameter(
             'cfg_clipping_mode', vals=vals.Bool(),
             docstring='Clipping mode, when True ignores ValueErrors  when '
             'setting parameters. This can be useful when running optimizations',
@@ -1373,7 +1380,8 @@ class MeasurementControl(Instrument):
                     t_left=round((100.-percdone)/(percdone) *
                                  elapsed_time, 1) if
                     percdone != 0 else '')
-
+            if self.on_progress_callback() is not None:
+                self.on_progress_callback()(percdone)
             if percdone != 100:
                 end_char = ''
             else:

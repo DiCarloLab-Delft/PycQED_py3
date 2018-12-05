@@ -6,25 +6,95 @@ from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
 
 
+default_mw_lutmap = {
+    0: {"name": "I",        "theta": 0, "phi": 0, "type": "ge"},
+    1: {"name": "rX180",    "theta": 180, "phi": 0, "type": "ge"},
+    2: {"name": "rY180",    "theta": 180, "phi": 90, "type": "ge"},
+    3: {"name": "rX90",     "theta": 90, "phi": 0, "type": "ge"},
+    4: {"name": "rY90",     "theta": 90, "phi": 90, "type": "ge"},
+    5: {"name": "rXm90",    "theta": -90, "phi": 0, "type": "ge"},
+    6: {"name": "rYm90",    "theta": -90, "phi": 90, "type": "ge"},
+    7: {"name": "rPhi90",   "theta": 90, "phi": 0, "type": "ge"},
+    8: {"name": "spec",     "type": "spec"},
+    9: {"name": "rX12",      "theta": 180, "phi": 0, "type": "ef"},
+}
+
+valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw'}
+
+# _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
+#            'rXm90',  'rYm90', 'rPhi90', 'spec']
+# # use remaining codewords to set pi/2 gates for various angles
+# for i in range(18):
+#     angle = i * 20
+#     _def_lm.append('r{}_90'.format(angle))
+
+
+def mw_lutmap_is_valid(lutmap: dict) -> bool:
+    """
+    Test if lutmap obeys schema.
+
+    Args:
+        lutmap
+    Return:
+        valid (bool):
+    """
+    # FIXME: make this part of the validator for the LutMap parameter.
+    for key, value in lutmap.items():
+        if not isinstance(key, int):
+            raise TypeError
+        if value['type'] not in valid_types:
+            raise ValueError("{} not in {}".format(value['type'],
+                                                   valid_types))
+
+    return True
+
+
+def theta_to_amp(theta: float, amp180: float):
+    """
+    Convert θ in deg to pulse amplitude based on a reference amp180.
+
+    Note that all angles are mapped onto the domain [-180, 180) so that
+    the minimum possible angle for each rotation is used.
+    """
+    # phase wrapped to [-180, 180)
+    theta_wrap = ((-theta+180) % 360-180)*-1
+    amp = theta_wrap/180*amp180
+    return amp
+
+
 class Base_MW_LutMan(Base_LutMan):
-    _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-               'rXm90',  'rYm90', 'rPhi90', 'spec']
-    # use remaining codewords to set pi/2 gates for various angles
-    for i in range(18):
-        angle = i * 20
-        _def_lm.append('r{}_90'.format(angle))
+    """
+    The base class for the microwave lutman.
+
+    Standard microwave pulses are generated based on a lutmap.
+
+    - Schema of lutmap.
+    - important attributes
+        self._wave_dict
+
+    Typical usage flow of the mw-lutmans
+
+        1. specify a lutmap that determines what waveforms are used.
+        2. set some parameters such as mw_amp180
+        3. generate waveforms -> stored in self._wave_dict
+        4. upload waveforms
+
+    """
 
     def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.ef
-        """
-        def_lm = self._def_lm
-        LutMap = OrderedDict()
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
-        self.LutMap(LutMap)
+        """Set the default lutmap for standard microwave drive pulses."""
+        self.LutMap(default_mw_lutmap.copy())
+
+    def codeword_idx_to_parnames(self, cw_idx: int):
+        """Convert a codeword_idx to a list of par names for the waveform."""
+        # the possible channels way of doing this is to make it work both for
+        # VSM style lutmans and no VSM style lutmans.
+        possible_channels = ('channel_GI', 'channel_GQ',
+                             'channel_DI', 'channel_DQ',
+                             'channel_I', 'channel_Q')
+        codewords = ['wave_ch{}_cw{:03}'.format(self[ch](), cw_idx)
+                     for ch in possible_channels if hasattr(self, ch)]
+        return codewords
 
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
@@ -104,95 +174,52 @@ class Base_MW_LutMan(Base_LutMan):
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(1, self._num_channels))
 
-    def generate_standard_waveforms(self,
-                                    apply_predistortion_matrix: bool=True):
+    def generate_standard_waveforms(
+            self, apply_predistortion_matrix: bool=True):
         self._wave_dict = OrderedDict()
+
         if self.cfg_sideband_mode() == 'static':
             f_modulation = self.mw_modulation()
         else:
             f_modulation = 0
 
-        self._wave_dict['I'] = self.wf_func(
-            amp=0, sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=0,
-            motzoi=0)
-        self._wave_dict['rX180'] = self.wf_func(
-            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=0,
-            motzoi=self.mw_motzoi())
-        self._wave_dict['rY180'] = self.wf_func(
-            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=90,
-            motzoi=self.mw_motzoi())
-        self._wave_dict['rX90'] = self.wf_func(
-            amp=self.mw_amp180()*self.mw_amp90_scale(),
-            sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=0,
-            motzoi=self.mw_motzoi())
-        self._wave_dict['rY90'] = self.wf_func(
-            amp=self.mw_amp180()*self.mw_amp90_scale(),
-            sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=90,
-            motzoi=self.mw_motzoi())
-        self._wave_dict['rXm90'] = self.wf_func(
-            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
-            sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=0,
-            motzoi=self.mw_motzoi())
-        self._wave_dict['rYm90'] = self.wf_func(
-            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
-            sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=90,
-            motzoi=self.mw_motzoi())
+        # lutmap is expected to obey lutmap mw schema
+        for idx, waveform in self.LutMap().items():
+            if waveform['type'] == 'ge':
+                amp = theta_to_amp(theta=waveform['theta'],
+                                   amp180=self.mw_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=f_modulation,
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=self.mw_motzoi())
+            elif waveform['type'] == 'ef':
+                amp = theta_to_amp(theta=waveform['theta'],
+                                   amp180=self.mw_ef_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=self.mw_ef_modulation(),
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=0)
+            elif waveform['type'] == 'raw-drag':
+                self._wave_dict[idx] = self.wf_func(
+                    **waveform["drag_pars"])
 
-        self._wave_dict['rPhi180'] = self.wf_func(
-            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
-            motzoi=self.mw_motzoi())
-        self._wave_dict['rPhi90'] = self.wf_func(
-            amp=self.mw_amp180()*self.mw_amp90_scale(),
-            sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
-            motzoi=self.mw_motzoi())
-        self._wave_dict['rPhim90'] = self.wf_func(
-            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
-            sigma_length=self.mw_gauss_width(),
-            f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
-            motzoi=self.mw_motzoi())
-        self._wave_dict['spec'] = self.spec_func(
-            amp=self.spec_amp(),
-            length=self.spec_length(),
-            sampling_rate=self.sampling_rate(),
-            delay=0,
-            phase=0)
+            elif waveform['type'] == 'spec':
+                self._wave_dict[idx] = self.spec_func(
+                    amp=self.spec_amp(),
+                    length=self.spec_length(),
+                    sampling_rate=self.sampling_rate(),
+                    delay=0,
+                    phase=0)
+            else:
+                raise ValueError
 
-        self._wave_dict['rX12'] = self.wf_func(
-            amp=self.mw_ef_amp180(),
-            sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_ef_modulation(),
-            sampling_rate=self.sampling_rate(),
-            phase=0,
-            motzoi=0)
-
-        for i in range(18):
-            angle = i * 20
-            self._wave_dict['r{}_90'.format(angle)] = self.wf_func(
-                amp=self.mw_amp180()*self.mw_amp90_scale(),
-                sigma_length=self.mw_gauss_width(),
-                f_modulation=f_modulation,
-                sampling_rate=self.sampling_rate(), phase=angle,
-                motzoi=self.mw_motzoi())
-
+        # Add predistortions + test
         if (self.mixer_apply_predistortion_matrix()
                 and apply_predistortion_matrix):
             self._wave_dict = self.apply_mixer_predistortion_corrections(
@@ -210,10 +237,32 @@ class Base_MW_LutMan(Base_LutMan):
                                            regenerate_waveforms: bool=False):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
-        waveforms = self._wave_dict[waveform_name]
-        codewords = self.LutMap()[waveform_name]
+
+        if isinstance(waveform_name, int):
+            cw_idx = waveform_name
+        else:
+            raise DeprecationWarning
+
+        waveforms = self._wave_dict[cw_idx]
+        codewords = self.codeword_idx_to_parnames(cw_idx)
+
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
+
+    def load_phase_pulses_to_AWG_lookuptable(self,
+                                             phases=np.arange(0, 360, 20)):
+        """
+        Loads rPhi90 pulses onto the AWG lookuptable.
+        """
+
+        if (len(phases) > 18):
+            raise ValueError('max 18 amplitude values can be provided')
+        lm = self.LutMap()
+        for i, (phase) in enumerate(phases):
+            lm[i+9] = {"name": "rPhi90",    "theta": 90,
+                       "phi": phase, "type": "ge"}
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
 
     def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
                                                mod_freqs: list=None):
@@ -226,9 +275,7 @@ class Base_MW_LutMan(Base_LutMan):
         This method contains several steps
             1. determine what ef-pulses to generate
             2. generate a LutMap to use and upload the waveforms
-            3. generate the ef-pulses in a for-loop
-            4. couple the waveforms to the AWG params
-            5. upload the codeword program that couples AWG parameters
+            3. generate and upload waveforms.
         """
 
         # 1. Determine what ef-pulses to generate
@@ -240,42 +287,33 @@ class Base_MW_LutMan(Base_LutMan):
         if (len(amps) > 18):
             raise ValueError('max 18 amplitude values can be provided')
 
-        if mod_freqs == None:
+        if mod_freqs is None:
             mod_freqs = [self.mw_ef_modulation()]*len(amps)
         elif len(mod_freqs) == 1:
             mod_freqs = [mod_freqs]*len(amps)
 
         # 2. Generate a LutMap for the ef-pulses
+        lm = self.LutMap()
         for i, (amp, mod_freq) in enumerate(zip(amps, mod_freqs)):
-            cw_idx = i + 9
-            possible_channels = ('channel_GI', 'channel_GQ',
-                                'channel_DI', 'channel_DQ',
-                                'channel_I', 'channel_Q')
-            #
-            codewords = ['wave_ch{}_cw{:03}'.format(self[ch](), cw_idx)
-                for ch in possible_channels if hasattr(self, ch)]
+            lm[i+9] = {"name": "", "type": "raw-drag",
+                       "drag_pars": {
+                           "amp": amp, "f_modulation": mod_freq,
+                           "sigma_length": self.mw_gauss_width(),
+                           "sampling_rate": self.sampling_rate(),
+                           "motzoi": 0}
+                       }
 
-            # 3. Generate the ef-pulses in the for loop
-            self._wave_dict['ef_{}'.format(i)] = self.wf_func(
-                amp=amp, sigma_length=self.mw_gauss_width(),
-                f_modulation=mod_freq, sampling_rate=self.sampling_rate(),
-                phase=0,
-                motzoi=self.mw_motzoi())
-            # 4. Set the waveforms
-            for cw, waveform in zip(codewords,
-                                    self._wave_dict['ef_{}'.format(i)]):
-                self.AWG.get_instr().set(cw, waveform)
-
-        # This ensures only the channels that are relevant get reconfigured
-        if 'channel_GI' in self.parameters:
-            awgs = [self.channel_GI()//2, self.channel_DI()//2]
-        else:
-            awgs = [self.channel_I()//2]
-        # 5. Upload the codeword program to ensure the pulses are loaded
-        self.AWG.get_instr().upload_codeword_program(awgs=awgs)
+        # 3. generate and upload waveforms
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
 
 class CBox_MW_LutMan(Base_MW_LutMan):
+    _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
+               'rXm90',  'rYm90', 'rPhi90', 'spec']
+    # use remaining codewords to set pi/2 gates for various angles
+    for i in range(18):
+        angle = i * 20
+        _def_lm.append('r{}_90'.format(angle))
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
@@ -373,7 +411,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0.5)
 
-
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
         for awg_ch in [self.channel_I(), self.channel_Q()]:
@@ -391,21 +428,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair)))
         assert vals[0] == vals[1]
         return vals[0]
-
-    def generate_standard_waveforms(self):
-            wave_dict = super().generate_standard_waveforms(
-                apply_predistortion_matrix=False)
-
-            wave_dict['square'] = wf.mod_square(
-                amp=self.sq_amp(),
-                length=self.mw_gauss_width()*4,  # to ensure same duration as mw
-                f_modulation=self.mw_modulation(),
-                sampling_rate=self.sampling_rate())
-
-            if self.mixer_apply_predistortion_matrix():
-                self._wave_dict = self.apply_mixer_predistortion_corrections(
-                    self._wave_dict)
-            return self._wave_dict
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True, stop_start: bool = True,
@@ -436,21 +458,20 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             # Add if statemetn based on the hash here
             self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 
-        for waveform_name in self.LutMap().keys():
+        for waveform_key in self.LutMap().keys():
             self.load_waveform_realtime(
-                waveform_name=waveform_name,
-                wf_nr=None, regenerate_waveforms=False)
+                waveform_key=waveform_key, regenerate_waveforms=False)
 
         self._update_expected_program_hash()
 
-    def load_waveform_realtime(self, waveform_name: str,
+    def load_waveform_realtime(self, waveform_key,
                                wf_nr: int = None,
                                regenerate_waveforms: bool=True):
         """
         Loads a waveform using the realtime memory manipulation.
 
         Args:
-            waveform_name:        (str) : name of the waveform
+            waveform_key:         (int) : key of the waveform in _wave_dict
             wf_nr                 (int) : what codeword to load the pulse onto
                 if set to None, will determine awg_nr based on self.LutMap
             regenerate_waveforms (bool) : if True regenerates all waveforms
@@ -459,10 +480,10 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        I, Q = self._wave_dict[waveform_name]
+        I, Q = self._wave_dict[waveform_key]
 
         if wf_nr is None:
-            wf_nr = int(self.LutMap()[waveform_name][0][-3:])
+            wf_nr = waveform_key
 
         AWG = self.AWG.get_instr()
 
@@ -534,20 +555,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         self.wf_func = wf.mod_gauss_VSM
         self.spec_func = wf.block_pulse_vsm
 
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = OrderedDict()
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'wave_ch{}_cw{:03}'.format(self.channel_GI(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_GQ(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_DI(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_DQ(), cw_idx))
-        self.LutMap(LutMap)
-
     def _add_waveform_parameters(self):
         super(AWG8_MW_LutMan, self)._add_waveform_parameters()
         # Base_MW_LutMan._add_waveform_parameters(self)
@@ -561,8 +568,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
     def generate_standard_waveforms(self):
 
-        wave_dict = super(AWG8_MW_LutMan, self).generate_standard_waveforms(
-            apply_predistortion_matrix=False)
+        wave_dict = super(AWG8_MW_LutMan, self).generate_standard_waveforms()
         wave_dict['square'] = wf.mod_square_VSM(
             amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
             length=self.mw_gauss_width()*4,  # to ensure same duration as mw
@@ -599,14 +605,14 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                 parameter_class=ManualParameter, initial_value=None,
                 vals=vals.Ints())
 
-    def load_waveform_realtime(self, waveform_name: str,
+    def load_waveform_realtime(self, waveform_key,
                                wf_nr: int = None,
                                regenerate_waveforms: bool=True):
         """
         Loads a waveform using the realtime memory manipulation.
 
         Args:
-            waveform_name:        (str) : name of the waveform
+            waveform_key:         (int) : key of the waveform in _wave_dict
             wf_nr                 (int) : what codeword to load the pulse onto
                 if set to None, will determine awg_nr based on self.LutMap
             regenerate_waveforms (bool) : if True regenerates all waveforms
@@ -615,10 +621,10 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        GI, GQ, DI, DQ = self._wave_dict[waveform_name]
+        GI, GQ, DI, DQ = self._wave_dict[waveform_key]
 
         if wf_nr is None:
-            wf_nr = int(self.LutMap()[waveform_name][0][-3:])
+            wf_nr = waveform_key
 
         AWG = self.AWG.get_instr()
 
@@ -679,6 +685,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
+
 
 class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
     def __init__(self, name, **kw):
@@ -866,16 +873,16 @@ class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
         # all channels are used and hardcoded in functionality
         pass
 
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = OrderedDict()
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'wave_ch1_cw{:03}'.format(cw_idx),
-                'wave_ch2_cw{:03}'.format(cw_idx),
-                'wave_ch3_cw{:03}'.format(cw_idx),
-                'wave_ch4_cw{:03}'.format(cw_idx))
-        self.LutMap(LutMap)
+    # def set_default_lutmap(self):
+    #     """
+    #     Set's the default lutmap for standard microwave drive pulses.
+    #     """
+    #     def_lm = self._def_lm
+    #     LutMap = OrderedDict()
+    #     for cw_idx, cw_key in enumerate(def_lm):
+    #         LutMap[cw_key] = (
+    #             'wave_ch1_cw{:03}'.format(cw_idx),
+    #             'wave_ch2_cw{:03}'.format(cw_idx),
+    #             'wave_ch3_cw{:03}'.format(cw_idx),
+    #             'wave_ch4_cw{:03}'.format(cw_idx))
+    #     self.LutMap(LutMap)

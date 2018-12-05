@@ -433,18 +433,14 @@ class CCLight_Transmon(Qubit):
         return self._mw_fine_delay
 
     def _set_flux_fine_delay(self,val):
-        if self.cfg_with_vsm():
-            logging.warning('CCL transmon is using VSM. Use mw_vsm_delay to'
-                            'adjust delay')
+        lutman = self.find_instrument(self.instr_LutMan_Flux())
+        AWG = lutman.find_instrument(lutman.AWG())
+        using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+        if using_QWG:
+            logging.warning('CCL transmon is using QWG. Not implemented.')
         else:
-            lutman = self.find_instrument(self.instr_LutMan_Flux())
-            AWG = lutman.find_instrument(lutman.AWG())
-            using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
-            if using_QWG:
-                logging.warning('CCL transmon is using QWG. Not implemented.')
-            else:
-                AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
-                # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
+            AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
+            # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
         self._flux_fine_delay = val
 
 
@@ -962,13 +958,14 @@ class CCLight_Transmon(Qubit):
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
                         UHFQC.set('quex_wint_weights_{}_real'.format(
-                            self.ro_acq_weight_chQ()), opt_WI)
-                        UHFQC.set('quex_wint_weights_{}_imag'.format(
                             self.ro_acq_weight_chQ()), opt_WQ)
+                        UHFQC.set('quex_wint_weights_{}_imag'.format(
+                            self.ro_acq_weight_chQ()), opt_WI)
                         UHFQC.set('quex_rot_{}_real'.format(
                             self.ro_acq_weight_chQ()), 1.0)
                         UHFQC.set('quex_rot_{}_imag'.format(
                             self.ro_acq_weight_chQ()), 1.0)
+
 
         else:
             raise NotImplementedError(
@@ -1000,7 +997,6 @@ class CCLight_Transmon(Qubit):
 
         # 2. Prepares map and parameters for waveforms
         #    (except pi-pulse amp, which depends on VSM usage)
-        MW_LutMan.set_default_lutmap()
         MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
         MW_LutMan.mw_gauss_width(self.mw_gauss_width())
         MW_LutMan.channel_amp(self.mw_channel_amp())
@@ -1366,7 +1362,7 @@ class CCLight_Transmon(Qubit):
                 Navg=5,
                 prepare_function=mw_lutman.load_waveform_realtime,
                 # Codeword 10 is hardcoded in the generate CCL config
-                prepare_function_kwargs={'waveform_name': 'square', 'wf_nr': 10})
+                prepare_function_kwargs={'waveform_key': 'square', 'wf_nr': 10})
             ad_func_pars = {'adaptive_function': cma.fmin,
                             'x0': x0,
                             'sigma0': 1,
@@ -2208,7 +2204,7 @@ class CCLight_Transmon(Qubit):
                                           analyze, close_fig, real_imag,
                                           prepare_for_timedomain)
 
-    def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.2, 2.0, 31),
+    def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.1, 1.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True, all_modules=False):
         if MC is None:
@@ -2241,8 +2237,9 @@ class CCLight_Transmon(Qubit):
                 mod_out, ch_in)]
             D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
                 mod_out, ch_in)]
+
             s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=False,
-                                        retrieve_value=True)
+                                        retrieve_value=True, instr=VSM)
 
         self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
@@ -2890,7 +2887,7 @@ class CCLight_Transmon(Qubit):
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
 
-    def measure_flipping(self, number_of_flips=np.arange(20), equator=True,
+    def measure_flipping(self, number_of_flips=np.arange(0, 40, 2), equator=True,
                          MC=None, analyze=True, close_fig=True, update=True,
                          ax='x', angle='180'):
 
@@ -2949,7 +2946,7 @@ class CCLight_Transmon(Qubit):
         if using_VSM:
             VSM = self.instr_VSM.get_instr()
             if motzoi_amps is None:
-                motzoi_amps = np.linspace(0.2, 2.0, 31)
+                motzoi_amps = np.linspace(0.1, 1.0, 31)
             mod_out = self.mw_vsm_mod_out()
             ch_in = self.mw_vsm_ch_in()
             D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(

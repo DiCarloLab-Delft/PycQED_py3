@@ -69,6 +69,22 @@ class Test_HDF5(unittest.TestCase):
             mock_parab_pars['array_like']['value'],
             np.linspace(0, 11, 23))
 
+    def test_writing_and_reading_dicts_to_hdf5_int_keys(self):
+        test_dict = {
+            0: {"name": "I",        "theta": 0, "phi": 0, "type": "ge"},
+            1: {"name": "rX180",    "theta": 180, "phi": 0, "type": "ge"}}
+        data_object = h5d.Data(name='test_object', datadir=self.datadir)
+        h5d.write_dict_to_hdf5(test_dict, data_object)
+        data_object.close()
+        filepath = data_object.filepath
+
+        new_dict = {}
+        opened_hdf5_file = h5py.File(filepath, 'r')
+        h5d.read_dict_from_hdf5(new_dict, opened_hdf5_file)
+
+        self.assertEqual(test_dict.keys(), new_dict.keys())
+        self.assertEqual(test_dict[0], new_dict[0])
+
     def test_writing_and_reading_dicts_to_hdf5(self):
         """
         Tests dumping some random dictionary to hdf5 and reading back the

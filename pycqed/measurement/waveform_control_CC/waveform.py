@@ -139,8 +139,8 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
     block_I = amp_I * np.ones(int(pulse_samples))
     block_Q = amp_Q * np.ones(int(pulse_samples))
     Zeros = np.zeros(int(delay_samples))
-    pulse_I = list(Zeros)+list(block_I)
-    pulse_Q = list(Zeros)+list(block_Q)
+    pulse_I = np.array(list(Zeros)+list(block_I))
+    pulse_Q = np.array(list(Zeros)+list(block_Q))
     return pulse_I, pulse_Q
 
 
