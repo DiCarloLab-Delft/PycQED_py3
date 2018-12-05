@@ -48,6 +48,13 @@ def f_to_parallelize_new(arglist):
     MC.set_detector_function(d)
 
 
+    exp_metadata = {'double sided':fluxlutman.czd_double_sided(), 
+                     'length': fluxlutman.cz_length(),
+                     'distortions': noise_parameters_CZ.distortions(), 
+                     'T2_scaling': noise_parameters_CZ.T2_scaling(), 
+                     'sigma_q1': noise_parameters_CZ.sigma_q1(), 
+                     'sigma_q0': noise_parameters_CZ.sigma_q0()}
+
     if adaptive_pars['mode']=='adaptive': 
         MC.set_sweep_functions([fluxlutman.cz_theta_f, fluxlutman.cz_lambda_2])
         MC.set_adaptive_function_parameters({'adaptive_function': adaptive.Learner2D, 
@@ -55,28 +62,31 @@ def f_to_parallelize_new(arglist):
                                          'bounds':[(adaptive_pars['theta_f_min'], adaptive_pars['theta_f_max']), (adaptive_pars['lambda2_min'], adaptive_pars['lambda2_max'])]})
 
         if noise_parameters_CZ.cluster():
-            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
-                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+            dat = MC.run(
+                '2D simulation_new_cluster2 ', 
+                exp_metadata=exp_metadata, 
                 mode='adaptive')
-                #mode='2D')
+
         else:
-        	dat = MC.run('2D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
-                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+
+        	dat = MC.run('2D simulation_new_2', 
+                exp_metadata=exp_metadata, 
                 mode='adaptive')
-                #mode='2D')
+
     elif adaptive_pars['mode']=='1D':
         MC.set_sweep_functions([fluxlutman.cz_theta_f])
-        MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'], adaptive_pars['theta_f_max'],adaptive_pars['n_points']))
+        MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'], 
+            adaptive_pars['theta_f_max'],adaptive_pars['n_points']))
         if noise_parameters_CZ.cluster():
-            dat = MC.run('1D simulation_new_cluster2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
-                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+            dat = MC.run('1D simulation_new_cluster2',
+                exp_metadata=exp_metadata, 
                 mode='1D')
-                #mode='2D')
+
         else:
-            dat = MC.run('1D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
-                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+            dat = MC.run('1D simulation_new_2', 
+                exp_metadata=exp_metadata, 
                 mode='1D')
-                #mode='2D')
+
 
 
     fluxlutman.close()

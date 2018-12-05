@@ -109,6 +109,14 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
         w_q0 > w_q1
         and the anharmonicities alpha negative
     """
+    # this is because of a bug in numpy 1.12 with np.real (solved in >1.14)
+    w_q0 = float(w_q0)
+    w_q1 = float(w_q1)
+    alpha_q0 = float(alpha_q0)
+    alpha_q1 = float(alpha_q1)
+    J = float(J)
+
+
 
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
@@ -804,9 +812,11 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
         print('operating frequency of q1 should be lower than its sweet spot frequency.')
         w_q1 = w_q1_sweetspot
 
-    w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
+    w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(
+        f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
 
-    correction_to_H = coupled_transmons_hamiltonian_new(w_q0=0, w_q1=np.real(w_q1_biased-w_q1), alpha_q0=0, alpha_q1=0, J=0)
+    correction_to_H = coupled_transmons_hamiltonian_new(
+        w_q0=0, w_q1=np.real(w_q1_biased-w_q1), alpha_q0=0, alpha_q1=0, J=0)
 
 
     #t0 = time.time()
