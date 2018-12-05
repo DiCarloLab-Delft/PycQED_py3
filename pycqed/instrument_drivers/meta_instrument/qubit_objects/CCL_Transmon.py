@@ -24,6 +24,8 @@ from pycqed.measurement.openql_experiments.openql_helpers import \
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
+import warnings
+
 
 import cma
 from pycqed.measurement.optimization import nelder_mead
@@ -1083,14 +1085,12 @@ class CCLight_Transmon(Qubit):
         VSM = self.instr_VSM.get_instr()
         VSM.set('ch{}_frequency'.format(
             self.mw_vsm_ch_in()), self.freq_qubit())
-
-        VSM.set('mod{}_ch{}_marker_state'.format(
-            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), 'on')
         VSM.set('mod{}_ch{}_marker_state'.format(
             self.spec_vsm_mod_out(), self.spec_vsm_ch_in()), 'off')
+        VSM.set('mod{}_ch{}_marker_state'.format(
+            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), 'on')
         VSM.set('mod{}_marker_source'.format(
             self.mw_vsm_mod_out()), self.mw_vsm_marker_source())
-
         VSM.set('mod{}_ch{}_derivative_amp'.format(
             self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_D_amp())
         VSM.set('mod{}_ch{}_derivative_phase'.format(
@@ -1128,10 +1128,14 @@ class CCLight_Transmon(Qubit):
         self.measure_rabi(amps=amps, MC=MC, analyze=False,
                           all_modules=all_modules)
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
-        if self.cfg_with_vsm():
-            self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
-        else:
-            self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
+        try:
+            if self.cfg_with_vsm():
+                self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
+            else:
+                self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
+        except(ValueError):
+                warnings.warn("Extracted piPulse amplitude out of parameter range. " \
+                "Keeping previous value.")
         return True
 
     def calibrate_mw_vsm_delay(self):
@@ -1643,7 +1647,7 @@ class CCLight_Transmon(Qubit):
             ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
-                             analyze=True, close_fig=True):
+                             analyze=True, close_fig=True, label=''):
         if not pulsed:
             logging.warning('CCL transmon can only perform '
                             'pulsed spectrocsopy')
@@ -1673,7 +1677,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(freqs)
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='spectroscopy_'+self.msmt_suffix)
+        MC.run(name='spectroscopy_'+self.msmt_suffix+label)
         # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
