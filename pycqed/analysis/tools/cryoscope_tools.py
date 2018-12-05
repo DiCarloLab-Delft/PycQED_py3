@@ -177,6 +177,8 @@ class CryoscopeAnalyzer:
             ax = plt.gca()
         ax.set_title(title)
 
+        # If window size is longer than data this plot will throw an exception
+        window_size = np.min([window_size, len(self.norm_data)])
         f, t, Zxx = ss.stft(self.norm_data, fs=self.sampling_rate,
                             nperseg=window_size,
                             noverlap=0.95 * window_size, return_onesided=False)

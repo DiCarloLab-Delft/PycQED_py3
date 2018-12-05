@@ -38,7 +38,10 @@ def interpolate_heatmap(x, y, z, n: int=None, interp_method:str='linear'):
     The output of this method can directly be used for
         plt.imshow(z_grid, extent=extent, aspect='auto')
         where the extent is determined by the min and max of the x_grid and
-        y_grid
+        y_grid. 
+
+    The output can also be used as input for 
+        ax.pcolormesh(x, y, Z,**kw) 
 
     """
 

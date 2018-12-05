@@ -397,3 +397,14 @@ def make_anglemap(N=256, use_hpl=True):
 
 
 hsluv_anglemap = make_anglemap(use_hpl=False)
+
+
+def plot_fit(xvals, fit_res, ax, **plot_kws):
+    """
+    Evaluates a fit result at specified values to plot the fit.
+    """
+    model = fit_res.model
+    independent_var = model.independent_vars[0]
+    yvals = model.eval(fit_res.params, **{independent_var: xvals})
+    ax.plot(xvals, yvals, **plot_kws)
+

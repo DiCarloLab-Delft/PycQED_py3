@@ -13,6 +13,7 @@ from openql.openql import Program, Kernel, Platform
 
 output_dir = join(dirname(__file__), 'output')
 ql.set_option('output_dir', output_dir)
+ql.set_option('scheduler', 'ALAP')
 
 
 def create_program(pname: str, platf_cfg: str, nregisters: int=0):
@@ -50,6 +51,9 @@ def create_kernel(kname: str, program):
     """
     Wrapper around constructor of openQL "Kernel" class.
     """
+    kname = kname.translate ({ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
+    kname = 'k_'+kname # prefix with k_
+
     k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
     return k
 
@@ -104,7 +108,9 @@ def add_single_qubit_cal_points(p, qubit_idx,
 
 
 def add_two_q_cal_points(p, q0: int, q1: int,
-                         reps_per_cal_pt: int =1):
+                         reps_per_cal_pt: int =1, 
+                         f_state_cal_pts: bool=False, 
+                         f_state_cal_pt_cw: int = 31):
     """
     Returns a list of kernels containing calibration points for two qubits
 
@@ -112,6 +118,8 @@ def add_two_q_cal_points(p, q0: int, q1: int,
         p               : OpenQL  program to add calibration points to
         q0, q1          : ints of two qubits
         reps_per_cal_pt : number of times to repeat each cal point
+        f_state_cal_pts : if True, add calibration points for the 2nd exc. state
+        f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition. 
     Returns:
         kernel_list     : list containing kernels for the calibration points
     """
@@ -120,18 +128,37 @@ def add_two_q_cal_points(p, q0: int, q1: int,
                     ["01"]*reps_per_cal_pt +
                     ["10"]*reps_per_cal_pt +
                     ["11"]*reps_per_cal_pt)
+    if f_state_cal_pts: 
+        extra_combs = (['02']*reps_per_cal_pt + ['20']*reps_per_cal_pt + 
+                       ['22']*reps_per_cal_pt)
+        combinations += extra_combs
+
+
     for i, comb in enumerate(combinations):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
         k.prepz(q0)
         k.prepz(q1)
-        if comb[0] == '1':
-            k.gate('rx180', [q0])
-        else:
+        if comb[0] =='0':
             k.gate('i', [q0])
-        if comb[1] == '1':
-            k.gate('rx180', [q1])
-        else:
+        elif comb[0] == '1':
+            k.gate('rx180', [q0])
+        elif comb[0] =='2': 
+            k.gate('rx180', [q0])
+            # FIXME: this is a workaround
+            #k.gate('rx12', [q0])
+            k.gate('cw_31', [q0])
+
+        if comb[1] =='0':
             k.gate('i', [q1])
+        elif comb[1] == '1':
+            k.gate('rx180', [q1])
+        elif comb[1] =='2': 
+            k.gate('rx180', [q1])
+            # FIXME: this is a workaround
+            #k.gate('rx12', [q1])
+            k.gate('cw_31', [q1])
+
+
         # Used to ensure timing is aligned
         k.gate('wait', [q0, q1], 0)
         k.measure(q0)

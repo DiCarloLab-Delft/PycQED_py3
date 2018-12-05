@@ -116,6 +116,11 @@ def compute_propagator(arglist):
 
 
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
+    if fluxlutman.czd_double_sided():
+        amp_final=[amp_final[0],-amp_final[0]]
+    else:
+        amp_final=[amp_final[0],amp_final[0]]
+    sim_step_new=sim_step_new/2
     amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
 
     # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp_final_new],
@@ -191,7 +196,7 @@ class ramsey_experiment(det.Soft_Detector):
         Returns: quantites of interest
         """
         super().__init__()
-        self.value_names = ['population_02','population_11']
+        self.value_names = ['population_higher_state','population_lower_state']
         self.value_units = ['%', '%']
         self.fluxlutman = fluxlutman
         self.noise_parameters_CZ = noise_parameters_CZ
@@ -276,7 +281,7 @@ class ramsey_experiment(det.Soft_Detector):
 
             qoi = czf.quantities_of_interest_ramsey(U=U_superop_average,initial_state=self.noise_parameters_CZ.initial_state(),fluxlutman=self.fluxlutman,noise_parameters_CZ=self.noise_parameters_CZ)
 
-            quantities_of_interest = [qoi['population_02'], qoi['population_11']]
+            quantities_of_interest = [qoi['population_higher_state'], qoi['population_lower_state']]
             qoi_vec=np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
 

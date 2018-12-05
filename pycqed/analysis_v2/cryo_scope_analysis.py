@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from typing import Union
 from copy import deepcopy
+from scipy.stats import sem 
+from uncertainties import ufloat 
 from pycqed.analysis import analysis_toolbox as a_tools
 from collections import OrderedDict
 from pycqed.analysis import measurement_analysis as ma_old
@@ -136,7 +138,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             label='',
             derivative_window_length: float=5e-9,
             norm_window_size: int=31,
-            nyquist_order: int =0,
+            nyquist_order: int ='auto',
             ch_amp_key: str='Snapshot/instruments/AWG8_8005'
         '/parameters/awgs_0_outputs_1_amplitude',
             ch_range_key: str='Snapshot/instruments/AWG8_8005'
@@ -174,7 +176,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         self.ch_idx_sin = ch_idx_sin
 
         super().__init__(
-            t_start=t_start, t_stop=t_stop, label=label,extract_only=extract_only,
+            t_start=t_start, t_stop=t_stop, label=label, extract_only=extract_only,
             options_dict=options_dict, close_figs=close_figs)
         if auto:
             self.run_analysis()
@@ -217,7 +219,6 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
                 if isinstance(self.polycoeffs_freq_conv, str):
                     self.polycoeffs_freq_conv = np.array(
                         a.data_file[self.polycoeffs_freq_conv])
-                    print(np.array(self.polycoeffs_freq_conv))
 
                 self.raw_data_dict['data'] =\
                     a.measured_values[self.ch_idx_cos] + \
@@ -239,6 +240,9 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
+        self.proc_data_dict['quantities_of_interest'] = {}
+        qoi = self.proc_data_dict['quantities_of_interest']
+
         self.proc_data_dict['derivative_window_length'] = \
             self.derivative_window_length
         self.proc_data_dict['norm_window_size'] = self.norm_window_size
@@ -251,7 +255,21 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             demod_smooth=None)
 
         self.ca.freq_to_amp = self.freq_to_amp
-        self.ca.nyquist_order = self.nyquist_order
+        if self.nyquist_order == 'auto':
+            amp = self.proc_data_dict['amps'][0]
+            nyquist_order = np.polyval(self.polycoeffs_freq_conv, amp)//(
+                self.ca.sampling_rate/2)
+            self.ca.nyquist_order = nyquist_order
+        else:
+            self.ca.nyquist_order = self.nyquist_order
+
+        # Storing specific quantities of interest 
+        qoi['nyquist_order'] = self.nyquist_order
+        qoi['mean_detuning'] = ufloat(np.mean(self.ca.real_detuning), 
+                                      sem(self.ca.real_detuning))
+
+
+
 
     def prepare_plots(self):
         # pass

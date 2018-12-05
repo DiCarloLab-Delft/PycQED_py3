@@ -595,6 +595,25 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('2D adaptive sampling test', mode='adaptive')
 
+    def test_progress_callback(self):
+
+        progress_param = ManualParameter('progress', initial_value=0)
+
+        def set_progress_param_callable(progress):
+            progress_param(progress)
+
+        self.MC.on_progress_callback(set_progress_param_callable)
+
+        self.assertEqual(progress_param(), 0)
+        sweep_pts = np.linspace(0, 10, 30)
+        self.MC.set_sweep_function(None_Sweep())
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        dat = self.MC.run('1D_soft')
+
+        self.assertEqual(progress_param(), 100)
+
+
     @classmethod
     def tearDownClass(self):
         self.MC.close()

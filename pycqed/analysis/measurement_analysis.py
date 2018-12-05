@@ -18,6 +18,7 @@ import textwrap
 from scipy.interpolate import interp1d
 import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
+from scipy.ndimage.filters import gaussian_filter
 import imp
 import math
 
@@ -6659,6 +6660,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                              linecut_log=False, colorplot_log=False,
                              plot_all=True, save_fig=True,
                              transpose=False, figsize=None, filtered=False,
+                             subtract_mean_x=False, subtract_mean_y=False, 
                              **kw):
         '''
         Args:
@@ -6741,9 +6743,16 @@ class TwoD_Analysis(MeasurementAnalysis):
             if "yunit" not in kw:
                 kw["yunit"] = self.parameter_units[1]
 
+            # subtract mean from each row/column if demanded
+            plot_zvals = meas_vals.transpose()
+            if subtract_mean_x:
+                plot_zvals = plot_zvals - np.mean(plot_zvals,axis=1)[:,None]
+            if subtract_mean_y:
+                plot_zvals = plot_zvals - np.mean(plot_zvals,axis=0)[None,:]
+
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
-                               z=meas_vals.transpose(),
+                               z=plot_zvals,
                                zlabel=self.zlabels[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
@@ -7954,19 +7963,27 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                  xlabel=None, ylabel='Frequency (GHz)', 
                  weight_function_magn=0,
                  use_distance=True,
+                 quadratures=None,
+                 blur=None,
                  **kw):
         super().__init__(timestamp=timestamp, label=label, **kw)
         self.get_naming_and_values_2D()
-        measured_magns = np.transpose(self.measured_values[weight_function_magn])
-        measured_phases = np.transpose(self.measured_values[1+weight_function_magn])
-        rad = [(i * np.pi/180) for i in measured_phases]
-        real = [measured_magns[j] * np.cos(i) for j, i in enumerate(rad)]
-        imag = [measured_magns[j] * np.sin(i) for j, i in enumerate(rad)]
+        if quadratures is not None:
+            real = np.transpose(self.measured_values[quadratures[0]])
+            imag = np.transpose(self.measured_values[quadratures[1]])
+        else:
+            measured_magns = np.transpose(self.measured_values[weight_function_magn])
+            measured_phases = np.transpose(self.measured_values[1+weight_function_magn])
+            rad = [(i * np.pi/180) for i in measured_phases]
+            real = [measured_magns[j] * np.cos(i) for j, i in enumerate(rad)]
+            imag = [measured_magns[j] * np.sin(i) for j, i in enumerate(rad)]
         dists = [a_tools.calculate_distance_ground_state(real[i],imag[i], normalize=True) for i in range(len(real))]
 
         self.S21dist = dists
         if use_distance:
             self.Z[0]=np.array(self.S21dist)
+        if blur is not None:
+            self.Z[0] = gaussian_filter(self.Z[0], blur)
         flux = self.Y[:, 0]
         self.make_raw_figure(transpose=transpose, cmap=cmap,
                                                       add_title=add_title,
