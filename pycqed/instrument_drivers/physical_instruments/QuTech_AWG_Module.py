@@ -143,13 +143,15 @@ class QuTech_AWG_Module(SCPI):
                             label='DIO input operation mode',
                             get_cmd='SYSTem:DIO:MODE?',
                             set_cmd='SYSTem:DIO:MODE ' + '{}',
-                            vals=vals.Enum('MASter', 'SLAve'),
-                            val_mapping={'master': 'MASter', 'slave': 'SLAve'},
+                            vals=vals.Enum('MASTER', 'SLAVE'),
+                            val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
                             docstring='Get or set the DIO input operation mode\n' \
                                 'Paramaters:\n' \
-                                '\tmaster: Use DIO codeword (lower 14 bits) input from its own IORearDIO board\n' \
+                                '\tmaster: Use DIO codeword (lower 14 bits) input '\
+                                'from its own IORearDIO board\n' \
                                     '\t\tEnables SE and DIFF inputs\n' \
-                                '\tslave; Use DIO codeword (upper 14 bits) input from the connected master IORearDIO board\n'
+                                '\tslave; Use DIO codeword (upper 14 bits) input '\
+                                'from the connected master IORearDIO board\n'
                                     '\t\tDisables SE and DIFF inputs\n' )
 
         self.add_parameter('dio_calibrate',
@@ -157,14 +159,73 @@ class QuTech_AWG_Module(SCPI):
                             label='Calibrate DIO signals',
                             get_cmd='SYSTem:DIO:CALibrate',
                             get_parser=self._int_to_array,
-                            docstring='Calibrate the DIO input signals\n' \
-                                'Will analyze the input signal for each DIO channel (used to transer codeword bits).\n' \
-                                'The signals are sampled and devided in sections. This function will search these sections\n' \
-                                'and find all \n' \
-                                '\tmaster: Use DIO codeword (lower 14 bits) input from its own IORearDIO board\n' \
-                                    '\t\tEnables SE and DIFF inputs\n' \
-                                '\tslave; Use DIO codeword (upper 14 bits) input from the connected master IORearDIO board\n'
-                                    '\t\tDisables SE and DIFF inputs\n' )
+                            docstring='Calibrate the DIO input signals.\n' \
+                                'Will analyze the input signals for each DIO '\
+                                'inputs (used to transfer codeword bits), secondly, '\
+                                'the most preferable index is set and stored.\n\n' \
+
+                                'Each signal is sampled and divided into sections. '\
+                                'These sections are analyzed to find a stable '\
+                                'stable signal on all inputs. These stable sections '\
+                                'are addressed by there index.\n\n' \
+
+                                'Note 1: Expect and DIO calibration signal on the inputs:\n' \
+                                '\tAn all codewords bits high followed by an all codeword ' \
+                                'bits low in a continues repetition. This results in a ' \
+                                'square wave of 25 MHz on the DIO inputs of the ' \
+                                'DIO connection.\n\n' \
+
+                                'Note 2: DIO inputs will be ignored from calibration ' \
+                                'if the representing bit in the bitSelect of all ' \
+                                'channels are disabled (see param:chX_bit_select)\n\n' \
+
+                                'Note 3: The best index is stored in non-volatile ' \
+                                'memory and loaded at startup.\n\n' \
+
+                                'Note 4: The QWG will continuously validate if ' \
+                                'the active index is still stable.\n\n' \
+
+                                'Return: List of stable indexes\n'\
+                                    '\t- The first index in the list is set and stored as active index\n' \
+                                    '\t- The list is ordered by most preferable index first\n' \
+                                    '\t- If no suitable indexes are found the list '\
+                                    'is empty and an error is pushed onto the error stack\n'
+                            )
+
+        self.add_parameter('dio_is_calibrated',
+                            unit='',
+                            label='DIO calibration status',
+                            get_cmd='SYSTem:DIO:CALibrate?',
+                            val_mapping={True: '1', False: '0'},
+                            docstring='Get DIO calibration status\n' \
+                                'Note: will also return false on no signal.\n\n' \
+                                'Result:\n' \
+                                '\tTrue: DIO is calibrated\n'\
+                                '\tFalse: DIO is not calibrated'
+                            )
+
+        self.add_parameter('dio_index',
+                            unit='',
+                            label='DIO calibration index',
+                            get_cmd='SYSTem:DIO:INDex?',
+                            set_cmd='SYSTem:DIO:INDex {}',
+                            get_parser=np.uint32,
+                            vals=vals.Ints(0, 15),
+                            docstring='Get and set DIO calibration index\n' \
+                                'Index will also be stored in non-volatile memory\n' \
+                                'See dio_calibrate() paramater\n' \
+                            )
+
+        self.add_parameter('dio_signal',
+                            unit='',
+                            label='DIO signal detect status',
+                            get_cmd='SYSTem:DIO:SIGNal?',
+                            val_mapping={True: '1', False: '0'},
+                            docstring='Get the DIO signal detect status of SE/DIFF/Master input.\n' \
+                                'Result:\n' \
+                                '\tTrue: Signal detected\n'\
+                                '\tFalse: No signal detected'
+                            )
 
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
