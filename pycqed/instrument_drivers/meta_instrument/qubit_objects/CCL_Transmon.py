@@ -956,13 +956,14 @@ class CCLight_Transmon(Qubit):
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
                         UHFQC.set('quex_wint_weights_{}_real'.format(
-                            self.ro_acq_weight_chQ()), opt_WI)
-                        UHFQC.set('quex_wint_weights_{}_imag'.format(
                             self.ro_acq_weight_chQ()), opt_WQ)
+                        UHFQC.set('quex_wint_weights_{}_imag'.format(
+                            self.ro_acq_weight_chQ()), opt_WI)
                         UHFQC.set('quex_rot_{}_real'.format(
                             self.ro_acq_weight_chQ()), 1.0)
                         UHFQC.set('quex_rot_{}_imag'.format(
                             self.ro_acq_weight_chQ()), 1.0)
+
 
         else:
             raise NotImplementedError(
@@ -2232,8 +2233,9 @@ class CCLight_Transmon(Qubit):
                 mod_out, ch_in)]
             D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
                 mod_out, ch_in)]
+
             s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=False,
-                                        retrieve_value=True)
+                                        retrieve_value=True, instr=VSM)
 
         self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
@@ -2940,7 +2942,7 @@ class CCLight_Transmon(Qubit):
         if using_VSM:
             VSM = self.instr_VSM.get_instr()
             if motzoi_amps is None:
-                motzoi_amps = np.linspace(0.2, 2.0, 31)
+                motzoi_amps = np.linspace(0.1, 1.0, 31)
             mod_out = self.mw_vsm_mod_out()
             ch_in = self.mw_vsm_ch_in()
             D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(

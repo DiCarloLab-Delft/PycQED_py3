@@ -965,10 +965,11 @@ def two_qubit_DJ(q0, q1, platf_cfg):
     return p
 
 
-def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
+def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
                                     number_of_repetitions: int = 10,
                                     initialization_msmt: bool=False,
-                                    initial_states=[0, 1]):
+                                    initial_states=[0, 1],
+                                    flux_codeword: str = 'fl_cw_01'):
     """
     Implements a circuit for repeated parity checks.
 
@@ -990,7 +991,7 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
         initialization_msmt : whether to start with an initial measurement
                     to prepare the starting state.
     """
-    p = oqh.create_program("two_qubit_repeated_parity_check", platf_cfg)
+    p = oqh.create_program("single_qubit_repeated_parity_check", platf_cfg)
 
     for initial_state in initial_states:
         k = oqh.create_kernel(
@@ -1011,7 +1012,7 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
             # k.gate('wait', [qA, qD], 0)
             k.gate('ry90', [qA])
             k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-            k.gate('fl_cw_01', [2, 0])
+            k.gate(flux_codeword, [2, 0])
             k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
             # k.gate('fl_cw_01', qA, qD)
 
@@ -1022,6 +1023,82 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
         # hardcoded barrier because of openQL #104
         k.gate('wait', [2, 0], 0)
         k.gate('wait', [qA, qD], 0)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
+                                    echo: bool=True,
+                                    number_of_repetitions: int = 10,
+                                    initialization_msmt: bool=False,
+                                    initial_states=[0, 1, 2, 3],
+                                    flux_codeword0: str = 'fl_cw_03',
+                                    flux_codeword1: str = 'fl_cw_01'):
+    """
+    Implements a circuit for repeated parity checks on two qubits.
+
+    Circuit looks as follows:
+
+    Data0   (M)|------0----------------|^N -M
+               |      |                |
+    Ancilla (M)|--y90-0-(y180)-0-y90-M-|   -M
+               |               |       |
+    Data1   (M)|---------------0-------|   -M
+
+
+    The initial "M" measurement is optional, the circuit is repated N times
+    At the end both qubits are measured.
+
+    Arguments:
+        qD0 :       Data qubit, this is the qubit that the repeated parity
+                    check will be performed on.
+        qD1 :       Data qubit, this is the qubit that the repeated parity
+                    check will be performed on.
+        exho:       additional pi-pulse between the CZs
+        qA :        Ancilla qubit, qubit that the parity will be mapped onto.
+        platf_cfg:  filename of the platform config file
+        number_of_repetitions: number of times to repeat the circuit
+        initialization_msmt : whether to start with an initial measurement
+                    to prepare the starting state.
+    """
+    p = oqh.create_program("two_qubit_repeated_parity_check", platf_cfg)
+
+    for initial_state in initial_states:
+        k = oqh.create_kernel(
+            'repeated_parity_check_{}'.format(initial_state), p)
+        k.prepz(qD0)
+        k.prepz(qD1)
+        k.prepz(qA)
+        if initialization_msmt:
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+            k.measure(qD0)
+            k.measure(qD1)
+            k.measure(qA)
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+        if initial_state == 1:
+            k.gate('rx180', [qD0])
+        if initial_state == 2:
+            k.gate('rx180', [qD1])
+        if initial_state == 3:
+            k.gate('rx180', [qD0])
+            k.gate('rx180', [qD1])
+        for i in range(number_of_repetitions):
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+            k.gate('ry90', [qA])
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+            k.gate(flux_codeword0, [2, 0])
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+            if echo:
+                k.gate('ry180', [qA])
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+            k.gate(flux_codeword1, [2, 0])
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+            k.gate('ry90', [qA])
+            k.measure(qA)
+        k.measure(qD0)
+        k.measure(qD1)
         p.add_kernel(k)
 
     p = oqh.compile(p)
@@ -1109,14 +1186,14 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
 
             p.add_kernel(k)
     if add_cal_points:
-        p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1, 
-                                     f_state_cal_pts=True, 
-                                     f_state_cal_pt_cw=31) 
-            # hardcoded requires ef pulses to be prepared 
+        p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1,
+                                     f_state_cal_pts=True,
+                                     f_state_cal_pt_cw=31)
+            # hardcoded requires ef pulses to be prepared
     p = oqh.compile(p)
 
     if add_cal_points:
-        cal_pts_idx = [361, 362, 363, 364, 
+        cal_pts_idx = [361, 362, 363, 364,
                        365, 366, 367]
     else:
         cal_pts_idx = []
@@ -1246,26 +1323,26 @@ def grovers_two_qubits_repeated(qubits, platf_cfg: str,
 
         for j in range(i):
             # Oracle stage
-            k.gate('cz', [2, 0]) #hardcoded fixme 
+            k.gate('cz', [2, 0]) #hardcoded fixme
             # k.cz(q0, q1)
             # Tagging stage
             if (j % 2 == 0):
-                k.gate('rym90', [q0])                
+                k.gate('rym90', [q0])
                 k.gate('rym90', [q1])
                 # k.ry(q0, -90)
                 # k.ry(q1, -90)
             else:
-                k.gate('ry90', [q0])                
+                k.gate('ry90', [q0])
                 k.gate('ry90', [q1])
                 # k.ry(q0, 90)
                 # k.ry(q1, 90)
-            k.gate('cz', [2, 0]) #hardcoded fixme 
+            k.gate('cz', [2, 0]) #hardcoded fixme
             # k.cz(q0, q1)
             if (j % 2 == 0):
-                k.gate('ry90', [q0])                
+                k.gate('ry90', [q0])
                 k.gate('ry90', [q1])
             else:
-                k.gate('rym90', [q0])                
+                k.gate('rym90', [q0])
                 k.gate('rym90', [q1])
             # if (j % 2 == 0):
             #     k.ry(q0, 90)
