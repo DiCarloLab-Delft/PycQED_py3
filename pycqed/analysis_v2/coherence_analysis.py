@@ -18,7 +18,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
                  options_dict: dict = None, extract_only: bool = False, auto: bool = True,
-                 close_figs: bool = True, do_fitting: bool = True,
+                 close_figs: bool = True, do_fitting: bool = True, fit_qubit_Q_factor=False,
                  tau_key='Analysis.Fitted Params F|1>.tau.value',
                  tau_std_key='Analysis.Fitted Params F|1>.tau.stderr',
                  use_chisqr = False,
@@ -75,7 +75,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                                 }
             self.numeric_params = ['tau', 'tau_stderr'] #, 'chisquared'
 
-
+        self.fit_qubit_Q_factor = fit_qubit_Q_factor
 
         self.plot_versus_dac = plot_versus_dac
         if plot_versus_dac:
@@ -146,6 +146,13 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                 if self.verbose:
                     # todo: print EC and EJ
                     pass
+
+            if self.fit_qubit_Q_factor:
+                freq = self.raw_data_dict['dac_sorted_freq']
+                tau = self.raw_data_dict['freq_sorted_tau']
+                fit_object_Q_factor = fit_fixed_Q_factor(freq,tau)
+                self.fit_res['Q_qubit'] = fit_object_Q_factor.best_values['Q']
+                self.fit_res['Q_qubit_fitfct'] = lambda x: fit_object_Q_factor.model.eval(fit_object_Q_factor.params, freq=x)
         else:
             print('Warning: first run extract_data!')
 
@@ -158,7 +165,20 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             self._prepare_plot(ax_id='time_stability', xvals=self.raw_data_dict['datetime'],
                                yvals=self.raw_data_dict['tau'], yerr=self.raw_data_dict['tau_stderr'],
                                xlabel='Time in Delft', xunit=None)
-            if self.plot_versus_frequency:
+            if self.plot_versus_frequency and self.fit_qubit_Q_factor:
+                plot_dict = {
+                    'xlabel': 'Qubit Frequency', 'xunit': 'Hz',
+                    'ylabel': 'T1', 'yunit': 's'
+                }
+                pds, pdf = plot_scatter_errorbar_fit(self=self, ax_id='freq_relation',
+                                                     xdata=self.raw_data_dict['freq_sorted'],
+                                                     ydata=self.raw_data_dict['freq_sorted_tau'],
+                                                     yerr=self.raw_data_dict['freq_sorted_tau_stderr'],
+                                                     fitfunc=self.fit_res['Q_qubit_fitfct'],
+                                                     pdict_scatter=plot_dict, pdict_fit=plot_dict)
+                self.plot_dicts["freq_relation_scatter"] = pds
+                self.plot_dicts["freq_relation_fit"] = pdf
+            else:
                 self._prepare_plot(ax_id='freq_relation', xvals=self.raw_data_dict['freq_sorted'],
                                    yvals=self.raw_data_dict['freq_sorted_tau'],
                                    yerr=self.raw_data_dict['freq_sorted_tau_stderr'],
@@ -215,7 +235,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             'ylabel': 'Coherence',
             'yrange': (0, 1.1 * np.max(yvals)),
             'yunit': 's',
-            # 'marker': 'x',
+            'marker': 'x',
             # 'setlabel': setlabel,
             # 'legend_title': legend_title,
             # 'title': (self.raw_data_dict['timestamps'][0]+' - ' +
@@ -999,12 +1019,29 @@ def partial_omega_over_flux(flux, Ec, Ej):
             np.sin(np.pi * flux) / np.sqrt(np.abs(np.cos(np.pi * flux)))
     return model
 
+def fixed_Q_factor_model(freq, Q):
+    '''
+    inverse proportional dependence of the qubit T1 on frequrncy can be described
+    with a constant Q-factor of a qubit: Q = 2*pi*f*T1
+    Here is a function calculating T1(f) that can be fitted to data
+    '''
+
+    model = Q/(2*np.pi*freq)
+    return model
+
+def fit_fixed_Q_factor(freq, tau):
+    Q_factor_model = lmfit.Model(fixed_Q_factor_model)
+    Q_factor_model.set_param_hint('Q', value=50e4, min=100e3, max=100e6)
+    fit_result_Q_factor = Q_factor_model.fit(tau, freq=freq)
+    return fit_result_Q_factor
+
 
 def fit_frequencies(dac, freq):
+    dac0_guess = 5*np.max(np.abs(dac))
     arch_model.set_param_hint('Ec', value=260e6, min=100e6, max=350e6)
     arch_model.set_param_hint('Ej', value=19e9, min=0.1e9, max=30e9)
     arch_model.set_param_hint('offset', value=0, min=-0.05, max=0.05)
-    arch_model.set_param_hint('dac0', value=0.1, min=0)
+    arch_model.set_param_hint('dac0', value=dac0_guess, min=0)
 
     arch_model.make_params()
     # print('freq, dac', freq, dac)

@@ -6660,6 +6660,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                              linecut_log=False, colorplot_log=False,
                              plot_all=True, save_fig=True,
                              transpose=False, figsize=None, filtered=False,
+                             subtract_mean_x=False, subtract_mean_y=False, 
                              **kw):
         '''
         Args:
@@ -6742,9 +6743,16 @@ class TwoD_Analysis(MeasurementAnalysis):
             if "yunit" not in kw:
                 kw["yunit"] = self.parameter_units[1]
 
+            # subtract mean from each row/column if demanded
+            plot_zvals = meas_vals.transpose()
+            if subtract_mean_x:
+                plot_zvals = plot_zvals - np.mean(plot_zvals,axis=1)[:,None]
+            if subtract_mean_y:
+                plot_zvals = plot_zvals - np.mean(plot_zvals,axis=0)[None,:]
+
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
-                               z=meas_vals.transpose(),
+                               z=plot_zvals,
                                zlabel=self.zlabels[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
@@ -8249,12 +8257,15 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         if f1_guess is None:
             f1_guess = np.mean(total_freqs) - g_guess
 
-        c2_guess = (f2_guess - f1_guess) / cross_flux_guess
         if f2_guess is None:
             # The factor *1000* is a magic number but seems to give a
             # reasonable guess that converges well.
             c1_guess = -1 * ((max(total_freqs) - min(total_freqs)) /
                              (max(total_flux) - min(total_flux))) / 1000
+
+            c2_guess = 1 * ((max(total_freqs) - min(total_freqs)) /
+                             (max(total_flux) - min(total_flux))) / 1000
+
 
             f2_guess = cross_flux_guess * (c1_guess - c2_guess) + f1_guess
         else:

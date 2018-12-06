@@ -1524,6 +1524,8 @@ def plot_scatter_errorbar(self, ax_id, xdata, ydata,
             xs = 0 if xerr is None else np.min(xerr) / np.max(xdata)
             if ys < 1e-2 and xs < 1e-2:
                 pds['line_kws'] = {'fmt': 'o'}
+            else:
+                pds['line_kws'] = {'fmt': '.'}
     else:
         pds['func'] = 'scatter'
 
