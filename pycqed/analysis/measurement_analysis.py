@@ -8257,12 +8257,15 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         if f1_guess is None:
             f1_guess = np.mean(total_freqs) - g_guess
 
-        c2_guess = (f2_guess - f1_guess) / cross_flux_guess
         if f2_guess is None:
             # The factor *1000* is a magic number but seems to give a
             # reasonable guess that converges well.
             c1_guess = -1 * ((max(total_freqs) - min(total_freqs)) /
                              (max(total_flux) - min(total_flux))) / 1000
+
+            c2_guess = 1 * ((max(total_freqs) - min(total_freqs)) /
+                             (max(total_flux) - min(total_flux))) / 1000
+
 
             f2_guess = cross_flux_guess * (c1_guess - c2_guess) + f1_guess
         else:
