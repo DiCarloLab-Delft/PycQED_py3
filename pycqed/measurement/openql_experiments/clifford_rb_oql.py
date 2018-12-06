@@ -166,7 +166,6 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                 if isinstance(q, str):
                                     k.gate(g, [qubit_map[q]])
                                 elif isinstance(q, list):
-                                    # proper codeword
                                     # This is a hack because we cannot
                                     # properly trigger CZ gates.
                                     k.gate("wait",  list(qubit_map.values()), 0)
@@ -247,6 +246,7 @@ def character_benchmarking(
         interleaving_cliffords=[None],
         program_name: str='character_benchmarking',
         cal_points: bool=True, f_state_cal_pts: bool=True,
+        flux_codeword='cz',
         recompile: bool=True):
     """
     Create OpenQL program to perform two-qubit character benchmarking.
@@ -340,7 +340,14 @@ def character_benchmarking(
                                 k.gate(g, [qubit_map[q]])
                             elif isinstance(q, list):
                                 # proper codeword
-                                k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
+                                # k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
+
+                                # This is a hack because we cannot
+                                # properly trigger CZ gates.
+                                k.gate("wait",  list(qubit_map.values()), 0)
+                                k.gate(flux_codeword, [2, 0])
+                                k.gate("wait",  list(qubit_map.values()), 0)
+
                     for qubit_idx in qubit_map.values():
                         k.measure(qubit_idx)
 
