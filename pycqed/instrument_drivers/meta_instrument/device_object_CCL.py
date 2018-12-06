@@ -808,8 +808,13 @@ class DeviceCCL(Instrument):
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
-            a = mra.two_qubit_ssro_fidelity(name)
-            a = ma2.Multiplexed_Readout_Analysis()
+            a = ma2.Singleshot_Readout_Analysis(
+                t_start=None, t_stop=None,
+                label=name,
+                options_dict={'post_select': initialization_msmt,
+                              'nr_samples': 2+2*initialization_msmt,
+                              'post_select_threshold':self.find_instrument(qA).ro_acq_threshold()},
+                extract_only=False)
         return a
 
     def measure_two_qubit_parity(self, qD0: str,qD1: str, qA: str,
@@ -835,7 +840,7 @@ class DeviceCCL(Instrument):
         qD1idx = self.find_instrument(qD1).cfg_qubit_nr()
         qAidx = self.find_instrument(qA).cfg_qubit_nr()
 
-        p = mqo.two_qubit_parity_check(qD0idx, qD1idx,qAidx,
+        p = mqo.two_qubit_parity_check(qD0idx, qD1idx, qAidx,
                                            self.cfg_openql_platform_fn(),
                                            number_of_repetitions=number_of_repetitions,
                                            initialization_msmt=initialization_msmt,
@@ -870,7 +875,7 @@ class DeviceCCL(Instrument):
         #    a = ma2.Multiplexed_Readout_Analysis()
             a = ma2.Singleshot_Readout_Analysis(
                 t_start=None, t_stop=None,
-                label='parity',
+                label=name,
                 options_dict={'post_select': initialization_msmt,
                               'nr_samples': 2+2*initialization_msmt,
                               'post_select_threshold':self.find_instrument(qA).ro_acq_threshold()},
@@ -1700,7 +1705,9 @@ class DeviceCCL(Instrument):
                                    15., 19., 25., 31., 39., 49, 62, 79]),
             nr_seeds=100, interleaving_cliffords=[None, -4368],
             label='TwoQubit_CharBench_{}seeds_icl{}_{}_{}',
-            recompile: bool ='as needed', cal_points=True):
+            flux_codeword='fl_cw_01',
+            recompile: bool ='as needed',
+            ch_idxs=np.array([1, 2])):
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
@@ -1743,6 +1750,7 @@ class DeviceCCL(Instrument):
                     list(map(int, nr_cliffords)),
                     interleaving_cliffords,
                     qubits[0], qubits[1]),
+                flux_codeword=flux_codeword,
                 platf_cfg=self.cfg_openql_platform_fn(),
                 interleaving_cliffords=interleaving_cliffords,
                 recompile=recompile)
@@ -1779,7 +1787,7 @@ class DeviceCCL(Instrument):
                             qubits[0], qubits[1]),
                exp_metadata={'bins': sweep_points})
         # N.B. if measurement was interrupted this wont work
-        ma2.CharacterBenchmarking_TwoQubit_Analysis()
+        ma2.CharacterBenchmarking_TwoQubit_Analysis(ch_idxs=ch_idxs)
 
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
