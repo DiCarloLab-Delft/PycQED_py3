@@ -1001,10 +1001,12 @@ def partial_omega_over_flux(flux, Ec, Ej):
 
 
 def fit_frequencies(dac, freq):
+    dac0_guess = 5*np.max(np.abs(dac))
+    print(dac0_guess)
     arch_model.set_param_hint('Ec', value=260e6, min=100e6, max=350e6)
     arch_model.set_param_hint('Ej', value=19e9, min=0.1e9, max=30e9)
     arch_model.set_param_hint('offset', value=0, min=-0.05, max=0.05)
-    arch_model.set_param_hint('dac0', value=0.1, min=0)
+    arch_model.set_param_hint('dac0', value=dac0_guess, min=0)
 
     arch_model.make_params()
     # print('freq, dac', freq, dac)
