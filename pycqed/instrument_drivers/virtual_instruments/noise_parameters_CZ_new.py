@@ -58,6 +58,10 @@ class NoiseParametersCZ(Instrument):
                            label='duration of the single qubit Z rotations at the end of the pulse',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+        self.add_parameter('total_idle_time', unit='s',
+                           label='duration of the idle time',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
         
         
         # Control parameters for the simulations

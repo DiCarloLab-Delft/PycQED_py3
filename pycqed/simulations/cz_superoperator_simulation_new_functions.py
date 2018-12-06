@@ -200,7 +200,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
     if T1_q1 != 0:
         c_ops.append(np.sqrt(1/T1_q1)*b)
 
-    rescaling_of_Tphi_02 = 4
+    rescaling_of_Tphi_02 = 2
     if rescaling_of_Tphi_02==2:
         rate_01_scaling = 4/9
         rate_02_scaling = 16/9
@@ -263,7 +263,7 @@ def phases_from_superoperator(U):
     """
     if U.type=='oper':
         phi_00 = np.rad2deg(np.angle(U[0, 0]))  # expected to equal 0 because of our
-        										# choice for the energy, not because of rotating frame. But not guaranteed including the coupling
+                                                # choice for the energy, not because of rotating frame. But not guaranteed including the coupling
         phi_01 = np.rad2deg(np.angle(U[1, 1]))
         phi_10 = np.rad2deg(np.angle(U[3, 3]))
         phi_11 = np.rad2deg(np.angle(U[4, 4]))
@@ -766,7 +766,7 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
         else:
             Tphi01_q0_vec = T2_q0_vec     
     else:
-    	Tphi01_q0_vec = []
+        Tphi01_q0_vec = []
 
 
     c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
@@ -1085,12 +1085,12 @@ def average_phases(phases,weights):
 
 
 def verify_CPTP(U):
-	# args: U(Qobj): superoperator or unitary
-	# returns: trace dist of the partial trace that should be the identity, i.e. trace dist should be zero for TP maps
-	choi = qtp.to_choi(U)
-	candidate_identity = choi.ptrace([0,1])    # 3 since we have a qutrit
-	ptrace = qtp.tracedist(candidate_identity,qtp.tensor(qtp.qeye(3),qtp.qeye(3)))
-	return ptrace
+    # args: U(Qobj): superoperator or unitary
+    # returns: trace dist of the partial trace that should be the identity, i.e. trace dist should be zero for TP maps
+    choi = qtp.to_choi(U)
+    candidate_identity = choi.ptrace([0,1])    # 3 since we have a qutrit
+    ptrace = qtp.tracedist(candidate_identity,qtp.tensor(qtp.qeye(3),qtp.qeye(3)))
+    return ptrace
 
 
 def return_instrument_args(fluxlutman,noise_parameters_CZ):
@@ -1126,7 +1126,8 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ):
                                 'n_sampling_gaussian_vec': noise_parameters_CZ.n_sampling_gaussian_vec(),
                                 'cluster': noise_parameters_CZ.cluster(),
                                 'detuning': noise_parameters_CZ.detuning(),
-                                'initial_state': noise_parameters_CZ.initial_state()}
+                                'initial_state': noise_parameters_CZ.initial_state(),
+                                'total_idle_time': noise_parameters_CZ.total_idle_time()}
 
     return fluxlutman_args, noise_parameters_CZ_args
 
@@ -1165,6 +1166,7 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     noise_parameters_CZ.cluster(noise_parameters_CZ_args['cluster'])
     noise_parameters_CZ.detuning(noise_parameters_CZ_args['detuning'])
     noise_parameters_CZ.initial_state(noise_parameters_CZ_args['initial_state'])
+    noise_parameters_CZ.total_idle_time(noise_parameters_CZ_args['total_idle_time'])
 
     return fluxlutman, noise_parameters_CZ
 

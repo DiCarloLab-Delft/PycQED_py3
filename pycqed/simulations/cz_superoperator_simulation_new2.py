@@ -69,14 +69,17 @@ def f_to_parallelize_new(arglist):
              (adaptive_pars['lambda2_min'], adaptive_pars['lambda2_max'])]})
 
         if noise_parameters_CZ.cluster():
-            dat = MC.run(
-                '2D simulation_new_cluster2 ', 
-                exp_metadata=exp_metadata, 
-                mode='adaptive')
+            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='adaptive',exp_metadata=exp_metadata)
 
         else:
-
-        	dat = MC.run('2D simulation_new_2', 
+            if adaptive_pars['long_name']:
+                dat = MC.run('2D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='adaptive',exp_metadata=exp_metadata)
+            else:
+                dat = MC.run('2D simulation_new_2', 
                 exp_metadata=exp_metadata, 
                 mode='adaptive')
 
@@ -85,12 +88,17 @@ def f_to_parallelize_new(arglist):
         MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'], 
             adaptive_pars['theta_f_max'],adaptive_pars['n_points']))
         if noise_parameters_CZ.cluster():
-            dat = MC.run('1D simulation_new_cluster2',
-                exp_metadata=exp_metadata, 
-                mode='1D')
+            dat = MC.run('1D simulation_new_cluster2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D',exp_metadata=exp_metadata)
 
         else:
-            dat = MC.run('1D simulation_new_2', 
+            if adaptive_pars['long_name']:
+                dat = MC.run('1D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D',exp_metadata=exp_metadata)
+            else:
+                dat = MC.run('1D simulation_new_2', 
                 exp_metadata=exp_metadata, 
                 mode='1D')
 
@@ -115,7 +123,7 @@ def compute_propagator(arglist):
 
 
     sim_step=1/fluxlutman.sampling_rate()
-    subdivisions_of_simstep=4                          # 4 is a good one, corresponding to a time step of 0.1 ns
+    subdivisions_of_simstep=1                          # 4 is a good one, corresponding to a time step of 0.1 ns
     sim_step_new=sim_step/subdivisions_of_simstep      # waveform is generated according to sampling rate of AWG,
                                                        # but we can use a different step for simulating the time evolution
     tlist = np.arange(0, fluxlutman.cz_length(),
@@ -155,19 +163,8 @@ def compute_propagator(arglist):
     amp_interp=interp1d(tlist_temp,amp_temp)
     amp=amp_interp(tlist_new)
 
-    # We add the single qubit rotations at the end of the pulse
-    if noise_parameters_CZ.Z_rotations_length() != 0:
-        tlist_singlequbitrotations = np.arange(0,noise_parameters_CZ.Z_rotations_length(),sim_step_new)
-        amp = np.concatenate([amp,np.zeros(len(tlist_singlequbitrotations))+amp[0]])
-        tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.Z_rotations_length(),sim_step_new,tlist_new)
 
-    t_final = tlist_new[-1]+sim_step_new
-
-    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp],
-    #                          title='Pulse with (possibly) single qubit rotations',
-    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
-
-
+    # Apply voltage scaling
     amp = amp * noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
 
 
@@ -185,8 +182,39 @@ def compute_propagator(arglist):
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
 
 
+    # We add the single qubit rotations at the end of the pulse
+    if noise_parameters_CZ.Z_rotations_length() != 0:
+        tlist_singlequbitrotations = np.arange(0,noise_parameters_CZ.Z_rotations_length(),sim_step_new)
+        amp_Z_rotation = np.zeros(len(tlist_singlequbitrotations))+amp_final[0]
+        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0)
+        tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.Z_rotations_length(),sim_step_new,tlist_new)
+
+    # We add the idle time at the end of the pulse (even if it's not at the end. It doesn't matter)
+    if noise_parameters_CZ.total_idle_time() != 0:
+        tlist_idle_time = np.arange(0,noise_parameters_CZ.total_idle_time(),sim_step_new)
+        amp_idle_time = np.zeros(len(tlist_idle_time))+amp_final[0]
+        double_sided = fluxlutman.czd_double_sided()
+        fluxlutman.czd_double_sided(False)
+        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0)
+        fluxlutman.czd_double_sided(double_sided)
+        tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.total_idle_time(),sim_step_new,tlist_new)
+
+
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
     amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
+
+
+    if noise_parameters_CZ.Z_rotations_length() != 0:
+        amp_final=np.concatenate((amp_final,amp_Z_rotation))
+        f_pulse_final=np.concatenate((f_pulse_final,f_pulse_Z_rotation))
+    if noise_parameters_CZ.total_idle_time() != 0:
+        amp_final=np.concatenate((amp_final,amp_idle_time))
+        f_pulse_final=np.concatenate((f_pulse_final,f_pulse_idle_time))
+
+    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final],
+    #                          title='Pulse with (possibly) single qubit rotations',
+    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
+
 
     # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp_final_new],
     #                          title='Pulse with distortions and shift due to fluxbias_q0, difference',
@@ -195,6 +223,9 @@ def compute_propagator(arglist):
     # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[f_pulse_final/1e9],
     #                          title='Pulse with distortions and shift due to fluxbias_q0',
     #                            xlabel='Time (ns)',ylabel='Frequency (GHz)')
+
+
+    t_final = tlist_new[-1]+sim_step_new
 
 
     ### Obtain jump operators, possibly time-dependent (incoherent part of the noise)
@@ -334,6 +365,56 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 t_final_vec.append(result_list[1])
 
 
+            t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
+            w_q0, w_q1, alpha_q0 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
+
+
+            '''
+            #### Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
+            leakage_vec=[]
+            infid_vec=[]
+            phase_q0_vec=[]
+            phase_q1_vec=[]
+            fluxbias_q0_vec=[]
+            cond_phase_vec=[]
+
+            mid_index=int(len(U_final_vec)/2)
+            print(mid_index)
+
+            for i in range(len(U_final_vec)):
+                if U_final_vec[i].type == 'oper':
+                    U_final_vec[i] = qtp.to_super(U_final_vec[i])
+                qoi_temp = czf.simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i],t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+                if i==mid_index:
+                    print(qoi_temp)
+                leakage_vec.append(qoi_temp['L1'])
+                infid_vec.append(1-qoi_temp['avgatefid_compsubspace_pc'])
+                phase_q0_vec.append(qoi_temp['phase_q0'])
+                phase_q1_vec.append(qoi_temp['phase_q1'])
+                cond_phase_vec.append(qoi_temp['phi_cond'])
+
+                fluxbias_q0=input_to_parallelize[i]['fluxbias_q0']
+                fluxbias_q0_vec.append(fluxbias_q0)
+
+            #leakage_vec=np.array(leakage_vec)-leakage_vec[mid_index]
+            cond_phase_vec=np.array(cond_phase_vec)-cond_phase_vec[mid_index]
+            phase_q0_vec=np.array(phase_q0_vec)-phase_q0_vec[mid_index]
+            phase_q1_vec=np.array(phase_q1_vec)-phase_q1_vec[mid_index]
+            infid_vec=np.array(infid_vec)-infid_vec[mid_index]
+
+            czf.plot(x_plot_vec=[np.array(fluxbias_q0_vec)*1e3],
+                          y_plot_vec=[cond_phase_vec,phase_q0_vec,phase_q1_vec],
+                          title='Sensitivity to quasi_static flux offsets',
+                          xlabel='Flux offset (m$\Phi_0$)',ylabel='Phase (deg)',
+                          legend_labels=['conditional phase err','phase QR err','phase QL err'])
+            czf.plot(x_plot_vec=[np.array(fluxbias_q0_vec)*1e3],
+                          y_plot_vec=[np.array(leakage_vec)*100],
+                          title='Sensitivity to quasi_static flux offsets',
+                          xlabel='Flux offset (m$\Phi_0$)',ylabel='Leakage $L_1$ (%)',
+                          legend_labels=['leakage'])
+            '''
+
+
             for i in range(len(U_final_vec)):
                 if U_final_vec[i].type == 'oper':
                     U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
@@ -341,9 +422,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting average propagator
             #print(czf.verify_CPTP(U_superop_average))
 
-
-            t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
-            w_q0, w_q1, alpha_q0 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
 
             qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
             if self.noise_parameters_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
@@ -372,14 +450,14 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             U_temp[38,20]=0
             U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
             for n in range(1,201,2):
-            	U_superop_n=U_superop_average**n
-            	U_superop_dephased_n = U_superop_dephased**n
-            	qoi=czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
-            	qoi_dephased=czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
-            	leakage_vec.append(qoi['L1'])
-            	infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
-            	leakage_dephased_vec.append(qoi_dephased['L1'])
-            	infid_dephased_vec.append(1-qoi_dephased['avgatefid_compsubspace_pc'])
+                U_superop_n=U_superop_average**n
+                U_superop_dephased_n = U_superop_dephased**n
+                qoi=czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+                qoi_dephased=czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+                leakage_vec.append(qoi['L1'])
+                infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
+                leakage_dephased_vec.append(qoi_dephased['L1'])
+                infid_dephased_vec.append(1-qoi_dephased['avgatefid_compsubspace_pc'])
 
             czf.plot(x_plot_vec=[np.arange(1,200,2)],
                           #y_plot_vec=[leakage_vec,infid_vec,leakage_dephased_vec,infid_dephased_vec],
