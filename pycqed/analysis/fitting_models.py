@@ -548,6 +548,47 @@ def avoided_crossing_direct_coupling(flux, f_center1, f_center2,
     result = np.where(flux_state, frequencies[:, 0], frequencies[:, 1])
     return result
 
+def avoided_crossing_freq_shift(flux, a, b, g):
+    """
+    Calculates the frequency shift due to an avoided crossing for the following model:
+        [delta_f,  g ]
+        [g,        0 ]
+
+    delta_f = a*flux + b 
+    
+    Parameters 
+    ----------
+    flux : array like
+        flux bias values 
+    a, b : float
+        parameters used to calculate frequency distance (delta) away from 
+        avoided crossing according to 
+            delta_f = a*flux+b 
+    
+    g: float
+        Coupling strength strength, beware to relabel your variable if using this
+        model to fit J1 or J2.
+    
+    Returns
+    ------- 
+    frequency_shift : (float) 
+    
+    
+    Note: this model is useful for fitting the frequency shift due to an interaction 
+    in a chevron experiment (after fourier transforming the data). 
+    """
+    
+    frequencies = np.zeros([len(flux), 2])
+    for kk, fl_i in enumerate(flux):
+        f_1 = a*fl_i  +  b
+        f_2 = 0
+        matrix = [[f_1, g],
+                  [g, f_2]]
+        frequencies[kk, :] = np.linalg.eigvalsh(matrix)[:2]
+    result = frequencies[:, 1]- frequencies[:, 0]
+    return result
+
+
 
 ######################
 # Residual functions #
