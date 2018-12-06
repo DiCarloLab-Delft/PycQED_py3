@@ -57,9 +57,16 @@ def f_to_parallelize_new(arglist):
 
     if adaptive_pars['mode']=='adaptive': 
         MC.set_sweep_functions([fluxlutman.cz_theta_f, fluxlutman.cz_lambda_2])
-        MC.set_adaptive_function_parameters({'adaptive_function': adaptive.Learner2D, 
-                                         'goal':lambda l: l.npoints>adaptive_pars['n_points'], 
-                                         'bounds':[(adaptive_pars['theta_f_min'], adaptive_pars['theta_f_max']), (adaptive_pars['lambda2_min'], adaptive_pars['lambda2_max'])]})
+        if adaptive_pars['uniform']: 
+            loss_per_triangle= adaptive.learner.learner2D.uniform_loss
+        else: 
+            loss_per_triangle=None
+        MC.set_adaptive_function_parameters(
+            {'adaptive_function': adaptive.Learner2D, 
+            'loss_per_triangle': loss_per_triangle, 
+             'goal':lambda l: l.npoints>adaptive_pars['n_points'], 
+             'bounds':[(adaptive_pars['theta_f_min'], adaptive_pars['theta_f_max']), 
+             (adaptive_pars['lambda2_min'], adaptive_pars['lambda2_max'])]})
 
         if noise_parameters_CZ.cluster():
             dat = MC.run(
