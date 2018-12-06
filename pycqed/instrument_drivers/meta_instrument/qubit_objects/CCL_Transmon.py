@@ -2625,17 +2625,17 @@ class CCLight_Transmon(Qubit):
 
         exp_metadata = {'feedback': feedback, 'sequence_type': sequence_type,
                         'depletion_time': depletion_time, 'net_gate': net_gate}
-        suffix = 'depletion_time_{}_ro_pulse_type_{}_feedback_{}_net_gate_{}'.format(
+        suffix = 'depletion_time_{}_ro_pulse_{}_feedback_{}_net_gate_{}'.format(
             depletion_time, self.ro_pulse_type(), feedback, net_gate)
         MC.run(
-            'Measure_error_fraction_{}_{}'.format(self.msmt_suffix, suffix),
+            'RTE_{}_{}'.format(self.msmt_suffix, suffix),
             exp_metadata=exp_metadata)
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
             a = ma2.Single_Qubit_RoundsToEvent_Analysis(
                 t_start=None, t_stop=None,
                 options_dict={'typ_data_idx': 0,
-                              'scan_label': 'error_fraction'},
+                              'scan_label': 'RTE'},
                 extract_only=True)
             return a.proc_data_dict['frac_single']
 
