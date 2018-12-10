@@ -6660,7 +6660,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                              linecut_log=False, colorplot_log=False,
                              plot_all=True, save_fig=True,
                              transpose=False, figsize=None, filtered=False,
-                             subtract_mean_x=False, subtract_mean_y=False, 
+                             subtract_mean_x=False, subtract_mean_y=False,
                              **kw):
         '''
         Args:
@@ -7960,7 +7960,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                  g_guess=30e6, coupling_label=r'$J_1/2\pi$',
                  break_before_fitting=False,
                  add_title=True,
-                 xlabel=None, ylabel='Frequency (GHz)', 
+                 xlabel=None, ylabel='Frequency (GHz)',
                  weight_function_magn=0,
                  use_distance=True,
                  quadratures=None,
@@ -8002,7 +8002,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         y0=filt_func_y0,
                                         filter_idx_low=filter_idx_low,
                                         filter_idx_high=filter_idx_high,
-                                        force_keep_idx_low=force_keep_idx_low, 
+                                        force_keep_idx_low=force_keep_idx_low,
                                         force_keep_idx_high=force_keep_idx_high,
                                         filter_threshold=filter_threshold)
         filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high, \
@@ -8082,7 +8082,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         filter_mask_low = np.where(
             peaks_low > filter_func(flux), False, filter_mask_low)
         filter_mask_low[filter_idx_low] = False  # hand remove 2 datapoints
-        filter_mask_low[force_keep_idx_low] = True  
+        filter_mask_low[force_keep_idx_low] = True
 
         filt_flux_low = flux[filter_mask_low]
         filt_peaks_low = peaks_low[filter_mask_low]
@@ -9026,7 +9026,8 @@ def time_domain_DAC_scan_analysis_and_plot(**kwargs):
 def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                            predistort=True, plot=True, timestamp_ground=None,
                            timestamp_excited=None, close_fig=True,
-                           optimization_window=None, post_rotation_angle=None):
+                           optimization_window=None, post_rotation_angle=None,
+                           plot_max_time=4096/1.8e9):
     data_file = MeasurementAnalysis(
         label='_0', auto=True, TwoD=False, close_fig=True, timestamp=timestamp_ground)
     temp = data_file.load_hdf5data()
@@ -9117,8 +9118,9 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
     if plot:
         fig, ax = plt.subplots()
-        plt.plot(x, I0, label='I ground')
-        plt.plot(x, I1, label='I excited')
+        time = np.arange(0, len(weight_I) / 1.8, 1/1.8)
+        plt.plot(time, I0, label='I ground')
+        plt.plot(time, I1, label='I excited')
         ax.set_ylim(-edge, edge)
 
         plt.title('Demodulated I')
@@ -9129,7 +9131,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
             plt.axvline(optimization_start * 1e9, linestyle='--',
                         color='k', label='depletion optimization window')
             plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
-        ax.set_xlim(0, 1500)
+        ax.set_xlim(0, plot_max_time*1e9)
         plt.legend()
 
         plt.savefig(data_file.folder + '\\' +
@@ -9137,8 +9139,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         plt.close()
 
         fig, ax = plt.subplots()
-        plt.plot(x, Q0, label='Q ground')
-        plt.plot(x, Q1, label='Q excited')
+        plt.plot(time, Q0, label='Q ground')
+        plt.plot(time, Q1, label='Q excited')
         ax.set_ylim(-edge, edge)
         plt.title('Demodulated Q')
         plt.xlabel('time (ns)')
@@ -9147,7 +9149,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
             plt.axvline(optimization_start * 1e9, linestyle='--',
                         color='k', label='depletion optimization window')
             plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
-        ax.set_xlim(0, 1500)
+        ax.set_xlim(0, plot_max_time*1e9)
         plt.legend()
 
         plt.savefig(data_file.folder + '\\' +
@@ -9155,13 +9157,13 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         plt.close()
 
         fig, ax = plt.subplots()
-        plt.plot(x, power0 * 1e6, label='ground', lw=4)
-        plt.plot(x, power1 * 1e6, label='excited', lw=4)
+        plt.plot(time, power0 * 1e6, label='ground', lw=4)
+        plt.plot(time, power1 * 1e6, label='excited', lw=4)
         if optimization_window != None:
             plt.axvline(optimization_start * 1e9, linestyle='--',
                         color='k', label='depletion optimization window')
             plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
-        ax.set_xlim(0, 1500)
+        ax.set_xlim(0, plot_max_time*1e9)
         plt.title('Signal power (uW)')
         plt.ylabel('Signal power (uW)')
 
@@ -9285,7 +9287,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.savefig(data_file.folder + '\\' + 'IQ_trajectory_weights')
     plt.close()
 
-    time = np.linspace(0, len(weight_I) / 1.8, len(weight_I))
+    time = np.arange(0, len(weight_I) / 1.8, 1/1.8)
     fig, ax = plt.subplots()
     plt.plot(time, weight_I, label='weight I')
     plt.plot(time, weight_Q, label='weight Q')
@@ -9299,7 +9301,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.title('weight functions_' + data_file.timestamp_string)
     plt.axhline(0, linestyle='--')
     edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
-
+    ax.set_xlim(0, plot_max_time*1e9)
     plt.savefig(data_file.folder + '\\' + 'weight_functions.' +
                 fig_format, format=fig_format)
     plt.close()
