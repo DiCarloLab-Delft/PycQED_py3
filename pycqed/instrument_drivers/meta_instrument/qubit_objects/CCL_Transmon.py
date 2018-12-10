@@ -224,7 +224,7 @@ class CCLight_Transmon(Qubit):
         self.add_parameter(
             'ro_acq_mixer_phi',  unit='degree',
             label='Readout mixer phi',
-            vals=vals.Numbers(min_value=0),
+            vals=vals.Numbers(),
             initial_value=0,
             parameter_class=ManualParameter,
             docstring=('acquisition mixer phi, used for mixer deskewing in'
@@ -745,8 +745,10 @@ class CCLight_Transmon(Qubit):
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
 
-    def upload_deskewing_matrix(phi, alpha):
-        UHFQC=self.instr_acquisition.get_instr()
+    def _prep_deskewing_matrix(self):
+        UHFQC = self.instr_acquisition.get_instr()
+        alpha = self.ro_acq_mixer_alpha()
+        phi = self.ro_acq_mixer_phi()
         predistortion_matrix = np.array(
             ((1, -alpha * np.sin(phi * 2 * np.pi / 360)),
              (0, alpha * np.cos(phi * 2 * np.pi / 360))))

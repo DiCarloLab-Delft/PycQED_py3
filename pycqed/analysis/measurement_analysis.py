@@ -8257,15 +8257,12 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         if f1_guess is None:
             f1_guess = np.mean(total_freqs) - g_guess
 
+        c2_guess = (f2_guess - f1_guess) / cross_flux_guess
         if f2_guess is None:
             # The factor *1000* is a magic number but seems to give a
             # reasonable guess that converges well.
             c1_guess = -1 * ((max(total_freqs) - min(total_freqs)) /
                              (max(total_flux) - min(total_flux))) / 1000
-
-            c2_guess = 1 * ((max(total_freqs) - min(total_freqs)) /
-                             (max(total_flux) - min(total_flux))) / 1000
-
 
             f2_guess = cross_flux_guess * (c1_guess - c2_guess) + f1_guess
         else:
@@ -9314,8 +9311,6 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
 
 # analysis functions
-
-
 def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True):
     # predistortion_matrix = np.array(
     #     ((1,  np.tan(phi*2*np.pi/360)),
