@@ -211,8 +211,18 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                                         fr_rb['eps'], '\n')
         text_msg += format_value_string(r'$L_1$', fr_dec['L1'], '\n')
         text_msg += format_value_string(r'$L_2$', fr_dec['L2'], '\n')
-
         self.proc_data_dict['rb_msg'] = text_msg
+
+        self.proc_data_dict['quantities_of_interest'] = {}
+        qoi = self.proc_data_dict['quantities_of_interest']
+        qoi['eps_simple'] = ufloat(fr_rb_simple['eps'].value,
+                                   fr_rb_simple['eps'].stderr)
+        qoi['eps_X1'] = ufloat(fr_rb['eps'].value,
+                               fr_rb['eps'].stderr)
+        qoi['L1'] = ufloat(fr_dec['L1'].value,
+                           fr_dec['L1'].stderr)
+        qoi['L2'] = ufloat(fr_dec['L2'].value,
+                           fr_dec['L2'].stderr)
 
     def fit_rb_decay(self, lambda_1: float, L1: float, simple: bool=False):
         """
@@ -384,14 +394,14 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
                  options_dict: dict=None, auto=True, close_figs=True,
                  classification_method='rates', rates_ch_idxs: list =[0, 2],
-                 ignore_f_cal_pts: bool=False
+                 ignore_f_cal_pts: bool=False, extract_only: bool = False,
                  ):
         if options_dict is None:
             options_dict = dict()
         super(RandomizedBenchmarking_SingleQubit_Analysis, self).__init__(
             t_start=t_start, t_stop=t_stop, label=label,
             options_dict=options_dict, close_figs=close_figs,
-            do_fitting=True)
+            do_fitting=True, extract_only=extract_only)
         self.d1 = 4
         # used to determine how to determine 2nd excited state population
         self.classification_method = classification_method
@@ -1113,6 +1123,116 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
             'horizontalalignment': 'left'}
 
 
+class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
+    """
+    Analysis for two qubit interleaved randomized benchmarking of a CZ gate.
+
+    This is a meta-analysis. It runs
+    "RandomizedBenchmarking_TwoQubit_Analysis" for each of the individual
+    datasets in the "extract_data" method and uses the quantities of interest
+    to create the combined figure.
+
+    The figure as well as the quantities of interest are stored in
+    the interleaved data file.
+    """
+
+    def __init__(self, ts_base: str, ts_int: str,
+                 label_base: str='', label_int: str='',
+                 options_dict: dict={}, auto=True, close_figs=True,
+                 ch_idxs: list =[0, 2]):
+        super().__init__(do_fitting=True, close_figs=close_figs,
+                         options_dict=options_dict)
+        self.ts_base = ts_base
+        self.ts_int = ts_int
+        self.label_base = label_base
+        self.label_int = label_int
+        self.ch_idxs = ch_idxs
+        self.options_dict = options_dict
+        self.close_figs = close_figs
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.raw_data_dict = OrderedDict()
+        a_int = RandomizedBenchmarking_TwoQubit_Analysis(
+            t_start=self.ts_int, label=self.label_int,
+            options_dict=self.options_dict, auto=True,
+            close_figs=self.close_figs, rates_ch_idxs=self.ch_idxs,
+            extract_only=True)
+
+        a_base = RandomizedBenchmarking_TwoQubit_Analysis(
+            t_start=self.ts_base, label=self.label_base,
+            options_dict=self.options_dict, auto=True,
+            close_figs=self.close_figs, rates_ch_idxs=self.ch_idxs,
+            extract_only=True)
+
+        # order is such that any information (figures, quantities of interest)
+        # are saved in the interleaved file.
+        self.timestamps = [a_int.timestamps[0], a_base.timestamps[0]]
+
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['timestamp_string'] = \
+            a_int.raw_data_dict['timestamp_string']
+        self.raw_data_dict['folder'] = a_int.raw_data_dict['folder']
+        self.raw_data_dict['analyses'] = {'base': a_base, 'int': a_int}
+
+    def process_data(self):
+        self.proc_data_dict = OrderedDict()
+        self.proc_data_dict['quantities_of_interest'] = {}
+        qoi = self.proc_data_dict['quantities_of_interest']
+
+        qoi_base = self.raw_data_dict['analyses']['base'].\
+            proc_data_dict['quantities_of_interest']
+        qoi_int = self.raw_data_dict['analyses']['int'].\
+            proc_data_dict['quantities_of_interest']
+
+        qoi.update({k+'_ref': v for k, v in qoi_base.items()})
+        qoi.update({k+'_int': v for k, v in qoi_int.items()})
+
+        qoi['eps_CZ_X1'] = interleaved_error(eps_int=qoi_int['eps_X1'],
+                                             eps_base=qoi_base['eps_X1'])
+        qoi['eps_CZ_simple'] = interleaved_error(
+            eps_int=qoi_int['eps_simple'], eps_base=qoi_base['eps_simple'])
+        qoi['L1_CZ'] = interleaved_error(eps_int=qoi_int['L1'],
+                                         eps_base=qoi_base['L1'])
+
+        # This is the naive estimate, when all observed error is assigned
+        # to the CZ gate
+        qoi['L1_CZ_naive'] = 1-(1-qoi_base['L1'])**(1/1.5)
+        qoi['eps_CZ_simple_naive'] = 1-(1-qoi_base['eps_X1'])**(1/1.5)
+        qoi['eps_CZ_X1_naive'] = 1-(1-qoi_base['eps_simple'])**(1/1.5)
+
+    def prepare_plots(self):
+        dd_base = self.raw_data_dict['analyses']['base'].proc_data_dict
+        dd_int = self.raw_data_dict['analyses']['int'].proc_data_dict
+
+        fr_base = self.raw_data_dict['analyses']['base'].fit_res
+        fr_int = self.raw_data_dict['analyses']['int'].fit_res
+
+        self.figs['main_irb_decay'], axs = plt.subplots(
+            nrows=2, sharex=True, gridspec_kw={'height_ratios': (2, 1)})
+        self.figs['main_irb_decay'].patch.set_alpha(0)
+        self.axs['main_irb_decay'] = axs[0]
+        self.axs['leak_decay'] = axs[1]
+        self.plot_dicts['main_irb_decay'] = {
+            'plotfn': plot_irb_decay_woods_gambetta,
+
+            'ncl':     dd_base['ncl'],
+            'M0_ref':    dd_base['M0'],
+            'M0_int':    dd_int['M0'],
+            'X1_ref':    dd_base['X1'],
+            'X1_int':   dd_int['X1'],
+            'fr_M0_ref':  fr_base['rb_decay'],
+            'fr_M0_int':  fr_int['rb_decay'],
+            'fr_M0_simple_ref':  fr_base['rb_decay_simple'],
+            'fr_M0_simple_int':  fr_int['rb_decay_simple'],
+            'fr_X1_ref':  fr_base['leakage_decay'],
+            'fr_X1_int':  fr_int['leakage_decay'],
+            'qoi': self.proc_data_dict['quantities_of_interest'],
+            'ax1': axs[1],
+            'title': '{} - {}'.format(self.timestamps[0], self.timestamps[1])}
+
+
 class CharacterBenchmarking_TwoQubit_Analysis(ba.BaseDataAnalysis):
     """
     Analysis for character benchmarking.
@@ -1327,7 +1447,6 @@ class CharacterBenchmarking_TwoQubit_Analysis(ba.BaseDataAnalysis):
             'plotfn': plot_char_rb_quantities,
             'ax_id': 'char_decay',
             'qoi': self.proc_data_dict['quantities_of_interest']}
-
 
 
 def plot_cal_points_hexbin(shots_0,
@@ -1592,6 +1711,64 @@ def plot_rb_decay_woods_gambetta(ncl, M0, X1, ax, ax1, title='', **kw):
     ax.set_title(title)
 
 
+def plot_irb_decay_woods_gambetta(
+        ncl, M0_ref, M0_int,
+        X1_ref, X1_int,
+        fr_M0_ref, fr_M0_int,
+        fr_M0_simple_ref, fr_M0_simple_int,
+        fr_X1_ref, fr_X1_int,
+        qoi,
+        ax, ax1, title='', **kw):
+
+    ncl_fine = np.linspace(ncl[0], ncl[-1], 1001)
+
+    ax.plot(ncl, M0_ref, marker='o', linestyle='', c='C0', label='Reference')
+    plot_fit(ncl_fine, fr_M0_ref, ax=ax, c='C0')
+
+    ax.plot(ncl, M0_int, marker='d', linestyle='', c='C1', label='Interleaved')
+    plot_fit(ncl_fine, fr_M0_int, ax=ax, c='C1')
+
+    ax.grid(axis='y')
+    ax.set_ylim(-.05, 1.05)
+    ax.set_ylabel(r'$M_0$ probability')
+
+    ax1.plot(ncl, X1_ref, marker='o', linestyle='',
+             label='Reference', c='C0')
+    ax1.plot(ncl, X1_int, marker='d', linestyle='', c='C1')
+
+    plot_fit(ncl_fine, fr_X1_ref, ax=ax1, c='C0')
+    plot_fit(ncl_fine, fr_X1_int, ax=ax1, c='C1')
+
+    ax1.grid(axis='y')
+
+    ax1.set_ylim(min(min(.97*X1_ref), .92), 1.01)
+    ax1.set_ylabel(r'$X_1$ population')
+    ax1.set_xlabel('Number of Cliffords')
+    ax.set_title(title)
+    ax.legend(loc=(1.05, .6))
+
+    collabels = ['$\epsilon_{X1}$ (%)', '$\epsilon$ (%)', 'L1 (%)']
+    rowlabels = ['Ref. curve', 'Int. curve', 'CZ-int.', 'CZ-naive']
+    table_data = [
+        [qoi['eps_X1_ref']*100, qoi['eps_simple_ref']*100,
+            qoi['L1_ref']*100],
+        [qoi['eps_X1_int']*100, qoi['eps_simple_int']*100, qoi['L1_int']*100],
+        [qoi['eps_CZ_X1']*100, qoi['eps_CZ_simple']*100, qoi['L1_CZ']*100],
+        [qoi['eps_CZ_X1_naive']*100, qoi['eps_CZ_simple_naive']*100,
+            qoi['L1_CZ_naive']*100], ]
+    ax.table(cellText=table_data,
+             colLabels=collabels,
+             rowLabels=rowlabels,
+             transform=ax1.transAxes,
+             bbox=(1.25, 0.05, .7, 1.4))
+
+
+def interleaved_error(eps_int, eps_base):
+    # Interleaved error calculation  Magesan et al. PRL 2012
+    eps = 1-(1-eps_int)/(1-eps_base)
+    return eps
+
+
 def leak_decay(A, B, lambda_1, m):
     """
     Eq. (9) of Wood Gambetta 2018.
@@ -1622,7 +1799,7 @@ def char_decay(A, alpha, m):
     Eq. 8 of Xue et al. ArXiv 1811.04002v1 (experimental implementation)
 
     Parameters
-    ==========
+    ----------
     A (float):
         Scaling factor of the decay
     alpha (float):
@@ -1656,14 +1833,15 @@ def depolarizing_par_to_eps(alpha, d):
     common RB paramater conversions.
 
     Parameters
-    ==========
+    ----------
     alpha (float):
         depolarizing parameter, also commonly referred to as lambda or p.
     d (int):
         dimension of the system, 2 for a single qubit, 4 for two-qubits.
 
     Returns
-    =======
+    -------
         eps = (1-alpha)*(d-1)/d
+
     """
     return (1-alpha)*(d-1)/d
