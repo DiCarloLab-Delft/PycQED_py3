@@ -821,27 +821,31 @@ class BaseDataAnalysis(object):
             plot_barwidthy = np.ones_like(zpos) * plot_barwidthy
         plot_barheight = plot_zvals.flatten()
 
-        if plot_colormap is not None:
-            # plot_color assumed to be floats
-            if hasattr(plot_color, '__iter__') and \
-                    hasattr(plot_color[0], '__iter__'):
-                plot_color = np.array(plot_color).flatten()
-            plot_color = plot_colormap(plot_color)
+        if 'color' in plot_barkws:
+            plot_color = plot_barkws.pop('color')
         else:
-            # plot_color assumed to be RGBA tuple(s)
-            if hasattr(plot_color[0], '__iter__') and \
-                    hasattr(plot_color[0][0], '__iter__'):
-                plot_color = np.array(plot_color)
-                plot_color = plot_color.reshape((-1, plot_color.shape[-1]))
-            elif not hasattr(plot_color[0], '__iter__'):
-                plot_color = np.array(plot_color)
-                n = plot_zvals.size
-                plot_color = np.repeat(plot_color, n).reshape(-1, n).T
+            if plot_colormap is not None:
+                # plot_color assumed to be floats
+                if hasattr(plot_color, '__iter__') and \
+                        hasattr(plot_color[0], '__iter__'):
+                    plot_color = np.array(plot_color).flatten()
+                plot_color = plot_colormap(plot_color)
+            else:
+                # plot_color assumed to be RGBA tuple(s)
+                if hasattr(plot_color[0], '__iter__') and \
+                        hasattr(plot_color[0][0], '__iter__'):
+                    plot_color = np.array(plot_color)
+                    plot_color = plot_color.reshape((-1, plot_color.shape[-1]))
+                elif not hasattr(plot_color[0], '__iter__'):
+                    plot_color = np.array(plot_color)
+                    n = plot_zvals.size
+                    plot_color = np.repeat(plot_color, n).reshape(-1, n).T
 
         zsort = plot_barkws.pop('zsort', 'max')
         p_out = pfunc(xpos - plot_barwidthx/2, ypos - plot_barwidthy/2, zpos,
                       plot_barwidthx, plot_barwidthy, plot_barheight,
-                      color=plot_color, zsort=zsort, **plot_barkws)
+                      color=plot_color,
+                      zsort=zsort, **plot_barkws)
 
         if plot_xtick_labels is not None:
             axs.xaxis.set_ticklabels(plot_xtick_labels)

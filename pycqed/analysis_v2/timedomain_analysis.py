@@ -1479,11 +1479,14 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                       self.raw_data_dict['timestamp'] + ' ' + meas_string,
             'yrange': (-1.1, 1.1),
             'xtick_loc': np.arange(4**nr_qubits - 1),
+            'xtick_rotation': 270,
             'xtick_labels': np.array(labels)[order],
             'bar_kws': dict(zorder=10),
             'setlabel': 'Fit to experiment',
             'do_legend': True
         }
+        if nr_qubits > 2:
+            self.plot_dicts['pauli_basis']['plotsize'] = (10, 5)
 
         rho_target = self.raw_data_dict['exp_metadata'].get('rho_target', None)
         rho_target = self.options_dict.get('rho_target', rho_target)
@@ -1535,6 +1538,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             'green': [[i/n, cols[i%n][1], cols[i%n][1]] for i in range(n+1)],
             'blue': [[i/n, cols[i%n][2], cols[i%n][2]] for i in range(n+1)],
         }
+
         return mpl.colors.LinearSegmentedColormap('DMDefault', cdict)
 
 

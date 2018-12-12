@@ -129,8 +129,8 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                 if find_empirical_variance:
                     y = 2*(1 - np.asarray(y)) - 1
                     self.epsilon[i] = np.std(y)
-
-            data = 2*(1 - data) - 1
+            # data = 1-data #Prob of |1>
+            data = 2*(1 - data) - 1 # <sigma_z>
 
         else:
             print('cal_points analysis')
@@ -709,7 +709,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
             for ts in timestamp:
                 folder = a_tools.get_folder(timestamp=ts)
                 self.folders.append(folder)
-
+            print(self.folders)
             folder = self.folders[0]
             if not isinstance(folder, str):
                 folder = folder[0]
@@ -826,7 +826,8 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         if make_fig_SRB_base:
             self.plot_SRB(
                 plot_errorbars=plot_errorbars,
-                save_fig=save_fig,  **kw)
+                save_fig=save_fig,
+                fig_title_suffix=fig_title_suffix, **kw)
 
         if make_fig_cross_talk:
             self.plot_cross_talk(
@@ -905,43 +906,45 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         for var_name in self.qb_names+['corr']:
             self.data_dict_raw['data'][var_name] = np.array([])
 
+        single_file = (len(self.folders) == 1)
         for i, folder in enumerate(self.folders):
             print(folder)
             self.folder = folder
             self.load_hdf5data(folder=self.folder, **kw)
-            # # get folder from timestamp
-            # self.folder = a_tools.get_folder(timestamp=ts)
-
-            self.extract_data(two_qubits=False, **kw)
+            self.extract_data(two_qubits=False,
+                              single_file=single_file, **kw)
 
             if i == 0:
                 self.data_dict_raw['nr_seeds'] = self.nr_seeds
-            # get the nr_cliffords for the sequence from the
-            # measurementstring
-            try:
-                idx_cliffs = self.measurementstring.index('cliffords')
-            except TypeError:
+            if not single_file:
+                # get the nr_cliffords for the sequence from the
+                # measurementstring
                 try:
-                    idx_cliffs = self.measurementstring.index('Cliffords')
+                    idx_cliffs = self.measurementstring.index('cliffords')
                 except TypeError:
-                    raise ValueError('Could not find the nr_cliffords in '
-                                     'the measurement string.')
-            nr_cliffs_string = self.measurementstring[
-                               idx_cliffs-7:idx_cliffs-1]
-            try:
-                idx_underscore = nr_cliffs_string.index('_')
-            except TypeError:
-                raise ValueError('Could not find the underscore in '
-                                 'the nr_cliffs substring.')
+                    try:
+                        idx_cliffs = self.measurementstring.index('Cliffords')
+                    except TypeError:
+                        raise ValueError('Could not find the nr_cliffords in '
+                                         'the measurement string.')
+                nr_cliffs_string = self.measurementstring[
+                                   idx_cliffs-7:idx_cliffs-1]
+                try:
+                    idx_underscore = nr_cliffs_string.index('_')
+                except TypeError:
+                    raise ValueError('Could not find the underscore in '
+                                     'the nr_cliffs substring.')
 
-            self.data_dict_raw['n_cl'] = np.append(
-                self.data_dict_raw['n_cl'],
-                int(float(nr_cliffs_string[idx_underscore+1::])))
+                self.data_dict_raw['n_cl'] = np.append(
+                    self.data_dict_raw['n_cl'],
+                    int(float(nr_cliffs_string[idx_underscore+1::])))
             self.add_analysis_datagroup_to_file()
 
             self.msmt_strings += [self.measurementstring]
             self.data_files += [self.data_file]
         print(self.data_dict_raw['data'])
+        from pprint import pprint
+        pprint(self.data_dict_raw)
         # get RO channels and fit data
         self.n_cl = self.data_dict_raw['n_cl']
         for var_name, dset in self.data_dict_raw['data'].items():
@@ -1050,64 +1053,101 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
             return data
         else:
-            self.nr_seeds = self.sweep_points.size
-            self.nr_shots = self.sweep_points_2D.size
-
-            mean_data_array = np.zeros(len(self.qb_names)+1)
-
+            single_file = kw.pop('single_file', True)
             measurement_data = deepcopy(self.data[2::])
-            # rescale data to be between [-1, 1]
-            # for dim in range(len(self.qb_names)):
-            #     measurement_data[dim] = -2*measurement_data[dim] + 1
-
             raw_correl_data = deepcopy(measurement_data[0])
-
-            # for i in np.arange(1, len(self.qb_names)):
-                # raw_correl_data = \
-                #     np.multiply(raw_correl_data,
-                #                 measurement_data[i])
-            #     raw_correl_data = np.bitwise_not(np.bitwise_xor(
-            #         raw_correl_data.astype(int),
-            #         measurement_data[i].astype(int)))
-            # if np.any(raw_correl_data == -2):
-            #     raw_correl_data += 2
 
             for col in range(measurement_data.shape[1]):
                 raw_correl_data[col] = 1 - np.count_nonzero(
                     measurement_data[:, col]) % 2
-                # raw_correl_data[col] = np.count_nonzero(
-                #     measurement_data[:, col]) % 2
 
-            if find_empirical_variance: # here for corr data only
-                y = np.array([])
-                for j in range(self.nr_seeds):
-                    y = np.append(y, np.mean(raw_correl_data[j::self.nr_seeds]))
-                y = 2*y-1
-                self.var_data_dict['corr'] = np.append(
-                        self.var_data_dict['corr'], np.std(y))
+            if single_file:
+                n_cl = self.sweep_points_2D
+                self.nr_seeds = np.unique(self.sweep_points).size
+                assert (self.data.shape[1] % (self.nr_seeds * n_cl.size) == 0)
+                nr_shots = self.data.shape[1] // (self.nr_seeds * n_cl.size)
 
-            mean_data_array[-1] = np.mean(raw_correl_data)
+                self.data_dict_raw['n_cl'] = n_cl
+                self.data_dict_raw['nr_shots'] = nr_shots
 
-            # get averaged results for each qubit measurement
-            for i in np.arange(len(self.qb_names)):
-                mean_data_array[i] = 1 - np.mean(measurement_data[i])
-                # mean_data_array[i] = np.mean(measurement_data[i])
+                for cliff_idx in range(n_cl.size):
+                    measurement_data_subset = \
+                        measurement_data[:,
+                        cliff_idx*nr_shots*self.nr_seeds:
+                        (cliff_idx+1)*nr_shots*self.nr_seeds]
+                    raw_correl_data_subset = \
+                        raw_correl_data[cliff_idx*nr_shots*self.nr_seeds:
+                                        (cliff_idx+1)*nr_shots*self.nr_seeds]
+                    mean_data_array = np.zeros(len(self.qb_names)+1)
 
-                if find_empirical_variance:
-                    dcol = 1 - measurement_data[i]
+                    if find_empirical_variance: # here for corr data only
+                        y = np.array([])
+                        for j in range(self.nr_seeds):
+                            y = np.append(y, np.mean(
+                                raw_correl_data_subset[j::self.nr_seeds]))
+                        y = 2*y-1
+                        self.var_data_dict['corr'] = np.append(
+                            self.var_data_dict['corr'], np.std(y))
+
+                    mean_data_array[-1] = np.mean(raw_correl_data_subset)
+
+                    # get averaged results for each qubit measurement
+                    for i in np.arange(len(self.qb_names)):
+                        mean_data_array[i] = 1 - np.mean(
+                            measurement_data_subset[i])
+
+                        if find_empirical_variance:
+                            dcol = 1 - measurement_data_subset[i]
+                            y = np.array([])
+                            for j in range(self.nr_seeds):
+                                y = np.append(y, np.mean(
+                                    dcol[j::self.nr_seeds]))
+                            y = 2*y-1
+                            self.var_data_dict[self.qb_names[i]] = np.append(
+                                self.var_data_dict[self.qb_names[i]], np.std(y))
+
+                    for var_name, data_point in zip(self.qb_names+['corr'],
+                                                    mean_data_array):
+                        self.data_dict_raw['data'][var_name] = np.append(
+                            self.data_dict_raw['data'][var_name],
+                            2*data_point-1) # <sigma_z>
+                            # data_point) # prob of |1>
+
+            else:
+                self.nr_seeds = self.sweep_points.size
+                # self.nr_shots = self.sweep_points_2D.size
+                mean_data_array = np.zeros(len(self.qb_names)+1)
+
+                if find_empirical_variance: # here for corr data only
                     y = np.array([])
                     for j in range(self.nr_seeds):
-                        y = np.append(y, np.mean(dcol[j::self.nr_seeds]))
+                        y = np.append(y, np.mean(
+                            raw_correl_data[j::self.nr_seeds]))
                     y = 2*y-1
-                    self.var_data_dict[self.qb_names[i]] = np.append(
-                        self.var_data_dict[self.qb_names[i]], np.std(y))
+                    self.var_data_dict['corr'] = np.append(
+                            self.var_data_dict['corr'], np.std(y))
 
-            for var_name, data_point in zip(self.qb_names+['corr'],
-                                            mean_data_array):
-                self.data_dict_raw['data'][var_name] = np.append(
-                    self.data_dict_raw['data'][var_name],
-                    2*data_point-1)
-                    # 0.5*data_point+0.5) #put data between [0.5, 1]
+                mean_data_array[-1] = np.mean(raw_correl_data)
+
+                # get averaged results for each qubit measurement
+                for i in np.arange(len(self.qb_names)):
+                    mean_data_array[i] = 1 - np.mean(measurement_data[i])
+
+                    if find_empirical_variance:
+                        dcol = 1 - measurement_data[i]
+                        y = np.array([])
+                        for j in range(self.nr_seeds):
+                            y = np.append(y, np.mean(dcol[j::self.nr_seeds]))
+                        y = 2*y-1
+                        self.var_data_dict[self.qb_names[i]] = np.append(
+                            self.var_data_dict[self.qb_names[i]], np.std(y))
+
+                for var_name, data_point in zip(self.qb_names+['corr'],
+                                                mean_data_array):
+                    self.data_dict_raw['data'][var_name] = np.append(
+                        self.data_dict_raw['data'][var_name],
+                        2*data_point-1)
+
             return
 
     def fit_data(self, data, numCliff,
@@ -1211,52 +1251,29 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 correl_variance_dict = {}
                 # find depolarization params from all possible combinations of
                 # qubit pairs/triplets from the single shots
-                for folder in self.folders:
-                    self.load_hdf5data(folder=folder, **kw)
+                if len(self.folders) > 1:
+                    for folder in self.folders:
+                        self.load_hdf5data(folder=folder, **kw)
+                        self.get_naming_and_values_2D()
+                        measurement_data = deepcopy(self.data[2::])
+                        self.fit_data_subsets(
+                            n, measurement_data,
+                            correl_data_dict, correl_variance_dict,
+                            find_empirical_variance=find_empirical_variance)
+                else:
+                    self.load_hdf5data(folder=self.folders[0], **kw)
                     self.get_naming_and_values_2D()
                     measurement_data = deepcopy(self.data[2::])
-                    for qb_combs in np.arange(2, n):
-                        # get list of tuples representing all combinations of
-                        # qb idxs
-                        idxs_list = list(itertools.combinations(range(n),
-                                                                qb_combs))
-                        raw_correl_data = np.zeros(len(measurement_data[0]))
-
-                        # calculate correlators for each index tuple by
-                        # multiplying all shots
-                        for idxs_combs in idxs_list:
-                            subspace_data = measurement_data[
-                                            np.asarray(idxs_combs), :]
-                            key = ''.join([str(i) for i in idxs_combs])
-                            if key not in correl_data_dict:
-                                correl_data_dict[key] = np.array([])
-                            if (key not in correl_variance_dict):
-                                if find_empirical_variance:
-                                    correl_variance_dict[key] = np.array([])
-                                else:
-                                    correl_variance_dict[key] = None
-
-                            for col in range(subspace_data.shape[1]):
-                                raw_correl_data[col] = 1 - np.count_nonzero(
-                                    subspace_data[:, col]) % 2
-
-                            if find_empirical_variance:
-                                # if we use empitical variance, then we need to
-                                # find the std of the nr_seeds distribution
-                                y = np.array([])
-                                for j in range(self.nr_seeds):
-                                    y = np.append(
-                                        y,
-                                        np.mean(raw_correl_data[j::self.nr_seeds]))
-                                y = 2*y-1
-                                correl_variance_dict[key] = np.append(
-                                    correl_variance_dict[key], np.std(y))
-
-                            #get <sigma_z^{\otimes s}>
-                            mean_correl_data = 2*np.mean(raw_correl_data) - 1
-                            correl_data_dict[key] = np.append(
-                                correl_data_dict[key],
-                                deepcopy(mean_correl_data))
+                    for cliff_idx in range(self.data_dict['n_cl'].size):
+                        measurement_data_subset = \
+                            measurement_data[:,
+                            cliff_idx*self.data_dict['nr_shots']*self.nr_seeds:
+                            (cliff_idx+1)*self.data_dict[
+                                'nr_shots']*self.nr_seeds]
+                        self.fit_data_subsets(
+                            n, measurement_data_subset,
+                            correl_data_dict, correl_variance_dict,
+                            find_empirical_variance=find_empirical_variance)
 
                 # fit each data set and get depolarization params
                 depolariz_params_dict = {}
@@ -1291,7 +1308,55 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                                             total_depolariz_param[
                                                 'stderr']/d)
 
-    def plot_SRB(self, save_fig=True, **kw):
+    def fit_data_subsets(self, nr_qubits, measurement_data,
+                         correl_data_dict, correl_variance_dict,
+                         find_empirical_variance=True):
+
+        for qb_combs in np.arange(2, nr_qubits):
+            # get list of tuples representing all combinations of
+            # qb idxs
+            idxs_list = list(itertools.combinations(range(nr_qubits),
+                                                    qb_combs))
+            raw_correl_data = np.zeros(len(measurement_data[0]))
+
+            # calculate correlators for each index tuple by
+            # multiplying all shots
+            for idxs_combs in idxs_list:
+                subspace_data = measurement_data[
+                                np.asarray(idxs_combs), :]
+                key = ''.join([str(i) for i in idxs_combs])
+                if key not in correl_data_dict:
+                    correl_data_dict[key] = np.array([])
+                if (key not in correl_variance_dict):
+                    if find_empirical_variance:
+                        correl_variance_dict[key] = np.array([])
+                    else:
+                        correl_variance_dict[key] = None
+
+                for col in range(subspace_data.shape[1]):
+                    raw_correl_data[col] = 1 - np.count_nonzero(
+                        subspace_data[:, col]) % 2
+
+                if find_empirical_variance:
+                    # if we use empirical variance, then we need to
+                    # find the std of the nr_seeds distribution
+                    y = np.array([])
+                    for j in range(self.nr_seeds):
+                        y = np.append(
+                            y,
+                            np.mean(raw_correl_data[j::self.nr_seeds]))
+                    y = 2*y-1
+                    correl_variance_dict[key] = np.append(
+                        correl_variance_dict[key], np.std(y))
+
+                #get <sigma_z^{\otimes s}>
+                mean_correl_data = 2*np.mean(raw_correl_data) - 1
+                correl_data_dict[key] = np.append(
+                    correl_data_dict[key],
+                    deepcopy(mean_correl_data))
+
+
+    def plot_SRB(self, save_fig=True, fig_title_suffix=None, **kw):
 
         show_SRB_base = kw.pop('show_SRB_base', False)
         plot_T1_lim_base = kw.pop('plot_T1_lim_base', True)
@@ -1370,6 +1435,8 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
             # Save figure
             if save_fig:
+                if fig_title_suffix is not None:
+                    fig_title += '_' + fig_title_suffix
                 filename = os.path.abspath(os.path.join(
                     self.save_folder, fig_title+'.png'))
                 fig.savefig(filename, format='png',
