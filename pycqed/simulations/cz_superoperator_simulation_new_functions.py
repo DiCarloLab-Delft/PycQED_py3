@@ -120,7 +120,7 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
 
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
-        J * (a.dag() - a) * (-b + b.dag())
+        J * (-1)*(a.dag()*b+a*b.dag()) #(a.dag() - a) * (-b + b.dag())
         #J * np.sqrt(2) * (qtp.tensor(qtp.basis(3,0),qtp.basis(3,2))*qtp.tensor(qtp.basis(3,1),qtp.basis(3,1)).dag()+\
         #    qtp.tensor(qtp.basis(3,1),qtp.basis(3,1))*qtp.tensor(qtp.basis(3,0),qtp.basis(3,2)).dag())
     H = H * (2*np.pi)
@@ -131,17 +131,19 @@ def calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ):
     # all inputs should be given in terms of frequencies, i.e. without the 2*np.pi factor
     # instead, the output includes already that factor
     w_q0=fluxlutman.calc_amp_to_freq(amp,'01')
-    w_q0_sweetspot=fluxlutman.calc_amp_to_freq(0,'01')
     w_q1=fluxlutman.calc_amp_to_freq(amp,'10')
     alpha_q0=fluxlutman.calc_amp_to_freq(amp,'02')-2*w_q0
     alpha_q1=noise_parameters_CZ.alpha_q1()
+    w_q0_intpoint=w_q1-alpha_q0
     J=fluxlutman.q_J2()/np.sqrt(2)
     w_bus=noise_parameters_CZ.w_bus()
 
     delta_q1=w_q1-w_bus
-    delta_q0_sweetspot=(w_q0_sweetspot)-w_bus
+    delta_q0_intpoint=(w_q0_intpoint)-w_bus
     delta_q0=(w_q0)-w_bus
-    J_temp = J / ((delta_q1+delta_q0_sweetspot)/(delta_q1*delta_q0_sweetspot)) * (delta_q1+delta_q0)/(delta_q1*delta_q0)
+    J_temp = J / ((delta_q1+delta_q0_intpoint)/(delta_q1*delta_q0_intpoint)) * ((delta_q1+delta_q0)/(delta_q1*delta_q0))
+
+    #print(w_q0,w_q1,alpha_q0,alpha_q1,J_temp)
 
     H=coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=J_temp)
     return H
@@ -1250,6 +1252,9 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
     return populations
 
 
+
+## effective Pauli error rates
+
 def calc_chi_matrix(U):
 
     '''
@@ -1274,18 +1279,25 @@ def calc_chi_matrix(U):
     
     U_2qubits=qtp.Qobj(U_2qubits,type='super',dims=[[[2, 2], [2, 2]], [[2, 2], [2, 2]]])
     chi_matrix = qtp.to_chi(U_2qubits)/Pauli_gr_size
+    #print(chi_matrix)
 
-    paulis_label=['1-II','IX','IY','IZ','XI','XX','XY','XZ','YI','YX','YY','YZ','ZI','ZX','ZY','ZZ','leak']
+    paulis_label=['II','IX','IY','IZ','XI','XX','XY','XZ','YI','YX','YY','YZ','ZI','ZX','ZY','ZZ']
+    paulis_label_mod=['1-II','IX','IY','IZ','XI','XX','XY','XZ','YI','YX','YY','YZ','ZI','ZX','ZY','ZZ','leak']
+
+    #qtp.hinton(chi_matrix,xlabels=paulis_label,ylabels=paulis_label,title='Chi matrix')
+
     diag = chi_matrix.diag()
     leak=1-sum(diag)
 
     diag=np.concatenate((diag,np.array([leak])))
     diag[0]=1-diag[0]
-    plot(x_plot_vec=[paulis_label],
+
+    plot(x_plot_vec=[paulis_label_mod],
                           y_plot_vec=[diag],
                           title='Pauli error rates from the chi matrix',
                           xlabel='Pauli index',ylabel='Error',yscale='log')
     print(diag)
+    
 
     return chi_matrix
 

@@ -128,10 +128,17 @@ def compute_propagator(arglist):
                                                        # but we can use a different step for simulating the time evolution
     tlist = np.arange(0, fluxlutman.cz_length(),
                        sim_step)
+    #H_0=czf.calc_hamiltonian(0,fluxlutman,noise_parameters_CZ)
+    #print(H_0.eigenenergies())
+    #print(H_0)
+
+
+    #believed_J2=36.4e6
+    #input_J2=fluxlutman.q_J2()
+    #fluxlutman.q_J2(believed_J2)
     
     eps_i = fluxlutman.calc_amp_to_eps(0, state_A='11', state_B='02')
     theta_i = wfl.eps_to_theta(eps_i, g=fluxlutman.q_J2())           # Beware theta in radian!
-
 
     if not fluxlutman.czd_double_sided():
         thetawave = wfl.martinis_flux_pulse(
@@ -146,6 +153,7 @@ def compute_propagator(arglist):
                  # transform detuning frequency to (positive) amplitude
     else:
         amp = get_f_pulse_double_sided(fluxlutman,theta_i)
+    #fluxlutman.q_J2(input_J2)
 
 
     # For better accuracy in simulations, redefine amp in terms of sim_step_new.
