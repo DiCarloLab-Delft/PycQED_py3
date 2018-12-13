@@ -125,6 +125,10 @@ class BaseDataAnalysis(object):
                                 -'do_individual_traces'
                                 -'filter_no_analysis'
                                 -'exact_label_match'
+                                -'filter_dict'
+                                    dictionary of parameter names as keys and
+                                    values as values. Only datasets with specified values
+                                    of parameters will be extracted and used in analysis
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
         '''
@@ -296,11 +300,13 @@ class BaseDataAnalysis(object):
         # this should always be extracted as it is used to determine where
         # the file is as required for datasaving
         self.params_dict['folder'] = 'folder'
+        filter_dict = self.options_dict.get('filter_dict', None)
         self.raw_data_dict = a_tools.get_data_from_timestamp_list(
             self.timestamps, param_names=self.params_dict,
             ma_type=self.ma_type,
             TwoD=TwoD, numeric_params=self.numeric_params,
-            filter_no_analysis=self.filter_no_analysis)
+            filter_no_analysis=self.filter_no_analysis,
+            filter_dict=filter_dict)
 
         # Use timestamps to calculate datetimes and add to dictionary
         self.raw_data_dict['datetime'] = [a_tools.datetime_from_timestamp(

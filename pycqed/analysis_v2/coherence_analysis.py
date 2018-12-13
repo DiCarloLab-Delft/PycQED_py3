@@ -822,7 +822,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 self.plot_dicts[cg_base + '_echo_scatter'] = pds
 
                 if self.options_dict.get('print_fit_result_plot', True):
-                    dac_fit_text = '$\Gamma = %.5f(\pm %.5f)$\n' % (
+                    dac_fit_text = '$\Gamma = %.2f(\pm %.2f)$\n' % (
                     self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
                     # dac_fit_text += '$\Gamma/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
                     # dac_fit_text += '$\Gamma/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])

@@ -450,11 +450,25 @@ def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
 
 
 def append_data_from_ma(ma, param_names, data, data_version=2,
-                        numeric_params=None):
-    new_data = get_data_from_ma(ma, param_names, data_version=data_version,
+                        numeric_params=None, filter_dict=None):
+    if filter_dict is not None:
+        param_names_filter = list(param_names)+list(filter_dict.keys())
+    else:
+        param_names_filter = param_names
+        
+    new_data = get_data_from_ma(ma, param_names_filter, data_version=data_version,
                                 numeric_params=numeric_params)
-    for param in param_names:
-        data[param].append(new_data[param])
+
+    if filter_dict is not None:
+        for k,v in filter_dict.items():
+            if new_data[k] != str(v):
+                break
+        else:
+            for param in param_names:
+                data[param].append(new_data[param])
+    else:
+        for param in param_names:
+            data[param].append(new_data[param])
 
 
 def get_data_from_timestamp_list(timestamps,
@@ -463,6 +477,7 @@ def get_data_from_timestamp_list(timestamps,
                                  max_files=None,
                                  filter_no_analysis=False,
                                  numeric_params=None,
+                                 filter_dict=None,
                                  ma_type='MeasurementAnalysis'):
     # dirty import inside this function to prevent circular import
     # FIXME: this function is at the base of the analysis v2 but relies
@@ -529,7 +544,7 @@ def get_data_from_timestamp_list(timestamps,
                                                     data_version=1)
                         else:
                             append_data_from_ma(ana, param_names.values(), data,
-                                                data_version=1)
+                                                data_version=1, filter_dict=filter_dict)
 
                     elif datasaving_format == 'Version 2':
                         if single_timestamp:
@@ -537,7 +552,8 @@ def get_data_from_timestamp_list(timestamps,
                                                     data_version=2)
                         else:
                             append_data_from_ma(
-                                ana, param_names.values(), data, data_version=2)
+                                ana, param_names.values(), data, data_version=2,
+                                                    filter_dict=filter_dict)
 
                 else:
                     remove_timestamps.append(timestamp)
