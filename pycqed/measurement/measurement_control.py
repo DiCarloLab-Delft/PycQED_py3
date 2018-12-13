@@ -290,8 +290,10 @@ class MeasurementControl(Instrument):
             self.adaptive_function = fmin_powell
         if issubclass(self.adaptive_function, BaseLearner):
             Learner = self.adaptive_function
-            self.learner = Learner(self.optimization_function,
-                                   bounds=self.af_pars['bounds'])
+            self.learner = Learner(
+                self.optimization_function,
+                loss_per_triangle=self.af_pars.get('loss_per_triangle'),
+                bounds=self.af_pars['bounds'])
             # N.B. the runner that is used is not an `adaptive.Runner` object
             # rather it is the `adaptive.runner.simple` function. This
             # ensures that everything runs in a single process, as is
