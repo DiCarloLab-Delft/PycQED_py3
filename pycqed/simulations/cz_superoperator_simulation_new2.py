@@ -8,6 +8,7 @@ from pycqed.simulations import cz_superoperator_simulation_new_functions as czf
 import numpy as np
 from pycqed.measurement import detector_functions as det
 import matplotlib.pyplot as plt
+from qcodes import Instrument
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from scipy.interpolate import interp1d
 import qutip as qtp
@@ -27,8 +28,10 @@ def f_to_parallelize_new(arglist):
     number = arglist['number']
     adaptive_pars = arglist['adaptive_pars']
 
-
-    MC = mc.MeasurementControl('MC'+'{}'.format(number), live_plot_enabled=False)
+    try: 
+        MC = Instrument.find_instrument('MC'+'{}'.format(number))
+    except KeyError:
+        MC = mc.MeasurementControl('MC'+'{}'.format(number), live_plot_enabled=False)
     from qcodes import station
     station = station.Station()
     station.add_component(MC)
@@ -44,7 +47,8 @@ def f_to_parallelize_new(arglist):
 
 
     d=CZ_trajectory_superoperator(fluxlutman=fluxlutman, noise_parameters_CZ=noise_parameters_CZ,
-                                                         fitted_stepresponse_ty=fitted_stepresponse_ty)
+                                  fitted_stepresponse_ty=fitted_stepresponse_ty, 
+                                  qois=adaptive_pars.get('qois', 'all'))
     MC.set_detector_function(d)
 
 
@@ -278,7 +282,8 @@ def get_f_pulse_double_sided(fluxlutman,theta_i):
 
 
 class CZ_trajectory_superoperator(det.Soft_Detector):
-    def __init__(self, fluxlutman, noise_parameters_CZ, fitted_stepresponse_ty):
+    def __init__(self, fluxlutman, noise_parameters_CZ, fitted_stepresponse_ty, 
+                qois='all'):
         """
         Detector for simulating a CZ trajectory.
         Args:
@@ -287,6 +292,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             noise_parameters_CZ: instrument that contains the noise parameters, plus some more
             fitted_stepresponse_ty: list of two elements, corresponding to the time t 
                                     and the step response in volts along the y axis
+            qois: list
+                list of quantities of interest, this can be used to return 
+                only a select set of values. The list should contain 
+                entries of "value_names". if qois=='all', all quantities are returned. 
         Structure: compute input parameters necessary to compute time evolution (propagator), then compute quantities of interest
         Returns: quantites of interest
         """
@@ -295,6 +304,14 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
                             'cond_phase02', 'coherent_leakage11', 'offset_difference', 'missing_fraction']
         self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%']
+
+        self.qois = qois
+        if self.qois != 'all': 
+            self.qoi_mask = [self.value_names.index(q) for q in qois]
+            self.value_names = list(np.array(self.value_names)[self.qoi_mask])
+            self.value_units = list(np.array(self.value_units)[self.qoi_mask])
+
+
         self.fluxlutman = fluxlutman
         self.noise_parameters_CZ = noise_parameters_CZ
         self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
@@ -479,11 +496,15 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         #                   title='Study of convergence of average',
         #                   xlabel='n_sampling_gaussian points',ylabel=self.value_names[i])
 
-
-        return qoi_plot[0,0], qoi_plot[0,1], qoi_plot[0,2], qoi_plot[0,3], qoi_plot[0,4], qoi_plot[0,5], qoi_plot[0,6], \
-               qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10], qoi_plot[0,11], qoi_plot[0,12], qoi_plot[0,13], qoi_plot[0,14]
-
-
+        return_values = [qoi_plot[0,0], qoi_plot[0,1], qoi_plot[0,2], qoi_plot[0,3], \
+            qoi_plot[0,4], qoi_plot[0,5], qoi_plot[0,6], \
+            qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10], \
+            qoi_plot[0,11], qoi_plot[0,12], qoi_plot[0,13], qoi_plot[0,14]]
+        if self.qois != 'all': 
+            return np.array(return_values)[self.qoi_mask]
+            
+        else: 
+            return return_values 
 
 
 
