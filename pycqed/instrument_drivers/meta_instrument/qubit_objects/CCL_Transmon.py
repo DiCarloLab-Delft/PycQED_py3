@@ -220,6 +220,25 @@ class CCLight_Transmon(Qubit):
                        ' readout pulse and the instruction that triggers the '
                        'acquisition. The positive number means that the '
                        'acquisition is started after the pulse is send.'))
+
+        self.add_parameter(
+            'ro_acq_mixer_phi',  unit='degree',
+            label='Readout mixer phi',
+            vals=vals.Numbers(),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('acquisition mixer phi, used for mixer deskewing in'
+                       'real time'))
+
+        self.add_parameter(
+            'ro_acq_mixer_alpha',  unit='',
+            label='Readout mixer alpha',
+            vals=vals.Numbers(min_value=0.8),
+            initial_value=1,
+            parameter_class=ManualParameter,
+            docstring=('acquisition mixer alpha, used for mixer deskewing in'
+                       'real time'))
+
         self.add_parameter(
             'ro_acq_input_average_length',  unit='s',
             label='Readout acquisition delay',
@@ -718,12 +737,26 @@ class CCLight_Transmon(Qubit):
         - set the integration weights
         """
         if self.cfg_prepare_ro_awg():
-            self.instr_acquisition.get_instr().load_default_settings()
+            self.instr_acquisition.get_instr().load_default_settings(upload_sequence=False)
             self._prep_ro_pulse(CW=CW)
             self._prep_ro_integration_weights()
+            self._prep_deskewing_matrix()
 
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
+
+    def _prep_deskewing_matrix(self):
+        UHFQC = self.instr_acquisition.get_instr()
+        alpha = self.ro_acq_mixer_alpha()
+        phi = self.ro_acq_mixer_phi()
+        predistortion_matrix = np.array(
+            ((1, -alpha * np.sin(phi * 2 * np.pi / 360)),
+             (0, alpha * np.cos(phi * 2 * np.pi / 360))))
+        UHFQC.quex_deskew_0_col_0(predistortion_matrix[0,0])
+        UHFQC.quex_deskew_0_col_1(predistortion_matrix[0,1])
+        UHFQC.quex_deskew_1_col_0(predistortion_matrix[1,0])
+        UHFQC.quex_deskew_1_col_1(predistortion_matrix[1,1])
+        return predistortion_matrix
 
     def _prep_ro_instantiate_detectors(self):
         self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
@@ -1997,10 +2030,13 @@ class CCLight_Transmon(Qubit):
                            cases=('off', 'on'),
                            prepare: bool=True, depletion_analysis: bool=True,
                            depletion_analysis_plot: bool=True,
-                           depletion_optimization_window=None):
+                           depletion_optimization_window=None,
+                           plot_max_time=None):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
+        if plot_max_time is None:
+            plot_max_time = self.ro_acq_integration_length()+250e-9
 
         if prepare:
             self.prepare_for_timedomain()
@@ -2048,10 +2084,13 @@ class CCLight_Transmon(Qubit):
             a = ma.Input_average_analysis(
                 IF=self.ro_freq_mod(),
                 optimization_window=depletion_optimization_window,
-                plot=depletion_analysis_plot)
+                plot=depletion_analysis_plot,
+                plot_max_time=plot_max_time)
             return a
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
+
+
 
     def measure_transients_CCL_switched(self, MC=None, analyze: bool=True,
                                         cases=('off', 'on'),
@@ -2163,6 +2202,7 @@ class CCLight_Transmon(Qubit):
             ma.Input_average_analysis(IF=self.ro_freq_mod())
 
         self.ro_acq_averages(old_avg)
+        # deskewing the input signal
 
         # Calculate optimal weights
         optimized_weights_I = (transients[1][0] - transients[0][0])
@@ -2493,10 +2533,11 @@ class CCLight_Transmon(Qubit):
         nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
         ma.OptimizationAnalysis(label='gate_tuneup_allxy')
 
-    def calibrate_depletion_pulse_transients(
+    def calibrate_depletion_pulse(
             self, nested_MC=None, amp0=None,
             amp1=None, phi0=180, phi1=0, initial_steps=None, two_par=True,
-            depletion_optimization_window=None, depletion_analysis_plot=False):
+            depletion_optimization_window=None, depletion_analysis_plot=False,
+            use_RTE_cost_function=False):
         """
         this function automatically tunes up a two step, four-parameter
         depletion pulse.
@@ -2546,15 +2587,24 @@ class CCLight_Transmon(Qubit):
                                            self.ro_pulse_down_phi1,
                                            self.ro_pulse_down_amp0,
                                            self.ro_pulse_down_amp1])
-        d = det.Function_Detector(self.measure_transients,
-                                  msmt_kw={'depletion_analysis': True,
-                                           'depletion_analysis_plot':
-                                           depletion_analysis_plot,
-                                           'depletion_optimization_window':
-                                           depletion_optimization_window},
-                                  value_names=['depletion cost'],
-                                  value_units=['au'],
-                                  result_keys=['depletion_cost'])
+        if use_RTE_cost_function:
+            d = det.Function_Detector(self.measure_error_fraction,
+                                      msmt_kw={'net_gate': 'pi',
+                                               'feedback':False,
+                                               'sequence_type':'echo'},
+                                      value_names=['error fraction'],
+                                      value_units=['au'],
+                                      result_keys=['error fraction'])
+        else:
+            d = det.Function_Detector(self.measure_transients,
+                                      msmt_kw={'depletion_analysis': True,
+                                               'depletion_analysis_plot':
+                                               depletion_analysis_plot,
+                                               'depletion_optimization_window':
+                                               depletion_optimization_window},
+                                      value_names=['depletion cost'],
+                                      value_units=['au'],
+                                      result_keys=['depletion_cost'])
         nested_MC.set_detector_function(d)
 
         if two_par:
@@ -2637,7 +2687,8 @@ class CCLight_Transmon(Qubit):
                 options_dict={'typ_data_idx': 0,
                               'scan_label': 'RTE'},
                 extract_only=True)
-            return a.proc_data_dict['frac_single']
+            return {'error fraction': a.proc_data_dict['frac_single']}
+
 
     def measure_T1(self, times=None, MC=None,
                    analyze=True, close_fig=True, update=True,

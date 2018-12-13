@@ -120,7 +120,7 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
 
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
-        J * (a.dag() - a) * (-b + b.dag())
+        J * (-1)*(a.dag()*b+a*b.dag()) #(a.dag() - a) * (-b + b.dag())
         #J * np.sqrt(2) * (qtp.tensor(qtp.basis(3,0),qtp.basis(3,2))*qtp.tensor(qtp.basis(3,1),qtp.basis(3,1)).dag()+\
         #    qtp.tensor(qtp.basis(3,1),qtp.basis(3,1))*qtp.tensor(qtp.basis(3,0),qtp.basis(3,2)).dag())
     H = H * (2*np.pi)
@@ -131,17 +131,19 @@ def calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ):
     # all inputs should be given in terms of frequencies, i.e. without the 2*np.pi factor
     # instead, the output includes already that factor
     w_q0=fluxlutman.calc_amp_to_freq(amp,'01')
-    w_q0_sweetspot=fluxlutman.calc_amp_to_freq(0,'01')
     w_q1=fluxlutman.calc_amp_to_freq(amp,'10')
     alpha_q0=fluxlutman.calc_amp_to_freq(amp,'02')-2*w_q0
     alpha_q1=noise_parameters_CZ.alpha_q1()
+    w_q0_intpoint=w_q1-alpha_q0
     J=fluxlutman.q_J2()/np.sqrt(2)
     w_bus=noise_parameters_CZ.w_bus()
 
     delta_q1=w_q1-w_bus
-    delta_q0_sweetspot=(w_q0_sweetspot)-w_bus
+    delta_q0_intpoint=(w_q0_intpoint)-w_bus
     delta_q0=(w_q0)-w_bus
-    J_temp = J / ((delta_q1+delta_q0_sweetspot)/(delta_q1*delta_q0_sweetspot)) * (delta_q1+delta_q0)/(delta_q1*delta_q0)
+    J_temp = J / ((delta_q1+delta_q0_intpoint)/(delta_q1*delta_q0_intpoint)) * ((delta_q1+delta_q0)/(delta_q1*delta_q0))
+
+    #print(w_q0,w_q1,alpha_q0,alpha_q1,J_temp)
 
     H=coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=J_temp)
     return H
@@ -487,6 +489,8 @@ def pro_avfid_superoperator_compsubspace_phasecorrected(U,L1,phases):
                 ptrace += inner[i, i]
             psum += (np.abs(ptrace))**2
 
+        #calc_chi_matrix(qtp.to_super(U_target).dag()*U)
+
         return np.real((dim*(1-L1) + psum) / (dim*(dim + 1)))
 
 
@@ -759,8 +763,6 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
         #                   title='T2 vs frequency from fit',
         #                   xlabel='Frequency_q0 (GHz)', ylabel='T2 (mu s)')
 
-        T2_q0_vec=T2_q0_vec * noise_parameters_CZ.T2_scaling()            # to vary T2 levels and plot performance vs T2
-
         if T1_q0 != 0:
             Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
         else:
@@ -769,7 +771,7 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
         Tphi01_q0_vec = []
 
 
-    c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
+    c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec * noise_parameters_CZ.T2_scaling(), Tphi01_q1 * noise_parameters_CZ.T2_scaling())
     return c_ops
 
 
@@ -1251,13 +1253,85 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
 
 
 
+## effective Pauli error rates
+
+def calc_chi_matrix(U):
+
+    '''
+    Input: superoperator U for two qutrits, in the Liouville representation.
+    Returns: chi matrix of the two-qubit subspace.
+             Note that it will not be necessarily positive definite and normalized due to leakage.
+    '''
+
+    Pauli_gr_size = 16
+    U_2qubits = np.zeros([Pauli_gr_size,Pauli_gr_size])
+
+    indexlist=[]
+    for x_prime in [0,1]:
+        for y_prime in [0,1]:
+            for x in [0,1]:
+                for y in [0,1]:
+                    indexlist.append(3*x+y+27*x_prime+9*y_prime)
+
+    for i in range(Pauli_gr_size):
+        for j in range(Pauli_gr_size):
+            U_2qubits[i,j]=U[indexlist[i],indexlist[j]]
+    
+    U_2qubits=qtp.Qobj(U_2qubits,type='super',dims=[[[2, 2], [2, 2]], [[2, 2], [2, 2]]])
+    chi_matrix = qtp.to_chi(U_2qubits)/Pauli_gr_size
+    #print(chi_matrix)
+
+    paulis_label=['II','IX','IY','IZ','XI','XX','XY','XZ','YI','YX','YY','YZ','ZI','ZX','ZY','ZZ']
+    paulis_label_mod=['1-II','IX','IY','IZ','XI','XX','XY','XZ','YI','YX','YY','YZ','ZI','ZX','ZY','ZZ','leak']
+
+    #qtp.hinton(chi_matrix,xlabels=paulis_label,ylabels=paulis_label,title='Chi matrix')
+
+    diag = chi_matrix.diag()
+    leak=1-sum(diag)
+
+    diag=np.concatenate((diag,np.array([leak])))
+    diag[0]=1-diag[0]
+
+    plot(x_plot_vec=[paulis_label_mod],
+                          y_plot_vec=[diag],
+                          title='Pauli error rates from the chi matrix',
+                          xlabel='Pauli index',ylabel='Error',yscale='log')
+    print(diag)
+    
+
+    return chi_matrix
 
 
 
+def calc_diag_pauli_transfer_matrix(U,U_target):
 
+    identity=qtp.Qobj([[1,0,0],
+                       [0,1,0],
+                       [0,0,1]])
+    sigmax=qtp.Qobj([[0,1,0],
+                     [1,0,0],
+                     [0,0,1]])
+    sigmay=qtp.Qobj([[0,-1j,0],
+                     [1j,0,0],
+                     [0,0,1]])
+    sigmaz=qtp.Qobj([[1,0,0],
+                     [0,-1,0],
+                     [0,0,1]])
+    pauli_list = [identity,sigmax,sigmay,sigmaz]
+    diag=[]
+    paulis_label=['II','IX','IY','IZ','XI','XX','XY','XZ','YI','YX','YY','YZ','ZI','ZX','ZY','ZZ']
 
-
-
+    for pauli_1 in pauli_list:
+        for pauli_2 in pauli_list:
+            pauli=qtp.tensor(pauli_1,pauli_2)
+            pauli_vec=qtp.operator_to_vector(pauli)
+            diag_elem=1/9*(pauli_vec.dag()*qtp.to_super(U_target)*U*pauli_vec).data[0,0]
+            diag.append(np.real(diag_elem))
+    print(diag)
+    czf.plot(x_plot_vec=[paulis_label],
+                  y_plot_vec=[diag],
+                  title='Diagonal of the Pauli transfer matrix',
+                  xlabel='Pauli index',ylabel='Value')
 
 
 

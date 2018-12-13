@@ -178,7 +178,7 @@ class UHFQC(Instrument):
         print('Initialized UHFQC', self._device,
               'in %.2fs' % (t1-t0))
 
-    def load_default_settings(self):
+    def load_default_settings(self, upload_sequence=True):
         # standard configurations adapted from Haendbaek's notebook
         # Run this block to do some standard configuration
 
@@ -192,7 +192,8 @@ class UHFQC(Instrument):
 
         # Load an AWG program (from Zurich
         # Instruments/LabOne/WebServer/awg/src)
-        self.awg_sequence_acquisition()
+        if upload_sequence:
+            self.awg_sequence_acquisition()
 
         # Turn on both outputs
         self.sigouts_0_on(1)
@@ -523,7 +524,7 @@ class UHFQC(Instrument):
                         data[n] = np.concatenate((data[n], v['vector']))
                         if len(data[n]) >= samples:
                             gotem[n] = True
-                
+
                 #if p in dataset:
                 #    for v in dataset[p]:
                 #        if n in data:
