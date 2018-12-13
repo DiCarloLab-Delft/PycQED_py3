@@ -1741,7 +1741,7 @@ def plot_irb_decay_woods_gambetta(
 
     ax1.grid(axis='y')
 
-    ax1.set_ylim(min(min(.97*X1_ref), .92), 1.01)
+    ax1.set_ylim(min(min(.97*X1_int), .92), 1.01)
     ax1.set_ylabel(r'$X_1$ population')
     ax1.set_xlabel('Number of Cliffords')
     ax.set_title(title)
