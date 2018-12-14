@@ -19,12 +19,12 @@ import qutip as qtp
 
 
 def f_to_parallelize_new(arglist):
+    # cluster wants a list as an argument.
+    # Below the various list items are assigned to their own variable
 
     fitted_stepresponse_ty = arglist['fitted_stepresponse_ty']
-    fluxlutman_args = arglist['fluxlutman_args']       # [sampling_rate, cz_length, q_J2, czd_double_sided, cz_lambda_2, cz_lambda_3,
-                                                           #        cz_theta_f, czd_length_ratio]
-    noise_parameters_CZ_args = arglist['noise_parameters_CZ_args']       # [Z_rotations_length, voltage_scaling_factor, distortions, T1_q0, T1_q1, T2_q0_sweetspot, T2_q0_interaction_point,
-                                                                             #      T2_q0_amplitude_dependent, T2_q1]
+    fluxlutman_args = arglist['fluxlutman_args']       # see function return_instrument_args in czf
+    noise_parameters_CZ_args = arglist['noise_parameters_CZ_args']       # see function return_instrument_args in czf
     number = arglist['number']
     adaptive_pars = arglist['adaptive_pars']
 
@@ -44,7 +44,6 @@ def f_to_parallelize_new(arglist):
     station.add_component(noise_parameters_CZ)
 
     fluxlutman, noise_parameters_CZ = czf.return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args)
-
 
     d=CZ_trajectory_superoperator(fluxlutman=fluxlutman, noise_parameters_CZ=noise_parameters_CZ,
                                   fitted_stepresponse_ty=fitted_stepresponse_ty, 
@@ -117,7 +116,8 @@ def f_to_parallelize_new(arglist):
 
 
 def compute_propagator(arglist):
-    # arglist = [samplepoint_q0,samplepoint_q1,fluxlutman_args,noise_parameters_CZ_args,fitted_stepresponse_ty]
+    # I was parallelizing this function in the cluster, then I changed but the list as an argument remains.
+    # Below each list item is assigned to its own variable
 
     fluxbias_q0 = arglist['fluxbias_q0']
     fluxbias_q1 = arglist['fluxbias_q1']
@@ -130,16 +130,12 @@ def compute_propagator(arglist):
     subdivisions_of_simstep=4                          # 4 is a good one, corresponding to a time step of 0.1 ns
     sim_step_new=sim_step/subdivisions_of_simstep      # waveform is generated according to sampling rate of AWG,
                                                        # but we can use a different step for simulating the time evolution
-    tlist = np.arange(0, fluxlutman.cz_length(),
-                       sim_step)
-    #H_0=czf.calc_hamiltonian(0,fluxlutman,noise_parameters_CZ)
-    #print(H_0.eigenenergies())
-    #print(H_0)
+    tlist = np.arange(0, fluxlutman.cz_length(), sim_step)
+    
+    #residual_coupling=conditional_frequency(0,fluxlutman,noise_parameters_CZ)      # To check residual coupling at the operating point.
+    #print(residual_coupling)                                                       # Change amp to get the residual coupling at different points
 
 
-    #believed_J2=36.4e6
-    #input_J2=fluxlutman.q_J2()
-    #fluxlutman.q_J2(believed_J2)
     
     eps_i = fluxlutman.calc_amp_to_eps(0, state_A='11', state_B='02')
     theta_i = wfl.eps_to_theta(eps_i, g=fluxlutman.q_J2())           # Beware theta in radian!
@@ -157,7 +153,7 @@ def compute_propagator(arglist):
                  # transform detuning frequency to (positive) amplitude
     else:
         amp = get_f_pulse_double_sided(fluxlutman,theta_i)
-    #fluxlutman.q_J2(input_J2)
+
 
 
     # For better accuracy in simulations, redefine amp in terms of sim_step_new.
@@ -176,8 +172,9 @@ def compute_propagator(arglist):
     amp=amp_interp(tlist_new)
 
 
+
     # Apply voltage scaling
-    amp = amp * noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
+    amp = amp * noise_parameters_CZ.voltage_scaling_factor() 
 
 
     ### Apply distortions
@@ -186,6 +183,7 @@ def compute_propagator(arglist):
     else:
         amp_final = amp
 
+    # Uncomment to get plots of the distorted pulse.
     # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final],
     #                          title='Pulse with distortions, absolute',
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
@@ -205,17 +203,20 @@ def compute_propagator(arglist):
     if noise_parameters_CZ.total_idle_time() != 0:
         tlist_idle_time = np.arange(0,noise_parameters_CZ.total_idle_time(),sim_step_new)
         amp_idle_time = np.zeros(len(tlist_idle_time))+amp_final[0]
-        double_sided = fluxlutman.czd_double_sided()
+        double_sided = fluxlutman.czd_double_sided()                # idle time is single-sided so we save the fluxlutman.czd_double_sided() value, set it to False
+                                                                    # and later restore it to the original value
         fluxlutman.czd_double_sided(False)
         amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0)
         fluxlutman.czd_double_sided(double_sided)
-        tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.total_idle_time(),sim_step_new,tlist_new)
+        tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.total_idle_time(),sim_step_new,tlist_new)   # misleading name for the function sorry
 
 
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
     amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
 
 
+    # We concatenate amp and f_pulse with the values they take during the Zrotations and idle_time.
+    # It comes after the previous line because of details of the function czf.shift_due_to_fluxbias_q0
     if noise_parameters_CZ.Z_rotations_length() != 0:
         amp_final=np.concatenate((amp_final,amp_Z_rotation))
         f_pulse_final=np.concatenate((f_pulse_final,f_pulse_Z_rotation))
@@ -224,9 +225,8 @@ def compute_propagator(arglist):
         f_pulse_final=np.concatenate((f_pulse_final,f_pulse_idle_time))
 
     # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final],
-    #                          title='Pulse with (possibly) single qubit rotations',
+    #                          title='Pulse with (possibly) single qubit rotations and idle time',
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
-
 
     # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp_final_new],
     #                          title='Pulse with distortions and shift due to fluxbias_q0, difference',
@@ -237,17 +237,17 @@ def compute_propagator(arglist):
     #                            xlabel='Time (ns)',ylabel='Frequency (GHz)')
 
 
-    t_final = tlist_new[-1]+sim_step_new
+    t_final = tlist_new[-1]+sim_step_new     # actual overall gate length
 
 
-    ### Obtain jump operators, possibly time-dependent (incoherent part of the noise)
+    ### Obtain jump operators for Lindblad equation
     c_ops = czf.return_jump_operators(noise_parameters_CZ=noise_parameters_CZ, f_pulse_final=f_pulse_final, fluxlutman=fluxlutman)
 
 
     ### Compute propagator
     U_final = czf.time_evolution_new(c_ops=c_ops, noise_parameters_CZ=noise_parameters_CZ, 
                                  fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new)
-    #print(czf.verify_CPTP(U_superop_average))
+    #print(czf.verify_CPTP(U_superop_average))    # simple check of CPTP property
 
     return [U_final, t_final]
 
@@ -305,7 +305,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 only a select set of values. The list should contain 
                 entries of "value_names". if qois=='all', all quantities are returned. 
         Structure: compute input parameters necessary to compute time evolution (propagator), then compute quantities of interest
-        Returns: quantites of interest
+        Returns: quantities of interest
         """
         super().__init__()
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
@@ -326,19 +326,16 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                                                                 # as a function of time (=t)
 
     def acquire_data_point(self, **kw):
-
-        #czf.plot_spectrum(fluxlutman=self.fluxlutman,noise_parameters_CZ=self.noise_parameters_CZ)
         
         ### Discretize average (integral) over a Gaussian distribution
         mean = 0
         sigma_q0 = self.noise_parameters_CZ.sigma_q0()
         sigma_q1 = self.noise_parameters_CZ.sigma_q1()          # one for each qubit, in units of Phi_0
-                 # 4e-6 is the same value as in the surface-17 paper of tom&brian. We see that 25 reproduces the T_phi^quasi-static for a Ramsey exp.
 
         qoi_plot = []    # used to verify convergence properties. If len(n_sampling_gaussian_vec)==1, it is useless
-        n_sampling_gaussian_vec = self.noise_parameters_CZ.n_sampling_gaussian_vec()  # 11 guarantees excellent convergence.
+        n_sampling_gaussian_vec = self.noise_parameters_CZ.n_sampling_gaussian_vec()      # 11 guarantees excellent convergence.
                                                                                           # We choose it odd so that the central point of the Gaussian is included.
-                                                                                          # ALWAYS choose it odd
+                                                                                          # Always choose it odd
         for n_sampling_gaussian in n_sampling_gaussian_vec:
             # If sigma=0 there's no need for sampling
             if sigma_q0 != 0:
@@ -360,9 +357,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
 
-            input_to_parallelize = []
+            input_to_parallelize = []               # This is actually the input that was parallelized in an old version.
+                                                    # Currently it just creates a list that is provided sequentially to compute_propagator
             weights=[]
-            number=-1           # used to number instruments that are created in the parallelization, to avoid conflicts
+            number=-1           # used to number instruments that are created in the parallelization, to avoid conflicts in the cluster
 
             
             for j_q0 in range(len(samplingpoints_gaussian_q0)):
@@ -370,7 +368,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 for j_q1 in range(len(samplingpoints_gaussian_q1)): 
                     fluxbias_q1 = samplingpoints_gaussian_q1[j_q1]                 # q1 spectator qubit
 
-                    input_point = {'fluxbias_q0': fluxbias_q0,                  # need to pass it like this to the cluster
+                    input_point = {'fluxbias_q0': fluxbias_q0,                  
                                    'fluxbias_q1': fluxbias_q1,
                                    'fluxlutman': self.fluxlutman,
                                    'noise_parameters_CZ': self.noise_parameters_CZ,
@@ -394,50 +392,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             w_q0, w_q1, alpha_q0 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
 
 
-            '''
-            #### Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
-            leakage_vec=[]
-            infid_vec=[]
-            phase_q0_vec=[]
-            phase_q1_vec=[]
-            fluxbias_q0_vec=[]
-            cond_phase_vec=[]
-
-            mid_index=int(len(U_final_vec)/2)
-            print(mid_index)
-
-            for i in range(len(U_final_vec)):
-                if U_final_vec[i].type == 'oper':
-                    U_final_vec[i] = qtp.to_super(U_final_vec[i])
-                qoi_temp = czf.simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i],t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
-                if i==mid_index:
-                    print(qoi_temp)
-                leakage_vec.append(qoi_temp['L1'])
-                infid_vec.append(1-qoi_temp['avgatefid_compsubspace_pc'])
-                phase_q0_vec.append(qoi_temp['phase_q0'])
-                phase_q1_vec.append(qoi_temp['phase_q1'])
-                cond_phase_vec.append(qoi_temp['phi_cond'])
-
-                fluxbias_q0=input_to_parallelize[i]['fluxbias_q0']
-                fluxbias_q0_vec.append(fluxbias_q0)
-
-            #leakage_vec=np.array(leakage_vec)-leakage_vec[mid_index]
-            cond_phase_vec=np.array(cond_phase_vec)-cond_phase_vec[mid_index]
-            phase_q0_vec=np.array(phase_q0_vec)-phase_q0_vec[mid_index]
-            phase_q1_vec=np.array(phase_q1_vec)-phase_q1_vec[mid_index]
-            infid_vec=np.array(infid_vec)-infid_vec[mid_index]
-
-            czf.plot(x_plot_vec=[np.array(fluxbias_q0_vec)*1e3],
-                          y_plot_vec=[cond_phase_vec,phase_q0_vec,phase_q1_vec],
-                          title='Sensitivity to quasi_static flux offsets',
-                          xlabel='Flux offset (m$\Phi_0$)',ylabel='Phase (deg)',
-                          legend_labels=['conditional phase err','phase QR err','phase QL err'])
-            czf.plot(x_plot_vec=[np.array(fluxbias_q0_vec)*1e3],
-                          y_plot_vec=[np.array(leakage_vec)*100],
-                          title='Sensitivity to quasi_static flux offsets',
-                          xlabel='Flux offset (m$\Phi_0$)',ylabel='Leakage $L_1$ (%)',
-                          legend_labels=['leakage'])
-            '''
+            ## Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
+            #sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q1,alpha_q0)
 
 
             for i in range(len(U_final_vec)):
@@ -463,41 +419,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             qoi_plot.append(qoi_vec)
 
 
-            '''leakage_vec=[]
-            infid_vec=[]
-            leakage_dephased_vec=[]
-            infid_dephased_vec=[]
-            dimensions = U_superop_average.dims
-            U_temp = U_superop_average.full()
-            U_temp[22,40]=0
-            U_temp[38,40]=0
-            U_temp[22,20]=0
-            U_temp[38,20]=0
-            U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
-            for n in range(1,201,2):
-                U_superop_n=U_superop_average**n
-                U_superop_dephased_n = U_superop_dephased**n
-                qoi=czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
-                qoi_dephased=czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
-                leakage_vec.append(qoi['L1'])
-                infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
-                leakage_dephased_vec.append(qoi_dephased['L1'])
-                infid_dephased_vec.append(1-qoi_dephased['avgatefid_compsubspace_pc'])
-
-            czf.plot(x_plot_vec=[np.arange(1,200,2)],
-                          #y_plot_vec=[leakage_vec,infid_vec,leakage_dephased_vec,infid_dephased_vec],
-                          y_plot_vec=[np.array(leakage_vec)*100,np.array(leakage_dephased_vec)*100],
-                          title='Repeated $CZ$ gates',
-                          xlabel='Number of CZ gates',ylabel='Leakage (%)',
-                          legend_labels=['Using directly the $CZ$ from the simulations','Depolarizing the leakage subspace'])
-
-            print(leakage_vec)
-            print(leakage_dephased_vec)'''
+            ## To study the effect of the coherence of leakage on repeated CZs (simpler than simulating a full RB experiment):
+            #repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0)
 
 
         qoi_plot = np.array(qoi_plot)
 
-        ## Plot to study the convergence properties of averaging over a Gaussian
+        ## Uncomment to study the convergence properties of averaging over a Gaussian
         # for i in range(len(qoi_plot[0])):
         #     czf.plot(x_plot_vec=[n_sampling_gaussian_vec],
         #                   y_plot_vec=[qoi_plot[:,i]],

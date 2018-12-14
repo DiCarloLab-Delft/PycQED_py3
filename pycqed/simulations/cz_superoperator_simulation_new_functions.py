@@ -1190,6 +1190,113 @@ def plot_spectrum(fluxlutman,noise_parameters_CZ):
                           xlabel='Amplitude (V)',ylabel='Frequency (GHz)')
 
 
+def conditional_frequency(amp,fluxlutman,noise_parameters_CZ):
+    # returns the energy difference (in Hz) between the actual 11 state and the bare 11 state
+    #              (whose energy is equal to the sum of the energies of the 01 and 10 states)
+    # amp=0 returns the residual coupling
+    H=calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
+    eigs=H.eigenenergies()
+    cond_frequency = eigs[4]-eigs[1]-eigs[2]+eigs[0]
+    cond_frequency = cond_frequency/(2*np.pi)
+    return cond_frequency
+
+
+def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q1,alpha_q0):
+    '''
+    Function used to study the effect of constant flux offsets on the quantities of interest.
+    The input should be a series of propagators computed for different flux offsets,
+    for a CZ gate that without offsets would be pretty good
+    '''
+
+    leakage_vec=[]
+    infid_vec=[]
+    phase_q0_vec=[]
+    phase_q1_vec=[]
+    fluxbias_q0_vec=[]
+    cond_phase_vec=[]
+
+    mid_index=int(len(U_final_vec)/2)    # mid_index corresponds to the quantities of interest without quasi-static flux noise
+    #print(mid_index)
+
+    for i in range(len(U_final_vec)):
+        if U_final_vec[i].type == 'oper':
+            U_final_vec[i] = qtp.to_super(U_final_vec[i])
+        qoi_temp = simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i],t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+        if i==mid_index:
+            print(qoi_temp)
+        leakage_vec.append(qoi_temp['L1'])
+        infid_vec.append(1-qoi_temp['avgatefid_compsubspace_pc'])
+        phase_q0_vec.append(qoi_temp['phase_q0'])
+        phase_q1_vec.append(qoi_temp['phase_q1'])
+        cond_phase_vec.append(qoi_temp['phi_cond'])
+
+        fluxbias_q0=input_to_parallelize[i]['fluxbias_q0']
+        fluxbias_q0_vec.append(fluxbias_q0)
+
+    leakage_vec=np.array(leakage_vec)    # absolute value for the leakage
+    cond_phase_vec=np.array(cond_phase_vec)-cond_phase_vec[mid_index]       # for phases, relative value to the case with no quasi-static noise
+    phase_q0_vec=np.array(phase_q0_vec)-phase_q0_vec[mid_index]
+    phase_q1_vec=np.array(phase_q1_vec)-phase_q1_vec[mid_index]
+    infid_vec=np.array(infid_vec)        # absolute value for the infidelity
+
+    plot(x_plot_vec=[np.array(fluxbias_q0_vec)*1e3],
+                  y_plot_vec=[cond_phase_vec,phase_q0_vec,phase_q1_vec],
+                  title='Sensitivity to quasi_static flux offsets',
+                  xlabel='Flux offset (m$\Phi_0$)',ylabel='Phase (deg)',
+                  legend_labels=['conditional phase err','phase QR err','phase QL err'])
+    plot(x_plot_vec=[np.array(fluxbias_q0_vec)*1e3],
+                  y_plot_vec=[np.array(leakage_vec)*100],
+                  title='Sensitivity to quasi_static flux offsets',
+                  xlabel='Flux offset (m$\Phi_0$)',ylabel='Leakage $L_1$ (%)',
+                  legend_labels=['leakage'])
+
+    return 1
+
+
+def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
+    '''
+    Function used to study how the leakage accumulation differs from the case in which we use directly the gate that comes out of the simulations
+    and the case in which we artificially dephase the leakage subspace wrt the computational subspace.
+    The input should be the propagator of a CZ gate that is pretty good.
+    '''
+
+    leakage_vec=[]
+    infid_vec=[]
+    leakage_dephased_vec=[]
+    infid_dephased_vec=[]
+
+    dimensions = U_superop_average.dims
+
+    U_temp = U_superop_average.full()
+    U_temp[22,40]=0             # matrix elements corresponding to the coherences between 11 and 02
+    U_temp[38,40]=0
+    U_temp[22,20]=0
+    U_temp[38,20]=0
+    U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
+
+    for n in range(1,200,2):        # we consider only odd n so that in theory it should be always a CZ
+        U_superop_n=U_superop_average**n
+        U_superop_dephased_n = U_superop_dephased**n
+        qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+        qoi_dephased=simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+        leakage_vec.append(qoi['L1'])
+        infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
+        leakage_dephased_vec.append(qoi_dephased['L1'])
+        infid_dephased_vec.append(1-qoi_dephased['avgatefid_compsubspace_pc'])
+
+    plot(x_plot_vec=[np.arange(1,200,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(leakage_vec)*100,np.array(leakage_dephased_vec)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Leakage (%)',
+                  legend_labels=['Using directly the $CZ$ from the simulations','Depolarizing the leakage subspace'])
+
+    print(leakage_vec)
+    print(leakage_dephased_vec)
+
+    return 1
+
+
 
 
 
