@@ -6,7 +6,7 @@ import time
 import logging
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
-#np.set_printoptions(threshold=np.inf)
+np.set_printoptions(threshold=np.inf)
 
 
 
@@ -63,6 +63,8 @@ hadamard_singleq = qtp.Qobj([[1,1,0],
 hadamard_q0 = qtp.tensor(qtp.qeye(3),hadamard_singleq)
 
 def qubit_to_2qutrit_unitary(U_2q,right_or_left):
+    # Transforms a unitary for a qubit into a unitary for a two-qutrit system.
+    # right_or_left ('right' or 'left') specifies whether U_2q acts on QR or QL
     U_temp = np.zeros([3,3],dtype=complex)
     U_temp[2,2]=1
     U_2q_matrix=U_2q.full()
@@ -117,19 +119,16 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
     J = float(J)
 
 
-
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
-        J * (-1)*(a.dag()*b+a*b.dag()) #(a.dag() - a) * (-b + b.dag())
-        #J * np.sqrt(2) * (qtp.tensor(qtp.basis(3,0),qtp.basis(3,2))*qtp.tensor(qtp.basis(3,1),qtp.basis(3,1)).dag()+\
-        #    qtp.tensor(qtp.basis(3,1),qtp.basis(3,1))*qtp.tensor(qtp.basis(3,0),qtp.basis(3,2)).dag())
+        J * (-1)*(a.dag()*b+a*b.dag()) #(a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
     H = H * (2*np.pi)
     return H
 
 
 def calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ):
     # all inputs should be given in terms of frequencies, i.e. without the 2*np.pi factor
-    # instead, the output includes already that factor
+    # instead, the output H includes already that factor
     w_q0=fluxlutman.calc_amp_to_freq(amp,'01')
     w_q1=fluxlutman.calc_amp_to_freq(amp,'10')
     alpha_q0=fluxlutman.calc_amp_to_freq(amp,'02')-2*w_q0
@@ -143,8 +142,6 @@ def calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ):
     delta_q0=(w_q0)-w_bus
     J_temp = J / ((delta_q1+delta_q0_intpoint)/(delta_q1*delta_q0_intpoint)) * ((delta_q1+delta_q0)/(delta_q1*delta_q0))
 
-    #print(w_q0,w_q1,alpha_q0,alpha_q1,J_temp)
-
     H=coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=J_temp)
     return H
 
@@ -153,10 +150,10 @@ def rotating_frame_transformation_propagator_new(U, t: float, H):
     """
     Transforms the frame of the unitary according to
         U' = U_{RF}*U
-        NOTE: remember that this is how the time evolution operator changes from one picture to another
+        NOTE: remember that this is how the time evolution operator changes from one picture to the other
 
     Args:
-        U (QObj): Unitary to be transformed
+        U (QObj): Unitary or superoperator to be transformed
         t (float): time at which to transform
         H (QObj): hamiltonian to be rotated away
 
@@ -188,7 +185,7 @@ def rotating_frame_transformation_operators(operator, t: float, H):
 
     U_RF = (1j*H*t).expm()
 
-    return U_RF * H * U_RF.dag()
+    return U_RF * operator * U_RF.dag()
 
 
 def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
@@ -214,7 +211,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
     else:
         logging.warning('Unsupported rescaling of Tphi_02.')
 
-    if Tphi01_q1 != 0:                                 # we automatically put also the decoherence for 12 and 02
+    if Tphi01_q1 != 0:                                 
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,-1,0],
                                     [0,0,0]])
@@ -235,7 +232,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
         collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
         c_ops.append(collapse*np.sqrt(rate_02_scaling/(2*Tphi02_q1)))
 
-    if Tphi01_q0_vec != []:                                 # we automatically put also the decoherence for 12 and 02
+    if Tphi01_q0_vec != []:                                 
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,-1,0],
                                     [0,0,0]])
@@ -306,7 +303,7 @@ def leakage_from_superoperator(U):
                 sump += p
         sump /= 4  # divide by dimension of comp subspace
         L1 = 1-sump
-        return L1
+        return np.real(L1)
     elif U.type=='super':
         """
         Calculates leakage by summing over all in and output states in the
@@ -355,7 +352,7 @@ def seepage_from_superoperator(U):
                 sump += p
         sump /= 5  # divide by number of non-computational states
         L1 = 1-sump
-        return L1
+        return np.real(L1)
     elif U.type=='super':
         sump = 0
         for i_list in [[0,2],[1,2],[2,0],[2,1],[2,2]]:
@@ -489,7 +486,8 @@ def pro_avfid_superoperator_compsubspace_phasecorrected(U,L1,phases):
                 ptrace += inner[i, i]
             psum += (np.abs(ptrace))**2
 
-        #calc_chi_matrix(qtp.to_super(U_target).dag()*U)
+        ## To plot the Pauli error rates of the twirled channel:
+        #calc_chi_matrix(qtp.to_super(U_target).dag()*U)            
 
         return np.real((dim*(1-L1) + psum) / (dim*(dim + 1)))
 
@@ -785,30 +783,25 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
         c_ops (list of Qobj): time (in)dependent jump operators
         amp(array): amplitude in voltage describes the y-component of the trajectory to simulate. Should be equisampled in time
         fluxlutman,noise_parameters_CZ: instruments containing various parameters
-        fluxbias_q0(float): random fluxbias on the spectator qubit 
+        fluxbias_q1(float): random fluxbias on the spectator qubit 
 
     Returns
         U_final(Qobj): propagator
 
     """
 
-    H_0=calc_hamiltonian(0,fluxlutman,noise_parameters_CZ)   # computed at 0 amplitude
-    # NOTE: parameters of H_0 could be not exactly e.g. the bare frequencies
+
 
     # We change the basis from the standard basis to the basis of eigenvectors of H_0
     # The columns of S are the eigenvectors of H_0, appropriately ordered
+    H_0 = calc_hamiltonian(0,fluxlutman,noise_parameters_CZ)
     if noise_parameters_CZ.dressed_compsub():
         S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
     else:
         S = qtp.tensor(qtp.qeye(3),qtp.qeye(3))       # line here to quickly switch off the use of S
-    H_0_diag = S.dag()*H_0*S
-
-    #w_q0 = fluxlutman.q_freq_01()
-    w_q0 = (H_0_diag[1,1]-H_0_diag[0,0]) / (2*np.pi)
-    #w_q1 = fluxlutman.q_freq_10()
-    w_q1 = (H_0_diag[3,3]-H_0_diag[0,0]) / (2*np.pi)
 
 
+    w_q1 = fluxlutman.q_freq_10()    # we 'save' the input value of w_q1
     w_q1_sweetspot = noise_parameters_CZ.w_q1_sweetspot()
     if w_q1 > w_q1_sweetspot:
         print('operating frequency of q1 should be lower than its sweet spot frequency.')
@@ -817,17 +810,18 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
     w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(
         f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
 
-    correction_to_H = coupled_transmons_hamiltonian_new(
-        w_q0=0, w_q1=np.real(w_q1_biased-w_q1), alpha_q0=0, alpha_q1=0, J=0)
+    fluxlutman.q_freq_10(w_q1_biased)     # we insert the change to w_q1 in this way because then J1 is also tuned appropriately
 
 
     #t0 = time.time()
 
     exp_L_total=1
     for i in range(len(amp)):
-        H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ) + correction_to_H
+        H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ)
         H=S.dag()*H*S
-        S_H = qtp.tensor(qtp.qeye(3),qtp.qeye(3))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])
+        S_H = qtp.tensor(qtp.qeye(3),qtp.qeye(3))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])   
+                                                   # Alternative for collapse operators that follow the basis of H
+                                                   # We do not believe that this would be the correct model.
         if c_ops != []:
             c_ops_temp=[]
             for c in range(len(c_ops)):
@@ -842,6 +836,8 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
 
     #t1 = time.time()
     #print('\n alternative propagator',t1-t0)
+
+    fluxlutman.q_freq_10(w_q1)
 
     U_final = exp_L_total    
     return U_final
@@ -948,22 +944,18 @@ def concatenate_CZpulse_and_Zrotations(Z_rotations_length,sim_step,tlist):
 
 def dressed_frequencies(fluxlutman, noise_parameters_CZ):
     H_0=calc_hamiltonian(0,fluxlutman,noise_parameters_CZ)   # computed at 0 amplitude
-    # NOTE: parameters of H_0 could be not exactly e.g. the bare frequencies
 
     # We change the basis from the standard basis to the basis of eigenvectors of H_0
     # The columns of S are the eigenvectors of H_0, appropriately ordered
     if noise_parameters_CZ.dressed_compsub():
         S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
     else:
-        S = qtp.tensor(qtp.qeye(3),qtp.qeye(3))       # line here to quickly switch off the use of S
+        S = qtp.tensor(qtp.qeye(3),qtp.qeye(3))       
     H_0_diag = S.dag()*H_0*S
 
-    #w_q0 = fluxlutman.q_freq_01()
     w_q0 = (H_0_diag[1,1]-H_0_diag[0,0]) / (2*np.pi)
-    #w_q1 = fluxlutman.q_freq_10()
     w_q1 = (H_0_diag[3,3]-H_0_diag[0,0]) / (2*np.pi)
 
-    #alpha_q0 = fluxlutman.calc_amp_to_freq(0,'02')-2*w_q0 
     alpha_q0 = (H_0_diag[2,2]-H_0_diag[0,0]) / (2*np.pi) - 2*w_q0
 
     return np.real(w_q0), np.real(w_q1), np.real(alpha_q0)
@@ -978,7 +970,7 @@ def shift_due_to_fluxbias_q0_singlefrequency(f_pulse,omega_0,fluxbias,positive_b
 
     # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
     f_pulse_final = f_pulse - np.pi/2 * (omega_0**2/f_pulse) * np.sqrt(1 - (f_pulse**4/omega_0**4)) * sign * fluxbias - \
-                          - np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * fluxbias**2
+                          +np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * fluxbias**2
                           # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
 
     return f_pulse_final
@@ -1250,7 +1242,6 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q
                   xlabel='Flux offset (m$\Phi_0$)',ylabel='Leakage $L_1$ (%)',
                   legend_labels=['leakage'])
 
-    return 1
 
 
 def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
@@ -1294,7 +1285,6 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     print(leakage_vec)
     print(leakage_dephased_vec)
 
-    return 1
 
 
 
@@ -1303,6 +1293,7 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
 ## functions for Ramsey/Rabi simulations
 
 def calc_populations(U):
+    # calculate populations for Ram/Echo-Z experiment
 
     if U.type == 'oper':
         U_pi2_pulsed = hadamard_q0 * U * hadamard_q0
@@ -1315,6 +1306,7 @@ def calc_populations(U):
 
 
 def calc_populations_new(rho_out,population_states):
+    # calculate populations for given states. Used to study dephasing in 11-02 subspace and to simulate Chevrons.
 
     populations = {'population_higher_state': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[0]))).data[0,0]),
                    'population_lower_state': np.abs((rho_out.dag()*qtp.operator_to_vector(qtp.ket2dm(population_states[1]))).data[0,0])}
@@ -1331,7 +1323,7 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
         eigs,eigvectors = H.eigenstates()
         psi_in = eigvectors[4]
 
-        population_states = [eigvectors[5],eigvectors[4]]
+        population_states = [eigvectors[5],eigvectors[4]]     # [higher state = 02, lower state = 11]
 
         rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
         rho_out = U * rho_in
@@ -1343,7 +1335,7 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
         eigs,eigvectors = H.eigenstates()
         psi_in = eigvectors[4]
 
-        population_states = [eigvectors[5],eigvectors[4]]
+        population_states = [eigvectors[5],eigvectors[4]]     # [higher state = 02, lower state = 11]
 
         rho_in = qtp.operator_to_vector(qtp.ket2dm(psi_in))
         rho_out = U * rho_in
@@ -1380,12 +1372,12 @@ def calc_chi_matrix(U):
                 for y in [0,1]:
                     indexlist.append(3*x+y+27*x_prime+9*y_prime)
 
-    for i in range(Pauli_gr_size):
+    for i in range(Pauli_gr_size):              # projecting over the two qubit subspace
         for j in range(Pauli_gr_size):
             U_2qubits[i,j]=U[indexlist[i],indexlist[j]]
     
     U_2qubits=qtp.Qobj(U_2qubits,type='super',dims=[[[2, 2], [2, 2]], [[2, 2], [2, 2]]])
-    chi_matrix = qtp.to_chi(U_2qubits)/Pauli_gr_size
+    chi_matrix = qtp.to_chi(U_2qubits)/Pauli_gr_size    # normalize so that the trace is 1
     #print(chi_matrix)
 
     paulis_label=['II','IX','IY','IZ','XI','XX','XY','XZ','YI','YX','YY','YZ','ZI','ZX','ZY','ZZ']
@@ -1394,7 +1386,7 @@ def calc_chi_matrix(U):
     #qtp.hinton(chi_matrix,xlabels=paulis_label,ylabels=paulis_label,title='Chi matrix')
 
     diag = chi_matrix.diag()
-    leak=1-sum(diag)
+    leak=1-sum(diag)           # we quantify leakage as the missing trace of the chi matrix (different notion from Wood&Gambetta)
 
     diag=np.concatenate((diag,np.array([leak])))
     diag[0]=1-diag[0]
@@ -1411,6 +1403,7 @@ def calc_chi_matrix(U):
 
 
 def calc_diag_pauli_transfer_matrix(U,U_target):
+    # not useful function because it is not immediate to infer the pauli error rates from it. Use calc_chi_matrix
 
     identity=qtp.Qobj([[1,0,0],
                        [0,1,0],

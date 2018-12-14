@@ -132,8 +132,8 @@ def compute_propagator(arglist):
                                                        # but we can use a different step for simulating the time evolution
     tlist = np.arange(0, fluxlutman.cz_length(), sim_step)
     
-    #residual_coupling=conditional_frequency(0,fluxlutman,noise_parameters_CZ)      # To check residual coupling at the operating point.
-    #print(residual_coupling)                                                       # Change amp to get the residual coupling at different points
+    # residual_coupling=czf.conditional_frequency(0,fluxlutman,noise_parameters_CZ)      # To check residual coupling at the operating point.
+    # print(residual_coupling)                                                       # Change amp to get the residual coupling at different points
 
 
     
