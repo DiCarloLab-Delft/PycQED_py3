@@ -172,6 +172,10 @@ def compute_propagator(arglist):
     amp=amp_interp(tlist_new)
 
 
+    if fluxlutman.czd_double_sided() and noise_parameters_CZ.waiting_at_sweetspot()!=0:
+        tlist_new, amp = czf.add_waiting_at_sweetspot(tlist_new,amp, noise_parameters_CZ.waiting_at_sweetspot())
+
+
 
     # Apply voltage scaling
     amp = amp * noise_parameters_CZ.voltage_scaling_factor() 

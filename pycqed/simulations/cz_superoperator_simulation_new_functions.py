@@ -1121,7 +1121,8 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ):
                                 'cluster': noise_parameters_CZ.cluster(),
                                 'detuning': noise_parameters_CZ.detuning(),
                                 'initial_state': noise_parameters_CZ.initial_state(),
-                                'total_idle_time': noise_parameters_CZ.total_idle_time()}
+                                'total_idle_time': noise_parameters_CZ.total_idle_time(),
+                                'waiting_at_sweetspot': noise_parameters_CZ.waiting_at_sweetspot()}
 
     return fluxlutman_args, noise_parameters_CZ_args
 
@@ -1161,6 +1162,7 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     noise_parameters_CZ.detuning(noise_parameters_CZ_args['detuning'])
     noise_parameters_CZ.initial_state(noise_parameters_CZ_args['initial_state'])
     noise_parameters_CZ.total_idle_time(noise_parameters_CZ_args['total_idle_time'])
+    noise_parameters_CZ.waiting_at_sweetspot(noise_parameters_CZ_args['waiting_at_sweetspot'])
 
     return fluxlutman, noise_parameters_CZ
 
@@ -1286,6 +1288,22 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     print(leakage_dephased_vec)
 
 
+def add_waiting_at_sweetspot(tlist,amp,waiting_at_sweetspot):
+
+    half_length = int(np.size(amp)/2)
+    amp_A = amp[0:half_length]                # positive and negative parts
+    amp_B = amp[half_length:]
+    tlist_A = tlist[0:half_length]                # positive and negative parts
+    tlist_B = tlist[half_length:]
+
+    sim_step = tlist[1]-tlist[0]
+
+    tlist_update = concatenate_CZpulse_and_Zrotations(waiting_at_sweetspot,sim_step,tlist_A)
+    tlist_update = concatenate_CZpulse_and_Zrotations(tlist_update[-1]+sim_step/2,sim_step,tlist_update)
+    amp_mid = np.zeros(np.size(tlist_update)-np.size(tlist))
+    amp = np.concatenate([amp_A,amp_mid,amp_B])
+
+    return tlist_update, amp
 
 
 

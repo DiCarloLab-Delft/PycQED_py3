@@ -94,6 +94,11 @@ class NoiseParametersCZ(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
 
+        self.add_parameter('waiting_at_sweetspot', unit='s',
+                           label='time spent at sweetspot during the two halves of a netzero pulse',
+                           parameter_class=ManualParameter, initial_value=0,
+                           vals=vals.Numbers())
+
 
         # for ramsey/Rabi simulations
 
