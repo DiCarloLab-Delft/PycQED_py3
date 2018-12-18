@@ -257,7 +257,7 @@ class ziShellEnvironment:
             for device in self.devices:
                 self.daq.vectorWrite('/' + device + '/' + path, value)
 
-    def geti(self, paths, deep=True):
+    def geti(self, paths, deep=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -303,7 +303,7 @@ class ziShellEnvironment:
         else:
             return values
 
-    def getd(self, paths, deep=True):
+    def getd(self, paths, deep=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -318,7 +318,16 @@ class ziShellEnvironment:
             if p[0] == '/':
                 if deep:
                     env.daq.getAsEvent(p)
-                    tmp = env.daq.poll(0.2, 500, 4, True)
+                    tries = 0
+                    while tries < 10:
+                        tmp = env.daq.poll(1.0, 500, 4, True)
+                        if tmp:
+                            break
+                        else:
+                            tries += 1
+                            if tries >= 10:
+                                raise TimeoutError('Timeout while trying to read from {}'.format(p))
+
                     if p in tmp:
                         values.append(tmp[p]['value'][0])
                 else:
@@ -549,12 +558,12 @@ def setv(path, value):
     env.setv(path, value)
 
 
-def getd(paths, deep=True):
+def getd(paths, deep=False):
     global env
     return env.getd(paths, deep)
 
 
-def geti(paths, deep=True):
+def geti(paths, deep=False):
     global env
     return env.geti(paths, deep)
 
@@ -890,7 +899,7 @@ class ziShellDevice:
         else:
             self.daq.vectorWrite('/' + self.device + '/' + path, value)
 
-    def geti(self, path, deep=True):
+    def geti(self, path, deep=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -911,7 +920,7 @@ class ziShellDevice:
         else:
             return self.daq.getInt(path)
 
-    def getd(self, path, deep=True):
+    def getd(self, path, deep=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -922,7 +931,16 @@ class ziShellDevice:
 
         if deep:
             self.daq.getAsEvent(path)
-            tmp = self.daq.poll(0.1, 500, 4, True)
+            tries = 0
+            while tries < 10:
+                tmp = self.daq.poll(0.1, 500, 4, True)
+                if tmp:
+                    break
+                else:
+                    tries += 1
+                    if tries >= 10:
+                        raise TimeoutError('Timeout while trying to read from {}'.format(path))
+
             if path in tmp:
                 return tmp[path]['value'][0]
             else:
@@ -1029,7 +1047,6 @@ class ziShellDevice:
         N.B. the uploaded program will not work unless the
         "configure_codeword_protocol" method is called on the HDAWG
         """
-        print('YES')
         t0 = time.time()
         success_and_ready = False
         # This check (and while loop) is added as a workaround for #9

@@ -135,7 +135,7 @@
     "awgs/0/triggers/0/hysteresis/absolute",
     "float",
     0,
-    999999995904.0
+    4.934802532196045
   ],
   [
     "awgs/0/triggers/0/hysteresis/mode",
@@ -145,9 +145,9 @@
   ],
   [
     "awgs/0/triggers/0/hysteresis/relative",
-    "float",
+    "int",
     0,
-    999999995904.0
+    3.1415927410125732
   ],
   [
     "awgs/0/triggers/0/level",
@@ -201,7 +201,7 @@
     "awgs/0/triggers/1/hysteresis/absolute",
     "float",
     0,
-    999999995904.0
+    1570796339200.0
   ],
   [
     "awgs/0/triggers/1/hysteresis/mode",
@@ -415,9 +415,9 @@
   ],
   [
     "sigouts/0/amplitudes/3",
-    "float",
-    -0.75,
-    0.75
+    "int_8bit",
+    0,
+    255
   ],
   [
     "sigouts/0/autorange",
@@ -427,9 +427,9 @@
   ],
   [
     "sigouts/0/enables/3",
-    "bool",
+    "int_8bit",
     0,
-    1.0
+    255
   ],
   [
     "sigouts/0/imp50",
@@ -459,7 +459,7 @@
     "sigouts/1/amplitudes/7",
     "float",
     -0.75,
-    0.75
+    1.5
   ],
   [
     "sigouts/1/autorange",
@@ -642,12 +642,6 @@
     2.0
   ],
   [
-    "quex/iavg/acqcnt",
-    "int_8bit",
-    0,
-    255
-  ],
-  [
     "quex/iavg/avgcnt",
     "int",
     0,
@@ -672,19 +666,13 @@
     255
   ],
   [
-    "quex/rl/acqcnt",
-    "int_8bit",
-    0,
-    255
-  ],
-  [
     "quex/rl/avgcnt",
     "int",
     0,
     17.0
   ],
   [
-    "quex/rl/expcnt",
+    "quex/rl/errcnt",
     "int_8bit",
     0,
     255
@@ -697,9 +685,9 @@
   ],
   [
     "quex/rl/readout",
-    "int",
+    "bool",
     0,
-    1023.0
+    1.0
   ],
   [
     "quex/rl/source",
@@ -831,7 +819,7 @@
     "quex/sl/length",
     "int",
     0,
-    16777215.0
+    16777216.0
   ],
   [
     "quex/sl/readout",
@@ -842,68 +830,68 @@
   [
     "quex/thres/0/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/thres/1/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/thres/2/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/thres/3/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/thres/4/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/thres/5/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/thres/6/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/thres/7/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/thres/8/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/thres/9/level",
     "float",
-    -128.0,
-    128.0
+    -8192.0,
+    8192.0
   ],
   [
     "quex/trans/0/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/0/real",
@@ -913,9 +901,9 @@
   ],
   [
     "quex/trans/0/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/1/real",
@@ -925,9 +913,9 @@
   ],
   [
     "quex/trans/0/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/2/real",
@@ -937,9 +925,9 @@
   ],
   [
     "quex/trans/0/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/3/real",
@@ -949,9 +937,9 @@
   ],
   [
     "quex/trans/0/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/4/real",
@@ -961,9 +949,9 @@
   ],
   [
     "quex/trans/0/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/5/real",
@@ -973,9 +961,9 @@
   ],
   [
     "quex/trans/0/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/6/real",
@@ -985,9 +973,9 @@
   ],
   [
     "quex/trans/0/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/7/real",
@@ -997,9 +985,9 @@
   ],
   [
     "quex/trans/0/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/8/real",
@@ -1009,9 +997,9 @@
   ],
   [
     "quex/trans/0/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/0/col/9/real",
@@ -1021,9 +1009,9 @@
   ],
   [
     "quex/trans/1/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/0/real",
@@ -1033,9 +1021,9 @@
   ],
   [
     "quex/trans/1/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/1/real",
@@ -1045,9 +1033,9 @@
   ],
   [
     "quex/trans/1/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/2/real",
@@ -1057,9 +1045,9 @@
   ],
   [
     "quex/trans/1/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/3/real",
@@ -1069,9 +1057,9 @@
   ],
   [
     "quex/trans/1/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/4/real",
@@ -1081,9 +1069,9 @@
   ],
   [
     "quex/trans/1/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/5/real",
@@ -1093,9 +1081,9 @@
   ],
   [
     "quex/trans/1/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/6/real",
@@ -1105,9 +1093,9 @@
   ],
   [
     "quex/trans/1/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/7/real",
@@ -1117,9 +1105,9 @@
   ],
   [
     "quex/trans/1/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/8/real",
@@ -1129,9 +1117,9 @@
   ],
   [
     "quex/trans/1/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/1/col/9/real",
@@ -1141,9 +1129,9 @@
   ],
   [
     "quex/trans/2/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/0/real",
@@ -1153,9 +1141,9 @@
   ],
   [
     "quex/trans/2/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/1/real",
@@ -1165,9 +1153,9 @@
   ],
   [
     "quex/trans/2/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/2/real",
@@ -1177,9 +1165,9 @@
   ],
   [
     "quex/trans/2/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/3/real",
@@ -1189,9 +1177,9 @@
   ],
   [
     "quex/trans/2/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/4/real",
@@ -1201,9 +1189,9 @@
   ],
   [
     "quex/trans/2/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/5/real",
@@ -1213,9 +1201,9 @@
   ],
   [
     "quex/trans/2/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/6/real",
@@ -1225,9 +1213,9 @@
   ],
   [
     "quex/trans/2/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/7/real",
@@ -1237,9 +1225,9 @@
   ],
   [
     "quex/trans/2/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/8/real",
@@ -1249,9 +1237,9 @@
   ],
   [
     "quex/trans/2/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/2/col/9/real",
@@ -1261,9 +1249,9 @@
   ],
   [
     "quex/trans/3/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/0/real",
@@ -1273,9 +1261,9 @@
   ],
   [
     "quex/trans/3/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/1/real",
@@ -1285,9 +1273,9 @@
   ],
   [
     "quex/trans/3/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/2/real",
@@ -1297,9 +1285,9 @@
   ],
   [
     "quex/trans/3/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/3/real",
@@ -1309,9 +1297,9 @@
   ],
   [
     "quex/trans/3/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/4/real",
@@ -1321,9 +1309,9 @@
   ],
   [
     "quex/trans/3/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/5/real",
@@ -1333,9 +1321,9 @@
   ],
   [
     "quex/trans/3/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/6/real",
@@ -1345,9 +1333,9 @@
   ],
   [
     "quex/trans/3/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/7/real",
@@ -1357,9 +1345,9 @@
   ],
   [
     "quex/trans/3/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/8/real",
@@ -1369,9 +1357,9 @@
   ],
   [
     "quex/trans/3/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/3/col/9/real",
@@ -1381,9 +1369,9 @@
   ],
   [
     "quex/trans/4/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/0/real",
@@ -1393,9 +1381,9 @@
   ],
   [
     "quex/trans/4/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/1/real",
@@ -1405,9 +1393,9 @@
   ],
   [
     "quex/trans/4/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/2/real",
@@ -1417,9 +1405,9 @@
   ],
   [
     "quex/trans/4/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/3/real",
@@ -1429,9 +1417,9 @@
   ],
   [
     "quex/trans/4/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/4/real",
@@ -1441,9 +1429,9 @@
   ],
   [
     "quex/trans/4/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/5/real",
@@ -1453,9 +1441,9 @@
   ],
   [
     "quex/trans/4/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/6/real",
@@ -1465,9 +1453,9 @@
   ],
   [
     "quex/trans/4/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/7/real",
@@ -1477,9 +1465,9 @@
   ],
   [
     "quex/trans/4/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/8/real",
@@ -1489,9 +1477,9 @@
   ],
   [
     "quex/trans/4/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/4/col/9/real",
@@ -1501,9 +1489,9 @@
   ],
   [
     "quex/trans/5/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/0/real",
@@ -1513,9 +1501,9 @@
   ],
   [
     "quex/trans/5/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/1/real",
@@ -1525,9 +1513,9 @@
   ],
   [
     "quex/trans/5/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/2/real",
@@ -1537,9 +1525,9 @@
   ],
   [
     "quex/trans/5/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/3/real",
@@ -1549,9 +1537,9 @@
   ],
   [
     "quex/trans/5/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/4/real",
@@ -1561,9 +1549,9 @@
   ],
   [
     "quex/trans/5/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/5/real",
@@ -1573,9 +1561,9 @@
   ],
   [
     "quex/trans/5/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/6/real",
@@ -1585,9 +1573,9 @@
   ],
   [
     "quex/trans/5/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/7/real",
@@ -1597,9 +1585,9 @@
   ],
   [
     "quex/trans/5/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/8/real",
@@ -1609,9 +1597,9 @@
   ],
   [
     "quex/trans/5/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/5/col/9/real",
@@ -1621,9 +1609,9 @@
   ],
   [
     "quex/trans/6/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/0/real",
@@ -1633,9 +1621,9 @@
   ],
   [
     "quex/trans/6/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/1/real",
@@ -1645,9 +1633,9 @@
   ],
   [
     "quex/trans/6/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/2/real",
@@ -1657,9 +1645,9 @@
   ],
   [
     "quex/trans/6/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/3/real",
@@ -1669,9 +1657,9 @@
   ],
   [
     "quex/trans/6/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/4/real",
@@ -1681,9 +1669,9 @@
   ],
   [
     "quex/trans/6/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/5/real",
@@ -1693,9 +1681,9 @@
   ],
   [
     "quex/trans/6/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/6/real",
@@ -1705,9 +1693,9 @@
   ],
   [
     "quex/trans/6/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/7/real",
@@ -1717,9 +1705,9 @@
   ],
   [
     "quex/trans/6/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/8/real",
@@ -1729,9 +1717,9 @@
   ],
   [
     "quex/trans/6/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/6/col/9/real",
@@ -1741,9 +1729,9 @@
   ],
   [
     "quex/trans/7/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/0/real",
@@ -1753,9 +1741,9 @@
   ],
   [
     "quex/trans/7/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/1/real",
@@ -1765,9 +1753,9 @@
   ],
   [
     "quex/trans/7/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/2/real",
@@ -1777,9 +1765,9 @@
   ],
   [
     "quex/trans/7/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/3/real",
@@ -1789,9 +1777,9 @@
   ],
   [
     "quex/trans/7/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/4/real",
@@ -1801,9 +1789,9 @@
   ],
   [
     "quex/trans/7/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/5/real",
@@ -1813,9 +1801,9 @@
   ],
   [
     "quex/trans/7/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/6/real",
@@ -1825,9 +1813,9 @@
   ],
   [
     "quex/trans/7/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/7/real",
@@ -1837,9 +1825,9 @@
   ],
   [
     "quex/trans/7/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/8/real",
@@ -1849,9 +1837,9 @@
   ],
   [
     "quex/trans/7/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/7/col/9/real",
@@ -1861,9 +1849,9 @@
   ],
   [
     "quex/trans/8/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/0/real",
@@ -1873,9 +1861,9 @@
   ],
   [
     "quex/trans/8/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/1/real",
@@ -1885,9 +1873,9 @@
   ],
   [
     "quex/trans/8/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/2/real",
@@ -1897,9 +1885,9 @@
   ],
   [
     "quex/trans/8/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/3/real",
@@ -1909,9 +1897,9 @@
   ],
   [
     "quex/trans/8/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/4/real",
@@ -1921,9 +1909,9 @@
   ],
   [
     "quex/trans/8/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/5/real",
@@ -1933,9 +1921,9 @@
   ],
   [
     "quex/trans/8/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/6/real",
@@ -1945,9 +1933,9 @@
   ],
   [
     "quex/trans/8/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/7/real",
@@ -1957,9 +1945,9 @@
   ],
   [
     "quex/trans/8/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/8/real",
@@ -1969,9 +1957,9 @@
   ],
   [
     "quex/trans/8/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/8/col/9/real",
@@ -1981,9 +1969,9 @@
   ],
   [
     "quex/trans/9/col/0/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/0/real",
@@ -1993,9 +1981,9 @@
   ],
   [
     "quex/trans/9/col/1/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/1/real",
@@ -2005,9 +1993,9 @@
   ],
   [
     "quex/trans/9/col/2/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/2/real",
@@ -2017,9 +2005,9 @@
   ],
   [
     "quex/trans/9/col/3/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/3/real",
@@ -2029,9 +2017,9 @@
   ],
   [
     "quex/trans/9/col/4/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/4/real",
@@ -2041,9 +2029,9 @@
   ],
   [
     "quex/trans/9/col/5/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/5/real",
@@ -2053,9 +2041,9 @@
   ],
   [
     "quex/trans/9/col/6/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/6/real",
@@ -2065,9 +2053,9 @@
   ],
   [
     "quex/trans/9/col/7/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/7/real",
@@ -2077,9 +2065,9 @@
   ],
   [
     "quex/trans/9/col/8/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/8/real",
@@ -2089,9 +2077,9 @@
   ],
   [
     "quex/trans/9/col/9/imag",
-    "float",
-    -2.0,
-    2.0
+    "int_8bit",
+    0,
+    255
   ],
   [
     "quex/trans/9/col/9/real",
@@ -2109,7 +2097,7 @@
     "quex/wint/length",
     "int",
     0,
-    16777216.0
+    4096.0
   ],
   [
     "quex/wint/mode",

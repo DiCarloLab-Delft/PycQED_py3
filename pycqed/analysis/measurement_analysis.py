@@ -514,7 +514,7 @@ class MeasurementAnalysis(object):
                                                 save=False,
                                                 **plot_args)
                 # fig.suptitle(self.plot_title)
-            fig.subplots_adjust(hspace=0.5)
+            fig.subplots_adjust(hspace=1.5)
             if show:
                 plt.show()
 
@@ -583,7 +583,7 @@ class MeasurementAnalysis(object):
                                     length=self.tick_length,
                                     width=self.tick_width)
 
-            fig.subplots_adjust(hspace=0.5)
+            fig.subplots_adjust(hspace=1.5)
 
             # Make space for title
             # fig.tight_layout(h_pad=1.5)

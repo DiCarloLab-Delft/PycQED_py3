@@ -785,6 +785,11 @@ class AWG5014Pulsar:
             self.add_parameter('{}_compensation_pulse_scale'.format(name),
                                parameter_class=ManualParameter,
                                vals=vals.Numbers(0., 1.), initial_value=0.5)
+            self.add_parameter('{}_compensation_pulse_delay'.format(name),
+                               parameter_class=ManualParameter,
+                               vals=vals.Numbers(min_value=0.),
+                               initial_value=500e-9)
+
         else:  # marker
             self.add_parameter('{}_type'.format(name),
                                get_cmd=lambda: 'marker')

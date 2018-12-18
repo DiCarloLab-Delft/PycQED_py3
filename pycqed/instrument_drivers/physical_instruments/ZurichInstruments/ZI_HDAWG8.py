@@ -51,7 +51,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._dev = zs.ziShellDevice()
         self._dev.connect_server(server, port)
         print("Trying to connect to device {}".format(self._devname))
-        self._dev.connect_device(self._devname, '1GbE')
+        self._dev.connect_device(self._devname, 'USB')
 
         dir_path = os.path.dirname(os.path.abspath(__file__))
         base_fn = os.path.join(dir_path, 'zi_parameter_files')

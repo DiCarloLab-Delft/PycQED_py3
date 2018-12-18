@@ -2266,9 +2266,9 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     pulse_list.append(RO_pulse)
 
     if not first_data_point:
-        reduced_pulse_list = [buffer_pulse,CZ_pulse]
+        reduced_pulse_list = [buffer_pulse, CZ_pulse]
         upload_channels,upload_AWGs = get_required_upload_information\
-                                            (reduced_pulse_list,station)
+                                            (reduced_pulse_list, station)
         if X90_target['I_channel'].split('_')[0] in upload_AWGs:
             upload_channels.append(X90_target['I_channel'])
             upload_channels.append(X90_target['Q_channel'])
@@ -2322,13 +2322,13 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
 def CZ_bleed_through_phase_seq(phases, qb_name, CZ_pulse_name, CZ_separation,
                                operation_dict, maximum_CZ_separation=None,
                                verbose=False, upload=True, return_seq=False,
-                               upload_channels='all', cal_points=True):
+                               upload_all=True, cal_points=True):
     '''
     Performs a Ramsey with interleaved Flux pulse
 
     Timings of sequence
-                         CZ_separation             sweep end time
-            |fluxpulse| <-------------> |fluxpulse|<-------->
+                         CZ_separation
+            |fluxpulse| <------------------------> |fluxpulse|
         |X90|  --------------------------------------------- |X90|  ---  |RO|
 
     Args:
@@ -2356,17 +2356,33 @@ def CZ_bleed_through_phase_seq(phases, qb_name, CZ_pulse_name, CZ_separation,
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    CZ_pulse = deepcopy(operation_dict[CZ_pulse_name])
-    CZ_pulse['pulse_delay'] = CZ_separation
+    CZ_pulse1 = deepcopy(operation_dict[CZ_pulse_name])
+    CZ_pulse2 = deepcopy(operation_dict[CZ_pulse_name])
+    CZ_pulse2['pulse_delay'] = CZ_separation
+    for CZ_pulse in [CZ_pulse1, CZ_pulse2]:
+        extra_buffer_aux_pulse = deepcopy(CZ_pulse['extra_buffer_aux_pulse'])
+        delta_sep = CZ_pulse['buffer_length_start'] + \
+                    CZ_pulse['buffer_length_end'] - np.abs(CZ_separation)
+        if delta_sep < 2*extra_buffer_aux_pulse:
+            CZ_pulse['extra_buffer_aux_pulse'] = delta_sep/2
 
     X90_2 = deepcopy(operation_dict['X90 ' + qb_name])
     X90_2['pulse_delay'] = maximum_CZ_separation - CZ_separation
     RO_pars = deepcopy(operation_dict['RO ' + qb_name])
 
+    if upload_all:
+        upload_AWGs = 'all'
+        upload_channels = 'all'
+    else:
+        upload_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG')] + \
+                      [station.pulsar.get(ch + '_AWG') for ch in
+                       CZ_pulse['aux_channels_dict']]
+        upload_channels = [CZ_pulse['channel']] + \
+                          list(CZ_pulse['aux_channels_dict'])
 
     for i, theta in enumerate(phases):
         if theta == phases[-4]:
-            CZ_pulse['amplitude'] = 0
+            CZ_pulse2['amplitude'] = 0
 
         if cal_points and (theta == phases[-4] or theta == phases[-3]):
             el = multi_pulse_elt(i, station,
@@ -2381,15 +2397,17 @@ def CZ_bleed_through_phase_seq(phases, qb_name, CZ_pulse_name, CZ_separation,
 
             el = multi_pulse_elt(i, station,
                                  [operation_dict['X90 ' + qb_name],
-                                  operation_dict[CZ_pulse_name],
-                                  CZ_pulse,
+                                  CZ_pulse1,
+                                  CZ_pulse2,
                                   X90_2,
                                   RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose,
-                                    channels=upload_channels)
+        station.pulsar.program_awgs(seq, *el_list,
+                                    AWGs=upload_AWGs,
+                                    channels=upload_channels,
+                                    verbose=verbose)
     if return_seq:
         return seq, el_list
     else:

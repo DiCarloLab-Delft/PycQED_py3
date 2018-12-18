@@ -754,13 +754,14 @@ class ResonatorSpectroscopy(Spectroscopy):
                             ax.plot([f_RO],
                                     [0],
                                     'w--', label=textstr)
-                        box_props = dict(boxstyle='Square',
-                                         facecolor='white', alpha=0.8)
-                        self.box_props = {key: val for key,
-                                                       val in box_props.items()}
-                        self.box_props.update({'linewidth': 0})
-                        self.box_props['alpha'] = 0.
-
+                        # box_props = dict(boxstyle='Square',
+                        #                  facecolor='white', alpha=0.8)
+                        # self.box_props = {key: val for key,
+                        #                                val in box_props.items()}
+                        # self.box_props.update({'linewidth': 0})
+                        # self.box_props['alpha'] = 0.
+                        #
+                        ax.legend(loc='upper left', bbox_to_anchor=[1, 1])
 
                 else:
                     reso_freqs = [fit_results[tt].params['f0'].value *

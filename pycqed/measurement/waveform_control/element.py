@@ -347,6 +347,8 @@ class Element:
             if self.pulsar.get('{}_type'.format(c)) == 'analog':
                 if self.pulsar.get('{}_charge_buildup_compensation'.format(c)):
                     tau = self.pulsar.get('{}_discharge_timescale'.format(c))
+                    comp_delay = self.pulsar.get('{}_compensation_pulse_delay'
+                                                 .format(c))
                     amp = self.pulsar.get('{}_amp'.format(c))
                     amp *= self.pulsar.get('{}_compensation_pulse_scale'
                                            .format(c))
@@ -364,10 +366,10 @@ class Element:
                         if integral > 0:
                             amp = -amp
                         tcomp = tau*np.log(1 - integral/(amp*tau))
-                    textra = np.arange(tend, tend + 3*tcomp, dt)
+                    textra = np.arange(tend, tend + tcomp + 2*comp_delay, dt)
                     t = np.append(t, textra)
-                    wf = np.append(wf, amp*((textra < tend + 2*tcomp) *
-                                            (textra >= tend + tcomp)))
+                    wf = np.append(wf, amp*((textra < tend + tcomp + comp_delay)
+                                            * (textra >= tend + comp_delay)))
                     tvals[c] = t
                     wfs[c] = wf
 

@@ -21,6 +21,7 @@ import pycqed.analysis.measurement_analysis as ma
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
 import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis.tomography as tomo
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as uhfqc
 from pycqed.measurement.optimization import nelder_mead, \
                                             generate_new_training_set
 from pygsti import construction as constr
@@ -390,6 +391,7 @@ def multiplexed_pulse(readouts, f_LO, upload=True):
             #qb.RO_pulse_type('Multiplexed_pulse_UHFQC')
             qb.f_RO_mod(qb.f_RO() - f_LO)
             samples = int(qb.RO_pulse_length() * fs)
+
             pulse = qb.RO_amp()*np.ones(samples)
 
             if qb.ro_pulse_shape() == 'gaussian_filtered':
@@ -400,6 +402,19 @@ def multiplexed_pulse(readouts, f_LO, upload=True):
                 filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
                                 (filter_sigma*fs)**2)
                 filter /= filter.sum()
+                pulse = np.convolve(pulse, filter, mode='full')
+            elif qb.ro_pulse_shape() == 'CLEAR':
+                filter_sigma = qb.ro_pulse_filter_sigma()
+                nr_sigma = qb.ro_pulse_nr_sigma()
+                filter_samples = int(filter_sigma*nr_sigma*fs)
+                filter_sample_idxs = np.arange(filter_samples)
+                filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
+                                (filter_sigma*fs)**2)
+                filter /= filter.sum()
+                pulse = uhfqc.CLEAR_shape(qb.RO_amp(), qb.RO_pulse_length(),
+                                 qb.ro_CLEAR_delta_amp_segment(),
+                                 qb.ro_CLEAR_segment_length(), sampling_rate=fs)
+
                 pulse = np.convolve(pulse, filter, mode='full')
             elif qb.ro_pulse_shape() == 'square':
                 pass
@@ -634,7 +649,9 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
             MC = qb.MC
         else:
             break
-
+    exp_metadata = {'reset_cycle_time': reset_cycle_time,
+                    'nr_resets': nr_resets,
+                    'shots': shots}
     operation_dict = {
         'RO': get_multiplexed_readout_pulse_dictionary(qubits)}
     qb_names = []
@@ -646,7 +663,6 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
         qubit_names=qb_names,
         operation_dict=operation_dict,
         reset_cycle_time=reset_cycle_time,
-        use_preselection=False,
         #sequence=sequence,
         nr_resets=nr_resets,
         upload=upload)
@@ -673,7 +689,8 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
 
-    MC.run_2D(name='active_reset_x{}_{}'.format(nr_resets, ','.join(qb_names)))
+    MC.run_2D(name='active_reset_x{}_{}'.format(nr_resets, ','.join(qb_names)),
+              exp_metadata=exp_metadata)
 
     MC.soft_avg(prev_avg)
 
@@ -690,11 +707,18 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     Important things to check when running the experiment:
         Is the readout separation commensurate with 225 MHz?
     """
-
-    if preselection:
-        multiplexed_pulse([(qb0, qb1, qb2), (qb1,), (qb0, qb1, qb2)], f_LO)
+    exp_metadata = {'feedback_delay': feedback_delay,
+                    'CZ_pulses': CZ_pulses,
+                    'ro_spacing': ro_spacing,
+                    'nr_echo_pulses': nr_echo_pulses,
+                    'cpmg_scheme': cpmg_scheme}
+    if reset:
+        if preselection:
+            multiplexed_pulse([(qb0, qb1, qb2), (qb1,), (qb0, qb1, qb2)], f_LO)
+        else:
+            multiplexed_pulse([(qb1,), (qb0, qb1, qb2)], f_LO)
     else:
-        multiplexed_pulse([(qb1,), (qb0, qb1, qb2)], f_LO)
+        multiplexed_pulse([qb0, qb1, qb2], f_LO)
 
     qubits = [qb0, qb1, qb2]
     for qb in qubits:
@@ -721,6 +745,7 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     nr_readouts = (3 if preselection else 2)*len(tomography_basis)**2
     if not reset:
         nr_readouts = (2 if preselection else 1)*len(tomography_basis)**2
+        # nr_readouts = (2 if preselection else 1)*len(tomography_basis)**3
 
     nr_shots *= nr_readouts
     df = get_multiplexed_readout_detector_functions(
@@ -735,7 +760,8 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     MC.set_detector_function(df)
     #
     MC.run_2D(name='two_qubit_parity{}-{}'.format(
-        '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])))
+        '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])),
+        exp_metadata=exp_metadata)
 
 
 def measure_tomography(qubits, prep_sequence, state_name, f_LO,
@@ -767,7 +793,6 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
                                                            drive_pulses=1)
 
     qubit_names = [qb.name for qb in qubits]
-
     seq_tomo, elts_tomo = mqs.n_qubit_tomo_seq(qubit_names,
                                                get_operation_dict(qubits),
                                                prep_sequence=prep_sequence,
@@ -791,10 +816,13 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
     n_segments = len(seq.elements)
     if preselection:
         n_segments *= 2
-
+    print(n_segments)
     # from this point on number of segments is fixed
     sf = awg_swf2.n_qubit_seq_sweep(seq_len=n_segments)
     shots *= n_segments
+    if shots > 1048576:
+        shots = 1048576 - 1048576 % n_segments
+    print('shots = ', shots)
     # if shots is None:
     #     shots = 4094 - 4094 % n_segments
     # # shots = 600000
@@ -2058,6 +2086,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         label = 'Ramsey' + msmt_suffix
         if isinstance(sweep_points, dict):
             exp_metadata = {'sweep_points_dict': sweep_points}
+        exp_metadata['artificial_detuning'] = artificial_detuning
         MC.run(label, exp_metadata=exp_metadata)
         sweep_params = None
 
@@ -2609,7 +2638,9 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases,
     MC.set_sweep_function_2D(s2)
     MC.set_sweep_points_2D(CZ_separation_times)
     MC.set_detector_function(qb.int_avg_det)
-    MC.run_2D('CZ_bleed_through{}'.format(qb.msmt_suffix))
+    idx = CZ_pulse_name.index('q')
+    MC.run_2D('CZ_bleed_through{}{}'.format(CZ_pulse_name[idx:idx+3],
+                                            qb.msmt_suffix))
 
     ma.MeasurementAnalysis(TwoD=True)
 
@@ -2660,7 +2691,7 @@ def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,
     MC.set_sweep_function(Rams_swf)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(measured_qubit.int_avg_det)
-    MC.run(label)
+    MC.run(label, exp_metadata={'artificial_detuning': artificial_detuning})
 
     if analyze:
         ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
@@ -2703,7 +2734,7 @@ def measure_ramsey_add_pulse_sweep_phase(
     MC.set_sweep_function(Rams_swf)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(measured_qubit.int_avg_det)
-    MC.run(label)
+    MC.run(label, exp_metadata={'artificial_detuning': artificial_detuning})
 
     if analyze:
         ma.MeasurementAnalysis(auto=True, close_fig=close_fig,

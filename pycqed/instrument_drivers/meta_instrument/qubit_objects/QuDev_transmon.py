@@ -1192,7 +1192,8 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
-        MC.run(label)
+        MC.run(label, exp_metadata={'artificial_detunings':
+                                        artificial_detunings})
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
@@ -1237,7 +1238,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
-        MC.run(label)
+        MC.run(label, exp_metadata={'artificial_detuning': artificial_detuning})
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
@@ -1288,7 +1289,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
-        MC.run(label)
+        MC.run(label, exp_metadata={'artificial_detuning': artificial_detuning})
 
         if analyze:
             RamseyA = ma.Ramsey_Analysis(
@@ -1352,7 +1353,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_2nd_swf)
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
-        MC.run(label)
+        MC.run(label, exp_metadata={'artificial_detuning': artificial_detuning})
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
@@ -1413,7 +1414,8 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_2nd_swf)
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
-        MC.run(label)
+        MC.run(label, exp_metadata={'artificial_detunings':
+                                        artificial_detunings})
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
@@ -2182,13 +2184,13 @@ class QuDev_transmon(Qubit):
             plt.plot(tbase / 1e-9, np.imag(don * modulation), '-', label='Q')
             plt.ylabel('d.c. voltage,\npi pulse (V)')
             plt.xlim(0, kw.get('tmax', 300))
-            plt.legend()
+            plt.legend(loc='upper right')
             plt.subplot(312)
             plt.plot(tbase / 1e-9, np.real(doff * modulation), '-', label='I')
             plt.plot(tbase / 1e-9, np.imag(doff * modulation), '-', label='Q')
             plt.ylabel('d.c. voltage,\nno pi pulse (V)')
             plt.xlim(0, kw.get('tmax', 300))
-            plt.legend()
+            plt.legend(loc='upper right')
             plt.subplot(313)
             plt.plot(tbase / 1e-9, np.real((don - doff) * modulation), '-',
                      label='I')
@@ -2196,7 +2198,7 @@ class QuDev_transmon(Qubit):
                      label='Q')
             plt.ylabel('d.c. voltage\ndifference (V)')
             plt.xlim(0, kw.get('tmax', 300))
-            plt.legend()
+            plt.legend(loc='upper right')
             plt.xlabel('Time (ns)')
             MAoff.save_fig(plt.gcf(), 'timetraces', xlabel='time',
                            ylabel='voltage')
@@ -4148,10 +4150,8 @@ class QuDev_transmon(Qubit):
             return cphase_all
 
 
-    def measure_flux_pulse_scope(self, freqs, delays, pulse_length=None, pulse_amp=None,
-                                 pulse_delay=None,
-                                 MC=None,
-                                 ):
+    def measure_flux_pulse_scope(self, freqs, delays, pulse_length=None,
+                                 pulse_amp=None, pulse_delay=None, MC=None):
         '''
         flux pulse scope measurement used to determine the shape of flux pulses
         set up as a 2D measurement (delay and drive pulse frequecy are being swept)
@@ -4239,10 +4239,13 @@ def add_CZ_pulse(qbc, qbt):
         qbc.add_pulse_parameter(op_name, ps_name + '_length', 'pulse_length',
                                 initial_value=0, vals=vals.Numbers(0))
         qbc.add_pulse_parameter(op_name, ps_name + '_buf_start',
-                                'buffer_length_start', initial_value=0,
+                                'buffer_length_start', initial_value=40e-9,
                                 vals=vals.Numbers(0))
         qbc.add_pulse_parameter(op_name, ps_name + '_buf_end',
-                                'buffer_length_end', initial_value=0,
+                                'buffer_length_end', initial_value=40e-9,
+                                vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_extra_buffer_aux_pulse',
+                                'extra_buffer_aux_pulse', initial_value=5e-9,
                                 vals=vals.Numbers(0))
         qbc.add_pulse_parameter(op_name, ps_name + '_delay', 'pulse_delay',
                                 initial_value=0, vals=vals.Numbers())
@@ -4250,7 +4253,7 @@ def add_CZ_pulse(qbc, qbt):
                                 'basis_rotation', initial_value={},
                                 vals=vals.Dict())
         qbc.add_pulse_parameter(op_name, ps_name + '_gaussian_filter_sigma',
-                                'gaussian_filter_sigma', initial_value=0,
+                                'gaussian_filter_sigma', initial_value=2e-9,
                                 vals=vals.Numbers(0))
 
 

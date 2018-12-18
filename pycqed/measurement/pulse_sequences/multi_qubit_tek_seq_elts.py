@@ -1608,7 +1608,7 @@ def parity_correction_seq(
     operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = \
         -ro_spacing - feedback_delay - operation_dict['RO mux']['length']
-    operation_dict['RO mux_presel']['refpoint'] = 'start'
+    operation_dict['RO mux_presel']['refpoint'] = 'end'
     # if reset:
     #     # used when nr_echo_pulses == 0:
     #     operation_dict['RO mux_presel']['refpoint'] = 'start'
@@ -1739,43 +1739,40 @@ def parity_correction_seq(
         # before the preparation pulses!
         pulse_list.append(operation_dict['RO presel_dummy'])
 
-    from pprint import pprint
-    pprint(pulse_list)
     el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, name='main')
     el_list.append(el_main)
 
-    # # feedback elements
-    # fb_sequence_0 = ['I ' + q2n]
-    # fb_sequence_1 = ['X180 ' + q2n] if reset else ['I ' + q2n]
-    # pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
-    # el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
-    #                                trigger=False, previous_element=el_main))
-    # pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
-    # el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
-    #                         trigger=False, previous_element=el_main)
-    # el_list.append(el_fb)
+    # feedback elements
+    fb_sequence_0 = ['I ' + q2n]
+    fb_sequence_1 = ['I ' + q2n] if reset else ['I ' + q2n]
+    pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
+    el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
+                                   trigger=False, previous_element=el_main))
+    pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
+    el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
+                            trigger=False, previous_element=el_main)
+    el_list.append(el_fb)
 
 
     # tomography elements
     tomography_sequences = get_tomography_pulses(q0n, q2n,
                                                  basis_pulses=tomography_basis)
-    print(tomography_sequences)
     for i, tomography_sequence in enumerate(tomography_sequences):
         tomography_sequence.append('RO mux')
         pulse_list = [operation_dict[pulse] for pulse in tomography_sequence]
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=False,
                                        name='tomography_{}'.format(i),
-                                       previous_element=el_main))
-                                       # previous_element=el_fb))
+                                       # previous_element=el_main))
+                                       previous_element=el_fb))
 
     # create the sequence
     seq_name = 'Two qubit entanglement by parity measurement'
     seq = sequence.Sequence(seq_name)
-    # seq.codewords[0] = 'feedback_0'
-    # seq.codewords[1] = 'feedback_1'
+    seq.codewords[0] = 'feedback_0'
+    seq.codewords[1] = 'feedback_1'
     for i in range(len(tomography_basis)**2):
         seq.append('main_{}'.format(i), 'main', trigger_wait=True)
-        # seq.append('feedback_{}'.format(i), 'codeword', trigger_wait=False)
+        seq.append('feedback_{}'.format(i), 'codeword', trigger_wait=False)
         seq.append('tomography_{}'.format(i), 'tomography_{}'.format(i),
                    trigger_wait=False)
 
@@ -1816,7 +1813,7 @@ def parity_correction_no_reset_seq(
     """
 
     operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
-    operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing
+    operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing-feedback_delay
     operation_dict['RO mux_presel']['refpoint'] = 'start'
 
     operation_dict['I_fb'] = {
@@ -1829,29 +1826,17 @@ def parity_correction_no_reset_seq(
         'pulse_type': 'SquarePulse',
         'channel': operation_dict['RO mux']['acq_marker_channel'],
         'amplitude': 0.0,
-        'length': ro_spacing,
+        'length': ro_spacing+feedback_delay,
         'pulse_delay': 0}
 
     if prep_sequence is None:
-        prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
-    # main (first) element
-    pulse_sequence = deepcopy(prep_sequence)
-    pulse_sequence.append('mY90s ' + q1n)
-    pulse_sequence.append(CZ_pulses[0])
-    pulse_sequence.append(CZ_pulses[1])
-    pulse_sequence.append('Y90 ' + q1n)
-    pulse_sequence.append('I_fb')
-
-    # if preselection:
-    #     pulse_sequence.append('RO mux_presel')
-    #     # RO presel dummy is referenced to end of RO mux presel => it happens
-    #     # before the preparation pulses!
-    #     pulse_sequence.append('RO presel_dummy')
+        prep_sequence = ['Y90 ' + q0n, 'mY90s ' + q1n, 'Y90s ' + q2n,
+                         CZ_pulses[0], CZ_pulses[1], 'Y90 ' + q1n, 'I_fb']
 
     # tomography elements
     tomography_sequences = get_tomography_pulses(q0n, q2n,
                                                  basis_pulses=tomography_basis)
-
+    print(len(tomography_sequences))
     # create the elements
     el_list = []
     for i, tomography_sequence in enumerate(tomography_sequences):
@@ -1861,7 +1846,7 @@ def parity_correction_no_reset_seq(
             # RO presel dummy is referenced to end of RO mux presel => it happens
             # before the preparation pulses!
             tomography_sequence.append('RO presel_dummy')
-        pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
+        pulse_list = [operation_dict[pulse] for pulse in prep_sequence]
         pulse_list += [operation_dict[pulse] for pulse in tomography_sequence]
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
                                        name='tomography_{}'.format(i)))
@@ -1869,7 +1854,8 @@ def parity_correction_no_reset_seq(
     # create the sequence
     seq_name = 'Two qubit entanglement by parity measurement'
     seq = sequence.Sequence(seq_name)
-    for i in range(len(tomography_basis)**2):
+    # for i in range(len(tomography_basis)**2):
+    for i, tomography_sequence in enumerate(tomography_sequences):
         seq.append('tomography_{}'.format(i), 'tomography_{}'.format(i),
                    trigger_wait=True)
 

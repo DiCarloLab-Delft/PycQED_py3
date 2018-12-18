@@ -413,6 +413,7 @@ class BufferedCZPulse(Pulse):
         self.pulse_length = kw.pop('pulse_length', 0)
         self.buffer_length_start = kw.pop('buffer_length_start', 0)
         self.buffer_length_end = kw.pop('buffer_length_end', 0)
+        self.extra_buffer_aux_pulse = kw.pop('extra_buffer_aux_pulse', 5e-9)
         self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma', 0)
         self.length = self.pulse_length + self.buffer_length_start + \
                       self.buffer_length_end
@@ -424,6 +425,8 @@ class BufferedCZPulse(Pulse):
                                           self.buffer_length_start)
         self.buffer_length_end = kw.pop('buffer_length_end',
                                         self.buffer_length_end)
+        self.extra_buffer_aux_pulse = kw.pop('extra_buffer_aux_pulse',
+                                             self.extra_buffer_aux_pulse)
         self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma',
                                             self.gaussian_filter_sigma)
         self.length = self.pulse_length + self.buffer_length_start + \
@@ -439,9 +442,9 @@ class BufferedCZPulse(Pulse):
         pulse_length = self.pulse_length
         if chan != self.channel:
             amp = self.aux_channels_dict[chan]
-            buffer_start -= 5e-9
-            buffer_end -= 5e-9
-            pulse_length += 10e-9
+            buffer_start -= self.extra_buffer_aux_pulse
+            buffer_end -= self.extra_buffer_aux_pulse
+            pulse_length += 2*self.extra_buffer_aux_pulse
 
         if self.gaussian_filter_sigma == 0:
             wave = np.ones_like(tvals)*amp

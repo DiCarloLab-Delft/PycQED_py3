@@ -2995,9 +2995,8 @@ class CZ_bleed_through_phase_hard_sweep(swf.Hard_Sweep):
         self.parameter_name = 'theta'
         self.unit = 'rad'
 
-    def prepare(self, **kw):
+    def prepare(self, upload_all=True, **kw):
         if self.upload:
-            upload_channels = kw.pop('upload_channels', 'all')
             fsqs.CZ_bleed_through_phase_seq(
                 phases=self.sweep_points,
                 qb_name=self.qb_name,
@@ -3008,7 +3007,7 @@ class CZ_bleed_through_phase_hard_sweep(swf.Hard_Sweep):
                 verbose=self.verbose,
                 upload=self.upload,
                 return_seq=self.return_seq,
-                upload_channels=upload_channels,
+                upload_all=upload_all,
                 cal_points=self.cal_points)
 
 
@@ -3020,6 +3019,7 @@ class CZ_bleed_through_separation_time_soft_sweep(swf.Soft_Sweep):
         self.hard_sweep = hard_sweep
         self.upload = upload
         self.upload_channels = upload_channels
+        self.is_first_sweeppoint = True
         self.name = 'CZ_bleed_through_separation_time'
         self.parameter_name = 't_sep'
         self.unit = 's'
@@ -3027,4 +3027,5 @@ class CZ_bleed_through_separation_time_soft_sweep(swf.Soft_Sweep):
     def set_parameter(self, val):
         self.hard_sweep.CZ_separation = val
         self.hard_sweep.upload = self.upload
-        self.hard_sweep.prepare(upload_channels=self.upload_channels)
+        self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
+        self.is_first_sweeppoint = False

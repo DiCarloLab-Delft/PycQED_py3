@@ -417,7 +417,8 @@ class UHFQC(Instrument):
             for m in args:
                 nodes = [k.lower()
                          for k in nodes if fnmatch(k.lower(), m.lower())]
-
+        nodes = [k.lower() for k in nodes if 'weights' not in k.lower()]
+        nodes = [k.lower() for k in nodes if 'statemap' not in k.lower()]
         return nodes
 
     def sync(self):
