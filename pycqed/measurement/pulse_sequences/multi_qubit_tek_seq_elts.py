@@ -1579,61 +1579,59 @@ def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
 
 def parity_correction_seq(
         q0n, q1n, q2n, operation_dict, CZ_pulses, feedback_delay=900e-9,
-        prep_sequence=None, reset=True, nr_echo_pulses=0,
+        prep_sequence=None, reset=True, nr_parity_measurements=1,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False, preselection=False,
-        ro_spacing=1e-6, cpmg_scheme=True):
+        ro_spacing=1e-6, dd_scheme=None, nr_dd_pulses=4):
     """
 
-    |              elem 1               |  elem 2  | elem 3
+    |              elem 1               |  elem 2  |  (elem 3, 2)  | elem 4
 
-    |q0> |======|---------*------------------------|======|
-         | prep |         |                        | tomo |
-    |q1> | q0,  |--mY90s--*--*--Y90--meas===-------| q0,  |
-         | q2   |            |             ||      | q2   |
-    |q2> |======|------------*------------X180-----|======|
-
+    |q0> |======|---------*--------------------------(           )-|======|
+         | prep |         |                         (   repeat    )| tomo |
+    |q1> | q0,  |--mY90s--*--*--Y90--meas=Y180------(   parity    )| q0,  |
+         | q2   |            |             ||       ( measurement )| q2   |
+    |q2> |======|------------*------------Y180-------(           )-|======|
+ 
     required elements:
-        prep_sequence:
-            contains everything up to the first readout
-        Echo decoupling elements
-            contains nr_echo_pulses X180 equally-spaced pulses on q0n, q2n
-            FOR THIS TO WORK, ALL QUBITS MUST HAVE THE SAME PI-PULSE LENGTH
-        feedback x 2 (for the two readout results):
-            contains conditional Y80 on q1 and q2
-        tomography x 6**2:
-            measure all observables of the two qubits X/Y/Z
+        elem_1:
+            contains everything up to the first readout including preparation
+            and first parity measurement
+        elem_2 (x2):
+            contains conditional Y180 on q1 and q2
+        elem_3:
+            additional parity measurements
+        elem_4 (x6**2):
+            tomography rotations for q0 and q2
     """
 
     operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = \
         -ro_spacing - feedback_delay - operation_dict['RO mux']['length']
     operation_dict['RO mux_presel']['refpoint'] = 'end'
-    # if reset:
-    #     # used when nr_echo_pulses == 0:
-    #     operation_dict['RO mux_presel']['refpoint'] = 'start'
-    #     # operation_dict['RO mux_presel']['pulse_delay'] -= \
-    #     #     operation_dict['RO mux']['length']
-    # else:
-    #     # used when nr_echo_pulses != 0:
-    #     operation_dict['RO mux_presel']['refpoint'] = 'end'
 
-    operation_dict['I_fb'] = {
-        'pulse_type': 'SquarePulse',
-        'channel': operation_dict['RO mux']['acq_marker_channel'],
-        'amplitude': 0.0,
-        'length': feedback_delay,
-        'pulse_delay': 0}
     operation_dict['RO presel_dummy'] = {
         'pulse_type': 'SquarePulse',
         'channel': operation_dict['RO mux']['acq_marker_channel'],
         'amplitude': 0.0,
-        'length': ro_spacing + feedback_delay,
+        'length': ro_spacing + feedback_delay + \
+                  operation_dict['RO mux']['length'],
         'pulse_delay': 0}
+    
+    if dd_scheme is None:
+        dd_pulses = [{
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict['RO mux']['acq_marker_channel'],
+        'amplitude': 0.0,
+        'length': feedback_delay,
+        'pulse_delay': 0}]
+    else:
+        dd_pulses = get_dd_pulse_list(
+            operation_dict, [q0n, q2n], feedback_delay, nr_pulses=nr_dd_pulses, 
+            dd_scheme=dd_scheme)
 
     if prep_sequence is None:
         prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
-        # prep_sequence = ['Y90 ' + q0n, 'mY90s ' + q1n]
 
     # create the elements
     el_list = []
@@ -1645,93 +1643,9 @@ def parity_correction_seq(
     pulse_sequence.append(CZ_pulses[0])
     pulse_sequence.append(CZ_pulses[1])
     pulse_sequence.append('Y90 ' + q1n)
-    if reset:
-        pulse_sequence.append('RO ' + q1n)
-
-    # used when nr_echo_pulses == 0
-    # pulse_sequence.append('I_fb')
-
-    # # with Echo pulses between CZ gates
-    # pulse_sequence.append('CZ ' + q1n + ' ' + q0n)
-    # pulse_sequence.append('Y180 ' + q0n)
-    # pulse_sequence.append('Y90s ' + q2n)
-    # pulse_sequence.append('CZ ' + q1n + ' ' + q2n)
-    # pulse_sequence.append('Y180 ' + q0n)
-    # pulse_sequence.append('Y90s ' + q1n)
-    # if reset:
-    #     pulse_sequence.append('RO ' + q1n)
-
+    pulse_sequence.append('RO ' + q1n)
     pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
-
-    if nr_echo_pulses > 0:
-        echo_sequence = get_decoupling_pulses(q0n, q2n,
-                                              nr_pulses=nr_echo_pulses)
-
-        DRAG_length = deepcopy(operation_dict['X180 '+q0n]['nr_sigma']) * \
-                      deepcopy(operation_dict['X180 '+q0n]['sigma'])
-        total_echo_pulses_length = feedback_delay + \
-                                   operation_dict['RO mux']['length']
-        if cpmg_scheme:
-            start_end_delay = (total_echo_pulses_length
-                               - nr_echo_pulses*DRAG_length) / \
-                              2 / nr_echo_pulses
-            echo_pulse_delay = 2*start_end_delay
-
-            if start_end_delay < 0:
-                logging.error("Dynamical decoupling pulses don't fit into the "
-                              "feedback delay time")
-            operation_dict['I_echo'] = {
-                'pulse_type': 'SquarePulse',
-                'channel': operation_dict['RO mux']['acq_marker_channel'],
-                'amplitude': 0.0,
-                'length': start_end_delay,
-                'pulse_delay': 0}
-
-            for i, pulse in enumerate(echo_sequence):
-                single_op_dict = deepcopy(operation_dict[pulse])
-                if 's' not in pulse:
-                    single_op_dict['pulse_delay'] = \
-                        (start_end_delay if i == 0 else echo_pulse_delay)
-                    if i == 0:
-                        single_op_dict['refpoint'] = 'start'
-                pulse_list.append(single_op_dict)
-
-        else:
-            pulse_positions_func = lambda idx, N: np.sin(np.pi*idx/(2*N+2))**2
-            pulse_delays_func = (lambda idx, N: total_echo_pulses_length*(
-                pulse_positions_func(idx, N) -
-                pulse_positions_func(idx-1, N)) -
-                    ((0.5 if idx == 1 else 1)*DRAG_length))
-
-            # total_delays = np.sum([pulse_delays_func(j, nr_echo_pulses)
-            #                        for j in np.arange(1, nr_echo_pulses+1)] +
-            #                       [pulse_delays_func(1, nr_echo_pulses)])
-            if nr_echo_pulses*DRAG_length > total_echo_pulses_length:
-                raise ValueError("Dynamical decoupling pulses don't fit "
-                                 "into the feedback delay time")
-
-            operation_dict['I_echo'] = {
-                'pulse_type': 'SquarePulse',
-                'channel': operation_dict['RO mux']['acq_marker_channel'],
-                'amplitude': 0.0,
-                'length': pulse_delays_func(1, nr_echo_pulses),
-                'pulse_delay': 0}
-
-            echo_idx = 0
-            for i, pulse in enumerate(echo_sequence):
-                single_op_dict = deepcopy(operation_dict[pulse])
-                if 's' not in pulse:
-                    echo_idx += 1
-                    single_op_dict['pulse_delay'] = \
-                        pulse_delays_func(echo_idx, nr_echo_pulses)
-                    if i == 0:
-                        single_op_dict['refpoint'] = 'start'
-                pulse_list.append(single_op_dict)
-
-        pulse_list.append(operation_dict['I_echo'])
-
-    else:
-        pulse_list.append(operation_dict['I_fb'])
+    pulse_list += dd_pulses
 
     if preselection:
         pulse_list.append(operation_dict['RO mux_presel'])
@@ -1739,20 +1653,31 @@ def parity_correction_seq(
         # before the preparation pulses!
         pulse_list.append(operation_dict['RO presel_dummy'])
 
-    el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, name='main')
+    el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, 
+                              name='main')
     el_list.append(el_main)
 
     # feedback elements
-    fb_sequence_0 = ['I ' + q2n]
-    fb_sequence_1 = ['I ' + q2n] if reset else ['I ' + q2n]
+    fb_sequence_0 = ['I ' + q1n, 'Is ' + q2n]
+    fb_sequence_1 = ['Y180 ' + q1n, 'Y180s ' + q2n] if reset else fb_sequence_0
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
-    el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
-                                   trigger=False, previous_element=el_main))
+    el_fb_0 = multi_pulse_elt(0, station, pulse_list, name='feedback_0',
+                              trigger=False, previous_element=el_main)
+    el_list.append(el_fb_0)
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
-    el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
-                            trigger=False, previous_element=el_main)
-    el_list.append(el_fb)
+    el_fb_1 = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
+                              trigger=False, previous_element=el_main)
+    el_list.append(el_fb_1)
 
+    # repeated parity measurement element. Phase errors need to be corrected 
+    # for by careful selection of qubit drive IF-s.
+    pulse_sequence = ['mY90 ' + q1n, CZ_pulses[0], CZ_pulses[1], 'Y90', 
+                    'RO ' + q1n]
+    pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
+    pulse_list += dd_pulses
+    el_repeat = multi_pulse_elt(0, station, pulse_list, trigger=False, 
+                                name='repeat', previous_element=el_fb_0)
+    el_list.append(el_repeat)
 
     # tomography elements
     tomography_sequences = get_tomography_pulses(q0n, q2n,
@@ -1762,8 +1687,7 @@ def parity_correction_seq(
         pulse_list = [operation_dict[pulse] for pulse in tomography_sequence]
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=False,
                                        name='tomography_{}'.format(i),
-                                       # previous_element=el_main))
-                                       previous_element=el_fb))
+                                       previous_element=el_fb_0))
 
     # create the sequence
     seq_name = 'Two qubit entanglement by parity measurement'
@@ -1772,7 +1696,12 @@ def parity_correction_seq(
     seq.codewords[1] = 'feedback_1'
     for i in range(len(tomography_basis)**2):
         seq.append('main_{}'.format(i), 'main', trigger_wait=True)
-        seq.append('feedback_{}'.format(i), 'codeword', trigger_wait=False)
+        seq.append('feedback_{}_0'.format(i), 'codeword', trigger_wait=False)
+        for j in range(1, nr_parity_measurements):
+            seq.append('repeat_{}_{}'.format(i, j), 'repeat',
+                       trigger_wait=False)
+            seq.append('feedback_{}_{}'.format(i, j), 'codeword', 
+                       trigger_wait=False)
         seq.append('tomography_{}'.format(i), 'tomography_{}'.format(i),
                    trigger_wait=False)
 
@@ -2426,6 +2355,52 @@ def general_multi_qubit_seq(
     else:
         return seq
 
+def get_dd_pulse_list(operation_dict, qb_names, dd_time, nr_pulses=4, 
+                      dd_scheme='cpmg', udd_buffer=0):
+    pulse_length = operation_dict['X180 ' + qb_names[-1]]['nr_sigma'] * \
+                   operation_dict['X180 ' + qb_names[-1]]['sigma']
+    def cpmg_delay(i, nr_pulses=nr_pulses, dd_time=dd_time, 
+                   pulse_length=pulse_length):
+        delay = (dd_time - nr_pulses*pulse_length)/nr_pulses
+        if i == 0 or i == nr_pulses:
+            return delay/2
+        else:
+            return delay
+    def udd_delay(i, nr_pulses=nr_pulses, dd_time=dd_time, 
+                  pulse_length=pulse_length, buffer=udd_buffer):
+        if i == 0 or i == nr_pulses:
+            return buffer
+        delay = np.sin(0.5*np.pi*(i + 1)/(nr_pulses + 1))**2
+        delay -= np.sin(0.5*np.pi*i/(nr_pulses + 1))**2
+        delay *= dd_time - pulse_length - 2*buffer
+        delay -= pulse_length
+        return delay
+    if dd_scheme == 'cpmg':
+        delay_func = cpmg_delay 
+    elif dd_scheme == 'udd':
+        delay_func = udd_delay
+    else:
+        raise ValueError('Unknown decoupling scheme "{}"'.format(dd_scheme))
+    pulse_list = []
+    for i in range(nr_pulses):
+        delay_pulse = {
+            'pulse_type': 'SquarePulse',
+            'channel': operation_dict['X180 ' + qb_names[0]]['I_channel'],
+            'amplitude': 0.0,
+            'length': delay_func(i),
+            'pulse_delay': 0}
+        pulse_list.append(delay_pulse)
+        for j, qbn in enumerate(qb_names):
+            pulse_name = 'X180 ' if j == 0 else 'X180s '
+            pulse_list.append(operation_dict[pulse_name + qbn])
+    delay_pulse = {
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict['X180 ' + qb_names[0]]['I_channel'],
+        'amplitude': 0.0,
+        'length': delay_func(nr_pulses),
+        'pulse_delay': 0}
+    pulse_list.append(delay_pulse)
+    return pulse_list
 
 def get_DD_pulse_list(operation_dict, qb_names, DD_time,
                       qb_names_DD=None,

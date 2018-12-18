@@ -697,12 +697,12 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
 
 def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                               CZ_pulses, nreps=1,
-                             upload=True, MC=None, prep_sequence=None,
-                             nr_echo_pulses=0, cpmg_scheme=True,
-                             nr_shots=5000,
-                             tomography_basis=(
-                                 'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
-                             reset=True, preselection=False, ro_spacing=1e-6):
+                              upload=True, MC=None, prep_sequence=None,
+                              nr_dd_pulses=0, dd_scheme=None,
+                              nr_shots=5000,
+                              tomography_basis=(
+                                  'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+                              reset=True, preselection=False, ro_spacing=1e-6):
     """
     Important things to check when running the experiment:
         Is the readout separation commensurate with 225 MHz?
@@ -710,15 +710,19 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     exp_metadata = {'feedback_delay': feedback_delay,
                     'CZ_pulses': CZ_pulses,
                     'ro_spacing': ro_spacing,
-                    'nr_echo_pulses': nr_echo_pulses,
-                    'cpmg_scheme': cpmg_scheme}
-    if reset:
+                    'nr_dd_pulses': nr_dd_pulses,
+                    'dd_scheme': dd_scheme}
+    if reset == True or reset == False:
         if preselection:
-            multiplexed_pulse([(qb0, qb1, qb2), (qb1,), (qb0, qb1, qb2)], f_LO)
+            multiplexed_pulse([(qb0, qb1, qb2), (qb1,)*nr_parity_measurements,
+                               (qb0, qb1, qb2)], f_LO)
         else:
-            multiplexed_pulse([(qb1,), (qb0, qb1, qb2)], f_LO)
-    else:
+            multiplexed_pulse([(qb1,)*nr_parity_measurements, 
+                               (qb0, qb1, qb2)], f_LO)
+    elif reset == 'simple':
         multiplexed_pulse([qb0, qb1, qb2], f_LO)
+    else:
+        raise ValueError("reset parameter must be True/False/'simple'")
 
     qubits = [qb0, qb1, qb2]
     for qb in qubits:
@@ -730,35 +734,34 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     for qb in qubits:
         qb.prepare_for_timedomain(multiplexed=True)
 
-    sf = awg_swf2.parity_correction(qb0.name, qb1.name, qb2.name,
-                                    CZ_pulses=CZ_pulses,
-                                    operation_dict=get_operation_dict(qubits),
-                                    feedback_delay=feedback_delay,
-                                    prep_sequence=prep_sequence, reset=reset,
-                                    nr_echo_pulses=nr_echo_pulses,
-                                    cpmg_scheme=cpmg_scheme,
-                                    tomography_basis=tomography_basis,
-                                    upload=upload, verbose=False,
-                                    preselection=preselection,
-                                    ro_spacing=ro_spacing)
+    sf = awg_swf2.parity_correction(
+        qb0.name, qb1.name, qb2.name,
+        operation_dict=get_operation_dict(qubits), CZ_pulses=CZ_pulses,   
+        feedback_delay=feedback_delay, prep_sequence=prep_sequence, 
+        reset=reset, nr_parity_measurements=nr_parity_measurements,
+        tomography_basis=tomography_basis,
+        preselection=preselection,
+        ro_spacing=ro_spacing,
+        dd_scheme=dd_scheme,
+        nr_dd_pulses=nr_dd_pulses,
+        upload=upload, verbose=False)
 
-    nr_readouts = (3 if preselection else 2)*len(tomography_basis)**2
-    if not reset:
-        nr_readouts = (2 if preselection else 1)*len(tomography_basis)**2
-        # nr_readouts = (2 if preselection else 1)*len(tomography_basis)**3
+    if reset == 'simple':
+        nr_parity_measurements = 1
 
+    nr_readouts = 1 + nr_parity_measurements + (1 if preselection else 0)
+    nr_readouts *= len(tomography_basis)**2
+    
     nr_shots *= nr_readouts
     df = get_multiplexed_readout_detector_functions(
         qubits, nr_shots=nr_shots)['int_log_det']
 
     MC.set_sweep_function(sf)
-    # MC.set_sweep_points(np.tile(np.arange(nr_readouts)/2,
-    #                             [nr_shots//nr_readouts]))
     MC.set_sweep_points(np.arange(nr_shots))
     MC.set_sweep_function_2D(swf.None_Sweep())
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
-    #
+    
     MC.run_2D(name='two_qubit_parity{}-{}'.format(
         '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])),
         exp_metadata=exp_metadata)
