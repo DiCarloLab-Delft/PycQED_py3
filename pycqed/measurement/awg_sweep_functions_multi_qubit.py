@@ -816,3 +816,36 @@ class GST_swf(swf.Hard_Sweep):
                 upload_all=upload_all,
                 return_seq=self.return_seq,
                 verbose=self.verbose)
+
+
+class RO_dynamic_phase_swf(swf.Hard_Sweep):
+
+    def __init__(self, qbp_name, qbr_names,
+                 phases, operation_dict,
+                 pulse_separation,
+                 verbose=False, cal_points=True,
+                 upload=True, return_seq=False):
+
+        super().__init__()
+        self.qbp_name = qbp_name
+        self.qbr_names = qbr_names
+        self.phases = phases
+        self.operation_dict = operation_dict
+        self.pulse_separation = pulse_separation
+        self.cal_points = cal_points
+        self.upload = upload
+        self.return_seq = return_seq
+        self.verbose = verbose
+
+        self.name = 'RO dynamic phase sweep'
+        self.parameter_name = 'theta'
+        self.unit = 'rad'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.ro_dynamic_phase_seq(
+                qbp_name=self.qbp_name, qbr_names=self.qbr_names,
+                phases=self.phases, operation_dict=self.operation_dict,
+                pulse_separation=self.pulse_separation,
+                verbose=self.verbose, cal_points=self.cal_points,
+                upload=True, return_seq=self.return_seq)

@@ -1657,17 +1657,16 @@ def parity_correction_seq(
                               name='main')
     el_list.append(el_main)
 
-    # feedback elements
-    fb_sequence_0 = ['I ' + q1n, 'Is ' + q2n]
-    fb_sequence_1 = ['Y180 ' + q1n, 'Y180s ' + q2n] if reset else fb_sequence_0
-    pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
-    el_fb_0 = multi_pulse_elt(0, station, pulse_list, name='feedback_0',
-                              trigger=False, previous_element=el_main)
-    el_list.append(el_fb_0)
-    pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
-    el_fb_1 = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
-                              trigger=False, previous_element=el_main)
-    el_list.append(el_fb_1)
+    # # feedback elements
+    # fb_sequence_0 = ['I ' + q2n]
+    #                           = ['X180 ' + q2n] if reset else ['I ' + q2n]
+    # pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
+    # el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
+    #                                trigger=False, previous_element=el_main))
+    # pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
+    # el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
+    #                         trigger=False, previous_element=el_main)
+    # el_list.append(el_fb)
 
     # repeated parity measurement element. Phase errors need to be corrected 
     # for by careful selection of qubit drive IF-s.
@@ -2608,6 +2607,99 @@ def pygsti_seq(qb_names, pygsti_listOfExperiments, operation_dict,
                                     AWGs=upload_AWGs,
                                     channels='all',
                                     verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+def ro_dynamic_phase_seq(qbp_name, qbr_names,
+                         phases, operation_dict,
+                         pulse_separation,
+                         verbose=False, cal_points=True,
+                         upload=True, return_seq=False):
+
+    """
+    RO cross-dephasing measurement sequence. Measured the dynamic phase induced
+    on qbr by a measurement tone on the pulsed qubit (qbp).
+    Args:
+        qbp_name: pulsed qubit name; RO pulse is applied on this qubit
+        qbr_names: ramsey (measured) qubits
+        phases: array of phases for the second piHalf pulse on qbr
+        operation_dict: contains operation dicts from both qubits;
+            !!! Must contain 'RO mux' which is the mux RO pulse only for
+            the measured_qubits (qbr_names) !!!
+        pulse_separation: separation between the two piHalf pulses, shouls be
+            equal to integration length
+        cal_points: use cal points
+    """
+
+    seq_name = 'ro_dynamic_phase_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    for i, theta in enumerate(phases):
+        for reference_meas in [False, True]:
+            qbr_X90pulse1_list = []
+            qbr_X90pulse2_list = []
+            cal_I_pulses = []
+            cal_X_pulses = []
+            for j, qbr_name in enumerate(qbr_names):
+                qbr_X90pulse1 = deepcopy(operation_dict['X90 ' + qbr_name])
+                qbr_X90pulse1['refpoint'] = 'end' if j == 0 else 'start'
+                qbr_X90pulse1_list += [qbr_X90pulse1]
+
+                qbr_X90pulse2 = deepcopy(operation_dict['X90 ' + qbr_name])
+                qbr_X90pulse2['pulse_delay'] = \
+                    pulse_separation if j == 0 else 0
+                if reference_meas:
+                    qbr_X90pulse2['refpoint'] = 'end' if j == 0 else 'start'
+                else:
+                    qbr_X90pulse2['refpoint'] = 'start'
+                qbr_X90pulse2_list += [qbr_X90pulse2]
+
+                # cal pulses
+                cal_I_pulse = deepcopy(operation_dict['I ' + qbr_name])
+                if reference_meas:
+                    cal_I_pulse['refpoint'] = 'end' if j == 0 else 'start'
+                else:
+                    cal_I_pulse['pulse_delay'] = pulse_separation if j == 0 else 0
+                    cal_I_pulse['refpoint'] = 'start'
+                cal_I_pulses += [cal_I_pulse]
+
+                cal_X_pulse = deepcopy(operation_dict['X180 ' + qbr_name])
+                if reference_meas:
+                    cal_X_pulse['refpoint'] = 'end' if j == 0 else 'start'
+                else:
+                    cal_X_pulse['pulse_delay'] = pulse_separation if j == 0 else 0
+                    cal_X_pulse['refpoint'] = 'start'
+                cal_X_pulses += [cal_X_pulse]
+
+            if cal_points and (i == (len(phases)-4) or i == (len(phases)-3)):
+                pulse_list = []
+                if not reference_meas:
+                    pulse_list += [operation_dict['RO ' + qbp_name]]
+                pulse_list += cal_I_pulses + [operation_dict['RO mux']]
+            elif cal_points and (i == (len(phases)-2) or i == (len(phases)-1)):
+                pulse_list = []
+                if not reference_meas:
+                    pulse_list += [operation_dict['RO ' + qbp_name]]
+                pulse_list += cal_X_pulses + [operation_dict['RO mux']]
+            else:
+                for qbr_X90pulse2 in qbr_X90pulse2_list:
+                    qbr_X90pulse2['phase'] = theta*180/np.pi
+
+                pulse_list = qbr_X90pulse1_list
+                if not reference_meas:
+                    pulse_list += [operation_dict['RO ' + qbp_name]]
+                pulse_list += qbr_X90pulse2_list + [operation_dict['RO mux']]
+            el = multi_pulse_elt(i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     if return_seq:
         return seq, el_list

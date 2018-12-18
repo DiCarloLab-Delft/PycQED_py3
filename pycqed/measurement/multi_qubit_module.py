@@ -3021,3 +3021,63 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
                 title=label, verbosity=2)
 
     return MC
+
+
+def measure_ro_cross_dephasing(pulsed_qubit, measured_qubits, phases,
+                               f_LO, pulse_separation=None,
+                               upload=True, cal_points=True,
+                               MC=None, UHFQC=None, pulsar=None):
+
+    if not hasattr(measured_qubits, '__iter__'):
+        measured_qubits = [measured_qubits]
+    qubits = measured_qubits + [pulsed_qubit]
+
+    if pulse_separation is None:
+        pulse_separation = max([qb.RO_acq_integration_length()
+                                for qb in qubits])
+    if MC is None:
+        MC = measured_qubits[0].MC
+    if UHFQC is None:
+        UHFQC = measured_qubits[0].UHFQC
+    if pulsar is None:
+        pulsar = measured_qubits[0].AWG
+    operation_dict = get_operation_dict(qubits)
+    operation_dict['RO mux'] = get_multiplexed_readout_pulse_dictionary(
+        measured_qubits)
+
+    for qb in qubits:
+        qb.prepare_for_timedomain(multiplexed=True)
+    multiplexed_pulse([(pulsed_qubit), measured_qubits, measured_qubits],
+                      f_LO, upload=True)
+
+    channels = []
+    for qb in qubits:
+        channels += [qb.RO_acq_weight_function_I()]
+        if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
+            if qb.RO_acq_weight_function_Q() is not None:
+                channels += [qb.RO_acq_weight_function_Q()]
+    df = det.UHFQC_integrated_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=pulse_separation,
+            nr_averages=max([qb.RO_acq_averages() for qb in qubits]),
+            values_per_point=3,
+            values_per_point_suffex=['_probe', '_measure', '_ref_measure'])
+
+    qbr_names = [qbr.name for qbr in measured_qubits]
+    sf = awg_swf2.RO_dynamic_phase_swf(
+        qbp_name=pulsed_qubit.name,
+        qbr_names=qbr_names,
+        phases=phases,
+        operation_dict=operation_dict,
+        pulse_separation=pulse_separation,
+        cal_points=cal_points,
+        upload=upload)
+    MC.set_sweep_function(sf)
+    MC.set_sweep_points(phases)
+    MC.set_detector_function(df)
+    exp_metadata = {'pulse_separation': pulse_separation,
+                    'f_LO': f_LO}
+    MC.run_2D('RO_DynamicPhase_{}{}'.format(
+        pulsed_qubit.name, ''.join(qbr_names)),
+              exp_metadata=exp_metadata)
+    ma.MeasurementAnalysis(TwoD=True)

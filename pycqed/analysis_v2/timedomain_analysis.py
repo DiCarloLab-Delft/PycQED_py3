@@ -136,7 +136,7 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
         There are several options possible to specify the normalization
         using the options dict.
-            cal_points (tuple) of indices of the calibration points
+            cal_points (tuple) of indices of the calibrati  on points
 
             zero_coord, one_coord
         """
@@ -169,6 +169,167 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
         # self.add_dataset_to_analysisgroup('Corrected data',
         #                                   self.proc_data_dict['corr_data'])
+
+
+class Normalize_Multi_Qubit_Data(ba.BaseDataAnalysis):
+
+    def process_data(self):
+        """
+        This takes care of rotating and normalizing the data if required.
+        There are several options possible to specify the normalization
+        using the options dict.
+            cal_points (tuple) of indices of the calibration points
+
+            zero_coord, one_coord
+        """
+
+        cal_points = self.options_dict.get('cal_points', None)
+        zero_coord = self.options_dict.get('zero_coord', None)
+        one_coord = self.options_dict.get('one_coord', None)
+        if cal_points is None:
+            cal_points = [list(range(-4, -2)), list(range(-2, 0))]
+
+        channel_map = self.options_dict.get('channel_map', None)
+        if channel_map is None:
+            raise ValueError('channel_map must be defined in '
+                             'self.options_dict.')
+        ch_map_lists = {k:v for k,v in channel_map.items()
+                        if isinstance(v, list)}
+        if np.any([len(v) > 2 for v in ch_map_lists.values()]):
+            raise ValueError('{} have more than 2 RO channels. There is no '
+                             'support for this case.'.format(
+                ','.join([k for k, v in ch_map_lists.items() if len(v) > 2])))
+        self.proc_data_dict['corr_data'] = deepcopy(channel_map)
+
+        measured_RO_channels = list(self.raw_data_dict[
+                                        'measured_values_ord_dict'])
+        meas_results_per_qb_per_ROch = {}
+        for qb_name, RO_channels in channel_map.items():
+            meas_results_per_qb_per_ROch[qb_name] = {}
+            if isinstance(RO_channels, str):
+                meas_ROs_per_qb = [RO_ch for RO_ch in measured_RO_channels
+                                   if RO_channels in RO_ch]
+                for meas_RO in meas_ROs_per_qb:
+                    meas_results_per_qb_per_ROch[qb_name][meas_RO] = \
+                        self.raw_data_dict[
+                            'measured_values_ord_dict'][meas_RO][0]
+
+            elif isinstance(RO_channels, list):
+                for qb_RO_ch in RO_channels:
+                    meas_ROs_per_qb = [RO_ch for RO_ch in measured_RO_channels
+                                      if qb_RO_ch in RO_ch]
+                    for meas_RO in meas_ROs_per_qb:
+                        meas_results_per_qb_per_ROch[qb_name][meas_RO] = \
+                            self.raw_data_dict[
+                                'measured_values_ord_dict'][meas_RO][0]
+            else:
+                raise TypeError('The RO channels for {} must either a list '
+                                'or a string.'.format(qb_name))
+
+        self.proc_data_dict['meas_results_per_qb_per_ROch'] = \
+            meas_results_per_qb_per_ROch
+        for qb_name, meas_res_dict in meas_results_per_qb_per_ROch.items():
+            if len(meas_res_dict) == 1:
+                # one RO channel per qubit
+                if self.options_dict.get('TwoD', False):
+                    raw_data_arr = meas_res_dict[list(meas_res_dict)[0]]
+                    self.proc_data_dict['corr_data'][qb_name] = \
+                        deepcopy(raw_data_arr.transpose())
+                    for col in range(raw_data_arr.shape[1]):
+                        self.proc_data_dict['corr_data'][qb_name][col] = \
+                            a_tools.normalize_data_v3(
+                                data=raw_data_arr[:, col],
+                                cal_zero_points=cal_points[0],
+                                cal_one_points=cal_points[1])
+                else:
+                    self.proc_data_dict['corr_data'][qb_name] = \
+                        a_tools.normalize_data_v3(
+                            data=meas_res_dict[list(meas_res_dict)[0]],
+                            cal_zero_points=cal_points[0],
+                            cal_one_points=cal_points[1])
+            elif list(meas_res_dict) == channel_map[qb_name]:
+                # two RO channels per qubit
+                if self.options_dict.get('TwoD', False):
+                    raw_data_arr = meas_res_dict[list(meas_res_dict)[0]]
+                    self.proc_data_dict['corr_data'][qb_name] = \
+                        deepcopy(raw_data_arr.transpose())
+                    for col in range(raw_data_arr.shape[1]):
+                        data_array = np.array(
+                            [v[:, col] for v in meas_res_dict.values()])
+                        self.proc_data_dict['corr_data'][qb_name][col], _, _ = \
+                            a_tools.rotate_and_normalize_data(
+                                data=data_array,
+                                zero_coord=zero_coord,
+                                one_coord=one_coord,
+                                cal_zero_points=cal_points[0],
+                                cal_one_points=cal_points[1])
+                else:
+                    self.proc_data_dict['corr_data'][qb_name], _, _ = \
+                        a_tools.rotate_and_normalize_data(
+                            data=np.array([v for v in meas_res_dict.values()]),
+                            zero_coord=zero_coord,
+                            one_coord=one_coord,
+                            cal_zero_points=cal_points[0],
+                            cal_one_points=cal_points[1])
+            else:
+                # multiple readouts per qubit per channel
+                self.proc_data_dict['corr_data'][qb_name] = {}
+                if isinstance(channel_map[qb_name], str):
+                    qb_ro_ch0 = channel_map[qb_name]
+                else:
+                    qb_ro_ch0 = channel_map[qb_name][0]
+                ro_suffixes = [s[len(qb_ro_ch0)+1::] for s in
+                               list(meas_res_dict) if qb_ro_ch0 in s]
+                for i, ro_suf in enumerate(ro_suffixes):
+                    if len(ro_suffixes) == len(meas_res_dict):
+                        # one RO ch per qubit
+                        if self.options_dict.get('TwoD', False):
+                            raw_data_arr = meas_res_dict[list(meas_res_dict)[i]]
+                            self.proc_data_dict['corr_data'][qb_name][ro_suf] = \
+                                deepcopy(raw_data_arr.transpose())
+                            for col in range(raw_data_arr.shape[1]):
+                                self.proc_data_dict['corr_data'][qb_name][
+                                        ro_suf][col] = \
+                                    a_tools.normalize_data_v3(
+                                        data=raw_data_arr[:, col],
+                                        cal_zero_points=cal_points[0],
+                                        cal_one_points=cal_points[1])
+                        else:
+                            self.proc_data_dict['corr_data'][qb_name][ro_suf] = \
+                                a_tools.normalize_data_v3(
+                                    data=meas_res_dict[list(meas_res_dict)[i]],
+                                    cal_zero_points=cal_points[0],
+                                    cal_one_points=cal_points[1])
+                    else:
+                        # two RO ch per qubit
+                        if self.options_dict.get('TwoD', False):
+                            raw_data_arr = meas_res_dict[list(meas_res_dict)[i]]
+                            self.proc_data_dict['corr_data'][qb_name][ro_suf] = \
+                                deepcopy(raw_data_arr.transpose())
+                            for col in range(raw_data_arr.shape[1]):
+                                data_array = np.array(
+                                    [v[:, col] for k, v in meas_res_dict.items()
+                                     if ro_suf in k])
+                                self.proc_data_dict['corr_data'][
+                                        qb_name][ro_suf][col], _, _ = \
+                                    a_tools.rotate_and_normalize_data(
+                                        data=data_array,
+                                        zero_coord=zero_coord,
+                                        one_coord=one_coord,
+                                        cal_zero_points=cal_points[0],
+                                        cal_one_points=cal_points[1])
+                        else:
+                            data_array = np.array(
+                                [v for k, v in meas_res_dict.items()
+                                 if ro_suf in k])
+                            self.proc_data_dict['corr_data'][qb_name][ro_suf], \
+                            _, _ = \
+                                a_tools.rotate_and_normalize_data(
+                                    data=data_array,
+                                    zero_coord=zero_coord,
+                                    one_coord=one_coord,
+                                    cal_zero_points=cal_points[0],
+                                    cal_one_points=cal_points[1])
 
 
 class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
@@ -556,6 +717,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'plotfn': self.plot_text,
                 'box_props': 'fancy',
                 'text_string': self.raw_data_dict['scale_factor_msg']}
+
 
 class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
     """
@@ -2123,4 +2285,120 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
                         ''+str("%.3f" %
                         (self.fit_res['excited_state'].params['tau'].value*1e9))+''
                         ' ns',
-            'do_legend': True }
+            'do_legend': True}
+
+
+class RODynamicPhaseAnalysis(Normalize_Multi_Qubit_Data):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None, single_timestamp: bool=False,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+
+        # self.channel_map = self.options_dict.get('channel_map', None)
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'measurementstring': 'measurementstring',
+                            'sweep_points': 'sweep_points',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        if self.options_dict.get('TwoD', False):
+            self.params_dict['sweep_points_2D'] = 'sweep_points_2D'
+        self.single_timestamp = single_timestamp
+        self.numeric_params = []
+
+        # This analysis makes a hardcoded assumption on the calibration points
+        if self.options_dict.get('cal_points', None):
+            self.options_dict['cal_points'] = [list(range(-4, -2)),
+                                               list(range(-2, 0))]
+        # if self.options_dict.get('RO_channels', None):
+        #     self.options_dict['RO_channels'] = [(0,1)]
+        if auto:
+            self.run_analysis()
+
+    def prepare_fitting(self):
+        pass
+        # NoCalPoints = len(np.array(self.options_dict['cal_points']).flatten())
+        # self.fit_dicts = OrderedDict()
+        # cos_mod = lmfit.Model(fit_mods.CosFunc)
+        # guess_pars = fit_mods.Cos_guess(
+        #     model=cos_mod, t=self.raw_data_dict['sweep_points'][:-NoCalPoints],
+        #     data=self.proc_data_dict['corr_data'][:-NoCalPoints])
+        # guess_pars['amplitude'].vary = True
+        # guess_pars['offset'].vary = True
+        # guess_pars['frequency'].vary = True
+        # guess_pars['phase'].vary = True
+        #
+        # self.fit_dicts['cos_fit'] = {
+        #     'fit_fn': fit_mods.CosFunc,
+        #     'fit_xvals': {'t':
+        #                       self.raw_data_dict['sweep_points'][:-NoCalPoints]},
+        #     'fit_yvals': {'data':
+        #                       self.proc_data_dict['corr_data'][:-NoCalPoints]},
+        #     'guess_pars': guess_pars}
+
+    def analyze_fit_results(self):
+        pass
+        # sf_line = self._get_scale_factor_line()
+        # sf_cos = self._get_scale_factor_cos()
+        # self.proc_data_dict['scale_factor'] = self.get_scale_factor()
+        #
+        # msg = 'Scale fact. based on '
+        # if self.proc_data_dict['scale_factor'] == sf_cos:
+        #     msg += 'cos fit\n'
+        # else:
+        #     msg += 'line fit\n'
+        # msg += 'cos fit: {:.4f}\n'.format(sf_cos)
+        # msg += 'line fit: {:.4f}'.format(sf_line)
+        #
+        # self.raw_data_dict['scale_factor_msg'] = msg
+        # TODO: save scale factor to file
+
+    def prepare_plots(self):
+        pass
+        # self.plot_dicts['main'] = {
+        #     'plotfn': self.plot_line,
+        #     'xvals': self.raw_data_dict['sweep_points'],
+        #     'xlabel': self.raw_data_dict['xlabel'],
+        #     'xunit': self.raw_data_dict['xunit'],  # does not do anything yet
+        #     'yvals': self.proc_data_dict['corr_data'],
+        #     'ylabel': 'Excited state population',
+        #     'yunit': '',
+        #     'setlabel': 'data',
+        #     'title': (self.raw_data_dict['timestamp'] + ' ' +
+        #               self.raw_data_dict['measurementstring']),
+        #     'do_legend': True,
+        #     'legend_pos': 'upper right'}
+        #
+        # if self.do_fitting:
+        #     self.plot_dicts['line_fit'] = {
+        #         'ax_id': 'main',
+        #         'plotfn': self.plot_fit,
+        #         'fit_res': self.fit_dicts['line_fit']['fit_res'],
+        #         'plot_init': self.options_dict['plot_init'],
+        #         'setlabel': 'line fit',
+        #         'do_legend': True,
+        #         'legend_pos': 'upper right'}
+        #
+        #     self.plot_dicts['cos_fit'] = {
+        #         'ax_id': 'main',
+        #         'plotfn': self.plot_fit,
+        #         'fit_res': self.fit_dicts['cos_fit']['fit_res'],
+        #         'plot_init': self.options_dict['plot_init'],
+        #         'setlabel': 'cos fit',
+        #         'do_legend': True,
+        #         'legend_pos': 'upper right'}
+        #
+        #     self.plot_dicts['text_msg'] = {
+        #         'ax_id': 'main',
+        #         'ypos': 0.15,
+        #         'plotfn': self.plot_text,
+        #         'box_props': 'fancy',
+        #         'text_string': self.raw_data_dict['scale_factor_msg']}
+        #

@@ -17,7 +17,8 @@ import itertools
 from collections import OrderedDict
 import numpy as np
 import pycqed.analysis.fitting_models as fit_mods
-from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
+from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, \
+    gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from scipy.optimize import minimize

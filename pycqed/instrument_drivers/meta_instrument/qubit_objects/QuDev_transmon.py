@@ -26,7 +26,11 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
 from pycqed.measurement import optimization as opti
 from pycqed.measurement import mc_parameter_wrapper
 import pycqed.analysis_v2.spectroscopy_analysis as sa
-import pycqed.simulations.readout_mode_simulations_for_CLEAR_pulse as sim_CLEAR
+try:
+    import pycqed.simulations.readout_mode_simulations_for_CLEAR_pulse \
+        as sim_CLEAR
+except ModuleNotFoundError:
+    logging.warning('"readout_mode_simulations_for_CLEAR_pulse" not imported.')
 
 class QuDev_transmon(Qubit):
     def __init__(self, name, MC,
@@ -211,6 +215,14 @@ class QuDev_transmon(Qubit):
                            label='RO pulse Gaussian filter length',
                            vals=vals.Numbers(0),
                            parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_basis_rotation',
+                           initial_value={},
+                           docstring='Dynamic phase acquired by other qubits '
+                                     'due to a measurement tone on this qubit.',
+                           label='RO pulse basis rotation dictionary',
+                           vals=vals.Dict(),
+                           parameter_class=ManualParameter)
+
         # add CLEAR pulse parameters
         self.add_parameter('ro_CLEAR_delta_amp_segment',
                            initial_value=None, unit='',
@@ -227,6 +239,7 @@ class QuDev_transmon(Qubit):
                            label='CLEAR-segment length',
                            vals=vals.Lists(vals.Numbers()),
                            parameter_class=ManualParameter)
+
         # add pulsed spectroscopy pulse parameters
         self.add_operation('Spec')
         self.add_pulse_parameter('Spec', 'spec_pulse_type', 'pulse_type',
