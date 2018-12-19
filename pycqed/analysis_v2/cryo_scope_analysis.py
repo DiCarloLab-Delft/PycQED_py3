@@ -207,7 +207,10 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
                 timestamp=timestamp, auto=False, close_file=False)
             a.get_naming_and_values()
             if i == 0:
-                ch_amp = a.data_file[self.ch_amp_key].attrs['value']
+                if self.ch_amp_key is None: 
+                    ch_amp = 1
+                else: 
+                    ch_amp = a.data_file[self.ch_amp_key].attrs['value']
                 if self.ch_range_key is None:
                     ch_range = 2  # corresponds to a scale factor of 1
                 else:
