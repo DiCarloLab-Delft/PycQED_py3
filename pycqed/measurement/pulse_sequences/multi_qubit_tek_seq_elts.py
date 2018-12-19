@@ -2630,7 +2630,7 @@ def ro_dynamic_phase_seq(qbp_name, qbr_names,
         operation_dict: contains operation dicts from both qubits;
             !!! Must contain 'RO mux' which is the mux RO pulse only for
             the measured_qubits (qbr_names) !!!
-        pulse_separation: separation between the two piHalf pulses, shouls be
+        pulse_separation: separation between the two pi-half pulses, shouls be
             equal to integration length
         cal_points: use cal points
     """
@@ -2639,62 +2639,66 @@ def ro_dynamic_phase_seq(qbp_name, qbr_names,
     seq = sequence.Sequence(seq_name)
     el_list = []
 
+    # put together n-qubit calibration point pulse lists
+    # put together n-qubit ramsey pulse lists
+    cal_I_pulses = []
+    cal_X_pulses = []
+    x90_1_pulses = []  # first ramsey pulse
+    x90_2a_pulses = []  # with readout pulse
+    x90_2b_pulses = []  # without readout pulse
+    for j, qbr_name in enumerate(qbr_names):
+        if j == 0:
+            cal_I_pulses.append(deepcopy(operation_dict['I ' + qbr_name]))
+            cal_X_pulses.append(deepcopy(operation_dict['X180 ' + qbr_name]))
+            x90_1_pulses.append(deepcopy(operation_dict['X90 ' + qbr_name]))
+            x90_2a_pulses.append(deepcopy(operation_dict['X90 ' + qbr_name]))
+            x90_2b_pulses.append(deepcopy(operation_dict['X90 ' + qbr_name]))
+            x90_2a_pulses[-1]['pulse_delay'] = pulse_separation
+            x90_2a_pulses[-1]['refpoint'] = 'start'
+            x90_2b_pulses[-1]['pulse_delay'] = pulse_separation
+        else:
+            cal_I_pulses.append(deepcopy(operation_dict['Is ' + qbr_name]))
+            cal_X_pulses.append(deepcopy(operation_dict['X180s ' + qbr_name]))
+            x90_1_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
+            x90_2a_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
+            x90_2b_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
+    cal_I_pulses.append(operation_dict['RO mux'])
+    cal_X_pulses.append(operation_dict['RO mux'])
+
     for i, theta in enumerate(phases):
-        for reference_meas in [False, True]:
-            qbr_X90pulse1_list = []
-            qbr_X90pulse2_list = []
-            cal_I_pulses = []
-            cal_X_pulses = []
-            for j, qbr_name in enumerate(qbr_names):
-                qbr_X90pulse1 = deepcopy(operation_dict['X90 ' + qbr_name])
-                qbr_X90pulse1['refpoint'] = 'end' if j == 0 else 'start'
-                qbr_X90pulse1_list += [qbr_X90pulse1]
+        if cal_points and (i == (len(phases)-4) or i == (len(phases)-3)):
+            pulse_list = [operation_dict['I ' + qbp_name],
+                          operation_dict['RO ' + qbp_name]]
+            el = multi_pulse_elt(3*i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+            for j in range(1, 3):
+                el = multi_pulse_elt(3*i + j, station, cal_I_pulses)
+                el_list.append(el)
+                seq.append_element(el, trigger_wait=True)
+        elif cal_points and (i == (len(phases)-2) or i == (len(phases)-1)):
+            pulse_list = [operation_dict['X180 ' + qbp_name],
+                          operation_dict['RO ' + qbp_name]]
+            el = multi_pulse_elt(3*i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+            for j in range(1, 3):
+                el = multi_pulse_elt(3*i + j, station, cal_X_pulses)
+                el_list.append(el)
+                seq.append_element(el, trigger_wait=True)
+        else:
+            for qbr_X90_pulse in x90_2a_pulses + x90_2b_pulses:
+                qbr_X90_pulse['phase'] = theta*180/np.pi
 
-                qbr_X90pulse2 = deepcopy(operation_dict['X90 ' + qbr_name])
-                qbr_X90pulse2['pulse_delay'] = \
-                    pulse_separation if j == 0 else 0
-                if reference_meas:
-                    qbr_X90pulse2['refpoint'] = 'end' if j == 0 else 'start'
-                else:
-                    qbr_X90pulse2['refpoint'] = 'start'
-                qbr_X90pulse2_list += [qbr_X90pulse2]
+            pulse_list = x90_1_pulses + [operation_dict['RO ' + qbp_name]] + \
+                         x90_2a_pulses + [operation_dict['RO mux']]
+            el = multi_pulse_elt(3*i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
 
-                # cal pulses
-                cal_I_pulse = deepcopy(operation_dict['I ' + qbr_name])
-                if reference_meas:
-                    cal_I_pulse['refpoint'] = 'end' if j == 0 else 'start'
-                else:
-                    cal_I_pulse['pulse_delay'] = pulse_separation if j == 0 else 0
-                    cal_I_pulse['refpoint'] = 'start'
-                cal_I_pulses += [cal_I_pulse]
-
-                cal_X_pulse = deepcopy(operation_dict['X180 ' + qbr_name])
-                if reference_meas:
-                    cal_X_pulse['refpoint'] = 'end' if j == 0 else 'start'
-                else:
-                    cal_X_pulse['pulse_delay'] = pulse_separation if j == 0 else 0
-                    cal_X_pulse['refpoint'] = 'start'
-                cal_X_pulses += [cal_X_pulse]
-
-            if cal_points and (i == (len(phases)-4) or i == (len(phases)-3)):
-                pulse_list = []
-                if not reference_meas:
-                    pulse_list += [operation_dict['RO ' + qbp_name]]
-                pulse_list += cal_I_pulses + [operation_dict['RO mux']]
-            elif cal_points and (i == (len(phases)-2) or i == (len(phases)-1)):
-                pulse_list = []
-                if not reference_meas:
-                    pulse_list += [operation_dict['RO ' + qbp_name]]
-                pulse_list += cal_X_pulses + [operation_dict['RO mux']]
-            else:
-                for qbr_X90pulse2 in qbr_X90pulse2_list:
-                    qbr_X90pulse2['phase'] = theta*180/np.pi
-
-                pulse_list = qbr_X90pulse1_list
-                if not reference_meas:
-                    pulse_list += [operation_dict['RO ' + qbp_name]]
-                pulse_list += qbr_X90pulse2_list + [operation_dict['RO mux']]
-            el = multi_pulse_elt(i, station, pulse_list)
+            pulse_list = x90_1_pulses + x90_2b_pulses + \
+                         [operation_dict['RO mux']]
+            el = multi_pulse_elt(3*i + 1, station, pulse_list)
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
 

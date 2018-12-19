@@ -21,7 +21,11 @@ import pycqed.analysis.measurement_analysis as ma
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
 import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis.tomography as tomo
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as uhfqc
+try:
+    import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as uhfqc
+except ModuleNotFoundError:
+    logging.warning('"UHFQuantumController" not imported.')
+
 from pycqed.measurement.optimization import nelder_mead, \
                                             generate_new_training_set
 from pygsti import construction as constr
@@ -3023,7 +3027,7 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
     return MC
 
 
-def measure_ro_cross_dephasing(pulsed_qubit, measured_qubits, phases,
+def measure_ro_dynamic_phases(pulsed_qubit, measured_qubits, phases,
                                f_LO, pulse_separation=None,
                                upload=True, cal_points=True,
                                MC=None, UHFQC=None, pulsar=None):
@@ -3076,6 +3080,7 @@ def measure_ro_cross_dephasing(pulsed_qubit, measured_qubits, phases,
     MC.set_sweep_points(phases)
     MC.set_detector_function(df)
     exp_metadata = {'pulse_separation': pulse_separation,
+                    'cal_points': cal_points,
                     'f_LO': f_LO}
     MC.run_2D('RO_DynamicPhase_{}{}'.format(
         pulsed_qubit.name, ''.join(qbr_names)),
