@@ -214,6 +214,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         """
 
         self.metadata = self.raw_data_dict.get('exp_metadata', [{}])[0]
+        if self.metadata is None:
+            self.metadata = {}
         self.channel_map = self.options_dict['channel_map']
         ch_map_lists = {k:v for k,v in self.channel_map.items()
                         if isinstance(v, list)}
@@ -463,7 +465,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             'yvals': yvals,
             'ylabel': 'Excited state population',
             'yunit': '',
-            'setlabel': ['with measurement', 'no measurement'],
+            'setlabel': '',
             'title': (self.raw_data_dict['timestamps'][0] + ' ' +
                       self.raw_data_dict['measurementstring'][0]),
             'linestyle': 'none',
