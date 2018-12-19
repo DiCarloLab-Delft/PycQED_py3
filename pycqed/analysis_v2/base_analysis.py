@@ -951,7 +951,6 @@ class BaseDataAnalysis(object):
             colors = get_color_list(len_color_cycle, cmap)
             if cmap == 'tab10':
                 len_color_cycle = min(10, len_color_cycle)
-
             # plot_*vals is the list of *vals arrays
             for i, (xvals, yvals) in enumerate(zip(plot_xvals, plot_yvals)):
                 p_out.append(pfunc(xvals, yvals,
@@ -989,7 +988,13 @@ class BaseDataAnalysis(object):
             legend_ncol = pdict.get('legend_ncol', 1)
             legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
-            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
+            legend_frameon = pdict.get('legend_frameon', False)
+            legend_bbox_to_anchor = pdict.get('legend_bbox_to_anchor', None)
+            axs.legend(title=legend_title,
+                       loc=legend_pos,
+                       ncol=legend_ncol,
+                       bbox_to_anchor=legend_bbox_to_anchor,
+                       frameon=legend_frameon)
 
         if self.tight_fig:
             axs.figure.tight_layout()
