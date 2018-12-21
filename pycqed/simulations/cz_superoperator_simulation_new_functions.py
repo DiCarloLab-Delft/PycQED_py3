@@ -1217,7 +1217,7 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q
             U_final_vec[i] = qtp.to_super(U_final_vec[i])
         qoi_temp = simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i],t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
         if i==mid_index:
-            print(qoi_temp)
+            print('qoi_temp =',qoi_temp)
         leakage_vec.append(qoi_temp['L1'])
         infid_vec.append(1-qoi_temp['avgatefid_compsubspace_pc'])
         phase_q0_vec.append(qoi_temp['phase_q0'])
@@ -1227,6 +1227,7 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q
         fluxbias_q0=input_to_parallelize[i]['fluxbias_q0']
         fluxbias_q0_vec.append(fluxbias_q0)
 
+    fluxbias_q0_vec=np.array(fluxbias_q0_vec)
     leakage_vec=np.array(leakage_vec)    # absolute value for the leakage
     cond_phase_vec=np.array(cond_phase_vec)-cond_phase_vec[mid_index]       # for phases, relative value to the case with no quasi-static noise
     phase_q0_vec=np.array(phase_q0_vec)-phase_q0_vec[mid_index]
@@ -1234,20 +1235,28 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q
     infid_vec=np.array(infid_vec)        # absolute value for the infidelity
 
     plot(x_plot_vec=[np.array(fluxbias_q0_vec)*1e3],
+                  y_plot_vec=[np.array(leakage_vec)*100],
+                  title='Sensitivity to quasi_static flux offsets',
+                  xlabel='Flux offset (m$\Phi_0$)',ylabel='Leakage $L_1$ (%)',
+                  legend_labels=['leakage'])
+    plot(x_plot_vec=[np.array(fluxbias_q0_vec)*1e3],
                   y_plot_vec=[cond_phase_vec,phase_q0_vec,phase_q1_vec],
                   title='Sensitivity to quasi_static flux offsets',
                   xlabel='Flux offset (m$\Phi_0$)',ylabel='Phase (deg)',
                   legend_labels=['conditional phase err','phase QR err','phase QL err'])
     plot(x_plot_vec=[np.array(fluxbias_q0_vec)*1e3],
-                  y_plot_vec=[np.array(leakage_vec)*100],
+                  y_plot_vec=[np.array(infid_vec)*100],
                   title='Sensitivity to quasi_static flux offsets',
-                  xlabel='Flux offset (m$\Phi_0$)',ylabel='Leakage $L_1$ (%)',
-                  legend_labels=['leakage'])
-    print('fluxbias_q0',fluxbias_q0)
-    print('leakage_vec',leakage_vec)
-    print('cond_phase_vec',cond_phase_vec)
-    print('phase_q0_vec',phase_q0_vec)
-    print('phase_q1_vec',phase_q1_vec)
+                  xlabel='Flux offset (m$\Phi_0$)',ylabel='Infidelity $L_1$ (%)',
+                  legend_labels=['infidelity'])
+
+    print('fluxbias_q0_vec =',fluxbias_q0_vec.tolist())
+    print('leakage_vec =',leakage_vec.tolist())
+    print('cond_phase_vec =',cond_phase_vec.tolist())
+    print('phase_q0_vec =',phase_q0_vec.tolist())
+    print('phase_q1_vec =',phase_q1_vec.tolist())
+    print('infid_vec =',infid_vec.tolist())
+    
 
 
 
