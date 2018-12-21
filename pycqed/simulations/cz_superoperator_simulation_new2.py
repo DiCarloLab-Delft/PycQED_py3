@@ -397,7 +397,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             ## Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
-            #sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q1,alpha_q0)
+            czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q1,alpha_q0)
 
 
             for i in range(len(U_final_vec)):
@@ -424,7 +424,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             ## To study the effect of the coherence of leakage on repeated CZs (simpler than simulating a full RB experiment):
-            #repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0)
+            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0)
 
 
         qoi_plot = np.array(qoi_plot)

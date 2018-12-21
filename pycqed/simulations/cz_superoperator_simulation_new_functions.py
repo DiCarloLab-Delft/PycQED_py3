@@ -1243,6 +1243,11 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q
                   title='Sensitivity to quasi_static flux offsets',
                   xlabel='Flux offset (m$\Phi_0$)',ylabel='Leakage $L_1$ (%)',
                   legend_labels=['leakage'])
+    print('fluxbias_q0',fluxbias_q0)
+    print('leakage_vec',leakage_vec)
+    print('cond_phase_vec',cond_phase_vec)
+    print('phase_q0_vec',phase_q0_vec)
+    print('phase_q1_vec',phase_q1_vec)
 
 
 
