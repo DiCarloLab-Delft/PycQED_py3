@@ -597,6 +597,9 @@ class DeviceCCL(Instrument):
                                         wait_time_ns: int=0,
                                         label='',
                                         flux_codeword='fl_cw_01',
+                                        q2: str=None,
+                                        flux_codeword2: str='fl_cw_03',
+                                        q2_excited: bool=False,
                                         nr_of_repeated_gates: int =1,
                                         verbose=True, disable_metadata=False,
                                         extract_only=False):
@@ -627,15 +630,24 @@ class DeviceCCL(Instrument):
         assert q1 in self.qubits()
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
+        if q2 is None:
+            q2idx = None
+        else:
+            q2idx = self.find_instrument(q2).cfg_qubit_nr()
 
         # These are hardcoded angles in the mw_lutman for the AWG8
-        angles = np.arange(0, 341, 20)
+        angles = np.concatenate([np.arange(0, 101, 20), np.arange(140,341,20)]) #avoid CW15, issue
+        # angles = np.arange(0, 341, 20))
+
         p = mqo.conditional_oscillation_seq(
             q0idx, q1idx, platf_cfg=self.cfg_openql_platform_fn(),
             angles=angles, wait_time_after=wait_time_ns,
             flux_codeword=flux_codeword,
             nr_of_repeated_gates=nr_of_repeated_gates,
-            CZ_disabled=CZ_disabled)
+            CZ_disabled=CZ_disabled,
+            q2=q2idx,
+            flux_codeword2=flux_codeword2,
+            q2_excited=q2_excited)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Phase', unit='deg')
@@ -657,6 +669,9 @@ class DeviceCCL(Instrument):
             print(info_msg)
 
         return a
+
+
+
 
     def measure_two_qubit_grovers_repeated(
             self, qubits: list, nr_of_grover_iterations=40,
@@ -762,11 +777,12 @@ class DeviceCCL(Instrument):
     def measure_single_qubit_parity(self, qD: str, qA: str,
                                     number_of_repetitions: int = 1,
                                     initialization_msmt: bool=False,
-                                    initial_states=[0, 1],
+                                    initial_states=['0', '1'],
                                     nr_shots: int=4088*4,
                                     flux_codeword: str = 'fl_cw_01',
                                     analyze: bool=True, close_fig: bool=True,
-                                    prepare_for_timedomain: bool=True, MC=None):
+                                    prepare_for_timedomain: bool=True, MC=None,
+                                    parity_axis='Z'):
         assert qD in self.qubits()
         assert qA in self.qubits()
         if prepare_for_timedomain:
@@ -782,14 +798,15 @@ class DeviceCCL(Instrument):
                                            number_of_repetitions=number_of_repetitions,
                                            initialization_msmt=initialization_msmt,
                                            initial_states=initial_states,
-                                           flux_codeword=flux_codeword
+                                           flux_codeword=flux_codeword,
+                                           parity_axis=parity_axis
                                            )
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
 
 
 
-        d = self.get_int_logging_detector(qubits=[qD,qA],
+        d = self.get_int_logging_detector(qubits=[qA],
                                           result_logging_mode='lin_trans')
         d.nr_shots = 4088  # To ensure proper data binning
 
@@ -820,19 +837,24 @@ class DeviceCCL(Instrument):
     def measure_two_qubit_parity(self, qD0: str,qD1: str, qA: str,
                                     number_of_repetitions: int = 1,
                                     initialization_msmt: bool=False,
-                                    initial_states=[0, 1, 3, 2], #nb: this groups even and odd
-                                    nr_shots: int=4088*4,
+                                    initial_states=[['0','0'],['0','1'],['1','1',],['1','0']], #nb: this groups even and odd
+                                    # nr_shots: int=4088*4,
                                     flux_codeword0: str = 'fl_cw_03',
                                     flux_codeword1: str = 'fl_cw_01',
                                     analyze: bool=True, close_fig: bool=True,
                                     prepare_for_timedomain: bool=True, MC=None,
                                     echo: bool=True,
-                                    post_select_threshold: float=None):
+                                    post_select_threshold: float=None,
+                                    parity_axes=['ZZ'], tomo=False,
+                                    tomo_after=False,
+                                    ro_time=1000e-9,
+                                    echo_during_ancilla_mmt: bool=True
+                                    ):
         assert qD0 in self.qubits()
         assert qD1 in self.qubits()
         assert qA in self.qubits()
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[qD1,qD0,qA])
+            self.prepare_for_timedomain(qubits=[qD1, qD0, qA])
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -847,8 +869,12 @@ class DeviceCCL(Instrument):
                                            initial_states=initial_states,
                                            flux_codeword0=flux_codeword0,
                                            flux_codeword1=flux_codeword1,
-                                           echo=echo
-                                           )
+                                           echo=echo,
+                                           parity_axes=parity_axes,
+                                           tomo=tomo,
+                                           tomo_after=tomo_after,
+                                           ro_time=ro_time,
+                                           echo_during_ancilla_mmt=echo_during_ancilla_mmt)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
 
@@ -856,7 +882,28 @@ class DeviceCCL(Instrument):
 
         d = self.get_int_logging_detector(qubits=[qD1, qD0, qA],
                                           result_logging_mode='lin_trans')
-        d.nr_shots = 4088  # To ensure proper data binning
+
+        if tomo:
+            mmts_per_round = (number_of_repetitions*len(parity_axes)+1*initialization_msmt+1*tomo_after)
+            print('mmts_per_round', mmts_per_round)
+            nr_shots = 2048*64*mmts_per_round  # To ensure proper data binning
+            if mmts_per_round < 8:
+                d.nr_shots = 2048*64*mmts_per_round  # To ensure proper data binning
+            elif mmts_per_round < 10:
+                d.nr_shots = 64*64*mmts_per_round  # To ensure proper data binning
+            elif mmts_per_round < 20:
+                d.nr_shots = 32*64*mmts_per_round  # To ensure proper data binning
+            elif mmts_per_round < 40:
+                d.nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
+            else:
+                d.nr_shots = 8*64*mmts_per_round  # To ensure proper data binning
+            print('detector shots', d.nr_shots)
+
+
+        else:
+            d.nr_shots = 4096*8  # To ensure proper data binning
+            nr_shots = 4096*8  # To ensure proper data binning
+
 
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
@@ -866,21 +913,23 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        name='Two_qubit_parity_{}_{}_{}_{}'.format(qD1,qD0,qA, self.msmt_suffix)
+        name = 'Two_qubit_parity_{}_{}_{}_{}_{}'.format(parity_axes, qD1, qD0, qA, self.msmt_suffix)
         MC.run(name)
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
-            a = mra.two_qubit_ssro_fidelity(name)
-        #    a = ma2.Multiplexed_Readout_Analysis()
+            if not tomo:
+                if not initialization_msmt:
+                    a = mra.two_qubit_ssro_fidelity(name)
             a = ma2.Singleshot_Readout_Analysis(
-                t_start=None, t_stop=None,
-                label=name,
-                options_dict={'post_select': initialization_msmt,
-                              'nr_samples': 2+2*initialization_msmt,
-                              'post_select_threshold':self.find_instrument(qA).ro_acq_threshold()},
-                extract_only=False)
-        return a
+                    t_start=None, t_stop=None,
+                    label=name,
+                    options_dict={'post_select': initialization_msmt,
+                                  'nr_samples': 2+2*initialization_msmt,
+                                  'post_select_threshold':self.find_instrument(qA).ro_acq_threshold(),
+                                  'preparation_labels':['prep. 00, 11', 'prep. 01, 10']},
+                    extract_only=False)
+            return a
 
 
 
@@ -974,7 +1023,7 @@ class DeviceCCL(Instrument):
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
                                               prepare_for_timedomain=True,
-                                              amps_rel=np.linspace(0, 1, 25),
+                                              amps_rel=np.linspace(0, 1, 11),
                                               verbose=True,
                                               get_quantum_eff: bool=False,
                                               dephasing_sequence='ramsey'):
@@ -999,15 +1048,15 @@ class DeviceCCL(Instrument):
             self.prepare_for_timedomain(qubits=qubits)
 
         # Save old qubit suffixes
-        old_suffixes = [q.msmt_suffix for q in qubits]
+        old_suffixes = [self.find_instrument(q).msmt_suffix for q in qubits]
         old_suffix = self.msmt_suffix
 
         # Save the start-time of the experiment for analysis
         start = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # Loop over all target and measurement qubits
-        target_qubits = qubits[:]
-        measured_qubits = qubits[:]
+        target_qubits = [self.find_instrument(q) for q in qubits]
+        measured_qubits = [self.find_instrument(q) for q in qubits]
         for target_qubit in target_qubits:
             for measured_qubit in measured_qubits:
                 # Set measurement label suffix
@@ -1060,7 +1109,7 @@ class DeviceCCL(Instrument):
 
         # reset the msmt_suffix'es
         for qi, q in enumerate(qubits):
-            q.msmt_suffix = old_suffixes[qi]
+            self.find_instrument(q).msmt_suffix = old_suffixes[qi]
         self.msmt_suffix = old_suffix
 
         # Run the analysis for this experiment
@@ -1068,7 +1117,7 @@ class DeviceCCL(Instrument):
             options_dict = {
                 'verbose': True,
             }
-            qarr = [q.name for q in qubits]
+            qarr = qubits
             labelpatt = 'ro_amp_sweep_dephasing'+lpatt
             ca = ma2.CrossDephasingAnalysis(t_start=start, t_stop=stop,
                                             label_pattern=labelpatt,
@@ -1513,7 +1562,7 @@ class DeviceCCL(Instrument):
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
-
+        d = self.get_int_logging_detector(qubits=qubits)
         MC.soft_avg(1)
         # set back the settings
         self.ro_acq_weight_type(old_weight_type)
@@ -1570,7 +1619,7 @@ class DeviceCCL(Instrument):
         else:
             sweep_points = np.repeat(nr_cliffords, 2)
 
-        d = self.get_int_logging_detector(qubits=qubits)
+
 
         counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
@@ -1720,6 +1769,7 @@ class DeviceCCL(Instrument):
 
         MC.soft_avg(1)
         # set back the settings
+        d = self.get_int_logging_detector(qubits=qubits)
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
@@ -1762,7 +1812,7 @@ class DeviceCCL(Instrument):
         print('Succesfully generated {} Character benchmarking programs in {:.1f}s'.format(
             nr_seeds, time.time()-t0))
 
-        d = self.get_int_logging_detector(qubits=qubits)
+
 
         counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
