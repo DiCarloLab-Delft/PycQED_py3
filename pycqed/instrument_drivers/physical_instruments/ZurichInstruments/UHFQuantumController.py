@@ -690,28 +690,29 @@ class UHFQC(Instrument):
 
     def prepare_SSB_weight_and_rotation(self, IF,
                                         weight_function_I=0,
-                                        weight_function_Q=1):
+                                        weight_function_Q=1,
+                                        rotation_angle=0):
         """
         Sets defualt integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
         """
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        print(len(tbase))
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+        cosI = np.array(np.cos(2*np.pi*IF*tbase+rotation_angle))
+        sinI = np.array(np.sin(2*np.pi*IF*tbase+rotation_angle))
         self.set('quex_wint_weights_{}_real'.format(weight_function_I),
                  np.array(cosI))
         self.set('quex_wint_weights_{}_imag'.format(weight_function_I),
                  np.array(sinI))
-        self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
-                 np.array(sinI))
-        self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
-                 np.array(cosI))
         self.set('quex_rot_{}_real'.format(weight_function_I), 1.0)
         self.set('quex_rot_{}_imag'.format(weight_function_I), 1.0)
-        self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
-        self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
+        if weight_function_Q!=None:
+            self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
+                     np.array(sinI))
+            self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
+                     np.array(cosI))
+            self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
+            self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
 
     def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
