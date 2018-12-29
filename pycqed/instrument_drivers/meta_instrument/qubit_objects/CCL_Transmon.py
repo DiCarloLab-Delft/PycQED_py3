@@ -273,6 +273,23 @@ class CCLight_Transmon(Qubit):
         self.add_parameter('ro_acq_threshold', unit='dac-value',
                            initial_value=0,
                            parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_rotated_SSB_when_optimal', vals=vals.Bool(),
+                           docstring=(
+                               'bypasses optimal weights, and uses rotated SSB instead'),
+                           initial_value=False,
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_rotated_SSB_rotation_angle',vals=vals.Numbers(
+                               min_value=-np.pi, max_value=np.pi),
+                           docstring=(
+                               'uses this as the rotation angle for rotated SSB'),
+                           initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_integration_length_weigth_function',vals=vals.Numbers(
+                               min_value=0, max_value=4096/1.8e9),
+                           docstring=(
+                               'sets weight function elements to 0 beyond this time'),
+                           initial_value=4096/1.8e9,
+                           parameter_class=ManualParameter)
 
         # self.add_parameter('cal_pt_zero',
         #                    initial_value=None,
@@ -646,6 +663,7 @@ class CCLight_Transmon(Qubit):
                            initial_value=False,
                            parameter_class=ManualParameter)
 
+
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
                            initial_value=300e6,
@@ -957,6 +975,13 @@ class CCLight_Transmon(Qubit):
                         self.ro_acq_weight_func_Q() is None):
                     logging.warning('Optimal weights are None,' +
                                     ' not setting integration weights')
+                elif self.ro_acq_rotated_SSB_when_optimal():
+                    #this allows bypasing the optimal weights for poor SNR qubits
+                    UHFQC.prepare_SSB_weight_and_rotation(
+                                IF=self.ro_freq_mod(),
+                                weight_function_I=self.ro_acq_weight_chI(),
+                                weight_function_Q=None,
+                                rotation_angle=self.ro_acq_rotated_SSB_rotation_angle())
                 else:
                     # When optimal weights are used, only the RO I weight
                     # channel is used
@@ -1909,6 +1934,7 @@ class CCLight_Transmon(Qubit):
                     a = ma.SSRO_Analysis(label='SSRO',
                                          channels=d.value_names,
                                          no_fits=no_figs, rotate=True)
+                    self.ro_acq_rotated_SSB_rotation_angle(a.theta)
                     return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
 
     def measure_SSRO_frequency_amplitude_sweep(self, freqs=None, amps_rel=np.linspace(0, 1, 11),
@@ -2840,6 +2866,7 @@ class CCLight_Transmon(Qubit):
             platf_cfg = multi_qubit_platf_cfg
 
         self.prepare_for_timedomain()
+        self.instr_LutMan_MW.get_instr().load_phase_pulses_to_AWG_lookuptable()
         if cross_target_qubits is None:
             qubits = [self.cfg_qubit_nr()]
         else:
@@ -2848,7 +2875,8 @@ class CCLight_Transmon(Qubit):
                 qubits.append(cross_target_qubit.cfg_qubit_nr())
             qubits.append(self.cfg_qubit_nr())
 
-        angles = np.arange(0, 421, 20)
+        # angles = np.arange(0, 421, 20)
+        angles = np.concatenate([np.arange(0, 101, 20), np.arange(140,421,20)]) #avoid CW15, issue
         if sequence == 'ramsey':
             p = mqo.Ramsey_msmt_induced_dephasing(qubits=qubits, angles=angles,
                                                   platf_cfg=platf_cfg)
@@ -3452,10 +3480,7 @@ class CCLight_Transmon(Qubit):
                 ro_len += cross_target_qubit.ro_pulse_down_length1()
                 readout_pulse_lengths.append(ro_len)
             readout_pulse_length = np.max(readout_pulse_lengths)
-        print(cfg_qubit_nrs)
-        print(optimization_M_amps)
-        print(optimization_M_amp_down0s)
-        print(optimization_M_amp_down1s)
+
 
         RO_lutman = self.instr_LutMan_RO.get_instr()
         if sequence == 'ramsey':
@@ -3476,7 +3501,7 @@ class CCLight_Transmon(Qubit):
 
         self.ro_acq_delay(old_delay + readout_pulse_length + d)
 
-        self.ro_acq_integration_length(readout_pulse_length+100e-9)
+        #self.ro_acq_integration_length(readout_pulse_length+100e-9)
         self.ro_acq_weight_type('SSB')
         self.prepare_for_timedomain()
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
@@ -3574,11 +3599,11 @@ class CCLight_Transmon(Qubit):
         readout_pulse_length = self.ro_pulse_length()
         readout_pulse_length += self.ro_pulse_down_length0()
         readout_pulse_length += self.ro_pulse_down_length1()
-        self.ro_acq_integration_length(readout_pulse_length+100e-9)
+        #self.ro_acq_integration_length(readout_pulse_length+0e-9)
 
         self.ro_pulse_type('up_down_down')
-        # calibrate optimal weights
-        self.calibrate_optimal_weights(verify=False)
+        # setting acquisition weights to optimal
+        self.ro_acq_weight_type('optimal')
 
         # calibrate residual excitation and relaxation at high power
         self.measure_ssro(cal_residual_excitation=True, SNR_detector=True,
