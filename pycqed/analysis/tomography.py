@@ -11,6 +11,7 @@ import lmfit
 
 import matplotlib.pyplot as plt
 from pycqed.analysis import measurement_analysis as ma
+import pycqed.analysis.tools.data_manipulation as dm_tools
 
 
 class TomoAnalysis_JointRO():
@@ -761,7 +762,18 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                  single_shots=True,
                  fig_format='png',
                  q0_label='q0',
-                 q1_label='q1', close_fig=True, **kw):
+                 q1_label='q1',
+                 q_post_select_label='qA',
+                 q_post_select=False, #parity ancilla
+                 q_post_select_threshold=0, #ancilla threshold
+                 q_post_selection_states=[0], #selecting on excited state
+                 q_post_selection_indices=[0],
+                 weight_channels=[0, 1],
+                 close_fig=True,
+                 tomo_after_ancilla_mmt=False,
+                 q_post_select_initialisation=False,
+                 nr_parity_check_rounds=1,
+                 **kw):
         self.label = label
         self.timestamp = timestamp
         self.target_cardinal = target_cardinal
@@ -775,6 +787,16 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.q1_label = q1_label
         self.close_fig = close_fig
         self.single_shots = single_shots
+        #parameters for parity measurements
+        self.q_post_select_label = q_post_select_label
+        self.q_post_select = q_post_select
+        self.q_post_selection_states = q_post_selection_states
+        self.q_post_selection_indices = q_post_selection_indices
+        self.q_post_select_threshold = q_post_select_threshold
+        self.weight_channels = weight_channels
+        self.tomo_after_ancilla_mmt = tomo_after_ancilla_mmt
+        self.q_post_select_initialisation = q_post_select_initialisation
+        self.nr_parity_check_rounds = nr_parity_check_rounds
         kw['h5mode'] = 'r+'
         super(Tomo_Multiplexed, self).__init__(auto=auto, timestamp=timestamp,
                                                label=label, **kw)
@@ -787,17 +809,78 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         # constraint imposed by UHFLI
         self.nr_segments = 64
         self.exp_name = os.path.split(self.folder)[-1][7:]
-        if self.single_shots:
-            self.shots_q0 = np.zeros(
-                (self.nr_segments, int(len(self.measured_values[0])/self.nr_segments)))
-            self.shots_q1 = np.zeros(
-                (self.nr_segments, int(len(self.measured_values[1])/self.nr_segments)))
-            for i in range(self.nr_segments):
-                self.shots_q0[i, :] = self.measured_values[0][i::self.nr_segments]
-                self.shots_q1[i, :] = self.measured_values[1][i::self.nr_segments]
+        nr_consecutive_mmts = self.nr_parity_check_rounds+self.tomo_after_ancilla_mmt+self.q_post_select_initialisation
+        print('nr consecutive mmts per run', nr_consecutive_mmts)
 
+        if self.single_shots:
+            #data qubit tomo results:
+            measured_values1_preshaping = self.measured_values[self.weight_channels[0]][nr_consecutive_mmts-1::nr_consecutive_mmts] #only selecting the last data qubit outcome
+            measured_values2_preshaping = self.measured_values[self.weight_channels[1]][nr_consecutive_mmts-1::nr_consecutive_mmts] #only selecting the last data qubit outcome
+            nr_runs = int(len(measured_values1_preshaping)/self.nr_segments)
+
+            # reshaping results according to segments and runs
+            measured_values1 = np.zeros(
+                (self.nr_segments, nr_runs))
+            measured_values2 = np.zeros(
+                (self.nr_segments, nr_runs))
+            for i in range(self.nr_segments):
+                measured_values1[i, :] = measured_values1_preshaping[i::self.nr_segments]
+                measured_values2[i, :] = measured_values2_preshaping[i::self.nr_segments]
+
+            #ancilla qubit data preparation
+            if self.q_post_select:
+                measured_values_ancilla = np.zeros((self.nr_segments, nr_consecutive_mmts,  nr_runs))
+                measured_values_ancilla_preshaping = self.measured_values[self.weight_channels[2]]
+                for j in range(nr_consecutive_mmts):
+                    measured_values_ancilla_select = measured_values_ancilla_preshaping[j::nr_consecutive_mmts]
+                    for i in range(self.nr_segments):
+                        measured_values_ancilla[i, j, :] = measured_values_ancilla_select[i::self.nr_segments]
+
+            if self.q_post_select_initialisation: #only initizilizing the ancilla
+                    measured_values_ancilla_preshaping = self.measured_values[self.weight_channels[2]][0::nr_consecutive_mmts] #only selecting the last data qubit outcome
+                    measured_values_ancilla_init = np.zeros((self.nr_segments, nr_runs))
+                    for i in range(self.nr_segments):
+                        measured_values_ancilla_init[i, :] = measured_values_ancilla_preshaping[i::self.nr_segments]
+
+            #digitizing and serivative of the ancilla outcomes and postselection of the data qubit outcomes
+            for i in range(36): #no selection on the calibration points, only the 36 runs
+                # post selecting on initialization measurement
+                if self.q_post_select_initialisation:
+                    shots_qA_init = measured_values_ancilla_init[i]
+                    post_select_indices_0 = dm_tools.get_post_select_indices(
+                            thresholds=[self.q_post_select_threshold],
+                            init_measurements=[shots_qA_init],
+                            positive_case=True)
+                    measured_values1[i, :][post_select_indices_0] = np.nan
+                    measured_values2[i, :][post_select_indices_0] = np.nan
+
+                if self.q_post_select:
+                    # first digitize the 2D array
+                    # post selecting on parity measurement outcomes
+                    # 1. selecting a trace to analyze
+                    if self.tomo_after_ancilla_mmt: #throw away last point
+                        ancilla_outcomes = measured_values_ancilla[i,:,:]
+                    else:
+                        ancilla_outcomes = measured_values_ancilla[i,:,:]
+                    # 2. digitize the trace to 0 (ground) and 1 (excited)
+                    ancilla_outcomes=dm_tools.digitize(data=ancilla_outcomes,
+                                                       threshold=self.q_post_select_threshold,
+                                                       zero_state=0)
+                    # 3. take the binary derivative for the 2D arrays
+                    ancilla_outcomes_derivative=dm_tools.binary_derivative_2D(ancilla_outcomes, axis=1)
+                    # gettinh the postselection indeces based on the relevant postselection index
+                    for index, state in zip(self.q_post_selection_indices, self.q_post_selection_states):
+                        post_select_indices_0 = np.array(np.where(ancilla_outcomes_derivative[index,:]!=state)).flatten()
+                        measured_values1[i, :][post_select_indices_0] = np.nan
+                        measured_values2[i, :][post_select_indices_0] = np.nan
+                    fraction=np.array(measured_values1[i,:])
+
+            print(np.size(measured_values1[i,:]))
+            print('pos_selection_fraction ', fraction)
             # Get correlations between shots
-            self.shots_q0q1 = np.multiply(self.shots_q1, self.shots_q0)
+            self.shots_q0q1 = np.multiply(measured_values2, measured_values1)
+            # self.shots_q0 = measured_values1
+            # self.shots_q1 = measured_values2
 
             if self.start_shot != 0 or self.end_shot != -1:
                 self.shots_q0 = self.shots_q0[:, self.start_shot:self.end_shot]
@@ -808,29 +891,29 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             # Making  the first figure, tomo shots
             ##########################################
 
-            avg_h1 = np.mean(self.shots_q0, axis=1)
-            avg_h2 = np.mean(self.shots_q1, axis=1)
-            avg_h12 = np.mean(self.shots_q0q1, axis=1)
+            avg_h1 = np.nanmean(measured_values1, axis=1)
+            avg_h2 = np.nanmean(measured_values2, axis=1)
+            avg_h12 = np.nanmean(self.shots_q0q1, axis=1)
         else:
             avg_h1 = self.measured_values[0]
             avg_h2 = self.measured_values[1]
             avg_h12 = self.measured_values[2]
 
         # Binning all the points required for the tomo
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
+        h1_00 = np.nanmean(avg_h1[36:36+7])
+        h1_01 = np.nanmean(avg_h1[43:43+7])
+        h1_10 = np.nanmean(avg_h1[50:50+7])
+        h1_11 = np.nanmean(avg_h1[57:])
 
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
+        h2_00 = np.nanmean(avg_h2[36:36+7])
+        h2_01 = np.nanmean(avg_h2[43:43+7])
+        h2_10 = np.nanmean(avg_h2[50:50+7])
+        h2_11 = np.nanmean(avg_h2[57:])
 
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
+        h12_00 = np.nanmean(avg_h12[36:36+7])
+        h12_01 = np.nanmean(avg_h12[43:43+7])
+        h12_10 = np.nanmean(avg_h12[50:50+7])
+        h12_11 = np.nanmean(avg_h12[57:])
 
         # std_arr = np.array( std_h2_00, std_h2_01, std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
         # plt.plot(std_arr)
@@ -856,39 +939,39 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         # dived by scalefactor
 
         # key for next step
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
+        h1_00 = np.nanmean(avg_h1[36:36+7])
+        h1_01 = np.nanmean(avg_h1[43:43+7])
+        h1_10 = np.nanmean(avg_h1[50:50+7])
+        h1_11 = np.nanmean(avg_h1[57:])
 
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
+        h2_00 = np.nanmean(avg_h2[36:36+7])
+        h2_01 = np.nanmean(avg_h2[43:43+7])
+        h2_10 = np.nanmean(avg_h2[50:50+7])
+        h2_11 = np.nanmean(avg_h2[57:])
 
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
+        h12_00 = np.nanmean(avg_h12[36:36+7])
+        h12_01 = np.nanmean(avg_h12[43:43+7])
+        h12_10 = np.nanmean(avg_h12[50:50+7])
+        h12_11 = np.nanmean(avg_h12[57:])
 
-        std_h1_00 = np.std(avg_h1[36:36+7])
-        std_h1_01 = np.std(avg_h1[43:43+7])
-        std_h1_10 = np.std(avg_h1[50:50+7])
-        std_h1_11 = np.std(avg_h1[57:])
+        std_h1_00 = np.nanstd(avg_h1[36:36+7])
+        std_h1_01 = np.nanstd(avg_h1[43:43+7])
+        std_h1_10 = np.nanstd(avg_h1[50:50+7])
+        std_h1_11 = np.nanstd(avg_h1[57:])
 
-        std_h2_00 = np.std(avg_h2[36:36+7])
-        std_h2_01 = np.std(avg_h2[43:43+7])
-        std_h2_10 = np.std(avg_h2[50:50+7])
-        std_h2_11 = np.std(avg_h2[57:])
+        std_h2_00 = np.nanstd(avg_h2[36:36+7])
+        std_h2_01 = np.nanstd(avg_h2[43:43+7])
+        std_h2_10 = np.nanstd(avg_h2[50:50+7])
+        std_h2_11 = np.nanstd(avg_h2[57:])
 
-        std_h12_00 = np.std(avg_h12[36:36+7])
-        std_h12_01 = np.std(avg_h12[43:43+7])
-        std_h12_10 = np.std(avg_h12[50:50+7])
-        std_h12_11 = np.std(avg_h12[57:])
+        std_h12_00 = np.nanstd(avg_h12[36:36+7])
+        std_h12_01 = np.nanstd(avg_h12[43:43+7])
+        std_h12_10 = np.nanstd(avg_h12[50:50+7])
+        std_h12_11 = np.nanstd(avg_h12[57:])
 
-        std_h1 = np.mean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
-        std_h2 = np.mean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
-        std_h12 = np.mean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
+        std_h1 = np.nanmean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
+        std_h2 = np.nanmean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
+        std_h12 = np.nanmean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
         std_arr = np.array([std_h1_00, std_h1_01, std_h1_10, std_h1_11, std_h2_00, std_h2_01,
                             std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
 
@@ -896,25 +979,25 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         # plt.plot(std_arr)
         # plt.show()
 
-        fac = np.mean([std_h1, std_h2, std_h12])
+        fac = np.nanmean([std_h1, std_h2, std_h12])
         avg_h1 *= fac/std_h1
         avg_h2 *= fac/std_h2
         avg_h12 *= fac/std_h12
 
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
+        h1_00 = np.nanmean(avg_h1[36:36+7])
+        h1_01 = np.nanmean(avg_h1[43:43+7])
+        h1_10 = np.nanmean(avg_h1[50:50+7])
+        h1_11 = np.nanmean(avg_h1[57:])
 
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
+        h2_00 = np.nanmean(avg_h2[36:36+7])
+        h2_01 = np.nanmean(avg_h2[43:43+7])
+        h2_10 = np.nanmean(avg_h2[50:50+7])
+        h2_11 = np.nanmean(avg_h2[57:])
 
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
+        h12_00 = np.nanmean(avg_h12[36:36+7])
+        h12_01 = np.nanmean(avg_h12[43:43+7])
+        h12_10 = np.nanmean(avg_h12[50:50+7])
+        h12_11 = np.nanmean(avg_h12[57:])
 
         self.plot_TV_mode(avg_h1, avg_h2, avg_h12)
         #############################
@@ -989,10 +1072,10 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             self.operators_fit = self.operators
         """
         bell_idx (int) : integer referring to a specific bell state.
-            0: |Psi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
-            1: |Psi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
+            0: |Phi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
+            1: |Phi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
             2: |Psi_m> = |01> - |10>   (<XX>,<YY>,<ZZ>) = (-1,-1,-1)
-            3: |Psi_m> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
+            3: |Psi_p> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
         """
 
         fit_func_wrapper = lambda dummy_x, angle_MSQ,\
@@ -1163,8 +1246,10 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                      fig=fig3,
                                      ax=fig3.add_subplot(122, projection='3d'))
 
-        figname = 'MLE-Tomography_Exp_{}.{}'.format(self.exp_name,
-                                                    self.fig_format)
+
+        figname = 'MLE-Tomography_states_{}_indices_{}_Exp_{}.{}'.format(self.q_post_selection_states, self.q_post_selection_indices, self.exp_name,
+                                                    self.fig_format,
+                                                    )
         fig3.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         savename = os.path.abspath(os.path.join(
             self.folder, figname))

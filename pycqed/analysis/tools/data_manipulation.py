@@ -265,10 +265,13 @@ def digitize(data, threshold: float, one_larger_than_threshold: bool=True,
     return data_digitized
 
 
-def get_post_select_indices(thresholds, init_measurements):
+def get_post_select_indices(thresholds, init_measurements, positive_case=True):
     post_select_indices = []
     for th, in_m in zip(thresholds, init_measurements):
-        post_select_indices.append(np.where(in_m> th)[0])
+        if positive_case:
+            post_select_indices.append(np.where(in_m> th)[0])
+        else:
+            post_select_indices.append(np.where(in_m< th)[0])
 
     post_select_indices = np.unique(np.concatenate(post_select_indices))
     return post_select_indices
@@ -570,9 +573,9 @@ def populations_using_rate_equations(SI: np.array, SX: np.array,
 
     Parameters:
     -----------
-    SI : array 
+    SI : array
         signal value for signal with I (Identity) added
-    SX : array 
+    SX : array
         signal value for signal with X (π-pulse) added
     V0 : float
         Reference signal level for 0-state (calibration point).
@@ -581,7 +584,7 @@ def populations_using_rate_equations(SI: np.array, SX: np.array,
     V2 : float
         Reference signal level for 2-state (calibration point).
 
-    
+
     Returns:
     --------
     P0 : array
@@ -590,7 +593,7 @@ def populations_using_rate_equations(SI: np.array, SX: np.array,
         population of the |1> state
     P2 : array
         population of the |2> state
-    M_inv : 2D array  
+    M_inv : 2D array
         Matrix inverse to find populations
 
     Based on equation (S1) from Asaad & Dickel et al. npj Quant. Info. (2016)
@@ -612,10 +615,10 @@ def populations_using_rate_equations(SI: np.array, SX: np.array,
     M = np.array([[V0-V2, V1-V2], [V1-V2, V0-V2]])
     M_inv = np.linalg.inv(M)
 
-    # using lists instead of preallocated array allows this to work 
-    # with ufloats 
-    P0 = [] 
-    P1 = [] 
+    # using lists instead of preallocated array allows this to work
+    # with ufloats
+    P0 = []
+    P1 = []
     for i, (sI, sX) in enumerate(zip(SI, SX)):
         p0, p1 = np.dot(np.array([sI-V2, sX-V2]), M_inv)
         p0, p1 = np.dot(M_inv, np.array([sI-V2, sX-V2]))
@@ -624,7 +627,7 @@ def populations_using_rate_equations(SI: np.array, SX: np.array,
 
     P0 = np.array(P0)
     P1 = np.array(P1)
-    
+
     P2 = 1 - P0 - P1
 
     return P0, P1, P2, M_inv
