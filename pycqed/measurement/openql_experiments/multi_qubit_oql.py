@@ -1151,8 +1151,8 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                                     k.gate('rx180', [qD0])
                                     k.gate('rx180', [qD1])
                                 elif parity_axis=='XX':
-                                    k.gate('rx180', [qD0])
-                                    k.gate('rx180', [qD1])
+                                    k.gate('ry180', [qD0])
+                                    k.gate('ry180', [qD1])
                                 elif parity_axis=='YY':
                                     k.gate('rx180', [qD0])
                                     k.gate('rx180', [qD1])

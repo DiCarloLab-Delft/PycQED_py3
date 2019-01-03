@@ -886,9 +886,9 @@ class DeviceCCL(Instrument):
         if tomo:
             mmts_per_round = (number_of_repetitions*len(parity_axes)+1*initialization_msmt+1*tomo_after)
             print('mmts_per_round', mmts_per_round)
-            nr_shots = 2048*64*mmts_per_round  # To ensure proper data binning
-            if mmts_per_round < 8:
-                d.nr_shots = 2048*64*mmts_per_round  # To ensure proper data binning
+            nr_shots = 4096*64*mmts_per_round  # To ensure proper data binning
+            if mmts_per_round < 4:
+                d.nr_shots = 4096*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 10:
                 d.nr_shots = 64*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 20:
@@ -907,6 +907,7 @@ class DeviceCCL(Instrument):
 
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
+        self.msmt_suffix='rounds{}'.format(number_of_repetitions)
         MC.soft_avg(1)
         MC.live_plot_enabled(False)
 

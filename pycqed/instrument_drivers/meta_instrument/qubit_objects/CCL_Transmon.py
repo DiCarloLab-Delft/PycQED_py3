@@ -981,7 +981,8 @@ class CCLight_Transmon(Qubit):
                                 IF=self.ro_freq_mod(),
                                 weight_function_I=self.ro_acq_weight_chI(),
                                 weight_function_Q=None,
-                                rotation_angle=self.ro_acq_rotated_SSB_rotation_angle())
+                                rotation_angle=self.ro_acq_rotated_SSB_rotation_angle(),
+                                length=self.ro_acq_integration_length_weigth_function())
                 else:
                     # When optimal weights are used, only the RO I weight
                     # channel is used
