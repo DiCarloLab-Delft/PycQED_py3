@@ -691,7 +691,8 @@ class UHFQC(Instrument):
     def prepare_SSB_weight_and_rotation(self, IF,
                                         weight_function_I=0,
                                         weight_function_Q=1,
-                                        rotation_angle=0):
+                                        rotation_angle=0,
+                                        length=4096/1.8e9):
         """
         Sets defualt integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
@@ -700,6 +701,13 @@ class UHFQC(Instrument):
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase+rotation_angle))
         sinI = np.array(np.sin(2*np.pi*IF*tbase+rotation_angle))
+        if length<4096/1.8e9:
+            max_sample=int(length*1.8e9)
+            print(max_sample)
+            #setting the samples beyond the length to 0
+            cosI[max_sample:]=0
+            sinI[max_sample:]=0
+            print(cosI)
         self.set('quex_wint_weights_{}_real'.format(weight_function_I),
                  np.array(cosI))
         self.set('quex_wint_weights_{}_imag'.format(weight_function_I),
