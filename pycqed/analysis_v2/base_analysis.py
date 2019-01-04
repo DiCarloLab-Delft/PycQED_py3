@@ -561,6 +561,52 @@ class BaseDataAnalysis(object):
                     d = self._convert_dict_rec(copy.deepcopy(fit_res))
                     write_dict_to_hdf5(d, entry_point=fr_group)
 
+    def save_processed_data(self, key=None):
+        """
+        Saves data from the processed data dictionary to the hdf5 file
+        
+        Args:
+            key: key of the data to save. All processed data is saved by 
+                 default.
+        """
+
+        if isinstance(key, (list, set)):
+            for k in key:
+                self.save_processed_data(k)
+            return
+
+        # Check weather there is any data to save
+        if hasattr(self, 'proc_data_dict') and self.proc_data_dict is not None\
+                and key in self.proc_data_dict:
+            fn = self.options_dict.get('analysis_result_file', False)
+            if fn == False:
+                fn = a_tools.measurement_filename(
+                    a_tools.get_folder(self.timestamps[0]))
+            try:
+                os.mkdir(os.path.dirname(fn))
+            except FileExistsError:
+                pass
+
+            if self.verbose:
+                print('Saving fitting results to %s' % fn)
+
+            with h5py.File(fn, 'a') as data_file:
+                try:
+                    analysis_group = data_file.create_group('Analysis')
+                except ValueError:
+                    # If the analysis group already exists.
+                    analysis_group = data_file['Analysis']
+
+                try:
+                    proc_data_group = \
+                        analysis_group.create_group('Processed data')
+                except ValueError:
+                    # If the processed data group already exists.
+                    proc_data_group = analysis_group['Processed data']
+
+                d = {key: self.proc_data_dict[key]}
+                write_dict_to_hdf5(d, entry_point=proc_data_group)
+
     @staticmethod
     def _convert_dict_rec(obj):
         try:

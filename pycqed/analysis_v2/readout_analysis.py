@@ -1298,36 +1298,36 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
     def process_data(self):
         super().process_data()
 
-        # table_norm = self.proc_data_dict['probability_table']
-        # self.proc_data_dict['cross_fidelity_matrix'] = \
-        #     self.cross_fidelity_matrix()
+        table_norm = self.proc_data_dict['probability_table']
+        if self.use_preselection:
+            table_norm = table_norm[1::2, 1:] / (table_norm[1::2, 0][:, None])
+        self.proc_data_dict['probability_table_data_only'] = table_norm
+        self.proc_data_dict['cross_fidelity_matrix'] = \
+            self.cross_fidelity_matrix(table_norm, len(self.channel_map))
         # self.proc_data_dict['cross_correlations_matrix'] = \
         #     self.cross_correlations_matrix()
 
+        self.save_processed_data('probability_table')
+        self.save_processed_data('probability_table_data_only')
+        self.save_processed_data('cross_fidelity_matrix')
+
     @staticmethod
     def cross_fidelity_matrix(table_norm, n_qubits):
-
         masks = []
-        for i in reversed(range(3)):
-            masks.append(np.arange(8)//(2**i)%2 != 0)
-        CF = np.zeros((3, 3))
-        for i in range(3):
-            for j in range(3):
-                CF[i, j] = np.mean(PT.T[i][masks[j]] - PT.T[i][np.logical_not(masks[j])])
-
-        # combination_list = list(
-        #     itertools.product([False, True], repeat=n_qubits))
-        # F = np.zeros((n_qubits, n_qubits))
-        # for k in range(n_qubits):
-        #     for l in range(n_qubits):
-        #         for kk, prep_list in enumerate(combination_list):
-        #             prepl = 2*prep_list[l] - 1
-        #             assk = 0
-        #             for ll, ass_list in enumerate(combination_list):
-        #                 assk += (2*ass_list[k] - 1)*table_norm[kk, ll]
-        #             F[k, l] += prepl*assk
-        # F /= 2**n_qubits
-        return CF
+        for i in reversed(range(n_qubits)):
+            masks.append(np.arange(2**n_qubits)//(2**i)%2 != 0)
+        cf = np.zeros((n_qubits, n_qubits))
+        for qb_prep in range(n_qubits):
+            for qb_assign in range(n_qubits):
+                err = np.mean(table_norm[
+                    masks[qb_prep]][:,
+                    np.logical_not(masks[qb_assign])])
+                err += np.mean(table_norm[
+                    np.logical_not(masks[qb_prep])][:,
+                    masks[qb_assign]])
+                err *= 2**(n_qubits-1)
+                cf[qb_prep, qb_assign] = 1 - err
+        return cf
 
     @staticmethod
     def cross_correlations_matrix(table_norm, n_qubits):
