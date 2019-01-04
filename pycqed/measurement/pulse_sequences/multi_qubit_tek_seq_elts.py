@@ -1658,25 +1658,42 @@ def parity_correction_seq(
     el_list.append(el_main)
 
     # # feedback elements
-    # fb_sequence_0 = ['I ' + q2n]
-    #                           = ['X180 ' + q2n] if reset else ['I ' + q2n]
-    # pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
-    # el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
-    #                                trigger=False, previous_element=el_main))
-    # pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
-    # el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
-    #                         trigger=False, previous_element=el_main)
-    # el_list.append(el_fb)
+    fb_sequence_0 = ['I ' + q2n, 'Is ' + qb1n]
+    fb_sequence_1 = ['X180 ' + q2n] if reset else ['I ' + q2n]
+    fb_sequence_1 += ['X180s ' + qb1n]
+    pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
+    el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
+                                   trigger=False, previous_element=el_main))
+    pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
+    el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
+                            trigger=False, previous_element=el_main)
+    el_list.append(el_fb)
 
     # repeated parity measurement element. Phase errors need to be corrected 
     # for by careful selection of qubit drive IF-s.
-    pulse_sequence = ['mY90 ' + q1n, CZ_pulses[0], CZ_pulses[1], 'Y90', 
+    pulse_sequence = ['mY90 ' + q1n, CZ_pulses[0], CZ_pulses[1], 'Y90 ' + qb1n, 
                     'RO ' + q1n]
     pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
     pulse_list += dd_pulses
     el_repeat = multi_pulse_elt(0, station, pulse_list, trigger=False, 
-                                name='repeat', previous_element=el_fb_0)
+                                name='repeat', previous_element=el_fb)
     el_list.append(el_repeat)
+
+    # check that the qubits do not acquire any phase over one round of parity 
+    # correction
+    for qbn in [q0n, q1n, q2n]:
+        ifreq = operation_dict['X180 ' + qbn]['frequency']
+        elements_length = el_fb.ideal_length() + el_repeat.ideal_length()
+        phase_from_if = 360*ifreq*elements_length
+        dynamic_phase = el_fb.drive_phase_offsets.get(qbn, 0)
+        dynamic_phase += el_repeat.drive_phase_offsets.get(qbn, 0)
+        total_phase = phase_from_if + dynamic_phase
+        total_mod_phase = total_phase - 360*(total_phase//360)
+        print(qbn + ' aquires a phase of {} = {} (mod 360)'.format(
+            total_phase, total_mod_phase) + ' degrees each correction ' + 
+            'cycle. You should reduce the intermediate frequency by {} Hz.'\
+            .format(total_mod_phase/elements_length/360))
+
 
     # tomography elements
     tomography_sequences = get_tomography_pulses(q0n, q2n,
@@ -1686,7 +1703,7 @@ def parity_correction_seq(
         pulse_list = [operation_dict[pulse] for pulse in tomography_sequence]
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=False,
                                        name='tomography_{}'.format(i),
-                                       previous_element=el_fb_0))
+                                       previous_element=el_fb))
 
     # create the sequence
     seq_name = 'Two qubit entanglement by parity measurement'
