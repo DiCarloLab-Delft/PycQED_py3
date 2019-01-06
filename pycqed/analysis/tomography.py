@@ -841,13 +841,13 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 (self.nr_segments, nr_runs))
             measured_values2 = np.zeros(
                 (self.nr_segments, nr_runs))
-            if self.PF_tracking in ['PF_tracking', 'first_last']:
+            if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus']:
                 # preparing a Pauli record with dimensions according to the parity pattern
                 self.PF_record = np.zeros(
                     (self.nr_measurement_segments, nr_runs, len(self.PF_parity_pattern)))
             for i in range(self.nr_segments):
-                measured_values1[i,:] = measured_values1_preshaping[i::self.nr_segments]
-                measured_values2[i,:] = measured_values2_preshaping[i::self.nr_segments]
+                measured_values1[i, :] = measured_values1_preshaping[i::self.nr_segments]
+                measured_values2[i, :] = measured_values2_preshaping[i::self.nr_segments]
 
             # ancilla qubit data preparation
             if self.q_post_select:
@@ -882,8 +882,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                         thresholds=[self.q_post_select_threshold],
                         init_measurements=[shots_qA_init],
                         positive_case=True)
-                    measured_values1[i, :][post_select_indices_0] = np.nan
-                    measured_values2[i, :][post_select_indices_0] = np.nan
+                    #measured_values1[i, :][post_select_indices_0] = np.nan
+                    #measured_values2[i, :][post_select_indices_0] = np.nan
 
                 if self.q_post_select:
                     # first digitize the 2D array
@@ -913,31 +913,35 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                         measured_values1[i, :][post_select_indices_0] = np.nan
                         measured_values2[i, :][post_select_indices_0] = np.nan
                     # 4. make a Pauli record in case the pauli frame of tomography is to be updated
-                    if self.PF_tracking in ['PF_tracking', 'first_last']:
+                    if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus']:
                         for j in range(len(self.PF_parity_pattern)):
                             # print('j', j)
                             # print('axis', self.PF_parity_pattern[j])
-                            parity_outcomes = ancilla_outcomes_derivative[j+len(
-                                self.PF_parity_pattern)::len(
+                            parity_outcomes = ancilla_outcomes_derivative[j::len(
                                 self.PF_parity_pattern)]
                             # print(self.PF_parity_pattern[j])
                             # print(len(parity_outcomes))
                             # adding bell-state specific number
                             if self.PF_tracking=='PF_tracking':
                                 if self.q_post_selection_states[j]==1:
-                                    added_nr = len(parity_outcomes)
+                                    added_nr = len(parity_outcomes)+1
                                 else:
                                     added_nr = 0
                                 # print(added_nr)
                                 self.PF_record[i, :, j] = np.sum(
                                     parity_outcomes, axis=0)+added_nr% 2
-                            elif self.PF_tracking=='first_last':
+                            elif self.PF_tracking=='PF_reset':
                                 if self.q_post_selection_states[j]==1:
                                     self.PF_record[i, :, j] = parity_outcomes[-1]+1%2
                                 else:
                                     self.PF_record[i, :, j] = parity_outcomes[-1]
-
-
+                            elif self.PF_tracking=='PF_reset_all_phi_plus':
+                                # print('here',parity_outcomes)
+                                # print(len(parity_outcomes))
+                                if len(parity_outcomes)==1:
+                                    self.PF_record[i, :, j] = parity_outcomes
+                                else:
+                                    self.PF_record[i, :, j] = parity_outcomes[-1]
 
 
             #calculate post-selection fraction
@@ -1009,7 +1013,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
 
         # applying pauli frame update here
         # first suptracting offsets and rescaling all individual shots
-        if self.PF_tracking in ['PF_tracking', 'first_last']:
+        if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus']:
             # first subtracting offsets
             measured_values1 -= mean_h1
             measured_values2 -= mean_h2
@@ -1021,14 +1025,12 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             for j, axis in enumerate(self.PF_parity_pattern):
                 record = self.PF_record[:, :, j]
                 if axis=='ZZ':
-                    print('ZZ correction')
                     for i in np.concatenate([np.arange(0,12), np.arange(24,36)]):
                         for k in range(len(record[i,:])):
                             if record[i,k]==1:
                                 measured_values1[i,k]=-1*measured_values1[i,k]
                                 self.shots_q0q1[i,k]=-1*self.shots_q0q1[i,k]
                 elif axis=='XX':
-                    print('XX correction')
                     for i in np.concatenate([np.arange(12,36)]):
                         for k in range(len(record[i,:])):
                             if record[i,k]==1:
@@ -1205,7 +1207,6 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.plot_LI()
         if self.MLE:
             self.plot_MLE()
-
         try:
             self.add_analysis_datagroup_to_file()
             self.save_fitted_parameters(fit_res=self.fit_res,
@@ -1214,13 +1215,18 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             logging.warning(e)
         try:
             pars_dict = {'fidelity': self.fidelity,
+                         'fidelity_mle': self.fidelity_mle,
                          'best_fidelity': self.best_fidelity,
+                         'operators_mle': self.operators_mle,
                          'angle_LSQ': np.rad2deg(self.fit_res.best_values['angle_LSQ']),
                          'angle_MSQ': np.rad2deg(self.fit_res.best_values['angle_MSQ']),
                          'LSQ_name': self.q0_label,
                          'MSQ_name': self.q1_label}
-
-            self.save_dict_to_analysis_group(pars_dict, 'tomography_results')
+            name='tomography_results_decoding_{}_states_{}_indices_{}'.format(self.PF_tracking,
+                                                                self.q_post_selection_states,
+                                                                self.q_post_selection_indices)
+            self.save_dict_to_analysis_group(pars_dict, name)
+            print('saved')
         # only works if MLE and target bell were specified
         except Exception as e:
             print(e)
@@ -1317,12 +1323,19 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             target_expectations = get_cardianal_pauli_exp(
                 self.target_cardinal)
             plot_target_pauli_set(target_expectations, ax)
-        if self.target_bell is not None:
+            txt_x_pos = 10
+            if self.target_cardinal in [0,7]:
+                txt_y_pos=-0.5
+            else:
+                txt_y_pos=0.5
+
+        elif self.target_bell is not None:
             self.fidelity_mle = calc_fid2_bell(self.operators_mle,
                                                self.target_bell)
             target_expectations = get_bell_pauli_exp(self.target_bell)
             plot_target_pauli_set(target_expectations, ax)
             txt_x_pos = -1
+            txt_y_pos = 0.5
         else:
             txt_x_pos = 10
 
@@ -1342,11 +1355,10 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                                    self.fit_res.best_values['angle_LSQ'] *
                                                    180./np.pi,
                                                    self.fit_res.best_values['angle_MSQ']*180./np.pi)
-                if self.q_post_select:
-                    msg +=str('\nselected fraction ={:.3f}'.format(self.fraction))
-                    print('in the loop')
+            if self.q_post_select:
+                msg +=str('\nselected frac. ={:.3f}'.format(self.fraction))
 
-            ax.text(txt_x_pos, .5, msg)
+            ax.text(txt_x_pos, txt_y_pos, msg)
 
         plot_operators(self.operators_mle, ax, labels=self.meas_op_labels)
         ax.set_title('Max likelihood estimation tomography')
