@@ -703,11 +703,9 @@ class UHFQC(Instrument):
         sinI = np.array(np.sin(2*np.pi*IF*tbase+rotation_angle))
         if length<4096/1.8e9:
             max_sample=int(length*1.8e9)
-            print(max_sample)
             #setting the samples beyond the length to 0
             cosI[max_sample:]=0
             sinI[max_sample:]=0
-            print(cosI)
         self.set('quex_wint_weights_{}_real'.format(weight_function_I),
                  np.array(cosI))
         self.set('quex_wint_weights_{}_imag'.format(weight_function_I),

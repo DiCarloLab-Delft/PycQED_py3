@@ -2857,7 +2857,9 @@ class CCLight_Transmon(Qubit):
                                        close_fig: bool=True,
                                        update: bool=True,
                                        cross_target_qubits: list=None,
-                                       multi_qubit_platf_cfg=None):
+                                       multi_qubit_platf_cfg=None,
+                                       target_qubit_excited=False,
+                                       extra_echo=False):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2878,16 +2880,35 @@ class CCLight_Transmon(Qubit):
 
         # angles = np.arange(0, 421, 20)
         angles = np.concatenate([np.arange(0, 101, 20), np.arange(140,421,20)]) #avoid CW15, issue
+
+
         if sequence == 'ramsey':
+            readout_pulse_length = self.ro_pulse_length()
+            readout_pulse_length += self.ro_pulse_down_length0()
+            readout_pulse_length += self.ro_pulse_down_length1()
+            if extra_echo:
+                wait_time = readout_pulse_length/2+20e-9
+            else:
+                wait_time = 0
+
             p = mqo.Ramsey_msmt_induced_dephasing(qubits=qubits, angles=angles,
-                                                  platf_cfg=platf_cfg)
+                                                  platf_cfg=platf_cfg,
+                                                  target_qubit_excited=target_qubit_excited,
+                                                  extra_echo=extra_echo,
+                                                  wait_time=wait_time)
         elif sequence == 'echo':
             readout_pulse_length = self.ro_pulse_length()
             readout_pulse_length += self.ro_pulse_down_length0()
             readout_pulse_length += self.ro_pulse_down_length1()
+            if extra_echo:
+                wait_time = readout_pulse_length/2+20e-9
+            else:
+                wait_time = readout_pulse_length+40e-9
             p = mqo.echo_msmt_induced_dephasing(qubits=qubits, angles=angles,
                                                 platf_cfg=platf_cfg,
-                                                wait_time=readout_pulse_length)
+                                                wait_time=wait_time,
+                                                target_qubit_excited=target_qubit_excited,
+                                                extra_echo=extra_echo)
         else:
             raise ValueError('sequence must be set to ramsey or echo')
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -3443,7 +3464,9 @@ class CCLight_Transmon(Qubit):
     def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None,
                                                      nested_MC=None, cross_target_qubits=None,
                                                      multi_qubit_platf_cfg=None, analyze=False,
-                                                     verbose: bool=True, sequence='ramsey'):
+                                                     verbose: bool=True, sequence='ramsey',
+                                                     target_qubit_excited=False,
+                                                     extra_echo=False):
         waveform_name = 'up_down_down_final'
 
         if nested_MC is None:
@@ -3489,7 +3512,7 @@ class CCLight_Transmon(Qubit):
                 self.cfg_qubit_nr()), 200e-9)
         elif sequence == 'echo':
             RO_lutman.set('M_final_delay_R{}'.format(self.cfg_qubit_nr()),
-                          200e-9+readout_pulse_length)
+                          200e-9)#+readout_pulse_length)
         else:
             raise NotImplementedError('dephasing sequence not recognized')
 
@@ -3523,6 +3546,8 @@ class CCLight_Transmon(Qubit):
                 'multi_qubit_platf_cfg': multi_qubit_platf_cfg,
                 'analyze': True,
                 'sequence': sequence,
+                'target_qubit_excited':target_qubit_excited,
+                'extra_echo':extra_echo
             },
             result_keys=['coherence', 'phase']
         )

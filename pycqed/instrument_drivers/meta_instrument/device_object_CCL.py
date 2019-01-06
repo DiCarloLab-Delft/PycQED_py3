@@ -848,7 +848,8 @@ class DeviceCCL(Instrument):
                                     parity_axes=['ZZ'], tomo=False,
                                     tomo_after=False,
                                     ro_time=1000e-9,
-                                    echo_during_ancilla_mmt: bool=True
+                                    echo_during_ancilla_mmt: bool=True,
+                                    XY_echo: bool=False
                                     ):
         assert qD0 in self.qubits()
         assert qD1 in self.qubits()
@@ -874,7 +875,8 @@ class DeviceCCL(Instrument):
                                            tomo=tomo,
                                            tomo_after=tomo_after,
                                            ro_time=ro_time,
-                                           echo_during_ancilla_mmt=echo_during_ancilla_mmt)
+                                           echo_during_ancilla_mmt=echo_during_ancilla_mmt,
+                                           XY_echo=XY_echo)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
 
@@ -892,7 +894,7 @@ class DeviceCCL(Instrument):
             elif mmts_per_round < 10:
                 d.nr_shots = 64*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 20:
-                d.nr_shots = 32*64*mmts_per_round  # To ensure proper data binning
+                d.nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 40:
                 d.nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
             else:
@@ -1027,7 +1029,11 @@ class DeviceCCL(Instrument):
                                               amps_rel=np.linspace(0, 1, 11),
                                               verbose=True,
                                               get_quantum_eff: bool=False,
-                                              dephasing_sequence='ramsey'):
+                                              dephasing_sequence='ramsey',
+                                              selected_target=None,
+                                              selected_measured=None,
+                                              target_qubit_excited=False,
+                                              extra_echo=False):
         '''
         Measures the msmt induced dephasing for readout the readout of qubits
         i on qubit j. Additionally measures the SNR as a function of amplitude
@@ -1058,6 +1064,10 @@ class DeviceCCL(Instrument):
         # Loop over all target and measurement qubits
         target_qubits = [self.find_instrument(q) for q in qubits]
         measured_qubits = [self.find_instrument(q) for q in qubits]
+        if selected_target!=None:
+            target_qubits = [target_qubits[selected_target]]
+        if selected_measured!=None:
+            measured_qubits = [measured_qubits[selected_measured]]
         for target_qubit in target_qubits:
             for measured_qubit in measured_qubits:
                 # Set measurement label suffix
@@ -1099,7 +1109,10 @@ class DeviceCCL(Instrument):
                         cross_target_qubits=list_target_qubits,
                         multi_qubit_platf_cfg=mqp,
                         analyze=True,
-                        sequence=dephasing_sequence
+                        sequence=dephasing_sequence,
+                        target_qubit_excited=target_qubit_excited,
+                        extra_echo=extra_echo,
+                        # buffer_time=buffer_time
                     )
                 # Print the result of the measurement
                 if verbose:

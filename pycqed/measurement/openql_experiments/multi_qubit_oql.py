@@ -110,7 +110,9 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
     return p
 
 
-def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str):
+def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
+                                  target_qubit_excited: bool=False, wait_time=0,
+                                  extra_echo=False):
     """
     Ramsey sequence that varies azimuthal phase instead of time. Works for
     a single qubit or multiple qubits. The coherence of the LSQ is measured,
@@ -138,12 +140,28 @@ def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str):
         k = oqh.create_kernel("Ramsey_azi_"+str(angle), p)
         for qubit in qubits:
             k.prepz(qubit)
+        if len(qubits)>1 and target_qubit_excited:
+            for qubit in qubits[:-1]:
+                k.gate('rx180', [qubit])
         k.gate('rx90', [qubits[-1]])
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         for qubit in qubits:
             k.measure(qubit)
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-        k.gate('cw_{:02}'.format(cw_idx), [qubits[-1]])
+        if extra_echo:
+            k.gate('rx180', [qubits[-1]])
+            k.gate("wait", qubits, round(wait_time*1e9))
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+        if len(qubits)>1 and target_qubit_excited:
+            for qubit in qubits[:-1]:
+                k.gate('rx180', [qubit])
+        if angle == 90:
+            # special because the cw phase pulses go in mult of 20 deg
+            k.gate('ry90', [qubits[-1]])
+        elif angle == 0:
+            k.gate('rx90', [qubits[-1]])
+        else:
+            k.gate('cw_{:02}'.format(cw_idx), [qubits[-1]])
         p.add_kernel(k)
 
     # adding the calibration points
@@ -154,7 +172,8 @@ def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str):
 
 
 def echo_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
-                                wait_time: float=0):
+                                wait_time: float=0, target_qubit_excited: bool=False,
+                                extra_echo: bool=False):
     """
     Ramsey sequence that varies azimuthal phase instead of time. Works for
     a single qubit or multiple qubits. The coherence of the LSQ is measured,
@@ -170,8 +189,17 @@ def echo_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
                         of which the coherence is measured LSQ.
         angles:         the list of angles for each Ramsey element
         platf_cfg:      filename of the platform config file
-        wait_time       wait time to acount for the measurement time for the
-                        second arm of the echo in s
+        wait_time       wait time to acount for the measurement time in parts
+                        of the echo sequence without measurement pulse
+
+    Circuit looks as follows:
+
+    qubits[:-1]    -----------------------(x180)[variable msmt](x180)
+
+    qubits[-1]     - x90-wait-(x180)-wait- x180-wait-(x180)-wait-x90 - [strong mmt]
+
+
+
     Returns:
         p:              OpenQL Program object containing
 
@@ -185,13 +213,33 @@ def echo_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
         for qubit in qubits:
             k.prepz(qubit)
         k.gate('rx90', [qubits[-1]])
+        k.gate("wait", qubits, round(wait_time*1e9))
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+        if extra_echo:
+            k.gate('rx180', [qubits[-1]])
+            k.gate("wait", qubits, round(wait_time*1e9))
+        k.gate('rx180', [qubits[-1]])
+        if len(qubits)>1 and target_qubit_excited:
+            for qubit in qubits[:-1]:
+                k.gate('rx180', [qubit])
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         for qubit in qubits:
             k.measure(qubit)
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-        k.gate('rx180', [qubits[-1]])
-        k.gate("wait", [qubits[-1]], round(wait_time*1e9))
-        k.gate('cw_{:02}'.format(cw_idx), [qubits[-1]])
+        if extra_echo:
+            k.gate('rx180', [qubits[-1]])
+            k.gate("wait", qubits, round(wait_time*1e9))
+        if len(qubits)>1 and target_qubit_excited:
+            for qubit in qubits[:-1]:
+                k.gate('rx180', [qubit])
+        if angle == 90:
+            # special because the cw phase pulses go in mult of 20 deg
+            k.gate('ry90', [qubits[-1]])
+        elif angle == 0:
+            k.gate('rx90', [qubits[-1]])
+        else:
+            k.gate('cw_{:02}'.format(cw_idx), [qubits[-1]])
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         p.add_kernel(k)
 
     # adding the calibration points
@@ -1052,17 +1100,18 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                                     parity_axes=['ZZ'], tomo=False,
                                     tomo_after=False,
                                     ro_time=500e-9,
-                                    echo_during_ancilla_mmt: bool=False):
+                                    echo_during_ancilla_mmt: bool=False,
+                                    XY_echo: bool=False):
     """
     Implements a circuit for repeated parity checks on two qubits.
 
     Circuit looks as follows:
-
-    Data0   (M)-prep.|------0----------------|^N (wait) (echo) (wait) (tomo) -M
-                     |      |                |
-    Ancilla (M)------|--y90-0-(y180)-0-y90-M-|   -M
-                     |               |       |
-    Data1   (M)-prep.|---------------0-------|   (wait) (echo) (wait) (tomo) -M
+                                                         ^N
+    Data0   ----prep.|(my90)0--(y90)(wait) (echo) (wait)| (tomo) -MMMMMMMMMMMMMMMMMMMM
+                     |      |                           |
+    Ancilla (M)------|-my90-0-0-y90-MMMMMMMMMMMMMMMMMMMM|
+                     |        |                         |
+    Data1   ----prep.|(my90)--0(y90)(wait) (echo) (wait)| (tomo) -MMMMMMMMMMMMMMMMMMMM
 
 
     The initial "M" measurement is optional, the circuit is repated N times
@@ -1101,7 +1150,11 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                     # k.measure(qD0)
                     # k.measure(qD1)
                     k.measure(qA)
-                    k.gate('wait', [qD0, qD1, qA], int(1000)) #adding additional weight time to ensure good initialization
+                    if echo_during_ancilla_mmt:
+                        k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9+20))
+                    if XY_echo:
+                        k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9*2+40))
+                    k.gate('wait', [qD0, qD1, qA], int(100)) #adding additional wait time to ensure good initialization
                     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
                 #state preparation
                 for i, initial_state_q in enumerate(initial_state):
@@ -1122,7 +1175,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                 #parity measurement(s)
                 for i in range(number_of_repetitions):
                     for parity_axis in parity_axes:
-                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                        #k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
                         if parity_axis=='XX':
                             k.gate('rym90', [qD0])
                             k.gate('rym90', [qD1])
@@ -1147,16 +1200,16 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                             k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
                             k.measure(qA)
                             if echo_during_ancilla_mmt:
-                                if parity_axis=='ZZ':
+                                k.gate('ry180', [qD0])
+                                k.gate('ry180', [qD1])
+                                k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
+                                if XY_echo:
                                     k.gate('rx180', [qD0])
                                     k.gate('rx180', [qD1])
-                                elif parity_axis=='XX':
+                                    k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
                                     k.gate('ry180', [qD0])
                                     k.gate('ry180', [qD1])
-                                elif parity_axis=='YY':
-                                    k.gate('rx180', [qD0])
-                                    k.gate('rx180', [qD1])
-                            k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
+                                    k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
                 k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #separating parity from tomo
                 #tomography
                 if tomo:
@@ -1173,16 +1226,21 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                 p.add_kernel(k)
     if tomo:
         #only add calbration points when doing tomography
+        interleaved_delay=ro_time
+        if echo_during_ancilla_mmt:
+            interleaved_delay=ro_time+20e-9
+        if XY_echo:
+            interleaved_delay=3*ro_time+60e-9
         if tomo_after:
             p = oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=7, measured_qubits=[qD0, qD1],
                                      interleaved_measured_qubits=[qA],
-                                     interleaved_delay=ro_time,
+                                     interleaved_delay=interleaved_delay,
                                      nr_of_interleaves=initialization_msmt+number_of_repetitions*len(parity_axes))
 
         else:
             p = oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=7, measured_qubits=[qD0, qD1, qA],
                          interleaved_measured_qubits=[qA],
-                         interleaved_delay=ro_time, nr_of_interleaves=initialization_msmt+number_of_repetitions*len(parity_axes)-1)
+                         interleaved_delay=interleaved_delay, nr_of_interleaves=initialization_msmt+number_of_repetitions*len(parity_axes)-1)
 
     p = oqh.compile(p)
     return p
