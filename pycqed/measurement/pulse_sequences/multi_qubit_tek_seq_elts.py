@@ -1694,7 +1694,6 @@ def parity_correction_seq(
             'cycle. You should reduce the intermediate frequency by {} Hz.'\
             .format(total_mod_phase/elements_length/360))
 
-
     # tomography elements
     tomography_sequences = get_tomography_pulses(q0n, q2n,
                                                  basis_pulses=tomography_basis)
@@ -2633,7 +2632,7 @@ def pygsti_seq(qb_names, pygsti_listOfExperiments, operation_dict,
 
 def ro_dynamic_phase_seq(qbp_name, qbr_names,
                          phases, operation_dict,
-                         pulse_separation, init_state = 'g',
+                         pulse_separation,
                          verbose=False, cal_points=True,
                          upload=True, return_seq=False):
 
@@ -2679,8 +2678,6 @@ def ro_dynamic_phase_seq(qbp_name, qbr_names,
             x90_1_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
             x90_2a_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
             x90_2b_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
-    if init_state == 'e':
-        x90_1_pulses.append(deepcopy(operation_dict['X180 ' + qbp_name]))
     cal_I_pulses.append(operation_dict['RO mux'])
     cal_X_pulses.append(operation_dict['RO mux'])
 

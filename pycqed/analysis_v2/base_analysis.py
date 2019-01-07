@@ -561,7 +561,7 @@ class BaseDataAnalysis(object):
                     d = self._convert_dict_rec(copy.deepcopy(fit_res))
                     write_dict_to_hdf5(d, entry_point=fr_group)
 
-    def save_processed_data(self, key=None):
+    def save_processed_data(self, key=None, overwrite=True):
         """
         Saves data from the processed data dictionary to the hdf5 file
         
@@ -605,7 +605,8 @@ class BaseDataAnalysis(object):
                     proc_data_group = analysis_group['Processed data']
 
                 d = {key: self.proc_data_dict[key]}
-                write_dict_to_hdf5(d, entry_point=proc_data_group)
+                write_dict_to_hdf5(d, entry_point=proc_data_group, 
+                                   overwrite=overwrite)
 
     @staticmethod
     def _convert_dict_rec(obj):

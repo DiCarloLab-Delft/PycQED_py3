@@ -133,7 +133,7 @@ def encode_to_utf8(s):
     return s
 
 
-def write_dict_to_hdf5(data_dict: dict, entry_point):
+def write_dict_to_hdf5(data_dict: dict, entry_point, overwrite=False):
     """
     Args:
         data_dict (dict): dictionary to write to hdf5 file
@@ -151,7 +151,15 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                       ' {}:{} of type {}'.format(key, item, type(item)))
                 logging.warning(e)
         elif isinstance(item, np.ndarray):
-            entry_point.create_dataset(key, data=item)
+            try:
+                entry_point.create_dataset(key, data=item)
+            except RuntimeError:
+                if overwrite:
+                    del entry_point[key]
+                    entry_point.create_dataset(key, data=item)
+                else:
+                    raise
+
         elif item is None:
             # as h5py does not support saving None as attribute
             # I create special string, note that this can create
@@ -159,9 +167,17 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             entry_point.attrs[key] = 'NoneType:__None__'
 
         elif isinstance(item, dict):
-            entry_point.create_group(key)
+            try:
+                entry_point.create_group(key)
+            except RuntimeError:
+                if overwrite:
+                    del entry_point[key]
+                    entry_point.create_group(key)
+                else:
+                    raise
             write_dict_to_hdf5(data_dict=item,
-                               entry_point=entry_point[key])
+                               entry_point=entry_point[key],
+                               overwrite=overwrite)
         elif isinstance(item, (list, tuple)):
             if len(item) > 0:
                 elt_type = type(item[0])
@@ -171,8 +187,16 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                         not isinstance(item, tuple)):
                     if isinstance(item[0], (int, float,
                                             np.int32, np.int64)):
-                        entry_point.create_dataset(key,
-                                                   data=np.array(item))
+                        try:
+                            entry_point.create_dataset(key, 
+                                                       data=np.array(item))
+                        except RuntimeError:
+                            if overwrite:
+                                del entry_point[key]
+                                entry_point.create_dataset(key, 
+                                                           data=np.array(item))
+                            else:
+                                raise
                         entry_point[key].attrs['list_type'] = 'array'
 
                     # strings are saved as a special dtype hdf5 dataset
@@ -180,8 +204,16 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                         dt = h5py.special_dtype(vlen=str)
                         data = np.array(item)
                         data = data.reshape((-1, 1))
-                        ds = entry_point.create_dataset(
-                            key, (len(data), 1), dtype=dt)
+                        try:
+                            ds = entry_point.create_dataset(
+                                key, (len(data), 1), dtype=dt)
+                        except RuntimeError:
+                            if overwrite:
+                                del entry_point[key]
+                                entry_point.create_dataset(
+                                    key, (len(data), 1), dtype=dt)
+                            else:
+                                raise
                         ds.attrs['list_type'] = 'str'
                         ds[:] = data
                     else:
@@ -192,7 +224,14 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                         entry_point.attrs[key] = str(item)
                 # Storing of generic lists/tuples
                 else:
-                    entry_point.create_group(key)
+                    try:
+                        entry_point.create_group(key)
+                    except RuntimeError:
+                        if overwrite:
+                            del entry_point[key]
+                            entry_point.create_group(key)
+                        else:
+                            raise
                     # N.B. item is of type list
                     list_dct = {'list_idx_{}'.format(idx): entry for
                                 idx, entry in enumerate(item)}
@@ -204,7 +243,8 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                     group_attrs['list_length'] = len(item)
                     write_dict_to_hdf5(
                         data_dict=list_dct,
-                        entry_point=entry_point[key])
+                        entry_point=entry_point[key],
+                        overwrite=overwrite)
             else:
                 # as h5py does not support saving None as attribute
                 entry_point.attrs[key] = 'NoneType:__emptylist__'
