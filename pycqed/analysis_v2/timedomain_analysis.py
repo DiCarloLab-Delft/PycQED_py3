@@ -1783,7 +1783,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                       self.raw_data_dict['timestamp'] + ' ' + meas_string,
             'yrange': (-1.1, 1.1),
             'xtick_loc': np.arange(4**nr_qubits - 1),
-            'xtick_rotation': 270,
+            'xtick_rotation': 90,
             'xtick_labels': np.array(labels)[order],
             'bar_kws': dict(zorder=10),
             'setlabel': 'Fit to experiment',

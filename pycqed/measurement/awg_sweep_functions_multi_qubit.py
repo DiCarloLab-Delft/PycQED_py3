@@ -462,27 +462,26 @@ class three_qubit_GHZ_tomo(swf.Hard_Sweep):
 
 
 class parity_correction(swf.Hard_Sweep):
-    def __init__(self, q0n, q1n, q2n, operation_dict, CZ_pulses, 
-                 feedback_delay, prep_sequence=None, reset=True, 
-                 nr_parity_measurements=1, 
+    def __init__(self, q0n, q1n, q2n, operation_dict, feedback_delay,
+                 CZ_pulses,
+                 prep_sequence=None, nr_echo_pulses=4, cpmg_scheme=True,
                  tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
-                 preselection=False, ro_spacing=1e-6, dd_scheme=None, 
-                 nr_dd_pulses=4, upload=True, verbose=False):
+                 reset=True, upload=True, verbose=False, preselection=False,
+                 ro_spacing=1e-6):
         super().__init__()
         self.q0n = q0n
         self.q1n = q1n
         self.q2n = q2n
-        self.operation_dict = operation_dict
         self.CZ_pulses = CZ_pulses
+        self.operation_dict = operation_dict
         self.feedback_delay = feedback_delay
-        self.prep_sequence = prep_sequence
-        self.reset = reset
-        self.nr_parity_measurements = nr_parity_measurements
         self.tomography_basis = tomography_basis
+        self.prep_sequence = prep_sequence
+        self.nr_echo_pulses = nr_echo_pulses
+        self.cpmg_scheme = cpmg_scheme
         self.preselection = preselection
         self.ro_spacing = ro_spacing
-        self.dd_scheme = dd_scheme
-        self.nr_dd_pulses = nr_dd_pulses
+        self.reset = reset
         self.upload = upload
         self.parameter_name = 'sample'
         self.unit = '#'
@@ -491,21 +490,22 @@ class parity_correction(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            if self.reset == True or self.reset == False:
+            if self.reset:
                 sqs2.parity_correction_seq(
                     self.q0n, self.q1n, self.q2n,
-                    self.operation_dict, self.CZ_pulses,
+                    self.operation_dict,
+                    CZ_pulses=self.CZ_pulses,
                     feedback_delay=self.feedback_delay,
                     prep_sequence=self.prep_sequence,
-                    reset=self.reset,
                     tomography_basis=self.tomography_basis,
+                    reset=self.reset,
                     verbose=self.verbose,
                     preselection=self.preselection,
                     ro_spacing=self.ro_spacing,
-                    dd_scheme=self.dd_scheme,
-                    nr_dd_pulses=self.nr_dd_pulses
-                    )
-            elif self.reset == 'simple':
+                    nr_echo_pulses=self.nr_echo_pulses,
+                    cpmg_scheme=self.cpmg_scheme
+                )
+            else:
                 sqs2.parity_correction_no_reset_seq(
                     self.q0n, self.q1n, self.q2n,
                     self.operation_dict,
@@ -822,7 +822,7 @@ class RO_dynamic_phase_swf(swf.Hard_Sweep):
 
     def __init__(self, qbp_name, qbr_names,
                  phases, operation_dict,
-                 pulse_separation,
+                 pulse_separation, init_state,
                  verbose=False, cal_points=True,
                  upload=True, return_seq=False):
 
@@ -832,6 +832,7 @@ class RO_dynamic_phase_swf(swf.Hard_Sweep):
         self.phases = phases
         self.operation_dict = operation_dict
         self.pulse_separation = pulse_separation
+        self.init_state = init_state
         self.cal_points = cal_points
         self.upload = upload
         self.return_seq = return_seq
@@ -847,5 +848,6 @@ class RO_dynamic_phase_swf(swf.Hard_Sweep):
                 qbp_name=self.qbp_name, qbr_names=self.qbr_names,
                 phases=self.phases, operation_dict=self.operation_dict,
                 pulse_separation=self.pulse_separation,
+                init_state=self.init_state,
                 verbose=self.verbose, cal_points=self.cal_points,
                 upload=True, return_seq=self.return_seq)

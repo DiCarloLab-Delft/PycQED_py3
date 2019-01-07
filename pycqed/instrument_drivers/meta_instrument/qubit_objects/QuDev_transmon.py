@@ -199,7 +199,8 @@ class QuDev_transmon(Qubit):
         self.add_parameter('ro_pulse_shape', initial_value='square',
                            docstring="Shape of the RO pulse. ['square',"
                                      "'gaussian_filtered','CLEAR']",
-                           vals=vals.Enum('square', 'gaussian_filtered','CLEAR'),
+                           vals=vals.Enum('square', 'gaussian_filtered',
+                                          'gaussian_filtered_flip','CLEAR'),
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pulse_filter_sigma', unit='s',
                            initial_value=10e-9,
@@ -214,13 +215,6 @@ class QuDev_transmon(Qubit):
                                      'RO pulse Gaussian filter',
                            label='RO pulse Gaussian filter length',
                            vals=vals.Numbers(0),
-                           parameter_class=ManualParameter)
-        self.add_parameter('ro_pulse_basis_rotation',
-                           initial_value={},
-                           docstring='Dynamic phase acquired by other qubits '
-                                     'due to a measurement tone on this qubit.',
-                           label='RO pulse basis rotation dictionary',
-                           vals=vals.Dict(),
                            parameter_class=ManualParameter)
 
         # add CLEAR pulse parameters
@@ -283,6 +277,15 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'RO_pulse_phase', 'phase',
                                  initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('RO', 'ro_pulse_basis_rotation',
+                                 'basis_rotation', initial_value={},
+                                 docstring='Dynamic phase acquired by other '
+                                           'qubits due to a measurement tone on'
+                                           ' this qubit.',
+                                 label='RO pulse basis rotation dictionary',
+                                 vals=vals.Dict())
+
+
         # add drive pulse parameters
         self.add_operation('X180')
         self.add_pulse_parameter('X180', 'pulse_type', 'pulse_type',

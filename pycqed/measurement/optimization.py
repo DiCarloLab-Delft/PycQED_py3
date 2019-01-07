@@ -5,7 +5,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from pycqed.analysis import machine_learning_toolbox as ml
-except ModuleNotFoundError:
+except Exception:
     logger.warning('Machine learning packages not loaded. '
                    'Run from pycqed.analysis import machine_learning_toolbox to see errors.')
 

@@ -397,8 +397,20 @@ def multiplexed_pulse(readouts, f_LO, upload=True):
             samples = int(qb.RO_pulse_length() * fs)
 
             pulse = qb.RO_amp()*np.ones(samples)
+            tbase = np.linspace(0, len(pulse) / fs, len(pulse), endpoint=False)
 
             if qb.ro_pulse_shape() == 'gaussian_filtered':
+                filter_sigma = qb.ro_pulse_filter_sigma()
+                nr_sigma = qb.ro_pulse_nr_sigma()
+                filter_samples = int(filter_sigma*nr_sigma*fs)
+                filter_sample_idxs = np.arange(filter_samples)
+                filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
+                                (filter_sigma*fs)**2)
+                filter /= filter.sum()
+                pulse = np.convolve(pulse, filter, mode='full')
+            elif qb.ro_pulse_shape() == 'gaussian_filtered_flip':
+                pulse = pulse*(np.ones(samples) - np.cos(2*np.pi*200e6*tbase))
+
                 filter_sigma = qb.ro_pulse_filter_sigma()
                 nr_sigma = qb.ro_pulse_nr_sigma()
                 filter_samples = int(filter_sigma*nr_sigma*fs)
@@ -455,9 +467,13 @@ def multiplexed_pulse(readouts, f_LO, upload=True):
 def get_multiplexed_readout_pulse_dictionary(qubits):
     """Takes the readout pulse parameters from the first qubit in `qubits`"""
     maxlen = 0
+    basis_rotation = {}
     for qb in qubits:
         if qb.RO_pulse_length() > maxlen:
             maxlen = qb.RO_pulse_length()
+        for qbn, rot in qb.ro_pulse_basis_rotation().items():
+            basis_rotation[qbn] = basis_rotation.get(qbn, 0) + rot
+
     return {'RO_pulse_marker_channel': qubits[0].RO_acq_marker_channel(),
             'acq_marker_channel': qubits[0].RO_acq_marker_channel(),
             'acq_marker_delay': qubits[0].RO_acq_marker_delay(),
@@ -467,6 +483,7 @@ def get_multiplexed_readout_pulse_dictionary(qubits):
             'phase': 0,
             'pulse_delay': qubits[0].RO_pulse_delay(),
             'pulse_type': 'Multiplexed_UHFQC_pulse',
+            'basis_rotation': basis_rotation,
             'target_qubit': ','.join([qb.name for qb in qubits])}
 
 
@@ -3028,7 +3045,7 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
 
 
 def measure_ro_dynamic_phases(pulsed_qubit, measured_qubits, phases,
-                               f_LO, pulse_separation=None,
+                               f_LO, pulse_separation=None, init_state='g',
                                upload=True, cal_points=True,
                                MC=None, UHFQC=None, pulsar=None):
 
@@ -3051,7 +3068,7 @@ def measure_ro_dynamic_phases(pulsed_qubit, measured_qubits, phases,
 
     for qb in qubits:
         qb.prepare_for_timedomain(multiplexed=True)
-    multiplexed_pulse([(pulsed_qubit), measured_qubits, measured_qubits],
+    multiplexed_pulse([[pulsed_qubit], measured_qubits, measured_qubits],
                       f_LO, upload=True)
 
     channels = []
@@ -3074,6 +3091,7 @@ def measure_ro_dynamic_phases(pulsed_qubit, measured_qubits, phases,
         phases=phases,
         operation_dict=operation_dict,
         pulse_separation=pulse_separation,
+        init_state=init_state,
         cal_points=cal_points,
         upload=upload)
     MC.set_sweep_function(sf)
@@ -3082,7 +3100,7 @@ def measure_ro_dynamic_phases(pulsed_qubit, measured_qubits, phases,
     exp_metadata = {'pulse_separation': pulse_separation,
                     'cal_points': cal_points,
                     'f_LO': f_LO}
-    MC.run_2D('RO_DynamicPhase_{}{}'.format(
+    MC.run('RO_DynamicPhase_{}{}'.format(
         pulsed_qubit.name, ''.join(qbr_names)),
               exp_metadata=exp_metadata)
-    ma.MeasurementAnalysis(TwoD=True)
+    ma.MeasurementAnalysis()

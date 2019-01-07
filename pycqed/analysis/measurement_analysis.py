@@ -41,7 +41,7 @@ from math import floor
 from pycqed.measurement import optimization as opt
 try:
     from pycqed.analysis import machine_learning_toolbox as mlt
-except ModuleNotFoundError:
+except: #ModuleNotFoundError:
     logger.warning('Machine learning packages not loaded. '
                    'Run from pycqed.analysis import machine_learning_toolbox to see errors.')
 import pycqed.analysis.tools.plotting as pl_tools
@@ -7219,60 +7219,63 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 old_freq_ef = float(
                     instr_set[self.qb_name].attrs['f_ef_qubit'])
 
-                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                # label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                #         '\nold f0={:.5f} GHz' \
+                #         '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz\n' \
+                #         'f0_gf/2={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                #         '\nold f0_gf/2={:.5f} GHz' \
+                #         '\nguess f0_gf/2={:.5f} GHz' \
+                #         '\nkappa_gf={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                #     self.fit_res.params['f0'].value * scale,
+                #     self.fit_res.params['f0'].stderr / 1e6,
+                #     old_freq * scale,
+                #     self.fit_res.params['kappa'].value / 1e6,
+                #     self.fit_res.params['kappa'].stderr / 1e6,
+                #     self.fit_res.params['f0_gf_over_2'].value * scale,
+                #     self.fit_res.params['f0_gf_over_2'].stderr / 1e6,
+                #     old_freq_ef * scale,
+                #     self.fit_res.init_values['f0_gf_over_2']*scale,
+                #     self.fit_res.params['kappa_gf_over_2'].value / 1e6,
+                #     self.fit_res.params['kappa_gf_over_2'].stderr / 1e6)
+                label = 'f0={:.5f} GHz ' \
                         '\nold f0={:.5f} GHz' \
-                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz\n' \
-                        'f0_gf/2={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                        '\nkappa0={:.4f} MHz' \
+                        'f0_gf/2={:.5f} GHz ' \
                         '\nold f0_gf/2={:.5f} GHz' \
                         '\nguess f0_gf/2={:.5f} GHz' \
-                        '\nkappa_gf={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                        '\nkappa_gf={:.4f} MHz'.format(
                     self.fit_res.params['f0'].value * scale,
-                    self.fit_res.params['f0'].stderr / 1e6,
                     old_freq * scale,
                     self.fit_res.params['kappa'].value / 1e6,
-                    self.fit_res.params['kappa'].stderr / 1e6,
                     self.fit_res.params['f0_gf_over_2'].value * scale,
-                    self.fit_res.params['f0_gf_over_2'].stderr / 1e6,
                     old_freq_ef * scale,
                     self.fit_res.init_values['f0_gf_over_2']*scale,
-                    self.fit_res.params['kappa_gf_over_2'].value / 1e6,
-                    self.fit_res.params['kappa_gf_over_2'].stderr / 1e6)
+                    self.fit_res.params['kappa_gf_over_2'].value / 1e6)
             except (TypeError, KeyError, ValueError):
                 logging.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
-                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz\n' \
-                        'f0_gf/2={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                        '\nkappa_gf={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                label = 'f0={:.5f} GHz ' \
+                        '\nkappa0={:.4f} MHz \n' \
+                        'f0_gf/2={:.5f} GHz  ' \
+                        '\nkappa_gf={:.4f} MHz '.format(
                     self.fit_res.params['f0'].value * scale,
-                    self.fit_res.params['f0'].stderr / 1e6,
                     self.fit_res.params['kappa'].value / 1e6,
-                    self.fit_res.params['kappa'].stderr / 1e6,
                     self.fit_res.params['f0_gf_over_2'].value * scale,
-                    self.fit_res.params['f0_gf_over_2'].stderr / 1e6,
-                    self.fit_res.params['kappa_gf_over_2'].value / 1e6,
-                    self.fit_res.params['kappa_gf_over_2'].stderr / 1e6)
+                    self.fit_res.params['kappa_gf_over_2'].value / 1e6)
         else:
+            label = 'f0={:.5f} GHz '.format(
+                self.fit_res.params['f0'].value * scale)
             try:
                 old_freq = float(instr_set[self.qb_name].attrs['f_qubit'])
-
-                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                        '\nold f0={:.5f} GHz' \
-                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
-                    self.fit_res.params['f0'].value * scale,
-                    self.fit_res.params['f0'].stderr / 1e6,
-                    old_freq * scale,
-                    self.fit_res.params['kappa'].value / 1e6,
-                    self.fit_res.params['kappa'].stderr / 1e6)
+                label += '\nold f0={:.5f} GHz' .format(
+                    old_freq * scale)
             except (TypeError, KeyError, ValueError):
                 logging.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
-                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
-                    self.fit_res.params['f0'].value * scale,
-                    self.fit_res.params['f0'].stderr / 1e6,
-                    self.fit_res.params['kappa'].value / 1e6,
-                    self.fit_res.params['kappa'].stderr / 1e6)
+            label += 'f0={:.5f} GHz ' \
+                 '\nkappa0={:.4f} MHz'.format(
+                self.fit_res.params['f0'].value * scale,
+                self.fit_res.params['kappa'].value / 1e6)
 
         self.add_textbox(label, fig_dist, ax_dist)
         # fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,

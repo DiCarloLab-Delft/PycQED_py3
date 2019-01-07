@@ -474,12 +474,6 @@ class ResonatorSpectroscopy(Spectroscopy):
 
                 self.chi = (self.sim_fit[1].params['omega_ro'].value -
                             self.sim_fit[0].params['omega_ro'].value)/2
-                self.f_RO = x_fit_0[np.argmax(np.abs(self.sim_fit[1].eval(
-                                                         self.sim_fit[1].params,
-                                                         f=x_fit_0)-
-                                                     self.sim_fit[0].eval(
-                                                         self.sim_fit[0].params,
-                                                         f=x_fit_0)))]
                 self.f_RO_res = (self.sim_fit[0].params['omega_ro'].value+
                                  self.sim_fit[1].params['omega_ro'].value)/2
                 self.f_PF = self.sim_fit[0].params['omega_pf'].value
@@ -581,8 +575,12 @@ class ResonatorSpectroscopy(Spectroscopy):
         else:
             proc_data_dict = self.proc_data_dict
             plotsize = self.options_dict.get('plotsize')
-
             plot_fn = self.plot_line
+            amp_diff = np.abs(proc_data_dict['plot_amp'][0]*np.exp(
+                                  1j*np.pi*proc_data_dict['plot_phase'][0]/180)-
+                              proc_data_dict['plot_amp'][1]*np.exp(
+                                  1j*np.pi*proc_data_dict['plot_phase'][1]/180))
+            self.f_RO = proc_data_dict['plot_frequency'][0][np.argmax(amp_diff)]
             self.plot_dicts['amp1'] = {'plotfn': plot_fn,
                                       'ax_id': 'amp',
                                       'xvals': proc_data_dict['plot_frequency'][0],
@@ -611,6 +609,16 @@ class ResonatorSpectroscopy(Spectroscopy):
                                        'linestyle': '',
                                        'marker': 'o',
                                        'setlabel': '|e> data',
+                                       'do_legend': True
+                                       }
+            self.plot_dicts['diff'] = {'plotfn': plot_fn,
+                                       'ax_id': 'amp',
+                                       'xvals': proc_data_dict['plot_frequency'][0],
+                                       'yvals': amp_diff,
+                                       'color': 'g',
+                                       'linestyle': '',
+                                       'marker': 'o',
+                                       'setlabel': 'diff',
                                        'do_legend': True
                                        }
             self.plot_dicts['phase'] = {'plotfn': plot_fn,
@@ -714,19 +722,6 @@ class ResonatorSpectroscopy(Spectroscopy):
                                         fit_results[1].params,
                                         f=x_fit_1),
                                     'r--', linewidth=1.5, label='|e> fit')
-                            ax.plot(x_fit_0,np.abs(
-                                fit_results[1].eval(
-                                    fit_results[1].params,
-                                    f=x_fit_1)- fit_results[0].eval(
-                                    fit_results[0].params,
-                                    f=x_fit_1)),
-                                    'g--', linewidth=1.5, label='Difference')
-                            self.f_RO = x_fit_0[np.argmax(np.abs(fit_results[1].eval(
-                                            fit_results[1].params,
-                                            f=x_fit_0)-
-                                            fit_results[0].eval(
-                                                fit_results[0].params,
-                                               f=x_fit_0)))]
                             f_RO = self.f_RO
                             ax.plot([f_RO, f_RO],
                                     [0,max(max(self.raw_data_dict['amp'][0]),
