@@ -1940,7 +1940,8 @@ def sliding_flux_pulses_seq(
         cw_idx = angle//20 + 9
 
         k.prepz(q0)
-        k.gate(flux_codeword_a, [2, 0])
+        k.gate(flux_codeword_a, [2, 0]) # edge hardcoded because of openql
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)  # alignment workaround
         # hardcoded because of flux_tuples, [q1, q0])
         k.gate('wait', [q0, q1], wait_time)
 
@@ -1950,9 +1951,9 @@ def sliding_flux_pulses_seq(
             k.gate('ry90', [q0])
         else:
             raise ValueError('ramsey_axis must be "x" ot "y"')
-        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-        k.gate(flux_codeword_b, [2, 0])
-        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)  # alignment workaround
+        k.gate(flux_codeword_b, [2, 0]) # edge hardcoded because of openql
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)  # alignment workaround
         k.gate('wait', [q0, q1], 60)
         # hardcoded because of flux_tuples, [q1, q0])
         # hardcoded angles, must be uploaded to AWG

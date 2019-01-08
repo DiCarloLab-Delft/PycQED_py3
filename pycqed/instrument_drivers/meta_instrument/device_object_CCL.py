@@ -622,7 +622,7 @@ class DeviceCCL(Instrument):
                 regenerate_waveforms=True)
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0,q1])
+            self.prepare_for_timedomain(qubits=[q0, q1])
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1535,12 +1535,17 @@ class DeviceCCL(Instrument):
         if wait_time < 0:
             raise ValueError()
 
-        angles = np.arange(0, 341, 20*1)
+        # angles = np.arange(0, 341, 20*1)
+        # These are hardcoded angles in the mw_lutman for the AWG8
+        angles = np.concatenate([np.arange(0, 101, 20), np.arange(140,341,20)]) #avoid CW15, issue
+        # angles = np.arange(0, 341, 20))
+
+        qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
         p = mqo.sliding_flux_pulses_seq(
-            # qubits=qubits,  #FIXME, hardcoded because of OpenQL
-            qubits=[0, 2],
+            qubits=qubit_idxs,
             platf_cfg=self.cfg_openql_platform_fn(),
             wait_time=wait_time,
+            angles=angles,
             flux_codeword_a=flux_codeword_a, flux_codeword_b=flux_codeword_b,
             add_cal_points=False)
 
@@ -1553,7 +1558,8 @@ class DeviceCCL(Instrument):
         nested_MC.run('sliding_CZ_oscillation_{}'.format(counter_par()),
                       disable_snapshot_metadata=True)
 
-        a = ma2.Oscillation_Analysis()
+        # ch_idx = 1 because of the order of the correlation detector
+        a = ma2.Oscillation_Analysis(ch_idx=1)
         phi = np.rad2deg(a.fit_res['cos_fit'].params['phase'].value) % 360
 
         phi_stderr = np.rad2deg(a.fit_res['cos_fit'].params['phase'].stderr)
