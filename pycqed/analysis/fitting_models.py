@@ -628,7 +628,10 @@ def exp_dec_guess(model, data, t, vary_n=False):
 
     model.set_param_hint('amplitude', value=amp_guess)
     model.set_param_hint('tau', value=tau_guess)
-    model.set_param_hint('n', value=1, vary=vary_n)
+    if vary_n:
+        model.set_param_hint('n', value=1.1, vary=vary_n, min=1)
+    else:
+        model.set_param_hint('n', value=1, vary=vary_n)
     model.set_param_hint('offset', value=offs_guess)
 
     params = model.make_params()

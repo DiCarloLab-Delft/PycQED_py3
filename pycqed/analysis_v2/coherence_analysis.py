@@ -39,6 +39,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         :param close_figs: Close the figure (do not display)
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
+        :param fit_qubit_Q_factor: Should fitting of a Q-factor be done? (for T1 measurement only!)
         :param tau_key: key for the tau (time) fit result, e.g. 'Analysis.Fitted Params F|1>.tau.value'
         :param tau_std_key: key for the tau (time) standard deviation fit result,
                             e.g. 'Analysis.Fitted Params F|1>.tau.stderr'
@@ -691,9 +692,9 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                         a.run_fitting()
                         self.fit_res[qubit][typ] = a.fit_res
 
-                        sorted_sens = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac'],
+                        sorted_sens = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac_sorted'],
                                                                  other_mess=a.fit_res['sensitivity_values'])
-                        sorted_flux = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac'],
+                        sorted_flux = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac_sorted'],
                                                                  other_mess=a.fit_res['flux_values'])
                         sorted_sens = np.array(sorted_sens, dtype=float)
                         sorted_flux = np.array(sorted_flux, dtype=float)
@@ -802,7 +803,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     'xlabel': r'Sensitivity $|\partial\nu/\partial\Phi|$',
                     'xunit': r'GHz/$\Phi_0$',
                     'ylabel': r'$\Gamma_{\phi}$',
-                    'yunit': r'$s^{-1}$',
+                    'yunit': r'Hz',
                     'setlabel': '$\Gamma_{\phi,\mathrm{Ramsey}}$',
                 }
                 pdict_fit = {}
@@ -822,17 +823,19 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 self.plot_dicts[cg_base + '_echo_scatter'] = pds
 
                 if self.options_dict.get('print_fit_result_plot', True):
-                    dac_fit_text = '$\Gamma = %.2f(\pm %.2f)$\n' % (
-                    self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
-                    # dac_fit_text += '$\Gamma/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
-                    # dac_fit_text += '$\Gamma/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
-
-                    self.fit_res[qubit]['gamma_slope_ramsey_std']
-                    self.fit_res[qubit]['gamma_slope_echo_std']
+                    # dac_fit_text = '$\Gamma = {:.2g}(\pm {:.2g})$\n'.format(
+                    #                 self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
+                    dac_fit_text = '$\Gamma/2 \pi = {:.2g}(\pm {:.2g})$ kHz\n'.format(
+                                    self.fit_res[qubit]['gamma_intercept']/1e3 , self.fit_res[qubit]['gamma_intercept_std']/1e3)
+                    dac_fit_text += 'slope Ramsey = {:.2g}(\pm {:.2g}) (m$\Phi_0$)\n'.format(
+                                    self.fit_res[qubit]['gamma_slope_ramsey']*1e3, self.fit_res[qubit]['gamma_slope_ramsey_std']*1e3)
+                    dac_fit_text += 'slope echo = {:.2g}(\pm {:.2g}) (m$\Phi_0$)'.format(
+                                    self.fit_res[qubit]['gamma_slope_echo']*1e3, self.fit_res[qubit]['gamma_slope_echo_std']*1e3)
 
                     self.plot_dicts[cg_base + '_text_msg'] = {
                         'ax_id': cg_base,
-                        # 'ypos': 0.15,
+                        'xpos': 0.6,
+                        'ypos': 0.95,
                         'plotfn': self.plot_text,
                         'box_props': 'fancy',
                         'text_string': dac_fit_text,

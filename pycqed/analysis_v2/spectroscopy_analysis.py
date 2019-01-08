@@ -274,6 +274,7 @@ class complex_spectroscopy(Spectroscopy):
                                        'plotsize': plotsize,
                                        'do_legend':True
                                        }
+
             pdict_names = ['amp', 'phase', 'real', 'imag']
 
             self.figs['combined'], axs = plt.subplots(
@@ -316,6 +317,27 @@ class VNA_analysis(complex_spectroscopy):
 
     def process_data(self):
         super(VNA_analysis, self).process_data()
+
+    def run_fitting(self):
+        super().run_fitting()
+
+        freq = self.fit_dicts['reso_fit']['fit_res'].params['f0']
+        Q = self.fit_dicts['reso_fit']['fit_res'].params['Q']
+        Qe = self.fit_dicts['reso_fit']['fit_res'].params['Qe']
+        theta = self.fit_dicts['reso_fit']['fit_res'].params['theta']
+        Qc = 1/np.real(1/(Qe*np.exp(1j*theta)))
+        Qi = 1/(1/Q - 1/Qc)
+
+        msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.stderr/1e6)
+        msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e2,Q.stderr/1e3)
+        msg += '\n'
+        msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+        msg += '\n'
+        msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
+
+        self.proc_data_dict['complex_fit_msg'] = msg
+
+
 
     def prepare_plots(self):
         super(VNA_analysis, self).prepare_plots()
@@ -370,6 +392,12 @@ class VNA_analysis(complex_spectroscopy):
                 'setlabel': 'hanger',
                 'line_kws': {'color': 'r'},
                 'do_legend': True}
+
+            self.plot_dicts['plane_text'] = {
+                                        'plotfn': self.plot_text,
+                                        'text_string': self.proc_data_dict['complex_fit_msg'],
+                                        'xpos': 1.05, 'ypos': .6, 'ax_id': 'plane',
+                                        'horizontalalignment': 'left'}
 
 
     def prepare_fitting(self):
