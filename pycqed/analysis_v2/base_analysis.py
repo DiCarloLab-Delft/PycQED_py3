@@ -231,13 +231,13 @@ class BaseDataAnalysis(object):
             self.analyze_fit_results()  # analyzing the results of the fits
         self.save_quantities_of_interest()
 
-        self.prepare_plots()  # specify default plots
         if not self.extract_only:
+            self.prepare_plots()  # specify default plots
             self.plot(key_list='auto')  # make the plots
 
-        if self.options_dict.get('save_figs', False):
-            self.save_figures(
-                close_figs=self.options_dict.get('close_figs', True))
+            if self.options_dict.get('save_figs', False):
+                self.save_figures(
+                    close_figs=self.options_dict.get('close_figs', True))
 
     def get_timestamps(self):
         """
