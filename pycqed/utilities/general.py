@@ -1,5 +1,6 @@
 import os
 import sys
+import ast
 import numpy as np
 import h5py
 import json
@@ -307,9 +308,16 @@ def load_settings(instrument,
                                 try:
                                     instrument.set(parameter, value)
                                 except Exception:
-                                    print('Could not set parameter "%s" to "%s"'
-                                          ' for instrument "%s"' % (
-                                              parameter, value, instrument_name))
+                                    try:
+                                        instrument.set(parameter,
+                                                       ast.literal_eval(value))
+                                    except Exception:
+                                        print('Could not set parameter '
+                                              '"%s" to "%s" '
+                                              'for instrument "%s"' % (
+                                                  parameter, value,
+                                                  instrument_name))
+
             success = True
             f.close()
         except Exception as e:
