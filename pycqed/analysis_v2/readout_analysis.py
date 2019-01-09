@@ -1258,7 +1258,7 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
             combination_list = list(itertools.product([False, True],
                                                       repeat=len(qubits)))
             preselection_condition = dict(zip(
-                [(qb, 1) for qb in qubits],  # keys contain shift
+                [(qb, -1) for qb in qubits],  # keys contain shift
                 combination_list[0]  # first comb has all ground
             ))
 
