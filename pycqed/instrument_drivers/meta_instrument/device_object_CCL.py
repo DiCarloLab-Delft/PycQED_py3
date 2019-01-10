@@ -664,10 +664,6 @@ class DeviceCCL(Instrument):
                           'ch_idx_spec': 1},
             extract_only=extract_only)
 
-        if verbose:
-            info_msg = (print(a.plot_dicts['phase_message']['text_string']))
-            print(info_msg)
-
         return a
 
 

@@ -768,20 +768,42 @@ class Oscillation_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict = OrderedDict()
         idx = self.ch_idx
 
-        self.proc_data_dict['yvals'] = list(
+        normalize_to_cal_points = self.options_dict.get(
+            'normalize_to_cal_points', False)
+        cal_points = [
+            [[-4, -3], [-2, -1]],
+            [[-4, -2], [-3, -1]],
+            ]
+
+        yvals = list(
             self.raw_data_dict['measured_values_ord_dict'].values())[idx][0]
+        if normalize_to_cal_points:
+            yvals = a_tools.normalize_data_v3(
+                yvals, cal_zero_points=cal_points[idx][0],
+                cal_one_points=cal_points[idx][1])
+        self.proc_data_dict['yvals'] = yvals
+
         self.proc_data_dict['ylabel'] = self.raw_data_dict['value_names'][0][idx]
         self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
+
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
         cos_mod = lmfit.Model(fit_mods.CosFunc)
         cos_mod.guess = fit_mods.Cos_guess.__get__(cos_mod, cos_mod.__class__)
+
+        if not (self.options_dict.get('normalize_to_cal_points', False)):
+            t=  self.raw_data_dict['xvals'][0]
+            data =  self.proc_data_dict['yvals']
+        else:
+            t=  self.raw_data_dict['xvals'][0][:-4]
+            data =  self.proc_data_dict['yvals'][:-4]
+
         self.fit_dicts['cos_fit'] = {
             'model': cos_mod,
             'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
-            'fit_xvals': {'t': self.raw_data_dict['xvals'][0]},
-            'fit_yvals': {'data': self.proc_data_dict['yvals']}}
+            'fit_xvals': {'t': t},
+            'fit_yvals': {'data': data}}
 
     def analyze_fit_results(self):
         fr = self.fit_res['cos_fit'].best_values
@@ -939,31 +961,31 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         fr_0 = self.fit_res['cos_fit_off']
         fr_1 = self.fit_res['cos_fit_on']
 
-        phi0 = ufloat(np.rad2deg(fr_0.params['phase'].value), 
+        phi0 = ufloat(np.rad2deg(fr_0.params['phase'].value),
             np.rad2deg(fr_0.params['phase'].stderr))
 
-        phi1 = ufloat(np.rad2deg(fr_1.params['phase'].value), 
+        phi1 = ufloat(np.rad2deg(fr_1.params['phase'].value),
             np.rad2deg(fr_1.params['phase'].stderr))
         qoi['phi_0'] = phi0
         qoi['phi_1'] = phi1
         qoi['phi_cond'] = phi0-phi1
 
-        qoi['osc_amp_0'] = ufloat(fr_0.params['amplitude'].value, 
+        qoi['osc_amp_0'] = ufloat(fr_0.params['amplitude'].value,
                                   fr_0.params['amplitude'].stderr)
 
-        qoi['osc_amp_1'] = ufloat(fr_1.params['amplitude'].value, 
+        qoi['osc_amp_1'] = ufloat(fr_1.params['amplitude'].value,
                                   fr_1.params['amplitude'].stderr)
 
 
-        qoi['osc_offs_0'] = ufloat(fr_0.params['offset'].value, 
+        qoi['osc_offs_0'] = ufloat(fr_0.params['offset'].value,
                                   fr_0.params['offset'].stderr)
 
-        qoi['osc_offs_1'] = ufloat(fr_1.params['offset'].value, 
+        qoi['osc_offs_1'] = ufloat(fr_1.params['offset'].value,
                                   fr_1.params['offset'].stderr)
 
         qoi['offs_diff'] = qoi['osc_offs_1'] - qoi['osc_offs_0']
-        
-        
+
+
         # phi0 = np.rad2deg(fr_0['phase'].value)
         # phi1 = np.rad2deg(fr_1['phase'].value)
 
@@ -995,9 +1017,9 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         #     fr_1['offset'].value - fr_0['offset'].value, offs_stderr)
 
         # self.proc_data_dict['osc_amp'] = (osc_amp, osc_amp_stderr)
-        spec_on = ufloat(np.mean(self.proc_data_dict['yvals_spec_on'][:-3]), 
+        spec_on = ufloat(np.mean(self.proc_data_dict['yvals_spec_on'][:-3]),
                           sem(self.proc_data_dict['yvals_spec_on'][:-3]))
-        spec_off = ufloat(np.mean(self.proc_data_dict['yvals_spec_off'][:-3]), 
+        spec_off = ufloat(np.mean(self.proc_data_dict['yvals_spec_off'][:-3]),
                   sem(self.proc_data_dict['yvals_spec_off'][:-3]))
         qoi['missing_fraction'] = spec_on-spec_off
 
@@ -1069,11 +1091,11 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'Phase diff.: {}  deg\n'
                 'Phase off: {} deg\n'
                 'Phase on: {} deg\n\n'
-                
+
                 'Offs. diff.: {} %\n'
                 'Osc. offs. off: {} \n'
                 'Osc. offs. on: {}\n\n'
-                
+
                 'Osc. amp. off: {} \n'
                 'Osc. amp. on: {} '.format(
                     qoi['phi_cond'],
