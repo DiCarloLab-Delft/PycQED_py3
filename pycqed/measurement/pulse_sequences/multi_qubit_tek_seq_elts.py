@@ -1614,8 +1614,7 @@ def parity_correction_seq(
         'pulse_type': 'SquarePulse',
         'channel': operation_dict['RO mux']['acq_marker_channel'],
         'amplitude': 0.0,
-        'length': ro_spacing + feedback_delay + \
-                  operation_dict['RO mux']['length'],
+        'length': ro_spacing + feedback_delay,
         'pulse_delay': 0}
     
     if dd_scheme is None:
@@ -1631,7 +1630,8 @@ def parity_correction_seq(
             dd_scheme=dd_scheme)
 
     if prep_sequence is None:
-        prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
+        # prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
+        prep_sequence = ['Y90 ' + q0n]
 
     # create the elements
     el_list = []
@@ -1639,10 +1639,18 @@ def parity_correction_seq(
     # main (first) element
     pulse_sequence = deepcopy(prep_sequence)
     # w/o Echo pulses between CZ gates
-    pulse_sequence.append('mY90s ' + q1n)
+    pulse_sequence.append('mY90 ' + q1n)
+    # pulse_sequence.append('Y180s ' + q2n)
     pulse_sequence.append(CZ_pulses[0])
+    pulse_sequence.append('Y90 ' + q2n)
+    # pulse_sequence.append('Y180 ' + q0n)
+    # pulse_sequence.append('mY180s ' + q2n)
     pulse_sequence.append(CZ_pulses[1])
+    # pulse_sequence.append('mY180 ' + q0n)
     pulse_sequence.append('Y90 ' + q1n)
+
+    # operation_dict['RO_amp ' + q1n] = operation_dict['RO ' + q1n].copy()
+
     pulse_sequence.append('RO ' + q1n)
     pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
     pulse_list += dd_pulses
@@ -1654,35 +1662,38 @@ def parity_correction_seq(
         pulse_list.append(operation_dict['RO presel_dummy'])
 
     el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, 
-                              name='main')
+                              name='m')
     el_list.append(el_main)
 
     # # feedback elements
-    fb_sequence_0 = ['I ' + q2n, 'Is ' + qb1n]
+    fb_sequence_0 = ['I ' + q2n, 'Is ' + q1n]
     fb_sequence_1 = ['X180 ' + q2n] if reset else ['I ' + q2n]
-    fb_sequence_1 += ['X180s ' + qb1n]
+    fb_sequence_1 += ['X180s ' + q1n]
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
-    el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
+    el_list.append(multi_pulse_elt(0, station, pulse_list, name='f0',
                                    trigger=False, previous_element=el_main))
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
-    el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
+    el_fb = multi_pulse_elt(1, station, pulse_list, name='f1',
                             trigger=False, previous_element=el_main)
     el_list.append(el_fb)
 
     # repeated parity measurement element. Phase errors need to be corrected 
     # for by careful selection of qubit drive IF-s.
-    pulse_sequence = ['mY90 ' + q1n, CZ_pulses[0], CZ_pulses[1], 'Y90 ' + qb1n, 
-                    'RO ' + q1n]
+    pulse_sequence = ['mY90 ' + q1n,
+                      CZ_pulses[0],
+                      CZ_pulses[1],
+                      'Y90 ' + q1n,
+                      'RO ' + q1n]
     pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
     pulse_list += dd_pulses
     el_repeat = multi_pulse_elt(0, station, pulse_list, trigger=False, 
-                                name='repeat', previous_element=el_fb)
+                                name='r', previous_element=el_fb)
     el_list.append(el_repeat)
 
     # check that the qubits do not acquire any phase over one round of parity 
     # correction
     for qbn in [q0n, q1n, q2n]:
-        ifreq = operation_dict['X180 ' + qbn]['frequency']
+        ifreq = operation_dict['X180 ' + qbn]['mod_frequency']
         elements_length = el_fb.ideal_length() + el_repeat.ideal_length()
         phase_from_if = 360*ifreq*elements_length
         dynamic_phase = el_fb.drive_phase_offsets.get(qbn, 0)
@@ -1701,23 +1712,23 @@ def parity_correction_seq(
         tomography_sequence.append('RO mux')
         pulse_list = [operation_dict[pulse] for pulse in tomography_sequence]
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=False,
-                                       name='tomography_{}'.format(i),
+                                       name='t{}'.format(i),
                                        previous_element=el_fb))
 
     # create the sequence
     seq_name = 'Two qubit entanglement by parity measurement'
     seq = sequence.Sequence(seq_name)
-    seq.codewords[0] = 'feedback_0'
-    seq.codewords[1] = 'feedback_1'
+    seq.codewords[0] = 'f0'
+    seq.codewords[1] = 'f1'
     for i in range(len(tomography_basis)**2):
-        seq.append('main_{}'.format(i), 'main', trigger_wait=True)
-        seq.append('feedback_{}_0'.format(i), 'codeword', trigger_wait=False)
+        seq.append('m_{}'.format(i), 'm', trigger_wait=True)
+        seq.append('f_{}_0'.format(i), 'codeword', trigger_wait=False)
         for j in range(1, nr_parity_measurements):
-            seq.append('repeat_{}_{}'.format(i, j), 'repeat',
+            seq.append('r_{}_{}'.format(i, j), 'r',
                        trigger_wait=False)
-            seq.append('feedback_{}_{}'.format(i, j), 'codeword', 
+            seq.append('f_{}_{}'.format(i, j), 'codeword',
                        trigger_wait=False)
-        seq.append('tomography_{}'.format(i), 'tomography_{}'.format(i),
+        seq.append('t_{}'.format(i), 't{}'.format(i),
                    trigger_wait=False)
 
     if upload:

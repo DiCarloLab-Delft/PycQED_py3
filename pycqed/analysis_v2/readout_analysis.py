@@ -885,6 +885,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                 table[readout_n, state_n] = np.count_nonzero(mask)
         print(n_readouts)
         print(n_shots)
+        print(np.sum(table))
         return table*n_readouts/n_shots
 
     @staticmethod
@@ -1302,14 +1303,16 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
         if self.use_preselection:
             table_norm = table_norm[1::2, 1:] / (table_norm[1::2, 0][:, None])
         self.proc_data_dict['probability_table_data_only'] = table_norm
-        self.proc_data_dict['cross_fidelity_matrix'] = \
-            self.cross_fidelity_matrix(table_norm, len(self.channel_map))
+
+        if self.options_dict.get('do_cross_fidelity', True):
+            self.proc_data_dict['cross_fidelity_matrix'] = \
+                self.cross_fidelity_matrix(table_norm, len(self.channel_map))
+            self.save_processed_data('cross_fidelity_matrix')
         # self.proc_data_dict['cross_correlations_matrix'] = \
         #     self.cross_correlations_matrix()
 
         self.save_processed_data('probability_table')
         self.save_processed_data('probability_table_data_only')
-        self.save_processed_data('cross_fidelity_matrix')
 
     @staticmethod
     def cross_fidelity_matrix(table_norm, n_qubits):

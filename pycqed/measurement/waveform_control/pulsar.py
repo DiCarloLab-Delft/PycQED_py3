@@ -665,6 +665,13 @@ class AWG5014Pulsar:
         prev_offsets = {ch: obj.get('{}_offset'.format(ch)) for ch in
                         ['ch1', 'ch2', 'ch3', 'ch4']}
 
+        self.wfname_l = wfname_l
+        self.packed_waveforms = packed_waveforms
+        self.nrep_l = nrep_l
+        self.wait_l = wait_l
+        self.goto_l = goto_l
+        self.logic_jump_l = logic_jump_l
+
         if len(wfname_l) > 0:
             filename = sequence.name + '_FILE.AWG'
             awg_file = obj.generate_awg_file(packed_waveforms,
@@ -1184,11 +1191,17 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                 for wf in segment['wfname']:
                     if wf == 'codeword':
                         for wfname in precompiled_sequence.codewords.values():
-                            wf = wfname
-                    element_list.append(elements[wf])
+                            wf_new = wfname
+                    else:
+                            wf_new = wf
+                    element_list.append(elements[wf_new])
                 new_elt = element.combine_elements(element_list)
                 segment['wfname'] = new_elt.name
                 elements[new_elt.name] = new_elt
+            self.precompiled_sequence = precompiled_sequence
+        self.sequence = sequence
+        self.elements = elements
+
 
         # dict(name of AWG ->
         #      dict(i, element name ->
@@ -1215,6 +1228,8 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                 if (i, el.name) not in AWG_wfs[cAWG]:
                     AWG_wfs[cAWG][i, el.name] = {}
                 AWG_wfs[cAWG][i, el.name][cid] = waveforms[cname]
+
+        self.AWG_wfs = AWG_wfs
 
         for AWG in AWG_wfs:
             obj = self.AWG_obj(AWG=AWG)

@@ -496,7 +496,8 @@ def combine_elements(element_list):
         originalel.pulsar = pulsar
         if i != 0:
             el.shift_all_pulses(-originalel.offset() + element.ideal_length())
-        pulses = {el.name + '_' + p: el.pulses[p] for p in el.pulses}
+        pulses = {el.name + '_' + p + '_' + str(i): el.pulses[p]
+                  for p in el.pulses}
         for p in pulses:
             pulses[p].name = p
         element.pulses.update(pulses)

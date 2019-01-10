@@ -720,7 +720,7 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                               CZ_pulses, nreps=1,
                               upload=True, MC=None, prep_sequence=None,
                               nr_dd_pulses=0, dd_scheme=None,
-                              nr_shots=5000,
+                              nr_shots=5000, nr_parity_measurements=1,
                               tomography_basis=(
                                   'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                               reset=True, preselection=False, ro_spacing=1e-6):
@@ -733,13 +733,14 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                     'ro_spacing': ro_spacing,
                     'nr_dd_pulses': nr_dd_pulses,
                     'dd_scheme': dd_scheme}
-    if reset == True or reset == False:
+    if reset is True or reset is False:
         if preselection:
-            multiplexed_pulse([(qb0, qb1, qb2), (qb1,)*nr_parity_measurements,
-                               (qb0, qb1, qb2)], f_LO)
+            multiplexed_pulse([(qb0, qb1, qb2)] +
+                              [(qb1,)]*nr_parity_measurements +
+                              [(qb0, qb1, qb2)], f_LO)
         else:
-            multiplexed_pulse([(qb1,)*nr_parity_measurements, 
-                               (qb0, qb1, qb2)], f_LO)
+            multiplexed_pulse([(qb1,)]*nr_parity_measurements +
+                              [(qb0, qb1, qb2)], f_LO)
     elif reset == 'simple':
         multiplexed_pulse([qb0, qb1, qb2], f_LO)
     else:
@@ -783,7 +784,7 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
     
-    MC.run_2D(name='two_qubit_parity{}-{}'.format(
+    MC.run_2D(name='two_qubit_parity_x{}{}-{}'.format(nr_parity_measurements,
         '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])),
         exp_metadata=exp_metadata)
 
