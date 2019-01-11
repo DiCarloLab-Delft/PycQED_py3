@@ -1425,6 +1425,127 @@ def get_pulse_dict_from_pars(pulse_pars):
 
     return pulses
 
+def multi_elem_segment_timing_seq(phases, qbn, op_dict, ramsey_time,
+                                  nr_wait_elems, elem_type='interleaved',
+                                  cal_points=((-4, -3), (-2, -1)),
+                                  return_seq=True, upload=True):
+    """
+    Args:
+        phases: the phases for the second pi/2 pulse (in rad)
+        qbn: qubit name
+        op_dict: operation dictionaty
+        ramsey_time: delay between the two pi/2 pulses
+        nr_wait_elems: the number of waiting elements between the readout
+                       pulses
+        elem_type: 'fixed'/'codeword'/'interleaved'
+    """
+    # convert cal elems to correct range:
+    cal_points = (
+        tuple(i % len(phases) for i in cal_points[0]),
+        tuple(i % len(phases) for i in cal_points[1])
+    )
+
+    ## Create elements
+    el_list = []
+
+    idle_pulse = deepcopy(op_dict['I ' + qbn])
+    idle_pulse['nr_sigma'] = 1
+    idle_pulse['sigma'] = 2e-6
+    start_elem = multi_pulse_elt(0, station,
+                                 [idle_pulse, op_dict['X90 ' + qbn]], name='s',
+                                 trigger=True)
+    el_list.append(start_elem)
+
+    wait_pulse = deepcopy(op_dict['I ' + qbn])
+    wait_pulse['nr_sigma'] = 1
+    wait_pulse['sigma'] = ramsey_time/nr_wait_elems
+    wait_pulse['sigma'] -= station.pulsar.inter_element_spacing()
+    wait_samples_tek = ramsey_time/nr_wait_elems*1.2e9
+    dramsey_time = wait_samples_tek - 4*int(wait_samples_tek/4)
+    dramsey_time *= nr_wait_elems/1.2e9
+    print('wait_elem length {} Tektronix samples. Reduce ramsey time by {} s'
+          .format(wait_samples_tek, dramsey_time) + ' to satisfy granularity '
+          'constraint')
+    wait_elem = multi_pulse_elt(1, station, [wait_pulse], name='w',
+                                trigger=False, previous_element=start_elem)
+    el_list.append(wait_elem)
+
+    # check that no phase is acquired over the wait element
+    ifreq = op_dict['X180 ' + qbn]['mod_frequency']
+    phase_from_if = 360*ifreq*wait_elem.ideal_length()
+    dynamic_phase = wait_elem.drive_phase_offsets.get(qbn, 0)
+    total_phase = phase_from_if + dynamic_phase
+    total_mod_phase = total_phase - 360*(total_phase//360)
+    print(qbn + ' aquires a phase of {} ≡ {} (mod 360)'.format(
+        total_phase, total_mod_phase) + ' degrees each correction ' +
+          'cycle. You should reduce the intermediate frequency by {} Hz.' \
+          .format(total_mod_phase/wait_elem.ideal_length()/360))
+
+    cal0_elem = multi_pulse_elt(2, station, [op_dict['I ' + qbn],
+                                             op_dict['RO ' + qbn]], name='c0',
+                                trigger=True)
+    el_list.append(cal0_elem)
+    cal1_elem = multi_pulse_elt(3, station, [op_dict['X180 ' + qbn],
+                                             op_dict['RO ' + qbn]], name='c1',
+                                trigger=True)
+    el_list.append(cal1_elem)
+
+    for i, phase in enumerate(phases):
+        if i in cal_points[0] or i in cal_points[1]:
+            continue
+        x90_pulse_mes = deepcopy(op_dict['X90 ' + qbn])
+        x90_pulse_mes['phase'] = phase*180/np.pi
+        # multi-element-segment end element
+
+        mes_end_pulses = [x90_pulse_mes, op_dict['RO ' + qbn]]
+        mes_end_elem = multi_pulse_elt(4+2*i, station, mes_end_pulses,
+                                       name='e{}'.format(i), trigger=False,
+                                       previous_element=wait_elem)
+        el_list.append(mes_end_elem)
+
+        x90_pulse_ses = deepcopy(x90_pulse_mes)
+        x90_pulse_ses['pulse_delay'] = ramsey_time
+        x90_pulse_ses['pulse_delay'] += station.pulsar.inter_element_spacing()
+        ses_pulses = [idle_pulse, op_dict['X90 ' + qbn], x90_pulse_ses,
+                      op_dict['RO ' + qbn]]
+        ses_elem = multi_pulse_elt(5+2*i, station, ses_pulses,
+                                       name='a{}'.format(i), trigger=True)
+        el_list.append(ses_elem)
+
+    ## Create sequence
+    seq_name = 'Multi_elem_segment_timing_seq'
+    seq = sequence.Sequence(seq_name)
+    seq.codewords[0] = 'w'
+    seq.codewords[1] = 'w'
+    for i, phase in enumerate(phases):
+        if i in cal_points[0]:
+            seq.append('c0s{}'.format(i), 'c0', trigger_wait=True)
+            seq.append('c0m{}'.format(i), 'c0', trigger_wait=True)
+        elif i in cal_points[1]:
+            seq.append('c0s{}'.format(i), 'c1', trigger_wait=True)
+            seq.append('c0m{}'.format(i), 'c1', trigger_wait=True)
+        else:
+            seq.append('a{}'.format(i), 'a{}'.format(i), trigger_wait=True)
+            seq.append('s{}'.format(i), 's', trigger_wait=True)
+            for j in range(nr_wait_elems):
+                if elem_type == 'fixed':
+                    wfname = 'w'
+                elif elem_type == 'codeword':
+                    wfname = 'codeword'
+                elif elem_type == 'interleaved':
+                    wfname = ['w', 'codeword'][j%2]
+                else:
+                    raise ValueError('Invalid elem_type {}'.format(elem_type))
+                seq.append('w{}_{}'.format(j, i), wfname, trigger_wait=False)
+            seq.append('e{}'.format(i), 'e{}'.format(i), trigger_wait=False)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq
+
 def Z(theta=0, pulse_pars=None):
 
     """
@@ -1444,3 +1565,4 @@ def Z(theta=0, pulse_pars=None):
     Z_gate['phase'] = theta
 
     return Z_gate
+

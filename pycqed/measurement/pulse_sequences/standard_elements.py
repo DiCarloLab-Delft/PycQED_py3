@@ -225,6 +225,15 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                refpulse=last_pulse, refpoint='end', refpoint_new='end')
 
 
+    # Retrigger the slave AWG-s
+    if not trigger:
+        slave_triggers = sequencer_config.get('slave_AWG_trig_channels', {})
+        for cname, delay in slave_triggers.items():
+            el.add(bpl.SquarePulse(name='slave_trigger', channel=cname,
+                                   amplitude=1, length=20e-9),
+                   start=10e-9 - delay)
+
+
     # switch to global timing for adding the trigger pulses.
     el.shift_all_pulses(-el.offset())
     el.ignore_offset_correction = True

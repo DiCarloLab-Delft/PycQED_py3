@@ -145,6 +145,36 @@ class arbitrary_variable_swf(swf.Hard_Sweep):
             #the correct swf. in control_swf and set it's prepared value to True.
           pass
 
+
+class MultiElemSegmentTimingSwf(swf.Hard_Sweep):
+    def __init__(self, phases, qbn, op_dict, ramsey_time, nr_wait_elems,
+                 elem_type='interleaved', cal_points=((-4, -3), (-2, -1)),
+                 upload=True):
+        super().__init__()
+        self.phases = phases
+        self.qbn = qbn
+        self.op_dict = op_dict
+        self.ramsey_time = ramsey_time
+        self.nr_wait_elems = nr_wait_elems
+        self.elem_type = elem_type
+        self.cal_points = cal_points
+        self.upload = upload
+        self.name = 'Phase of second pi/2 pulse'
+        self.parameter_name = 'phase'
+        self.unit = 'rad'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.multi_elem_segment_timing_seq(
+                self.phases,
+                self.qbn,
+                self.op_dict,
+                self.ramsey_time,
+                self.nr_wait_elems,
+                elem_type=self.elem_type,
+                cal_points=self.cal_points,
+                upload=True)
+
 class Rabi(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, RO_pars, n=1, cal_points=True,

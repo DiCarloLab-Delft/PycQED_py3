@@ -257,6 +257,7 @@ class HDAWG8Pulsar:
         self.add_parameter('{}_min_length'.format(name),
                            get_cmd=lambda: 8 / 2.4e9)
         self.add_parameter('{}_inter_element_deadtime'.format(name),
+                           # get_cmd=lambda: 80 / 2.4e9)
                            get_cmd=lambda: 8 / 2.4e9)
                            # get_cmd=lambda: 0 / 2.4e9)
         self.add_parameter('{}_precompile'.format(name), initial_value=False,
@@ -513,12 +514,9 @@ class HDAWG8Pulsar:
         """
         repeat_open_str = 'repeat ({}) {{\n'.format(
             reps) if reps != 1 else ''
-        # trigger_str = '\t\twaitWave();\n\t\twaitDigTrigger(1);\n' if wait \
-        #     else '\t\twaitWave();\n'
-        trigger_str = 'waitDigTrigger(1);\n' if wait else ''
+        trigger_str = 'waitDigTrigger(1);\n'
         if name1 is None and name2 is None:
-            play_str = 'waitWave();\n' \
-                       'playWaveDIO();\n'
+            play_str = 'playWaveDIO();\n'
         elif name1 is None:
             play_str = 'playWave(2, {});\n'.format(name2)
         elif name2 is None:

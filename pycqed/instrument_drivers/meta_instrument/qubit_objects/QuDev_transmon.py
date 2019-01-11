@@ -1770,6 +1770,48 @@ class QuDev_transmon(Qubit):
                       'artif_detuning': self.artificial_detuning() },
                   do_fitting=True)
 
+    def measure_multi_element_segment_timing(
+            self, phases, ramsey_time=4e-6, nr_wait_elems=16,
+            elem_type='interleaved', cal_points=((-4, -3), (-2, -1)),
+            label=None, MC=None, upload=True, analyze=True, close_fig=True):
+
+        if label is None:
+            label = 'Multi_element_segment_timing' + self.msmt_suffix
+        if MC is None:
+            MC = self.MC
+
+        self.prepare_for_timedomain()
+        MC.set_sweep_function(awg_swf.MultiElemSegmentTimingSwf(
+            phases=phases,
+            qbn=self.name,
+            op_dict=self.get_operation_dict(),
+            ramsey_time=ramsey_time,
+            nr_wait_elems=nr_wait_elems,
+            elem_type=elem_type,
+            cal_points=cal_points,
+            upload=upload))
+        MC.set_sweep_points(phases)
+        d = det.UHFQC_integrated_average_detector(
+            self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
+            channels=self.int_avg_det.channels,
+            integration_length=self.RO_acq_integration_length(),
+            values_per_point=2, values_per_point_suffex=['_single_elem',
+                                                         '_multi_elem'])
+        MC.set_detector_function(d)
+
+        metadata = dict(
+            ramsey_time=ramsey_time,
+            nr_wait_elems=nr_wait_elems,
+            elem_type=elem_type,
+            cal_points=cal_points
+        )
+        MC.run(label, exp_metadata=metadata)
+
+        # Create a MeasurementAnalysis object for this measurement
+        if analyze:
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
+
     def calibrate_drive_mixer_carrier_NN(self,MC=None, update=True,make_fig=True,
                                  trigger_sep=5e-6,
                                  amplitude=0.1,

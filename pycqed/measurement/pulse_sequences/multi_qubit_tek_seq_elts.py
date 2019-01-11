@@ -1700,7 +1700,7 @@ def parity_correction_seq(
         dynamic_phase += el_repeat.drive_phase_offsets.get(qbn, 0)
         total_phase = phase_from_if + dynamic_phase
         total_mod_phase = total_phase - 360*(total_phase//360)
-        print(qbn + ' aquires a phase of {} = {} (mod 360)'.format(
+        print(qbn + ' aquires a phase of {} ≡ {} (mod 360)'.format(
             total_phase, total_mod_phase) + ' degrees each correction ' + 
             'cycle. You should reduce the intermediate frequency by {} Hz.'\
             .format(total_mod_phase/elements_length/360))
