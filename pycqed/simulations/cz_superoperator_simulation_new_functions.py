@@ -1313,11 +1313,34 @@ def add_waiting_at_sweetspot(tlist,amp,waiting_at_sweetspot):
     sim_step = tlist[1]-tlist[0]
 
     tlist_update = concatenate_CZpulse_and_Zrotations(waiting_at_sweetspot,sim_step,tlist_A)
-    tlist_update = concatenate_CZpulse_and_Zrotations(tlist_update[-1]+sim_step/2,sim_step,tlist_update)
+    tlist_update = concatenate_CZpulse_and_Zrotations(tlist_A[-1]+sim_step/2,sim_step,tlist_update)
     amp_mid = np.zeros(np.size(tlist_update)-np.size(tlist))
     amp = np.concatenate([amp_A,amp_mid,amp_B])
 
     return tlist_update, amp
+
+
+def correct_phases(U):
+    phases = phases_from_superoperator(U)
+    Ucorrection = qtp.Qobj([[np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, np.exp(-1j*np.deg2rad(phases[1])), 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[3]-phases[-1])), 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[1])), 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0]))]],
+                    type='oper',
+                    dims=[[3, 3], [3, 3]])
+
+    if U.type=='oper':
+        U=Ucorrection*U
+
+    elif U.type=='super':
+        U=qtp.to_super(Ucorrection)*U
+
+    return U
 
 
 

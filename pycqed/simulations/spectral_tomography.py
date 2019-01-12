@@ -12,7 +12,7 @@ from qcodes import Instrument
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from scipy.interpolate import interp1d
 import qutip as qtp
-#np.set_printoptions(threshold=np.inf)
+np.set_printoptions(threshold=np.inf)
 
 
 
@@ -109,7 +109,7 @@ def f_to_parallelize_new(arglist):
 
     elif adaptive_pars['mode']=='spectral_tomo':
         MC.set_sweep_functions([noise_parameters_CZ.T1_q0])
-        MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'], 
+        MC.set_sweep_points(np.logspace(adaptive_pars['theta_f_min'], 
             adaptive_pars['theta_f_max'],adaptive_pars['n_points']))
         if noise_parameters_CZ.cluster():
             dat = MC.run('1D sim_spectral_tomo double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
@@ -527,6 +527,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             #czf.repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0)
 
 
+            U_superop_average=czf.correct_phases(U_superop_average)
             GTM=get_PTM_or_GTM(U_superop_average,'GTM')
             PTM=get_PTM_or_GTM(U_superop_average,'PTM')
             T_GTM=extract_T_matrix(GTM)
