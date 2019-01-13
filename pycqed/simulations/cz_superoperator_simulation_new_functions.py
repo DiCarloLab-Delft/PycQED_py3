@@ -1312,7 +1312,7 @@ def add_waiting_at_sweetspot(tlist,amp,waiting_at_sweetspot):
 
     sim_step = tlist[1]-tlist[0]
 
-    tlist_update = concatenate_CZpulse_and_Zrotations(waiting_at_sweetspot,sim_step,tlist_A)
+    tlist_update = concatenate_CZpulse_and_Zrotations(waiting_at_sweetspot-sim_step/2,sim_step,tlist_A)
     tlist_update = concatenate_CZpulse_and_Zrotations(tlist_A[-1]+sim_step/2,sim_step,tlist_update)
     amp_mid = np.zeros(np.size(tlist_update)-np.size(tlist))
     amp = np.concatenate([amp_A,amp_mid,amp_B])
