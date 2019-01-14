@@ -717,7 +717,7 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
 
 
 def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
-                              CZ_pulses, nreps=1,
+                              CZ_pulses, nreps=1, parity_op='ZZ',
                               upload=True, MC=None, prep_sequence=None,
                               nr_dd_pulses=0, dd_scheme=None,
                               nr_shots=5000, nr_parity_measurements=1,
@@ -727,12 +727,17 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     """
     Important things to check when running the experiment:
         Is the readout separation commensurate with 225 MHz?
+    
+    Args:
+        parity_op: 'ZZ', 'XX', 'XX,ZZ' or 'ZZ,XX' specifies the type of parity 
+                   measurement
     """
     exp_metadata = {'feedback_delay': feedback_delay,
                     'CZ_pulses': CZ_pulses,
                     'ro_spacing': ro_spacing,
                     'nr_dd_pulses': nr_dd_pulses,
-                    'dd_scheme': dd_scheme}
+                    'dd_scheme': dd_scheme,
+                    'parity_op': parity_op}
     if reset is True or reset is False:
         if preselection:
             multiplexed_pulse([(qb0, qb1, qb2)] +
@@ -761,6 +766,7 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
         operation_dict=get_operation_dict(qubits), CZ_pulses=CZ_pulses,   
         feedback_delay=feedback_delay, prep_sequence=prep_sequence, 
         reset=reset, nr_parity_measurements=nr_parity_measurements,
+        parity_op=parity_op,
         tomography_basis=tomography_basis,
         preselection=preselection,
         ro_spacing=ro_spacing,
@@ -784,7 +790,8 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
     
-    MC.run_2D(name='two_qubit_parity_x{}{}-{}'.format(nr_parity_measurements,
+    MC.run_2D(name='two_qubit_parity_{}_x{}{}-{}'.format(
+        parity_op, nr_parity_measurements,
         '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])),
         exp_metadata=exp_metadata)
 

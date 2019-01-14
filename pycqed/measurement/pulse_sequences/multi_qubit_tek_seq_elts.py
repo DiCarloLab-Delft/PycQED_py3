@@ -1581,8 +1581,8 @@ def parity_correction_seq(
         q0n, q1n, q2n, operation_dict, CZ_pulses, feedback_delay=900e-9,
         prep_sequence=None, reset=True, nr_parity_measurements=1,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
-        upload=True, verbose=False, return_seq=False, preselection=False,
-        ro_spacing=1e-6, dd_scheme=None, nr_dd_pulses=4):
+        parity_op='ZZ', upload=True, verbose=False, return_seq=False, 
+        preselection=False, ro_spacing=1e-6, dd_scheme=None, nr_dd_pulses=4):
     """
 
     |              elem 1               |  elem 2  |  (elem 3, 2)  | elem 4
@@ -1603,7 +1603,13 @@ def parity_correction_seq(
             additional parity measurements
         elem_4 (x6**2):
             tomography rotations for q0 and q2
+
+    Args:
+        parity_op: 'ZZ', 'XX', 'XX,ZZ' or 'ZZ,XX' specifies the type of parity 
+                   measurement
     """
+    if parity_op not in ['ZZ', 'XX', 'XX,ZZ', 'ZZ,XX']:
+        raise ValueError("Invalid parity operator '{}'".format(parity_op))
 
     operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = \
@@ -1630,42 +1636,58 @@ def parity_correction_seq(
             dd_scheme=dd_scheme)
 
     if prep_sequence is None:
-        # prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
-        prep_sequence = ['Y90 ' + q0n]
+        if parity_op[0] == 'X':
+            prep_sequence = []
+        else:
+            prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
+    
+    xx_sequence_first =  ['Y90 ' + qb0n, 'Y90s ' + qb1n, 'Y90s ' + qb2n,
+                          CZ_pulses[0],
+                          CZ_pulses[1],
+                          'mY90 ' + qb0n, 'mY90s ' + qb1n,
+                          'RO ' + qb1n]
+    xx_sequence_after_z =  deepcopy(xx_sequence_first)
+    xx_sequence_after_x =  ['Y90 ' + qb0n, 'Y90s ' + qb1n,
+                            CZ_pulses[0],
+                            CZ_pulses[1],
+                            'mY90 ' + qb0n, 'mY90s ' + qb1n,
+                            'RO ' + qb1n]
+    zz_sequence_first =  ['Y90 ' + qb1n,
+                          CZ_pulses[0],
+                          CZ_pulses[1],
+                          'mY90 ' + qb1n,
+                          'RO ' + qb1n]
+    zz_sequence_after_z =  deepcopy(zz_sequence_first)
+    zz_sequence_after_x =  ['Y90 ' + qb1n, 'mY90s ' + qb2n,
+                            CZ_pulses[0],
+                            CZ_pulses[1],
+                            'mY90 ' + qb1n,
+                            'RO ' + qb1n]
+    pretomo_after_z = []
+    pretomo_after_x = ['mY90 ' + qb2n]
+
 
     # create the elements
     el_list = []
 
-    # main (first) element
-    pulse_sequence = deepcopy(prep_sequence)
-    # w/o Echo pulses between CZ gates
-    pulse_sequence.append('mY90 ' + q1n)
-    # pulse_sequence.append('Y180s ' + q2n)
-    pulse_sequence.append(CZ_pulses[0])
-    pulse_sequence.append('Y90 ' + q2n)
-    # pulse_sequence.append('Y180 ' + q0n)
-    # pulse_sequence.append('mY180s ' + q2n)
-    pulse_sequence.append(CZ_pulses[1])
-    # pulse_sequence.append('mY180 ' + q0n)
-    pulse_sequence.append('Y90 ' + q1n)
-
-    # operation_dict['RO_amp ' + q1n] = operation_dict['RO ' + q1n].copy()
-
-    pulse_sequence.append('RO ' + q1n)
-    pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
+    # first element
+    if parity_op in ['XX', 'XX,ZZ']:        
+        pulse_list = [operation_dict[pulse] for pulse in 
+            prep_sequence + xx_sequence_first]
+    else:
+        pulse_list = [operation_dict[pulse] for pulse in 
+            prep_sequence + zz_sequence_first]
     pulse_list += dd_pulses
-
     if preselection:
         pulse_list.append(operation_dict['RO mux_presel'])
         # RO presel dummy is referenced to end of RO mux presel => it happens
         # before the preparation pulses!
         pulse_list.append(operation_dict['RO presel_dummy'])
-
     el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, 
                               name='m')
     el_list.append(el_main)
 
-    # # feedback elements
+    # feedback elements
     fb_sequence_0 = ['I ' + q2n, 'Is ' + q1n]
     fb_sequence_1 = ['X180 ' + q2n] if reset else ['I ' + q2n]
     fb_sequence_1 += ['X180s ' + q1n]
@@ -1677,24 +1699,56 @@ def parity_correction_seq(
                             trigger=False, previous_element=el_main)
     el_list.append(el_fb)
 
-    # repeated parity measurement element. Phase errors need to be corrected 
+    # repeated parity measurement element(s). Phase errors need to be corrected 
     # for by careful selection of qubit drive IF-s.
-    pulse_sequence = ['mY90 ' + q1n,
-                      CZ_pulses[0],
-                      CZ_pulses[1],
-                      'Y90 ' + q1n,
-                      'RO ' + q1n]
-    pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
-    pulse_list += dd_pulses
-    el_repeat = multi_pulse_elt(0, station, pulse_list, trigger=False, 
-                                name='r', previous_element=el_fb)
-    el_list.append(el_repeat)
+    if parity_op == 'ZZ':
+        pulse_list = [operation_dict[pulse] for pulse in zz_sequence_after_z]
+        pulse_list += dd_pulses
+        el_repeat = multi_pulse_elt(0, station, pulse_list, trigger=False, 
+                                    name='rz', previous_element=el_fb)
+        el_list.append(el_repeat)
+    elif parity_op == 'XX':
+        pulse_list = [operation_dict[pulse] for pulse in xx_sequence_after_x]
+        pulse_list += dd_pulses
+        el_repeat = multi_pulse_elt(0, station, pulse_list, trigger=False, 
+                                    name='rx', previous_element=el_fb)
+        el_list.append(el_repeat)
+    elif parity_op == 'ZZ,XX':
+        pulse_list = [operation_dict[pulse] for pulse in xx_sequence_after_z]
+        pulse_list += dd_pulses
+        el_repeat_x = multi_pulse_elt(0, station, pulse_list, trigger=False, 
+                                     name='rx', previous_element=el_fb)
+        el_list.append(el_repeat_x)
+
+        pulse_list = [operation_dict[pulse] for pulse in zz_sequence_after_x]
+        pulse_list += dd_pulses
+        el_repeat_z = multi_pulse_elt(1, station, pulse_list, trigger=False, 
+                                     name='rz', previous_element=el_fb)
+        el_list.append(el_repeat_z)
+    elif parity_op == 'XX,ZZ':
+        pulse_list = [operation_dict[pulse] for pulse in zz_sequence_after_x]
+        pulse_list += dd_pulses
+        el_repeat_z = multi_pulse_elt(0, station, pulse_list, trigger=False, 
+                                      name='rz', previous_element=el_fb)
+        el_list.append(el_repeat_z)
+
+        pulse_list = [operation_dict[pulse] for pulse in xx_sequence_after_z]
+        pulse_list += dd_pulses
+        el_repeat_x = multi_pulse_elt(1, station, pulse_list, trigger=False, 
+                                      name='rx', previous_element=el_fb)
+        el_list.append(el_repeat_x)
 
     # check that the qubits do not acquire any phase over one round of parity 
     # correction
     for qbn in [q0n, q1n, q2n]:
         ifreq = operation_dict['X180 ' + qbn]['mod_frequency']
-        elements_length = el_fb.ideal_length() + el_repeat.ideal_length()
+        if parity_op in ['XX', 'ZZ']:
+            elements_length = el_fb.ideal_length() + el_repeat.ideal_length()
+        else:
+            elements_length = el_fb.ideal_length() + el_repeat_x.ideal_length()
+            print('Length difference of XX and ZZ cycles: {} s'.format(
+                el_repeat_x.ideal_length() - el_repeat_z.ideal_length()
+            ))
         phase_from_if = 360*ifreq*elements_length
         dynamic_phase = el_fb.drive_phase_offsets.get(qbn, 0)
         dynamic_phase += el_repeat.drive_phase_offsets.get(qbn, 0)
@@ -1706,11 +1760,15 @@ def parity_correction_seq(
             .format(total_mod_phase/elements_length/360))
 
     # tomography elements
+    if parity_op in ['XX', ['XX,ZZ', 'ZZ,XX'][nr_parity_measurements%2]]:
+        pretomo = pretomo_after_x
+    else:
+        pretomo = pretomo_after_z
     tomography_sequences = get_tomography_pulses(q0n, q2n,
                                                  basis_pulses=tomography_basis)
     for i, tomography_sequence in enumerate(tomography_sequences):
-        tomography_sequence.append('RO mux')
-        pulse_list = [operation_dict[pulse] for pulse in tomography_sequence]
+        pulse_list = [operation_dict[pulse] for pulse in 
+                          pretomo + tomography_sequence + ['RO mux']]
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=False,
                                        name='t{}'.format(i),
                                        previous_element=el_fb))
@@ -1724,8 +1782,12 @@ def parity_correction_seq(
         seq.append('m_{}'.format(i), 'm', trigger_wait=True)
         seq.append('f_{}_0'.format(i), 'codeword', trigger_wait=False)
         for j in range(1, nr_parity_measurements):
-            seq.append('r_{}_{}'.format(i, j), 'r',
-                       trigger_wait=False)
+            if parity_op in ['XX', ['XX,ZZ', 'ZZ,XX'][j%2]]:
+                seq.append('r_{}_{}'.format(i, j), 'rx',
+                          trigger_wait=False)
+            else:
+                seq.append('r_{}_{}'.format(i, j), 'rz',
+                          trigger_wait=False)
             seq.append('f_{}_{}'.format(i, j), 'codeword',
                        trigger_wait=False)
         seq.append('t_{}'.format(i), 't{}'.format(i),
