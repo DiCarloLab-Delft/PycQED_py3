@@ -1632,8 +1632,8 @@ def parity_correction_seq(
         'pulse_delay': 0}]
     else:
         dd_pulses = get_dd_pulse_list(
-            operation_dict, [q0n, q2n], feedback_delay, nr_pulses=nr_dd_pulses, 
-            dd_scheme=dd_scheme)
+            operation_dict, [q1n], feedback_delay, nr_pulses=nr_dd_pulses, 
+            dd_scheme=dd_scheme, init_buffer=400e-9)
 
     if prep_sequence is None:
         if parity_op[0] == 'X':
@@ -2444,9 +2444,21 @@ def general_multi_qubit_seq(
         return seq
 
 def get_dd_pulse_list(operation_dict, qb_names, dd_time, nr_pulses=4, 
-                      dd_scheme='cpmg', udd_buffer=0):
-    pulse_length = operation_dict['X180 ' + qb_names[-1]]['nr_sigma'] * \
-                   operation_dict['X180 ' + qb_names[-1]]['sigma']
+                      dd_scheme='cpmg', udd_buffer=0,
+                      init_buffer=0):
+    pulse_length = (operation_dict['X180 ' + qb_names[-1]]['nr_sigma'] * \
+                      operation_dict['X180 ' + qb_names[-1]]['sigma'])
+    pulse_list = []
+    if init_buffer>0:
+        dd_time -= init_buffer
+        delay_pulse = {
+            'pulse_type': 'SquarePulse',
+            'channel': operation_dict['X180 ' + qb_names[0]]['I_channel'],
+            'amplitude': 0.0,
+            'length': init_buffer,
+            'pulse_delay': 0}
+        pulse_list.append(delay_pulse)
+
     def cpmg_delay(i, nr_pulses=nr_pulses, dd_time=dd_time, 
                    pulse_length=pulse_length):
         delay = (dd_time - nr_pulses*pulse_length)/nr_pulses
@@ -2463,13 +2475,14 @@ def get_dd_pulse_list(operation_dict, qb_names, dd_time, nr_pulses=4,
         delay *= dd_time - pulse_length - 2*buffer
         delay -= pulse_length
         return delay
+
     if dd_scheme == 'cpmg':
         delay_func = cpmg_delay 
     elif dd_scheme == 'udd':
         delay_func = udd_delay
     else:
         raise ValueError('Unknown decoupling scheme "{}"'.format(dd_scheme))
-    pulse_list = []
+
     for i in range(nr_pulses):
         delay_pulse = {
             'pulse_type': 'SquarePulse',
@@ -2477,10 +2490,14 @@ def get_dd_pulse_list(operation_dict, qb_names, dd_time, nr_pulses=4,
             'amplitude': 0.0,
             'length': delay_func(i),
             'pulse_delay': 0}
-        pulse_list.append(delay_pulse)
+        if delay_pulse['length'] > 0:
+            pulse_list.append(delay_pulse)
         for j, qbn in enumerate(qb_names):
             pulse_name = 'X180 ' if j == 0 else 'X180s '
-            pulse_list.append(operation_dict[pulse_name + qbn])
+            pulse_pulse = deepcopy(operation_dict[pulse_name + qbn])
+            # pulse_pulse['sigma'] *= 2
+            # pulse_pulse['amplitude'] /= 2
+            pulse_list.append(pulse_pulse)
     delay_pulse = {
         'pulse_type': 'SquarePulse',
         'channel': operation_dict['X180 ' + qb_names[0]]['I_channel'],

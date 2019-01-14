@@ -1562,7 +1562,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         elif result_logging_mode == 'digitized':
             self.value_units = ['frac']*len(self.channels)
-            self.scaling_factor = 1
+            self.scaling_factor = 1/0.00146484375
 
         self.value_names, self.value_units = self._add_value_name_suffex(
             value_names=self.value_names, value_units=self.value_units,
@@ -2057,7 +2057,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         data = []
         if self.thresholding:
             for key in sorted(data_raw.keys()):
-                data.append(np.array(data_raw[key]))
+                data.append(np.array(data_raw[key])/0.00146484375)
         else:
             #print(self.scaling_factor)
             #print(self.nr_averages)
