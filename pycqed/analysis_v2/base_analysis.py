@@ -1457,7 +1457,8 @@ class BaseDataAnalysis(object):
 
         axs.vlines(x, ymin, ymax, colors,
                    linestyles=linestyles, label=label, **pdict['line_kws'])
-        axs.legend()
+        if pdict.get('do_legend', False):
+            axs.legend()
 
     def plot_matplot_ax_method(self, pdict, axs):
         """
