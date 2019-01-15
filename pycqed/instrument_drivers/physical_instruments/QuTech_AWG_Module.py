@@ -4,9 +4,9 @@ Author:     Wouter Vlothuizen, TNO/QuTech,
             edited by Adriaan Rol, Gerco Versloot
 Purpose:    Instrument driver for Qutech QWG
 Usage:
-Notes:      It is possible to view the QWG log using ssh. To do this connect
-            using ssh e.g., "ssh root@192.168.0.10"
-            Logging can be enabled using "tail -f /tmpLog/qwg.log"
+Notes:      It is possible to view the QWG log using ssh. To do this:
+            - connect using ssh e.g., "ssh root@192.168.0.10"
+            - viewed log using "tail -f /var/log/qwg.log"
 Bugs:
 '''
 
@@ -16,11 +16,9 @@ import numpy as np
 import struct
 import json
 from qcodes import validators as vals
-import warnings
-
-
 from qcodes.instrument.parameter import Parameter
 from qcodes.instrument.parameter import Command
+import warnings
 
 
 # Note: the HandshakeParameter is a temporary param that should be replaced
@@ -56,7 +54,6 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
-        # Commented out until bug fixed
         self.device_descriptor.numCodewords = 128
 
         # valid values
@@ -66,7 +63,6 @@ class QuTech_AWG_Module(SCPI):
 
         self.add_parameters()
         self.connect_message()
-
 
     def add_parameters(self):
         #######################################################################
@@ -201,7 +197,7 @@ class QuTech_AWG_Module(SCPI):
                                  +'Used for calibration of the DAC. Do not use to set the gain of a channel!\n' \
                                  +'Notes:\n  The gain setting is from 0 to 4095 \n' \
                                  +'    Where 0 is 0 V and 4095 is 3.3V \n' \
-                                 +'Get Return:\n   Setting of the gain in interger (0 - 4095)\n'\
+                                 +'Get Return:\n   Setting of the gain in integer (0 - 4095)\n'\
                                  +'Set parameter:\n   Integer: Gain of the DAC in , min: 0, max: 4095')
 
             self.add_parameter('_dac{}_digital_value'.format(ch),
@@ -294,10 +290,9 @@ class QuTech_AWG_Module(SCPI):
                           call_cmd='QUTEch:OUTPut:SYNCsideband',
                           docstring=doc_sSG)
 
-
     def stop(self):
         '''
-        Shutsdown output on channels. When stoped will check for errors or overflow
+        Stop output on channels and check for errors or overflow
         '''
         self.write('awgcontrol:stop:immediate')
 
@@ -418,7 +413,6 @@ class QuTech_AWG_Module(SCPI):
         result = str(msg)[1:-1]
         result = result.replace('\"\"', '\"') # SCPI/visa adds additional quotes
         return json.loads(result)
-
 
 
     ##########################################################################
