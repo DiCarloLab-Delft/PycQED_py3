@@ -312,11 +312,18 @@ def get_f_pulse_double_sided(fluxlutman,theta_i):
 
 # Functions for spectral tomography.
 
-def get_normalized_gellmann_matrices(index):
+def get_normalized_gellmann_matrices(index,specification):
     # Returns the Gell-Mann matrix specified by index, normalized to 1.
     # The numbering follows the wikipedia article. We use the index 0 for the identity.
-    # index must be an integer. 
-    lambda_0=qtp.qeye(3)/np.sqrt(3)
+    # index must be an integer.
+    if specification == 'GTM':
+        lambda_0=qtp.Qobj([[1,0,0],
+                           [0,1,0],
+                           [0,0,1]])/np.sqrt(3)
+    elif specification == 'PTM':
+        lambda_0=qtp.Qobj([[1,0,0],
+                           [0,1,0],
+                           [0,0,0]])/np.sqrt(2)
     lambda_1=qtp.Qobj([[0,1,0],
                        [1,0,0],
                        [0,0,0]])/np.sqrt(2)
@@ -345,6 +352,16 @@ def get_normalized_gellmann_matrices(index):
     return lambdas[index]
 
 
+def transform_basis(C,S):
+    # C (operator or superoperator)
+    # S: matrix change of basis
+    if C.type == 'oper':    
+        return S.dag()*C*S
+    elif C.type == 'super':
+    	S=qtp.to_super(S)
+    	return S.dag()*C*S
+
+
 def get_PTM_or_GTM(S,specification):
     # Input: superoperator S in Liouville representation for 2 qutrits
     # Output: Gellmann Transfer Matrix of S, defined as
@@ -355,14 +372,14 @@ def get_PTM_or_GTM(S,specification):
         dim=9
     GTM=np.zeros([dim**2,dim**2],dtype=complex)
     for i in range(0,dim):
-        lambda_i=get_normalized_gellmann_matrices(i)
+        lambda_i=get_normalized_gellmann_matrices(i,specification)
         for i_prime in range(0,dim):
-            lambda_i_prime=get_normalized_gellmann_matrices(i_prime)
+            lambda_i_prime=get_normalized_gellmann_matrices(i_prime,specification)
             lambda_i_combined=qtp.operator_to_vector(qtp.tensor(lambda_i,lambda_i_prime))
             for j in range(0,dim):
-                lambda_j=get_normalized_gellmann_matrices(j)
+                lambda_j=get_normalized_gellmann_matrices(j,specification)
                 for j_prime in range(0,dim):
-                    lambda_j_prime=get_normalized_gellmann_matrices(j_prime)
+                    lambda_j_prime=get_normalized_gellmann_matrices(j_prime,specification)
                     lambda_j_combined=qtp.operator_to_vector(qtp.tensor(lambda_j,lambda_j_prime))
                 
                     GTM[i*dim+i_prime,j*dim+j_prime]=(lambda_i_combined.dag()*S*lambda_j_combined).data[0,0]
@@ -528,6 +545,16 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             U_superop_average=czf.correct_phases(U_superop_average)
+
+            H_0=czf.calc_hamiltonian(0,self.fluxlutman,self.noise_parameters_CZ)   # computed at 0 amplitude
+            # We change the basis from the standard basis to the basis of eigenvectors of H_0
+            # The columns of S are the eigenvectors of H_0, appropriately ordered
+            if self.noise_parameters_CZ.dressed_compsub():
+                S = qtp.Qobj(czf.matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
+            else:
+                S = qtp.tensor(qtp.qeye(3),qtp.qeye(3))
+            U_superop_average=transform_basis(U_superop_average,S.dag())
+
             GTM=get_PTM_or_GTM(U_superop_average,'GTM')
             PTM=get_PTM_or_GTM(U_superop_average,'PTM')
             T_GTM=extract_T_matrix(GTM)
