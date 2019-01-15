@@ -141,8 +141,8 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameter('dio_mode',
                             unit='',
                             label='DIO input operation mode',
-                            get_cmd='SYSTem:DIO:MODE?',
-                            set_cmd='SYSTem:DIO:MODE ' + '{}',
+                            get_cmd='DIO:MODE?',
+                            set_cmd='DIO:MODE ' + '{}',
                             vals=vals.Enum('MASTER', 'SLAVE'),
                             val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
                             docstring='Get or set the DIO input operation mode\n' \
@@ -154,11 +154,8 @@ class QuTech_AWG_Module(SCPI):
                                 'from the connected master IORearDIO board\n'
                                     '\t\tDisables SE and DIFF inputs\n' )
 
-        self.add_parameter('dio_calibrate',
-                            unit='',
-                            label='Calibrate DIO signals',
-                            get_cmd='SYSTem:DIO:CALibrate',
-                            get_parser=self._int_to_array,
+        self.add_function('dio_calibrate',
+                            call_cmd='DIO:CALibrate',
                             docstring='Calibrate the DIO input signals.\n' \
                                 'Will analyze the input signals for each DIO '\
                                 'inputs (used to transfer codeword bits), secondly, '\
@@ -166,36 +163,31 @@ class QuTech_AWG_Module(SCPI):
 
                                 'Each signal is sampled and divided into sections. '\
                                 'These sections are analyzed to find a stable '\
-                                'stable signal on all inputs. These stable sections '\
+                                'stable signal. These stable sections '\
                                 'are addressed by there index.\n\n' \
 
-                                'Note 1: Expect and DIO calibration signal on the inputs:\n' \
+                                'Note 1: Expects a DIO calibration signal on the inputs:\n' \
                                 '\tAn all codewords bits high followed by an all codeword ' \
                                 'bits low in a continues repetition. This results in a ' \
                                 'square wave of 25 MHz on the DIO inputs of the ' \
-                                'DIO connection.\n\n' \
+                                'DIO connection. Individual DIO inputs where no ' \
+                                'signal is detected will not be calibrated, See ' \
+                                'paramater dio_calibrated_inputs\n\n' \
 
-                                'Note 2: DIO inputs will be ignored from calibration ' \
-                                'if the representing bit in the bitSelect of all ' \
-                                'channels are disabled (see param:chX_bit_select)\n\n' \
-
-                                'Note 3: The best index is stored in non-volatile ' \
+                                'Note 2: The best index is stored in non-volatile ' \
                                 'memory and loaded at startup.\n\n' \
 
-                                'Note 4: The QWG will continuously validate if ' \
+                                'Note 3: The QWG will continuously validate if ' \
                                 'the active index is still stable.\n\n' \
 
-                                'Return: List of stable indexes\n'\
-                                    '\t- The first index in the list is set and stored as active index\n' \
-                                    '\t- The list is ordered by most preferable index first\n' \
-                                    '\t- If no suitable indexes are found the list '\
-                                    'is empty and an error is pushed onto the error stack\n'
+                                'If no suitable indexes are found the list '\
+                                'is empty and an error is pushed onto the error stack\n'
                             )
 
         self.add_parameter('dio_is_calibrated',
                             unit='',
                             label='DIO calibration status',
-                            get_cmd='SYSTem:DIO:CALibrate?',
+                            get_cmd='DIO:CALibrate?',
                             val_mapping={True: '1', False: '0'},
                             docstring='Get DIO calibration status\n' \
                                 'Note: will also return false on no signal.\n\n' \
@@ -204,11 +196,11 @@ class QuTech_AWG_Module(SCPI):
                                 '\tFalse: DIO is not calibrated'
                             )
 
-        self.add_parameter('dio_index',
+        self.add_parameter('dio_active_index',
                             unit='',
                             label='DIO calibration index',
-                            get_cmd='SYSTem:DIO:INDex?',
-                            set_cmd='SYSTem:DIO:INDex {}',
+                            get_cmd='DIO:INDexes:ACTive?',
+                            set_cmd='DIO:INDexes:ACTive {}',
                             get_parser=np.uint32,
                             vals=vals.Ints(0, 15),
                             docstring='Get and set DIO calibration index\n' \
@@ -216,10 +208,27 @@ class QuTech_AWG_Module(SCPI):
                                 'See dio_calibrate() paramater\n' \
                             )
 
+        self.add_parameter('dio_suitable_indexes',
+                            unit='',
+                            label='DIO suitable indexes',
+                            get_cmd='DIO:INDexes?',
+                            get_parser=self._int_to_array,
+                            docstring='Get DIO all suitable indexes\n' \
+                                    '\t- The array is ordered by most preferable index first\n'
+                            )
+
+        self.add_parameter('dio_calibrated_inputs',
+                            unit='',
+                            label='DIO calibrated inputs',
+                            get_cmd='DIO:INPutscalibrated?',
+                            get_parser=int,
+                            docstring='Get all DIO inputs channels which are calibrated\n'
+                            )
+
         self.add_parameter('dio_signal',
                             unit='',
                             label='DIO signal detect status',
-                            get_cmd='SYSTem:DIO:SIGNal?',
+                            get_cmd='DIO:SIGNal?',
                             val_mapping={True: '1', False: '0'},
                             docstring='Get the DIO signal detect status of SE/DIFF/Master input.\n' \
                                 'Result:\n' \
@@ -449,7 +458,6 @@ class QuTech_AWG_Module(SCPI):
         '''
         self.write('awgcontrol:stop:immediate')
 
-        self.detect_overflow()
         self.getErrors()
 
     def _add_codeword_parameters(self):
@@ -546,18 +554,6 @@ class QuTech_AWG_Module(SCPI):
                 break;
 
         return result
-
-    def detect_overflow(self):
-        '''
-        Will raise an error if on a channel overflow happened
-        '''
-        status = self.get_system_status()
-        err_msg = [];
-        for channel in status["channels"]:
-            if(channel["overflow"] == True):
-                err_msg.append("Wave overflow detected on channel: {}".format(channel["id"]))
-        if(len(err_msg) > 0):
-            raise RuntimeError(err_msg)
 
     def detect_underdrive(self, status):
         '''
