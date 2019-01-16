@@ -407,7 +407,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         N.B. the implementation is specific to this type of AWG
         """
-
+        if self.AWG() is None:
+            logging.warning('No AWG present, returning unity scale factor.')
+            return 1
         channel_amp = self.cfg_awg_channel_amplitude()
         channel_range_pp = self.cfg_awg_channel_range()
         # channel range of 5 corresponds to -2.5V to +2.5V
