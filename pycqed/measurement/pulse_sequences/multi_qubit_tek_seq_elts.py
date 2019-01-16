@@ -2473,6 +2473,58 @@ def general_multi_qubit_seq(
     else:
         return seq
 
+
+def measurement_induced_dephasing_seq(phases, qbn_dephased, ro_op, 
+        operation_dict, readout_separation, nr_readouts=1, 
+        cal_points=((-4, -3), (-2, -1)), upload=True, return_seq=True):
+    cal_points=(
+        tuple(i%len(phases) for i in cal_points[0]),
+        tuple(i%len(phases) for i in cal_points[1])
+    )
+    seq_name = 'measurement_induced_dephasing_seq'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    idle_pulse = {
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict[ro_op]['acq_marker_channel'],
+        'amplitude': 0.0,
+        'length': readout_separation,
+        'pulse_delay': 0}
+
+    el_cal0 = multi_pulse_elt(0, 
+                    [operation_dict['I ' + qbn_dephased],
+                     operation_dict['RO ' + qbn_dephased])
+    el_cal1 = multi_pulse_elt(1, 
+                    [operation_dict['X180 ' + qbn_dephased],
+                     operation_dict['RO ' + qbn_dephased])
+    el_list.append(el_cal0)
+    el_list.append(el_cal1)
+
+    for i, phase in enumerate(phases):
+        if i in cal_points[0]:
+            seq.append_element(el_cal0, repetitions=nr_readouts+1)
+        elif i in cal_points[1]:
+            seq.append_element(el_cal1, repetitions=nr_readouts+1)
+        else:
+            x90_2 = deepcopy(operation_dict['X90 ' + qbn_dephased])
+            x90_2['phase'] = phase
+            pulse_list = [operation_dict['X90 ' + qbn_dephased]]
+            for j in range(nr_readouts)
+                pulse_list += [operation_dict[ro_op], idle_pulse]
+            pulse_list += [x90_2, operation_dict['RO ' + qbn_dephased]]
+            el = multi_pulse_elt(2+i, station, pulse_list)
+            seq.append_element(el)
+    
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq
+
+
 def get_dd_pulse_list(operation_dict, qb_names, dd_time, nr_pulses=4, 
                       dd_scheme='cpmg', udd_buffer=0,
                       init_buffer=0):

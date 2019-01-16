@@ -1801,6 +1801,63 @@ def cphase_finetune_parameters(qbc, qbt, qbr, flux_length, flux_amplitudes,
 
     return best_amp
 
+def measure_measurement_induced_dephasing(qb_dephased, qb_target, phases, amps,
+        readout_separation, f_LO, nr_readouts=1, 
+        cal_points=((-4, -3), (-2, -1)), MC=None, UHFQC=None, pulsar=None, 
+        upload=True):
+
+    if MC is None:
+        MC = qb_dephased.MC
+    if UHFQC is None:
+        UHFQC = qb_dephased.UHFQC
+    if pulsar is None:
+        pulsar = qb_dephased.AWG
+    operation_dict = get_operation_dict([qb_dephased, qb_target])
+    for qb in [qb_target, qb_dephased]:
+        qb.prepare_for_timedomain(multiplexed=True)
+    channels = qb_dephased.int_avg_det.channels
+    suffixes = ['_probe_{}'.format(i + 1) for i in range(nr_readouts)] + \
+               ['_measure']
+    df = det.UHFQC_integrated_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=qb_dephased.RO_acq_integration_length(),
+            nr_averages=qb_dephased.RO_acq_averages(),
+            values_per_point=nr_readouts+1,
+            values_per_point_suffex=suffixes)
+
+    sf = awg_swf2.Measurement_Induced_Dephasing_Phase_Swf(
+        qbn_dephased=qb_dephased.name, 
+        ro_op='RO ' + qb_target.name, 
+        operation_dict=operation_dict, 
+        readout_separation=readout_separation,
+        nr_readouts=nr_readouts, 
+        cal_points=cal_points, 
+        upload=upload)
+    MC.set_sweep_function(sf)
+    MC.set_sweep_points(phases)
+    sf2 = awg_swf2.Measurement_Induced_Dephasing_Amplitude_Swf(
+        qb_dephased=qb_dephased,
+        qb_targeted=qb_targeted,
+        nr_readouts=nr_readouts,
+        multiplexed_pulse_fn=multiplexed_pulse, 
+        f_LO=f_LO
+    )
+    MC.set_sweep_function_2D(sf2)
+    MC.set_sweep_points_2D(amps)
+    MC.set_detector_function(df)
+    exp_metadata = {'readout_separation': readout_separation, 
+                    'nr_readouts': nr_readouts, 
+                    'cal_points': cal_points,
+                    'f_LO': f_LO
+                    }
+    MC.run('RO_DynamicPhase_{}{}'.format(
+        pulsed_qubit.name, ''.join(qbr_names)),
+              exp_metadata=exp_metadata)
+    ma.MeasurementAnalysis()
+
+
+
+
 class Averaged_Cphase_Measurement():
 
     def __init__(self, qbc, qbt, qbr, n_phases, MC, n_average=5,
