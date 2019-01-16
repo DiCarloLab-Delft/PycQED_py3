@@ -12,6 +12,8 @@ import pycqed.measurement.waveform_control.element as element
 import string
 import time
 import pprint
+import base64
+import hashlib
 
 from pycqed.instrument_drivers.virtual_instruments.virtual_awg5014 import \
     VirtualAWG5014

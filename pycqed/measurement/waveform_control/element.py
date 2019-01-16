@@ -300,7 +300,8 @@ class Element:
                 continue
             nsamples = self.samples(c)
             wfs[c] = np.zeros(nsamples)
-            tvals[c] = np.arange(nsamples) / self._clock(c) + self.time_offset
+            tvals[c] = np.arange(nsamples) / self._clock(c) + \
+                       self.time_offset + self.channel_delay(c)
         # we first compute the ideal function values
         for p in self.pulses:
             if channels is not None and \
@@ -318,8 +319,7 @@ class Element:
                         raise Exception(
                             'Pulse {} on channel {} in element {} starts at a '
                             'negative time.'.format(p, c, self.name))
-                    chan_tvals[c] = tvals[c].copy()[idx0:idx1] + \
-                                    self.channel_delay(c)
+                    chan_tvals[c] = tvals[c].copy()[idx0:idx1]
             pulsewfs = self.pulses[p].get_wfs(chan_tvals)
 
             for c in self.pulses[p].channels:

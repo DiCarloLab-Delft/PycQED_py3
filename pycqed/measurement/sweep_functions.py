@@ -220,7 +220,7 @@ class QX_RB_Sweep(Soft_Sweep):
 
 class Delayed_None_Sweep(Soft_Sweep):
 
-    def __init__(self, sweep_control='soft', delay=0, **kw):
+    def __init__(self, sweep_control='soft', delay=0, mode='cycle_delay', **kw):
         super().__init__()
         self.sweep_control = sweep_control
         self.name = 'None_Sweep'
@@ -228,6 +228,7 @@ class Delayed_None_Sweep(Soft_Sweep):
         self.unit = 'arb. unit'
         self.delay = delay
         self.time_last_set = 0
+        self.mode = mode
         if delay > 60:
             logging.warning(
                 'setting a delay of {:.g}s are you sure?'.format(delay))
@@ -236,9 +237,12 @@ class Delayed_None_Sweep(Soft_Sweep):
         '''
         Set the parameter(s) to be sweeped. Differs per sweep function
         '''
+        if self.mode != 'cycle_delay':
+            self.time_last_set = time.time()
         while (time.time() - self.time_last_set) < self.delay:
             pass  # wait
-        self.time_last_set = time.time()
+        if self.mode == 'cycle_delay':
+            self.time_last_set = time.time()
 
 
 ###################################

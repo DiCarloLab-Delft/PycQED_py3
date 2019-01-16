@@ -478,7 +478,7 @@ class parity_correction(swf.Hard_Sweep):
         self.prep_sequence = prep_sequence
         self.reset = reset
         self.nr_parity_measurements = nr_parity_measurements
-        self.parity_op=parity_op,
+        self.parity_op = parity_op
         self.tomography_basis = tomography_basis
         self.preselection = preselection
         self.ro_spacing = ro_spacing
@@ -519,6 +519,8 @@ class parity_correction(swf.Hard_Sweep):
                     verbose=self.verbose,
                     preselection=self.preselection,
                     ro_spacing=self.ro_spacing,
+                    dd_scheme=self.dd_scheme,
+                    nr_dd_pulses=self.nr_dd_pulses,
                 )
 
 

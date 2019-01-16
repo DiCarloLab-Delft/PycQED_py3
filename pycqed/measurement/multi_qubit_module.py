@@ -734,22 +734,18 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     """
     exp_metadata = {'feedback_delay': feedback_delay,
                     'CZ_pulses': CZ_pulses,
+                    'nr_parity_measurements': nr_parity_measurements,
                     'ro_spacing': ro_spacing,
                     'nr_dd_pulses': nr_dd_pulses,
                     'dd_scheme': dd_scheme,
                     'parity_op': parity_op}
-    if reset is True or reset is False:
-        if preselection:
-            multiplexed_pulse([(qb0, qb1, qb2)] +
-                              [(qb1,)]*nr_parity_measurements +
-                              [(qb0, qb1, qb2)], f_LO)
-        else:
-            multiplexed_pulse([(qb1,)]*nr_parity_measurements +
-                              [(qb0, qb1, qb2)], f_LO)
-    elif reset == 'simple':
-        multiplexed_pulse([qb0, qb1, qb2], f_LO)
+    if preselection:
+        multiplexed_pulse([(qb0, qb1, qb2)] +
+                          [(qb1,)]*nr_parity_measurements +
+                          [(qb0, qb1, qb2)], f_LO)
     else:
-        raise ValueError("reset parameter must be True/False/'simple'")
+        multiplexed_pulse([(qb1,)]*nr_parity_measurements +
+                          [(qb0, qb1, qb2)], f_LO)
 
     qubits = [qb0, qb1, qb2]
     for qb in qubits:
@@ -786,7 +782,7 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
 
     MC.set_sweep_function(sf)
     MC.set_sweep_points(np.arange(nr_shots))
-    MC.set_sweep_function_2D(swf.None_Sweep())
+    MC.set_sweep_function_2D(swf.Delayed_None_Sweep(mode='set_delay', delay=5))
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
     

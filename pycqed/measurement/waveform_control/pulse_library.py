@@ -147,6 +147,7 @@ class SSB_DRAG_pulse(Pulse):
         return self
 
     def chan_wf(self, chan, tvals):
+        print(self.name, tvals[0])
         idx0 = np.where(tvals >= tvals[0])[0][0]
         idx1 = np.where(tvals <= tvals[0] + self.length)[0][-1] + 1
         wf = np.zeros(len(tvals))

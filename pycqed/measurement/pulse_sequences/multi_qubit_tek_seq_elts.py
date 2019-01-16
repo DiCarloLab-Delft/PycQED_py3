@@ -1578,7 +1578,7 @@ def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
         return seq_name
 
 def parity_correction_seq(
-        q0n, q1n, q2n, operation_dict, CZ_pulses, feedback_delay=900e-9,
+        qb1n, qb2n, qb3n, operation_dict, CZ_pulses, feedback_delay=900e-9,
         prep_sequence=None, reset=True, nr_parity_measurements=1,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         parity_op='ZZ', upload=True, verbose=False, return_seq=False, 
@@ -1632,39 +1632,46 @@ def parity_correction_seq(
         'pulse_delay': 0}]
     else:
         dd_pulses = get_dd_pulse_list(
-            operation_dict, [q1n], feedback_delay, nr_pulses=nr_dd_pulses, 
-            dd_scheme=dd_scheme, init_buffer=400e-9)
+            operation_dict,
+            # [qb2n],
+            [qb1n, qb3n],
+            feedback_delay,
+            nr_pulses=nr_dd_pulses,
+            dd_scheme=dd_scheme,
+            init_buffer=0)
 
     if prep_sequence is None:
         if parity_op[0] == 'X':
             prep_sequence = []
         else:
-            prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
+            prep_sequence = ['Y90 ' + qb1n, 'Y90s ' + qb3n]
     
-    xx_sequence_first =  ['Y90 ' + qb0n, 'Y90s ' + qb1n, 'Y90s ' + qb2n,
+    xx_sequence_first =  ['Y90 ' + qb1n, 'mY90s ' + qb2n, 'Y90s ' + qb3n,
                           CZ_pulses[0],
                           CZ_pulses[1],
-                          'mY90 ' + qb0n, 'mY90s ' + qb1n,
-                          'RO ' + qb1n]
+                          # 'mY90 ' + qb1n,
+                          'Y90 ' + qb2n,
+                          'RO ' + qb2n]
     xx_sequence_after_z =  deepcopy(xx_sequence_first)
-    xx_sequence_after_x =  ['Y90 ' + qb0n, 'Y90s ' + qb1n,
+    xx_sequence_after_x =  ['mY90s ' + qb2n,
                             CZ_pulses[0],
                             CZ_pulses[1],
-                            'mY90 ' + qb0n, 'mY90s ' + qb1n,
-                            'RO ' + qb1n]
-    zz_sequence_first =  ['Y90 ' + qb1n,
+                            # 'mY90 ' + qb1n,
+                            'Y90 ' + qb2n,
+                            'RO ' + qb2n]
+    zz_sequence_first =  ['mY90 ' + qb2n,
                           CZ_pulses[0],
                           CZ_pulses[1],
-                          'mY90 ' + qb1n,
-                          'RO ' + qb1n]
+                          'Y90 ' + qb2n,
+                          'RO ' + qb2n]
     zz_sequence_after_z =  deepcopy(zz_sequence_first)
-    zz_sequence_after_x =  ['Y90 ' + qb1n, 'mY90s ' + qb2n,
+    zz_sequence_after_x =  ['mY90 ' + qb2n, 'mY90s ' + qb3n, 'mY90s ' + qb1n,
                             CZ_pulses[0],
                             CZ_pulses[1],
-                            'mY90 ' + qb1n,
-                            'RO ' + qb1n]
+                            'Y90 ' + qb2n,
+                            'RO ' + qb2n]
     pretomo_after_z = []
-    pretomo_after_x = ['mY90 ' + qb2n]
+    pretomo_after_x = ['mY90 ' + qb3n, 'mY90s ' + qb1n,]
 
 
     # create the elements
@@ -1688,9 +1695,9 @@ def parity_correction_seq(
     el_list.append(el_main)
 
     # feedback elements
-    fb_sequence_0 = ['I ' + q2n, 'Is ' + q1n]
-    fb_sequence_1 = ['X180 ' + q2n] if reset else ['I ' + q2n]
-    fb_sequence_1 += ['X180s ' + q1n]
+    fb_sequence_0 = ['I ' + qb3n, 'Is ' + qb2n]
+    fb_sequence_1 = ['X180 ' + qb3n] if reset else ['I ' + qb3n]
+    fb_sequence_1 += ['X180s ' + qb2n] if reset else ['Is ' + qb2n]
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
     el_list.append(multi_pulse_elt(0, station, pulse_list, name='f0',
                                    trigger=False, previous_element=el_main))
@@ -1740,7 +1747,7 @@ def parity_correction_seq(
 
     # check that the qubits do not acquire any phase over one round of parity 
     # correction
-    for qbn in [q0n, q1n, q2n]:
+    for qbn in [qb1n, qb2n, qb3n]:
         ifreq = operation_dict['X180 ' + qbn]['mod_frequency']
         if parity_op in ['XX', 'ZZ']:
             elements_length = el_fb.ideal_length() + el_repeat.ideal_length()
@@ -1749,9 +1756,8 @@ def parity_correction_seq(
             print('Length difference of XX and ZZ cycles: {} s'.format(
                 el_repeat_x.ideal_length() - el_repeat_z.ideal_length()
             ))
+        dynamic_phase = el_main.drive_phase_offsets.get(qbn, 0)
         phase_from_if = 360*ifreq*elements_length
-        dynamic_phase = el_fb.drive_phase_offsets.get(qbn, 0)
-        dynamic_phase += el_repeat.drive_phase_offsets.get(qbn, 0)
         total_phase = phase_from_if + dynamic_phase
         total_mod_phase = total_phase - 360*(total_phase//360)
         print(qbn + ' aquires a phase of {} ≡ {} (mod 360)'.format(
@@ -1764,7 +1770,7 @@ def parity_correction_seq(
         pretomo = pretomo_after_x
     else:
         pretomo = pretomo_after_z
-    tomography_sequences = get_tomography_pulses(q0n, q2n,
+    tomography_sequences = get_tomography_pulses(qb1n, qb3n,
                                                  basis_pulses=tomography_basis)
     for i, tomography_sequence in enumerate(tomography_sequences):
         pulse_list = [operation_dict[pulse] for pulse in 
@@ -1804,7 +1810,7 @@ def parity_correction_seq(
 
 def parity_correction_no_reset_seq(
         q0n, q1n, q2n, operation_dict, CZ_pulses, feedback_delay=900e-9,
-        prep_sequence=None, ro_spacing=1e-6,
+        prep_sequence=None, ro_spacing=1e-6, dd_scheme=None, nr_dd_pulses=0,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False, preselection=False):
     """
@@ -1830,15 +1836,10 @@ def parity_correction_no_reset_seq(
     """
 
     operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
-    operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing-feedback_delay
-    operation_dict['RO mux_presel']['refpoint'] = 'start'
+    operation_dict['RO mux_presel']['pulse_delay'] = \
+        -ro_spacing - feedback_delay - operation_dict['RO mux']['length']
+    operation_dict['RO mux_presel']['refpoint'] = 'end'
 
-    operation_dict['I_fb'] = {
-        'pulse_type': 'SquarePulse',
-        'channel': operation_dict['RO mux']['acq_marker_channel'],
-        'amplitude': 0.0,
-        'length': feedback_delay,
-        'pulse_delay': 0}
     operation_dict['RO presel_dummy'] = {
         'pulse_type': 'SquarePulse',
         'channel': operation_dict['RO mux']['acq_marker_channel'],
@@ -1846,9 +1847,48 @@ def parity_correction_no_reset_seq(
         'length': ro_spacing+feedback_delay,
         'pulse_delay': 0}
 
+    if dd_scheme is None:
+        dd_pulses = [{
+            'pulse_type': 'SquarePulse',
+            'channel': operation_dict['RO mux']['acq_marker_channel'],
+            'amplitude': 0.0,
+            'length': feedback_delay,
+            'pulse_delay': 0}]
+    else:
+        dd_pulses = get_dd_pulse_list(
+            operation_dict,
+            # [qb2n],
+            [q0n, q2n],
+            feedback_delay,
+            nr_pulses=nr_dd_pulses,
+            dd_scheme=dd_scheme,
+            init_buffer=0)
+
     if prep_sequence is None:
-        prep_sequence = ['Y90 ' + q0n, 'mY90s ' + q1n, 'Y90s ' + q2n,
-                         CZ_pulses[0], CZ_pulses[1], 'Y90 ' + q1n, 'I_fb']
+        prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n,
+                         'mY90 ' + q1n,
+                         CZ_pulses[0], CZ_pulses[1],
+                         'Y90 ' + q1n,
+                         'RO ' + q1n]
+
+    pulse_list = [operation_dict[pulse] for pulse in prep_sequence] + dd_pulses
+
+    if preselection:
+        pulse_list.append(operation_dict['RO mux_presel'])
+        # RO presel dummy is referenced to end of RO mux presel => it happens
+        # before the preparation pulses!
+        pulse_list.append(operation_dict['RO presel_dummy'])
+
+    idle_length = operation_dict['X180 ' + q1n]['sigma']
+    idle_length *= operation_dict['X180 ' + q1n]['nr_sigma']
+    idle_length += 2*8/2.4e9
+    idle_pulse = {
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict['RO mux']['acq_marker_channel'],
+        'amplitude': 0.0,
+        'length': idle_length,
+        'pulse_delay': 0}
+    pulse_list.append(idle_pulse)
 
     # tomography elements
     tomography_sequences = get_tomography_pulses(q0n, q2n,
@@ -1858,14 +1898,11 @@ def parity_correction_no_reset_seq(
     el_list = []
     for i, tomography_sequence in enumerate(tomography_sequences):
         tomography_sequence.append('RO mux')
-        if preselection:
-            tomography_sequence.append('RO mux_presel')
-            # RO presel dummy is referenced to end of RO mux presel => it happens
-            # before the preparation pulses!
-            tomography_sequence.append('RO presel_dummy')
-        pulse_list = [operation_dict[pulse] for pulse in prep_sequence]
-        pulse_list += [operation_dict[pulse] for pulse in tomography_sequence]
-        el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
+        pulse_list_tomo = deepcopy(pulse_list) + \
+                          [operation_dict[pulse] for pulse in
+                           tomography_sequence]
+        el_list.append(multi_pulse_elt(i, station, pulse_list_tomo,
+                                       trigger=True,
                                        name='tomography_{}'.format(i)))
 
     # create the sequence
@@ -2091,7 +2128,6 @@ def Ramsey_add_pulse_seq(times, measured_qubit_name,
     pulse_pars_x2['refpoint'] = 'start'
     RO_pars = operation_dict['RO ' + measured_qubit_name]
     add_pulse_pars = deepcopy(operation_dict['X180 ' + pulsed_qubit_name])
-    drag_pulse_length = pulse_pars_x1['nr_sigma']*pulse_pars_x1['sigma']
 
     for i, tau in enumerate(times):
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
@@ -2111,12 +2147,6 @@ def Ramsey_add_pulse_seq(times, measured_qubit_name,
                     i, station, [operation_dict['X90 ' + measured_qubit_name],
                                  pulse_pars_x2, RO_pars])
             else:
-                VZ1 = deepcopy(operation_dict['Z180 '+measured_qubit_name])
-                VZ2 = deepcopy(operation_dict['Z180 '+measured_qubit_name])
-                VZ1['basis_rotation'][measured_qubit_name] = \
-                    -2*np.pi*320e3 *drag_pulse_length*180/np.pi
-                VZ2['basis_rotation'][measured_qubit_name] = \
-                    -2*np.pi*320e3 *drag_pulse_length*180/np.pi
                 el = multi_pulse_elt(i, station,
                                      [add_pulse_pars, pulse_pars_x1,
                                      # [pulse_pars_x1, add_pulse_pars,
@@ -2495,8 +2525,6 @@ def get_dd_pulse_list(operation_dict, qb_names, dd_time, nr_pulses=4,
         for j, qbn in enumerate(qb_names):
             pulse_name = 'X180 ' if j == 0 else 'X180s '
             pulse_pulse = deepcopy(operation_dict[pulse_name + qbn])
-            # pulse_pulse['sigma'] *= 2
-            # pulse_pulse['amplitude'] /= 2
             pulse_list.append(pulse_pulse)
     delay_pulse = {
         'pulse_type': 'SquarePulse',
@@ -2722,7 +2750,7 @@ def pygsti_seq(qb_names, pygsti_listOfExperiments, operation_dict,
 
 def ro_dynamic_phase_seq(qbp_name, qbr_names,
                          phases, operation_dict,
-                         pulse_separation,
+                         pulse_separation, init_state,
                          verbose=False, cal_points=True,
                          upload=True, return_seq=False):
 
@@ -2768,6 +2796,8 @@ def ro_dynamic_phase_seq(qbp_name, qbr_names,
             x90_1_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
             x90_2a_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
             x90_2b_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
+    if init_state == 'e':
+        x90_1_pulses.append(deepcopy(operation_dict['X180 ' + qbp_name]))
     cal_I_pulses.append(operation_dict['RO mux'])
     cal_X_pulses.append(operation_dict['RO mux'])
 
