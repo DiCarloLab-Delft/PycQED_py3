@@ -6,7 +6,7 @@ Purpose:    Instrument driver for Qutech QWG
 Usage:
 Notes:      It is possible to view the QWG log using ssh. To do this:
             - connect using ssh e.g., "ssh root@192.168.0.10"
-            - viewed log using "tail -f /var/log/qwg.log"
+            - view log using "tail -f /var/log/qwg.log"
 Bugs:
 '''
 

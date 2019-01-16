@@ -9,29 +9,14 @@
 
 from .SCPI import SCPI
 from qcodes.instrument.base import Instrument
-#from qcodes import Parameter
 from qcodes.instrument.parameter import ManualParameter
 from qcodes import validators as vals
 import os
 import logging
 import json
-#import sys
-#import traceback
 import array
-#import re
 
 log = logging.getLogger(__name__)
-
-"""
-Provide the definitions for the maximum and minimum of each expected data
-types.
-"""
-INT32_MAX = +2147483647
-INT32_MIN = -2147483648
-CHAR_MAX = +127
-CHAR_MIN = -128
-
-MAX_NUM_INSN = 2**15
 
 class Qutech_CC(SCPI):
     """
@@ -62,23 +47,35 @@ class Qutech_CC(SCPI):
             self.remove_instance(self)
             super().__init__(name, address, port, **kwargs)
         self.get_idn()
-        self.add_standard_parameters()
-        self.add_additional_parameters()
+        self._add_parameters()
         self.connect_message()
 
+    def sequence_program(self, program_string):
+        """
+        """
+        self.write('QUTech:SEQuence:PROGram')
+
+    # FIXME: add function to get assembly errors
+
     def start(self, getOperationComplete=True):
+        """
+        """
         self.write('awgcontrol:run:immediate')
         # FIXME: Introduced to work around AWG8 triggering issue
         if getOperationComplete:
             self.getOperationComplete()
 
     def stop(self, getOperationComplete=True):
+        """
+        """
         self.write('awgcontrol:stop:immediate')
         # FIXME: Introduced to work around AWG8 triggering issue
         if getOperationComplete:
             self.getOperationComplete()
 
     def get_idn(self):
+        """
+        """
         self.version_info = {}
         try:
             id_string = ""
@@ -86,7 +83,7 @@ class Qutech_CC(SCPI):
             id_string = id_string.replace("'", "\"")
             self.version_info = json.loads(id_string)
         except Exception as e:
-            logging.warn('Error: failed to retrieve IDN from CC', str(e))
+            logging.warn('Error: failed to retrieve IDN from CC, exception %s', str(e))
 
         self.version_info["Driver Version"] = self.driver_version
 
@@ -162,15 +159,8 @@ class Qutech_CC(SCPI):
     # 'private' functions, internal to the driver
     ##########################################################################
 
-    def add_additional_parameters(self):
+    def _add_parameters(self):
         """
-        Certain hardware specific parameters cannot be generated
-        automatically. This function generates the functions to upload
-        instructions for the user. They are special because
-        these functions use the _upload_instructions and _upload_microcode
-        functions internally, and they output binary data using the
-        SCPI.py driver, which is not qcodes standard. Therefore,
-        we have to manually created them specifically for CC-Light.
         """
         self.add_parameter(
             'eqasm_program',
@@ -181,168 +171,10 @@ class Qutech_CC(SCPI):
             vals=vals.Strings()
         )
 
-        self.add_parameter(
-            'control_store',
-            label=('Control store'),
-            docstring='Uploads the microcode to the CC-Light. ' +
-            'Valid input is a string representing the filename.',
-            set_cmd=self._upload_microcode,
-            vals=vals.Strings()
-        )
-
-        self.add_parameter(
-            'qisa_opcode',
-            label=('QISA opcode qmap'),
-            docstring='Uploads the opcode.qmap to the CC-Light assembler. ' +
-            'Valid input is a string representing the filename.',
-            set_cmd=self._upload_opcode_qmap,
-            vals=vals.Strings()
-        )
-
         self.add_parameter('last_loaded_instructions',
                            vals=vals.Strings(),
                            initial_value='',
                            parameter_class=ManualParameter)
-
-    def _read_parameters(self):
-        """
-        This function is the 'magic'. It queries the hardware for all the
-        parameters which can be put in standard QCodes parameter form.
-        The hardware is expected to produce a json-formatted string which
-        gets sent via TCP/IP. This function also writes out the json-file,
-        for user inspection. The function returns a json string.
-        """
-        dir_path = os.path.dirname(os.path.abspath(__file__))
-
-        param_file_dir = os.path.join(dir_path, '_CCL')
-
-        if not os.path.exists(param_file_dir):
-            os.makedirs(param_file_dir)
-
-        self.param_file_name = os.path.join(param_file_dir,
-                                            'ccl_param_nodes.json')
-
-        open_file_success = False
-        try:
-            file = open(self.param_file_name, "r")
-            open_file_success = True
-        except Exception as e:
-            log.info("CC-Light local parameter file {} not found ({})".format(
-                            self.param_file_name, e))
-
-        read_file_success = False
-        if open_file_success:
-            try:
-                file_content = json.loads(file.read())
-                file.close()
-                read_file_success = True
-            except Exception as e:
-                log.info("Error while reading CC-Light local parameter file."
-                        " Will update it from the hardware.")
-
-        if read_file_success:
-            self.saved_param_version = None
-            if "Embedded Software Build Time" in file_content["version"]:
-                self.saved_param_version = \
-                    file_content["version"]["Embedded Software Build Time"]
-
-            # check if the saved parameters have the same version number
-            # as CC-Light, if yes, return the saved one.
-            if (('Embedded Software Build Time' in self.version_info and
-                  (self.version_info['Embedded Software Build Time'] ==
-                  self.saved_param_version)) or
-                self._dummy_instr):
-                results = file_content["parameters"]
-                return results
-            else:
-                log.info("CC-Light local parameter file out of date."
-                    " Will update it from the hardware.")
-
-        try:
-            raw_param_string = self.ask('QUTech:PARAMeters?')
-        except Exception as e:
-            raise ValueError("Failed to retrieve parameter information"
-                " from CC-Light hardware: ", e)
-
-        raw_param_string = raw_param_string.replace('\t', '\n')
-
-        try:
-            results = json.loads(raw_param_string)["parameters"]
-        except Exception as e:
-            raise ValueError("Unrecognized parameter information received from "
-                "CC-Light: \n {}".format(raw_param_string))
-
-        try:
-            # file.write(raw_param_string)
-            # load dump combination is to sort and indent
-            param_dict = json.loads(raw_param_string)
-            file = open(self.param_file_name, 'w')
-            par_str = json.dumps(param_dict,
-                                  indent=4, sort_keys=True)
-            file.write(par_str)
-            file.close()
-        except Exception as e:
-            log.info("Failed to update CC-Light local parameter file:", str(e))
-
-        return results
-
-    def add_standard_parameters(self):
-        """
-        Function to automatically generate the CC-Light specific functions
-        from the qcodes parameters. The function uses the add_parameter
-        function internally.
-        """
-        self.parameter_list = self._read_parameters()
-
-        for parameter in self.parameter_list:
-            name = parameter["name"]
-            del parameter["name"]
-
-            if ("vals" in parameter):
-                validator = parameter["vals"]
-                try:
-                    val_type = validator["type"]
-
-                    if (val_type == "Bool"):
-                        parameter["vals"] = vals.Ints(0, 1)
-                        parameter['get_parser'] = int
-
-                    elif (val_type == "Non_Neg_Number"):
-                        if ("range" in validator):
-                            val_min = validator["range"][0]
-                            val_max = validator["range"][1]
-                        else:
-                            val_min = 0
-                            val_max = INT32_MAX
-
-                        parameter["vals"] = vals.PermissiveInts(val_min,
-                                                                val_max)
-                        parameter['get_parser'] = int
-                        parameter['set_parser'] = int
-
-                    else:
-                        log.warning("Failed to set the validator for the" +
-                                    " parameter " + name + ", because of a" +
-                                    " unknown validator type: '" + val_type +
-                                    "'")
-
-                except Exception as e:
-                    log.warning(
-                        "Failed to set the validator for the parameter " +
-                        name + ".(%s)", str(e))
-
-            try:
-                log.info("Adding parameter:")
-                for key, value in parameter.items():
-                    log.info("\t", key, value)
-                log.info("\n")
-
-                self.add_parameter(name, **parameter)
-
-            except Exception as e:
-                log.warning("Failed to create the parameter " + name +
-                            ", because of a unknown keyword in this" +
-                            " parameter.(%s)", str(e))
 
     ###########################################################################
     #  These are functions which cannot be cast into the standard
@@ -445,12 +277,6 @@ class Qutech_CC(SCPI):
         retval = self.ask_int(strCommand)
         return retval
 
-    def _change_file_ext(self, qumis_name, ext):
-        pathname = os.path.dirname(qumis_name)
-        base_name = os.path.splitext(os.path.basename(qumis_name))[0]
-        fn = os.path.join(pathname, base_name + ext)
-        return fn
-
 
 class dummy_CC(Qutech_CC):
     """
@@ -464,8 +290,8 @@ class dummy_CC(Qutech_CC):
         self._dummy_instr = True
         self.model = name
         self.version_info = self.get_idn()
-        self.add_standard_parameters()
-        self.add_additional_parameters()
+        self._add_standard_parameters()
+        self._add_parameters()
         self.connect_message()
         # required because of annoying IP instrument
         self._port = ''
@@ -481,7 +307,7 @@ class dummy_CC(Qutech_CC):
     def getOperationComplete(self):
         return True
 
-    def add_standard_parameters(self):
+    def _add_standard_parameters(self):
         """
         Dummy version, all are manual parameters
         """
@@ -541,7 +367,7 @@ class dummy_CC(Qutech_CC):
                             ", because of a unknown keyword in this" +
                             " parameter.(%s)", str(e))
 
-    def add_additional_parameters(self):
+    def _add_parameters(self):
         """
         Dummy version, parameters are added as manual parameters
         """
