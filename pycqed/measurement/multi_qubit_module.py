@@ -20,6 +20,7 @@ import pycqed.measurement.composite_detector_functions as cdet
 import pycqed.analysis.measurement_analysis as ma
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
 import pycqed.analysis_v2.readout_analysis as ra
+import pycqed.analysis_v2.timedomain_analysis as tda
 import pycqed.analysis.tomography as tomo
 try:
     import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as uhfqc
@@ -1801,33 +1802,25 @@ def cphase_finetune_parameters(qbc, qbt, qbr, flux_length, flux_amplitudes,
 
     return best_amp
 
-def measure_measurement_induced_dephasing(qb_dephased, qb_target, phases, amps,
-        readout_separation, f_LO, nr_readouts=1, 
+def measure_measurement_induced_dephasing(qb_dephased, qb_targeted, phases, amps,
+        readout_separation, f_LO, nr_readouts=1, label=None,
         cal_points=((-4, -3), (-2, -1)), MC=None, UHFQC=None, pulsar=None, 
         upload=True):
-
+    if label is None:
+        label = 'measurement_induced_dephasing_x{}_{}_{}'.format(
+            nr_readouts, qb_dephased.name, qb_targeted.name)
     if MC is None:
         MC = qb_dephased.MC
     if UHFQC is None:
         UHFQC = qb_dephased.UHFQC
     if pulsar is None:
         pulsar = qb_dephased.AWG
-    operation_dict = get_operation_dict([qb_dephased, qb_target])
-    for qb in [qb_target, qb_dephased]:
+    operation_dict = get_operation_dict([qb_dephased, qb_targeted])
+    for qb in [qb_targeted, qb_dephased]:
         qb.prepare_for_timedomain(multiplexed=True)
-    channels = qb_dephased.int_avg_det.channels
-    suffixes = ['_probe_{}'.format(i + 1) for i in range(nr_readouts)] + \
-               ['_measure']
-    df = det.UHFQC_integrated_average_detector(
-            UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            integration_length=qb_dephased.RO_acq_integration_length(),
-            nr_averages=qb_dephased.RO_acq_averages(),
-            values_per_point=nr_readouts+1,
-            values_per_point_suffex=suffixes)
-
     sf = awg_swf2.Measurement_Induced_Dephasing_Phase_Swf(
         qbn_dephased=qb_dephased.name, 
-        ro_op='RO ' + qb_target.name, 
+        ro_op='RO ' + qb_targeted.name,
         operation_dict=operation_dict, 
         readout_separation=readout_separation,
         nr_readouts=nr_readouts, 
@@ -1844,18 +1837,23 @@ def measure_measurement_induced_dephasing(qb_dephased, qb_target, phases, amps,
     )
     MC.set_sweep_function_2D(sf2)
     MC.set_sweep_points_2D(amps)
+    channels = qb_dephased.int_avg_det.channels
+    suffixes = ['_probe_{}'.format(i + 1) for i in range(nr_readouts)] + \
+               ['_measure']
+    df = det.UHFQC_integrated_average_detector(
+        UHFQC=UHFQC, AWG=pulsar, channels=channels,
+        integration_length=qb_dephased.RO_acq_integration_length(),
+        nr_averages=qb_dephased.RO_acq_averages(),
+        values_per_point=nr_readouts+1,
+        values_per_point_suffex=suffixes)
     MC.set_detector_function(df)
-    exp_metadata = {'readout_separation': readout_separation, 
+    exp_metadata = {'readout_separation': readout_separation,
                     'nr_readouts': nr_readouts, 
                     'cal_points': cal_points,
                     'f_LO': f_LO
                     }
-    MC.run('RO_DynamicPhase_{}{}'.format(
-        pulsed_qubit.name, ''.join(qbr_names)),
-              exp_metadata=exp_metadata)
-    ma.MeasurementAnalysis()
-
-
+    MC.run_2D(label, exp_metadata=exp_metadata)
+    tda.MeasurementInducedDephasingAnalysis(do_fitting=True)
 
 
 class Averaged_Cphase_Measurement():

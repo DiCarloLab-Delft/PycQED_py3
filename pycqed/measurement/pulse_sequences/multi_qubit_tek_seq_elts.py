@@ -2492,29 +2492,34 @@ def measurement_induced_dephasing_seq(phases, qbn_dephased, ro_op,
         'length': readout_separation,
         'pulse_delay': 0}
 
-    el_cal0 = multi_pulse_elt(0, 
+    el_cal0 = multi_pulse_elt(0, station,
                     [operation_dict['I ' + qbn_dephased],
-                     operation_dict['RO ' + qbn_dephased])
-    el_cal1 = multi_pulse_elt(1, 
+                     operation_dict['RO ' + qbn_dephased]])
+    el_cal1 = multi_pulse_elt(1, station,
                     [operation_dict['X180 ' + qbn_dephased],
-                     operation_dict['RO ' + qbn_dephased])
+                     operation_dict['RO ' + qbn_dephased]])
     el_list.append(el_cal0)
     el_list.append(el_cal1)
 
     for i, phase in enumerate(phases):
         if i in cal_points[0]:
-            seq.append_element(el_cal0, repetitions=nr_readouts+1)
+            for j in range(nr_readouts+1):
+                seq.append('cal0_{}_{}'.format(i, j), el_cal0.name,
+                           trigger_wait=True)
         elif i in cal_points[1]:
-            seq.append_element(el_cal1, repetitions=nr_readouts+1)
+            for j in range(nr_readouts+1):
+                seq.append('cal1_{}_{}'.format(i, j), el_cal1.name,
+                           trigger_wait=True)
         else:
             x90_2 = deepcopy(operation_dict['X90 ' + qbn_dephased])
-            x90_2['phase'] = phase
+            x90_2['phase'] = 180*phase/np.pi
             pulse_list = [operation_dict['X90 ' + qbn_dephased]]
-            for j in range(nr_readouts)
+            for j in range(nr_readouts):
                 pulse_list += [operation_dict[ro_op], idle_pulse]
             pulse_list += [x90_2, operation_dict['RO ' + qbn_dephased]]
             el = multi_pulse_elt(2+i, station, pulse_list)
-            seq.append_element(el)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
     
     if upload:
         station.pulsar.program_awgs(seq, *el_list)

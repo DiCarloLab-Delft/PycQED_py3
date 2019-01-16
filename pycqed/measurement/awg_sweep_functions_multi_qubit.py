@@ -2,6 +2,7 @@ import numpy as np
 import logging
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts as sqs2
+import time
 
 class two_qubit_off_on(swf.Hard_Sweep):
 
@@ -861,11 +862,11 @@ class Measurement_Induced_Dephasing_Phase_Swf(swf.Hard_Sweep):
     def __init__(self, qbn_dephased, ro_op, operation_dict, readout_separation,
                  nr_readouts, cal_points=((-4,-3), (-2,-1)), upload=True):
         super().__init__()
-        self.qbn_dephased = qbn_dephased, 
-        self.ro_op = ro_op, 
-        self.operation_dict = operation_dict, 
-        self.readout_separation = readout_separation, 
-        self.nr_readouts = nr_readouts, 
+        self.qbn_dephased = qbn_dephased
+        self.ro_op = ro_op
+        self.operation_dict = operation_dict
+        self.readout_separation = readout_separation
+        self.nr_readouts = nr_readouts
         self.cal_points = cal_points
         self.upload = upload
 
@@ -886,13 +887,17 @@ class Measurement_Induced_Dephasing_Phase_Swf(swf.Hard_Sweep):
 
 class Measurement_Induced_Dephasing_Amplitude_Swf(swf.Soft_Sweep):
     class DummyQubit:
-        _params = ['f_RO', 'f_RO_mod', 'RO_pulse_length', 'RO_amp', 
+        _params = ['f_RO', 'f_RO_mod', 'RO_pulse_length', 'RO_amp',
                    'ro_pulse_shape', 'ro_pulse_filter_sigma', 
                    'ro_pulse_nr_sigma', 'ro_CLEAR_delta_amp_segment', 
                    'ro_CLEAR_segment_length']
         
         def __init__(self, qb):
             self._values = {}
+            self.name = qb.name
+            self.UHFQC = qb.UHFQC
+            self.readout_DC_LO = qb.readout_DC_LO
+            self.readout_UC_LO = qb.readout_UC_LO
             for param in self._params:
                 self.make_param(param, qb.get(param))
 
@@ -903,7 +908,7 @@ class Measurement_Induced_Dephasing_Amplitude_Swf(swf.Soft_Sweep):
                     return self._values[name]
                 else:
                     self._values[name] = v
-            setattr(self, 'name', accessor)
+            setattr(self, name, accessor)
     
     def __init__(self, qb_dephased, qb_targeted, nr_readouts, 
                  multiplexed_pulse_fn, f_LO):
@@ -918,8 +923,14 @@ class Measurement_Induced_Dephasing_Amplitude_Swf(swf.Soft_Sweep):
         self.parameter_name = 'amp'
         self.unit = 'max'
 
+    def prepare(self, **kw):
+        pass
+
     def set_parameter(self, val):
         qb_targeted_dummy = self.DummyQubit(self.qb_targeted)
         qb_targeted_dummy.RO_amp(val)
-        readouts = [(qb_targeted_dummy,)]*self.nr_readouts + [(qb_dephased,)]
-        self.multiplexed_pulse_fn(readouts, f_LO, upload=True) 
+        readouts = [(qb_targeted_dummy,)]*self.nr_readouts + \
+                   [(self.qb_dephased,)]
+        time.sleep(0.1)
+        self.multiplexed_pulse_fn(readouts, self.f_LO, upload=True)
+        time.sleep(0.1)

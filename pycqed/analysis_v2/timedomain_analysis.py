@@ -2579,3 +2579,250 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                     'box_props': None,
                     'text_string': textstr}
 
+
+class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
+    def __init__(self, *args, **kwargs):
+        options_dict = kwargs.pop('options_dict', {})
+        options_dict['TwoD'] = options_dict.get('TwoD', True)
+        super().__init__(*args, options_dict=options_dict, **kwargs)
+        self.single_timestamp = True
+        self.params_dict = {
+            'value_names': 'value_names',
+            'measured_values': 'measured_values',
+            'sweep_points': 'sweep_points',
+            'sweep_points_2D': 'sweep_points_2D',
+            'measurementstring': 'measurementstring',
+            'exp_metadata': 'exp_metadata'}
+        self.numeric_params = []
+        if kwargs.get('auto', True):
+            self.run_analysis()
+
+    def process_data(self):
+        rdd = self.raw_data_dict
+        pdd = self.proc_data_dict
+        self.metadata = rdd.get('exp_metadata', {})
+        if self.metadata is None:
+            self.metadata = {}
+        self.cal_points = self.metadata.get('cal_points', ((-4, -3), (-2, -1)))
+        self.cal_points = self.options_dict.get('cal_points', self.cal_points)
+        self.cal_points = tuple([j % len(rdd['sweep_points'])
+                                 for j in self.cal_points[i]]
+                                for i in [0, 1])
+
+        data_ch_indices = [i for i, ch in enumerate(rdd['value_names'])
+                           if ch[-8:] == '_measure']
+        if len(data_ch_indices) == 1:
+            # if only one weight function is used rotation is not required
+            pdd['corr_data_all'] = np.array([a_tools.normalize_data_v3(
+                    row, cal_zero_points=self.cal_points[0],
+                         cal_one_points=self.cal_points[1])
+                for row in rdd['measured_values'][data_ch_indices[0]].T]).T
+        else:
+            pdd['corr_data_all'] = np.array([a_tools.rotate_and_normalize_data(
+                data=[dataI, dataQ],
+                zero_coord=None, one_coord=None,
+                cal_zero_points=self.cal_points[0],
+                cal_one_points=self.cal_points[1])[0] for dataI, dataQ in zip(
+                *[rdd['measured_values'][data_ch_indices[i]].T for i in [0, 1]]
+            )]).T
+
+        pdd['corr_data'] = np.array([pdd['corr_data_all'][i]
+                                     for i in range(len(pdd['corr_data_all']))
+                                     if (i not in self.cal_points[0] and
+                                         i not in self.cal_points[1])])
+        pdd['phases'] = np.array([rdd['sweep_points'][i]
+                                  for i in range(len(rdd['sweep_points']))
+                                  if (i not in self.cal_points[0] and
+                                      i not in self.cal_points[1])])
+        pdd['amplitudes'] = rdd['sweep_points_2D']
+
+    def prepare_fitting(self):
+        pdd = self.proc_data_dict
+        rdd = self.raw_data_dict
+        self.fit_dicts = OrderedDict()
+        cos_mod = lmfit.Model(fit_mods.CosFunc)
+        cos_mod.guess = fit_mods.Cos_guess.__get__(cos_mod, cos_mod.__class__)
+        for i, data in enumerate(pdd['corr_data'].T):
+            self.fit_dicts['cos_fit_{}'.format(i)] = {
+                'model': cos_mod,
+                'guess_dict': {'frequency': {'value': 1/2/np.pi,
+                                             'vary': False}},
+                'fit_xvals': {'t': pdd['phases']},
+                'fit_yvals': {'data': data}}
+
+    def analyze_fit_results(self):
+        pdd = self.proc_data_dict
+        pdd['phase_contrast'] = np.array([
+            self.fit_res['cos_fit_{}'.format(i)].best_values['amplitude']
+            for i in range(len(pdd['amplitudes']))])
+        pdd['phase_offset'] = np.array([
+            self.fit_res['cos_fit_{}'.format(i)].best_values['phase']
+            for i in range(len(pdd['amplitudes']))])
+        pdd['phase_offset'] += np.pi*(pdd['phase_contrast'] < 0)
+        pdd['phase_offset'] = (pdd['phase_offset'] + np.pi) % (2*np.pi) - np.pi
+        pdd['phase_offset'] = np.unwrap(pdd['phase_offset'])
+        pdd['phase_contrast'] = np.abs(pdd['phase_contrast'])
+
+        gauss_mod = lmfit.models.GaussianModel()
+        self.fit_dicts['phase_contrast_fit'] = {
+            'model': gauss_mod,
+            'guess_dict': {'center': {'value': 0, 'vary': False}},
+            'fit_xvals': {'x': pdd['amplitudes']},
+            'fit_yvals': {'data': pdd['phase_contrast']}}
+
+        quadratic_mod = lmfit.models.QuadraticModel()
+        self.fit_dicts['phase_offset_fit'] = {
+            'model': quadratic_mod,
+            'guess_dict': {'b': {'value': 0, 'vary': False}},
+            'fit_xvals': {'x': pdd['amplitudes']},
+            'fit_yvals': {'data': pdd['phase_offset']}}
+        self.run_fitting()
+
+        pdd['sigma'] = self.fit_res['phase_contrast_fit'].best_values['sigma']
+        pdd['sigma_err'] = self.fit_res['phase_contrast_fit'].params['sigma'].\
+                                                                        stderr
+        pdd['a'] = self.fit_res['phase_offset_fit'].best_values['a']
+        pdd['a_err'] = self.fit_res['phase_offset_fit'].params['a'].stderr
+        pdd['c'] = self.fit_res['phase_offset_fit'].best_values['c']
+        pdd['c_err'] = self.fit_res['phase_offset_fit'].params['c'].stderr
+
+        pdd['sigma_err'] = float('nan') if pdd['sigma_err'] is None \
+                                        else pdd['sigma_err']
+        pdd['a_err'] = float('nan') if pdd['a_err'] is None else pdd['a_err']
+        pdd['c_err'] = float('nan') if pdd['c_err'] is None else pdd['c_err']
+
+
+    def prepare_plots(self):
+        pdd = self.proc_data_dict
+
+        self.plot_dicts['corr_data'] = {
+            'title': self.raw_data_dict['measurementstring'] +
+                     '\n' + self.raw_data_dict['timestamp'],
+            'plotfn': self.plot_colorxy,
+            'xvals': pdd['phases'],
+            'yvals': pdd['amplitudes'],
+            'zvals': pdd['corr_data'].T,
+            'xlabel': r'Pulse phase, $\phi$',
+            'xunit': 'rad',
+            'ylabel': r'Readout pulse amplitude, $V_{RO}$',
+            'yunit': 'DAC unit',
+            'zlabel': 'Excited state population',
+        }
+
+        colormap = self.options_dict.get('colormap', mpl.cm.plasma)
+        for i, amp in enumerate(pdd['amplitudes']):
+            color = colormap(i/(len(pdd['amplitudes'])-1))
+            label = 'cos_data_{}'.format(i)
+            self.plot_dicts[label] = {
+                'title': self.raw_data_dict['measurementstring'] +
+                         '\n' + self.raw_data_dict['timestamp'],
+                'ax_id': 'amplitude_crossections',
+                'plotfn': self.plot_line,
+                'xvals': pdd['phases'],
+                'yvals': pdd['corr_data'][:,i],
+                'xlabel': r'Pulse phase, $\phi$',
+                'xunit': 'rad',
+                'ylabel': 'Excited state population',
+                'linestyle': '',
+                'color': color,
+                'setlabel': 'data {}: amp={:.4f}'.format(i, amp),
+                'do_legend': True,
+                'legend_bbox_to_anchor': (1, 1),
+                'legend_pos': 'upper left',
+            }
+        if self.do_fitting:
+            for i, amp in enumerate(pdd['amplitudes']):
+                color = colormap(i/(len(pdd['amplitudes'])-1))
+                label = 'cos_fit_{}'.format(i)
+                self.plot_dicts[label] = {
+                    'ax_id': 'amplitude_crossections',
+                    'plotfn': self.plot_fit,
+                    'fit_res': self.fit_res[label],
+                    'plot_init': self.options_dict.get('plot_init', False),
+                    'color': color,
+                    'setlabel': 'fit {}: amp={:.4f}'.format(i, amp),
+                }
+
+                # Phase contrast
+            self.plot_dicts['phase_contrast_data'] = {
+                'title': self.raw_data_dict['measurementstring'] +
+                         '\n' + self.raw_data_dict['timestamp'],
+                'ax_id': 'phase_contrast',
+                'plotfn': self.plot_line,
+                'xvals': pdd['amplitudes'],
+                'yvals': 200*pdd['phase_contrast'],
+                'xlabel': r'Readout pulse amplitude, $V_{RO}$',
+                'xunit': 'DAC unit',
+                'ylabel': 'Phase contrast',
+                'yunit': '%',
+                'linestyle': '',
+                'color': 'k',
+                'setlabel': 'data',
+                'do_legend': True,
+            }
+            self.plot_dicts['phase_contrast_fit'] = {
+                'ax_id': 'phase_contrast',
+                'plotfn': self.plot_line,
+                'xvals': pdd['amplitudes'],
+                'yvals': 200*self.fit_res['phase_contrast_fit'].best_fit,
+                'color': 'r',
+                'marker': '',
+                'setlabel': 'fit',
+                'do_legend': True,
+            }
+            self.plot_dicts['phase_contrast_labels'] = {
+                'ax_id': 'phase_contrast',
+                'plotfn': self.plot_line,
+                'xvals': pdd['amplitudes'],
+                'yvals': 200*pdd['phase_contrast'],
+                'marker': '',
+                'linestyle': '',
+                'setlabel': r'$\sigma = ({:.5f} \pm {:.5f})$ DAC unit'.
+                    format(pdd['sigma'], pdd['sigma_err']),
+                'do_legend': True,
+                'legend_bbox_to_anchor': (1, 1),
+                'legend_pos': 'upper left',
+            }
+
+            # Phase offset
+            self.plot_dicts['phase_offset_data'] = {
+                'title': self.raw_data_dict['measurementstring'] +
+                         '\n' + self.raw_data_dict['timestamp'],
+                'ax_id': 'phase_offset',
+                'plotfn': self.plot_line,
+                'xvals': pdd['amplitudes'],
+                'yvals': 180*pdd['phase_offset']/np.pi,
+                'xlabel': r'Readout pulse amplitude, $V_{RO}$',
+                'xunit': 'DAC unit',
+                'ylabel': 'Phase offset',
+                'yunit': 'deg',
+                'linestyle': '',
+                'color': 'k',
+                'setlabel': 'data',
+                'do_legend': True,
+            }
+            self.plot_dicts['phase_offset_fit'] = {
+                'ax_id': 'phase_offset',
+                'plotfn': self.plot_line,
+                'xvals': pdd['amplitudes'],
+                'yvals': 180*self.fit_res['phase_offset_fit'].best_fit/np.pi,
+                'color': 'r',
+                'marker': '',
+                'setlabel': 'fit',
+                'do_legend': True,
+            }
+            self.plot_dicts['phase_offset_labels'] = {
+                'ax_id': 'phase_offset',
+                'plotfn': self.plot_line,
+                'xvals': pdd['amplitudes'],
+                'yvals': 180*pdd['phase_contrast']/np.pi,
+                'marker': '',
+                'linestyle': '',
+                'setlabel': r'$a = {:.0f} \pm {:.0f}$ deg/(DAC unit)${{}}^2$'.
+                    format(180*pdd['a']/np.pi, 180*pdd['a_err']/np.pi) + '\n' +
+                            r'$c = {:.1f} \pm {:.1f}$ deg'.
+                    format(180*pdd['c']/np.pi, 180*pdd['c_err']/np.pi),
+                'do_legend': True,
+                'legend_bbox_to_anchor': (1, 1),
+                'legend_pos': 'upper left',
+            }
