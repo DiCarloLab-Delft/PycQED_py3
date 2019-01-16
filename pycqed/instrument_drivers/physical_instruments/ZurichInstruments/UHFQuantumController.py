@@ -178,7 +178,7 @@ class UHFQC(Instrument):
         print('Initialized UHFQC', self._device,
               'in %.2fs' % (t1-t0))
 
-    def load_default_settings(self):
+    def load_default_settings(self, upload_sequence=True):
         # standard configurations adapted from Haendbaek's notebook
         # Run this block to do some standard configuration
 
@@ -192,7 +192,8 @@ class UHFQC(Instrument):
 
         # Load an AWG program (from Zurich
         # Instruments/LabOne/WebServer/awg/src)
-        self.awg_sequence_acquisition()
+        if upload_sequence:
+            self.awg_sequence_acquisition()
 
         # Turn on both outputs
         self.sigouts_0_on(1)
@@ -523,7 +524,7 @@ class UHFQC(Instrument):
                         data[n] = np.concatenate((data[n], v['vector']))
                         if len(data[n]) >= samples:
                             gotem[n] = True
-                
+
                 #if p in dataset:
                 #    for v in dataset[p]:
                 #        if n in data:
@@ -689,28 +690,35 @@ class UHFQC(Instrument):
 
     def prepare_SSB_weight_and_rotation(self, IF,
                                         weight_function_I=0,
-                                        weight_function_Q=1):
+                                        weight_function_Q=1,
+                                        rotation_angle=0,
+                                        length=4096/1.8e9):
         """
         Sets defualt integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
         """
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        print(len(tbase))
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+        cosI = np.array(np.cos(2*np.pi*IF*tbase+rotation_angle))
+        sinI = np.array(np.sin(2*np.pi*IF*tbase+rotation_angle))
+        if length<4096/1.8e9:
+            max_sample=int(length*1.8e9)
+            #setting the samples beyond the length to 0
+            cosI[max_sample:]=0
+            sinI[max_sample:]=0
         self.set('quex_wint_weights_{}_real'.format(weight_function_I),
                  np.array(cosI))
         self.set('quex_wint_weights_{}_imag'.format(weight_function_I),
                  np.array(sinI))
-        self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
-                 np.array(sinI))
-        self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
-                 np.array(cosI))
         self.set('quex_rot_{}_real'.format(weight_function_I), 1.0)
         self.set('quex_rot_{}_imag'.format(weight_function_I), 1.0)
-        self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
-        self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
+        if weight_function_Q!=None:
+            self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
+                     np.array(sinI))
+            self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
+                     np.array(cosI))
+            self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
+            self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
 
     def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096

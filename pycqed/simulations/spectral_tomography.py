@@ -12,7 +12,7 @@ from qcodes import Instrument
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from scipy.interpolate import interp1d
 import qutip as qtp
-#np.set_printoptions(threshold=np.inf)
+np.set_printoptions(threshold=np.inf)
 
 
 
@@ -86,6 +86,7 @@ def f_to_parallelize_new(arglist):
                 exp_metadata=exp_metadata, 
                 mode='adaptive')
 
+
     elif adaptive_pars['mode']=='1D':
         MC.set_sweep_functions([fluxlutman.cz_theta_f])
         MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'], 
@@ -102,6 +103,26 @@ def f_to_parallelize_new(arglist):
                 mode='1D',exp_metadata=exp_metadata)
             else:
                 dat = MC.run('1D simulation_new_2', 
+                exp_metadata=exp_metadata, 
+                mode='1D')
+
+
+    elif adaptive_pars['mode']=='spectral_tomo':
+        MC.set_sweep_functions([noise_parameters_CZ.T1_q0])
+        MC.set_sweep_points(np.logspace(adaptive_pars['theta_f_min'], 
+            adaptive_pars['theta_f_max'],adaptive_pars['n_points']))
+        if noise_parameters_CZ.cluster():
+            dat = MC.run('1D sim_spectral_tomo double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D',exp_metadata=exp_metadata)
+
+        else:
+            if adaptive_pars['long_name']:
+                dat = MC.run('1D sim_spectral_tomo double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D',exp_metadata=exp_metadata)
+            else:
+                dat = MC.run('1D sim_spectral_tomo', 
                 exp_metadata=exp_metadata, 
                 mode='1D')
 
@@ -289,6 +310,89 @@ def get_f_pulse_double_sided(fluxlutman,theta_i):
 
 
 
+# Functions for spectral tomography.
+
+def get_normalized_gellmann_matrices(index,specification):
+    # Returns the Gell-Mann matrix specified by index, normalized to 1.
+    # The numbering follows the wikipedia article. We use the index 0 for the identity.
+    # index must be an integer.
+    if specification == 'GTM':
+        lambda_0=qtp.Qobj([[1,0,0],
+                           [0,1,0],
+                           [0,0,1]])/np.sqrt(3)
+    elif specification == 'PTM':
+        lambda_0=qtp.Qobj([[1,0,0],
+                           [0,1,0],
+                           [0,0,0]])/np.sqrt(2)
+    lambda_1=qtp.Qobj([[0,1,0],
+                       [1,0,0],
+                       [0,0,0]])/np.sqrt(2)
+    lambda_2=qtp.Qobj([[0,-1j,0],
+                       [1j,0,0],
+                       [0,0,0]])/np.sqrt(2)
+    lambda_3=qtp.Qobj([[1,0,0],
+                       [0,-1,0],
+                       [0,0,0]])/np.sqrt(2)
+    lambda_4=qtp.Qobj([[0,0,1],
+                       [0,0,0],
+                       [1,0,0]])/np.sqrt(2)
+    lambda_5=qtp.Qobj([[0,0,-1j],
+                       [0,0,0],
+                       [1j,0,0]])/np.sqrt(2)
+    lambda_6=qtp.Qobj([[0,0,0],
+                       [0,0,1],
+                       [0,1,0]])/np.sqrt(2)
+    lambda_7=qtp.Qobj([[0,0,0],
+                       [0,0,-1j],
+                       [0,1j,0]])/np.sqrt(2)
+    lambda_8=qtp.Qobj([[1,0,0],
+                       [0,1,0],
+                       [0,0,-2]])/np.sqrt(6)
+    lambdas=[lambda_0,lambda_1,lambda_2,lambda_3,lambda_4,lambda_5,lambda_6,lambda_7,lambda_8]
+    return lambdas[index]
+
+
+def transform_basis(C,S):
+    # C (operator or superoperator)
+    # S: matrix change of basis
+    if C.type == 'oper':    
+        return S.dag()*C*S
+    elif C.type == 'super':
+    	S=qtp.to_super(S)
+    	return S.dag()*C*S
+
+
+def get_PTM_or_GTM(S,specification):
+    # Input: superoperator S in Liouville representation for 2 qutrits
+    # Output: Gellmann Transfer Matrix of S, defined as
+    #                   GTM_ij = Tr(lambda_i*S(lambda_j))
+    if specification=='PTM':
+        dim=4
+    elif specification=='GTM':
+        dim=9
+    GTM=np.zeros([dim**2,dim**2],dtype=complex)
+    for i in range(0,dim):
+        lambda_i=get_normalized_gellmann_matrices(i,specification)
+        for i_prime in range(0,dim):
+            lambda_i_prime=get_normalized_gellmann_matrices(i_prime,specification)
+            lambda_i_combined=qtp.operator_to_vector(qtp.tensor(lambda_i,lambda_i_prime))
+            for j in range(0,dim):
+                lambda_j=get_normalized_gellmann_matrices(j,specification)
+                for j_prime in range(0,dim):
+                    lambda_j_prime=get_normalized_gellmann_matrices(j_prime,specification)
+                    lambda_j_combined=qtp.operator_to_vector(qtp.tensor(lambda_j,lambda_j_prime))
+                
+                    GTM[i*dim+i_prime,j*dim+j_prime]=(lambda_i_combined.dag()*S*lambda_j_combined).data[0,0]
+    return GTM
+
+
+def extract_T_matrix(PTM):
+    # For any numpy matrix it returns the submatrix obtained deleting the first column and the first row.
+    PTM=np.delete(PTM,0,0)
+    PTM=np.delete(PTM,0,1)
+    return PTM
+
+
 
 
 
@@ -315,7 +419,17 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
                             'cond_phase02', 'coherent_leakage11', 'offset_difference', 'missing_fraction']
+        for i in range(1,81):
+            self.value_names.append('eig_real_GTM_'+str(i))
+        for i in range(1,81):
+            self.value_names.append('eig_imag_GTM_'+str(i))
+        for i in range(1,16):
+            self.value_names.append('eig_real_PTM_'+str(i))
+        for i in range(1,16):
+            self.value_names.append('eig_imag_PTM_'+str(i))
         self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%']
+        for i in range(0,95*2):
+            self.value_units.append('a.u.')
 
         self.qois = qois
         if self.qois != 'all': 
@@ -328,6 +442,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         self.noise_parameters_CZ = noise_parameters_CZ
         self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
                                                                 # as a function of time (=t)
+
+        self.noise_parameters_CZ.T1_q1(self.noise_parameters_CZ.T1_q0())
+
 
     def acquire_data_point(self, **kw):
         
@@ -427,6 +544,25 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             #czf.repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0)
 
 
+            U_superop_average=czf.correct_phases(U_superop_average)
+
+            H_0=czf.calc_hamiltonian(0,self.fluxlutman,self.noise_parameters_CZ)   # computed at 0 amplitude
+            # We change the basis from the standard basis to the basis of eigenvectors of H_0
+            # The columns of S are the eigenvectors of H_0, appropriately ordered
+            if self.noise_parameters_CZ.dressed_compsub():
+                S = qtp.Qobj(czf.matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
+            else:
+                S = qtp.tensor(qtp.qeye(3),qtp.qeye(3))
+            U_superop_average=transform_basis(U_superop_average,S.dag())
+
+            GTM=get_PTM_or_GTM(U_superop_average,'GTM')
+            PTM=get_PTM_or_GTM(U_superop_average,'PTM')
+            T_GTM=extract_T_matrix(GTM)
+            T_PTM=extract_T_matrix(PTM)
+            eig_T_GTM=np.linalg.eigvals(T_GTM)
+            eig_T_PTM=np.linalg.eigvals(T_PTM)
+
+
         qoi_plot = np.array(qoi_plot)
 
         ## Uncomment to study the convergence properties of averaging over a Gaussian
@@ -440,6 +576,14 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             qoi_plot[0,4], qoi_plot[0,5], qoi_plot[0,6], \
             qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10], \
             qoi_plot[0,11], qoi_plot[0,12], qoi_plot[0,13], qoi_plot[0,14]]
+        for eig in eig_T_GTM:
+            return_values.append(np.real(eig))
+        for eig in eig_T_GTM:
+            return_values.append(np.real(-1j*eig))
+        for eig in eig_T_PTM:
+            return_values.append(np.real(eig))
+        for eig in eig_T_PTM:
+            return_values.append(np.real(-1j*eig))
         if self.qois != 'all': 
             return np.array(return_values)[self.qoi_mask]
             

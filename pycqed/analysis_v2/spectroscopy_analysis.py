@@ -243,7 +243,7 @@ class complex_spectroscopy(Spectroscopy):
             self.plot_dicts['real'] = {'plotfn': plot_fn,
                                        'xvals': proc_data_dict['plot_frequency'],
                                        'yvals': proc_data_dict['plot_real'],
-                                       'title': 'S21 amp: %s' % (self.timestamps[0]),
+                                       'title': 'S21 real: %s' % (self.timestamps[0]),
                                        'xlabel': proc_data_dict['freq_label'],
                                        'ylabel': proc_data_dict['real_label'],
                                        'yrange': proc_data_dict['amp_range'],
@@ -254,7 +254,7 @@ class complex_spectroscopy(Spectroscopy):
             self.plot_dicts['imag'] = {'plotfn': plot_fn,
                                        'xvals': proc_data_dict['plot_frequency'],
                                        'yvals': proc_data_dict['plot_imag'],
-                                       'title': 'S21 phase: %s' % (self.timestamps[0]),
+                                       'title': 'S21 imaginary: %s' % (self.timestamps[0]),
                                        'xlabel': proc_data_dict['freq_label'],
                                        'ylabel': proc_data_dict['imag_label'],
                                        'yrange': proc_data_dict['amp_range'],
@@ -262,6 +262,19 @@ class complex_spectroscopy(Spectroscopy):
                                        'plotsize': plotsize,
                                        'do_legend':True
                                        }
+            self.plot_dicts['plane'] = {'plotfn': plot_fn,
+                                       'xvals': proc_data_dict['plot_real'],
+                                       'yvals': proc_data_dict['plot_imag'],
+                                       'title': 'S21 parametric plot: %s' % (self.timestamps[0]),
+                                       'xlabel': proc_data_dict['real_label'],
+                                       'ylabel': proc_data_dict['imag_label'],
+                                       'yrange': proc_data_dict['amp_range'],
+                                       'xrange': proc_data_dict['amp_range'],
+                                       'setlabel':'plane',
+                                       'plotsize': plotsize,
+                                       'do_legend':True
+                                       }
+
             pdict_names = ['amp', 'phase', 'real', 'imag']
 
             self.figs['combined'], axs = plt.subplots(
@@ -287,6 +300,9 @@ class complex_spectroscopy(Spectroscopy):
 
 
 class VNA_analysis(complex_spectroscopy):
+    '''
+    Performs as fit to the resonance using data acquired using VNA R&S ZNB 20
+    '''
     def __init__(self, t_start,
                  options_dict=None,
                  t_stop=None,
@@ -301,6 +317,30 @@ class VNA_analysis(complex_spectroscopy):
 
     def process_data(self):
         super(VNA_analysis, self).process_data()
+
+    def run_fitting(self):
+        super().run_fitting()
+
+        freq = self.fit_dicts['reso_fit']['fit_res'].params['f0']
+        Q = self.fit_dicts['reso_fit']['fit_res'].params['Q']
+        Qe = self.fit_dicts['reso_fit']['fit_res'].params['Qe']
+        theta = self.fit_dicts['reso_fit']['fit_res'].params['theta']
+
+        Qc = 1/np.real(1/(Qe.value*np.exp(1j*theta.value)))
+        Qi = 1/(1/Q.value - 1/Qc)
+
+        msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.stderr/1e6)
+        msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.stderr/1e3)
+        msg += '\n'
+        msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+        msg += '\n'
+        msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+        msg += '\n'
+        msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
+
+        self.proc_data_dict['complex_fit_msg'] = msg
+
+
 
     def prepare_plots(self):
         super(VNA_analysis, self).prepare_plots()
@@ -344,6 +384,23 @@ class VNA_analysis(complex_spectroscopy):
                 'setlabel': 'hanger',
                 'line_kws': {'color': 'r'},
                 'do_legend': True}
+
+            self.plot_dicts['reso_fit_phase'] = {
+                'ax_id': 'plane',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
+                'output_mod_fn': np.imag,
+                'output_mod_fn_x': np.real,
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'hanger',
+                'line_kws': {'color': 'r'},
+                'do_legend': True}
+
+            self.plot_dicts['plane_text'] = {
+                                        'plotfn': self.plot_text,
+                                        'text_string': self.proc_data_dict['complex_fit_msg'],
+                                        'xpos': 1.05, 'ypos': .6, 'ax_id': 'plane',
+                                        'horizontalalignment': 'left'}
 
 
     def prepare_fitting(self):

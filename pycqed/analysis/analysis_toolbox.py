@@ -450,11 +450,48 @@ def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
 
 
 def append_data_from_ma(ma, param_names, data, data_version=2,
-                        numeric_params=None):
-    new_data = get_data_from_ma(ma, param_names, data_version=data_version,
+                        numeric_params=None, filter_dict=None):
+    """
+    Extract data from an analysis object and appends it to lists in a dict. 
+
+    params
+    ------
+    ma: 
+        analysis class to be used to extract the data? 
+    param_names: 
+        parameters to extract. 
+    data: (dictionary)
+        dictionary containing lists of data. 
+    numeric_params 
+        this parameter is ignored (TODO remove this)
+    filter_dict: 
+        dictionary to use to filter, keys correpond to parameter names, 
+        values correspond to desired values of these params. If a Value is not
+        equal to the filter param, no data from that dataset is loaded at all. 
+
+    Returns
+    -------
+    nothing, the data object is modified inside the function scope. 
+
+    """
+    if filter_dict is not None:
+        param_names_filter = list(param_names)+list(filter_dict.keys())
+    else:
+        param_names_filter = param_names
+        
+    new_data = get_data_from_ma(ma, param_names_filter, data_version=data_version,
                                 numeric_params=numeric_params)
-    for param in param_names:
-        data[param].append(new_data[param])
+
+    if filter_dict is not None:
+        for k,v in filter_dict.items():
+            if new_data[k] != str(v):
+                break
+        else:
+            for param in param_names:
+                data[param].append(new_data[param])
+    else:
+        for param in param_names:
+            data[param].append(new_data[param])
 
 
 def get_data_from_timestamp_list(timestamps,
@@ -463,6 +500,7 @@ def get_data_from_timestamp_list(timestamps,
                                  max_files=None,
                                  filter_no_analysis=False,
                                  numeric_params=None,
+                                 filter_dict=None,
                                  ma_type='MeasurementAnalysis'):
     # dirty import inside this function to prevent circular import
     # FIXME: this function is at the base of the analysis v2 but relies
@@ -529,7 +567,7 @@ def get_data_from_timestamp_list(timestamps,
                                                     data_version=1)
                         else:
                             append_data_from_ma(ana, param_names.values(), data,
-                                                data_version=1)
+                                                data_version=1, filter_dict=filter_dict)
 
                     elif datasaving_format == 'Version 2':
                         if single_timestamp:
@@ -537,7 +575,8 @@ def get_data_from_timestamp_list(timestamps,
                                                     data_version=2)
                         else:
                             append_data_from_ma(
-                                ana, param_names.values(), data, data_version=2)
+                                ana, param_names.values(), data, data_version=2,
+                                                    filter_dict=filter_dict)
 
                 else:
                     remove_timestamps.append(timestamp)
@@ -748,6 +787,8 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         all_timestamps += timestamps
     # Ensures the order of the timestamps is ascending
     all_timestamps.sort()
+    if len(all_timestamps) == 0:
+        raise ValueError('No matching timestamps found')
     return all_timestamps
 
 
@@ -1630,7 +1671,10 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
     return normalized_data
 
 
-def datetime_from_timestamp(timestamp):
+def datetime_from_timestamp(timestamp: str):
+    """
+    Converst a timestamp instring in a datetime object. 
+    """
     try:
         if len(timestamp) == 14:
             return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
@@ -2202,7 +2246,7 @@ def calculate_tr_bus_tr_bus_tr_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3 ,f_bus1, 
     g2 = np.abs(g2)
     g3 = np.abs(g3)
     g4 = np.abs(g4)
-    H1 = np.array([[f_01_1,     0,      0,     g1,  0], 
+    H1 = np.array([[f_01_1,     0,      0,     g1,  0],
                    [0,     f_01_2,      0,     g2,  g3],
                    [0,          0, f_01_3,      0,  g4],
                    [g1,        g2,      0, f_bus1,  0],
@@ -2211,7 +2255,7 @@ def calculate_tr_bus_tr_bus_tr_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3 ,f_bus1, 
     E10000, E01000, E00100, E00010, E00001 = np.linalg.eigvalsh(H1)
     return E10000, E01000, E00100, E00010, E00001
 
-def calculate_tr_bus_square(EC1, EC2, EC3, EC4, EJ1, EJ2, EJ3 ,EJ4, f_bus1_2, 
+def calculate_tr_bus_square(EC1, EC2, EC3, EC4, EJ1, EJ2, EJ3 ,EJ4, f_bus1_2,
                             f_bus2_3,f_bus3_4, f_bus4_1, g1_2, g2_3, g3_4, g4_1,
                             dim=None, ng=0):
     '''
@@ -2234,7 +2278,7 @@ def calculate_tr_bus_square(EC1, EC2, EC3, EC4, EJ1, EJ2, EJ3 ,EJ4, f_bus1_2,
     #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
     # try:
     #E0000 = 0
-    H1 = np.array([[f_01_1,     0,     0,     0,    g1_2,       0,       0,    g4_1], 
+    H1 = np.array([[f_01_1,     0,     0,     0,    g1_2,       0,       0,    g4_1],
                    [     0,f_01_2,     0,     0,    g1_2,    g2_3,       0,       0],
                    [     0,     0,f_01_3,     0,       0,    g2_3,    g3_4,       0],
                    [     0,     0,     0,f_01_4,       0,       0,    g3_4,   g4_1],
@@ -2246,7 +2290,7 @@ def calculate_tr_bus_square(EC1, EC2, EC3, EC4, EJ1, EJ2, EJ3 ,EJ4, f_bus1_2,
     E10000000, E01000000, E00100000, E00010000, E00001000, E00000100, E00000010, E0000001 = np.linalg.eigvalsh(H1)
     return E10000000, E01000000, E00100000, E00010000, E00001000, E00000100, E00000010, E0000001
 
-def calculate_tr_tr_tr_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3, g1_2, g2_3, 
+def calculate_tr_tr_tr_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3, g1_2, g2_3,
                                    dim=None, ng=0):
     '''
     Calculates transmon energy levels for three coupled transmons in the 1-excitation manifolc.
@@ -2267,7 +2311,7 @@ def calculate_tr_tr_tr_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3, g1_2, g2_3,
     #E0000 = 0
     g1_2 = np.abs(g1_2)
     g2_3 = np.abs(g2_3)
-    H1 = np.array([[f_01_1,     g1_2,      0], 
+    H1 = np.array([[f_01_1,     g1_2,      0],
                    [g1_2,     f_01_2,      g2_3],
                    [0,          g2_3, f_01_3]])
 
@@ -2278,7 +2322,7 @@ def calculate_tr_tr_tr_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3, g1_2, g2_3,
     g2_3_2first = g2_3*injs2[1,2]/injs2[0,1]
     g2_3_2sec = g2_3*injs3[1,2]/injs3[0,1]
 
-    H2 = np.array([[f_01_1+f_12_1,g1_2_2first  ,0            ,0            ,0            ,0            ], 
+    H2 = np.array([[f_01_1+f_12_1,g1_2_2first  ,0            ,0            ,0            ,0            ],
                    [g1_2_2first  ,f_01_1+f_01_2,g1_2_2sec    ,g2_3         ,0            ,0            ],
                    [0            ,g1_2_2sec    ,f_01_2+f_12_2,0            ,g2_3_2first  ,0            ],
                    [0            ,g2_3         ,0            ,f_01_1+f_01_3,g1_2         ,0            ],
@@ -2309,7 +2353,7 @@ def calculate_tr_tr_tr_bus_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3, fbus, g1_2, 
     #E0000 = 0
     g1_2 = np.abs(g1_2)
     g2_3 = np.abs(g2_3)
-    H1 = np.array([[f_01_1,     g1_2,     0,g1_bus], 
+    H1 = np.array([[f_01_1,     g1_2,     0,g1_bus],
                    [g1_2,     f_01_2,  g2_3,     0],
                    [0,          g2_3,f_01_3,g3_bus],
                    [g1_bus,        0,g3_bus,  fbus]])
@@ -2326,7 +2370,7 @@ def calculate_tr_tr_tr_bus_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3, fbus, g1_2, 
     g3_bus_2first = g3_bus*injs3[1,2]/injs3[0,1]
     g3_bus_2sec = g3_bus*np.sqrt(2)
 
-    H2 = np.array([[f_01_1+f_12_1,g1_2_2first  ,0            ,0            ,0            ,0            ,g1_bus_2first,0           ,0            ,0          ], 
+    H2 = np.array([[f_01_1+f_12_1,g1_2_2first  ,0            ,0            ,0            ,0            ,g1_bus_2first,0           ,0            ,0          ],
                    [g1_2_2first  ,f_01_1+f_01_2,g1_2_2sec    ,g2_3         ,0            ,0            ,0            ,g1_bus      ,0            ,0          ],
                    [0            ,g1_2_2sec    ,f_01_2+f_12_2,0            ,g2_3_2first  ,0            ,0            ,0           ,0            ,0          ],
                    [0            ,g2_3         ,0            ,f_01_1+f_01_3,g1_2         ,0            ,g3_bus       ,0           ,g1_bus       ,0          ],
@@ -2356,7 +2400,7 @@ def calculate_tr_bus_tr_bus_transitions(EC1, EC3, EJ1, EJ3, fbus2, fbus4, g1_2, 
     #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
     # try:
     #E0000 = 0
-    H1 = np.array([[f_01_1,g1_2  ,0     ,g4_1 ], 
+    H1 = np.array([[f_01_1,g1_2  ,0     ,g4_1 ],
                    [g1_2  ,fbus2,g2_3  ,0    ],
                    [0     ,g2_3  ,f_01_3,g3_4 ],
                    [g4_1  ,0     ,g3_4  ,fbus4]])
@@ -2376,12 +2420,12 @@ def calculate_tr_bus_tr_bus_transitions(EC1, EC3, EJ1, EJ3, fbus2, fbus4, g1_2, 
     g4_1_2sec   = g4_1*injs1[1,2]/injs1[0,1]
 
     f_01_2 = fbus2
-    f_12_2 = fbus2 
+    f_12_2 = fbus2
     f_01_4 = fbus4
     f_12_4 = fbus4
 
 
-    H2 = np.array([[f_01_1+f_12_1,g1_2_2first  ,0            ,0            ,0            ,0            ,g4_1_2first  ,0            ,0            ,0            ], 
+    H2 = np.array([[f_01_1+f_12_1,g1_2_2first  ,0            ,0            ,0            ,0            ,g4_1_2first  ,0            ,0            ,0            ],
                    [g1_2_2first  ,f_01_1+f_01_2,g1_2_2sec    ,g2_3         ,0            ,0            ,0            ,g4_1         ,0            ,0            ],
                    [0            ,g1_2_2sec    ,f_01_2+f_12_2,0            ,g2_3_2first  ,0            ,0            ,0            ,0            ,0            ],
                    [0            ,g2_3         ,0            ,f_01_1+f_01_3,g1_2         ,0            ,g3_4         ,0            ,g4_1         ,0            ],
@@ -2412,7 +2456,7 @@ def calculate_tr_bus_tr(EC1, EC2, EJ1, EJ2,f_bus, g1, g2, dim=None, ng=0):
     #E0000 = 0
     g1 = np.abs(g1)
     g2 = np.abs(g2)
-    H1 = np.array([[f_01_1,     0,      g1], 
+    H1 = np.array([[f_01_1,     0,      g1],
                    [0,     f_01_2,      g2],
                    [g1,        g2,      f_bus]])
 
@@ -2455,7 +2499,7 @@ def calculate_tr_tr(EC1, EC2, EJ1, EJ2, g1, dim=None, ng=0):
     # try:
     #E0000 = 0
     g1 = np.abs(g1)
-    H1 = np.array([[f_01_1,     g1], 
+    H1 = np.array([[f_01_1,     g1],
                    [g1,        f_01_2]])
 
     E10, E01 = np.linalg.eigvalsh(H1)

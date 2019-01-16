@@ -21,7 +21,7 @@ class Base_Flux_LutMan(Base_LutMan):
     _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
 
     def render_wave(self, wave_name, show=True, time_units='s',
-                    reload_pulses: bool=True, render_distorted_wave: bool=True,
+                    reload_pulses: bool = True, render_distorted_wave: bool = True,
                     QtPlot_win=None):
         """
         Renders a waveform
@@ -194,6 +194,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=10e-6,
                            unit='s', vals=vals.Numbers(0, 100e-6))
+        self.add_parameter('cfg_awg_channel_range',
+                           docstring='peak peak value, channel range of 5 corresponds to -2.5V to +2.5V',
+                           get_cmd=self._get_awg_channel_range,
+                           unit='V_pp')
+        self.add_parameter('cfg_awg_channel_amplitude',
+                           docstring='digital scale factor between 0 and 1',
+                           get_cmd=self._get_awg_channel_amplitude,
+                           unit='a.u.', vals=vals.Numbers(0, 1))
 
     def _set_cfg_operating_mode(self, val):
         self._cfg_operating_mode = val
@@ -236,7 +244,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             raise ValueError('State {} not recognized'.format(state))
         return polycoeffs
 
-    def calc_amp_to_freq(self, amp: float, state: str='01'):
+    def calc_amp_to_freq(self, amp: float, state: str = '01'):
         """
         Converts pulse amplitude in Volt to energy in Hz for a particular state
         Args:
@@ -257,7 +265,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         return np.polyval(polycoeffs, amp)
 
-    def calc_freq_to_amp(self, freq: float, state: str='01',
+    def calc_freq_to_amp(self, freq: float, state: str = '01',
                          positive_branch=True):
         """
         Calculates amplitude in Volt corresponding to the energy of a state
@@ -275,7 +283,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                                     positive_branch=positive_branch)
 
     def calc_amp_to_eps(self, amp: float,
-                        state_A: str='01', state_B: str='02'):
+                        state_A: str = '01', state_B: str = '02'):
         """
         Calculates detuning between two levels as a function of pulse
         amplitude in Volt.
@@ -303,7 +311,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         return np.polyval(polycoeffs, amp)
 
     def calc_eps_to_amp(self, eps,
-                        state_A: str='01', state_B: str='02',
+                        state_A: str = '01', state_B: str = '02',
                         positive_branch=True):
         """
         Calculates amplitude in Volt corresponding to an energy difference
@@ -341,7 +349,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             sol = np.min(sols)
 
         # imaginary part is ignored, instead sticking to closest real value
-        return np.real(sol)
+        # float is because of a typecasting bug in np 1.12 (solved in 1.14)
+        return float(np.real(sol))
 
     def calc_net_zero_length_ratio(self):
         """
@@ -364,6 +373,29 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             lr = - amp_J2_neg/(amp_J2_pos-amp_J2_neg)
             return lr
 
+    def _get_awg_channel_amplitude(self):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
+        awg_nr = awg_ch//2
+        ch_pair = awg_ch % 2
+        for i in range(5):
+            channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
+                awg_nr, ch_pair))
+            if channel_amp is not None:
+                break
+            time.sleep(0.5)
+        return channel_amp
+
+    def _get_awg_channel_range(self):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
+        # channel range of 5 corresponds to -2.5V to +2.5V
+        for i in range(5):
+            channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
+            if channel_range_pp is not None:
+                break
+            time.sleep(0.5)
+        return channel_range_pp
 
     def get_dac_val_to_amp_scalefactor(self):
         """
@@ -375,29 +407,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         N.B. the implementation is specific to this type of AWG
         """
-        AWG = self.AWG.get_instr()
-
-        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
-        awg_nr = awg_ch//2
-        ch_pair = awg_ch % 2
-
-        for i in range(5):
-            channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
-                awg_nr, ch_pair))
-            if channel_amp is not None:
-                break
-            time.sleep(0.5)
-
-
+        if self.AWG() is None:
+            logging.warning('No AWG present, returning unity scale factor.')
+            return 1
+        channel_amp = self.cfg_awg_channel_amplitude()
+        channel_range_pp = self.cfg_awg_channel_range()
         # channel range of 5 corresponds to -2.5V to +2.5V
-        for i in range(5):
-            channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
-            if channel_range_pp is not None:
-                break
-            time.sleep(0.5)
-
-
-        # direct_mode = AWG.get('sigouts_{}_direct'.format(awg_ch))
         scalefactor = channel_amp*(channel_range_pp/2)
         return scalefactor
 
@@ -541,6 +556,15 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
 
+        self.add_parameter(
+            'czd_signs', initial_value=['+', '-'],
+            docstring='Used to determine the sign of the two parts of the '
+            'double sided CZ pulse. This should be a list of two elements,'
+            ' where "+" is a positive pulse, "-" a negative amplitude and "0" '
+            'a disabled pulse.',
+            vals=vals.Lists(vals.Enum('+', '-', 0)),
+            parameter_class=ManualParameter)
+
         self.add_parameter('mcz_nr_of_repeated_gates',
                            initial_value=1, vals=vals.PermissiveInts(1, 40),
                            parameter_class=ManualParameter)
@@ -633,6 +657,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             return CZ
 
         else:
+            signs = self.czd_signs()
+
             # Simple double sided CZ pulse implemented in most basic form.
             # repeats the same CZ gate twice and sticks it together.
             length_ratio = self.calc_net_zero_length_ratio()
@@ -642,10 +668,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 theta_f=np.deg2rad(self.cz_theta_f()),
                 lambda_2=self.cz_lambda_2(), lambda_3=self.cz_lambda_3())
             CZ_eps_A = wfl.theta_to_eps(CZ_theta_A, g=self.q_J2())
+
             CZ_amp_A = self.calc_eps_to_amp(
-                CZ_eps_A, state_A='11', state_B='02', positive_branch=True)
+                CZ_eps_A, state_A='11', state_B='02',
+                positive_branch=(signs[0] == '+'))
 
             CZ_A = dac_scalefactor*CZ_amp_A
+            if signs[0] == 0:
+                CZ_A *= 0
 
             # Generate the second CZ pulse. If the params are np.nan, default
             # to the main parameter
@@ -669,10 +699,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 lambda_2=d_lambda_2, lambda_3=d_lambda_3)
             CZ_eps_B = wfl.theta_to_eps(CZ_theta_B, g=self.q_J2())
             CZ_amp_B = self.calc_eps_to_amp(
-                CZ_eps_B, state_A='11', state_B='02', positive_branch=False)
+                CZ_eps_B, state_A='11', state_B='02',
+                positive_branch=(signs[1] == '+'))
 
             CZ_B = dac_scalefactor*CZ_amp_B
-
+            if signs[1] == 0:
+                CZ_B *= 0
             # Combine both halves of the double sided CZ gate
             amp_rat = self.czd_amp_ratio()
             waveform = np.concatenate(
@@ -696,7 +728,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         return offset
 
     def _gen_phase_corr(self, phase_corr_amp: float = None,
-                        cz_offset_comp: bool =False):
+                        cz_offset_comp: bool = False):
         """
         Generates a phase correction pulse.
         Amp can be given as an argument in order to use it in the multi-pulse
@@ -983,10 +1015,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         if self.czd_double_sided():
             corr_pulse += phase_corr_sine_series([self.cz_phase_corr_amp()],
-                                                     corr_samples)
-        else: 
+                                                 corr_samples)
+        else:
             corr_pulse += phase_corr_sine_series_half([self.cz_phase_corr_amp()],
-                                         corr_samples)
+                                                      corr_samples)
 
         if self.disable_cz_only_z():
             modified_wf = np.concatenate([base_wf*0, corr_pulse])
@@ -999,7 +1031,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     #################################
 
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
+                                           regenerate_waveforms: bool = False):
         """
         Loads a specific waveform to the AWG
         """
@@ -1024,8 +1056,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.AWG.get_instr().set(codeword, waveform)
 
     def load_waveforms_onto_AWG_lookuptable(
-            self, regenerate_waveforms: bool=True, stop_start: bool = True,
-            force_load_sequencer_program: bool=False):
+            self, regenerate_waveforms: bool = True, stop_start: bool = True,
+            force_load_sequencer_program: bool = False):
         """
         Loads all waveforms specified in the LutMap to an AWG for both this
         LutMap and the partner LutMap.
@@ -1082,7 +1114,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             self.load_waveform_realtime(
                 waveform_name=waveform_name,
                 wf_nr=None, regenerate_waveforms=regenerate_waveforms_realtime)
-
+        #updating channel amplitude and range
+        self.cfg_awg_channel_amplitude()
+        self.cfg_awg_channel_range()
         self._update_expected_program_hash()
 
     def _generate_single_cw_program(self, cw_idx):
@@ -1184,7 +1218,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
     def load_waveform_realtime(self, waveform_name: str,
                                wf_nr: int = None,
-                               regenerate_waveforms: bool=True):
+                               regenerate_waveforms: bool = True):
         """
         Args:
             waveform_name:        (str) : name of the waveform
@@ -1297,7 +1331,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     #################################
 
     def plot_cz_trajectory(self, axs=None, show=True,
-                           extra_plot_samples: int=50):
+                           extra_plot_samples: int = 50):
         """
         Plots the cz trajectory in frequency space.
         """
@@ -1347,7 +1381,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if ax is None:
             f, ax = plt.subplots()
         # 1. Plotting levels
-        amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG in amp mode
+        # maximum voltage of AWG in amp mode
+        amps = np.linspace(-2.5, 2.5, 101)
         freqs = self.calc_amp_to_freq(amps, state='01')
         ax.plot(amps, freqs, label='$f_{01}$')
         ax.text(0, self.calc_amp_to_freq(0, state='01'), '01', color='C0',
@@ -1381,7 +1416,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         ax.plot([amp_J2], [f_11_02],
                 color='C4', marker='o', label='11-02')
         ax.text(amp_J2, f_11_02,
-                '({:.3f},{:.2f})'.format(amp_J2, f_11_02*1e-9),
+                '({:.4f},{:.2f})'.format(amp_J2, f_11_02*1e-9),
                 color='C4',
                 ha='left', va='bottom', clip_on=True)
 
@@ -1390,7 +1425,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         ax.plot([amp_J1], [f_10_01],
                 color='C5', marker='o', label='10-01')
         ax.text(amp_J1, f_10_01,
-                '({:.3f},{:.2f})'.format(amp_J1, f_10_01*1e-9),
+                '({:.4f},{:.2f})'.format(amp_J1, f_10_01*1e-9),
                 color='C5', ha='left', va='bottom', clip_on=True)
 
         # 3. Adding legend etc.
@@ -1434,7 +1469,7 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
                            parameter_class=ManualParameter)
 
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
+                                           regenerate_waveforms: bool = False):
         """
         Loads a specific waveform to the AWG
         """
@@ -1553,6 +1588,7 @@ def phase_corr_sine_series(a_i, nr_samples):
     for i, a in enumerate(a_i):
         s += a*np.sin((i+1)*x)
     return s
+
 
 def phase_corr_sine_series_half(a_i, nr_samples):
     """

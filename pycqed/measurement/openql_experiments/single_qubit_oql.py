@@ -542,12 +542,12 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
+        #k.gate('i', [qubit_idx])
         k.gate('rx180', [qubit_idx])
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
+        #k.gate('i', [qubit_idx])
         if net_gate == 'pi':
             k.gate('rxm90', [qubit_idx])
         elif net_gate == 'i':
@@ -556,6 +556,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
             raise ValueError('net_gate ({})should be "i" or "pi"'.format(
                 net_gate))
         if feedback:
+            k.gate("wait", [qubit_idx], 20)
             k.gate('C1rx180', [qubit_idx])
     elif sequence_type == 'pi':
         if net_gate == 'pi':
@@ -566,6 +567,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
             raise ValueError('net_gate ({})should be "i" or "pi"'.format(
                 net_gate))
         if feedback:
+            k.gate("wait", [qubit_idx], 20)
             k.gate('C1rx180', [qubit_idx])
     else:
         raise ValueError('sequence_type ({})should be "echo" or "pi"'.format(
@@ -701,7 +703,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         times = times[:-4]
     for t in times:
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi-flux-pi', p)
+        k = oqh.create_kernel('pi_flux_pi', p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         k.gate('fl_cw_02', [2, 0])

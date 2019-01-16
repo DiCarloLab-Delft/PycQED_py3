@@ -10,6 +10,7 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.fitting_models import Qubit_dac_to_freq, Resonator_dac_to_freq, Qubit_dac_arch_guess, \
     Resonator_dac_arch_guess
 import lmfit
+import matplotlib.pyplot as plt
 from scipy import optimize
 from collections import OrderedDict
 from copy import deepcopy, copy
@@ -465,41 +466,77 @@ class FrequencySusceptibility(sa.Basic2DInterpolatedAnalysis):
         for m1, m2 in zip(m[:-step],m[step:]):
             m1 -= np.mean(m1)
             m2 -= np.mean(m2)
-            cor = np.correlate(m1,m2,mode='same')
+            cor = np.correlate(m2,m1,mode='same')
             cor_tot += cor
 
+        self.freq_diff, self.correlation = f_offset, cor_tot
+
         # fit baussian to the sum of the correlations
-        gauss = lambda f, f0, A, w, o: A*np.exp(-(f-f0)**2/2/w**2)+o
+        self.gauss = lambda f, f0, A, w, o: A*np.exp(-(f-f0)**2/2/w**2)+o
         pk = a_tools.peak_finder_v2(f_offset, cor_tot)
         p0 = (pk[0], np.max(cor_tot), 3*(f_offset[1]-f_offset[0]), -np.max(cor_tot)/100)
-        popt, perr = optimize.curve_fit(gauss, f_offset, cor_tot, p0=p0)
+        popt, perr = optimize.curve_fit(self.gauss, f_offset, cor_tot, p0=p0)
+        self.correlation_fit_parameters = popt
 
         # save susceptinility in the proc_data_dict
-        self.proc_data_dict[''] = f
+        self.proc_data_dict['freq'] = f
         self.proc_data_dict['dac'] = dac
         self.proc_data_dict['measured_value'] = m
         self.proc_data_dict['susceptibility'] = popt[0]/ddac/step
         
+        self.proc_data_dict['correlation_msg'] = '$\Delta I=${:.3g} A ' \
+                    '(order {})\n' \
+                    '$\Delta f_0=${:.3} Hz\n' \
+                    'susc. {:.3g} Hz/A'.format(ddac/step,self.correlation_distance,popt[0],popt[0]/ddac/step)
 
     def run_fitting(self):
         pass
 
     def prepare_plots(self):
-        self.figs['slope'], ax = plt.subplots()
-        self.axs['slope'] = ax
+        self.figs['slope'], axs = plt.subplots(figsize=(5,5),nrows=2,
+            gridspec_kw={'height_ratios': (2, 1)})
+        self.axs['slope'] = axs[0]
+        self.axs['correlations'] = axs[1]
 
-        self.plot_dicts['slope'] = {
-            'plotfn': plot_colormap_and_susceptibility,
-            'x': self.proc_data_dict['freq'],
-            'y': self.proc_data_dict['dac'],
-            'z': self.proc_data_dict['measured_value'],
-            'title': ' {}'.format(val_name_q0),
-            'ax_id': 'rb_pops_q0'}
+        self.plot_dicts['slope'] = {'plotfn': self.plot_colorxy,
+                    'zorder': 0,
+                    'xvals': self.proc_data_dict['freq'][0,:],
+                    'yvals': self.proc_data_dict['dac'][:,0],
+                    'zvals': self.proc_data_dict['measured_value'],
+                    'title': 'Frequency Susceptibility to Fluxcurrent',
+                    'xlabel': 'Frequency',
+                    'xunit': 'Hz',
+                    'ylabel': 'Current',
+                    'yunit': 'A',
+                    'zlabel': '',
+                    }
 
-def plot_colormap_and_susceptibility(x, y, z, xlab, ylab, zlab, title, ax, **kw):
-    ax.pcolor(x, y, z, **kw)
+        self.plot_dicts['correlations'] = {'plotfn': self.plot_line,
+                    'xvals': self.freq_diff,
+                    'yvals': self.correlation,
+                    'title': '',
+                    'xlabel': '$\Delta f$',
+                    'xunit': 'Hz',
+                    'ylabel': 'Current',
+                    'yunit': 'A',
+                    'marker': '.',
+                    }
 
-    ax.set_xlabel(xlab)
-    ax.set_ylabel(ylab)
-    ax.colorbar(label=zlab)
-    ax.set_title(title)
+        self.plot_dicts['correlations_fit'] = {'plotfn': self.plot_line,
+                    'xvals': self.freq_diff,
+                    'yvals': self.gauss(self.freq_diff,*self.correlation_fit_parameters),
+                    'title': '',
+                    'xlabel': '$\Delta f$',
+                    'xunit': 'Hz',
+                    'ylabel': 'Correlation',
+                    'yunit': '',
+                    'ax_id': 'correlations',
+                    'marker': '',
+                    }
+
+        self.plot_dicts['rb_text'] = {
+                    'plotfn': self.plot_text,
+                    'text_string': self.proc_data_dict['correlation_msg'],
+                    'xpos': 0.98, 'ypos': 0.92,
+                    'horizontalalignment': 'right',
+                    'ax_id': 'correlations',}

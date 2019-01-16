@@ -69,6 +69,7 @@ Important clifford indices:
         Y90  : Cl 21
         X180 : Cl 3
         Y180 : Cl 6
+        Z180 : Cl 9
         CZ   : 4368
 
 """
@@ -80,6 +81,27 @@ gate_decomposition = epstein_efficient_decomposition
 X90 = C1[16]
 Y90 = C1[21]
 mY90 = C1[15]
+
+# A dict containing clifford IDs with common names.
+common_cliffords = {'I':  0, 'X':  3, 'Y':  6, 'Z':  9,
+                    'II':  0, 'IX':  3, 'IY':  6, 'IZ':  9,
+
+                    'XI': 24*3 + 0, 'XX': 24*3 + 3,
+                    'XY': 24*3 + 6, 'XZ': 24*3 + 9,
+
+                    'YI':  24*6 + 0, 'YX':  24*6 + 3,
+                    'YY':  24*6 + 6, 'YZ':  24*6 + 9,
+
+                    'ZI':  24*9 + 0, 'ZX':  24*9 + 3,
+                    'ZY':  24*9 + 6, 'ZZ':  24*9 + 9,
+
+                    'X90':  16,
+                    'Y90':  21,
+                    'X180':  3,
+                    'Y180':  6,
+                    'Z180':  9,
+                    'CZ': -4368,
+                    }
 
 
 class Clifford(object):
@@ -266,8 +288,8 @@ def iSWAP_like_PTM(idx):
     S1y_q1 = np.kron(np.dot(C1[idx_3], X90), np.eye(4))
 
     return np.linalg.multi_dot(list(reversed([C1_q0, C1_q1,
-                                CZ, sq_swap_gates, CZ,
-                                S1_q0, S1y_q1])))
+                                              CZ, sq_swap_gates, CZ,
+                                              S1_q0, S1y_q1])))
 
 
 def iSWAP_like_gates(idx):
@@ -323,9 +345,9 @@ def SWAP_like_PTM(idx):
     sq_swap_gates_2 = np.kron(Y90, np.eye(4))
 
     return np.linalg.multi_dot(list(reversed([sq_like_cliff, CZ,
-                                sq_swap_gates_0, CZ,
-                                sq_swap_gates_1, CZ,
-                                sq_swap_gates_2])))
+                                              sq_swap_gates_0, CZ,
+                                              sq_swap_gates_1, CZ,
+                                              sq_swap_gates_2])))
 
 
 def SWAP_like_gates(idx):
@@ -364,6 +386,7 @@ def SWAP_like_gates(idx):
              sq_swap_gates_1_q0 + sq_swap_gates_1_q1 + CZ +
              sq_swap_gates_2_q0 + sq_swap_gates_2_q1)
     return gates
+
 
 ##############################################################################
 # It is important that this check is after the Clifford objects as otherwise

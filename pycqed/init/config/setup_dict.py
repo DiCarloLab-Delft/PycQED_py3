@@ -51,7 +51,7 @@ data_dir_dict = {'Aprilia_Jr': r'\\TUD278336',
                  'Bart_Laptop': r'C:\Experiments/NumericalOptimization/Data',
                  'Qudev_testbench' : r'E:\Control software\data',
                  'LaVespa': r'D:\Experiments\18031_Intel_resonators',
-                 'LaAprilia_1' : r'D:\Experiments\1802_IntelS7Airbridges',
+                 'LaAprilia_1' : r'D:\\Experiments\\1812_CZsims\\data',
                  'La_Ducati' : r'D:\Experiments\1808_Cheesymon_NK_A1\Data'
                  #'LaAprilia_1' : r'D:\Experiments\1802_Argon\Data'
                  }

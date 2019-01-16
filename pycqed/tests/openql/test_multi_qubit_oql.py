@@ -119,7 +119,7 @@ try:
                     q1=2,
                     bell_state=bell_state,
                     platf_cfg=config_fn)
-                self.assertEqual(p.name, 'two_qubit_tomo_bell')
+                self.assertEqual(p.name, 'two_qubit_tomo_bell_2_0')
 
 
         def test_two_qubit_tomo_bell_by_waiting(self):

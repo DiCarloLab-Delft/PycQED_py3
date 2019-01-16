@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from scipy.interpolate import interp1d
 import qutip as qtp
+from qcodes import Instrument
 #np.set_printoptions(threshold=np.inf)
 
 
@@ -18,17 +19,20 @@ import qutip as qtp
 
 
 def f_to_parallelize_new(arglist):
+    # cluster wants a list as an argument.
+    # Below the various list items are assigned to their own variable
 
     fitted_stepresponse_ty = arglist['fitted_stepresponse_ty']
-    fluxlutman_args = arglist['fluxlutman_args']       # [sampling_rate, cz_length, q_J2, czd_double_sided, cz_lambda_2, cz_lambda_3,
-                                                           #        cz_theta_f, czd_length_ratio]
-    noise_parameters_CZ_args = arglist['noise_parameters_CZ_args']       # [Z_rotations_length, voltage_scaling_factor, distortions, T1_q0, T1_q1, T2_q0_sweetspot, T2_q0_interaction_point,
-                                                                             #      T2_q0_amplitude_dependent, T2_q1]
+    fluxlutman_args = arglist['fluxlutman_args']       # see function return_instrument_args in czf
+    noise_parameters_CZ_args = arglist['noise_parameters_CZ_args']       # see function return_instrument_args in czf
     number = arglist['number']
     adaptive_pars = arglist['adaptive_pars']
 
 
-    MC = mc.MeasurementControl('MC'+'{}'.format(number), live_plot_enabled=False)
+    try: 
+        MC = Instrument.find_instrument('MC'+'{}'.format(number))
+    except KeyError:
+        MC = mc.MeasurementControl('MC'+'{}'.format(number), live_plot_enabled=False)
     from qcodes import station
     station = station.Station()
     station.add_component(MC)
@@ -42,23 +46,27 @@ def f_to_parallelize_new(arglist):
 
     fluxlutman, noise_parameters_CZ = czf.return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args)
 
-
     d=ramsey_experiment(fluxlutman=fluxlutman, noise_parameters_CZ=noise_parameters_CZ,
                                                          fitted_stepresponse_ty=fitted_stepresponse_ty)
     MC.set_sweep_functions([fluxlutman.cz_length])
     MC.set_detector_function(d)
     MC.set_sweep_points(np.arange(0, adaptive_pars['max_time'], adaptive_pars['time_step']))
 
+    exp_metadata = {'detuning': noise_parameters_CZ.detuning(), 
+                     'sigma_q1': noise_parameters_CZ.sigma_q1(), 
+                     'sigma_q0': noise_parameters_CZ.sigma_q0()}
+
     if noise_parameters_CZ.cluster():
         dat = MC.run('1D ramsey_new_cluster sigma_q1 {:.0f}, sigma_q0 {:.0f}, detuning {:.0f}'.format(noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6,
                                                                             noise_parameters_CZ.detuning()/1e6), 
-            mode='1D')
-            #mode='2D')
+            mode='1D',exp_metadata=exp_metadata)
     else:
-    	dat = MC.run('1D ramsey_new sigma_q1 {:.0f}, sigma_q0 {:.0f}, detuning {:.0f}'.format(noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6,
-                                                                            noise_parameters_CZ.detuning()/1e6), 
-            mode='1D')
-            #mode='2D')
+        if adaptive_pars['long_name']:
+            dat = MC.run('1D ramsey_new sigma_q1 {:.0f}, sigma_q0 {:.0f}, detuning {:.0f}'.format(noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6,
+                                                                    noise_parameters_CZ.detuning()/1e6), 
+                                                                    mode='1D',exp_metadata=exp_metadata)
+        else:
+            dat = MC.run('1D ramsey_new', mode='1D',exp_metadata=exp_metadata)
 
 
     fluxlutman.close()
@@ -70,7 +78,8 @@ def f_to_parallelize_new(arglist):
 
 
 def compute_propagator(arglist):
-    # arglist = [samplepoint_q0,samplepoint_q1,fluxlutman_args,noise_parameters_CZ_args,fitted_stepresponse_ty]
+    # I was parallelizing this function in the cluster, then I changed but the list as an argument remains.
+    # Below each list item is assigned to its own variable
 
     fluxbias_q0 = arglist['fluxbias_q0']
     fluxbias_q1 = arglist['fluxbias_q1']
@@ -80,7 +89,7 @@ def compute_propagator(arglist):
 
 
     sim_step=fluxlutman.cz_length()
-    subdivisions_of_simstep=1                          # 4 is a good one, corresponding to a time step of 0.1 ns
+    subdivisions_of_simstep=1                          # irrelevant for these simulations
     sim_step_new=sim_step/subdivisions_of_simstep      # waveform is generated according to sampling rate of AWG,
                                                        # but we can use a different step for simulating the time evolution
     tlist = [0]
@@ -93,38 +102,19 @@ def compute_propagator(arglist):
 
     t_final = tlist_new[-1]+sim_step_new
 
-    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp],
-    #                          title='Pulse with (possibly) single qubit rotations',
-    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
 
-
-    amp = amp * noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
-
-
-    ### Apply distortions
-    if noise_parameters_CZ.distortions():
-        amp_final = czf.distort_amplitude(fitted_stepresponse_ty=fitted_stepresponse_ty,amp=amp,tlist_new=tlist_new,sim_step_new=sim_step_new)
-    else:
-        amp_final = amp
-
-    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final],
-    #                          title='Pulse with distortions, absolute',
-    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
-    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp],
-    #                          title='Pulse with distortions, difference',
-    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
+    amp = amp * noise_parameters_CZ.voltage_scaling_factor() 
+    amp_final=amp
 
 
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
+    #   Since we assume the hamiltonian to be constant on each side of the pulse, we just need two time steps
+    if fluxlutman.czd_double_sided():
+        amp_final=[amp_final[0],-amp_final[0]]    # Echo-Z
+    else:
+        amp_final=[amp_final[0],amp_final[0]]     # Ram-Z
+    sim_step_new=sim_step_new/2
     amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
-
-    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp_final_new],
-    #                          title='Pulse with distortions and shift due to fluxbias_q0, difference',
-    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
-    # amp_final = amp_final_new
-    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[f_pulse_final/1e9],
-    #                          title='Pulse with distortions and shift due to fluxbias_q0',
-    #                            xlabel='Time (ns)',ylabel='Frequency (GHz)')
 
 
     ### Obtain jump operators, possibly time-dependent (incoherent part of the noise)
@@ -135,7 +125,8 @@ def compute_propagator(arglist):
     U_final = czf.time_evolution_new(c_ops=c_ops, noise_parameters_CZ=noise_parameters_CZ, 
                                  fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new)
     #print(czf.verify_CPTP(U_superop_average))
-    U_final = czf.rotating_frame_transformation_propagator_new(U=U_final, t=t_final, H=czf.calc_hamiltonian(amp_final[0],fluxlutman,noise_parameters_CZ))
+    U_final = czf.rotating_frame_transformation_propagator_new(U=U_final, t=t_final, H=czf.calc_hamiltonian(amp[0],fluxlutman,noise_parameters_CZ))
+                                    # important to use amp and NOT amp_final here because the fluxbias is random and unknown to us.
 
     return [U_final, t_final]
 
@@ -191,7 +182,7 @@ class ramsey_experiment(det.Soft_Detector):
         Returns: quantites of interest
         """
         super().__init__()
-        self.value_names = ['population_02','population_11']
+        self.value_names = ['population_higher_state','population_lower_state']
         self.value_units = ['%', '%']
         self.fluxlutman = fluxlutman
         self.noise_parameters_CZ = noise_parameters_CZ
@@ -276,14 +267,14 @@ class ramsey_experiment(det.Soft_Detector):
 
             qoi = czf.quantities_of_interest_ramsey(U=U_superop_average,initial_state=self.noise_parameters_CZ.initial_state(),fluxlutman=self.fluxlutman,noise_parameters_CZ=self.noise_parameters_CZ)
 
-            quantities_of_interest = [qoi['population_02'], qoi['population_11']]
+            quantities_of_interest = [qoi['population_higher_state'], qoi['population_lower_state']]
             qoi_vec=np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
 
 
         qoi_plot = np.array(qoi_plot)
 
-        ## Plot to study the convergence properties of averaging over a Gaussian
+        ## Uncomment to study the convergence properties of averaging over a Gaussian
         # for i in range(len(qoi_plot[0])):
         #     czf.plot(x_plot_vec=[n_sampling_gaussian_vec],
         #                   y_plot_vec=[qoi_plot[:,i]],
