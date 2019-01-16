@@ -185,11 +185,10 @@ class Qubit(Instrument):
         raise NotImplementedError()
 
 
-    def measure_flipping(self,  number_of_flips=2*np.arange(60),
-                         MC=None, label='',
-                         equator=True,
-                         analyze=True, close_fig=True, verbose=True):
-        raise NotImplementedError
+    def measure_flipping(self, number_of_flips=np.arange(20), equator=True,
+                         MC=None, analyze=True, close_fig=True, update=True,
+                         ax='x', angle='180'):
+        raise NotImplementedError()
 
     def measure_ramsey(self):
         raise NotImplementedError()

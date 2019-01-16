@@ -3789,6 +3789,20 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.frac1_1 = frac1_1
         self.F_d = F_d
         self.SNR = SNR
+        # Add the fit and data to the analysis object
+        self.n0 = n0 # x-Data for the histograms
+        self.n1 = n1 # x-Data for the histograms
+        self.bins0 = bins0 # y-Data for the histograms
+        self.bins1 = bins1 # y-Data for the histograms
+        self.norm0 = norm0 # x-values of histogram fit
+        self.y0 = y0 # y-values of histogram fit
+        self.y0_0 = y0_0
+        self.y0_1 = y0_1
+        self.norm0 = norm0 # x-values of histogram fit
+        self.y1 = y1 # y-values of histogram fit
+        self.y1_0 = y1_0
+        self.y1_1 = y1_1
+
 
     def plot_2D_histograms(self, shots_I_0, shots_Q_0, shots_I_1, shots_Q_1,
                            **kw):
@@ -7903,7 +7917,7 @@ class DoubleFrequency(TD_Analysis):
         ax.set_ylabel(r'$F |1\rangle$')
         ax.set_title('%s: Double Frequency analysis' % self.timestamp)
         ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x * 1e6, y, 'o')
+        ax.plot(plot_x * 1e6, y, 'o-')
         ax.plot(plot_x[:-4] * 1e6, self.fit_plot, '-')
         fig.tight_layout()
         self.save_fig(fig, **kw)
@@ -8099,7 +8113,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                  g_guess=30e6, coupling_label=r'$J_1/2\pi$',
                  break_before_fitting=False,
                  add_title=True,
-                 xlabel=None, ylabel='Frequency (GHz)', 
+                 xlabel=None, ylabel='Frequency (GHz)',
                  weight_function_magn=0,
                  use_distance=True,
                  **kw):
@@ -8133,7 +8147,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         y0=filt_func_y0,
                                         filter_idx_low=filter_idx_low,
                                         filter_idx_high=filter_idx_high,
-                                        force_keep_idx_low=force_keep_idx_low, 
+                                        force_keep_idx_low=force_keep_idx_low,
                                         force_keep_idx_high=force_keep_idx_high,
                                         filter_threshold=filter_threshold)
         filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high, \
@@ -8213,7 +8227,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         filter_mask_low = np.where(
             peaks_low > filter_func(flux), False, filter_mask_low)
         filter_mask_low[filter_idx_low] = False  # hand remove 2 datapoints
-        filter_mask_low[force_keep_idx_low] = True  
+        filter_mask_low[force_keep_idx_low] = True
 
         filt_flux_low = flux[filter_mask_low]
         filt_peaks_low = peaks_low[filter_mask_low]

@@ -15,6 +15,7 @@ from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_UHFQC
 from pycqed.measurement.calibration_toolbox import mixer_skewness_calibration_5014
@@ -603,7 +604,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
 
-    def measure_flipping_seq(self, N=np.arange(31)*2,
+    def measure_flipping(self, number_of_flips=2*np.arange(20),
                      MC=None, analyze=True, close_fig=True,
                      verbose=False, upload=True):
         # prepare for timedomain takes care of rescaling
@@ -611,13 +612,21 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         if MC is None:
             MC = self.MC.get_instr()
 
+        nf = np.array(number_of_flips)
+        dn = nf[1] - nf[0]
+        nf = np.concatenate([nf,
+                             (nf[-1]+1*dn,
+                                 nf[-1]+2*dn,
+                              nf[-1]+3*dn,
+                              nf[-1]+4*dn)])
+
         MC.set_sweep_function(awg_swf.Flipping(
             pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, upload=upload))
-        MC.set_sweep_points(N)
+        MC.set_sweep_points(nf)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Flipping'+self.msmt_suffix)
+        MC.run('flipping_'+self.msmt_suffix)
         if analyze:
-            ma.Flipping_Analysis(auto=True, close_fig=close_fig)
+            ma2.FlippingAnalysis(options_dict={'scan_label':'flipping'})
 
     def measure_rabi_amp90(self,
                            scales=np.linspace(-0.7, 0.7, 31), n=1,
@@ -650,10 +659,56 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             a = ma.T1_Analysis(auto=True, close_fig=close_fig)
             return a.T1
 
+    def measure_T1_qp(self, times, N_pi_pulses=2,
+                      N_pi_pulse_delay=100e-9, MC=None, analyze=True,
+                      upload=True, close_fig=True):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        times = np.concatenate([times,
+                               (times[-1]+times[1],
+                                times[-1]+times[2],
+                                times[-1]+times[3],
+                                times[-1]+times[4])])
+        MC.set_sweep_function(awg_swf.T1_qp(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            N_pi_pulses=N_pi_pulses, N_pi_pulse_delay=N_pi_pulse_delay,
+             upload=upload))
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('T1_qp_N_'+str(N_pi_pulses)+'_tau_pi_'+str(N_pi_pulse_delay)+'_'+self.msmt_suffix)
+        if analyze:
+            a = ma.T1_Analysis(auto=True, close_fig=close_fig)
+            return a.T1
+    def measure_T1_2pi_qp(self, times, N_2pi_pulses=2,
+                      N_2pi_pulse_delay=100e-9, MC=None, analyze=True,
+                      upload=True, close_fig=True):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        times = np.concatenate([times,
+                               (times[-1]+times[1],
+                                times[-1]+times[2],
+                                times[-1]+times[3],
+                                times[-1]+times[4])])
+        MC.set_sweep_function(awg_swf.T1_2pi_qp(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            N_2pi_pulses=N_2pi_pulses, N_2pi_pulse_delay=N_2pi_pulse_delay,
+             upload=upload))
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('T1_2pi_qp_N_'+str(N_2pi_pulses)+'_tau_2pi_'+str(N_2pi_pulse_delay)+'_'+self.msmt_suffix)
+        if analyze:
+            a = ma.T1_Analysis(auto=True, close_fig=close_fig)
+            return a.T1
+
+
     def measure_ramsey(self, times, artificial_detuning=0,
                        f_qubit=None, label='',
                        MC=None, analyze=True, close_fig=True, verbose=True,
-                       upload=True):
+                       upload=True, analyze_double_freq = False):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
@@ -671,14 +726,21 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.run('Ramsey'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig)
-            if verbose:
-                fitted_freq = a.fit_res.params['frequency'].value
-                print('Artificial detuning: {:.2e}'.format(
-                      artificial_detuning))
-                print('Fitted detuning: {:.2e}'.format(fitted_freq))
-                print('Actual detuning:{:.2e}'.format(
-                      fitted_freq-artificial_detuning))
+            if analyze_double_freq == False:
+                a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig)
+                if verbose:
+                    fitted_freq = a.fit_res.params['frequency'].value
+                    print('Artificial detuning: {:.2e}'.format(
+                        artificial_detuning))
+                    print('Fitted detuning: {:.2e}'.format(fitted_freq))
+                    print('Actual detuning:{:.2e}'.format(
+                        fitted_freq-artificial_detuning))
+            else:
+                a = ma.DoubleFrequency(auto=True, close_fig=close_fig)
+                #Implement 'verbose' later, this is fine fow now
+                if verbose:
+                    print("Verbose output")
+                    # fitted_freq = a.fit_res.params[]
 
     def measure_echo(self, times, label='', MC=None,
                      artificial_detuning=None, upload=True,
@@ -771,7 +833,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      MC=None,
                      analyze=True,
                      close_fig=True,
-                     verbose=True, optimized_weights=False, SSB=False,
+                     verbose=True, optimized_weights=False, SSB=True,
                      one_weight_function_UHFQC=False,
                      multiplier=1, nr_shots=4095):
         self.prepare_for_timedomain()

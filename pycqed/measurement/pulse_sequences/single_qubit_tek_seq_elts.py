@@ -218,6 +218,7 @@ def T1_seq(times,
     seq_name = 'T1_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
+    #RO_pulse_delay = amount of time for pulse to end
     RO_pulse_delay = RO_pars['pulse_delay']
     RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -233,6 +234,134 @@ def T1_seq(times,
                 el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
             else:
                 el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+def T1_2pi_qp_seq(times,
+           pulse_pars, RO_pars,N_2pi_pulses,N_2pi_pulse_delay,
+           cal_points=True,
+           verbose=False, upload=True, return_seq=True):
+
+    '''
+    for every different tau:
+        make N pi pulses
+        append the T1 experiment
+        make an element out of the above sequence
+    send to the AWG
+    '''
+    seq_name = 'T1_2pi_Quasiparticle_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    RO_pulse_delay = RO_pars['pulse_delay']
+    RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+
+    #First 2pi pulse
+    starting_X360 = deepcopy(pulses['X360'])
+    starting_X360['refpoint'] = 'start'
+    QP_X360_list = []
+    #Add N-1 extra 2pi pulses
+    for tt in range(N_2pi_pulses-1):
+        QP_X360_list.append(deepcopy(pulses['X360']))
+        #Add a delay of N_2pi_pulse_delay counting from the start of the
+        #previous pumping pulse
+        QP_X360_list[tt]['refpoint'] = 'start'
+        QP_X360_list[tt]['pulse_delay'] = N_2pi_pulse_delay
+
+    #Add a pi probe pulse
+    T1_X180 = deepcopy(pulses['X180'])
+    T1_X180['refpoint'] = 'start'
+    T1_X180['pulse_delay'] = N_2pi_pulse_delay
+
+    for i, tau in enumerate(times):  # seq has to have at least 2 elts
+        RO_pars['pulse_delay'] = RO_pulse_delay + tau
+        RO_pars['refpoint'] = 'start'  # time defined between start of ops
+        if (cal_points and (i == (len(times)-4) or i == (len(times)-3))):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif(cal_points and (i == (len(times)-2) or i == (len(times)-1))):
+            RO_pars['pulse_delay'] = RO_pulse_delay
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+
+            pulse_list = [starting_X360]
+            pulse_list += QP_X360_list
+            pulse_list += [T1_X180]
+            pulse_list += [RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+def T1_qp_seq(times,
+           pulse_pars, RO_pars,N_pi_pulses,N_pi_pulse_delay,
+           cal_points=True,
+           verbose=False, upload=True, return_seq=True):
+    '''
+    Rabi sequence for a single qubit using the tektronix.
+    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    Input pars:
+        times:       array of times to wait after the initial pi-pulse
+        pulse_pars:  dict containing the pulse parameters
+        RO_pars:     dict containing the RO parameters
+    '''
+    seq_name = 'T1_Quasiparticle_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    RO_pulse_delay = RO_pars['pulse_delay']
+    RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    '''
+    for every different tau:
+        make N pi pulses
+        append the T1 experiment
+        make an element out of the above sequence
+    send to the AWG
+    '''
+    starting_X180 = deepcopy(pulses['X180'])
+    starting_X180['refpoint'] = 'start'
+    QP_X180_list = []
+
+    for tt in range(N_pi_pulses-1):
+        QP_X180_list.append(deepcopy(pulses['X180']))
+        #Add a delay of N_2pi_pulse_delay counting from the start of the
+        #previous pumping pulse
+
+        QP_X180_list[tt]['refpoint'] = 'start'
+        QP_X180_list[tt]['pulse_delay'] = N_pi_pulse_delay
+
+    T1_X180 = deepcopy(pulses['X180'])
+    T1_X180['refpoint'] = 'start'
+    T1_X180['pulse_delay'] = N_pi_pulse_delay
+
+    for i, tau in enumerate(times):  # seq has to have at least 2 elts
+        RO_pars['pulse_delay'] = RO_pulse_delay + tau #Time of gate + free evolution time
+        RO_pars['refpoint'] = 'start'  # time defined between start of ops
+        if (cal_points and (i == (len(times)-4) or i == (len(times)-3))):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif(cal_points and (i == (len(times)-2) or i == (len(times)-1))):
+            RO_pars['pulse_delay'] = RO_pulse_delay
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            # el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+            pulse_list = [starting_X180]
+            pulse_list += QP_X180_list
+            pulse_list += [T1_X180]
+            pulse_list += [RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
@@ -265,9 +394,12 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     # waveforms
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
+    #Set up the 'return'-pulse to return to 0
     pulse_pars_x2 = deepcopy(pulses['X90'])
-    pulse_pars_x2['refpoint'] = 'start'
+    #Evolve tau from the END of the first pulse
+    pulse_pars_x2['refpoint'] = 'end'
     for i, tau in enumerate(times):
+
         pulse_pars_x2['pulse_delay'] = tau
 
         if artificial_detuning is not None:
@@ -305,6 +437,7 @@ def Echo_seq(times, pulse_pars, RO_pars,
         RO_pars:        dict containing the RO parameters
         cal_points:     whether to use calibration points or not
     '''
+    print('sequencing')
     seq_name = 'Echo_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
@@ -312,8 +445,12 @@ def Echo_seq(times, pulse_pars, RO_pars,
     pulses = get_pulse_dict_from_pars(pulse_pars)
     center_X180 = deepcopy(pulses['X180'])
     final_X90 = deepcopy(pulses['X90'])
-    center_X180['refpoint'] = 'start'
-    final_X90['refpoint'] = 'start'
+    # first_X90 = deepcopy(pulses['X90'])
+    # first_X90['refpoint']='start'
+    # #start the second pulse tau/2 from the END of the previous pulse
+    center_X180['refpoint'] = 'end'
+    #start the third pulse tau/2 from the END of the second pulse
+    final_X90['refpoint'] = 'end'
 
     for i, tau in enumerate(times):
         center_X180['pulse_delay'] = tau/2
@@ -362,10 +499,12 @@ def CPMG_seq(times, pulse_pars, CPMG_order, RO_pars,
     CPMG_list = []
     for tt in range(CPMG_order):
         CPMG_list.append(deepcopy(pulses['Y180']))
-        CPMG_list[tt]['refpoint'] = 'start'
+        #Start this pulse 'tau/N' or 'tau/2N' since the END of the previous pulse
+        CPMG_list[tt]['refpoint'] = 'end'
     final_X90 = deepcopy(pulses['X90'])
-    final_X90['refpoint'] = 'start'
+    final_X90['refpoint'] = 'end'
     starting_X90 = deepcopy(pulses['X90'])
+    #This one can start from the start of the trigger pulse
     starting_X90['refpoint'] = 'start'
 
     for i, tau in enumerate(times):
@@ -769,6 +908,7 @@ def get_pulse_dict_from_pars(pulse_pars):
     '''
     pi_amp = pulse_pars['amplitude']
     pi2_amp = pulse_pars['amplitude']*pulse_pars['amp90_scale']
+    twopi_amp = pulse_pars['amplitude']*2 #might be included in pulsepars
 
     pulses = {'I': deepcopy(pulse_pars),
               'X180': deepcopy(pulse_pars),
@@ -778,7 +918,9 @@ def get_pulse_dict_from_pars(pulse_pars):
               'Y180': deepcopy(pulse_pars),
               'mY180': deepcopy(pulse_pars),
               'Y90': deepcopy(pulse_pars),
-              'mY90': deepcopy(pulse_pars)}
+              'mY90': deepcopy(pulse_pars),
+              'X360': deepcopy(pulse_pars),
+              'mX360': deepcopy(pulse_pars)}
 
     pulses['I']['amplitude'] = 0
     pulses['mX180']['amplitude'] = -pi_amp
@@ -793,4 +935,6 @@ def get_pulse_dict_from_pars(pulse_pars):
     pulses['mY90']['amplitude'] = -pi2_amp
     pulses['mY90']['phase'] = 90
 
+    pulses['X360']['amplitude'] = twopi_amp
+    pulses['mX360']['amplitude'] = - twopi_amp
     return pulses

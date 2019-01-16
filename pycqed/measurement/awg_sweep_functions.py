@@ -869,6 +869,57 @@ class T1(swf.Hard_Sweep):
                        pulse_pars=self.pulse_pars,
                        RO_pars=self.RO_pars)
 
+class T1_qp(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, RO_pars,
+                 N_pi_pulses, N_pi_pulse_delay,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.N_pi_pulses = N_pi_pulses
+        self.N_pi_pulse_delay = N_pi_pulse_delay
+        self.upload = upload
+        self.cal_points = cal_points
+        self.name = 'T1_qp'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.T1_qp_seq(times=self.sweep_points,
+                         N_pi_pulses = self.N_pi_pulses,
+                         N_pi_pulse_delay = self.N_pi_pulse_delay,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         cal_points=self.cal_points)
+class T1_2pi_qp(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, RO_pars,
+                 N_2pi_pulses, N_2pi_pulse_delay,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.N_2pi_pulses = N_2pi_pulses
+        self.N_2pi_pulse_delay = N_2pi_pulse_delay
+        self.upload = upload
+        self.cal_points = cal_points
+        self.name = 'T1_2pi_qp'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.T1_2pi_qp_seq(times=self.sweep_points,
+                         N_2pi_pulses = self.N_2pi_pulses,
+                         N_2pi_pulse_delay = self.N_2pi_pulse_delay,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         cal_points=self.cal_points)
+
 
 class AllXY(swf.Hard_Sweep):
 

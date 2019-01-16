@@ -728,6 +728,9 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
 
         if exact_label_match:
             all_measdirs = [x for x in all_measdirs if label in x]
+            #BUG: does not compare the exact string, just a substring
+            #So 'q5_spectroscopy_f02' will be included in a search for
+            #'q5_spectroscopy'
         else:
             for each_label in label:
                 all_measdirs = [x for x in all_measdirs if each_label in x]
