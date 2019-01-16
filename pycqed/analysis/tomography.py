@@ -11,6 +11,7 @@ import lmfit
 
 import matplotlib.pyplot as plt
 from pycqed.analysis import measurement_analysis as ma
+import pycqed.analysis.tools.data_manipulation as dm_tools
 
 
 class TomoAnalysis_JointRO():
@@ -39,8 +40,8 @@ class TomoAnalysis_JointRO():
                          qtp.rotation(qtp.sigmay(), np.pi / 2),
                          qtp.rotation(qtp.sigmax(), -np.pi / 2),
                          qtp.rotation(qtp.sigmay(), -np.pi / 2)]
-    measurement_operator_labels = ['I', 'X', 'x', 'y', '-x','-y']
-    #MAKE SURE THE LABELS CORRESPOND TO THE ROTATION MATRIXES DEFINED ABOVE
+    measurement_operator_labels = ['I', 'X', 'x', 'y', '-x', '-y']
+    # MAKE SURE THE LABELS CORRESPOND TO THE ROTATION MATRIXES DEFINED ABOVE
 
     # The set of single qubit basis operators and labels
     measurement_basis = [
@@ -79,10 +80,9 @@ class TomoAnalysis_JointRO():
             self.rotation_matrixes, n_qubits)
 
         if check_labels is True:
-            print('Measurement op. labels: {}'.format(self.get_meas_operator_labels(n_qubits)))
+            print('Measurement op. labels: {}'.format(
+                self.get_meas_operator_labels(n_qubits)))
             print('Basis labels: {}'.format(self.get_basis_labels(n_qubits)))
-
-
 
     def execute_pseudo_inverse_tomo(self):
         """
@@ -105,8 +105,8 @@ class TomoAnalysis_JointRO():
         return (basis_decomposition, rho)
 
     def execute_least_squares_physical_tomo(self, use_weights=True, show_time=False,
-                               ftol=0.01, xtol=0.001, full_output=0,
-                               max_iter=1000):
+                                            ftol=0.01, xtol=0.001, full_output=0,
+                                            max_iter=1000):
         """
         Performs a max likelihood optimization using fmin_powell in order to
         get the closest physically realisable state.
@@ -177,10 +177,10 @@ class TomoAnalysis_JointRO():
                                     counts_tomo,
                                     counts_cal,
                                     N_total,
-                                    used_bins = [0,2],
-                                    n_runs = 100,
-                                    array_like = False,
-                                    correct_measurement_operators = True):
+                                    used_bins=[0, 2],
+                                    n_runs=100,
+                                    array_like=False,
+                                    correct_measurement_operators=True):
         """
         Executes the SDPDA tomo n_runs times with data distributed via a Multinomial distribution
         in order to get a list of rhos from which one can calculate errorbars on various derived quantities
@@ -188,10 +188,11 @@ class TomoAnalysis_JointRO():
         If array_like is set to true it will just return a 3D array of rhos
         """
 
-        rhos= []
+        rhos = []
         for i in range(n_runs):
-            #generate a data set based on multinomial distribution with means according to the measured data
-            mc = [np.random.multinomial(sum(counts),(np.array(counts)+0.0) / sum(counts)) for counts in counts_tomo]
+            # generate a data set based on multinomial distribution with means according to the measured data
+            mc = [np.random.multinomial(sum(counts), (np.array(
+                counts)+0.0) / sum(counts)) for counts in counts_tomo]
             rhos.append(self.execute_SDPA_2qubit_tomo(mc,
                                                       counts_cal,
                                                       N_total,
@@ -203,8 +204,7 @@ class TomoAnalysis_JointRO():
         else:
             return rhos
 
-
-    def execute_SDPA_2qubit_tomo(self, counts_tomo, counts_cal, N_total, used_bins = [0,2],
+    def execute_SDPA_2qubit_tomo(self, counts_tomo, counts_cal, N_total, used_bins=[0, 2],
                                  correct_measurement_operators=True):
         """
         Estimates a density matrix given single shot counts of 4 thresholded
@@ -215,28 +215,32 @@ class TomoAnalysis_JointRO():
         The tomo counts are used for the actual reconstruction.
         """
         if isinstance(used_bins, int):
-            #allow for a single projection operator
+            # allow for a single projection operator
             used_bins = [used_bins]
 
         Pm_corrected = self.get_meas_operators_from_cal(counts_cal,
                                                         correct_measurement_operators)
 
-        #Select the correct data based on the bins used
-        #(and therefore based on the projection operators used)
-        data = np.array([float(count[k]) for count in counts_tomo for k in used_bins] ).transpose()
+        # Select the correct data based on the bins used
+        # (and therefore based on the projection operators used)
+        data = np.array([float(count[k])
+                         for count in counts_tomo for k in used_bins]).transpose()
 
-        #get the total number of counts per tomo
-        N = np.array([np.sum(counts_tomo, axis=1) for k in used_bins]).flatten()
+        # get the total number of counts per tomo
+        N = np.array([np.sum(counts_tomo, axis=1)
+                      for k in used_bins]).flatten()
 
-        #add weights based on the total number of data points kept each run
+        # add weights based on the total number of data points kept each run
         #weights = np.sqrt(N)
         weights = N/float(N_total)
 
-        #calculate the density matrix using the sdpa solver
-        rho_nathan, n_estimate = self._tomoc_fw([Pm_corrected[k] for k in used_bins], data, weights=weights)
+        # calculate the density matrix using the sdpa solver
+        rho_nathan, n_estimate = self._tomoc_fw(
+            [Pm_corrected[k] for k in used_bins], data, weights=weights)
 
         if((np.abs(N_total - n_estimate) / N_total > 0.03)):
-            print('WARNING estimated N(%d) is not close to provided N(%d) '% (n_estimate,N_total))
+            print('WARNING estimated N(%d) is not close to provided N(%d) ' %
+                  (n_estimate, N_total))
 
         return rho_nathan
 
@@ -244,20 +248,21 @@ class TomoAnalysis_JointRO():
         """
         Used in the thresholded tomography. Returns the set of corrected measurement operators
         """
-        #setup the projection operators
-        Pm_0 = qtp.projection(2,0,0)
-        Pm_1 = qtp.projection(2,1,1)
-        Pm_00 = qtp.tensor(Pm_0,Pm_0)
-        Pm_11 = qtp.tensor(Pm_1,Pm_1)
-        Pm_01 = qtp.tensor(Pm_0,Pm_1)
-        Pm_10 = qtp.tensor(Pm_1,Pm_0)
+        # setup the projection operators
+        Pm_0 = qtp.projection(2, 0, 0)
+        Pm_1 = qtp.projection(2, 1, 1)
+        Pm_00 = qtp.tensor(Pm_0, Pm_0)
+        Pm_11 = qtp.tensor(Pm_1, Pm_1)
+        Pm_01 = qtp.tensor(Pm_0, Pm_1)
+        Pm_10 = qtp.tensor(Pm_1, Pm_0)
         Pm = [Pm_00, Pm_01, Pm_10, Pm_11]
-        #calculate bin probabilities normalized horizontally
-        probs = counts_cal / np.sum(counts_cal, axis = 1, dtype=float)[:,np.newaxis]
-        #print(probs)
-        #correct the measurement operators based on calibration point counts
+        # calculate bin probabilities normalized horizontally
+        probs = counts_cal / \
+            np.sum(counts_cal, axis=1, dtype=float)[:, np.newaxis]
+        # print(probs)
+        # correct the measurement operators based on calibration point counts
         if correct_measurement_operators is True:
-            #just calc P_m_corrected = probs.T * P_m (matrix product)
+            # just calc P_m_corrected = probs.T * P_m (matrix product)
             d = range(len(Pm))
             l = range(np.shape(counts_cal)[1])
             Pm_corrected = [sum(probs.T[i][j] * Pm[j] for j in d) for i in l]
@@ -267,7 +272,6 @@ class TomoAnalysis_JointRO():
         # print Pm_corrected
         # print 'End of operators'
         return Pm_corrected
-
 
     def get_basis_labels(self, n_qubits):
         """
@@ -309,6 +313,7 @@ class TomoAnalysis_JointRO():
 #                    Private functions
 #
 ##############################################################
+
 
     def _max_likelihood_optimization_function(self, t_params):
         """
@@ -402,56 +407,59 @@ class TomoAnalysis_JointRO():
     def _calculate_matrix_set(self, starting_set, n_qubits):
         return _calculate_matrix_set(starting_set, n_qubits)
 
-    def _tomoc_fw(self, measurement_operators, data, weights=False, filename=False, reload_toolbox = False):
-
+    def _tomoc_fw(self, measurement_operators, data, weights=False, filename=False, reload_toolbox=False):
         """
         Wrapper function to parse the data for the SDPA tomo.
         TODO cut this code and build a toolbox based on a python version of a c-based semi-definite optimization wrapper, because this code is horrendous.
         Uses a  python parser to rewrite the MLE tomo into a semi-definite optimization problem which is then solved by a C-Library.
         requires a list of measurement operators and a set of data of dims: (len(measurement_operators) * len(self.rotation_vector,1)
         """
-        #get directory of toolbox
+        # get directory of toolbox
         directory = os.path.dirname(__file__) + '/tools/tomoc_fw'
         if reload_toolbox is True:
             reload(pytomoc_fw)
-        if len(data.shape)==1:
+        if len(data.shape) == 1:
             data = np.expand_dims(data, axis=1)
-        if len(weights.shape)==1:
+        if len(weights.shape) == 1:
             weights = np.expand_dims(weights, axis=1)
         if type(weights) is bool:
             if not weights:
                 weights = np.ones(data.shape)
-        #print(measurement_operators[0])
-        observables = [rot.dag() * measurement_operator * rot for rot in self.rotation_vector for measurement_operator in measurement_operators]
-        observablearray = np.array([np.ravel(obs.full(), order='C') for obs in observables])
-        #print data.shape, weights.shape, observablearray.shape
+        # print(measurement_operators[0])
+        observables = [rot.dag() * measurement_operator *
+                       rot for rot in self.rotation_vector for measurement_operator in measurement_operators]
+        observablearray = np.array(
+            [np.ravel(obs.full(), order='C') for obs in observables])
+        # print data.shape, weights.shape, observablearray.shape
         # print(data)
         # print(weights)
-        out = np.concatenate((data,weights,observablearray), axis=1)
+        out = np.concatenate((data, weights, observablearray), axis=1)
         if not filename:
             filename = 'temp' + str(uuid.uuid4())
-        with open(directory+'/'+filename+'.tomo','w') as f:
+        with open(directory+'/'+filename+'.tomo', 'w') as f:
             np.savetxt(f, out.view(float), fmt='%.11g', delimiter=',')
     #             np.savetxt(f, out, delimiter=',')
-        #print f.name
-        #os.chdir(directory)
+        # print f.name
+        # os.chdir(directory)
         #sys.argv = ['pytomoc_fw', '-v', f.name]
-        #execfile('pytomoc_fw')
+        # execfile('pytomoc_fw')
 
         pytomoc_fw.execute_pytomoc_fw({}, f.name)
         filename_rho = directory+'\\'+filename
 
-        rho = np.loadtxt(filename_rho+'.rhor', delimiter=',')+ 1j*np.loadtxt(filename_rho+'.rhoi', delimiter=',')
+        rho = np.loadtxt(filename_rho+'.rhor', delimiter=',') + \
+            1j*np.loadtxt(filename_rho+'.rhoi', delimiter=',')
         N_est = rho.trace()
         rho = rho/rho.trace()
-        rho = qtp.Qobj(rho, dims=[[2,2],[2,2]])
+        rho = qtp.Qobj(rho, dims=[[2, 2], [2, 2]])
 
-        #delete temp files
+        # delete temp files
         files = glob.glob(filename_rho+'*')
         for file in files:
             os.remove(file)
 
         return rho, N_est
+
 
 def _calculate_matrix_set(starting_set, n_qubits):
     """
@@ -680,6 +688,7 @@ def get_bell_pauli_exp(bell_idx, theta_q0=0, theta_q1=0):
     return np.concatenate(([1], pauli1, pauli2, paulic))
     # return sets_bell
 
+
 def calc_fid2_cardinal(pauli_op_dis, cardinal_state):
     """
     Calculates fidelity using the pauli set representation of the state
@@ -761,7 +770,20 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                  single_shots=True,
                  fig_format='png',
                  q0_label='q0',
-                 q1_label='q1', close_fig=True, **kw):
+                 q1_label='q1',
+                 q_post_select_label='qA',
+                 q_post_select=False,  # parity ancilla
+                 q_post_select_threshold=0,  # ancilla threshold
+                 q_post_selection_states=[0],  # selecting on excited state
+                 q_post_selection_indices=[0],
+                 weight_channels=[0, 1],
+                 close_fig=True,
+                 tomo_after_ancilla_mmt=False,
+                 q_post_select_initialisation=False,
+                 nr_parity_check_rounds=1,
+                 PF_tracking='first',
+                 PF_parity_pattern=['ZZ'],
+                 **kw):
         self.label = label
         self.timestamp = timestamp
         self.target_cardinal = target_cardinal
@@ -775,6 +797,18 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.q1_label = q1_label
         self.close_fig = close_fig
         self.single_shots = single_shots
+        # parameters for parity measurements
+        self.q_post_select_label = q_post_select_label
+        self.q_post_select = q_post_select
+        self.q_post_selection_states = q_post_selection_states
+        self.q_post_selection_indices = q_post_selection_indices
+        self.q_post_select_threshold = q_post_select_threshold
+        self.weight_channels = weight_channels
+        self.tomo_after_ancilla_mmt = tomo_after_ancilla_mmt
+        self.q_post_select_initialisation = q_post_select_initialisation
+        self.nr_parity_check_rounds = nr_parity_check_rounds
+        self.PF_tracking = PF_tracking
+        self.PF_parity_pattern = PF_parity_pattern
         kw['h5mode'] = 'r+'
         super(Tomo_Multiplexed, self).__init__(auto=auto, timestamp=timestamp,
                                                label=label, **kw)
@@ -786,18 +820,139 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         # hard coded number of segments for a 2 qubit state tomography
         # constraint imposed by UHFLI
         self.nr_segments = 64
+        self.nr_measurement_segments = 36  # the rest is calibration points
         self.exp_name = os.path.split(self.folder)[-1][7:]
+        nr_consecutive_mmts = self.nr_parity_check_rounds + \
+            self.tomo_after_ancilla_mmt+self.q_post_select_initialisation
+        print('nr consecutive mmts per run', nr_consecutive_mmts)
+
         if self.single_shots:
-            self.shots_q0 = np.zeros(
-                (self.nr_segments, int(len(self.measured_values[0])/self.nr_segments)))
-            self.shots_q1 = np.zeros(
-                (self.nr_segments, int(len(self.measured_values[1])/self.nr_segments)))
+            # data qubit tomo results:
+            # only selecting the last data qubit outcome
+            measured_values1_preshaping = self.measured_values[self.weight_channels[0]
+                                                               ][nr_consecutive_mmts-1::nr_consecutive_mmts]
+            # only selecting the last data qubit outcome
+            measured_values2_preshaping = self.measured_values[self.weight_channels[1]
+                                                               ][nr_consecutive_mmts-1::nr_consecutive_mmts]
+            nr_runs = int(len(measured_values1_preshaping)/self.nr_segments)
+
+            # reshaping results according to segments and runs
+            measured_values1 = np.zeros(
+                (self.nr_segments, nr_runs))
+            measured_values2 = np.zeros(
+                (self.nr_segments, nr_runs))
+            if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus']:
+                # preparing a Pauli record with dimensions according to the parity pattern
+                self.PF_record = np.zeros(
+                    (self.nr_measurement_segments, nr_runs, len(self.PF_parity_pattern)))
             for i in range(self.nr_segments):
-                self.shots_q0[i, :] = self.measured_values[0][i::self.nr_segments]
-                self.shots_q1[i, :] = self.measured_values[1][i::self.nr_segments]
+                measured_values1[i, :] = measured_values1_preshaping[i::self.nr_segments]
+                measured_values2[i, :] = measured_values2_preshaping[i::self.nr_segments]
+
+            # ancilla qubit data preparation
+            if self.q_post_select:
+                measured_values_ancilla = np.zeros(
+                    (self.nr_segments, nr_consecutive_mmts,  nr_runs))
+                measured_values_ancilla_preshaping = self.measured_values[self.weight_channels[2]]
+                for j in range(nr_consecutive_mmts):
+                    measured_values_ancilla_select = measured_values_ancilla_preshaping[
+                        j::nr_consecutive_mmts]
+                    for i in range(self.nr_segments):
+                        measured_values_ancilla[i, j,
+                                                :] = measured_values_ancilla_select[i::self.nr_segments]
+
+            if self.q_post_select_initialisation:  # only initizilizing the ancilla
+                # only selecting the last data qubit outcome
+                measured_values_ancilla_preshaping = self.measured_values[
+                    self.weight_channels[2]][0::nr_consecutive_mmts]
+                measured_values_ancilla_init = np.zeros(
+                    (self.nr_segments, nr_runs))
+                for i in range(self.nr_segments):
+                    measured_values_ancilla_init[i,
+                                                 :] = measured_values_ancilla_preshaping[i::self.nr_segments]
+
+            # digitizing and serivative of the ancilla outcomes and postselection of the data qubit outcomes
+
+            # no selection on the calibration points, only the 36 runs
+            for i in range(self.nr_measurement_segments):
+                # post selecting on initialization measurement
+                if self.q_post_select_initialisation:
+                    shots_qA_init = measured_values_ancilla_init[i]
+                    post_select_indices_0 = dm_tools.get_post_select_indices(
+                        thresholds=[self.q_post_select_threshold],
+                        init_measurements=[shots_qA_init],
+                        positive_case=True)
+                    #measured_values1[i, :][post_select_indices_0] = np.nan
+                    #measured_values2[i, :][post_select_indices_0] = np.nan
+
+                if self.q_post_select:
+                    # first digitize the 2D array
+                    # post selecting on parity measurement outcomes
+                    # 1. selecting a trace to analyze
+                    if self.tomo_after_ancilla_mmt:  # throw away last point
+                        ancilla_outcomes = measured_values_ancilla[i, :-1, :]
+                    else:
+                        ancilla_outcomes = measured_values_ancilla[i, :, :]
+                    # print('shape ancilla outcomes raw ', np.shape(ancilla_outcomes))
+                    # 2. digitize the trace to 0 (ground) and 1 (excited)
+                    ancilla_outcomes = dm_tools.digitize(data=ancilla_outcomes,
+                                                         threshold=self.q_post_select_threshold,
+                                                         zero_state=0)
+                    # 3. take the binary derivative for the 2D arrays
+                    if not self.q_post_select_initialisation:
+                        # the derivative will remove one colum of data, add zeros to compensate if no initialization mmt is there
+                        zeros = np.zeros((1,np.shape(ancilla_outcomes)[1]))
+                        ancilla_outcomes=np.append(ancilla_outcomes, zeros, axis=0)
+                    ancilla_outcomes_derivative = dm_tools.binary_derivative_2D(
+                        ancilla_outcomes, axis=1)
+                    # print('shape ancilla outcomes derivative ', np.shape(ancilla_outcomes_derivative))
+                    # getting the postselection indices based on the relevant postselection index
+                    for index, state in zip(self.q_post_selection_indices, self.q_post_selection_states):
+                        post_select_indices_0 = np.array(
+                            np.where(ancilla_outcomes_derivative[index, :] != state)).flatten()
+                        measured_values1[i, :][post_select_indices_0] = np.nan
+                        measured_values2[i, :][post_select_indices_0] = np.nan
+                    # 4. make a Pauli record in case the pauli frame of tomography is to be updated
+                    if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus']:
+                        for j in range(len(self.PF_parity_pattern)):
+                            # print('j', j)
+                            # print('axis', self.PF_parity_pattern[j])
+                            parity_outcomes = ancilla_outcomes_derivative[j::len(
+                                self.PF_parity_pattern)]
+                            # print(self.PF_parity_pattern[j])
+                            # print(len(parity_outcomes))
+                            # adding bell-state specific number
+                            if self.PF_tracking=='PF_tracking':
+                                if self.q_post_selection_states[j]==1:
+                                    added_nr = len(parity_outcomes)+1
+                                else:
+                                    added_nr = 0
+                                # print(added_nr)
+                                self.PF_record[i, :, j] = np.sum(
+                                    parity_outcomes, axis=0)+added_nr% 2
+                            elif self.PF_tracking=='PF_reset':
+                                if self.q_post_selection_states[j]==1:
+                                    self.PF_record[i, :, j] = parity_outcomes[-1]+1%2
+                                else:
+                                    self.PF_record[i, :, j] = parity_outcomes[-1]
+                            elif self.PF_tracking=='PF_reset_all_phi_plus':
+                                # print('here',parity_outcomes)
+                                # print(len(parity_outcomes))
+                                if len(parity_outcomes)==1:
+                                    self.PF_record[i, :, j] = parity_outcomes
+                                else:
+                                    self.PF_record[i, :, j] = parity_outcomes[-1]
+
+
+            #calculate post-selection fraction
+            if self.q_post_select:
+                relevant_data=measured_values1[:36,:].flatten()
+                self.fraction=1-len(np.where(np.isnan(relevant_data))[0])/np.size(relevant_data)
 
             # Get correlations between shots
-            self.shots_q0q1 = np.multiply(self.shots_q1, self.shots_q0)
+            self.shots_q0q1 = np.multiply(measured_values2, measured_values1)
+            # self.shots_q0 = measured_values1
+            # self.shots_q1 = measured_values2
 
             if self.start_shot != 0 or self.end_shot != -1:
                 self.shots_q0 = self.shots_q0[:, self.start_shot:self.end_shot]
@@ -808,36 +963,35 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             # Making  the first figure, tomo shots
             ##########################################
 
-            avg_h1 = np.mean(self.shots_q0, axis=1)
-            avg_h2 = np.mean(self.shots_q1, axis=1)
-            avg_h12 = np.mean(self.shots_q0q1, axis=1)
+            avg_h1 = np.nanmean(measured_values1, axis=1)
+            avg_h2 = np.nanmean(measured_values2, axis=1)
+            avg_h12 = np.nanmean(self.shots_q0q1, axis=1)
         else:
             avg_h1 = self.measured_values[0]
             avg_h2 = self.measured_values[1]
             avg_h12 = self.measured_values[2]
 
         # Binning all the points required for the tomo
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
+        h1_00 = np.nanmean(avg_h1[36:36+7])
+        h1_01 = np.nanmean(avg_h1[43:43+7])
+        h1_10 = np.nanmean(avg_h1[50:50+7])
+        h1_11 = np.nanmean(avg_h1[57:])
 
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
+        h2_00 = np.nanmean(avg_h2[36:36+7])
+        h2_01 = np.nanmean(avg_h2[43:43+7])
+        h2_10 = np.nanmean(avg_h2[50:50+7])
+        h2_11 = np.nanmean(avg_h2[57:])
 
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
+        h12_00 = np.nanmean(avg_h12[36:36+7])
+        h12_01 = np.nanmean(avg_h12[43:43+7])
+        h12_10 = np.nanmean(avg_h12[50:50+7])
+        h12_11 = np.nanmean(avg_h12[57:])
 
         # std_arr = np.array( std_h2_00, std_h2_01, std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
         # plt.plot(std_arr)
         # plt.show()
 
         # Substract avg of all traces
-
         mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
         mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
         mean_h12 = (h12_00+h12_11+h12_01+h12_10)/4
@@ -850,45 +1004,80 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         scale_h2 = (h2_00+h2_01-h2_10-h2_11)/4
         scale_h12 = (h12_00+h12_11-h12_01-h12_10)/4
 
+        # normalizing all shots according to the calibration points
+
         avg_h1 = (avg_h1)/scale_h1
         avg_h2 = (avg_h2)/scale_h2
         avg_h12 = (avg_h12)/scale_h12
         # dived by scalefactor
 
+        # applying pauli frame update here
+        # first suptracting offsets and rescaling all individual shots
+        if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus']:
+            # first subtracting offsets
+            measured_values1 -= mean_h1
+            measured_values2 -= mean_h2
+            self.shots_q0q1 -= mean_h12
+            # and rescaling all individual shots
+            measured_values1 = measured_values1/scale_h1
+            measured_values2 = measured_values2/scale_h2
+            self.shots_q0q1 = self.shots_q0q1/scale_h12
+            for j, axis in enumerate(self.PF_parity_pattern):
+                record = self.PF_record[:, :, j]
+                if axis=='ZZ':
+                    for i in np.concatenate([np.arange(0,12), np.arange(24,36)]):
+                        for k in range(len(record[i,:])):
+                            if record[i,k]==1:
+                                measured_values1[i,k]=-1*measured_values1[i,k]
+                                self.shots_q0q1[i,k]=-1*self.shots_q0q1[i,k]
+                elif axis=='XX':
+                    for i in np.concatenate([np.arange(12,36)]):
+                        for k in range(len(record[i,:])):
+                            if record[i,k]==1:
+                                measured_values1[i,k]=-1*measured_values1[i,k]
+                                self.shots_q0q1[i,k]=-1*self.shots_q0q1[i,k]
+
+            #redefining the average values
+            avg_h1 = np.nanmean(measured_values1, axis=1)
+            avg_h2 = np.nanmean(measured_values2, axis=1)
+            avg_h12 = np.nanmean(self.shots_q0q1, axis=1)
+
+
+
         # key for next step
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
+        h1_00 = np.nanmean(avg_h1[36:36+7])
+        h1_01 = np.nanmean(avg_h1[43:43+7])
+        h1_10 = np.nanmean(avg_h1[50:50+7])
+        h1_11 = np.nanmean(avg_h1[57:])
 
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
+        h2_00 = np.nanmean(avg_h2[36:36+7])
+        h2_01 = np.nanmean(avg_h2[43:43+7])
+        h2_10 = np.nanmean(avg_h2[50:50+7])
+        h2_11 = np.nanmean(avg_h2[57:])
 
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
+        h12_00 = np.nanmean(avg_h12[36:36+7])
+        h12_01 = np.nanmean(avg_h12[43:43+7])
+        h12_10 = np.nanmean(avg_h12[50:50+7])
+        h12_11 = np.nanmean(avg_h12[57:])
 
-        std_h1_00 = np.std(avg_h1[36:36+7])
-        std_h1_01 = np.std(avg_h1[43:43+7])
-        std_h1_10 = np.std(avg_h1[50:50+7])
-        std_h1_11 = np.std(avg_h1[57:])
+        std_h1_00 = np.nanstd(avg_h1[36:36+7])
+        std_h1_01 = np.nanstd(avg_h1[43:43+7])
+        std_h1_10 = np.nanstd(avg_h1[50:50+7])
+        std_h1_11 = np.nanstd(avg_h1[57:])
 
-        std_h2_00 = np.std(avg_h2[36:36+7])
-        std_h2_01 = np.std(avg_h2[43:43+7])
-        std_h2_10 = np.std(avg_h2[50:50+7])
-        std_h2_11 = np.std(avg_h2[57:])
+        std_h2_00 = np.nanstd(avg_h2[36:36+7])
+        std_h2_01 = np.nanstd(avg_h2[43:43+7])
+        std_h2_10 = np.nanstd(avg_h2[50:50+7])
+        std_h2_11 = np.nanstd(avg_h2[57:])
 
-        std_h12_00 = np.std(avg_h12[36:36+7])
-        std_h12_01 = np.std(avg_h12[43:43+7])
-        std_h12_10 = np.std(avg_h12[50:50+7])
-        std_h12_11 = np.std(avg_h12[57:])
+        std_h12_00 = np.nanstd(avg_h12[36:36+7])
+        std_h12_01 = np.nanstd(avg_h12[43:43+7])
+        std_h12_10 = np.nanstd(avg_h12[50:50+7])
+        std_h12_11 = np.nanstd(avg_h12[57:])
 
-        std_h1 = np.mean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
-        std_h2 = np.mean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
-        std_h12 = np.mean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
+        std_h1 = np.nanmean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
+        std_h2 = np.nanmean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
+        std_h12 = np.nanmean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
         std_arr = np.array([std_h1_00, std_h1_01, std_h1_10, std_h1_11, std_h2_00, std_h2_01,
                             std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
 
@@ -896,25 +1085,25 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         # plt.plot(std_arr)
         # plt.show()
 
-        fac = np.mean([std_h1, std_h2, std_h12])
+        fac = np.nanmean([std_h1, std_h2, std_h12])
         avg_h1 *= fac/std_h1
         avg_h2 *= fac/std_h2
         avg_h12 *= fac/std_h12
 
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
+        h1_00 = np.nanmean(avg_h1[36:36+7])
+        h1_01 = np.nanmean(avg_h1[43:43+7])
+        h1_10 = np.nanmean(avg_h1[50:50+7])
+        h1_11 = np.nanmean(avg_h1[57:])
 
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
+        h2_00 = np.nanmean(avg_h2[36:36+7])
+        h2_01 = np.nanmean(avg_h2[43:43+7])
+        h2_10 = np.nanmean(avg_h2[50:50+7])
+        h2_11 = np.nanmean(avg_h2[57:])
 
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
+        h12_00 = np.nanmean(avg_h12[36:36+7])
+        h12_01 = np.nanmean(avg_h12[43:43+7])
+        h12_10 = np.nanmean(avg_h12[50:50+7])
+        h12_11 = np.nanmean(avg_h12[57:])
 
         self.plot_TV_mode(avg_h1, avg_h2, avg_h12)
         #############################
@@ -989,10 +1178,10 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             self.operators_fit = self.operators
         """
         bell_idx (int) : integer referring to a specific bell state.
-            0: |Psi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
-            1: |Psi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
+            0: |Phi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
+            1: |Phi_p> = |00> + |11>   (<XX>,<YY>,<ZZ>) = (+1,-1,+1)
             2: |Psi_m> = |01> - |10>   (<XX>,<YY>,<ZZ>) = (-1,-1,-1)
-            3: |Psi_m> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
+            3: |Psi_p> = |01> + |10>   (<XX>,<YY>,<ZZ>) = (+1,+1,-1)
         """
 
         fit_func_wrapper = lambda dummy_x, angle_MSQ,\
@@ -1018,7 +1207,6 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.plot_LI()
         if self.MLE:
             self.plot_MLE()
-
         try:
             self.add_analysis_datagroup_to_file()
             self.save_fitted_parameters(fit_res=self.fit_res,
@@ -1027,13 +1215,20 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             logging.warning(e)
         try:
             pars_dict = {'fidelity': self.fidelity,
+                         'fidelity_mle': self.fidelity_mle,
                          'best_fidelity': self.best_fidelity,
+                         'operators_mle_ZZ': self.operators_mle[5],
+                         'operators_mle_XX': self.operators_mle[10],
+                         'operators_mle_YY': self.operators_mle[15],
                          'angle_LSQ': np.rad2deg(self.fit_res.best_values['angle_LSQ']),
                          'angle_MSQ': np.rad2deg(self.fit_res.best_values['angle_MSQ']),
                          'LSQ_name': self.q0_label,
                          'MSQ_name': self.q1_label}
-
-            self.save_dict_to_analysis_group(pars_dict, 'tomography_results')
+            name='tomography_results_decoding_{}_states_{}_indices_{}'.format(self.PF_tracking,
+                                                                self.q_post_selection_states,
+                                                                self.q_post_selection_indices)
+            self.save_dict_to_analysis_group(pars_dict, name)
+            print('saved')
         # only works if MLE and target bell were specified
         except Exception as e:
             print(e)
@@ -1130,12 +1325,19 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             target_expectations = get_cardianal_pauli_exp(
                 self.target_cardinal)
             plot_target_pauli_set(target_expectations, ax)
-        if self.target_bell is not None:
+            txt_x_pos = 10
+            if self.target_cardinal in [0,7]:
+                txt_y_pos=-0.5
+            else:
+                txt_y_pos=0.5
+
+        elif self.target_bell is not None:
             self.fidelity_mle = calc_fid2_bell(self.operators_mle,
                                                self.target_bell)
             target_expectations = get_bell_pauli_exp(self.target_bell)
             plot_target_pauli_set(target_expectations, ax)
             txt_x_pos = -1
+            txt_y_pos = 0.5
         else:
             txt_x_pos = 10
 
@@ -1150,11 +1352,15 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                     fid_vec[i] = calc_fid2_bell(self.operators_mle,
                                                 self.target_bell, theta)
                 msg += str('\nMAX Fidelity {:.3f} at \n  ' + self.q0_label
-                        + '={:.1f} deg and\n  ' + self.q1_label
-                        + '={:.1f} deg').format(self.best_fidelity,
-                               self.fit_res.best_values['angle_LSQ']*180./np.pi,
-                               self.fit_res.best_values['angle_MSQ']*180./np.pi)
-            ax.text(txt_x_pos, .6, msg)
+                           + '={:.1f} deg and\n  ' + self.q1_label
+                           + '={:.1f} deg').format(self.best_fidelity,
+                                                   self.fit_res.best_values['angle_LSQ'] *
+                                                   180./np.pi,
+                                                   self.fit_res.best_values['angle_MSQ']*180./np.pi)
+            if self.q_post_select:
+                msg +=str('\nselected frac. ={:.3f}'.format(self.fraction))
+
+            ax.text(txt_x_pos, txt_y_pos, msg)
 
         plot_operators(self.operators_mle, ax, labels=self.meas_op_labels)
         ax.set_title('Max likelihood estimation tomography')
@@ -1163,8 +1369,12 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                      fig=fig3,
                                      ax=fig3.add_subplot(122, projection='3d'))
 
-        figname = 'MLE-Tomography_Exp_{}.{}'.format(self.exp_name,
-                                                    self.fig_format)
+        figname = 'MLE-Tomography_decoding_{}_states_{}_indices_{}_Exp_{}.{}'.format(self.PF_tracking,
+                                                                               self.q_post_selection_states,
+                                                                               self.q_post_selection_indices,
+                                                                               self.exp_name,
+                                                                               self.fig_format,
+                                                                               )
         fig3.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         savename = os.path.abspath(os.path.join(
             self.folder, figname))
@@ -1187,7 +1397,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         ax.set_title('Fit of single qubit phase errors')
         msg = ('MAX Fidelity at %.3f $\phi_{' + self.q0_label
                + '}=$%.1f deg and $\phi_{' + self.q1_label + '}=$%.1f deg') \
-               % (fidelity, angle_LSQ_deg, angle_MSQ_deg)
+            % (fidelity, angle_LSQ_deg, angle_MSQ_deg)
         msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
         ax.text(0.5, .6, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,
@@ -1204,7 +1414,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         ax.set_title('Fit of single qubit phase errors')
         msg = ('MAX Fidelity at %.3f $\phi_{' + self.q1_label
                + '}=$%.1f deg and $\phi_{' + self.q0_label + '}=$%.1f deg')\
-               % (fidelity, angle_LSQ_deg, angle_MSQ_deg)
+            % (fidelity, angle_LSQ_deg, angle_MSQ_deg)
         msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
         ax.text(0.5, .6, msg)
         figname = 'Fit_report_{}.{}'.format(self.exp_name,

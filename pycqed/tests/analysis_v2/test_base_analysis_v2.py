@@ -1,10 +1,13 @@
 import unittest
+import h5py
 import json
 import numpy as np
 import os
 import pycqed as pq
+import matplotlib.pyplot as plt
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
+import pycqed.analysis_v2.measurement_analysis as ma2
 
 
 class Test_base_analysis(unittest.TestCase):
@@ -12,6 +15,43 @@ class Test_base_analysis(unittest.TestCase):
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         a_tools.datadir = self.datadir
+
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
+
+    def test_save_fit_results(self):
+        # strictly speaking an integration test as it relies on the cond
+        # oscillation analysis, but the only thing tested here is
+        # if the value of the fit_result is saved.
+        ts = '20181126_131143'
+        a = ma2.Conditional_Oscillation_Analysis(t_start=ts)
+
+        exp_val = a.fit_res['cos_fit_off'].params['amplitude'].value
+
+        fn = a_tools.measurement_filename(a_tools.data_from_time(ts))
+        with h5py.File(fn, 'r') as file:
+            saved_val = float(file['Analysis']['cos_fit_off']['params']
+                              ['amplitude'].attrs['value'])
+
+        a.fit_res = {}
+        a.save_fit_results()
+        assert exp_val == saved_val
+
+    def test_save_quantities_of_interest(self):
+        # Test based on test below to get a dummy dataset
+        ts = '20161124_162604'
+        a = ba.BaseDataAnalysis()
+        a.proc_data_dict['quantities_of_interest'] = {'a': 5}
+        a.timestamps = [ts]
+        a.save_quantities_of_interest()
+
+        fn = a_tools.measurement_filename(a_tools.data_from_time(ts))
+        with h5py.File(fn, 'r') as file:
+            saved_val = float(file['Analysis']['quantities_of_interest'].attrs['a'])
+
+        assert saved_val == 5
+
 
     def test_save_load_json(self):
         # Load data from file

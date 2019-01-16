@@ -54,13 +54,13 @@ def _rotation_instruction(phi, theta):
 
 
 _rotation_expansions = {
-        # Expanding RX phi -> R 0 phi
-        'x': lambda angle_pi: ((0, angle_pi), ),
-        # Expanding RY phi -> R 0.5pi phi
-        'y': lambda angle_pi: ((0.5, angle_pi), ),
-        # Expanding RZ phi -> RY pi + R 0.5(phi - pi) pi
-        'z': lambda angle_pi: ((0.5, 1), (0.5*(angle_pi - 1.), 1))
-    }
+    # Expanding RX phi -> R 0 phi
+    'x': lambda angle_pi: ((0, angle_pi), ),
+    # Expanding RY phi -> R 0.5pi phi
+    'y': lambda angle_pi: ((0.5, angle_pi), ),
+    # Expanding RZ phi -> RY pi + R 0.5(phi - pi) pi
+    'z': lambda angle_pi: ((0.5, 1), (0.5*(angle_pi - 1.), 1))
+}
 
 
 def _rotation_decomposition(ax, angle):
@@ -106,10 +106,18 @@ def generate_config(filename: str,
     in the JSON. The details of what can be specified are given in the OpenQL
     documentation under "configuration_specification".
     """
+    # notation is (phi, theta) in fractions of pi
+    standard_rotations = [#(0, 0),
+         (0/180, 180/180),
+         (90/180, 180/180),
+         (0/180, 90/180),
+         (90/180, 90/180),
+         (0/180, -90/180),
+         (90/180, -90/180)]
 
     angles_pi = {
-        'x': [0.67, -0.23, -0.08, 0.08, -0.5, 0.5, 1],
-        'y': [-0.5, 0.5, 1],
+        'x': [0.67, -0.23, -0.08, 0.08],
+        'y': [],
         'z': [-0.38, 0.08, -0.1, -0.5, 0.5, 1]
     }
 
@@ -117,9 +125,17 @@ def generate_config(filename: str,
     # `rot_axis_angle` is an angle in xy plane, 0 for x and pi/2 for y.
     rotations = [[[_rotation_expansions[ax](angle)] for angle in angles_pi[ax]]
                  for ax in 'xyz']
+
     # sorry
     rotations = list(sorted(set(
         concat(concat(concat(rotations))))))
+
+    rotations = [r for r in rotations if r not in standard_rotations]
+
+
+
+    rotations = standard_rotations + rotations
+
     rots_kraus = [_rotation_kraus(*rot) for rot in rotations]
     rots_instr = [_rotation_instruction(*rot) for rot in rotations]
 
@@ -140,12 +156,19 @@ def generate_config(filename: str,
         "cnot %0,%1": ["ry90 %1", "cz %0,%1", "ry90 %1"],
 
         # To support other forms of writing the same gates
-        "x180 %0": ["rx180 %0"],
-        "y180 %0": ["ry180 %0"],
-        "y90 %0": ["ry90 %0"],
-        "x90 %0": ["rx90 %0"],
-        "my90 %0": ["rym90 %0"],
-        "mx90 %0": ["rxm90 %0"],
+        "x180 %0": ["rot_0_180 %0"],
+        "y180 %0": ["rot_90_180 %0"],
+        "y90 %0": ["rot_90_90 %0"],
+        "x90 %0": ["rot_0_90 %0"],
+        "my90 %0": ["rot_90_m90 %0"],
+        "mx90 %0": ["rot_0_m90 %0"],
+
+        "rx180 %0": ["rot_0_180 %0"],
+        "ry180 %0": ["rot_90_180 %0"],
+        "ry90 %0": ["rot_90_90 %0"],
+        "rx90 %0": ["rot_0_90 %0"],
+        "rym90 %0": ["rot_90_m90 %0"],
+        "rxm90 %0": ["rot_0_m90 %0"],
 
         # Clifford decomposition per
         # Eptstein et al. Phys. Rev. A 89, 062321 (2014)
@@ -335,7 +358,7 @@ def generate_config(filename: str,
                 "cc_light_codeword": cw,
                 "cc_light_opcode": 8+cw}
 
-            cfg["instructions"]['C1'+instr.format(q)] = {
+            cfg["instructions"]['c1'+instr.format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": mw_latency,
                 "qubits": [q],
@@ -349,7 +372,7 @@ def generate_config(filename: str,
                 "cc_light_opcode": 32+8+cw,
                 "cc_light_cond": 1}  # 1 means : do if last meas. == 1
 
-            cfg["instructions"]['C0'+instr.format(q)] = {
+            cfg["instructions"]['c0'+instr.format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": mw_latency,
                 "qubits": [q],
@@ -416,7 +439,7 @@ def generate_config(filename: str,
         for ft in flux_tuples:
             if ft[0] in qubits_active and ft[1] in qubits_active:
                 cfg["instructions"]["fl_cw_{:02} {},{}".format(
-                        cw_flux, ft[0], ft[1])] = {
+                    cw_flux, ft[0], ft[1])] = {
                     "duration": flux_pulse_duration,
                     "latency": fl_latency,
                     "qubits": [ft[0], ft[1]],
@@ -443,3 +466,10 @@ def generate_config(filename: str,
 
     with open(filename, 'w') as f:
         json.dump(cfg, f, indent=4)
+
+    rot_dict = {}
+    for i, r in enumerate(rotations):
+        rot_dict[i+1] = {'theta': r[1]*180, 'phi':r[0]*180, "type": "ge",
+                       "name": rots_instr[i]}
+
+    return rot_dict

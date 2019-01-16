@@ -323,9 +323,9 @@ class ZNB_VNA_detector(Hard_Detector):
         super(ZNB_VNA_detector, self).__init__()
         self.VNA = VNA
         self.value_names = ['ampl', 'phase',
-                            'real', 'imag', ]
+                            'real', 'imag', 'ampl_dB']
         self.value_units = ['', 'radians',
-                            '', '']
+                            '', '', 'dB']
 
     def get_values(self):
         '''
@@ -343,10 +343,10 @@ class ZNB_VNA_detector(Hard_Detector):
 
         complex_data = np.add(real_data, 1j*imag_data)
         ampl_linear = np.abs(complex_data)
-        # ampl_dB = 20*np.log10(ampl_linear)
+        ampl_dB = 20*np.log10(ampl_linear)
         phase_radians = np.arctan2(imag_data, real_data)
 
-        return ampl_linear, phase_radians, real_data, imag_data
+        return ampl_linear, phase_radians, real_data, imag_data, ampl_dB
 
 
 # Detectors for QuTech Control box modes
@@ -1441,7 +1441,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
         self.UHFQC.awgs_0_userregs_0(
-            int(self.nr_averages))  # 0 for rl, 1 for iavg
+            int(self.nr_averages)+1)
         self.nr_sweep_points = self.nr_samples
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='iavg')
 
@@ -1654,8 +1654,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
 
-        # the self.channels should be the same as data_raw.keys().
-        # this is to be tested (MAR 26-9-2017)
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
 
@@ -1807,7 +1805,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         # The AWG program uses userregs/0 to define the number o iterations in
         # the loop
         self.UHFQC.awgs_0_userregs_0(
-            int(self.nr_averages*self.nr_sweep_points))
+            int(self.nr_averages*self.nr_sweep_points)+1)
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
 
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
@@ -2035,7 +2033,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots) # The AWG program uses
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots+1) # The AWG program uses
         # userregs/0 to define the number of iterations
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
@@ -2144,7 +2142,7 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(self.shots_per_chunk)
+        self.UHFQC.awgs_0_userregs_0(self.shots_per_chunk+1)
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
         # The AWG program uses userregs/0 to define the number of iterations
         # in the loop

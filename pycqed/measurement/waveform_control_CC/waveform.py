@@ -64,10 +64,10 @@ def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
     '''
     sigma = sigma_length  # old legacy naming, to be replaced
     length = sigma*nr_sigma
-    mu = length/2.
 
     t_step = 1/sampling_rate
-    t = np.arange(0, nr_sigma*sigma + .1*t_step, t_step)
+    mu = length/2. - 0.5*t_step  # center should be offset by half a sample
+    t = np.arange(0, nr_sigma*sigma, t_step)
 
     gauss_env = amp*np.exp(-(0.5 * ((t-mu)**2) / sigma**2))
     deriv_gauss_env = motzoi * -1 * (t-mu)/(sigma**1) * gauss_env
@@ -139,8 +139,8 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
     block_I = amp_I * np.ones(int(pulse_samples))
     block_Q = amp_Q * np.ones(int(pulse_samples))
     Zeros = np.zeros(int(delay_samples))
-    pulse_I = list(Zeros)+list(block_I)
-    pulse_Q = list(Zeros)+list(block_Q)
+    pulse_I = np.array(list(Zeros)+list(block_I))
+    pulse_Q = np.array(list(Zeros)+list(block_Q))
     return pulse_I, pulse_Q
 
 

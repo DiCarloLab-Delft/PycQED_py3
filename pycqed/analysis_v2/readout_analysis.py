@@ -30,7 +30,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='', do_fitting: bool = True,
                  data_file_path: str=None,
-                 options_dict: dict=None, auto=True, **kw):
+                 options_dict: dict=None, auto=True,
+                 **kw):
         '''
         options dict options:
             'fixed_p10' fixes p(e|g) (do not vary in fit)
@@ -148,7 +149,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                                               **guess0)
                 fitres1 = gauss2D_model_1.fit(data=H1.transpose(),  x=x2d, y=y2d,
                                               **guess1)
-                
+
                 fr0 = fitres0.best_values
                 fr1 = fitres1.best_values
                 x0 = fr0['center_x']
@@ -190,8 +191,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         sh_min = min(np.min(eff_sh[0]), np.min(eff_sh[1]))
         sh_max = max(np.max(eff_sh[0]), np.max(eff_sh[1]))
         data_range = (sh_min, sh_max)
-        print(shots)
-        print(eff_sh)
         eff_sh_sort = [np.sort(eff_sh[0]), np.sort(eff_sh[1])]
         x0, n0 = np.unique(eff_sh_sort[0], return_counts=True)
         cumsum0 = np.cumsum(n0)
@@ -367,8 +366,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             y_volt_label = self.raw_data_dict['value_names'][1]
             y_volt_unit = self.raw_data_dict['value_units'][1]
         z_hist_label = 'Counts'
-        label_0 = '|g> prep.'
-        label_1 = '|e> prep.'
+        labels= self.options_dict.get('preparation_labels', ['|g> prep.', '|e> prep.'])
+        label_0 = labels[0]
+        label_1 = labels[1]
         title = ('\n' + self.timestamps[0] + ' - "' +
                  self.raw_data_dict['measurementstring'] + '"')
 

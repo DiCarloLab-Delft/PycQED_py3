@@ -5,6 +5,7 @@ Edited by Adriaan
 import json
 import numpy as np
 import unittest
+
 import pycqed as pq
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
@@ -30,6 +31,7 @@ dac = 'VFCQ6'
 qubit = 'Q2'
 t_start = '20180412_190000'
 t_stop = '20180412_210000'
+
 
 
 class Test_CoherenceAnalysis_Helpers(unittest.TestCase):

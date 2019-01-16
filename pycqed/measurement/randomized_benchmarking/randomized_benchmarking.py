@@ -8,22 +8,37 @@ from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 
 
-def calculate_net_clifford(cliffords):
+def calculate_net_clifford(rb_clifford_indices,
+                           Clifford=tqc.SingleQubitClifford):
     '''
-    Calculates the net-clifford corresponding to a list of cliffords using the
-    clifford lookuptable. The order of the input list "cliffords" is order in
-    which they are applied in time.
+    Calculate the net-clifford from a list of cliffords indices.
+
+    Args:
+        rb_clifford_indices: list or array of integers specifying the cliffords.
+        Clifford : Clifford object used to determine what
+            inversion technique to use and what indices are valid.
+            Valid choices are `SingleQubitClifford` and `TwoQubitClifford`
+
+    Returns:
+        net_clifford: a `Clifford` object containing the net-clifford.
+            the Clifford index is contained in the Clifford.idx attribute.
 
     Note: the order corresponds to the order in a pulse sequence but is
         the reverse of what it would be in a chained dot product.
-
     '''
-    net_cl = 0  # assumes element 0 is the Identity
-    for i in range(len(cliffords)):
-        # int is added to avoid deprecation warning, input is assumed to
-        # be int in the first place
-        net_cl = clifford_lookuptable[net_cl, int(cliffords[i])]
-    return net_cl
+
+    # Calculate the net clifford
+    net_clifford = Clifford(0)  # assumes element 0 is the Identity
+    for idx in rb_clifford_indices:
+        # hacking in exception for benchmarking only CZ
+        # (not as a member of CNOT group)
+        # abs is to remove the sign that is used to treat CZ ac CZ
+        # and not member of CNOT-like set of gates
+        cliff = Clifford(abs(idx))
+        # order of operators applied in is right to left, therefore
+        # the new operator is applied on the left side.
+        net_clifford = cliff*net_clifford
+    return net_clifford
 
 
 def calculate_recovery_clifford(cl_in, desired_cl=0):
@@ -65,9 +80,9 @@ def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
     return tape
 
 
-def randomized_benchmarking_sequence_old(n_cl:int,
-                                     desired_net_cl:int =0,
-                                     seed:int=None):
+def randomized_benchmarking_sequence_old(n_cl: int,
+                                         desired_net_cl: int =0,
+                                         seed: int=None):
     '''
     Generates a sequence of "n_cl" random single qubit Cliffords followed
     by a a recovery Clifford to make the net result correspond
@@ -92,7 +107,7 @@ def randomized_benchmarking_sequence_old(n_cl:int,
         rng_seed = np.random.RandomState(seed)
         rb_cliffords = rng_seed.randint(0, 24, int(n_cl))
 
-    net_clifford = calculate_net_clifford(rb_cliffords)
+    net_clifford = calculate_net_clifford(rb_cliffords).idx
     recovery_clifford = calculate_recovery_clifford(
         net_clifford, desired_net_cl)
 
@@ -106,10 +121,11 @@ def randomized_benchmarking_sequence_old(n_cl:int,
 # More advanced sequences are avaliable using this method.
 ##############################################################################
 
+
 def randomized_benchmarking_sequence(
         n_cl: int,
-        desired_net_cl:int = 0,
-        number_of_qubits:int = 1,
+        desired_net_cl: int = 0,
+        number_of_qubits: int = 1,
         max_clifford_idx: int = 11520,
         interleaving_cl: int = None,
         seed: int=None):
@@ -145,7 +161,7 @@ def randomized_benchmarking_sequence(
     if number_of_qubits == 1:
         Cl = tqc.SingleQubitClifford
         group_size = np.min([24, max_clifford_idx])
-    elif number_of_qubits ==2:
+    elif number_of_qubits == 2:
         Cl = tqc.TwoQubitClifford
         group_size = np.min([11520, max_clifford_idx])
     else:
@@ -167,7 +183,7 @@ def randomized_benchmarking_sequence(
 
     if desired_net_cl is not None:
         # Calculate the net clifford
-        net_clifford = calculate_net_clifford(rb_clifford_indices,Cl)
+        net_clifford = calculate_net_clifford(rb_clifford_indices, Cl)
 
         # determine the inverse of the sequence
         recovery_to_idx_clifford = net_clifford.get_inverse()
@@ -175,18 +191,3 @@ def randomized_benchmarking_sequence(
         rb_clifford_indices = np.append(rb_clifford_indices,
                                         recovery_clifford.idx)
     return rb_clifford_indices
-
-def calculate_net_clifford(rb_clifford_indices,Cl):
-    # Calculate the net clifford
-    net_clifford = Cl(0)
-    for idx in rb_clifford_indices:
-        # hacking in exception for benchmarking only CZ
-        # (not as a member of CNOT group)
-        # abs is to remove the sign that is used to treat CZ ac CZ
-        # and not member of CNOT-like set of gates
-        cliff = Cl(abs(idx))
-        # order of operators applied in is right to left, therefore
-        # the new operator is applied on the left side.
-        net_clifford = cliff*net_clifford
-    return net_clifford
-

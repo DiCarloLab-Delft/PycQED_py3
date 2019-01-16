@@ -1,11 +1,15 @@
 import numpy as np
 import unittest
 import pycqed as pq
+import matplotlib.pyplot as plt
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
 
 
 class Test_RTE_Analysis(unittest.TestCase):
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
 
     @classmethod
     def setUpClass(self):

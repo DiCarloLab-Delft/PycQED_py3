@@ -4,11 +4,14 @@ Hacked together by Rene Vollmer
 import datetime
 
 import pycqed.analysis_v2.base_analysis as ba
+import pycqed.analysis_v2.simple_analysis as sa
 import numpy as np
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.fitting_models import Qubit_dac_to_freq, Resonator_dac_to_freq, Qubit_dac_arch_guess, \
     Resonator_dac_arch_guess
 import lmfit
+import matplotlib.pyplot as plt
+from scipy import optimize
 from collections import OrderedDict
 from copy import deepcopy, copy
 
@@ -405,3 +408,135 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 temp_dict2['xlabel'] = r'Time in Delft'
                 temp_dict2['xunit'] = ''
                 self.plot_dicts['temperature_' + k + '_time_relation'] = temp_dict2
+
+
+class FrequencySusceptibility(sa.Basic2DInterpolatedAnalysis):
+
+    def __init__(self, t_start: str = None, t_stop: str = None,
+                 label: str = '',
+                 data_file_path: str = None,
+                 close_figs: bool = True,
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 do_fitting: bool = True,
+                 measurement_channel: int = 0,
+                 correlation_distance: int = 1,
+                 ):
+
+        """
+        Class for extracting local susceptibility the qubit frequency on DC
+        flux parameter. Local means that  qubit frequency is assumed to be
+        linearly dependent on the flux parameter.
+        The input dataset needs to be 2D, frequency (x-axis) vs flux parameter (y-axis).
+
+        The final result in units of Hz per unit-of-DC-flux-parameter is stored in 
+        self.proc_data_dict['susceptibility'].
+
+        TODO: Add plotting to verify the extraction of susceptibility is correct
+        """
+
+        self.measurement_channel = measurement_channel
+        self.correlation_distance = correlation_distance
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         do_fitting=do_fitting,
+                         close_figs=close_figs,
+                         extract_only=extract_only)
+
+    def process_data(self):
+        # load and reshape arrays
+        f = self.raw_data_dict['x']
+        dac = self.raw_data_dict['y']
+        cols = np.unique(f).shape[0]
+        f = f.reshape(-1, cols)
+        dac = dac.reshape(-1, cols)
+        
+        f_offset = f[0]-np.mean(f[0])
+        ddac = dac[1,0]-dac[0,0]
+        m = self.raw_data_dict['measured_values']
+        m = np.reshape(m,(m.shape[0],f.shape[0],-1))[self.measurement_channel]
+
+        # calculate correlation between cuts at different values of DC flux parameter
+        # sum all corelations
+        step = self.correlation_distance
+        cor_tot = copy(m[0])*0
+        for m1, m2 in zip(m[:-step],m[step:]):
+            m1 -= np.mean(m1)
+            m2 -= np.mean(m2)
+            cor = np.correlate(m2,m1,mode='same')
+            cor_tot += cor
+
+        self.freq_diff, self.correlation = f_offset, cor_tot
+
+        # fit baussian to the sum of the correlations
+        self.gauss = lambda f, f0, A, w, o: A*np.exp(-(f-f0)**2/2/w**2)+o
+        pk = a_tools.peak_finder_v2(f_offset, cor_tot)
+        p0 = (pk[0], np.max(cor_tot), 3*(f_offset[1]-f_offset[0]), -np.max(cor_tot)/100)
+        popt, perr = optimize.curve_fit(self.gauss, f_offset, cor_tot, p0=p0)
+        self.correlation_fit_parameters = popt
+
+        # save susceptinility in the proc_data_dict
+        self.proc_data_dict['freq'] = f
+        self.proc_data_dict['dac'] = dac
+        self.proc_data_dict['measured_value'] = m
+        self.proc_data_dict['susceptibility'] = popt[0]/ddac/step
+        
+        self.proc_data_dict['correlation_msg'] = '$\Delta I=${:.3g} A ' \
+                    '(order {})\n' \
+                    '$\Delta f_0=${:.3} Hz\n' \
+                    'susc. {:.3g} Hz/A'.format(ddac/step,self.correlation_distance,popt[0],popt[0]/ddac/step)
+
+    def run_fitting(self):
+        pass
+
+    def prepare_plots(self):
+        self.figs['slope'], axs = plt.subplots(figsize=(5,5),nrows=2,
+            gridspec_kw={'height_ratios': (2, 1)})
+        self.axs['slope'] = axs[0]
+        self.axs['correlations'] = axs[1]
+
+        self.plot_dicts['slope'] = {'plotfn': self.plot_colorxy,
+                    'zorder': 0,
+                    'xvals': self.proc_data_dict['freq'][0,:],
+                    'yvals': self.proc_data_dict['dac'][:,0],
+                    'zvals': self.proc_data_dict['measured_value'],
+                    'title': 'Frequency Susceptibility to Fluxcurrent',
+                    'xlabel': 'Frequency',
+                    'xunit': 'Hz',
+                    'ylabel': 'Current',
+                    'yunit': 'A',
+                    'zlabel': '',
+                    }
+
+        self.plot_dicts['correlations'] = {'plotfn': self.plot_line,
+                    'xvals': self.freq_diff,
+                    'yvals': self.correlation,
+                    'title': '',
+                    'xlabel': '$\Delta f$',
+                    'xunit': 'Hz',
+                    'ylabel': 'Current',
+                    'yunit': 'A',
+                    'marker': '.',
+                    }
+
+        self.plot_dicts['correlations_fit'] = {'plotfn': self.plot_line,
+                    'xvals': self.freq_diff,
+                    'yvals': self.gauss(self.freq_diff,*self.correlation_fit_parameters),
+                    'title': '',
+                    'xlabel': '$\Delta f$',
+                    'xunit': 'Hz',
+                    'ylabel': 'Correlation',
+                    'yunit': '',
+                    'ax_id': 'correlations',
+                    'marker': '',
+                    }
+
+        self.plot_dicts['rb_text'] = {
+                    'plotfn': self.plot_text,
+                    'text_string': self.proc_data_dict['correlation_msg'],
+                    'xpos': 0.98, 'ypos': 0.92,
+                    'horizontalalignment': 'right',
+                    'ax_id': 'correlations',}
