@@ -139,6 +139,8 @@ class Test_openql_compiler_helpers(unittest.TestCase):
         curdir = os.path.dirname(__file__)
         config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
         p = oqh.create_program('test_program', config_fn)
+        k = oqh.create_kernel('test_kernel', p)
+        p.add_kernel(k)
         p = oqh.compile(p)
         fn_split = os.path.split(p.filename)
 
