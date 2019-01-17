@@ -20,7 +20,6 @@ class Test_SSRO_auto_angle(unittest.TestCase):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
 
-    @unittest.expectedFailure
     def test_angles(self):
         tp = 2*np.pi
         ro_amp_high_factor = 0.1

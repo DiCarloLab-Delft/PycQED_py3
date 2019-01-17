@@ -1129,7 +1129,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
         initialization_msmt : whether to start with an initial measurement
                     to prepare the starting state.
     """
-    p = oqh.create_program("two_qubit_repeated_parity_check", platf_cfg)
+    p = oqh.create_program("two_qubit_parity_check", platf_cfg)
     data_qubits=[qD0,qD1]
     if tomo:
         tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']

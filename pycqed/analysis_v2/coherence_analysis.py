@@ -1,31 +1,307 @@
 '''
 Hacked together by Rene Vollmer
+Cleaned up (a bit) by Adriaan
 '''
-
+import os
+import matplotlib.pyplot as plt
 import datetime
+from collections import OrderedDict
+from copy import deepcopy
 import pycqed.analysis_v2.base_analysis as ba
-from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit, plot_scatter_errorbar
-from pycqed.analysis import measurement_analysis as ma_old
+from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit,\
+    plot_scatter_errorbar, set_xlabel, set_ylabel
 
 import numpy as np
 import lmfit
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str, \
+    format_lmfit_par, plot_lmfit_res
 
 from pycqed.analysis import analysis_toolbox as a_tools
 
 
+class CoherenceAnalysis(ba.BaseDataAnalysis):
+    """
+    Power spectral density analysis of transmon coherence.
+
+    Note, analysis of the coherence times is separated from data extraction
+    as that can be a complicated process that is highly experiment dependent.
+
+    Args:
+        coherence_table : table containing the data, see below for
+            specification.
+        freq_resonator: readout resonator frequency (in Hz)
+        Qc:             coupling Q of the readout resonator
+        chi_shift       in Hz
+        savename:       figures are saved in a folder created based on the
+            provided t_stop in the datadir. `savename` is used to name
+            this folder.
+
+
+    Coherence_table specification:
+           Row  | Content (arrays)
+        --------+--------
+            1   | dac
+            2   | frequency (Hz)
+            3   | T1 (s)
+            4   | T2 star (s)
+            5   | T2 echo (s)
+            6   | Exclusion mask (True where data is to be excluded)
+
+    Generates 8 plots:
+        > T1, T2, Echo vs flux
+        > T1, T2, Echo vs frequency
+        > T1, T2, Echo vs flux sensitivity
+        > ratio Ramsey/Echo vs flux
+        > ratio Ramsey/Echo vs frequency
+        > ratio Ramsey/Echo vs flux sensitivity
+        > Dephasing rates Ramsey and Echo vs flux sensitivity
+        > Dac arc fit, use to assess if sensitivity calculation is correct.
+
+    If properties of resonator are provided (freq_resonator, Qc, chi_shift),
+    it also calculates the number of noise photons.
+    """
+
+    def __init__(self, coherence_table,
+                 t_start: str=None, t_stop: str=None, label='',
+                 options_dict: dict=None, auto: bool=True, close_figs=True,
+                 freq_resonator: float=None, Qc: float=None,
+                 chi_shift: float=None, savename: str= 'coherence_analysis',
+                 **kwargs):
+
+        super().__init__(t_start=t_start, t_stop=t_stop, label=label,
+                         options_dict=options_dict, close_figs=close_figs,
+                         **kwargs)
+        if t_stop is not None:
+            self.options_dict['save_figs'] = False
+        self._coherence_table = coherence_table
+        self._freq_resonator = freq_resonator
+        self._Qc = Qc
+        self._chi_shift = chi_shift
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """Put data from the coherence table in the raw data dict."""
+        self.raw_data_dict = OrderedDict()
+        rdd = self.raw_data_dict
+        rdd['dac'], rdd['freq'], rdd['T1'], rdd['Tramsey'],\
+            rdd['Techo'], rdd['exclusion_mask'] = self._coherence_table
+        # Externally loaded tables my be cast to ints.
+        rdd['exclusion_mask'] = rdd['exclusion_mask'].astype(bool)
+
+        # Resonator information
+        rdd['freq_resonator'] = self._freq_resonator
+        rdd['Qc'] = self._Qc
+        rdd['chi_shift'] = self._chi_shift
+
+        # Extra info for datasaving etc.
+        rdd['timestamps'] = [self.t_start, self.t_stop]
+        t_stop = self.t_stop.split('_')
+        folder = os.path.join(
+            a_tools.datadir, t_stop[0],
+            '{}_coherence_analysis'.format(t_stop[1]))
+        self.raw_data_dict['folder'] = [folder]
+        print(folder)
+
+    def process_data(self):
+        """
+        Process data.
+
+        Performs the following:
+            - fit dac-arc
+            - convert dac to flux
+            - calculate sensitivity δf/δΦ
+            - calculate dephasing rates Γ
+            - fit dephasing rates
+            - determine derived quantities
+        """
+        self.fit_res = OrderedDict()
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+        pdd = self.proc_data_dict
+
+        # Extract the dac arcs required for getting the sensitivities
+        # FIXME: add a proper guess function to make the fit more robust
+        self.fit_res['dac_arc'] = fit_frequencies(pdd['dac'], pdd['freq'],
+                                                  dac0_guess=.1)
+
+        # convert dac in flux as unit of Phi_0
+        flux = (pdd['dac'] - self.fit_res['dac_arc'].best_values['offset'])\
+            / self.fit_res['dac_arc'].best_values['dac0']
+        pdd['flux'] = flux
+
+        # calculate the derivative vs flux
+        sensitivity_angular = partial_omega_over_flux(
+            flux, self.fit_res['dac_arc'].best_values['Ec'],
+            self.fit_res['dac_arc'].best_values['Ej'])
+        pdd['sensitivity'] = sensitivity_angular/(2*np.pi)
+
+        # Calculate pure dephasing rates
+        pdd['Gamma_phi_ramsey'] = calc_dephasing_rate(
+            T1=pdd['T1'], T2=pdd['Tramsey'])[~pdd['exclusion_mask']]
+        pdd['Gamma_phi_echo'] = calc_dephasing_rate(
+            T1=pdd['T1'], T2=pdd['Techo'])[~pdd['exclusion_mask']]
+
+        # Often, flux noise is well described by a power spectral density
+        # PSD of the form S_Φ = A*1/f (single sided), where A is a scaling
+        # factor (units of Φ_0^2).
+
+        # Fit dephasing rates as a function of sensitivity to a linear model.
+        self.fit_res['gammas'] = fit_gammas(
+            pdd['sensitivity'], pdd['Gamma_phi_ramsey'], pdd['Gamma_phi_echo'])
+
+        # There is special significance in the slope and the intercept of
+        # these distributions.
+        # The slope can be related to the magnitude (scale factor) of the
+        # flux noise. Both are typically expressed in units of μΦ_0.
+        pdd['slope_ramsey'] = \
+            self.fit_res['gammas'].params['slope_ramsey'].value
+        pdd['slope_echo'] = self.fit_res['gammas'].params['slope_echo'].value
+        # The intercept with the y-axis (zero sensitivity) relates to the
+        # flux insensitive contribution to the spectrum. The flux insensitive
+        # contribution can be linked to the photon number in the resonator.
+        # White noise shows up as a quadratic
+        pdd['intercept'] = self.fit_res['gammas'].params['intercept'].value
+
+        # Based on Martinis PRB 2003. Magic numbers are found by evaluating
+        # integral of eq. 10 with different filter spectra.
+        # filter spectrum of Ramsey is described in eq. 11, Echo in eq. 35
+        # Note that magic numbers are for *single* sided PSDs.
+        pdd['sqrtA_rams'] = pdd['slope_ramsey']/(np.pi*np.sqrt(30))
+        pdd['sqrtA_echo'] = pdd['slope_echo']/(np.pi*np.sqrt(1.386))
+        # Note: both methods that are expected to give the same number.
+        # More details can be found in Luthi PRL (2018) and month report M11
+
+        # from white noise
+        # using Eq 5 Yan et al. Nat. Comm. 7,12964  (The flux qubit revisited
+        # to enhance coherence and reproducability)
+        if not ((pdd['freq_resonator'] is None) and (pdd['Qc'] is None)
+                and (pdd['chi_shift'] is None)):
+            pdd['n_avg'] = calculate_n_avg(pdd['freq_resonator'], pdd['Qc'],
+                                           pdd['chi_shift'], pdd['intercept'])
+            print('Estimated residual photon number: %s' % pdd['n_avg'])
+        self._create_gamma_message()
+
+    def _create_gamma_message(self):
+        pdd = self.proc_data_dict
+        text_msg = 'Summary: \n'
+
+        text_msg += 'Slope Ramsey: {:.2f} {}\n'.format(*SI_val_to_msg_str(
+            pdd['slope_ramsey'], unit=r'$\Phi_0$', return_type=float))
+        text_msg += 'Slope echo: {:.2f} {}\n'.format(*SI_val_to_msg_str(
+            pdd['slope_echo'], unit=r'$\Phi_0$', return_type=float))
+        text_msg += r'$\sqrt{A}$' + \
+            ' Ramsey: {:.2f} {}\n'.format(*SI_val_to_msg_str(
+                pdd['sqrtA_rams'], unit=r'$\Phi_0$', return_type=float))
+        text_msg += r'$\sqrt{A}$'+'echo: {:.2f} {}\n'.format(*SI_val_to_msg_str(
+            pdd['sqrtA_echo'], unit=r'$\Phi_0$', return_type=float))
+
+        if 'n_avg' in self.proc_data_dict.keys():
+            text_msg += r'$n_\gamma$'+': {:.2f} {}\n'.format(*SI_val_to_msg_str(
+                pdd['n_avg'], unit='', return_type=float))
+        self.proc_data_dict['gamma_fit_msg'] = text_msg
+
+    def prepare_fitting(self):
+        pass
+
+    def run_fitting(self):
+        # Overwritten to prevent overwriting fit_res dict.
+        pass
+
+    def analyze_fit_results(self):
+        pass
+
+    def prepare_plots(self):
+        """
+        Prepare data for the plots.
+
+        The plots that are created are:
+            - dac-arc fit
+            - coherence times (3x)
+            - dephasing ratios (3x)
+            - dephasing rates fit
+        """
+        self.plot_dicts['dac_arc'] = {
+            'plotfn': plot_dac_arc,
+            'dac': self.proc_data_dict['dac'],
+            'freq': self.proc_data_dict['freq'],
+            'fit_res': self.fit_res['dac_arc']
+        }
+
+        fs = plt.rcParams['figure.figsize']
+
+        # # define figure and axes here to have custom layout
+        self.figs['coherence_times'], axs = plt.subplots(
+            nrows=1, ncols=3, sharey=True, figsize=(fs[0]*3, fs[1]))
+        self.figs['coherence_times'].patch.set_alpha(0)
+
+        self.axs['coherence_flux'] = axs[0]
+        self.axs['coherence_freq'] = axs[1]
+        self.axs['coherence_sens'] = axs[2]
+
+        self.plot_dicts['coherence_times'] = {
+            'plotfn': plot_coherence_times,
+            'axs': [axs[0], axs[1], axs[2]],
+            'ax_id': 'coherence_flux',
+            'flux': self.proc_data_dict['flux'],
+            'freq': self.proc_data_dict['freq'],
+            'sensitivity': self.proc_data_dict['sensitivity'],
+            'T1': self.proc_data_dict['T1'],
+            'Tramsey': self.proc_data_dict['Tramsey'],
+            'Techo': self.proc_data_dict['Techo'],
+        }
+
+        self.figs['coherence_ratios'], axs = plt.subplots(
+            nrows=1, ncols=3, sharey=True, figsize=(fs[0]*3, fs[1]))
+        self.figs['coherence_ratios'].patch.set_alpha(0)
+
+        self.axs['ratios_flux'] = axs[0]
+        self.axs['ratios_freq'] = axs[1]
+        self.axs['ratios_sens'] = axs[2]
+
+        self.plot_dicts['coherence_ratios'] = {
+            'plotfn': plot_ratios,
+            'axs': [axs[0], axs[1], axs[2]],
+            'ax_id': 'ratios_flux',
+            'flux': self.proc_data_dict['flux'],
+            'freq': self.proc_data_dict['freq'],
+            'sensitivity': self.proc_data_dict['sensitivity'],
+            'Gamma_phi_ramsey': self.proc_data_dict['Gamma_phi_ramsey'],
+            'Gamma_phi_echo': self.proc_data_dict['Gamma_phi_echo'],
+        }
+
+        self.plot_dicts['gamma_fit'] = {
+            'plotfn': plot_gamma_fit,
+            'sensitivity': self.proc_data_dict['sensitivity'],
+            'Gamma_phi_ramsey': self.proc_data_dict['Gamma_phi_ramsey'],
+            'Gamma_phi_echo': self.proc_data_dict['Gamma_phi_echo'],
+            'slope_echo': self.proc_data_dict['slope_echo'],
+            'slope_ramsey': self.proc_data_dict['slope_ramsey'],
+            'intercept': self.proc_data_dict['intercept'],
+            'freq': self.proc_data_dict['freq'],
+            'fit_res': self.fit_res['gammas']
+        }
+        self.plot_dicts['gamma_msg'] = {
+            'plotfn': self.plot_text,
+            'text_string': self.proc_data_dict['gamma_fit_msg'],
+            'xpos': 1.05, 'ypos': .6, 'ax_id': 'gamma_fit',
+            'horizontalalignment': 'left'}
+
+
 class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
     # todo docstring
-    def __init__(self, t_start: str = None, t_stop: str = None,
-                 label: str = '',
-                 options_dict: dict = None, extract_only: bool = False, auto: bool = True,
-                 close_figs: bool = True, do_fitting: bool = True, fit_qubit_Q_factor=False,
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='',
+                 options_dict: dict=None, extract_only: bool=False, auto: bool=True,
+                 close_figs: bool=True, do_fitting: bool=True,
                  tau_key='Analysis.Fitted Params F|1>.tau.value',
                  tau_std_key='Analysis.Fitted Params F|1>.tau.stderr',
-                 use_chisqr = False,
+                 use_chisqr=False,
                  plot_versus_dac=True,
                  dac_key='Instrument settings.fluxcurrent.Q',
                  plot_versus_frequency=True,
                  frequency_key='Instrument settings.Q.freq_qubit',
+                 fit_qubit_Q_factor=False,
                  ):
         '''
         Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
@@ -66,7 +342,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                 chisquared_key = 'Analysis.Fitted Params corr_data.chisqr'
             self.params_dict = {'tau': tau_key,
                                 'tau_stderr': tau_std_key,
-                                'chisquared' : chisquared_key
+                                'chisquared': chisquared_key
                                 }
             self.numeric_params = ['tau', 'tau_stderr', 'chisquared']
         else:
@@ -74,7 +350,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                                 'tau_stderr': tau_std_key,
                                 # 'chisquared' : chisquared_key
                                 }
-            self.numeric_params = ['tau', 'tau_stderr'] #, 'chisquared'
+            self.numeric_params = ['tau', 'tau_stderr']  # , 'chisquared'
 
         self.fit_qubit_Q_factor = fit_qubit_Q_factor
 
@@ -130,12 +406,15 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                 # dac = self.raw_data_dict['freq_sorted_dac']
                 # freq = self.raw_data_dict['freq_sorted']
                 # Extract the dac arcs required for getting the sensitivities
-                fit_object = fit_frequencies(dac=dac, freq=freq)
+                # FIXME hardcoded guess should be gone!
+                fit_object = fit_frequencies(dac=dac, freq=freq, dac0_guess=.1)
                 self.fit_res['dac_arc_object'] = fit_object
-                self.fit_res['dac_arc_fitfct'] = lambda x: fit_object.model.eval(fit_object.params, dac=x)
+                self.fit_res['dac_arc_fitfct'] = lambda x: fit_object.model.eval(
+                    fit_object.params, dac=x)
 
                 # convert dac in flux as unit of Phi_0
-                flux = (dac - fit_object.best_values['offset']) / fit_object.best_values['dac0']
+                flux = (
+                    dac - fit_object.best_values['offset']) / fit_object.best_values['dac0']
                 self.fit_res['flux_values'] = flux
 
                 # calculate the derivative vs flux
@@ -143,7 +422,8 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                                                               fit_object.best_values['Ej'])
                 self.fit_res['Ec'] = fit_object.best_values['Ec']
                 self.fit_res['Ej'] = fit_object.best_values['Ej']
-                self.fit_res['sensitivity_values'] = sensitivity_angular / (2 * np.pi)
+                self.fit_res['sensitivity_values'] = sensitivity_angular / \
+                    (2 * np.pi)
                 if self.verbose:
                     # todo: print EC and EJ
                     pass
@@ -151,9 +431,10 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             if self.fit_qubit_Q_factor:
                 freq = self.raw_data_dict['dac_sorted_freq']
                 tau = self.raw_data_dict['freq_sorted_tau']
-                fit_object_Q_factor = fit_fixed_Q_factor(freq,tau)
+                fit_object_Q_factor = fit_fixed_Q_factor(freq, tau)
                 self.fit_res['Q_qubit'] = fit_object_Q_factor.best_values['Q']
-                self.fit_res['Q_qubit_fitfct'] = lambda x: fit_object_Q_factor.model.eval(fit_object_Q_factor.params, freq=x)
+                self.fit_res['Q_qubit_fitfct'] = lambda x: fit_object_Q_factor.model.eval(
+                    fit_object_Q_factor.params, freq=x)
         else:
             print('Warning: first run extract_data!')
 
@@ -163,6 +444,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         if not ("time_stability" in self.plot_dicts):
+
             self._prepare_plot(ax_id='time_stability', xvals=self.raw_data_dict['datetime'],
                                yvals=self.raw_data_dict['tau'], yerr=self.raw_data_dict['tau_stderr'],
                                xlabel='Time in Delft', xunit=None)
@@ -251,63 +533,48 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
 
 class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
-    # todo docstring
+    """
+    Analysis for aliased Ramsey type experiments.
 
-    def __init__(self, t_start: str=None, t_stop: str=None,
-                label: str='', data_file_path: str=None,
-                options_dict: dict=None, extract_only: bool=False,
-                do_fitting: bool=True, auto=True,
-                ch_idxs: list =[0, 1],
-                ch_amp_key: str='Snapshot/instruments/AWG8_8014'
-                '/parameters/awgs_0_outputs_1_amplitude',
-                ch_range_key: str='Snapshot/instruments/AWG8_8014'
-                '/parameters/sigouts_0_range',
-                waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
-                '/parameters/sq_amp',
-                vary_offset=True):
+    Assumes final measurement is performed in both the x and y-basis.
+    """
+
+    def __init__(self, t_start: str = None, t_stop: str = None,
+                 label: str = '', data_file_path: str = None,
+                 options_dict: dict = None, extract_only: bool = False,
+                 do_fitting: bool = True, auto=True,
+                 ch_idxs: list= [0, 1],
+                 vary_offset: bool=True):
+        """
+
+        Args:
+            ch_idxs (list): correspond to column containing data in the x- and
+                y-basis respectively. If the figure shows no signal, be sure
+                to check this setting.
+        """
+
         super().__init__(t_start=t_start, t_stop=t_stop,
-                        label=label,
-                        data_file_path=data_file_path,
-                        options_dict=options_dict,
-                        extract_only=extract_only, do_fitting=do_fitting)
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
 
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
                             'xvals': 'sweep_points',
+                            'detuning': 'Experimental Data.Experimental Metadata.sq_eps',
                             'measurementstring': 'measurementstring',
                             'value_names': 'value_names',
                             'value_units': 'value_units',
                             'measured_values': 'measured_values'}
-        self.vary_offset = vary_offset
-        self.numeric_params = []
+        self.numeric_params = ['detuning']
         self.ch_idxs = ch_idxs
-        self.ch_amp_key = ch_amp_key
-        self.ch_range_key = ch_range_key
-        self.waveform_amp_key = waveform_amp_key
+        self.vary_offset = vary_offset
         if auto:
             self.run_analysis()
 
-    def extract_data(self):
-        super().extract_data()
-        
-        a = ma_old.MeasurementAnalysis(
-            timestamp=self.t_start, auto=False, close_file=False)
-        a.get_naming_and_values()
-
-        ch_amp = a.data_file[self.ch_amp_key].attrs['value']
-        if self.ch_range_key is None:
-            ch_range = 2  # corresponds to a scale factor of 1
-        else:
-            ch_range = a.data_file[self.ch_range_key].attrs['value']
-        waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
-        amp = ch_amp*ch_range/2*waveform_amp
-        self.proc_data_dict['sq_amp'] = amp
-
     def process_data(self):
-        self.proc_data_dict
-
-        xlab = self.raw_data_dict['value_names'][0][self.ch_idxs[0]]
-        ylab = self.raw_data_dict['value_names'][0][self.ch_idxs[1]]
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
         xs = self.raw_data_dict['measured_values'][0][self.ch_idxs[0]]
         ys = self.raw_data_dict['measured_values'][0][self.ch_idxs[1]]
 
@@ -319,33 +586,35 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
     def run_fitting(self):
         super().run_fitting()
 
-        decay_fit = lmfit.Model(lambda t, tau, A, n, o: A*np.exp(-(t/tau)**n)+o)
+        decay_fit = lmfit.Model(lambda t, tau, A, n,
+                                o: A*np.exp(-(t/tau)**n)+o)
 
         tau0 = self.raw_data_dict['xvals'][0][-1]/3
         decay_fit.set_param_hint('tau', value=tau0, min=0, vary=True)
         decay_fit.set_param_hint('A', value=0.7, vary=True)
         decay_fit.set_param_hint('n', value=1.2, min=1, max=2, vary=True)
-        decay_fit.set_param_hint('o', value=0.01, min=0, max=0.3, vary=self.vary_offset)
+        decay_fit.set_param_hint(
+            'o', value=0.01, min=0, max=0.3, vary=self.vary_offset)
         params = decay_fit.make_params()
         decay_fit = decay_fit.fit(data=self.proc_data_dict['amp'],
-                                    t=self.raw_data_dict['xvals'][0],
-                                    params=params)
+                                  t=self.raw_data_dict['xvals'][0],
+                                  params=params)
         self.fit_res['coherence_decay'] = decay_fit
 
         text_msg = 'Summary\n'
-        text_msg += r'Square pulse amp {:.3g}'.format(self.proc_data_dict['sq_amp'])+' V\n'
-        text_msg += r'$A \exp(-(t/\tau)^n)+o$' + '\n'
-        text_msg += format_value_string(r'$A$', decay_fit.params['A'], '\n')
-        text_msg += format_value_string(r'$\tau$', decay_fit.params['tau'], '\n')
-        text_msg += format_value_string(r'$n$', decay_fit.params['n'], '\n')
-        text_msg += format_value_string(r'$o$', decay_fit.params['o'], '')
+
+        det, unit = SI_val_to_msg_str(self.raw_data_dict['detuning'][0], 'Hz',
+                                      return_type=float)
+        text_msg += 'Square pulse detuning {:.3f} {}\n'.format(det, unit)
+
+        text_msg += r'Fitting to : $A e^{(-(t/\tau)^n)}+o$' + '\n\t'
+        text_msg += format_lmfit_par(r'$A$', decay_fit.params['A'], '\n\t')
+        text_msg += format_lmfit_par(r'$\tau$',
+                                     decay_fit.params['tau'], '\n\t')
+        text_msg += format_lmfit_par(r'$n$', decay_fit.params['n'], '\n\t')
+        text_msg += format_lmfit_par(r'$o$', decay_fit.params['o'], '')
 
         self.proc_data_dict['decay_fit_msg'] = text_msg
-                    
-
-    def save_fit_results(self):
-        # todo: if you want to save some results to a hdf5, do it here
-        pass
 
     def prepare_plots(self):
         self.plot_dicts['main'] = {
@@ -378,7 +647,15 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             'horizontalalignment': 'left'}
 
 
-class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
+class CoherenceTimesAnalysis_old(ba.BaseDataAnalysis):
+    """
+    Old version of Coherence times analysis.
+
+    This is in essence a messy combination of data extraction and the PSD
+    analysis of the coherence.
+
+    I am now separating these two out so that it is easier to use.
+    """
     T1 = 't1'
     T2 = 't2'  # e.g. echo
     T2_star = 't2s'  # e.g. ramsey
@@ -395,7 +672,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                  plot_versus_frequency: bool = True,
                  frequency_key_pattern: str = 'Instrument settings.{Q}.freq_qubit',
                  res_freq: list = None, res_Qc: list = None, chi_shift: list = None,
-                 do_fitting: bool = True, close_figs: bool = True, use_chisqr = False,
+                 do_fitting: bool = True, close_figs: bool = True, use_chisqr=False,
                  ):
         '''
         Plots and Analyses the coherence times (i.e. T1, T2 OR T2*) of one or several measurements.
@@ -452,7 +729,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         if qubit_instr_names is str:
             qubit_instr_names = [qubit_instr_names, ]
 
-        ## Check data and apply default values
+        # Check data and apply default values
         assert (len(qubit_instr_names) == len(dac_instr_names))
         if plot_versus_dac:
             assert (len(qubit_instr_names) == len(dac_instr_names))
@@ -493,11 +770,14 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
         req = (self.T1, self.T2, self.T2_star)
         if not all(k in tau_keys for k in req):
-            raise KeyError("You need to at least specify ", req, " for parameters tau_keys.")
+            raise KeyError("You need to at least specify ",
+                           req, " for parameters tau_keys.")
         if not all(k in tau_std_keys for k in req):
-            raise KeyError("You need to at least specify ", req, " for parameters tau_std_keys.")
+            raise KeyError("You need to at least specify ",
+                           req, " for parameters tau_std_keys.")
         if not all(k in labels for k in req):
-            raise KeyError("You need to at least specify ", req, " for parameters labels.")
+            raise KeyError("You need to at least specify ",
+                           req, " for parameters labels.")
 
         # Call abstract init
         super().__init__(t_start=t_start, t_stop=t_stop,
@@ -521,10 +801,12 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         for i, dac_instr_name in enumerate(dac_instr_names):
             qubit_instr_name = qubit_instr_names[i]
             if plot_versus_dac:
-                dac_key = self._parse(dac=dac_instr_name, qubit=qubit_instr_name, pattern=dac_key_pattern)
+                dac_key = self._parse(
+                    dac=dac_instr_name, qubit=qubit_instr_name, pattern=dac_key_pattern)
                 self.dac_keys.append(dac_key)
             if plot_versus_frequency:
-                freq_key = self._parse(dac=dac_instr_name, qubit=qubit_instr_name, pattern=frequency_key_pattern)
+                freq_key = self._parse(
+                    dac=dac_instr_name, qubit=qubit_instr_name, pattern=frequency_key_pattern)
                 self.freq_keys.append(freq_key)
 
         # Create all slave objects
@@ -540,7 +822,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
                 self.all_analysis[qubit][typ] = CoherenceTimesAnalysisSingle(
                     t_start=t_start, t_stop=t_stop,
-                    label=self._parse(dac=dac_instr_name, qubit=qubit, pattern=labels[typ]),
+                    label=self._parse(dac=dac_instr_name,
+                                      qubit=qubit, pattern=labels[typ]),
                     auto=False, extract_only=True,
                     tau_key=tau_key,
                     tau_std_key=tau_std_key,
@@ -550,7 +833,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     frequency_key=freq_key,
                     options_dict=options_dict,
                     close_figs=close_figs,
-                    use_chisqr = use_chisqr
+                    use_chisqr=use_chisqr
                 )
 
         if auto:
@@ -580,7 +863,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         self.raw_data_dict['datetime'] = [youngest]
         self.raw_data_dict['timestamps'] = [youngest.strftime("%Y%m%d_%H%M%S")]
         self.timestamps = [youngest]
-        folder = a_tools.datadir + '/%s_coherence_analysis' % (youngest.strftime("%Y%m%d/%H%M%S"))
+        folder = a_tools.datadir + \
+            '/%s_coherence_analysis' % (youngest.strftime("%Y%m%d/%H%M%S"))
         self.raw_data_dict['folder'] = [folder]
 
     @staticmethod
@@ -612,7 +896,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
             all_dac = np.array([])
             for typ in qo:
                 a = self.all_analysis[qubit][typ]
-                all_dac = np.append(all_dac, np.array(a.raw_data_dict['dac'], dtype=float))
+                all_dac = np.append(all_dac, np.array(
+                    a.raw_data_dict['dac'], dtype=float))
             all_dac = np.unique(all_dac)
             all_dac.sort()
             self.proc_data_dict[qubit]['all_dac'] = all_dac
@@ -629,7 +914,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
                 sorted_taus = np.array(sorted_taus)
                 # sorted_chis = self._put_data_into_scheme(scheme=all_dac, scheme_mess=d['dac'],
-                                                         # other_mess=d['chisquared'])
+                # other_mess=d['chisquared'])
                 # sorted_chis = np.array(sorted_chis)
                 # thold = 0.5
                 # mask = sorted_chis > thold
@@ -641,13 +926,12 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 self.proc_data_dict[qubit][typ]['all_dac_sorted_tau_mask'] = mask
                 # print('premask', qubit_mask, mask)
                 qubit_mask = (qubit_mask * 1 + mask * 1) == 2
-                self.proc_data_dict[qubit]['all_dac']= all_dac[~qubit_mask]
+                self.proc_data_dict[qubit]['all_dac'] = all_dac[~qubit_mask]
                 # print(qubit_mask)
                 # self.option_dict.get('shall i')
-                    # if yes, sort chi^2
-                    # mask = np.where self.option_dict.get('threshold')
-                    # qubit_mask = (qubit_mask * 1 + mask * 1) == 2
-
+                # if yes, sort chi^2
+                # mask = np.where self.option_dict.get('threshold')
+                # qubit_mask = (qubit_mask * 1 + mask * 1) == 2
 
                 self.proc_data_dict[qubit][typ]['qubit_mask'] = qubit_mask
             self.proc_data_dict[qubit]['all_mask'] = qubit_mask
@@ -661,7 +945,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 # print('mask', mask)
                 # print('qubitmask', self.proc_data_dict[qubit][typ]['qubit_mask'])
                 # print('calc', sorted_taus[~self.proc_data_dict[qubit][typ]['qubit_mask']])
-                self.proc_data_dict[qubit][typ]['all_dac_sorted_gamma'] = 1.0 / sorted_taus[~mask]
+                self.proc_data_dict[qubit][typ]['all_dac_sorted_gamma'] = 1.0 / \
+                    sorted_taus[~mask]
 
             # print(self.raw_data_dict['timestamps'])
             gamma_1 = self.proc_data_dict[qubit][self.T1]['all_dac_sorted_gamma']
@@ -708,7 +993,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
                 # Make the PSD fit, if we have enough data
                 exclusion_mask = self.proc_data_dict[qubit]['all_mask']
-                masked_dac = all_dac #[~exclusion_mask]
+                masked_dac = all_dac  # [~exclusion_mask]
                 if len(masked_dac) > 4:
                     # Fit gamma vs sensitivity
                     sensitivity = self.fit_res[qubit]['sorted_sensitivity']
@@ -728,8 +1013,10 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     sqrtA_echo = slope_echo / (np.pi * np.sqrt(1.386))
 
                     if self.verbose:
-                        print('Amplitude echo PSD = (%s u\Phi_0)^2' % (sqrtA_echo / 1e-6))
-                        print('Amplitude rams PSD = (%s u\Phi_0)^2' % (sqrtA_rams / 1e-6))
+                        print('Amplitude echo PSD = (%s u\Phi_0)^2' %
+                              (sqrtA_echo / 1e-6))
+                        print('Amplitude rams PSD = (%s u\Phi_0)^2' %
+                              (sqrtA_rams / 1e-6))
 
                     chi = self.chi_shift[qubit] if self.chi_shift else None
                     res_freq = self.res_freq[qubit] if self.res_freq else None
@@ -739,7 +1026,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     # using Eq 5 in Nat. Comm. 7,12964 (The flux qubit revisited to enhance
                     # coherence and reproducability)
                     if not ((res_freq is None) and (res_Qc is None) and (chi is None)):
-                        n_avg = calculate_n_avg(res_freq, res_Qc, chi, intercept)
+                        n_avg = calculate_n_avg(
+                            res_freq, res_Qc, chi, intercept)
                         self.fit_res[qubit]['avg_noise_photons'] = n_avg
                         if self.verbose:
                             print('Estimated residual photon number: %s' % n_avg)
@@ -747,8 +1035,10 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     self.fit_res[qubit]['gamma_intercept'] = intercept
                     self.fit_res[qubit]['gamma_slope_ramsey'] = slope_ramsey
                     self.fit_res[qubit]['gamma_slope_echo'] = slope_echo
-                    self.fit_res[qubit]['gamma_phi_ramsey_f'] = lambda x: slope_ramsey * x * 1e9 + intercept
-                    self.fit_res[qubit]['gamma_phi_echo_f'] = lambda x: slope_echo * x * 1e9 + intercept
+                    self.fit_res[qubit]['gamma_phi_ramsey_f'] = lambda x: slope_ramsey * \
+                        x * 1e9 + intercept
+                    self.fit_res[qubit]['gamma_phi_echo_f'] = lambda x: slope_echo * \
+                        x * 1e9 + intercept
                     self.fit_res[qubit]['sqrtA_echo'] = (sqrtA_echo / 1e-6)
                     self.fit_res[qubit]['fit_res'] = fit_res_gammas
 
@@ -756,14 +1046,14 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     self.fit_res[qubit]['gamma_slope_ramsey_std'] = fit_res_gammas.params['slope_ramsey'].stderr
                     self.fit_res[qubit]['gamma_slope_echo_std'] = fit_res_gammas.params['slope_echo'].stderr
 
-
                 else:
                     # fixme: make this a proper warning
                     print(
                         'Found %d dac values. I need at least 4 dac values to run the PSD analysis.' % len(masked_dac))
         else:
             # fixme: make this a proper warning
-            print('You have to enable plot_versus_frequency and plot_versus_dac to execute the PSD analysis.')
+            print(
+                'You have to enable plot_versus_frequency and plot_versus_dac to execute the PSD analysis.')
 
     def save_fit_results(self):
         # todo: if you want to save some results to a hdf5, do it here
@@ -823,15 +1113,13 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 self.plot_dicts[cg_base + '_echo_scatter'] = pds
 
                 if self.options_dict.get('print_fit_result_plot', True):
-                    # dac_fit_text = '$\Gamma = {:.2g}(\pm {:.2g})$\n'.format(
-                    #                 self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
-                    dac_fit_text = '$\Gamma/2 \pi = {:.2g}(\pm {:.2g})$ kHz\n'.format(
-                                    self.fit_res[qubit]['gamma_intercept']/1e3 , self.fit_res[qubit]['gamma_intercept_std']/1e3)
-                    dac_fit_text += 'slope Ramsey = {:.2g}(\pm {:.2g}) (m$\Phi_0$)\n'.format(
-                                    self.fit_res[qubit]['gamma_slope_ramsey']*1e3, self.fit_res[qubit]['gamma_slope_ramsey_std']*1e3)
-                    dac_fit_text += 'slope echo = {:.2g}(\pm {:.2g}) (m$\Phi_0$)'.format(
-                                    self.fit_res[qubit]['gamma_slope_echo']*1e3, self.fit_res[qubit]['gamma_slope_echo_std']*1e3)
+                    dac_fit_text = '$\Gamma = %.5f(\pm %.5f)$\n' % (
+                        self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
+                    # dac_fit_text += '$\Gamma/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
+                    # dac_fit_text += '$\Gamma/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
 
+                    self.fit_res[qubit]['gamma_slope_ramsey_std']
+                    self.fit_res[qubit]['gamma_slope_echo_std']
                     self.plot_dicts[cg_base + '_text_msg'] = {
                         'ax_id': cg_base,
                         'xpos': 0.6,
@@ -874,7 +1162,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
             # coherence_times
             ct_base = qubit + '_' + ct_all_base
 
-            plot_types = ['time_stability', 'freq_relation', 'dac_relation', 'flux_relation', 'sensitivity_relation', ]
+            plot_types = ['time_stability', 'freq_relation',
+                          'dac_relation', 'flux_relation', 'sensitivity_relation', ]
             ymax = [0] * len(plot_types)
             ymin = [0] * len(plot_types)
             markers = ('x', 'o', '+')
@@ -882,7 +1171,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 a = self.all_analysis[qubit][typ]
                 a.prepare_plots()
                 label = '%s_%s' % (qubit, typ)
-                for pti, plot_type in enumerate(plot_types):  # 'dac_freq_relation
+                # 'dac_freq_relation
+                for pti, plot_type in enumerate(plot_types):
 
                     if plot_type in ['freq_relation', ]:
                         if self.freq_keys:
@@ -905,19 +1195,24 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
                     if plot:
                         if a.plot_dicts[plot_type]['yrange']:
-                            ymin[pti] = min(ymin[pti], a.plot_dicts[plot_type]['yrange'][0])
-                            ymax[pti] = max(ymax[pti], a.plot_dicts[plot_type]['yrange'][1])
+                            ymin[pti] = min(
+                                ymin[pti], a.plot_dicts[plot_type]['yrange'][0])
+                            ymax[pti] = max(
+                                ymax[pti], a.plot_dicts[plot_type]['yrange'][1])
 
                         key = ct_base + '_' + plot_type + '_' + typ
                         self.plot_dicts[key] = a.plot_dicts[plot_type]
-                        self.plot_dicts[key]['ax_id'] = ct_base + '_' + plot_type
+                        self.plot_dicts[key]['ax_id'] = ct_base + \
+                            '_' + plot_type
                         self.plot_dicts[key]['setlabel'] = label
                         self.plot_dicts[key]['do_legend'] = True
                         self.plot_dicts[key]['yrange'] = None
                         # self.plot_dicts[key]['xrange'] = None
-                        self.plot_dicts[key]['marker'] = markers[typi % len(markers)]
+                        self.plot_dicts[key]['marker'] = markers[typi % len(
+                            markers)]
                         if self.plot_dicts[key]['func'] == 'errorbar':
-                            self.plot_dicts[key]['line_kws'] = {'fmt': markers[typi % len(markers)]}
+                            self.plot_dicts[key]['line_kws'] = {
+                                'fmt': markers[typi % len(markers)]}
 
                     if 'analysis' in dat and dat['analysis']:
                         if self.dac_keys and self.freq_keys:
@@ -932,7 +1227,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                                                         ydata=dat['analysis'][typ],
                                                         xerr=None, yerr=None,
                                                         pdict=pdict_scatter)
-                            self.plot_dicts[ct_base + '_flux_gamma_relation_' + typ] = pds
+                            self.plot_dicts[ct_base +
+                                            '_flux_gamma_relation_' + typ] = pds
             for pti, plot_type in enumerate(plot_types):
                 key = ct_base + '_' + plot_type + '_' + typ
                 if key in self.plot_dicts:
@@ -940,26 +1236,284 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
             # self.raw_data_dict[qubit][typ] = a.raw_data_dict
 
 
-def calculate_n_avg(freq_resonator, Qc, chi_shift, intercept):
+def calculate_n_avg(freq_resonator: float, Qc: float,
+                    chi_shift: float, intercept: float):
     """
-    Returns the avg photon of white noise,assuming photon shot noise from the RO hanger.
+    Calculate the avg. photon number of white noise.
+
+    args:
+        freq_resonator: resonator frequency (in Hz)
+        Qc  :       coupling quality factor
+        chi_shift : dispersive shift (includes 2pi? )
+        intercept :  ?? (FIXME ask someone who made this)
+
+    return:
+        n_avg : average photon number due to white noise effects.
+
+
+    Assumes photon shot noise from the RO resonator.
     """
-    k_r = 2 * np.pi * freq_resonator / Qc
-    eta = k_r ** 2 / (k_r ** 2 + 4 * chi_shift ** 2)
-    n_avg = intercept * k_r / (4 * chi_shift ** 2 * eta)
+    k_r = 2*np.pi*freq_resonator/Qc
+    eta = k_r**2/(k_r**2 + 4*chi_shift**2)
+    n_avg = intercept*k_r/(4*chi_shift**2*eta)
     return n_avg
 
 
-def prepare_input_table(dac: list, frequency: list, T1: list, T2_star: list, T2_echo: list,
-                        T1_mask: list = None, T2_star_mask: list = None, T2_echo_mask: list = None):
+def arch(dac, Ec, Ej, offset, dac0):
+    """
+    Convert flux (in dac) to frequency for a transmon.
+
+    Args:
+        - dac: voltage used in the DAC to generate the flux
+        - Ec (Hz): Charging energy of the transmon in Hz
+        - Ej (Hz): Josephson energy of the transmon in Hz
+        - offset: voltage offset of the arch (same unit of the dac)
+        - dac0: dac value to generate 1 Phi_0 (same unit of the dac)
+
+    Note: the Phi_0 (periodicity) dac0.
+
+    N.B. I believe we have a cleaner version of this somewhere...
+    """
+    d = np.abs(np.cos((np.pi * (dac - offset)) / dac0))
+    model = np.sqrt(8 * Ec * Ej * d) - Ec
+
+    return model
+
+
+# # define the model (from the function above) used to fit data
+# arch_model = lmfit.Model(arch)
+
+
+def partial_omega_over_flux(flux, Ec, Ej):
+    """
+    Calculate derivative of flux arc in units of omega/Phi0.
+
+    Args:
+        flux  (units of phi0)
+        Ec: charging energy (Hz)
+        Ej: josephson energy (Hz)
+
+    Return:
+        frequency/flux in units of omega/Phi0
+    """
+    model = -np.sign(np.cos(np.pi * flux)) * (np.pi ** 2) * \
+        np.sqrt(8 * Ec * Ej) * \
+        np.sin(np.pi * flux) / np.sqrt(np.abs(np.cos(np.pi * flux)))
+    return model
+
+
+def fixed_Q_factor_model(freq, Q):
+    '''
+    inverse proportional dependence of the qubit T1 on frequrncy can be described
+    with a constant Q-factor of a qubit: Q = 2*pi*f*T1
+    Here is a function calculating T1(f) that can be fitted to data
+    '''
+
+    model = Q/(2*np.pi*freq)
+    return model
+
+
+def fit_fixed_Q_factor(freq, tau):
+    Q_factor_model = lmfit.Model(fixed_Q_factor_model)
+    Q_factor_model.set_param_hint('Q', value=50e4, min=100e3, max=100e6)
+    fit_result_Q_factor = Q_factor_model.fit(tau, freq=freq)
+    return fit_result_Q_factor
+
+
+def fit_frequencies(dac, freq,
+                    Ec_guess=260e6, Ej_guess=19e9, offset_guess=0,
+                    dac0_guess=0.5):
+    """
+    Perform fit against the transmon flux arc model.
+
+    Args:
+        dac: flux in units of φ0
+        freq: 01 transition frequency in Hz
+
+    return:
+        fit_result_arch: an lmfit fit_result object.
+    """
+    # define the model (from the function) used to fit data
+    arch_model = lmfit.Model(arch)
+
+    # set some hardcoded guesses
+    arch_model.set_param_hint('Ec', value=Ec_guess, min=100e6, max=350e6)
+    arch_model.set_param_hint('Ej', value=Ej_guess, min=0.1e9, max=30e9)
+    arch_model.set_param_hint(
+        'offset', value=offset_guess, min=-0.05, max=0.05)
+    arch_model.set_param_hint('dac0', value=dac0_guess, min=0)
+
+    params = arch_model.make_params()
+    fit_result_arch = arch_model.fit(freq, dac=dac, params=params)
+    return fit_result_arch
+
+
+def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
+    """
+    Residual function for fitting dephasing rates (Gamma).
+
+    Two separate linear models are used for the ramsey and echo dephasing
+    rates.
+    """
+    # FIXME: this really needs a dostring to explain what it does
+    slope_ramsey = pars_dict['slope_ramsey']
+    slope_echo = pars_dict['slope_echo']
+    intercept = pars_dict['intercept']
+
+    gamma_values_ramsey = slope_ramsey*np.abs(sensitivity) + intercept
+    residual_ramsey = Gamma_phi_ramsey - gamma_values_ramsey
+
+    gamma_values_echo = slope_echo*np.abs(sensitivity) + intercept
+    residual_echo = Gamma_phi_echo - gamma_values_echo
+
+    return np.concatenate((residual_ramsey, residual_echo))
+
+
+def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
+               verbose: int=0):
+    """
+    Perform a fit to the residual_Gamma using hardcoded guesses.
+
+    Args:
+        sensitivity         x-values
+        Gamma_phi_ramsey    dephasing rate of Ramsey experiment
+        gamma_phi_echo      dephasing rate of echo experiment
+        verbose (int)       verbosity level
+    Returns:
+        fit_result_gammas  an lmfit fit_res object
+    """
+    # create a parameter set for the initial guess
+    p = lmfit.Parameters()
+    p.add('slope_ramsey', value=100.0, vary=True)
+    p.add('slope_echo', value=100.0, vary=True)
+    p.add('intercept', value=100.0, vary=True)
+
+    # mi = lmfit.minimize(super_residual, p)
+    def wrap_residual(p): return residual_Gamma(
+        p,
+        sensitivity=sensitivity,
+        Gamma_phi_ramsey=Gamma_phi_ramsey,
+        Gamma_phi_echo=Gamma_phi_echo)
+    fit_result_gammas = lmfit.minimize(wrap_residual, p)
+    if verbose > 0:
+        lmfit.printfuncs.report_fit(fit_result_gammas.params)
+    return fit_result_gammas
+
+
+def calc_dephasing_rate(T1, T2):
+    """Calculate pure dephasing rate based on T1 and T2."""
+    gamma = 1/T2 - 1/(2*T1)
+    return gamma
+
+
+def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None,
+                 path=None):
+    """
+    Power spectral density analysis of transmon coherence.
+
+    Args:
+        table : table containing the data, see below for specification.
+        freq_resonator: readout resonator frequency (in Hz)
+        Qc:             coupling Q of the readout resonator
+        chi_shift       in Hz
+        path:           filepath, if provided is used for saving the plots
+
+
+
+    Input table specification:
+           Row  | Content
+        --------+--------
+            1   | dac
+            2   | frequency
+            3   | T1
+            4   | T2 star
+            5   | T2 echo
+            6   | Exclusion mask (True where data is to be excluded)
+
+    Generates 8 plots:
+        > T1, T2, Echo vs flux
+        > T1, T2, Echo vs frequency
+        > T1, T2, Echo vs flux sensitivity
+        > ratio Ramsey/Echo vs flux
+        > ratio Ramsey/Echo vs frequency
+        > ratio Ramsey/Echo vs flux sensitivity
+        > Dephasing rates Ramsey and Echo vs flux sensitivity
+        > Dac arc fit, use to assess if sensitivity calculation is correct.
+
+    If properties of resonator are provided (freq_resonator, Qc, chi_shift),
+    it also calculates the number of noise photons.
+    """
+    dac, freq, T1, Tramsey, Techo, exclusion_mask = table
+    exclusion_mask = np.array(exclusion_mask, dtype=bool)
+
+    # Extract the dac arcs required for getting the sensitivities
+    fit_result_arch = fit_frequencies(dac, freq, dac0_guess=.1)
+
+    # convert dac in flux as unit of Phi_0
+    flux = (dac-fit_result_arch.best_values['offset'])\
+        / fit_result_arch.best_values['dac0']
+
+    # calculate the derivative vs flux
+    sensitivity_angular = partial_omega_over_flux(
+        flux, fit_result_arch.best_values['Ec'],
+        fit_result_arch.best_values['Ej'])
+    sensitivity = sensitivity_angular/(2*np.pi)
+
+    # Pure dephasing times
+    # Calculate pure dephasings
+    Gamma_1 = 1.0/T1[~exclusion_mask]
+    Gamma_ramsey = 1.0/Tramsey[~exclusion_mask]
+    Gamma_echo = 1.0/Techo[~exclusion_mask]
+
+    Gamma_phi_ramsey = Gamma_ramsey - Gamma_1/2.0
+    Gamma_phi_echo = Gamma_echo - Gamma_1/2.0
+
+    plot_dac_arc(dac, freq, fit_result_arch)
+    plot_coherence_times(flux, freq, sensitivity,
+                         T1, Tramsey, Techo, path)
+    plot_ratios(flux, freq, sensitivity,
+                Gamma_phi_ramsey, Gamma_phi_echo, path)
+
+    fit_res_gammas = fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo)
+
+    intercept = fit_res_gammas.params['intercept'].value
+    slope_ramsey = fit_res_gammas.params['slope_ramsey'].value
+    slope_echo = fit_res_gammas.params['slope_echo'].value
+
+    plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
+                   slope_ramsey, slope_echo, intercept, path)
+
+    # after fitting gammas
+    # from flux noise
+    # Martinis PRA 2003
+    sqrtA_rams = slope_ramsey/(np.pi*np.sqrt(30))
+    sqrtA_echo = slope_echo/(np.pi*np.sqrt(1.386))
+
+    print('Amplitude echo PSD = (%s u\Phi_0)^2' % (sqrtA_echo/1e-6))
+    print('Amplitude rams PSD = (%s u\Phi_0)^2' % (sqrtA_rams/1e-6))
+
+    # from white noise
+    # using Eq 5 in Nat. Comm. 7,12964 (The flux qubit revisited to enhance
+    # coherence and reproducability)
+    if not ((freq_resonator is None) and (Qc is None) and (chi_shift is None)):
+        n_avg = calculate_n_avg(freq_resonator, Qc, chi_shift, intercept)
+        print('Estimated residual photon number: %s' % n_avg)
+    else:
+        n_avg = np.nan
+
+    return (sqrtA_echo/1e-6), n_avg
+
+
+def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
+                        T1_mask=None, T2_star_mask=None, T2_echo_mask=None):
     """
     Returns a table ready for PSD_Analysis input
     If sizes are different, it adds nans on the end.
     """
-    assert (len(dac) == len(frequency))
-    assert (len(dac) == len(T1))
-    assert (len(dac) == len(T2_star))
-    assert (len(dac) == len(T2_echo))
+    assert(len(dac) == len(frequency))
+    assert(len(dac) == len(T1))
+    assert(len(dac) == len(T2_star))
+    assert(len(dac) == len(T2_echo))
 
     if T1_mask is None:
         T1_mask = np.zeros(len(T1), dtype=bool)
@@ -968,9 +1522,9 @@ def prepare_input_table(dac: list, frequency: list, T1: list, T2_star: list, T2_
     if T2_echo_mask is None:
         T2_echo_mask = np.zeros(len(T2_echo), dtype=bool)
 
-    assert (len(T1) == len(T1_mask))
-    assert (len(T2_star) == len(T2_star_mask))
-    assert (len(T2_echo) == len(T2_echo_mask))
+    assert(len(T1) == len(T1_mask))
+    assert(len(T2_star) == len(T2_star_mask))
+    assert(len(T2_echo) == len(T2_echo_mask))
 
     table = np.ones((6, len(dac)))
     table = table * np.nan
@@ -986,113 +1540,109 @@ def prepare_input_table(dac: list, frequency: list, T1: list, T2_star: list, T2_
     return table
 
 
-def arch(dac, Ec, Ej, offset, dac0):
-    '''
-    Function for frequency vs flux (in dac) for the transmon
+def plot_dac_arc(dac, freq, fit_res, title='', ax=None, **kw):
+    if ax == None:
+        f, ax = plt.subplots()
+    ax.set_title(title)
+    ax.plot(dac, freq, 'o', label='data')
+    plot_lmfit_res(ax=ax, fit_res=fit_res, plot_init=True,
+                   plot_kw={'label': 'arc-fit'},
+                   plot_init_kw={'label': 'init-fit', 'ls': '--'})
 
-    Input:
-        - dac: voltage used in the DAC to generate the flux
-        - Ec (Hz): Charging energy of the transmon in Hz
-        - Ej (Hz): Josephson energy of the transmon in Hz
-        - offset: voltage offset of the arch (same unit of the dac)
-        - dac0: dac value to generate 1 Phi_0 (same unit of the dac)
-
-    Note: the Phi_0 (periodicity) dac0
-    '''
-    d = np.abs(np.cos((np.pi * (dac - offset)) / dac0))
-    model = np.sqrt(8 * Ec * Ej * d) - Ec
-
-    return model
+    ax.legend(loc=0)
+    # FIXME, no units for xlabel
+    set_xlabel(ax, 'Dac', '')
+    set_ylabel(ax, 'Frequency', 'Hz')
 
 
-# define the model (from the function above) used to fit data
-arch_model = lmfit.Model(arch)
+def plot_coherence_times_freq(flux, freq, sensitivity,
+                              T1, Tramsey, Techo, path,
+                              figname='Coherence_times.PNG'):
+    f, ax = plt.subplots()
+
+    ax.plot(freq/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
+    ax.plot(freq/1e9, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
+    ax.plot(freq/1e9, Techo/1e-6, 'o', color='C0', label='$T_2$')
+    ax.set_title('$T_1$, $T_2^*$, $T_2$ vs frequency')
+    ax.set_xlabel('Frequency (GHz)')
+    ax.legend(loc=0)
 
 
-# derivative of arch vs flux (in unit of Phi0)
-# this is the sensitivity to flux noise
-def partial_omega_over_flux(flux, Ec, Ej):
-    '''
-    Note: flux is in unit of Phi0
-    Ej and Ec are in Hz
+def plot_coherence_times(flux, freq, sensitivity,
+                         T1, Tramsey, Techo, axs, ax=None, **kw):
+    if axs is None:
+        f, axs = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
 
-    Output: angular frequency over Phi_0
-    '''
-    model = -np.sign(np.cos(np.pi * flux)) * (np.pi ** 2) * np.sqrt(8 * Ec * Ej) * \
-            np.sin(np.pi * flux) / np.sqrt(np.abs(np.cos(np.pi * flux)))
-    return model
+    axs[0].plot(flux, T1, 'o', color='C3', label='$T_1$')
+    axs[0].plot(flux, Tramsey, 'o', color='C2', label='$T_2^*$')
+    axs[0].plot(flux, Techo, 'o', color='C0', label='$T_2$')
+    axs[0].set_title('$T_1$, $T_2^*$, $T_2$ vs flux')
+    set_ylabel(axs[0], 'Coherence time', 's')
+    set_xlabel(axs[0], 'Flux',  '$\Phi_0$')
 
-def fixed_Q_factor_model(freq, Q):
-    '''
-    inverse proportional dependence of the qubit T1 on frequrncy can be described
-    with a constant Q-factor of a qubit: Q = 2*pi*f*T1
-    Here is a function calculating T1(f) that can be fitted to data
-    '''
+    axs[1].plot(freq, T1, 'o', color='C3', label='$T_1$')
+    axs[1].plot(freq, Tramsey, 'o', color='C2', label='$T_2^*$')
+    axs[1].plot(freq, Techo, 'o', color='C0', label='$T_2$')
+    axs[1].set_title('$T_1$, $T_2^*$, $T_2$ vs frequency')
+    set_xlabel(axs[1], 'Frequency', 'Hz')
+    axs[1].legend(loc=0)
 
-    model = Q/(2*np.pi*freq)
-    return model
-
-def fit_fixed_Q_factor(freq, tau):
-    Q_factor_model = lmfit.Model(fixed_Q_factor_model)
-    Q_factor_model.set_param_hint('Q', value=50e4, min=100e3, max=100e6)
-    fit_result_Q_factor = Q_factor_model.fit(tau, freq=freq)
-    return fit_result_Q_factor
-
-
-def fit_frequencies(dac, freq):
-    dac0_guess = 5*np.max(np.abs(dac))
-    arch_model.set_param_hint('Ec', value=260e6, min=100e6, max=350e6)
-    arch_model.set_param_hint('Ej', value=19e9, min=0.1e9, max=30e9)
-    arch_model.set_param_hint('offset', value=0, min=-0.05, max=0.05)
-    arch_model.set_param_hint('dac0', value=dac0_guess, min=0)
-
-    arch_model.make_params()
-    # print('freq, dac', freq, dac)
-    fit_result_arch = arch_model.fit(freq, dac=dac)
-    return fit_result_arch
+    axs[2].plot(np.abs(sensitivity)/1e9, T1,
+                'o', color='C3', label='$T_1$')
+    axs[2].plot(np.abs(sensitivity)/1e9, Tramsey,
+                'o', color='C2', label='$T_2^*$')
+    axs[2].plot(
+        np.abs(sensitivity)/1e9, Techo, 'o', color='C0', label='$T_2$')
+    axs[2].set_title('$T_1$, $T_2^*$, $T_2$ vs sensitivity')
+    axs[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)')
 
 
-def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
-    slope_ramsey = pars_dict['slope_ramsey']
-    slope_echo = pars_dict['slope_echo']
-    intercept = pars_dict['intercept']
+def plot_ratios(flux, freq, sensitivity,
+                Gamma_phi_ramsey, Gamma_phi_echo, axs, ax=None, **kw):
+    # Pure dephasing times
+    if axs is None:
+        f, axs = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+    ratio_gamma = Gamma_phi_ramsey/Gamma_phi_echo
 
-    gamma_values_ramsey = slope_ramsey * np.abs(sensitivity) + intercept
-    # print(len(Gamma_phi_ramsey), len(gamma_values_ramsey))
-    residual_ramsey = Gamma_phi_ramsey - gamma_values_ramsey
+    axs[0].plot(flux/1e-3, ratio_gamma, 'o', color='C0')
+    axs[0].set_title(
+        '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs flux', size=16)
+    axs[0].set_ylabel('Ratio', size=16)
+    axs[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
 
-    gamma_values_echo = slope_echo * np.abs(sensitivity) + intercept
-    residual_echo = Gamma_phi_echo - gamma_values_echo
+    axs[1].plot(freq/1e9, ratio_gamma, 'o', color='C0')
+    axs[1].set_title(
+        '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs frequency', size=16)
+    axs[1].set_xlabel('Frequency (GHz)', size=16)
 
-    return np.concatenate((residual_ramsey, residual_echo))
-
-
-def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose: bool = False):
-    # create a parametrrer set for the initial guess
-    p = lmfit.Parameters()
-    p.add('slope_ramsey', value=100.0, vary=True)
-    p.add('slope_echo', value=100.0, vary=True)
-    p.add('intercept', value=100.0, vary=True)
-
-    wrap_residual = lambda p: residual_Gamma(p,
-                                             sensitivity=sensitivity,
-                                             Gamma_phi_ramsey=Gamma_phi_ramsey,
-                                             Gamma_phi_echo=Gamma_phi_echo)
-    fit_result_gammas = lmfit.minimize(wrap_residual, p)
-    if verbose:
-        lmfit.printfuncs.report_fit(fit_result_gammas.params)
-    return fit_result_gammas
+    axs[2].plot(np.abs(sensitivity)/1e9, ratio_gamma, 'o', color='C0')
+    axs[2].set_title(
+        '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs sensitivity', size=16)
+    axs[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
 
 
-def format_value_string(par_name: str, lmfit_par, end_char=''):
-    """
-    Formats an lmfit par to a  string of value with uncertainty.
-    """
-    val_string = par_name
-    val_string += ': {:.3g}'.format(lmfit_par.value)
-    if lmfit_par.stderr is not None:
-        val_string += r'$\pm$' + '{:.3g}'.format(lmfit_par.stderr)
-    else:
-        val_string += r'$\pm$' + 'NaN'
-    val_string += end_char
-    return val_string
+def super_residual(p):
+    data = residual_Gamma(p)
+    return data.astype(float)
+
+
+def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
+                   slope_ramsey, slope_echo, intercept, ax=None, **kw):
+    if ax is None:
+        f, ax = plt.subplots()
+
+    ax.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
+            'o', color='C2', label='$\Gamma_{\phi,\mathrm{Ramsey}}$')
+    ax.plot(np.abs(sensitivity)/1e9, slope_ramsey *
+            np.abs(sensitivity)+intercept, color='C2')
+
+    ax.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
+            'o', color='C0', label='$\Gamma_{\phi,\mathrm{Echo}}$')
+    ax.plot(np.abs(sensitivity)/1e9, slope_echo *
+            np.abs(sensitivity)+intercept, color='C0')
+
+    ax.legend(loc=0)
+    ax.set_title('Pure dephasing vs flux sensitivity')
+    ax.set_xlabel(r'$|\partial f/\partial\Phi|$ (GHz/$\Phi_0$)')
+    set_ylabel(ax, '$\Gamma_{\phi}$', 'Hz')
+    ax.set_ylim(0, np.max(Gamma_phi_ramsey)*1.05)

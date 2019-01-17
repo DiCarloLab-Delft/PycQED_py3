@@ -66,7 +66,7 @@ from pycqed.analysis_v2.optimization_analysis import OptimizationAnalysis
 from pycqed.analysis_v2.timing_cal_analysis import Timing_Cal_Flux_Coarse, \
     Timing_Cal_Flux_Fine
 
-from pycqed.analysis_v2.coherence_analysis import CoherenceTimesAnalysis, \
+from pycqed.analysis_v2.coherence_analysis import CoherenceAnalysis, \
     CoherenceTimesAnalysisSingle, AliasedCoherenceTimesAnalysisSingle
 from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, \
     ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy

@@ -16,7 +16,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
 from scipy.signal import argrelextrema
 # to allow backwards compatibility with old a_tools code
-from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
@@ -452,33 +451,33 @@ def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
 def append_data_from_ma(ma, param_names, data, data_version=2,
                         numeric_params=None, filter_dict=None):
     """
-    Extract data from an analysis object and appends it to lists in a dict. 
+    Extract data from an analysis object and appends it to lists in a dict.
 
     params
     ------
-    ma: 
-        analysis class to be used to extract the data? 
-    param_names: 
-        parameters to extract. 
+    ma:
+        analysis class to be used to extract the data?
+    param_names:
+        parameters to extract.
     data: (dictionary)
-        dictionary containing lists of data. 
-    numeric_params 
+        dictionary containing lists of data.
+    numeric_params
         this parameter is ignored (TODO remove this)
-    filter_dict: 
-        dictionary to use to filter, keys correpond to parameter names, 
+    filter_dict:
+        dictionary to use to filter, keys correpond to parameter names,
         values correspond to desired values of these params. If a Value is not
-        equal to the filter param, no data from that dataset is loaded at all. 
+        equal to the filter param, no data from that dataset is loaded at all.
 
     Returns
     -------
-    nothing, the data object is modified inside the function scope. 
+    nothing, the data object is modified inside the function scope.
 
     """
     if filter_dict is not None:
         param_names_filter = list(param_names)+list(filter_dict.keys())
     else:
         param_names_filter = param_names
-        
+
     new_data = get_data_from_ma(ma, param_names_filter, data_version=data_version,
                                 numeric_params=numeric_params)
 
@@ -1673,7 +1672,7 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
 def datetime_from_timestamp(timestamp: str):
     """
-    Converst a timestamp instring in a datetime object. 
+    Converst a timestamp instring in a datetime object.
     """
     try:
         if len(timestamp) == 14:

@@ -773,7 +773,7 @@ class Oscillation_Analysis(ba.BaseDataAnalysis):
         cal_points = [
             [[-4, -3], [-2, -1]],
             [[-4, -2], [-3, -1]],
-            ]
+        ]
 
         yvals = list(
             self.raw_data_dict['measured_values_ord_dict'].values())[idx][0]
@@ -786,18 +786,17 @@ class Oscillation_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['ylabel'] = self.raw_data_dict['value_names'][0][idx]
         self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
 
-
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
         cos_mod = lmfit.Model(fit_mods.CosFunc)
         cos_mod.guess = fit_mods.Cos_guess.__get__(cos_mod, cos_mod.__class__)
 
         if not (self.options_dict.get('normalize_to_cal_points', False)):
-            t=  self.raw_data_dict['xvals'][0]
-            data =  self.proc_data_dict['yvals']
+            t = self.raw_data_dict['xvals'][0]
+            data = self.proc_data_dict['yvals']
         else:
-            t=  self.raw_data_dict['xvals'][0][:-4]
-            data =  self.proc_data_dict['yvals'][:-4]
+            t = self.raw_data_dict['xvals'][0][:-4]
+            data = self.proc_data_dict['yvals'][:-4]
 
         self.fit_dicts['cos_fit'] = {
             'model': cos_mod,
@@ -844,6 +843,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                  data_file_path: str=None,
                  label: str='',
                  options_dict: dict=None, extract_only: bool=False,
+                 cal_points='gef',
                  close_figs: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
@@ -861,6 +861,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                             'value_units': 'value_units',
                             'measured_values': 'measured_values'}
 
+        # either "gef" or "ge"
+        self.cal_points = cal_points
         self.numeric_params = []
         if auto:
             self.run_analysis()
@@ -883,11 +885,19 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
 
         normalize_to_cal_points = self.options_dict.get(
             'normalize_to_cal_points', True)
-        cal_points = [
+
+        if self.cal_points == 'gef':
             # calibration point indices are when ignoring the f-state cal pts
-            [[-7, -6], [-5, -4], [-2, -1]],  # spec qubit
-            [[-7, -5], [-6, -4], [-3, -1]],  # oscillating qubits
-        ]
+            cal_points = [
+                [[-7, -5], [-6, -4], [-3, -1]],  # oscillating qubits
+                [[-7, -6], [-5, -4], [-2, -1]],  # spec qubit
+            ]
+        elif self.cal_points == 'ge':
+            # calibration point indices are when ignoring the f-state cal pts
+            cal_points = [
+                [[-4, -3], [-2, -1]],  # spec qubit
+                [[-4, -2], [-3, -1]],  # oscillating qubits
+            ]
 
         for idx, type_str in zip([ch_idx_osc, ch_idx_spec], ['osc', 'spec']):
             yvals = list(self.raw_data_dict['measured_values_ord_dict'].values())[
@@ -920,7 +930,10 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
 
             V0 = np.mean(yvals[cal_points[idx][0]])
             V1 = np.mean(yvals[cal_points[idx][1]])
-            V2 = np.mean(yvals[cal_points[idx][2]])
+            if self.cal_points != 'gef':
+                V2 = np.mean(yvals[cal_points[idx][2]])
+            else:
+                V2 = V1
 
             self.proc_data_dict['V0_{}'.format(type_str)] = V0
             self.proc_data_dict['V1_{}'.format(type_str)] = V1
@@ -962,10 +975,10 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         fr_1 = self.fit_res['cos_fit_on']
 
         phi0 = ufloat(np.rad2deg(fr_0.params['phase'].value),
-            np.rad2deg(fr_0.params['phase'].stderr))
+                      np.rad2deg(fr_0.params['phase'].stderr))
 
         phi1 = ufloat(np.rad2deg(fr_1.params['phase'].value),
-            np.rad2deg(fr_1.params['phase'].stderr))
+                      np.rad2deg(fr_1.params['phase'].stderr))
         qoi['phi_0'] = phi0
         qoi['phi_1'] = phi1
         qoi['phi_cond'] = phi0-phi1
@@ -976,56 +989,19 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         qoi['osc_amp_1'] = ufloat(fr_1.params['amplitude'].value,
                                   fr_1.params['amplitude'].stderr)
 
-
         qoi['osc_offs_0'] = ufloat(fr_0.params['offset'].value,
-                                  fr_0.params['offset'].stderr)
+                                   fr_0.params['offset'].stderr)
 
         qoi['osc_offs_1'] = ufloat(fr_1.params['offset'].value,
-                                  fr_1.params['offset'].stderr)
+                                   fr_1.params['offset'].stderr)
 
         qoi['offs_diff'] = qoi['osc_offs_1'] - qoi['osc_offs_0']
 
-
-        # phi0 = np.rad2deg(fr_0['phase'].value)
-        # phi1 = np.rad2deg(fr_1['phase'].value)
-
-        # phi0_stderr = np.rad2deg(fr_0['phase'].stderr)
-        # phi1_stderr = np.rad2deg(fr_1['phase'].stderr)
-
-        # self.proc_data_dict['phi_0'] = phi0, phi0_stderr
-        # self.proc_data_dict['phi_1'] = phi1, phi1_stderr
-        # phi_cond_stderr = (phi0_stderr**2+phi1_stderr**2)**.5
-        # self.proc_data_dict['phi_cond'] = (phi1 - phi0), phi_cond_stderr
-
-
-        # osc_amp = np.mean([fr_0['amplitude'], fr_1['amplitude']])
-        # osc_amp_stderr = np.sqrt(fr_0['amplitude'].stderr**2 +
-        #                          fr_1['amplitude']**2)/2
-
-        # self.proc_data_dict['osc_amp_0'] = (fr_0['amplitude'].value,
-        #                                     fr_0['amplitude'].stderr)
-        # self.proc_data_dict['osc_amp_1'] = (fr_1['amplitude'].value,
-        #                                     fr_1['amplitude'].stderr)
-
-        # self.proc_data_dict['osc_offs_0'] = (fr_0['offset'].value,
-        #                                      fr_0['offset'].stderr)
-        # self.proc_data_dict['osc_offs_1'] = (fr_1['offset'].value,
-        #                                      fr_1['offset'].stderr)
-
-        # offs_stderr = (fr_0['offset'].stderr**2+fr_1['offset'].stderr**2)**.5
-        # self.proc_data_dict['offs_diff'] = (
-        #     fr_1['offset'].value - fr_0['offset'].value, offs_stderr)
-
-        # self.proc_data_dict['osc_amp'] = (osc_amp, osc_amp_stderr)
         spec_on = ufloat(np.mean(self.proc_data_dict['yvals_spec_on'][:-3]),
-                          sem(self.proc_data_dict['yvals_spec_on'][:-3]))
+                         sem(self.proc_data_dict['yvals_spec_on'][:-3]))
         spec_off = ufloat(np.mean(self.proc_data_dict['yvals_spec_off'][:-3]),
-                  sem(self.proc_data_dict['yvals_spec_off'][:-3]))
+                          sem(self.proc_data_dict['yvals_spec_off'][:-3]))
         qoi['missing_fraction'] = spec_on-spec_off
-
-        # self.proc_data_dict['missing_fraction'] = (
-        #     np.mean(self.proc_data_dict['yvals_spec_on'][:-3]) -
-        #     np.mean(self.proc_data_dict['yvals_spec_off'][:-4]))
 
     def prepare_plots(self):
         self._prepare_main_oscillation_figure()
@@ -1145,8 +1121,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         if self.do_fitting:
             leak_msg = (
                 'Missing fraction: {} % '.format(
-                    self.proc_data_dict['quantities_of_interest']\
-                        ['missing_fraction']*100))
+                    self.proc_data_dict['quantities_of_interest']
+                    ['missing_fraction']*100))
             self.plot_dicts['leak_msg'] = {
                 'ax_id': 'spectator_qubit',
                 'ypos': 0.7,
@@ -1154,7 +1130,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'plotfn': self.plot_text,
                 'box_props': 'fancy',
                 'line_kws': {'alpha': 0},
-                'horizontalalignment':'left',
+                'horizontalalignment': 'left',
                 'text_string': leak_msg}
             # offset as a guide for the eye
             y = self.fit_res['cos_fit_on'].params['offset'].value

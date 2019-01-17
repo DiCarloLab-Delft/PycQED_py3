@@ -1,6 +1,7 @@
 """
 File containing the BaseDataAnalyis class.
 """
+import warnings
 from inspect import signature
 import os
 import numpy as np
@@ -192,6 +193,9 @@ class BaseDataAnalysis(object):
         self.figs = OrderedDict()
         self.presentation_mode = self.options_dict.get(
             'presentation_mode', False)
+        if self.presentation_mode:
+            warnings.warn("presentation_mode is deprecated",
+                          DeprecationWarning)
         self.tight_fig = self.options_dict.get('tight_fig', True)
         # used in self.plot_text, here for future compatibility
         self.fancy_box_props = dict(boxstyle='round', pad=.4,
@@ -220,6 +224,7 @@ class BaseDataAnalysis(object):
     def run_analysis(self):
         """
         This function is at the core of all analysis and defines the flow.
+
         This function is typically called after the __init__.
         """
         self.extract_data()  # extract data specified in params dict
@@ -237,7 +242,8 @@ class BaseDataAnalysis(object):
 
             if self.options_dict.get('save_figs', False):
                 self.save_figures(
-                    close_figs=self.options_dict.get('close_figs', True))
+                    close_figs=self.options_dict.get('close_figs', True),
+                    tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
     def get_timestamps(self):
         """
@@ -388,22 +394,37 @@ class BaseDataAnalysis(object):
         """
         pass
 
-    def save_figures(self, savedir: str = None, savebase: str = None,
+    def save_figures(self, savedir: str = None,
                      tag_tstamp: bool = True,
                      fmt: str = 'png', key_list: list = 'auto',
                      close_figs: bool = True):
+        """
+        Save figures self.figs attribute.
+
+        Args:
+            savedir (str)       : directory to save figures to.
+                    raw_data_dict['folder'] if not specified
+                    raw_data_dict['folder'][-1] if folder is a list
+            tag_tstamp (bool)   : appends a timstamp in the figure filename
+            fmt (str)           : the format to save the figures in
+                    e.g., png, svg, pdf etc.
+            key_list (list)      : keys of figures to save, if 'auto',
+                saves all figures in self.figs.
+
+
+        """
         if savedir is None:
-            savedir = self.raw_data_dict.get('folder', '')
+            savedir = self.raw_data_dict.get('folder')
+            # for analyses that have more than one
             if isinstance(savedir, list):
                 savedir = savedir[0]
 
-        if savebase is None:
-            savebase = ''
         if tag_tstamp:
             tstag = '_' + self.raw_data_dict['timestamps'][0]
         else:
             tstag = ''
 
+        # FIXME: remove either auto or None as an option.
         if key_list == 'auto' or key_list is None:
             key_list = self.figs.keys()
 
@@ -418,15 +439,15 @@ class BaseDataAnalysis(object):
         for key in key_list:
             if self.presentation_mode:
                 savename = os.path.join(
-                    savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
+                    savedir, key + tstag + 'presentation' + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
                 savename = os.path.join(
-                    savedir, savebase + key + tstag + 'presentation' + '.svg')
+                    savedir, key + tstag + 'presentation' + '.svg')
                 self.figs[key].savefig(
                     savename, bbox_inches='tight', fmt='svg')
             else:
                 savename = os.path.join(
-                    savedir, savebase + key + tstag + '.' + fmt)
+                    savedir, key + tstag + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
                 plt.close(self.figs[key])
@@ -1373,6 +1394,8 @@ class BaseDataAnalysis(object):
                 # The initial guess
                 pdict_init['yvals'] = model.eval(
                     **pdict_init['fit_res'].init_values,
+                    #This is probably a bug .init_values should be .init_params
+                    # not changing as I cannot test it right now.
                     **{independent_var: pdict_init['xvals']})
             else:
                 output = fit_fn(**pdict_init['fit_res'].initial_params,

@@ -755,7 +755,8 @@ class CCLight_Transmon(Qubit):
         - set the integration weights
         """
         if self.cfg_prepare_ro_awg():
-            self.instr_acquisition.get_instr().load_default_settings(upload_sequence=False)
+            self.instr_acquisition.get_instr().load_default_settings(
+                upload_sequence=False)
             self._prep_ro_pulse(CW=CW)
             self._prep_ro_integration_weights()
             self._prep_deskewing_matrix()
