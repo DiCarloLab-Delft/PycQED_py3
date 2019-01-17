@@ -307,3 +307,29 @@ def standard_qubit_pulses_to_rotations(pulse_list: List[Tuple]) \
     for i in range(len(rotations)):
         rotations[i].dims = [[d] for d in rotations[i].shape]
     return rotations
+
+
+def standard_qubit_pulses_to_pauli(pulse_list: List[Tuple]) \
+        -> List[qtp.Qobj]:
+    """
+    Converts lists of n-tuples of standard PycQED single-qubit pulse names to
+    the corresponding measurement operators.
+    """
+    standard_pulses = {
+        'I': 'Z',
+        'X180': 'mZ',
+        'mX180': 'mZ',
+        'Y180': 'mZ',
+        'mY180': 'mZ',
+        'X90': 'Y',
+        'mX90': 'mY',
+        'Y90': 'X',
+        'mY90': 'mX',
+        'Z90': 'Z',
+        'mZ90': 'Z',
+        'Z180': 'Z',
+        'mZ180': 'Z',
+    }
+    paulis = [[''.join(standard_pulses[pulse] for pulse in qb_pulses)][0]
+              for qb_pulses in pulse_list]
+    return paulis

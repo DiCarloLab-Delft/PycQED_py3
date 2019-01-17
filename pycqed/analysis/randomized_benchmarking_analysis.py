@@ -76,15 +76,31 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
             self.data_RB = self.extract_data(**kw)
             #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
             #n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
-            self.add_analysis_datagroup_to_file()
-            self.add_dataset_to_analysisgroup('Corrected data', self.data_RB)
-            self.analysis_group.attrs.create(
-                'corrected data based on', 'calibration points'.encode('utf-8'))
-
             self.fit_res = self.fit_data(self.data_RB, self.n_cl, **kw)
             self.fit_results = [self.fit_res]
+            self.data_RB_raw = deepcopy(self.data_RB)
+            self.fit_res_raw = deepcopy(self.fit_res)
+            self.add_analysis_datagroup_to_file()
+            self.add_dataset_to_analysisgroup('RB data',
+                                              self.data_RB_raw)
+            # self.analysis_group.attrs.create(
+            #     'corrected data based on', 'calibration points'.encode('utf-8'))
+            self.save_fitted_parameters(fit_res=self.fit_res_raw,
+                                        var_name='F|1>')
 
-            self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
+            if kw.pop('add_correction', False):
+                A = self.fit_res.best_values['Amplitude']
+                B = self.fit_res.best_values['offset']
+                A_scaled = A+B
+                # overwrite the values of the Amplitude and offset
+                self.fit_res.best_values['Amplitude'] = A_scaled
+                self.fit_res.best_values['offset'] = 0
+                self.data_RB = (A_scaled/A)*(self.data_RB - B)
+                self.add_dataset_to_analysisgroup('Corrected data - rescaled',
+                                                  self.data_RB)
+                self.save_fitted_parameters(fit_res=self.fit_res,
+                                            var_name='F|1>')
+
             if make_fig_RB:
                 self.make_figures(close_main_fig=close_main_fig, **kw)
 

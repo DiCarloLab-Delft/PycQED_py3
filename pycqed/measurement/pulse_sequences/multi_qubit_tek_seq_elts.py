@@ -1653,7 +1653,7 @@ def parity_correction_seq(
                           'Y90 ' + qb2n,
                           'RO ' + qb2n]
     xx_sequence_after_z =  deepcopy(xx_sequence_first)
-    xx_sequence_after_x =  ['mY90s ' + qb2n,
+    xx_sequence_after_x =  ['mY90 ' + qb2n,
                             CZ_pulses[0],
                             CZ_pulses[1],
                             # 'mY90 ' + qb1n,
