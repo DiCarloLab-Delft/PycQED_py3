@@ -67,8 +67,8 @@ class Test_CoherenceAnalysis_Helpers(unittest.TestCase):
 
         fit_res.plot_fit(show_init=True)
         pars = fit_res.params
-        self.assertAlmostEqual(Ec, pars['Ec'].value, places=-2)
-        self.assertAlmostEqual(Ej, pars['Ej'].value, places=-2)
+        self.assertAlmostEqual(Ec, pars['Ec'].value, places=-4)
+        self.assertAlmostEqual(Ej, pars['Ej'].value, places=-4)
         self.assertAlmostEqual(offset, pars['offset'].value, places=2)
         self.assertAlmostEqual(dac0, pars['dac0'].value, places=2)
 
@@ -156,7 +156,7 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
         self.assertTrue(set(a.figs.keys()).issubset(expected_fig_keys))
 
         self.assertAlmostEqual(a.fit_res['D1']['gamma_intercept'],
-                               62032.192, places=2)
+                               62032.192, places=-2)
         self.assertAlmostEqual(a.fit_res['D1']['sqrtA_echo'],
                                -0.058470, places=4)
 
