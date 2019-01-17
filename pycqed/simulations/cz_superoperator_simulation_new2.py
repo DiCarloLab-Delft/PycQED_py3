@@ -200,7 +200,7 @@ def compute_propagator(arglist):
     if noise_parameters_CZ.Z_rotations_length() != 0:
         tlist_singlequbitrotations = np.arange(0,noise_parameters_CZ.Z_rotations_length(),sim_step_new)
         amp_Z_rotation = np.zeros(len(tlist_singlequbitrotations))+amp_final[0]
-        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0)
+        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
         tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.Z_rotations_length(),sim_step_new,tlist_new)
 
     # We add the idle time at the end of the pulse (even if it's not at the end. It doesn't matter)
@@ -210,13 +210,13 @@ def compute_propagator(arglist):
         double_sided = fluxlutman.czd_double_sided()                # idle time is single-sided so we save the fluxlutman.czd_double_sided() value, set it to False
                                                                     # and later restore it to the original value
         fluxlutman.czd_double_sided(False)
-        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0)
+        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
         fluxlutman.czd_double_sided(double_sided)
         tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.total_idle_time(),sim_step_new,tlist_new)   # misleading name for the function sorry
 
 
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
-    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
+    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
 
 
     # We concatenate amp and f_pulse with the values they take during the Zrotations and idle_time.

@@ -681,10 +681,10 @@ def distort_amplitude(fitted_stepresponse_ty,amp,tlist_new,sim_step_new):
 
 
 
-def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0):
+def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,noise_parameters_CZ):
     
     if not fluxlutman.czd_double_sided():
-        omega_0 = compute_sweetspot_frequency(fluxlutman.q_polycoeffs_freq_01_det(),fluxlutman.q_freq_01())
+        omega_0 = compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot())
 
         f_pulse = fluxlutman.calc_amp_to_freq(amp_final,'01')
         f_pulse = np.clip(f_pulse,a_min=None,a_max=omega_0)                    # necessary otherwise the sqrt below gives nan
@@ -701,7 +701,7 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0):
         amp_B = amp_final[half_length:]
 
 
-        omega_0 = compute_sweetspot_frequency(fluxlutman.q_polycoeffs_freq_01_det(),fluxlutman.q_freq_01())
+        omega_0 = compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot())
 
         f_pulse_A = fluxlutman.calc_amp_to_freq(amp_A,'01')
         f_pulse_A = np.clip(f_pulse_A,a_min=None,a_max=omega_0)
@@ -748,8 +748,8 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
     # time-dependent jump operators on q0
     if T2_q0_amplitude_dependent[0] != -1:
 
-        f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency(fluxlutman.q_polycoeffs_freq_01_det(),fluxlutman.q_freq_01()))
-        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency(fluxlutman.q_polycoeffs_freq_01_det(),fluxlutman.q_freq_01()))
+        f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()))
+        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()))
         for i in range(len(sensitivity)):
             if sensitivity[i] < 1e-1:
                 sensitivity[i] = 1e-1
@@ -1122,7 +1122,8 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ):
                                 'detuning': noise_parameters_CZ.detuning(),
                                 'initial_state': noise_parameters_CZ.initial_state(),
                                 'total_idle_time': noise_parameters_CZ.total_idle_time(),
-                                'waiting_at_sweetspot': noise_parameters_CZ.waiting_at_sweetspot()}
+                                'waiting_at_sweetspot': noise_parameters_CZ.waiting_at_sweetspot(),
+                                'w_q0_sweetspot': noise_parameters_CZ.w_q0_sweetspot()}
 
     return fluxlutman_args, noise_parameters_CZ_args
 
@@ -1163,6 +1164,7 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     noise_parameters_CZ.initial_state(noise_parameters_CZ_args['initial_state'])
     noise_parameters_CZ.total_idle_time(noise_parameters_CZ_args['total_idle_time'])
     noise_parameters_CZ.waiting_at_sweetspot(noise_parameters_CZ_args['waiting_at_sweetspot'])
+    noise_parameters_CZ.w_q0_sweetspot(noise_parameters_CZ_args['w_q0_sweetspot'])
 
     return fluxlutman, noise_parameters_CZ
 
@@ -1258,9 +1260,6 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q
     print('infid_vec =',infid_vec.tolist())
 
 
-def compute_sweetspot_frequency(polycoeff,freq_at_0_amp):
-    return polycoeff[1]**2/2/polycoeff[0]-polycoeff[2]+freq_at_0_amp
-
 
 def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     '''
@@ -1344,6 +1343,9 @@ def correct_phases(U):
 
     return U
 
+
+def compute_sweetspot_frequency(polycoeff,freq_at_0_amp):
+    return polycoeff[1]**2/2/polycoeff[0]-polycoeff[2]+freq_at_0_amp
 
 
 

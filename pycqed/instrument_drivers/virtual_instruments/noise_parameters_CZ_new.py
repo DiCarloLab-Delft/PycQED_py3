@@ -54,6 +54,10 @@ class NoiseParametersCZ(Instrument):
                            label='NB: different from the operating point in general',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+        self.add_parameter('w_q0_sweetspot',
+                           label='NB: different from the operating point in general',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
         self.add_parameter('Z_rotations_length', unit='s',
                            label='duration of the single qubit Z rotations at the end of the pulse',
                            parameter_class=ManualParameter,
