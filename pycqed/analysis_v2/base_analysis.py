@@ -439,15 +439,15 @@ class BaseDataAnalysis(object):
         for key in key_list:
             if self.presentation_mode:
                 savename = os.path.join(
-                    savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
+                    savedir, key + tstag + 'presentation' + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
                 savename = os.path.join(
-                    savedir, savebase + key + tstag + 'presentation' + '.svg')
+                    savedir, key + tstag + 'presentation' + '.svg')
                 self.figs[key].savefig(
                     savename, bbox_inches='tight', fmt='svg')
             else:
                 savename = os.path.join(
-                    savedir, savebase + key + tstag + '.' + fmt)
+                    savedir, key + tstag + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
                 plt.close(self.figs[key])
