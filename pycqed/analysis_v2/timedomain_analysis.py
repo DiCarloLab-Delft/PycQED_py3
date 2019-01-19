@@ -1740,6 +1740,25 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                           meas_string),
                 'bar_kws': dict(zorder=1),
             }
+    
+    def generate_raw_pauli_set(self):
+        nr_qubits = self.proc_data_dict['d'].bit_length() - 1
+        pauli_raw_values = []
+        for op in tomo.generate_pauli_set(nr_qubits)[1]:
+            nr_terms = 0
+            sum_terms = 0.
+            for meas_op, meas_res in zip(self.proc_data_dict['meas_operators'], 
+                                         self.proc_data_dict['meas_results']):
+                trace = (meas_op*op).tr().real
+                clss = int(trace*2)
+                if clss < 0:
+                    sum_terms -= meas_res
+                    nr_terms += 1
+                elif clss > 0:
+                    sum_terms += meas_res
+                    nr_terms += 1
+            pauli_raw_values.append(2**nr_qubits*sum_terms/nr_terms)
+        return pauli_raw_values
 
     def prepare_pauli_basis_plot(self):
         yexp = tomo.density_matrix_to_pauli_basis(self.proc_data_dict['rho'])
@@ -1750,7 +1769,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             order = [1, 2, 3]
         elif nr_qubits == 2:
             order = [1, 2, 3, 4, 8, 12, 5, 6, 7, 9, 10, 11, 13, 14, 15]
-        elif nr_qubits == 4:
+        elif nr_qubits == 3:
             order = [1, 2, 3, 4, 8, 12, 16, 32, 48] + \
                     [5, 6, 7, 9, 10, 11, 13, 14, 15] + \
                     [17, 18, 19, 33, 34, 35, 49, 50, 51] + \

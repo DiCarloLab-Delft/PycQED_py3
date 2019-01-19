@@ -333,3 +333,21 @@ def standard_qubit_pulses_to_pauli(pulse_list: List[Tuple]) \
     paulis = [[''.join(standard_pulses[pulse] for pulse in qb_pulses)][0]
               for qb_pulses in pulse_list]
     return paulis
+
+def generate_pauli_set(nr_qubits):
+    paulis = {
+        'I': qtp.qeye(2),
+        'X': qtp.sigmax(),
+        'Y': qtp.sigmay(),
+        'Z': qtp.sigmaz(),
+    }
+    labels = [''.join(ops) for ops in itertools.product(['I','X','Y','Z'], 
+              repeat=nr_qubits)]
+    operators = []
+    for label in labels:
+        op = qtp.Qobj([[1]])
+        for c in label:
+            op = qtp.tensor(op, paulis[c])
+        op.dims = [[2**nr_qubits], [2**nr_qubits]]
+        operators.append(op)
+    return labels, operators
