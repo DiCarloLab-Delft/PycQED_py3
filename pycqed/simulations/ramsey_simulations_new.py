@@ -96,7 +96,7 @@ def compute_propagator(arglist):
     tlist_new = tlist
 
 
-    freq = fluxlutman.q_freq_01() + noise_parameters_CZ.detuning()
+    freq = noise_parameters_CZ.w_q0_sweetspot() + noise_parameters_CZ.detuning()
     amp = [fluxlutman.calc_freq_to_amp(freq)]
 
 
@@ -114,7 +114,7 @@ def compute_propagator(arglist):
     else:
         amp_final=[amp_final[0],amp_final[0]]     # Ram-Z
     sim_step_new=sim_step_new/2
-    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
+    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
 
 
     ### Obtain jump operators, possibly time-dependent (incoherent part of the noise)
