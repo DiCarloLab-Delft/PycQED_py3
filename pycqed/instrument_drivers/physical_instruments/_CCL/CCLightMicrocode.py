@@ -197,7 +197,6 @@ class CCLightMicrocode():
                                     cs_line, idx))
 
     def load_microcode(self, filename):
-        print("file to load by mc: ", filename)
         try:
             mc_config = open(filename, 'r', encoding='utf-8')
             logging.info("opened file {} successfully.".format(filename))
@@ -215,30 +214,24 @@ class CCLightMicrocode():
 
             # remove the ':' character
             line = line.translate({ord(":"): None})
-            print("line to split: ", line)
+
             # get each number in the line
             line_number, condition, op_type_left, cw_left,\
                 op_type_right, cw_right = line.split()
 
             line_number = int(line_number)
-            # print("line_number: ", line_number, " ", end= "")
             condition = int(condition)
-            # print("condition: ", condition, " ", end= "")
             op_type_left = int(op_type_left)
-            # print("op_type_left: ", op_type_left, " ", end= "")
             cw_left = int(cw_left)
-            # print("cw_left: ", cw_left, " ", end= "")
             op_type_right = int(op_type_right)
-            # print("op_type_right: ", op_type_right, " ", end= "")
             cw_right = int(cw_right)
-            # print("cw_right: ", cw_right, " ", end= "")
+
             if line_number > 256:
                 raise ValueError("line number ({}) in the file "
                                  "exceeds the maximum value (256).")
 
             self.microcode[line_number] = self.gen_control_store_line(
                 condition, op_type_left, cw_left, op_type_right, cw_right)
-            # print(self.microcode[line_number])
 
     def write_to_bin(self, filename=None):
         bin_data = bytearray()
