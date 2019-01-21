@@ -197,6 +197,7 @@ class CCLightMicrocode():
                                     cs_line, idx))
 
     def load_microcode(self, filename):
+        print("file to load by mc: ", filename)
         try:
             mc_config = open(filename, 'r', encoding='utf-8')
             logging.info("opened file {} successfully.".format(filename))
@@ -208,8 +209,13 @@ class CCLightMicrocode():
         mc_config.readline()
 
         for line in mc_config:
+            # throw away empty lines
+            if not line.rstrip():
+                continue
+
             # remove the ':' character
             line = line.translate({ord(":"): None})
+            print("line to split: ", line)
             # get each number in the line
             line_number, condition, op_type_left, cw_left,\
                 op_type_right, cw_right = line.split()
