@@ -927,10 +927,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if not np.isnan(self.czd_net_integral()):
             curr_int = np.sum(base_wf)
             corr_int = self.czd_net_integral()-curr_int
-            corr_pulse = phase_corr_triangle(
+            #corr_pulse = phase_corr_triangle(
+            #    int_val=corr_int, nr_samples=corr_samples)
+
+            corr_pulse = phase_corr_square(
                 int_val=corr_int, nr_samples=corr_samples)
             if np.max(corr_pulse) > 0.5:
-                logging.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
+                logging.warning('net-zero integral correction({:.2f}) larger than 0.5'.format(
                     np.max(corr_pulse)))
         else:
             corr_pulse = np.zeros(corr_samples)
@@ -1005,7 +1008,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if self.czd_double_sided() and not np.isnan(self.czd_net_integral()):
             curr_int = np.sum(base_wf)
             corr_int = self.czd_net_integral()-curr_int
-            corr_pulse = phase_corr_triangle(
+
+#            corr_pulse = phase_corr_triangle(
+#                int_val=corr_int, nr_samples=corr_samples)
+            corr_pulse = phase_corr_square(
                 int_val=corr_int, nr_samples=corr_samples)
             if np.max(corr_pulse) > 0.5:
                 logging.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
@@ -1571,6 +1577,17 @@ def phase_corr_triangle(int_val, nr_samples):
     b = 2*int_val/(nr_samples+1)
     a = -b/nr_samples
     y = a*x+b
+    return y
+
+
+def phase_corr_square(int_val, nr_samples):
+    """
+    Creates an offset square with desired integrated value
+    """
+    x = np.arange(nr_samples)
+    # nr_samples+1 is because python counting starts at 0
+    a = int_val/(nr_samples+1)
+    y = a*np.ones(len(x))
     return y
 
 

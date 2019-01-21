@@ -227,6 +227,9 @@ class DeviceCCL(Instrument):
         self._prep_ro_instantiate_detectors(qubits=qubits)
 
     def prepare_fluxing(self):
+        # This line does not make sense...
+        # Flux pulses for all qubits on the device should be uploaded here
+        # to avoid strange bugs. - MAR Jan 2019
         q0 = self.qubits()[0]
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         fl_lutman.load_waveforms_onto_AWG_lookuptable()
