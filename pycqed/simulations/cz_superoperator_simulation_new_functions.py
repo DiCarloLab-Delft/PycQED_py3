@@ -1379,7 +1379,7 @@ def calc_populations_new(rho_out,population_states):
 def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ):
 
     if initial_state == '11_dressed':
-        freq = fluxlutman.q_freq_01() + noise_parameters_CZ.detuning()
+        freq = noise_parameters_CZ.w_q0_sweetspot() + noise_parameters_CZ.detuning()
         amp = fluxlutman.calc_freq_to_amp(freq)
         H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
         eigs,eigvectors = H.eigenstates()

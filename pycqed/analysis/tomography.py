@@ -1223,8 +1223,14 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                          'angle_LSQ': np.rad2deg(self.fit_res.best_values['angle_LSQ']),
                          'angle_MSQ': np.rad2deg(self.fit_res.best_values['angle_MSQ']),
                          'LSQ_name': self.q0_label,
-                         'MSQ_name': self.q1_label}
-            name='tomography_results_decoding_{}_states_{}_indices_{}'.format(self.PF_tracking,
+                         'MSQ_name': self.q1_label,
+                         'data_fraction': self.fraction}
+            if self.PF_tracking=='no_error':
+                name='tomography_results_decoding_{}_states_{}_indices_{}'.format(self.PF_tracking,
+                                                                self.q_post_selection_states[:len(self.PF_parity_pattern)],
+                                                                self.q_post_selection_indices[:len(self.PF_parity_pattern)])
+            else:
+                name='tomography_results_decoding_{}_states_{}_indices_{}'.format(self.PF_tracking,
                                                                 self.q_post_selection_states,
                                                                 self.q_post_selection_indices)
             self.save_dict_to_analysis_group(pars_dict, name)
