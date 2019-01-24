@@ -265,7 +265,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                                    capsize=self.line_width,
                                    capthick=self.line_width)
 
-        x_fine = np.linspace(0, self.n_cl[-1], 100)
+        x_fine = np.linspace(self.n_cl[0], self.n_cl[-1], 100)
         for fit_res in self.fit_results:
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
                 x_fine, **fit_res.best_values)
@@ -566,7 +566,8 @@ class Interleaved_RB_Analysis(RandomizedBenchmarking_Analysis):
         for i, msmt_name in enumerate(self.data_dict):
 
             # Plot fit lines
-            x_fine = np.linspace(0, self.ncl_dict[msmt_name][-1], 1000)
+            x_fine = np.linspace( self.ncl_dict[msmt_name][0],
+                                  self.ncl_dict[msmt_name][-1], 1000)
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
                 x_fine, **self.fit_res_dict[msmt_name].best_values)
             self.ax.plot(x_fine, best_fit, c=c[i])
@@ -1694,7 +1695,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                                    color=c)
 
         if plot_fit:
-            x_fine = np.linspace(0, n_cl[-1], 1000)
+            x_fine = np.linspace(n_cl[0], n_cl[-1], 1000)
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
                 x_fine, **fit_res.best_values)
             ax.plot(x_fine, best_fit, color=c)
@@ -1712,7 +1713,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
             if T1 is not None and T2 is not None and plot_T1_lim:
                 F_T1, p_T1 = calc_T1_limited_fidelity(
                     T1, T2, pulse_length)
-                x_fine = np.linspace(0, n_cl[-1], 1000)
+                x_fine = np.linspace(n_cl[0], n_cl[-1], 1000)
                 T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
                     x_fine, fit_res.best_values['Amplitude'], p_T1,
                     fit_res.best_values['offset'])

@@ -318,6 +318,7 @@ class two_qubit_randomized_benchmarking_one_length(swf.Hard_Sweep):
 
     def __init__(self, qb1n, qb2n, operation_dict,
                  nr_cliffords_value,
+                 cl_seq=None,
                  CZ_pulse_name=None,
                  net_clifford=0,
                  clifford_decomposition_name='HZ',
@@ -330,6 +331,7 @@ class two_qubit_randomized_benchmarking_one_length(swf.Hard_Sweep):
         self.qb2n = qb2n
         self.operation_dict = operation_dict
         self.nr_cliffords_value = nr_cliffords_value
+        self.cl_seq = cl_seq
         self.CZ_pulse_name = CZ_pulse_name
         self.net_clifford = net_clifford
         self.clifford_decomposition_name = clifford_decomposition_name
@@ -347,6 +349,7 @@ class two_qubit_randomized_benchmarking_one_length(swf.Hard_Sweep):
         if self.upload:
             sqs2.two_qubit_randomized_benchmarking_seq(
                 qb1n=self.qb1n, qb2n=self.qb2n,
+                cl_seq=self.cl_seq,
                 operation_dict=self.operation_dict,
                 nr_cliffords_value=self.nr_cliffords_value,
                 nr_seeds=self.sweep_points,
@@ -782,7 +785,7 @@ class GST_experiment_sublist_swf(swf.Soft_Sweep):
     def set_parameter(self, val, **kw):
 
         self.hard_swf.pygsti_listOfExperiments = \
-        self.pygsti_sublistOfExperiments[val]
+            self.pygsti_sublistOfExperiments[val]
         self.hard_swf.upload = True
         self.hard_swf.prepare(upload_all=self.is_first_sweeppoint)
         self.is_first_sweeppoint = False

@@ -924,6 +924,7 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
 def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
                                               nr_cliffords_array,
                                               nr_seeds_value,
+                                              cl_seq=None,
                                               CZ_pulse_name=None,
                                               net_clifford=0,
                                               nr_averages=4096,
@@ -943,7 +944,7 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
                 clifford_decomposition_name, nr_seeds_value,
                 nr_cliffords_array[-1], qb1n, qb2n)
         else:
-            label = 'IRB_{}_{}_{}_seeds_{}_cliffords'.format(
+            label = 'IRB_{}_{}_{}_seeds_{}_cliffords_{}{}'.format(
                 interleaved_gate, clifford_decomposition_name, nr_seeds_value,
                 nr_cliffords_array[-1], qb1n, qb2n)
 
@@ -973,6 +974,7 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
     hard_sweep_func = awg_swf2.two_qubit_randomized_benchmarking_one_length(
         qb1n=qb1n, qb2n=qb2n, operation_dict=operation_dict,
         nr_cliffords_value=nr_cliffords_array[0],
+        cl_seq=cl_seq,
         CZ_pulse_name=CZ_pulse_name,
         net_clifford=net_clifford,
         clifford_decomposition_name=clifford_decomposition_name,
@@ -2004,9 +2006,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     if cal_points:
         sweep_points_dict = deepcopy(sweep_points_dict)
-        print(sweep_points_dict)
         for key, spts in sweep_points_dict.items():
-            print(key, spts)
             if spts is None:
                 if key == 'n_rabi':
                     sweep_points_dict[key] = {}
@@ -2015,7 +2015,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                             np.linspace(
                                 (n_rabi_pulses-1)*qb.amp180()/n_rabi_pulses,
                                  min((n_rabi_pulses+1)*qb.amp180()/n_rabi_pulses,
-                                 0.95), 41)
+                                 0.9), 41)
                 else:
                    raise ValueError('Sweep points for {} measurement are not '
                                     'defined.'.format(key))
@@ -2966,21 +2966,29 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
     # Check if there are too many experiments to do
     max_exp_len = kw.pop('max_exp_len', 800)
     if nr_exp > max_exp_len:
+        print('2D Sweep')
         nr_subexp = nr_exp // max_exp_len
+        print(nr_subexp)
         pygsti_sublistOfExperiments = [listOfExperiments[
                                        i*max_exp_len:(i+1)*max_exp_len] for
                                        i in range(nr_subexp)]
-        pygsti_sublistOfExperiments += [listOfExperiments[
-                                        -(nr_exp - max_exp_len*nr_subexp)::]]
-
+        remaining_exps = nr_exp - max_exp_len*nr_subexp
+        if remaining_exps > 0:
+            pygsti_sublistOfExperiments += [listOfExperiments[-remaining_exps::]]
+        print(len(pygsti_sublistOfExperiments))
         # Set detector function
         nr_shots = nr_shots_per_seg*max_exp_len*(2 if preselection else 1)
         det_func = get_multiplexed_readout_detector_functions(
             qubits, UHFQC=UHFQC, pulsar=pulsar,
-            nr_shots=nr_shots)[key+'_log_det']
+            nr_shots=nr_shots, values_per_point=2,
+            values_per_point_suffex=['_presel', '_measure'])[key+'_log_det']
+
         # Define hard sweep
-        hard_sweep_points = np.tile(np.arange(max_exp_len),
-                                    nr_shots_per_seg*(2 if preselection else 1))
+        # hard_sweep_points = np.repeat(np.arange(max_exp_len),
+        #                             nr_shots_per_seg*(2 if preselection else 1))
+        hard_sweep_points = np.arange(max_exp_len*nr_shots_per_seg *
+                                      (2 if preselection else 1))
+
         hard_sweep_func = \
             awg_swf2.GST_swf(qb_names,
                              pygsti_listOfExperiments=
@@ -2997,14 +3005,18 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
             pygsti_sublistOfExperiments)
         MC_run_mode = '2D'
     else:
+        print('1D Sweep')
         # Set detector function
         nr_shots = nr_shots_per_seg*nr_exp*(2 if preselection else 1)
         det_func = get_multiplexed_readout_detector_functions(
             qubits, UHFQC=UHFQC, pulsar=pulsar,
-            nr_shots=nr_shots)[key+'_log_det']
+            nr_shots=nr_shots, values_per_point=2,
+            values_per_point_suffex=['_presel', '_measure'])[key+'_log_det']
         # Define hard sweep
-        hard_sweep_points = np.tile(np.arange(nr_exp),
-                                    nr_shots_per_seg*(2 if preselection else 1))
+        # hard_sweep_points = np.repeat(np.arange(nr_exp),
+        #                             nr_shots_per_seg*(2 if preselection else 1))
+        hard_sweep_points = np.arange(max_exp_len*nr_shots_per_seg *
+                                      (2 if preselection else 1))
         hard_sweep_func = \
             awg_swf2.GST_swf(qb_names,
                              pygsti_listOfExperiments=listOfExperiments,
