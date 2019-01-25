@@ -1126,7 +1126,8 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ):
                                 'initial_state': noise_parameters_CZ.initial_state(),
                                 'total_idle_time': noise_parameters_CZ.total_idle_time(),
                                 'waiting_at_sweetspot': noise_parameters_CZ.waiting_at_sweetspot(),
-                                'w_q0_sweetspot': noise_parameters_CZ.w_q0_sweetspot()}
+                                'w_q0_sweetspot': noise_parameters_CZ.w_q0_sweetspot(),
+                                'repetitions': noise_parameters_CZ.repetitions()}
 
     return fluxlutman_args, noise_parameters_CZ_args
 
@@ -1168,6 +1169,7 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     noise_parameters_CZ.total_idle_time(noise_parameters_CZ_args['total_idle_time'])
     noise_parameters_CZ.waiting_at_sweetspot(noise_parameters_CZ_args['waiting_at_sweetspot'])
     noise_parameters_CZ.w_q0_sweetspot(noise_parameters_CZ_args['w_q0_sweetspot'])
+    noise_parameters_CZ.repetitions(noise_parameters_CZ_args['repetitions'])
 
     return fluxlutman, noise_parameters_CZ
 
