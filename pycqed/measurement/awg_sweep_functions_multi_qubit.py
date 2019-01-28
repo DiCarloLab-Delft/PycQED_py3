@@ -549,7 +549,7 @@ class Ramsey_add_pulse_swf(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2. Ramsey_add_pulse_seq(
+            sqs2.Ramsey_add_pulse_seq(
                 times=self.sweep_points,
                 measured_qubit_name=self.measured_qubit_name,
                 pulsed_qubit_name=self.pulsed_qubit_name,

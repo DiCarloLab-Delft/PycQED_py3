@@ -1917,7 +1917,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                        artificial_detuning=None,
                        cal_points=True, no_cal_points=4, upload=True,
                        MC=None, soft_avgs=1, n_rabi_pulses=1,
-                       thresholded=False, #analyses can't handle it!
+                       thresholded=False, #analyses can't do thresholded=True!
                        analyze=True, update=False,
                        UHFQC=None, pulsar=None, **kw):
 
