@@ -1623,6 +1623,13 @@ def parity_correction_seq(
         'length': ro_spacing + feedback_delay,
         'pulse_delay': 0}
     
+    operation_dict['I rr_decay'] = {
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict['RO mux']['acq_marker_channel'],
+        'amplitude': 0.0,
+        'length': 400e-9,
+        'pulse_delay': 0}
+
     if dd_scheme is None:
         dd_pulses = [{
         'pulse_type': 'SquarePulse',
@@ -1645,6 +1652,8 @@ def parity_correction_seq(
             prep_sequence = []
         else:
             prep_sequence = ['Y90 ' + qb1n, 'Y90s ' + qb3n]
+    elif prep_sequence == 'mixed':
+        prep_sequence = ['Y90 ' + qb1n, 'Y90s ' + qb3n, 'RO mux', 'I rr_decay']
     
     xx_sequence_first =  ['Y90 ' + qb1n, 'mY90s ' + qb2n, 'Y90s ' + qb3n,
                           CZ_pulses[0],

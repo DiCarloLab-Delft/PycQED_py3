@@ -739,14 +739,25 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                     'ro_spacing': ro_spacing,
                     'nr_dd_pulses': nr_dd_pulses,
                     'dd_scheme': dd_scheme,
-                    'parity_op': parity_op}
+                    'parity_op': parity_op,
+                    'prep_sequence': prep_sequence,}
     if preselection:
-        multiplexed_pulse([(qb0, qb1, qb2)] +
-                          [(qb1,)]*nr_parity_measurements +
-                          [(qb0, qb1, qb2)], f_LO)
+        if prep_sequence == 'mixed':
+            multiplexed_pulse([(qb0, qb1, qb2), (qb0, qb2)] +
+                              [(qb1,)]*nr_parity_measurements +
+                              [(qb0, qb1, qb2)], f_LO)
+        else:
+            multiplexed_pulse([(qb0, qb1, qb2)] +
+                              [(qb1,)]*nr_parity_measurements +
+                              [(qb0, qb1, qb2)], f_LO)
     else:
-        multiplexed_pulse([(qb1,)]*nr_parity_measurements +
-                          [(qb0, qb1, qb2)], f_LO)
+        if prep_sequence == 'mixed':
+            multiplexed_pulse([(qb0, qb2)] +
+                              [(qb1,)]*nr_parity_measurements +
+                              [(qb0, qb1, qb2)], f_LO)
+        else:
+            multiplexed_pulse([(qb1,)]*nr_parity_measurements +
+                              [(qb0, qb1, qb2)], f_LO)
 
     qubits = [qb0, qb1, qb2]
     for qb in qubits:
