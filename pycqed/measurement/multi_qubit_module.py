@@ -724,7 +724,8 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                               nr_shots=5000, nr_parity_measurements=1,
                               tomography_basis=(
                                   'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
-                              reset=True, preselection=False, ro_spacing=1e-6):
+                              reset=True, preselection=False, ro_spacing=1e-6,
+                              skip_n_initial_parity_checks=0):
     """
     Important things to check when running the experiment:
         Is the readout separation commensurate with 225 MHz?
@@ -740,23 +741,26 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                     'nr_dd_pulses': nr_dd_pulses,
                     'dd_scheme': dd_scheme,
                     'parity_op': parity_op,
-                    'prep_sequence': prep_sequence,}
+                    'prep_sequence': prep_sequence,
+                    'skip_n_initial_parity_checks': 
+                        skip_n_initial_parity_checks,}
+    nr_ancilla_readouts = nr_parity_measurements - skip_n_initial_parity_checks
     if preselection:
         if prep_sequence == 'mixed':
             multiplexed_pulse([(qb0, qb1, qb2), (qb0, qb2)] +
-                              [(qb1,)]*nr_parity_measurements +
+                              [(qb1,)]*nr_ancilla_readouts +
                               [(qb0, qb1, qb2)], f_LO)
         else:
             multiplexed_pulse([(qb0, qb1, qb2)] +
-                              [(qb1,)]*nr_parity_measurements +
+                              [(qb1,)]*nr_ancilla_readouts +
                               [(qb0, qb1, qb2)], f_LO)
     else:
         if prep_sequence == 'mixed':
             multiplexed_pulse([(qb0, qb2)] +
-                              [(qb1,)]*nr_parity_measurements +
+                              [(qb1,)]*nr_ancilla_readouts +
                               [(qb0, qb1, qb2)], f_LO)
         else:
-            multiplexed_pulse([(qb1,)]*nr_parity_measurements +
+            multiplexed_pulse([(qb1,)]*nr_ancilla_readouts +
                               [(qb0, qb1, qb2)], f_LO)
 
     qubits = [qb0, qb1, qb2]
@@ -780,6 +784,7 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
         ro_spacing=ro_spacing,
         dd_scheme=dd_scheme,
         nr_dd_pulses=nr_dd_pulses,
+        skip_n_initial_parity_checks=skip_n_initial_parity_checks,
         upload=upload, verbose=False)
 
     if reset == 'simple':
