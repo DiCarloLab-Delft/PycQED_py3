@@ -797,8 +797,8 @@ class UHFQC(Instrument):
                     tmp = self._daq.get(p, True, 0)
                     values[p] = tmp[p]
                 except:
-                    print("Unexpected error:", sys.exc_info()[0])
-                    timeout += 1
+                    print("Unexpected error: path =", p)
+                    timeout += 1    # FIXME: why?
 
         if single:
             return values[paths[0]]
