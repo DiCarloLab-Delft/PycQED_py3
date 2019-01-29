@@ -525,11 +525,9 @@ class BaseDataAnalysis(object):
                 fit_fn = fit_dict.get('fit_fn', None)
                 model = fit_dict.get('model', lmfit.Model(fit_fn))
             fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-
             if fit_guess_fn is None:
                 if  fitting_type == 'model' and fit_dict.get('fit_guess', True):
                     fit_guess_fn = model.guess
-
             if guess_pars is None: # if you pass on guess_pars, immediately go to the fitting
                 if fit_guess_fn is not None: # Run the guess funtions here
 
@@ -553,7 +551,6 @@ class BaseDataAnalysis(object):
                         # A guess can also be specified as a dictionary.
                         # additionally this can be used to overwrite values
                         # from the guess functions.
-
                         if guess_dict is not None:
                              for gd_key, val in guess_dict.items():
                                  for attr, attr_val in val.items():
@@ -562,13 +559,14 @@ class BaseDataAnalysis(object):
                 elif guess_dict is not None:
                     if fitting_type is 'minimize':
                         params = lmfit.Parameters()
-                        for key, val in list(guess_dict.items()):
-                            params.add(key)
+                        for gd_key, val in list(guess_dict.items()):
+                            params.add(gd_key)
                             for attr, attr_val in val.items():
-                                setattr(params[key], attr, attr_val)
+                                setattr(params[gd_key], attr, attr_val)
+
                     elif fitting_type is 'model':
-                        for key, val in list(guess_dict.items()):
-                            model.set_param_hint(key, **val)
+                        for gd_key, val in list(guess_dict.items()):
+                            model.set_param_hint(gd_key, **val)
                         guess_pars = model.make_params()
             else:
                 if fitting_type is 'minimize':
@@ -578,7 +576,6 @@ class BaseDataAnalysis(object):
                 fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
                                                 params=guess_pars)
                 self.fit_res[key] = fit_dict['fit_res']
-
             elif fitting_type is 'minimize': # Perform the fitting
                 fit_dict['fit_res'] = lmfit.minimize(fcn=_complex_residual_function,
                         params=params,
@@ -660,6 +657,8 @@ class BaseDataAnalysis(object):
             for k in param.__dict__:
                 if not k.startswith('_') and k not in ['from_internal', ]:
                     dic['params'][param_name][k] = getattr(param, k)
+                if k in '_val':
+                    dic['params'][param_name]['value'] = getattr(param,k)
         return dic
 
     def plot(self, key_list=None, axs_dict=None,
