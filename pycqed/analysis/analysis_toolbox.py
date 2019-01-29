@@ -2290,6 +2290,40 @@ def solve_quadratic_equation(a, b, c, verbose=False):
         return [x1, x2]
 
 
+def calculate_f_qubit_from_power_scan(f_bare,f_shifted,g_coupling=65e6):
+    '''
+    Inputs are in Hz
+    f_bare: the resonator frequency without a coupled qubit
+    f_shifted: the reso freq shifted due to coupling of a qwubit
+    g_coupling: the coupling strengs
+    Output:
+    f_q: in Hz
+    '''
+    w_r = f_bare * 2* np.pi
+    w_shift = f_shifted * 2*np.pi
+    g = 2*np.pi * g_coupling
+    shift =(w_shift - w_r)/g**2
+    #f_shift > 0 when f_qubit<f_res
+    if (shift>0):
+        w_q = -1/(shift) + np.sqrt(1/(shift**2)+w_r**2)
+        #For the RWA approximation
+        # w_q_RWA = -1/shift + w_r
+    else:
+        w_q = 1/shift + np.sqrt(1/(shift**2)+w_r**2)
+
+        # w_q_RWA = 1/shift + w_r
+    return w_q/(2.*np.pi)
+
+def calculate_g_coupling_from_frequency_shift(f_bare,f_shifted,f_qubit):
+    w_r = 2*np.pi * f_bare
+    w_shift = 2*np.pi * f_shifted
+    w_q = 2*np.pi*f_qubit
+    shift = w_shift-w_r
+    rhs = 1./(w_q-w_r) + 1./(w_q+w_r)
+    # rhs_RWA = 1./(w_q-w_r)
+    return np.sqrt(np.abs(shift/rhs))/(2*np.pi)
+
+
 # def find_min(x, y, min_target=None, return_fit=False, perc=30):
 #     from scipy.signal import argrelextrema
 #     from lmfit.models import QuadraticModel
