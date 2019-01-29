@@ -11,12 +11,12 @@ from .SCPI import SCPI
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes import validators as vals
-import os
 import logging
 import json
 import array
 
 log = logging.getLogger(__name__)
+
 
 class Qutech_CC(SCPI):
     """
@@ -53,7 +53,9 @@ class Qutech_CC(SCPI):
     def sequence_program(self, program_string):
         """
         """
-        self.write('QUTech:SEQuence:PROGram')
+        hdr = 'QUTech:SEQuence:PROGram'
+        # convert program_string
+        self.binBlockWrite(binBlock, hdr)
 
     # FIXME: add function to get assembly errors
 

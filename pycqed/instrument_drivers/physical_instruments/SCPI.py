@@ -9,7 +9,6 @@ Bugs:
 '''
 
 from qcodes import IPInstrument
-from qcodes import validators as vals
 import socket
 
 """
@@ -36,7 +35,7 @@ class SCPI(IPInstrument):
         # FIXME convert operation etc to parameters
         # IDN is implemented in the instrument base class
 
-        # example of how the commands could look
+        # example of how the commands could look. FIXME
         self.add_function('reset', call_cmd='*RST')
 
     def _recv(self):
@@ -49,7 +48,7 @@ class SCPI(IPInstrument):
     # Helpers
     ###
 
-    def readBinary(self, size):
+    def _read_binary(self, size):
         data = self._socket.recv(size)
         actLen = len(data)
         expLen = size
@@ -60,7 +59,7 @@ class SCPI(IPInstrument):
             i = i+1
         return data
 
-    def writeBinary(self, binMsg):
+    def _write_binary(self, binMsg):
         self._socket.send(binMsg)       # FIXME: should be in parent class
 
     def ask_float(self, str):
@@ -73,40 +72,40 @@ class SCPI(IPInstrument):
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
     ###
 
-    def clearStatus(self):
+    def clear_status(self):
         self.write('*CLS')
 
-    def setEventStatusEnable(self, value):
+    def set_event_status_enable(self, value):
         self.write('*ESE %d' % value)
 
-    def getEventStatusEnable(self):
+    def get_event_status_enable(self):
         return self.ask('*ESE?')
 
-    def getEventStatusEnableRegister(self):
+    def get_event_status_enable_register(self):
         return self.ask('*ESR?')
 
-    def getIdentity(self):
+    def get_identity(self):
         return self.ask('*IDN?')
 
-    def operationComplete(self):
+    def operation_complete(self):
         self.write('*OPC')
 
-    def getOperationComplete(self):
+    def get_operation_complete(self):
         return self.ask('*OPC?')
 
-    def getOptions(self):
+    def get_options(self):
         return self.ask('*OPT?')
 
-    def serviceRequestEnable(self, value):
+    def service_request_enable(self, value):
         self.write('*SRE %d' % value)
 
-    def getServiceRequestEnable(self):
+    def get_service_request_enable(self):
         return self.ask_int('*SRE?')
 
-    def getStatusByte(self):
+    def get_status_byte(self):
         return self.ask_int('*STB?')
 
-    def getTestResult(self):
+    def get_test_result(self):
         # NB: result bits are device dependent
         return self.ask_int('*TST?')
 
@@ -131,7 +130,7 @@ class SCPI(IPInstrument):
     def getSystemErrorCount(self):
         return self.ask_int('system:error:count?')
 
-    def getSystemVersion(self):
+    def get_system_version(self):
         return self.ask('system:version?')
 
     ###
@@ -147,9 +146,9 @@ class SCPI(IPInstrument):
 
             header (string): command string to use
         '''
-        totHdr = header + SCPI.buildHeaderString(len(binBlock))
+        totHdr = header + SCPI._build_header_string(len(binBlock))
         binMsg = totHdr.encode() + binBlock
-        self.writeBinary(binMsg)
+        self._write_binary(binMsg)
         self.write('')                  # add a Line Terminator
 
     def binBlockRead(self):
@@ -157,20 +156,20 @@ class SCPI(IPInstrument):
         ''' read IEEE488.2 binblock
         '''
         # get and decode header
-        headerA = self.readBinary(2)                        # read '#N'
+        headerA = self._read_binary(2)                        # read '#N'
         headerAstr = headerA.decode()
         if(headerAstr[0] != '#'):
             s = 'SCPI header error: received {}'.format(headerA)
             raise RuntimeError(s)
         digitCnt = int(headerAstr[1])
-        headerB = self.readBinary(digitCnt)
+        headerB = self._read_binary(digitCnt)
         byteCnt = int(headerB.decode())
-        binBlock = self.readBinary(byteCnt)
-        self.readBinary(2)                                  # consume <CR><LF>
+        binBlock = self._read_binary(byteCnt)
+        self._read_binary(2)                                  # consume <CR><LF>
         return binBlock
 
     @staticmethod
-    def buildHeaderString(byteCnt):
+    def _build_header_string(byteCnt):
         ''' generate IEEE488.2 binblock header
         '''
         byteCntStr = str(byteCnt)
