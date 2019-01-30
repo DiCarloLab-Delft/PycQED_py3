@@ -21,7 +21,11 @@ class Test_qubitspec_analysis(unittest.TestCase):
         peaks_dict = self.a_pk.peaks
         self.assertEqual(peaks_dict['dips'], [])
 
-        first_peak = peaks_dict['peaks'][0]
+
+        # first_peak = peaks_dict['peaks'][0] Peak finder algorithm might have
+        #changed
+
+        highest_peak = peaks_dict['peak']
         peak_low = 4.55e9
         peak_high = 4.555e9
 
