@@ -566,8 +566,8 @@ class Interleaved_RB_Analysis(RandomizedBenchmarking_Analysis):
         for i, msmt_name in enumerate(self.data_dict):
 
             # Plot fit lines
-            x_fine = np.linspace( self.ncl_dict[msmt_name][0],
-                                  self.ncl_dict[msmt_name][-1], 1000)
+            x_fine = np.linspace(self.ncl_dict[msmt_name][0],
+                                 self.ncl_dict[msmt_name][-1], 1000)
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
                 x_fine, **self.fit_res_dict[msmt_name].best_values)
             self.ax.plot(x_fine, best_fit, c=c[i])
@@ -896,7 +896,11 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                     self.fit_data(dset, self.n_cl, d=d,
                                   epsilon=self.var_data_dict[var_name],
                                   **kw)
-                self.epsilon_dict[var_name] = self.epsilon
+                if self.epsilon is None:
+                    self.epsilon_dict[var_name] = self.var_data_dict[var_name]
+                else:
+                    self.epsilon_dict[var_name] = self.epsilon
+
 
     def single_shot_analysis(self, **kw):
 
@@ -979,7 +983,10 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 self.fit_data(dset, self.n_cl, d=d,
                               epsilon=
                               self.var_data_dict[var_name], **kw)
-            self.epsilon_dict[var_name] = self.epsilon
+            if self.epsilon is None:
+                self.epsilon_dict[var_name] = self.var_data_dict[var_name]
+            else:
+                self.epsilon_dict[var_name] = self.epsilon
 
     def extract_data(self, **kw):
 
@@ -1022,6 +1029,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                         data['data'][self.qb_names[idx]] = deepcopy(data_temp)
 
             else:
+                print('here')
                 nr_seeds = self.sweep_points.size
                 data['nr_seeds'] = nr_seeds
 
@@ -1197,10 +1205,12 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                                expr='1-fidelity_per_gate')
 
         params = RBModel.make_params()
+        self.conf_level = kw.pop('conf_level', 0.68)
 
         if kw.pop('single_fit', False):
             print('single fit')
             fit_res = RBModel.fit(data, numCliff=numCliff, params=params)
+            self.epsilon = None
         else:
             self.epsilon = kw.pop('epsilon', None)
             if self.epsilon is None:
@@ -1210,7 +1220,6 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
                 # Use the found error per Clifford to standard errors for the data
                 # points fro Helsen et al. (2017)
-                self.conf_level = kw.pop('conf_level', 0.68)
                 epsilon_guess = kw.pop('epsilon_guess', 0.01)
                 epsilon = calculate_confidence_intervals(
                     nr_seeds=self.nr_seeds,
@@ -1517,6 +1526,9 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 plot_errorbars=plot_errorbars,
                 **kw)
 
+            if self.epsilon_dict[var_name] is None:
+                plot_errorbars = False
+
         # plot the product \sigma_qb2 * \signam_qb7 which should equal
         # \sigma_corr in the ideal case
         self.find_and_plot_alpha_product(ax=ax, legend_labels=legend_labels,
@@ -1681,18 +1693,19 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 T1_lim_color = 'b'
 
         if plot_errorbars:
-            err_bars = epsilon
-            err_label = str(int(self.conf_level*100)) + '% CI'
-            a_tools.plot_errorbars(n_cl,
-                                   data,
-                                   ax=ax,
-                                   err_bars=err_bars,
-                                   label=err_label,
-                                   linewidth=line_width//2,
-                                   marker='none',
-                                   capsize=line_width,
-                                   capthick=line_width,
-                                   color=c)
+            if epsilon is not None:
+                err_bars = epsilon
+                err_label = str(int(self.conf_level*100)) + '% CI'
+                a_tools.plot_errorbars(n_cl,
+                                       data,
+                                       ax=ax,
+                                       err_bars=err_bars,
+                                       label=err_label,
+                                       linewidth=line_width//2,
+                                       marker='none',
+                                       capsize=line_width,
+                                       capthick=line_width,
+                                       color=c)
 
         if plot_fit:
             x_fine = np.linspace(n_cl[0], n_cl[-1], 1000)

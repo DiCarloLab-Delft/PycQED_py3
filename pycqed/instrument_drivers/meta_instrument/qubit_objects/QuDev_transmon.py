@@ -3362,7 +3362,7 @@ class QuDev_transmon(Qubit):
             print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
                 new_qubit_freq, RamseyA.ramsey_freq['freq_stderr']))
             print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
-                T2_star['T2_star'],T2_star['T2_star_stderr']))
+                T2_star['T2_star'], T2_star['T2_star_stderr']))
 
             if update:
                 if for_ef:

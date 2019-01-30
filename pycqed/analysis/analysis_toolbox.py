@@ -298,9 +298,58 @@ def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_file
                     data[param].append(temp[param.split('.')[-1]])
                 else:
                     warnings.warn(
-                        'This data file attribute does not exist or hasn''t been coded for extraction.')
+                        'This data file attribute does not exist or '
+                        'hasn''t been coded for extraction.')
         ma.data_file.close()
     return data
+
+
+def get_param_value_from_file(file_path, instr_name, param_name, h5mode='r+'):
+    data_file = h5py.File(measurement_filename(file_path), h5mode)
+    instr_settings = data_file['Instrument settings']
+    if instr_name in list(instr_settings.keys()):
+        if param_name in list(instr_settings[instr_name].attrs):
+            param_val = float(instr_settings[instr_name].attrs[param_name])
+        else:
+            raise ValueError('"{}" does not exist for instrument "."'.format(
+                param_name, instr_name))
+    else:
+        raise ValueError('"" does not exist in "Instrument settings."'.format(
+            instr_name))
+
+    return param_val
+
+def get_qb_channel_map_from_file(qb_names, file_path, h5mode='r+'):
+
+    data_file = h5py.File(measurement_filename(file_path), h5mode)
+    instr_settings = data_file['Instrument settings']
+    channel_map = {}
+    for qbn in qb_names:
+        ro_acq_weight_type = instr_settings[qbn].attrs['ro_acq_weight_type']
+        if ro_acq_weight_type in ['optimal', 'square_rot']:
+            channel_map[qbn] = [
+                instr_settings[qbn].attrs['RO_acq_weight_function_I']]
+        elif ro_acq_weight_type in ['SSB', 'DSB']:
+            channel_map[qbn] = [
+                instr_settings[qbn].attrs['RO_acq_weight_function_I'],
+                instr_settings[qbn].attrs['RO_acq_weight_function_Q']]
+        else:
+            raise ValueError('Unknown ro_acq_weight_type "{}."'.format(
+                ro_acq_weight_type))
+    return channel_map
+
+
+def get_qb_thresholds_from_file(qb_names, file_path, h5mode='r+'):
+    data_file = h5py.File(measurement_filename(file_path), h5mode)
+    instr_settings = data_file['Instrument settings']
+    thresholds = {}
+    for qbn in qb_names:
+        ro_channel = int(
+            instr_settings[qbn].attrs['RO_acq_weight_function_I'])
+        thresholds[qbn] = 1.5*float(
+            instr_settings['UHFQC'].attrs['quex_thres_{}_level'.format(
+                ro_channel)])
+    return thresholds
 
 
 def get_data_from_ma_v1(ma, param_names):
@@ -713,6 +762,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         folder = datadir
 
     datetime_start = datetime_from_timestamp(timestamp_start)
+
     if timestamp_end is None:
         datetime_end = datetime.datetime.today()
     else:

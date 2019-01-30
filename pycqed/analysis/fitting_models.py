@@ -960,7 +960,7 @@ def Cos_guess(model, data, t, **kwargs):
     return params
 
 
-def exp_damp_osc_guess(model, data, t):
+def exp_damp_osc_guess(model, data, t, n_guess=1):
     """
     Makes a guess for an exponentially damped oscillation.
     Uses the fft_freq_phase guess to guess the oscillation parameters.
@@ -973,7 +973,6 @@ def exp_damp_osc_guess(model, data, t):
 
     tau_guess = 2 / 3 * max(t)
     exp_offs_guess = np.mean(data)
-    n_guess = 1
 
     params = model.make_params(amplitude=amp_guess,
                                frequency=freq_guess,

@@ -226,7 +226,8 @@ class BaseDataAnalysis(object):
             self.plot(key_list='auto')  # make the plots
 
         if self.options_dict.get('save_figs', False):
-            self.save_figures(close_figs=self.options_dict.get('close_figs', False))
+            self.save_figures(close_figs=self.options_dict.get(
+                'close_figs', False))
 
     def get_timestamps(self):
         """
@@ -375,7 +376,7 @@ class BaseDataAnalysis(object):
         pass
 
     def save_figures(self, savedir: str = None, savebase: str = None,
-                     tag_tstamp: bool = True,
+                     tag_tstamp: bool = True, dpi: int = 300,
                      fmt: str = 'png', key_list: list = 'auto',
                      close_figs: bool = True):
         if savedir is None:
@@ -405,12 +406,14 @@ class BaseDataAnalysis(object):
         for key in key_list:
             if self.presentation_mode:
                 savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
-                self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
+                self.figs[key].savefig(savename, bbox_inches='tight',
+                                       fmt=fmt, dpi=dpi)
                 savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.svg')
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt='svg')
             else:
                 savename = os.path.join(savedir, savebase + key + tstag + '.' + fmt)
-                self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
+                self.figs[key].savefig(savename, bbox_inches='tight',
+                                       fmt=fmt, dpi=dpi)
             if close_figs:
                 plt.close(self.figs[key])
 
@@ -632,8 +635,11 @@ class BaseDataAnalysis(object):
             dic['params'][param_name] = {}
             param = model.params[param_name]
             for k in param.__dict__:
-                if not k.startswith('_') and k not in ['from_internal', ]:
-                    dic['params'][param_name][k] = getattr(param, k)
+                if k == '_val':
+                    dic['params'][param_name]['value'] = getattr(param, k)
+                else:
+                    if not k.startswith('_') and k not in ['from_internal', ]:
+                        dic['params'][param_name][k] = getattr(param, k)
         return dic
 
     def plot(self, key_list=None, axs_dict=None,
@@ -660,13 +666,18 @@ class BaseDataAnalysis(object):
             pdict = self.plot_dicts[key]
             pdict['no_label'] = no_label
             # Use the key of the plot_dict if no ax_id is specified
-            pdict['ax_id'] = pdict.get('ax_id', key)
+            pdict['fig_id'] = pdict.get('fig_id', key)
+            pdict['ax_id'] = pdict.get('ax_id', None)
 
-            if pdict['ax_id'] not in self.axs:
+            if isinstance(pdict['ax_id'], str):
+                pdict['fig_id'] = pdict['ax_id']
+                pdict['ax_id'] = None
+
+            if pdict['fig_id'] not in self.axs:
                 # This fig variable should perhaps be a different
                 # variable for each plot!!
                 # This might fix a bug.
-                self.figs[pdict['ax_id']], self.axs[pdict['ax_id']] = plt.subplots(
+                self.figs[pdict['fig_id']], self.axs[pdict['fig_id']] = plt.subplots(
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
@@ -674,15 +685,15 @@ class BaseDataAnalysis(object):
                     # plotsize None uses .rc_default of matplotlib
                 )
                 if pdict.get('3d', False):
-                    self.axs[pdict['ax_id']].remove()
-                    self.axs[pdict['ax_id']] = Axes3D(
-                        self.figs[pdict['ax_id']],
+                    self.axs[pdict['fig_id']].remove()
+                    self.axs[pdict['fig_id']] = Axes3D(
+                        self.figs[pdict['fig_id']],
                         azim=pdict.get('3d_azim', -35),
                         elev=pdict.get('3d_elev', 35))
-                    self.axs[pdict['ax_id']].patch.set_alpha(0)
+                    self.axs[pdict['fig_id']].patch.set_alpha(0)
 
                 # transparent background around axes for presenting data
-                self.figs[pdict['ax_id']].patch.set_alpha(0)
+                self.figs[pdict['fig_id']].patch.set_alpha(0)
 
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
@@ -698,13 +709,18 @@ class BaseDataAnalysis(object):
 
                 # used to ensure axes are touching
                 if plot_touching:
-                    self.axs[pdict['ax_id']].figure.subplots_adjust(wspace=0,
-                                                                    hspace=0)
+                    self.axs[pdict['fig_id']].figure.subplots_adjust(wspace=0,
+                                                                     hspace=0)
 
                 # Check if pdict is one of the accepted arguments, these are
                 # the plotting functions in the analysis base class.
                 if 'pdict' in signature(plotfn).parameters:
-                    plotfn(pdict=pdict, axs=self.axs[pdict['ax_id']])
+                    if pdict['ax_id'] is None:
+                        plotfn(pdict=pdict, axs=self.axs[pdict['fig_id']])
+                    else:
+                        plotfn(pdict=pdict,
+                               axs=self.axs[pdict['fig_id']].flatten()[
+                               pdict['ax_id']])
 
                 # most normal plot functions also work, it is required
                 # that these accept an "ax" argument to plot on and **kwargs
@@ -712,7 +728,11 @@ class BaseDataAnalysis(object):
                 elif 'ax' in signature(plotfn).parameters:
                     # Calling the function passing along anything
                     # defined in the specific plot dict as kwargs
-                    plotfn(ax=self.axs[pdict['ax_id']], **pdict)
+                    if pdict['ax_id'] is None:
+                        plotfn(ax=self.axs[pdict['fig_id']], **pdict)
+                    else:
+                        plotfn(ax=self.axs[pdict['fig_id']].flatten()[
+                            pdict['ax_id']], **pdict)
                 else:
                     raise ValueError(
                         '"{}" is not a valid plot function'.format(plotfn))
@@ -958,7 +978,6 @@ class BaseDataAnalysis(object):
                 plot_linekws['xerr'] = plot_linekws.get('xerr', xerr)
 
         pdict['line_kws'] = plot_linekws
-        pfunc = getattr(axs, pdict.get('func', 'plot'))
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
         plot_xlabel = pdict.get('xlabel', None)
@@ -998,17 +1017,21 @@ class BaseDataAnalysis(object):
             colors = get_color_list(len_color_cycle, cmap)
             if cmap == 'tab10':
                 len_color_cycle = min(10, len_color_cycle)
+
             # plot_*vals is the list of *vals arrays
+            pfunc = getattr(axs, pdict.get('func', 'plot'))
             for i, (xvals, yvals) in enumerate(zip(plot_xvals, plot_yvals)):
                 p_out.append(pfunc(xvals, yvals,
                                    linestyle=plot_linestyle,
                                    marker=plot_marker,
-                                   color=colors[i % len_color_cycle],
+                                   color=plot_linekws.pop(
+                                       'color', colors[i % len_color_cycle]),
                                    label='%s%s' % (
                                        dataset_desc, dataset_label[i]),
                                    **plot_linekws))
 
         else:
+            pfunc = getattr(axs, pdict.get('func', 'plot'))
             p_out = pfunc(plot_xvals, plot_yvals,
                           linestyle=plot_linestyle, marker=plot_marker,
                           label='%s%s' % (dataset_desc, dataset_label),
@@ -1020,16 +1043,12 @@ class BaseDataAnalysis(object):
             xmin, xmax = plot_xrange
             axs.set_xlim(xmin, xmax)
 
-        if plot_xlabel is not None:
-            set_axis_label('x', axs, plot_xlabel, plot_xunit)
-        if plot_ylabel is not None:
-            set_axis_label('y', axs, plot_ylabel, plot_yunit)
-        if plot_yrange is not None:
-            ymin, ymax = plot_yrange
-            axs.set_ylim(ymin, ymax)
-
         if plot_title is not None:
-            axs.set_title(plot_title)
+            axs.figure.text(0.5, 1, plot_title,
+                            horizontalalignment='center',
+                            verticalalignment='bottom',
+                            transform=axs.transAxes)
+            # axs.set_title(plot_title)
 
         if do_legend:
             legend_ncol = pdict.get('legend_ncol', 1)
@@ -1042,6 +1061,14 @@ class BaseDataAnalysis(object):
                        ncol=legend_ncol,
                        bbox_to_anchor=legend_bbox_to_anchor,
                        frameon=legend_frameon)
+
+        if plot_xlabel is not None:
+            set_axis_label('x', axs, plot_xlabel, plot_xunit)
+        if plot_ylabel is not None:
+            set_axis_label('y', axs, plot_ylabel, plot_yunit)
+        if plot_yrange is not None:
+            ymin, ymax = plot_yrange
+            axs.set_ylim(ymin, ymax)
 
         if self.tight_fig:
             axs.figure.tight_layout()
@@ -1408,6 +1435,9 @@ class BaseDataAnalysis(object):
                                      plot_numpoints)
         pdict['yvals'] = model.eval(pdict['fit_res'].params,
                                     **{independent_var: pdict['xvals']})
+        if not hasattr(pdict['yvals'], '__iter__'):
+            pdict['yvals'] = np.array([pdict['yvals']])
+            print('here', type(pdict['yvals']))
         self.plot_line(pdict, axs)
 
         if plot_init:
@@ -1456,7 +1486,26 @@ class BaseDataAnalysis(object):
         linestyles = pdict.get('linestyles', '--')
 
         axs.vlines(x, ymin, ymax, colors,
-                   linestyles=linestyles, label=label, **pdict['line_kws'])
+                   linestyles=linestyles, label=label,
+                   **pdict.get('line_kws', {}))
+        if pdict.get('do_legend', False):
+            axs.legend()
+
+    def plot_hlines(self, pdict, axs):
+        """
+        Helper function to add vlines to a plot
+        """
+        pfunc = getattr(axs, pdict.get('func', 'hlines'))
+        y = pdict['y']
+        xmin = pdict['xmin']
+        xmax = pdict['xmax']
+        label = pdict.get('setlabel', None)
+        colors = pdict.get('colors', None)
+        linestyles = pdict.get('linestyles', '--')
+
+        axs.hlines(y, xmin, xmax, colors,
+                   linestyles=linestyles, label=label,
+                   **pdict.get('line_kws', {}))
         if pdict.get('do_legend', False):
             axs.legend()
 

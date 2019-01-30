@@ -5130,7 +5130,7 @@ class Ramsey_Analysis(TD_Analysis):
         T2 = fit_res.params['tau'].value
         T2_stderr = fit_res.params['tau'].stderr
 
-        T2_star = {'T2_star':T2, 'T2_star_stderr':T2_stderr}
+        T2_star = {'T2_star': T2, 'T2_star_stderr': T2_stderr}
 
         return T2_star
 

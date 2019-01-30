@@ -173,7 +173,9 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
 class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
-    def __init__(self, t_start: str=None, t_stop: str=None,
+    def __init__(self,
+                 qb_names: list=None,
+                 t_start: str=None, t_stop: str=None,
                  data_file_path: str=None, single_timestamp: bool=False,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=False):
@@ -183,6 +185,10 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                          options_dict=options_dict,
                          extract_only=extract_only,
                          do_fitting=do_fitting)
+
+        self.qb_names = qb_names
+        if self.qb_names is None:
+            raise ValueError('Provide the "qb_names."')
 
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
@@ -197,11 +203,46 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         self.single_timestamp = single_timestamp
         self.numeric_params = []
-        self.channel_map = self.options_dict['channel_map']
+        self.get_default_plot_params_dict()
 
         if auto:
             self.run_analysis()
 
+    def get_default_plot_params_dict(self):
+
+        self.plot_params_dict = {}
+        self.plot_params_dict['plotsize'] = \
+            self.options_dict.get('plotsize', (7, 4))
+        self.plot_params_dict['fontsize'] = \
+            self.options_dict.get('fontsize', 11)
+        self.plot_params_dict['markersize'] = \
+            self.options_dict.get('markersize', None)
+        self.plot_params_dict['linewidth'] = \
+            self.options_dict.get('linewidth', 2)
+        self.plot_params_dict['axes_linewidth'] = \
+            self.options_dict.get('axes_linewidth', 0.5)
+        self.plot_params_dict['dpi'] = \
+            self.options_dict.get('dpi', 300)
+
+    def extract_data(self):
+
+        super().extract_data()
+        self.channel_map = a_tools.get_qb_channel_map_from_file(
+            self.qb_names, self.raw_data_dict['folder'][0])
+
+        value_names = self.raw_data_dict['value_names']
+        if hasattr(value_names, '__iter__'):
+            value_names = value_names[0]
+        for qbn in self.channel_map:
+            if 'raw' in value_names[0]:
+                self.channel_map[qbn] = ['raw w' + ch for
+                                         ch in self.channel_map[qbn]]
+            elif 'digitized' in value_names[0]:
+                self.channel_map[qbn] = ['digitized w' + ch for
+                                         ch in self.channel_map[qbn]]
+            else:
+                raise ValueError('Unknown value name "{}".'.format(
+                    value_names[0]))
 
     def process_data(self):
         """
@@ -216,8 +257,17 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.metadata = self.raw_data_dict.get('exp_metadata', [{}])[0]
         if self.metadata is None:
             self.metadata = {}
-        self.channel_map = self.options_dict['channel_map']
-        ch_map_lists = {k:v for k,v in self.channel_map.items()
+        if 'sweep_points_dict' in self.metadata:
+            # assumed to be of the form {qbn1: swpts_array1, qbn2: swpts_array2}
+            self.raw_data_dict['sweep_points_dict'] = \
+                {qbn: {'sweep_points': self.metadata['sweep_points_dict'][qbn]}
+                 for qbn in self.qb_names}
+        else:
+            self.raw_data_dict['sweep_points_dict'] = \
+                {qbn: {'sweep_points': self.raw_data_dict['sweep_points'][0]}
+                 for qbn in self.qb_names}
+
+        ch_map_lists = {k: v for k, v in self.channel_map.items()
                         if isinstance(v, list)}
         if np.any([len(v) > 2 for v in ch_map_lists.values()]):
             raise ValueError('{} have more than 2 RO channels. There is no '
@@ -254,17 +304,29 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         use_cal_points = self.metadata.get('cal_points', True)
         if use_cal_points:
             self.cal_points = self.options_dict.get('cal_points', None)
+            if self.cal_points is None:
+                print('Using the last 4 data points as cal points.')
+                self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
             zero_coord = self.options_dict.get('zero_coord', None)
             one_coord = self.options_dict.get('one_coord', None)
             if self.options_dict.get('TwoD', False):
-                self.sweep_points_2D = self.raw_data_dict['sweep_points_2D'][0]
-                self.proc_data_dict['corr_data'] = \
+                if 'sweep_points_2D_dict' in self.metadata:
+                    # assumed to be of the form {qbn1: swpts_array1,
+                    # qbn2: swpts_array2}
+                    self.raw_data_dict['sweep_points_2D_dict'] = \
+                        {qbn: self.metadata['sweep_points_2D_dict'][qbn] for
+                         qbn in self.qb_names}
+                else:
+                    self.raw_data_dict['sweep_points_2D_dict'] = \
+                        {qbn: self.raw_data_dict['sweep_points_2D'][0] for
+                         qbn in self.qb_names}
+                self.proc_data_dict['projected_data_dict'] = \
                     self.rotate_data_TwoD(meas_results_per_qb_per_ROch,
                                           self.channel_map,
                                           self.cal_points,
                                           zero_coord, one_coord)
             else:
-                self.proc_data_dict['corr_data'] = \
+                self.proc_data_dict['projected_data_dict'] = \
                     self.rotate_data(meas_results_per_qb_per_ROch,
                                      self.channel_map,
                                      self.cal_points,
@@ -272,21 +334,26 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
             if self.cal_points is not None:
                 self.NoCalPoints = len(np.array(self.cal_points).flatten())
-                self.sweep_points = \
-                    self.raw_data_dict['sweep_points'][0][:-self.NoCalPoints]
+                for qbn in self.qb_names:
+                    self.raw_data_dict['sweep_points_dict'][qbn][
+                        'msmt_sweep_points'] = \
+                        self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][:-self.NoCalPoints]
+                    self.raw_data_dict['sweep_points_dict'][qbn][
+                        'cal_points_sweep_points'] = \
+                        self.raw_data_dict['sweep_points_dict'][qbn][
+                            'sweep_points'][-self.NoCalPoints::]
             else:
                 self.NoCalPoints = 0
-                self.sweep_points = self.raw_data_dict['sweep_points'][0]
 
         else:
             self.NoCalPoints = 0
-            self.sweep_points = self.raw_data_dict['sweep_points'][0]
 
     @staticmethod
     def rotate_data(meas_results_per_qb_per_ROch, channel_map,
                     cal_points=None, zero_coord=None, one_coord=None):
 
-        rotated_data_dict = deepcopy(channel_map)
+        rotated_data_dict = OrderedDict()
         for qb_name, meas_res_dict in meas_results_per_qb_per_ROch.items():
             if len(meas_res_dict) == 1:
                 # one RO channel per qubit
@@ -413,40 +480,95 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         return rotated_data_dict
 
     def prepare_plots(self):
-        for qb_name, corr_data in self.proc_data_dict['corr_data'].items():
+        for qb_name, corr_data in self.proc_data_dict[
+                'projected_data_dict'].items():
             if isinstance(corr_data, dict):
                 for ro_suffix, data in corr_data.items():
                     plot_name = 'base_plot_' + qb_name + ro_suffix
-                    self.prepare_base_plot(
-                        plot_name, data,
+                    self.prepare_projected_data_plot(
+                        plot_name, data, qb_name=qb_name,
+                        title_suffix=qb_name+ro_suffix,
                         ref_state_plot_labels=(
                             'exc_state_' + qb_name + ro_suffix,
                             'gnd_state_' + qb_name + ro_suffix))
 
             else:
                 plot_name = 'base_plot_' + qb_name
-                self.prepare_base_plot(
-                    plot_name, corr_data,
+                self.prepare_projected_data_plot(
+                    plot_name, corr_data, qb_name=qb_name,
+                    title_suffix=qb_name,
                     ref_state_plot_labels=(
                         'exc_state_' + qb_name,
                         'gnd_state_' + qb_name))
 
-    def prepare_base_plot(self, plot_name, data,
-                          ref_state_plot_labels=('exc_state', 'gnd_state')):
-        if self.NoCalPoints != 0:
+        if self.options_dict.get('plot_raw_data', True):
+            self.prepare_raw_data_plots()
+
+    def prepare_raw_data_plots(self):
+
+        for qb_name, raw_data_dict in self.proc_data_dict[
+                'meas_results_per_qb_per_ROch'].items():
+            sweep_points = self.raw_data_dict['sweep_points_dict'][qb_name][
+                'sweep_points']
+            if len(raw_data_dict) == 1:
+                numplotsx = 1
+                numplotsy = 1
+            elif len(raw_data_dict) == 2:
+                numplotsx = 2
+                numplotsy = 1
+            else:
+                numplotsx = len(raw_data_dict) // 2 + len(raw_data_dict) % 2
+                numplotsy = 2
+
+            fig_title = (self.raw_data_dict['timestamps'][0] + ' ' +
+                         self.raw_data_dict['measurementstring'][0] +
+                         '\nRaw data ' + qb_name)
+            plot_name = 'raw_plot_' + qb_name
+            for ax_id, ro_channel in enumerate(raw_data_dict):
+                self.plot_dicts[plot_name + '_' + ro_channel] = {
+                    'fig_id': plot_name,
+                    'ax_id': ax_id,
+                    'plotfn': self.plot_line,
+                    'xvals': sweep_points,
+                    'xlabel': self.raw_data_dict['xlabel'][0],
+                    'xunit': self.raw_data_dict['xunit'][0][0],
+                    'yvals': raw_data_dict[ro_channel],
+                    'ylabel': '{} (Vpeak)'.format(ro_channel),
+                    'yunit': '',
+                    'numplotsx': numplotsx,
+                    'numplotsy': numplotsy,
+                    'plotsize': (7*numplotsx, 4*numplotsy),
+                    'title': fig_title,
+                    'linestyle': 'none'}
+
+    def prepare_projected_data_plot(
+            self, plot_name, data, qb_name, plot_cal_points=True,
+            sweep_points=None, title_suffix=None,
+            ref_state_plot_labels=('exc_state', 'gnd_state')):
+
+
+        xvals = sweep_points
+        if plot_cal_points and self.NoCalPoints != 0:
             assert (len(ref_state_plot_labels) == len(self.cal_points))
             yvals = data[:-self.NoCalPoints]
+            if xvals is None:
+                xvals = self.raw_data_dict['sweep_points_dict'][qb_name][
+                    'msmt_sweep_points']
 
             # plot cal points
             for i, cal_pts_idxs in enumerate(self.cal_points[::-1]):
                 self.plot_dicts[ref_state_plot_labels[i]] = {
-                    'ax_id': plot_name,
+                    'fig_id': plot_name,
                     'plotfn': self.plot_line,
-                    'xvals': self.raw_data_dict['sweep_points'][0][cal_pts_idxs],
-                    'yvals': np.mean([data[cal_pts_idxs],
-                                      data[cal_pts_idxs]],
-                                     axis=0),
-                    'setlabel': r'$|e\rangle$' if i == 0 \
+                    'plotsize': (7, 4),
+                    'xvals':
+                        np.mean([self.raw_data_dict['sweep_points_dict'][qb_name]
+                                     ['cal_points_sweep_points'][cal_pts_idxs],
+                                 self.raw_data_dict['sweep_points_dict'][qb_name]
+                                     ['cal_points_sweep_points'][cal_pts_idxs]],
+                                 axis=0),
+                    'yvals': data[cal_pts_idxs],
+                    'setlabel': r'$|e\rangle$' if i == 0
                         else r'$|g\rangle$',
                     'do_legend': True,
                     'legend_bbox_to_anchor': (1, 0.5),
@@ -454,20 +576,38 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     'linestyle': 'none',
                     'line_kws': {'color': 'gray' if i == 0 else 'k'}}
 
+                self.plot_dicts[ref_state_plot_labels[i]+'_line'] = {
+                    'fig_id': plot_name,
+                    'plotsize': (7, 4),
+                    'plotfn': self.plot_hlines,
+                    'y': np.mean(data[cal_pts_idxs]),
+                    'xmin': self.raw_data_dict['sweep_points_dict'][qb_name][
+                        'sweep_points'][0],
+                    'xmax': self.raw_data_dict['sweep_points_dict'][qb_name][
+                        'sweep_points'][-1],
+                    'colors': 'gray'}
+
         else:
             yvals = data
+            if xvals is None:
+                xvals = self.raw_data_dict['sweep_points_dict'][qb_name][
+                    'sweep_points']
 
+        title = (self.raw_data_dict['timestamps'][0] + ' ' +
+                 self.raw_data_dict['measurementstring'][0])
+        if title_suffix is not None:
+            title += '\n' + title_suffix
         self.plot_dicts[plot_name] = {
             'plotfn': self.plot_line,
-            'xvals': self.sweep_points,
+            'plotsize': (7, 4),
+            'xvals': xvals,
             'xlabel': self.raw_data_dict['xlabel'][0],
-            'xunit': self.raw_data_dict['xunit'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
             'yvals': yvals,
             'ylabel': 'Excited state population',
             'yunit': '',
-            'setlabel': '',
-            'title': (self.raw_data_dict['timestamps'][0] + ' ' +
-                      self.raw_data_dict['measurementstring'][0]),
+            'setlabel': 'Data',
+            'title': title,
             'linestyle': 'none',
             'do_legend': True,
             'legend_bbox_to_anchor': (1, 0.5),
@@ -1574,7 +1714,6 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             data[i] = v / v.sum()
         data = data.T
 
-
         Fs = self.options_dict.get('meas_operators', Fs)
         Fs = [qtp.Qobj(F) for F in Fs]
         d = Fs[0].shape[0]
@@ -2451,12 +2590,12 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
 
 class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
 
-    def __init__(self, t_start: str=None, t_stop: str=None,
+    def __init__(self, qb_names: list=None,  t_start: str=None, t_stop: str=None,
                  data_file_path: str=None, single_timestamp: bool=False,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
 
-        super().__init__(t_start=t_start, t_stop=t_stop,
+        super().__init__(qb_names=qb_names, t_start=t_start, t_stop=t_stop,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only,
@@ -2480,13 +2619,17 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
         for qbn in self.measured_qubits:
-            ro_dict = self.proc_data_dict['corr_data'][qbn]
+            ro_dict = self.proc_data_dict['projected_data_dict'][qbn]
+            sweep_points = self.raw_data_dict['sweep_points_dict'][qbn][
+                'msmt_sweep_points']
             for ro_suff, data in ro_dict.items():
                 cos_mod = lmfit.Model(fit_mods.CosFunc)
                 if self.NoCalPoints != 0:
                     data = data[:-self.NoCalPoints]
                 guess_pars = fit_mods.Cos_guess(
-                    model=cos_mod, t=self.sweep_points, data=data)
+                    model=cos_mod,
+                    t=sweep_points,
+                    data=data)
                 guess_pars['amplitude'].vary = True
                 guess_pars['offset'].vary = True
                 guess_pars['frequency'].vary = True
@@ -2495,7 +2638,7 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                 key = 'cos_fit_{}{}'.format(qbn, ro_suff)
                 self.fit_dicts[key] = {
                     'fit_fn': fit_mods.CosFunc,
-                    'fit_xvals': {'t': self.sweep_points},
+                    'fit_xvals': {'t': sweep_points},
                     'fit_yvals': {'data': data},
                     'guess_pars': guess_pars}
 
@@ -2515,25 +2658,32 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
 
         if self.do_fitting:
             for meas_qbn in self.measured_qubits:
+                sweep_points_dict = self.raw_data_dict['sweep_points_dict'][
+                    meas_qbn]
                 if self.NoCalPoints != 0:
-                    yvals = [self.proc_data_dict['corr_data'][meas_qbn][
+                    yvals = [self.proc_data_dict['projected_data_dict'][meas_qbn][
                                  '_ref_measure'][:-self.NoCalPoints],
-                             self.proc_data_dict['corr_data'][meas_qbn][
+                             self.proc_data_dict['projected_data_dict'][meas_qbn][
                                  '_measure'][:-self.NoCalPoints]]
+                    sweep_points = sweep_points_dict['msmt_sweep_points']
 
                     # plot cal points
                     for i, cal_pts_idxs in enumerate(self.cal_points[::-1]):
                         key = 'exc_state_' + meas_qbn if i == 0 else \
                             'gnd_state_' + meas_qbn
                         self.plot_dicts[key] = {
-                            'ax_id': 'dyn_phase_plot_' + meas_qbn,
+                            'fig_id': 'dyn_phase_plot_' + meas_qbn,
                             'plotfn': self.plot_line,
-                            'xvals': self.raw_data_dict['sweep_points'][0][
-                                cal_pts_idxs],
+                            'xvals': np.mean([
+                                sweep_points_dict['cal_points_sweep_points'][
+                                    cal_pts_idxs],
+                                sweep_points_dict['cal_points_sweep_points'][
+                                    cal_pts_idxs]],
+                                axis=0),
                             'yvals': np.mean([
-                                self.proc_data_dict['corr_data'][meas_qbn][
+                                self.proc_data_dict['projected_data_dict'][meas_qbn][
                                     '_ref_measure'][cal_pts_idxs],
-                                self.proc_data_dict['corr_data'][meas_qbn][
+                                self.proc_data_dict['projected_data_dict'][meas_qbn][
                                     '_measure'][cal_pts_idxs]],
                                              axis=0),
                             'setlabel': r'$|e\rangle$' if i == 0 \
@@ -2545,16 +2695,17 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                             'line_kws': {'color': 'gray' if i == 0 else 'k'}}
 
                 else:
-                    yvals = [self.proc_data_dict['corr_data'][meas_qbn][
+                    yvals = [self.proc_data_dict['projected_data_dict'][meas_qbn][
                                  '_ref_measure'],
-                             self.proc_data_dict['corr_data'][meas_qbn][
+                             self.proc_data_dict['projected_data_dict'][meas_qbn][
                                  '_measure']]
+                    sweep_points = sweep_points_dict['sweep_points']
 
                 self.plot_dicts['dyn_phase_plot_' + meas_qbn] = {
                     'plotfn': self.plot_line,
-                    'xvals': [self.sweep_points, self.sweep_points],
+                    'xvals': [sweep_points, sweep_points],
                     'xlabel': self.raw_data_dict['xlabel'][0],
-                    'xunit': self.raw_data_dict['xunit'][0],
+                    'xunit': self.raw_data_dict['xunit'][0][0],
                     'yvals': yvals,
                     'ylabel': 'Excited state population',
                     'yunit': '',
@@ -2567,7 +2718,7 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                     'legend_pos': 'center left'}
 
                 self.plot_dicts['cos_fit_' + meas_qbn + '_ref_measure'] = {
-                    'ax_id': 'dyn_phase_plot_' + meas_qbn,
+                    'fig_id': 'dyn_phase_plot_' + meas_qbn,
                     'plotfn': self.plot_fit,
                     'fit_res': self.fit_dicts['cos_fit_{}_ref_measure'.format(
                                     meas_qbn)]['fit_res'],
@@ -2577,7 +2728,7 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                     'legend_pos': 'center left'}
 
                 self.plot_dicts['cos_fit_' + meas_qbn + '_measure'] = {
-                    'ax_id': 'dyn_phase_plot_' + meas_qbn,
+                    'fig_id': 'dyn_phase_plot_' + meas_qbn,
                     'plotfn': self.plot_fit,
                     'fit_res': self.fit_dicts['cos_fit_{}_measure'.format(
                                     meas_qbn)]['fit_res'],
@@ -2589,13 +2740,12 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                 textstr = 'Dynamic phase = {:.2f}'.format(
                     self.dynamic_phases[meas_qbn]) + r'$^{\circ}$'
                 self.plot_dicts['text_msg_' + meas_qbn] = {
-                    'ax_id': 'dyn_phase_plot_' + meas_qbn,
-                    'verticalalignment': 'bottom',
-                    'horizontalalignment': 'left',
-                    'ypos': 0,
-                    'xpos': 1.05,
+                    'fig_id': 'dyn_phase_plot_' + meas_qbn,
+                    'ypos': -0.175,
+                    'xpos': 0.5,
+                    'horizontalalignment': 'center',
+                    'verticalalignment': 'top',
                     'plotfn': self.plot_text,
-                    'box_props': None,
                     'text_string': textstr}
 
 
@@ -2845,3 +2995,748 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                 'legend_bbox_to_anchor': (1, 1),
                 'legend_pos': 'upper left',
             }
+
+
+class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, qb_names: list=None,  t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+
+        super().__init__(qb_names=qb_names, t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only,
+                         do_fitting=do_fitting,
+                         auto=False)
+
+        if auto:
+            self.run_analysis()
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        for qbn in self.qb_names:
+            data = self.proc_data_dict['projected_data_dict'][qbn]
+            sweep_points = self.raw_data_dict['sweep_points_dict'][qbn][
+                'msmt_sweep_points']
+            if self.NoCalPoints != 0:
+                data = data[:-self.NoCalPoints]
+            cos_mod = lmfit.Model(fit_mods.CosFunc)
+            guess_pars = fit_mods.Cos_guess(
+                model=cos_mod, t=sweep_points, data=data)
+            guess_pars['amplitude'].vary = True
+            guess_pars['offset'].vary = True
+            guess_pars['frequency'].vary = True
+            guess_pars['phase'].vary = True
+
+            key = 'cos_fit_' + qbn
+            self.fit_dicts[key] = {
+                'fit_fn': fit_mods.CosFunc,
+                'fit_xvals': {'t': sweep_points},
+                'fit_yvals': {'data': data},
+                'guess_pars': guess_pars}
+
+    def analyze_fit_results(self):
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+        for qbn in self.qb_names:
+            fit_res = self.fit_dicts['cos_fit_' + qbn]['fit_res']
+            sweep_points = self.raw_data_dict['sweep_points_dict'][qbn][
+                'msmt_sweep_points']
+            self.proc_data_dict['analysis_params_dict'][qbn] = \
+                self.get_amplitudes(fit_res=fit_res, sweep_points=sweep_points)
+
+    def get_amplitudes(self, fit_res, sweep_points):
+        # Extract the best fitted frequency and phase.
+        freq_fit = fit_res.best_values['frequency']
+        phase_fit = fit_res.best_values['phase']
+
+        freq_std = fit_res.params['frequency'].stderr
+        phase_std = fit_res.params['phase'].stderr
+
+        # If fitted_phase<0, shift fitted_phase by 4. This corresponds to a
+        # shift of 2pi in the argument of cos.
+        if np.abs(phase_fit) < 0.1:
+            phase_fit = 0
+
+        # If phase_fit<1, the piHalf amplitude<0.
+        if phase_fit < 1:
+            logging.info('The data could not be fitted correctly. '
+                         'The fitted phase "%s" <1, which gives '
+                         'negative piHalf '
+                         'amplitude.' % phase_fit)
+
+        stepsize = sweep_points[1] - sweep_points[0]
+        if freq_fit > 2 * stepsize:
+            logging.info('The data could not be fitted correctly. The '
+                         'frequency "%s" is too high.' % freq_fit)
+        n = np.arange(-2, 10)
+
+        piPulse_vals = (n*np.pi - phase_fit)/(2*np.pi*freq_fit)
+        piHalfPulse_vals = (n*np.pi + np.pi/2 - phase_fit)/(2*np.pi*freq_fit)
+
+        # find piHalfPulse
+        try:
+            piHalfPulse = \
+                np.min(piHalfPulse_vals[piHalfPulse_vals >= sweep_points[1]])
+            n_piHalf_pulse = n[piHalfPulse_vals==piHalfPulse]
+        except ValueError:
+            piHalfPulse = np.asarray([])
+
+        if piHalfPulse.size == 0 or piHalfPulse > max(sweep_points):
+            i = 0
+            while (piHalfPulse_vals[i] < min(sweep_points) and
+                   i<piHalfPulse_vals.size):
+                i+=1
+            piHalfPulse = piHalfPulse_vals[i]
+            n_piHalf_pulse = n[i]
+
+        # find piPulse
+        try:
+            if piHalfPulse.size != 0:
+                piPulse = \
+                    np.min(piPulse_vals[piPulse_vals >= piHalfPulse])
+            else:
+                piPulse = np.min(piPulse_vals[piPulse_vals >= 0.001])
+            n_pi_pulse = n[piHalfPulse_vals == piHalfPulse]
+
+        except ValueError:
+            piPulse = np.asarray([])
+
+        if piPulse.size == 0:
+            i = 0
+            while (piPulse_vals[i] < min(sweep_points) and
+                   i < piPulse_vals.size):
+                i += 1
+            piPulse = piPulse_vals[i]
+            n_pi_pulse = n[i]
+
+        try:
+            freq_idx = fit_res.var_names.index('frequency')
+            phase_idx = fit_res.var_names.index('phase')
+            if fit_res.covar is not None:
+                cov_freq_phase = fit_res.covar[freq_idx, phase_idx]
+            else:
+                cov_freq_phase = 0
+        except ValueError:
+            cov_freq_phase = 0
+
+        piPulse_std = self.calculate_pulse_stderr(
+            f=freq_fit,
+            phi=phase_fit,
+            f_err=freq_std,
+            phi_err=phase_std,
+            period_num=n_pi_pulse,
+            cov=cov_freq_phase)
+        piHalfPulse_std = self.calculate_pulse_stderr(
+            f=freq_fit,
+            phi=phase_fit,
+            f_err=freq_std,
+            phi_err=phase_std,
+            period_num=n_piHalf_pulse,
+            cov=cov_freq_phase)
+
+        rabi_amplitudes = {'piPulse': piPulse,
+                           'piPulse_stderr': piPulse_std,
+                           'piHalfPulse': piHalfPulse,
+                           'piHalfPulse_stderr': piHalfPulse_std}
+
+        return rabi_amplitudes
+
+    def calculate_pulse_stderr(self, f, phi, f_err, phi_err,
+                               period_num, cov=0):
+        x = period_num + phi
+        return np.sqrt((f_err*x/(2*np.pi*(f**2)))**2 +
+                       (phi_err/(2*np.pi*f))**2 -
+                       2*(cov**2)*x/((2*np.pi*(f**3))**2))[0]
+
+    def prepare_plots(self):
+        super().prepare_plots()
+
+        if self.do_fitting:
+            for qbn in self.qb_names:
+                rabi_amplitudes = self.proc_data_dict['analysis_params_dict']
+                base_plot_name = 'base_plot_' + qbn
+                fit_res = self.fit_dicts['cos_fit_' + qbn]['fit_res']
+                self.plot_dicts['fit_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': self.plot_fit,
+                    'fit_res': fit_res ,
+                    'setlabel': 'cosine fit',
+                    'color': 'r',
+                    'do_legend': True,
+                    'legend_bbox_to_anchor': (1, 0.5),
+                    'legend_pos': 'center left'}
+
+                self.plot_dicts['piamp_marker_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': self.plot_line,
+                    'xvals': np.array([rabi_amplitudes[qbn]['piPulse']]),
+                    'yvals': np.array([fit_res.model.func(
+                        rabi_amplitudes[qbn]['piPulse'],
+                        **fit_res.best_values)]),
+                    'setlabel': '$\pi$-Pulse amp',
+                    'color': 'r',
+                    'marker': 'o',
+                    'markersize': 10,
+                    'linestyle': '',
+                    'do_legend': True,
+                    'legend_bbox_to_anchor': (1, 0.5),
+                    'legend_pos': 'center left'}
+
+                self.plot_dicts['piamp_hline_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': self.plot_hlines,
+                    'y': [fit_res.model.func(
+                        rabi_amplitudes[qbn]['piPulse'],
+                        **fit_res.best_values)],
+                    'xmin': self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][0],
+                    'xmax': self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][-1],
+                    'colors': 'gray'}
+
+                self.plot_dicts['pihalfamp_marker_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': self.plot_line,
+                    'xvals': np.array([rabi_amplitudes[qbn]['piHalfPulse']]),
+                    'yvals': np.array([fit_res.model.func(
+                        rabi_amplitudes[qbn]['piHalfPulse'],
+                        **fit_res.best_values)]),
+                    'setlabel': '$\pi /2$-Pulse amp',
+                    'color': 'm',
+                    'marker': 'o',
+                    'markersize': 10,
+                    'linestyle': '',
+                    'do_legend': True,
+                    'legend_bbox_to_anchor': (1, 0.5),
+                    'legend_pos': 'center left'}
+
+                self.plot_dicts['pihalfamp_hline_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': self.plot_hlines,
+                    'y': [fit_res.model.func(
+                        rabi_amplitudes[qbn]['piHalfPulse'],
+                        **fit_res.best_values)],
+                    'xmin': self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][0],
+                    'xmax': self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][-1],
+                    'colors': 'gray'}
+
+                old_pipulse_val = a_tools.get_param_value_from_file(
+                    file_path=self.raw_data_dict['folder'][0],
+                    instr_name=qbn, param_name='amp180')
+                old_pihalfpulse_val = old_pipulse_val * \
+                    a_tools.get_param_value_from_file(
+                    file_path=self.raw_data_dict['folder'][0],
+                    instr_name=qbn, param_name='amp90_scale')
+                textstr = ('  $\pi-Amp$ = {:.3f} V'.format(
+                    rabi_amplitudes[qbn]['piPulse']) +
+                           ' $\pm$ {:.3f} V '.format(
+                    rabi_amplitudes[qbn]['piPulse_stderr']) +
+                           '\n$\pi/2-Amp$ = {:.3f} V '.format(
+                    rabi_amplitudes[qbn]['piHalfPulse']) +
+                           ' $\pm$ {:.3f} V '.format(
+                    rabi_amplitudes[qbn]['piHalfPulse_stderr']) +
+                           '\n  $\pi-Amp_{old}$ = ' + '{:.3f} V '.format(
+                    old_pipulse_val) +
+                           '\n$\pi/2-Amp_{old}$ = ' + '{:.3f} V '.format(
+                    old_pihalfpulse_val))
+                self.plot_dicts['text_msg_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'ypos': -0.175,
+                    'xpos': 0.5,
+                    'horizontalalignment': 'center',
+                    'verticalalignment': 'top',
+                    'plotfn': self.plot_text,
+                    'text_string': textstr}
+
+
+class T1Analysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, qb_names: list=None,  t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+
+        super().__init__(qb_names=qb_names, t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only,
+                         do_fitting=do_fitting,
+                         auto=False)
+
+        if auto:
+            self.run_analysis()
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        for qbn in self.qb_names:
+            data = self.proc_data_dict['projected_data_dict'][qbn]
+            sweep_points = self.raw_data_dict['sweep_points_dict'][qbn][
+                'msmt_sweep_points']
+            if self.NoCalPoints != 0:
+                data = data[:-self.NoCalPoints]
+            exp_decay_mod = lmfit.Model(fit_mods.ExpDecayFunc)
+            guess_pars = fit_mods.exp_dec_guess(
+                model=exp_decay_mod, data=data, t=sweep_points)
+            guess_pars['amplitude'].vary = True
+            guess_pars['tau'].vary = True
+            guess_pars['offset'].vary = True
+            key = 'exp_decay_' + qbn
+            self.fit_dicts[key] = {
+                'fit_fn': exp_decay_mod.func,
+                'fit_xvals': {'t': sweep_points},
+                'fit_yvals': {'data': data},
+                'guess_pars': guess_pars}
+
+    def analyze_fit_results(self):
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+        for qbn in self.qb_names:
+            self.proc_data_dict['analysis_params_dict'][qbn] = OrderedDict()
+            self.proc_data_dict['analysis_params_dict'][qbn]['T1'] = \
+                self.fit_dicts['exp_decay_' + qbn]['fit_res'].best_values['tau']
+            self.proc_data_dict['analysis_params_dict'][qbn]['T1_stderr'] = \
+                self.fit_dicts['exp_decay_' + qbn]['fit_res'].params[
+                    'tau'].stderr
+
+    def prepare_plots(self):
+        super().prepare_plots()
+
+        if self.do_fitting:
+            for qbn in self.qb_names:
+                base_plot_name = 'base_plot_' + qbn
+                self.plot_dicts['fit_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': self.plot_fit,
+                    'fit_res': self.fit_dicts['exp_decay_' + qbn]['fit_res'],
+                    'setlabel': 'exp decay fit',
+                    'do_legend': True,
+                    'color': 'r',
+                    'legend_bbox_to_anchor': (1, 0.5),
+                    'legend_pos': 'center left'}
+
+                old_T1_val = a_tools.get_param_value_from_file(
+                    file_path=self.raw_data_dict['folder'][0],
+                    instr_name=qbn, param_name='T1')
+                T1_dict = self.proc_data_dict['analysis_params_dict']
+                textstr = '$T_1$ = {:.2f} $\mu$s'.format(
+                            T1_dict[qbn]['T1']*1e6) \
+                          + ' $\pm$ {:.2f} $\mu$s'.format(
+                            T1_dict[qbn]['T1_stderr']*1e6) \
+                          + '\nold $T_1$ = {:.2f} $\mu$s'.format(old_T1_val*1e6)
+                self.plot_dicts['text_msg_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'ypos': -0.175,
+                    'xpos': 0.5,
+                    'horizontalalignment': 'center',
+                    'verticalalignment': 'top',
+                    'plotfn': self.plot_text,
+                    'text_string': textstr}
+
+
+class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, qb_names: list=None,  t_start: str=None,
+                 t_stop: str=None, data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+
+        super().__init__(qb_names=qb_names, t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only,
+                         do_fitting=do_fitting,
+                         auto=False)
+
+        if auto:
+            self.run_analysis()
+
+    def prepare_fitting(self):
+        if self.options_dict.get('fit_gaussian_decay', True):
+            self.fit_keys = ['exp_decay_', 'gauss_decay_']
+        else:
+            self.fit_keys = ['exp_decay_']
+        self.fit_dicts = OrderedDict()
+        for qbn in self.qb_names:
+            data = self.proc_data_dict['projected_data_dict'][qbn]
+            sweep_points = self.raw_data_dict['sweep_points_dict'][qbn][
+                'msmt_sweep_points']
+            if self.NoCalPoints != 0:
+                data = data[:-self.NoCalPoints]
+            for i, key in enumerate([k + qbn for k in self.fit_keys]):
+                exp_damped_decay_mod = lmfit.Model(fit_mods.ExpDampOscFunc)
+                guess_pars = fit_mods.exp_damp_osc_guess(
+                    model=exp_damped_decay_mod, data=data, t=sweep_points,
+                    n_guess=i+1)
+                guess_pars['amplitude'].vary = False
+                guess_pars['amplitude'].value = 0.5
+                guess_pars['frequency'].vary = True
+                guess_pars['tau'].vary = True
+                guess_pars['phase'].vary = True
+                guess_pars['n'].vary = False
+                guess_pars['oscillation_offset'].vary = False
+                # guess_pars['exponential_offset'].value = 0.5
+                guess_pars['exponential_offset'].vary = True
+                self.fit_dicts[key] = {
+                    'fit_fn': exp_damped_decay_mod .func,
+                    'fit_xvals': {'t': sweep_points},
+                    'fit_yvals': {'data': data},
+                    'guess_pars': guess_pars}
+
+    def analyze_fit_results(self):
+        if 'artificial_detuning_dict' in self.metadata:
+            artificial_detuning_dict = self.metadata[
+                'artificial_detuning_dict']
+        elif 'artificial_detuning' in self.metadata:
+            artificial_detuning_dict = OrderedDict(
+                [(qbn, self.metadata['artificial_detuning'])
+                 for qbn in self.qb_names])
+        elif 'artificial_detuning' in self.options_dict:
+            artificial_detuning_dict = OrderedDict(
+                [(qbn, self.options_dict['artificial_detuning'])
+                 for qbn in self.qb_names])
+        else:
+            raise ValueError('"artificial_detuning" not found.')
+
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+        for qbn in self.qb_names:
+            self.proc_data_dict['analysis_params_dict'][qbn] = OrderedDict()
+            for key in [k + qbn for k in self.fit_keys]:
+                self.proc_data_dict['analysis_params_dict'][qbn][key] = \
+                    OrderedDict()
+                fit_res = self.fit_dicts[key]['fit_res']
+
+                old_qb_freq = a_tools.get_param_value_from_file(
+                    file_path=self.raw_data_dict['folder'][0],
+                    instr_name=qbn, param_name='f_qubit')
+                self.proc_data_dict['analysis_params_dict'][qbn][key][
+                    'old_qb_freq'] = old_qb_freq
+                self.proc_data_dict['analysis_params_dict'][qbn][key][
+                    'new_qb_freq'] = old_qb_freq + \
+                                     artificial_detuning_dict[qbn] - \
+                                     fit_res.best_values['frequency']
+                self.proc_data_dict['analysis_params_dict'][qbn][key][
+                    'new_qb_freq_stderr'] = fit_res.params['frequency'].stderr
+                self.proc_data_dict['analysis_params_dict'][qbn][key][
+                    'T2_star'] = fit_res.best_values['tau']
+                self.proc_data_dict['analysis_params_dict'][qbn][key][
+                    'T2_star_stderr'] = fit_res.params['tau'].stderr
+                self.proc_data_dict['analysis_params_dict'][qbn][key][
+                    'artificial_detuning'] = artificial_detuning_dict[qbn]
+
+    def prepare_plots(self):
+        super().prepare_plots()
+
+        if self.do_fitting:
+            ramsey_dict = self.proc_data_dict['analysis_params_dict']
+            for qbn in self.qb_names:
+                base_plot_name = 'base_plot_' + qbn
+                exp_decay_fit_key = self.fit_keys[0] + qbn
+                old_qb_freq = ramsey_dict[qbn][
+                    exp_decay_fit_key]['old_qb_freq']
+                textstr = '$f_{qubit \_ old}$ = '+'{:.4f} GHz '.format(
+                        old_qb_freq*1e-9)
+                T2_star_str = ''
+                for i, key in enumerate([k + qbn for k in self.fit_keys]):
+
+                    fit_res = self.fit_dicts[key]['fit_res']
+                    self.plot_dicts['fit_' + key] = {
+                        'fig_id': base_plot_name,
+                        'plotfn': self.plot_fit,
+                        'fit_res': fit_res,
+                        'setlabel': 'exp decay fit' if i == 0 else
+                            'gauss decay fit',
+                        'do_legend': True,
+                        'color': 'r' if i == 0 else 'C4',
+                        'legend_bbox_to_anchor': (1, 0.5),
+                        'legend_pos': 'center left'}
+
+                    textstr += \
+                        ('\n$f_{{qubit \_ new \_ {{{key}}} }}$ = '.format(
+                            key=('exp' if i == 0 else 'gauss')) +
+                            '{:.6f} GHz '.format(
+                            ramsey_dict[qbn][key]['new_qb_freq']*1e-9) +
+                            '$\pm$ {:.2E} GHz '.format(
+                            ramsey_dict[qbn][key][
+                                'new_qb_freq_stderr']*1e-9))
+                    T2_star_str += \
+                        ('\n$T_{{2,{{{key}}} }}^\star$ = '.format(
+                            key=('exp' if i == 0 else 'gauss')) +
+                            '{:.2f} $\mu$s'.format(
+                            fit_res.params['tau'].value*1e6) +
+                            '$\pm$ {:.2f} $\mu$s'.format(
+                            fit_res.params['tau'].stderr*1e6))
+
+                textstr += ('\n$\Delta f$ = {:.4f} MHz '.format(
+                    (ramsey_dict[qbn][exp_decay_fit_key]['new_qb_freq'] -
+                    old_qb_freq)*1e-6) + '$\pm$ {:.2E} MHz'.format(
+                    self.fit_dicts[exp_decay_fit_key]['fit_res'].params[
+                        'frequency'].stderr*1e-6) +
+                    '\n$f_{Ramsey}$ = '+'{:.4f} MHz $\pm$ {:.2E} MHz'.format(
+                    self.fit_dicts[exp_decay_fit_key]['fit_res'].params[
+                        'frequency'].value*1e-6,
+                    self.fit_dicts[exp_decay_fit_key]['fit_res'].params[
+                        'frequency'].stderr*1e-6))
+                textstr += T2_star_str
+                textstr += '\nartificial detuning = {:.2f} MHz'.format(
+                    ramsey_dict[qbn][exp_decay_fit_key][
+                        'artificial_detuning']*1e-6)
+
+                self.plot_dicts['text_msg_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'ypos': -0.175,
+                    'xpos': 0.5,
+                    'horizontalalignment': 'center',
+                    'verticalalignment': 'top',
+                    'plotfn': self.plot_text,
+                    'text_string': textstr}
+
+                self.plot_dicts['half_hline_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': self.plot_hlines,
+                    'y': 0.5,
+                    'xmin': self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][0],
+                    'xmax': self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][-1],
+                    'colors': 'gray'}
+
+
+class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, qb_names: list=None,  t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+
+        super().__init__(qb_names=qb_names, t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only,
+                         do_fitting=do_fitting,
+                         auto=False)
+
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        super().process_data()
+
+        self.proc_data_dict['qscale_data'] = OrderedDict()
+        for qbn in self.qb_names:
+            self.proc_data_dict['qscale_data'][qbn] = OrderedDict()
+            sweep_points = self.raw_data_dict['sweep_points_dict'][qbn][
+                'msmt_sweep_points']
+            data = self.proc_data_dict['projected_data_dict'][qbn]
+            if self.NoCalPoints != 0:
+                data = data[:-self.NoCalPoints]
+            self.proc_data_dict['qscale_data'][qbn]['sweep_points_xx'] = \
+                sweep_points[0::3]
+            self.proc_data_dict['qscale_data'][qbn]['sweep_points_xy'] = \
+                sweep_points[1::3]
+            self.proc_data_dict['qscale_data'][qbn]['sweep_points_xmy'] = \
+                sweep_points[2::3]
+            self.proc_data_dict['qscale_data'][qbn]['data_xx'] = \
+                data[0::3]
+            self.proc_data_dict['qscale_data'][qbn]['data_xy'] = \
+                data[1::3]
+            self.proc_data_dict['qscale_data'][qbn]['data_xmy'] = \
+                data[2::3]
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        for qbn in self.qb_names:
+            for msmt_label in ['_xx', '_xy', '_xmy']:
+                sweep_points = self.proc_data_dict['qscale_data'][qbn][
+                    'sweep_points' + msmt_label]
+                data = self.proc_data_dict['qscale_data'][qbn][
+                    'data' + msmt_label]
+
+                if msmt_label == '_xx':
+                    model = lmfit.models.ConstantModel()
+                else:
+                    model = lmfit.models.LinearModel()
+
+                guess_pars = model.guess(data=data, x=sweep_points)
+                key = 'fit' + msmt_label + '_' + qbn
+                self.fit_dicts[key] = {
+                    'fit_fn': model.func,
+                    'fit_xvals': {'x': sweep_points},
+                    'fit_yvals': {'data': data},
+                    'guess_pars': guess_pars}
+
+    def analyze_fit_results(self):
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+        # The best qscale parameter is the point where all 3 curves intersect.
+        threshold = 0.02
+        for qbn in self.qb_names:
+            self.proc_data_dict['analysis_params_dict'][qbn] = OrderedDict()
+            fitparams0 = self.fit_dicts['fit_xx'+'_'+qbn]['fit_res'].params
+            fitparams1 = self.fit_dicts['fit_xy'+'_'+qbn]['fit_res'].params
+            fitparams2 = self.fit_dicts['fit_xmy'+'_'+qbn]['fit_res'].params
+
+            intercept_diff_mean = fitparams1['intercept'].value - \
+                                  fitparams2['intercept'].value
+            slope_diff_mean = fitparams2['slope'].value - \
+                              fitparams1['slope'].value
+            optimal_qscale = intercept_diff_mean/slope_diff_mean
+
+            # Warning if Xpi/2Xpi line is not within +/-threshold of 0.5
+            if (fitparams0['c'].value > (0.5 + threshold)) or \
+                    (fitparams0['c'].value < (0.5 - threshold)):
+                logging.warning('The trace from the X90-X180 pulses is '
+                                'NOT within $\pm${} of the expected value '
+                                'of 0.5.'.format(threshold))
+            # Warning if optimal_qscale is not within +/-threshold of 0.5
+            y_optimal_qscale = optimal_qscale * fitparams2['slope'].value + \
+                                 fitparams2['intercept'].value
+            if (y_optimal_qscale > (0.5 + threshold)) or \
+                    (y_optimal_qscale < (0.5 - threshold)):
+                logging.warning('The optimal qscale found gives a population '
+                                'that is NOT within $\pm${} of the expected '
+                                'value of 0.5.'.format(threshold))
+
+            # Calculate standard deviation
+            intercept_diff_std_squared = \
+                fitparams1['intercept'].stderr**2 + \
+                fitparams2['intercept'].stderr**2
+            slope_diff_std_squared = \
+                fitparams2['slope'].stderr**2 + fitparams1['slope'].stderr**2
+
+            optimal_qscale_stderr = np.sqrt(
+                intercept_diff_std_squared*(1/slope_diff_mean**2) +
+                slope_diff_std_squared*(intercept_diff_mean /
+                                        (slope_diff_mean**2))**2)
+
+            self.proc_data_dict['analysis_params_dict'][qbn]['qscale'] = \
+                optimal_qscale
+            self.proc_data_dict['analysis_params_dict'][qbn][
+                'qscale_stderr'] = optimal_qscale_stderr
+
+    def prepare_plots(self):
+        super().prepare_plots()
+
+        color_dict = {'_xx': '#365C91',
+                      '_xy': '#683050',
+                      '_xmy': '#3C7541'}
+        label_dict = {'_xx': r'$X_{\pi/2}X_{\pi}$',
+                      '_xy': r'$X_{\pi/2}Y_{\pi}$',
+                      '_xmy': r'$X_{\pi/2}Y_{-\pi}$'}
+        for qbn in self.qb_names:
+            ref_state_plot_labels = ['exc_state_' + qbn,
+                                     'gnd_state_' + qbn]
+            self.plot_dicts.pop('base_plot_' + qbn)
+            for ref_state_plot_label in ref_state_plot_labels:
+                if ref_state_plot_label in self.plot_dicts:
+                    self.plot_dicts.pop(ref_state_plot_label)
+                if (ref_state_plot_label + '_line') in self.plot_dicts:
+                    self.plot_dicts.pop(ref_state_plot_label + '_line')
+
+            base_plot_name = 'data_xx_' + qbn
+            for msmt_label in ['_xx', '_xy', '_xmy']:
+                sweep_points = self.proc_data_dict['qscale_data'][qbn][
+                    'sweep_points' + msmt_label]
+                data = self.proc_data_dict['qscale_data'][qbn][
+                    'data' + msmt_label]
+                plot_name = 'data' + msmt_label + '_' + qbn
+
+                # plot data
+                self.plot_dicts[plot_name] = {
+                    'plotfn': self.plot_line,
+                    'xvals': sweep_points,
+                    'xlabel': self.raw_data_dict['xlabel'][0],
+                    'xunit': self.raw_data_dict['xunit'][0][0],
+                    'yvals': data,
+                    'ylabel': 'Excited state population',
+                    'yunit': '',
+                    'setlabel': 'Data - ' + label_dict[msmt_label],
+                    'title': (self.raw_data_dict['timestamps'][0] + ' ' +
+                              self.raw_data_dict['measurementstring'][0] +
+                              '\n' + qbn),
+                    'linestyle': 'none',
+                    'color': color_dict[msmt_label],
+                    'do_legend': True,
+                    'legend_bbox_to_anchor': (1, 0.5),
+                    'legend_pos': 'center left'}
+                if msmt_label != '_xx':
+                    self.plot_dicts[plot_name]['fig_id'] = base_plot_name
+
+                if self.do_fitting:
+                    # plot fit
+                    xfine = np.linspace(sweep_points[0], sweep_points[-1], 1000)
+                    fit_key = 'fit' + msmt_label + '_' + qbn
+                    fit_res = self.fit_dicts[fit_key]['fit_res']
+                    yvals = fit_res.model.func(xfine, **fit_res.best_values)
+                    if not hasattr(yvals, '__iter__'):
+                        yvals = np.array(len(xfine)*[yvals])
+                    self.plot_dicts[fit_key] = {
+                        'fig_id': base_plot_name,
+                        'plotfn': self.plot_line,
+                        'xvals': xfine,
+                        'yvals': yvals,
+                        'marker': '',
+                        'setlabel': 'Fit - ' + label_dict[msmt_label],
+                        'do_legend': True,
+                        'color': color_dict[msmt_label],
+                        'legend_bbox_to_anchor': (1, 0.5),
+                        'legend_pos': 'center left'}
+
+                    old_qscale_val = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='motzoi')
+                    textstr = 'Qscale = {:.4f} $\pm$ {:.4f}'.format(
+                        self.proc_data_dict['analysis_params_dict'][qbn][
+                            'qscale'],
+                        self.proc_data_dict['analysis_params_dict'][qbn][
+                            'qscale_stderr']) + \
+                            '\nold Qscale= {:.4f}'.format(old_qscale_val)
+
+                    self.plot_dicts['text_msg_' + qbn] = {
+                        'fig_id': base_plot_name,
+                        'ypos': -0.175,
+                        'xpos': 0.5,
+                        'horizontalalignment': 'center',
+                        'verticalalignment': 'top',
+                        'plotfn': self.plot_text,
+                        'text_string': textstr}
+
+            # plot cal points
+            if self.NoCalPoints != 0:
+                ref_state_plot_labels = ('exc_state_' + qbn,
+                                         'gnd_state_' + qbn)
+                assert (len(ref_state_plot_labels) == len(self.cal_points))
+                for i, cal_pts_idxs in enumerate(self.cal_points[::-1]):
+                    self.plot_dicts[ref_state_plot_labels[i]] = {
+                        'fig_id': base_plot_name,
+                        'plotfn': self.plot_line,
+                        'xvals': np.mean([
+                            self.raw_data_dict['sweep_points_dict'][qbn]
+                            ['cal_points_sweep_points'][cal_pts_idxs],
+                            self.raw_data_dict['sweep_points_dict'][qbn]
+                            ['cal_points_sweep_points'][cal_pts_idxs]],
+                            axis=0),
+                        'yvals': self.proc_data_dict[
+                            'projected_data_dict'][qbn][cal_pts_idxs],
+                        'setlabel': r'$|e\rangle$' if i == 0
+                        else r'$|g\rangle$',
+                        'do_legend': True,
+                        'legend_bbox_to_anchor': (1, 0.5),
+                        'legend_pos': 'center left',
+                        'linestyle': 'none',
+                        'line_kws': {'color': 'gray' if i == 0 else 'k'}}
+
+                    self.plot_dicts[ref_state_plot_labels[i]+'_line'] = {
+                        'fig_id': base_plot_name,
+                        'plotfn': self.plot_hlines,
+                        'y': np.mean(
+                            self.proc_data_dict[
+                                'projected_data_dict'][qbn][cal_pts_idxs]),
+                        'xmin': self.raw_data_dict['sweep_points_dict'][
+                            qbn]['sweep_points'][0],
+                        'xmax': self.raw_data_dict['sweep_points_dict'][
+                            qbn]['sweep_points'][-1],
+                        'colors': 'gray'}
+
+

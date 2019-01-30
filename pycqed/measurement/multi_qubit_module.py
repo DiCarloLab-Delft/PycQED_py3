@@ -2219,13 +2219,13 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         exp_metadata = None
         sweep_points = sweep_points_dict['qscale']
         temp_array = np.zeros(3*sweep_points.size)
-        np.put(temp_array,list(range(0,temp_array.size,3)),sweep_points)
-        np.put(temp_array,list(range(1,temp_array.size,3)),sweep_points)
-        np.put(temp_array,list(range(2,temp_array.size,3)),sweep_points)
+        np.put(temp_array, list(range(0, temp_array.size, 3)), sweep_points)
+        np.put(temp_array, list(range(1, temp_array.size, 3)), sweep_points)
+        np.put(temp_array, list(range(2, temp_array.size, 3)), sweep_points)
         sweep_points = temp_array
 
         if cal_points:
-            step = np.abs(sweep_points[-1]-sweep_points[-2])
+            step = np.abs(sweep_points[-1]-sweep_points[-4])
             if no_cal_points == 4:
                 sweep_points = np.concatenate(
                     [sweep_points, [sweep_points[-1]+step,
