@@ -862,7 +862,6 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                                 :] = measured_values_ancilla_select[i::self.nr_segments]
 
             if self.q_post_select_initialisation:  # only initizilizing the ancilla
-                # only selecting the last data qubit outcome
                 measured_values_ancilla_preshaping = self.measured_values[
                     self.weight_channels[2]][0::nr_consecutive_mmts]
                 measured_values_ancilla_init = np.zeros(
@@ -882,8 +881,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                         thresholds=[self.q_post_select_threshold],
                         init_measurements=[shots_qA_init],
                         positive_case=True)
-                    #measured_values1[i, :][post_select_indices_0] = np.nan
-                    #measured_values2[i, :][post_select_indices_0] = np.nan
+                    measured_values1[i, :][post_select_indices_0] = np.nan
+                    measured_values2[i, :][post_select_indices_0] = np.nan
 
                 if self.q_post_select:
                     # first digitize the 2D array
@@ -957,12 +956,10 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             if self.start_shot != 0 or self.end_shot != -1:
                 self.shots_q0 = self.shots_q0[:, self.start_shot:self.end_shot]
                 self.shots_q1 = self.shots_q1[:, self.start_shot:self.end_shot]
-                self.shots_q0q1 = self.shots_q0q1[
-                    :, self.start_shot:self.end_shot]
-            ##########################################
-            # Making  the first figure, tomo shots
-            ##########################################
-
+                self.shots_q0q1 = self.shots_q0q1[:, self.start_shot:self.end_shot]
+            ########################################
+            # Making  the first figure, tomo shots #
+            ########################################
             avg_h1 = np.nanmean(measured_values1, axis=1)
             avg_h2 = np.nanmean(measured_values2, axis=1)
             avg_h12 = np.nanmean(self.shots_q0q1, axis=1)
@@ -1374,13 +1371,21 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                      ylabels=['00', '01', '10', '11'],
                                      fig=fig3,
                                      ax=fig3.add_subplot(122, projection='3d'))
-
-        figname = 'MLE-Tomography_decoding_{}_states_{}_indices_{}_Exp_{}.{}'.format(self.PF_tracking,
+        if self.PF_tracking=='no_error':
+            figname = 'MLE-Tomography_decoding_{}_states_{}_indices_{}_Exp_{}.{}'.format(self.PF_tracking,
+                                                                               self.q_post_selection_states[:len(self.PF_parity_pattern)],
+                                                                               self.q_post_selection_indices[:len(self.PF_parity_pattern)],
+                                                                               self.exp_name,
+                                                                               self.fig_format,
+                                                                               )
+        else:
+            figname = 'MLE-Tomography_decoding_{}_states_{}_indices_{}_Exp_{}.{}'.format(self.PF_tracking,
                                                                                self.q_post_selection_states,
                                                                                self.q_post_selection_indices,
                                                                                self.exp_name,
                                                                                self.fig_format,
                                                                                )
+
         fig3.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         savename = os.path.abspath(os.path.join(
             self.folder, figname))
