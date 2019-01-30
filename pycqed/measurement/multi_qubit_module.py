@@ -790,7 +790,8 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     if reset == 'simple':
         nr_parity_measurements = 1
 
-    nr_readouts = 1 + nr_parity_measurements + (1 if preselection else 0)
+    nr_readouts = 1 + nr_parity_measurements + (1 if preselection else 0)\
+     + (1 if prep_sequence == 'mixed' else 0)
     nr_readouts *= len(tomography_basis)**2
     
     nr_shots *= nr_readouts
@@ -803,8 +804,9 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
     
-    MC.run_2D(name='two_qubit_parity_{}_x{}{}-{}'.format(
+    MC.run_2D(name='two_qubit_parity_{}_x{}{}{}-{}'.format(
         parity_op, nr_parity_measurements,
+        prep_sequence if prep_sequence=='mixed' else '',
         '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])),
         exp_metadata=exp_metadata)
 
@@ -1986,8 +1988,6 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     if pulsar is None:
         pulsar = qubits[0].AWG
 
-    exp_metadata = None
-
     # set up multiplexed readout
     multiplexed_pulse(qubits, f_LO, upload=True)
     operation_dict = get_operation_dict(qubits)
@@ -2051,6 +2051,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     # Do measurements
     # RABI
     if 'rabi' in sweep_points_dict:
+        exp_metadata = None
         sweep_points = sweep_points_dict['rabi']
 
         if sweep_params is None:
@@ -2100,6 +2101,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # N-RABI
     if 'n_rabi' in sweep_points_dict:
+        exp_metadata = None
         sweep_points = sweep_points_dict['n_rabi']
         if sweep_params is None:
             sweep_params = (
@@ -2148,6 +2150,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # RAMSEY
     if 'ramsey' in sweep_points_dict:
+        exp_metadata = None
         if artificial_detuning is None:
             raise ValueError('Specify an artificial_detuning for the Ramsey '
                              'measurement.')
@@ -2213,6 +2216,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # QSCALE
     if 'qscale' in sweep_points_dict:
+        exp_metadata = None
         sweep_points = sweep_points_dict['qscale']
         temp_array = np.zeros(3*sweep_points.size)
         np.put(temp_array,list(range(0,temp_array.size,3)),sweep_points)
@@ -2291,6 +2295,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # T1
     if 'T1' in sweep_points_dict:
+        exp_metadata = None
         sweep_points = sweep_points_dict['T1']
         if sweep_params is None:
             sweep_params = (
@@ -2332,6 +2337,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                         'updated.'%e)
     # T2 ECHO
     if 'T2' in sweep_points_dict:
+        exp_metadata = None
         if artificial_detuning is None:
             raise ValueError('Specify an artificial_detuning for the Ramsey '
                              'measurement.')

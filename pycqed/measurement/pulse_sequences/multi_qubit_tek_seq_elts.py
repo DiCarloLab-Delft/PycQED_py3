@@ -1616,6 +1616,8 @@ def parity_correction_seq(
     operation_dict['RO mux_presel']['pulse_delay'] = \
         -ro_spacing - feedback_delay - operation_dict['RO mux']['length']
     operation_dict['RO mux_presel']['refpoint'] = 'end'
+    operation_dict['RO mux_presel'].pop('basis_rotation', {})
+
     operation_dict['RO presel_dummy'] = {
         'pulse_type': 'SquarePulse',
         'channel': operation_dict['RO mux']['acq_marker_channel'],
@@ -1714,7 +1716,7 @@ def parity_correction_seq(
     # feedback elements
     fb_sequence_0 = ['I ' + qb3n, 'Is ' + qb2n]
     fb_sequence_1 = ['X180 ' + qb3n] if reset else ['I ' + qb3n]
-    fb_sequence_1 += ['X180s ' + qb2n] if reset else ['Is ' + qb2n]
+    fb_sequence_1 += ['X180s ' + qb2n]# if reset else ['Is ' + qb2n]
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
     el_list.append(multi_pulse_elt(0, station, pulse_list, name='f0',
                                    trigger=False, previous_element=el_main))
@@ -1825,15 +1827,17 @@ def parity_correction_seq(
         ifreq = operation_dict['X180 ' + qbn]['mod_frequency']
         if parity_op in ['XX', 'ZZ']:
             elements_length = el_fb.ideal_length() + el_repeat.ideal_length()
+            dynamic_phase = el_repeat.drive_phase_offsets.get(qbn, 0)
         else:
             elements_length = el_fb.ideal_length() + el_repeat_x.ideal_length()
+            dynamic_phase = el_repeat_x.drive_phase_offsets.get(qbn, 0)
             print('Length difference of XX and ZZ cycles: {} s'.format(
                 el_repeat_x.ideal_length() - el_repeat_z.ideal_length()
             ))
-        dynamic_phase = el_main.drive_phase_offsets.get(qbn, 0)
+        dynamic_phase -= el_main.drive_phase_offsets.get(qbn, 0)
         phase_from_if = 360*ifreq*elements_length
         total_phase = phase_from_if + dynamic_phase
-        total_mod_phase = total_phase - 360*(total_phase//360)
+        total_mod_phase = (total_phase + 180) % 360 - 180
         print(qbn + ' aquires a phase of {} ≡ {} (mod 360)'.format(
             total_phase, total_mod_phase) + ' degrees each correction ' + 
             'cycle. You should reduce the intermediate frequency by {} Hz.'\
