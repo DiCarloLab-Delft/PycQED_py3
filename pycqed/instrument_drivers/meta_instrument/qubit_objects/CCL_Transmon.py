@@ -2796,7 +2796,10 @@ class CCLight_Transmon(Qubit):
                        artificial_detuning: float=None,
                        freq_qubit: float=None,
                        label: str='',
-                       analyze=True, close_fig=True, update=True):
+                       prepare_for_timedomain=True,
+                       analyze=True, close_fig=True, update=True,
+                       detector=False,
+                       double_fit=False):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -2821,8 +2824,8 @@ class CCLight_Transmon(Qubit):
                                  times[-1]+2*dt,
                                     times[-1]+3*dt,
                                     times[-1]+4*dt)])
-
-        self.prepare_for_timedomain()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
 
         # adding 'artificial' detuning by detuning the qubit LO
         if freq_qubit is None:
@@ -2849,7 +2852,22 @@ class CCLight_Transmon(Qubit):
                                    artificial_detuning=artificial_detuning)
             if update:
                 self.T2_star(a.T2_star['T2_star'])
-                return a.T2_star
+            if double_fit:
+                b=ma.DoubleFrequency()
+                res = {
+                'T2star1': b.tau1,
+                'T2star2': b.tau2,
+                 'frequency1': b.f1,
+                 'frequency2': b.f2
+                    }
+                return res
+
+            else:
+                res = {
+                    'T2star': a.T2_star['T2_star'],
+                 'frequency': a.qubit_frequency,
+                    }
+                return res
 
     def measure_msmt_induced_dephasing(self, MC=None, sequence='ramsey',
                                        label: str='',
@@ -2888,7 +2906,7 @@ class CCLight_Transmon(Qubit):
             readout_pulse_length += self.ro_pulse_down_length0()
             readout_pulse_length += self.ro_pulse_down_length1()
             if extra_echo:
-                wait_time = readout_pulse_length/2+20e-9
+                wait_time = readout_pulse_length/2+0e-9
             else:
                 wait_time = 0
 
