@@ -777,7 +777,9 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
 
 
 def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
-                                    fluxbias_q1, amp, sim_step):
+                                    fluxbias_q1, amp, sim_step, intervals_list=[-1]):
+    if intervals_list[0]==-1:
+        intervals_list = np.zeros(np.size(amp))+sim_step
     """
     Calculates the propagator (either unitary or superoperator)
 
@@ -832,9 +834,9 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
                     c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_H.dag())    # c_ops are already in the H_0 basis
                 else:
                     c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
-            liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*sim_step).expm()
+            liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*intervals_list[i]).expm()
         else:
-            liouville_exp_t=(-1j*H*sim_step).expm()
+            liouville_exp_t=(-1j*H*intervals_list[i]).expm()
         exp_L_total=liouville_exp_t*exp_L_total
 
     #t1 = time.time()
