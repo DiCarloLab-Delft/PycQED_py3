@@ -783,6 +783,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                  nr_parity_check_rounds=1,
                  PF_tracking='first',
                  PF_parity_pattern=['ZZ'],
+                 blossom_record=None
                  **kw):
         self.label = label
         self.timestamp = timestamp
@@ -809,6 +810,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.nr_parity_check_rounds = nr_parity_check_rounds
         self.PF_tracking = PF_tracking
         self.PF_parity_pattern = PF_parity_pattern
+        self.blossom_record = blossom_record
         kw['h5mode'] = 'r+'
         super(Tomo_Multiplexed, self).__init__(auto=auto, timestamp=timestamp,
                                                label=label, **kw)
@@ -949,24 +951,17 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 self.fraction=1-len(np.where(np.isnan(relevant_data))[0])/np.size(relevant_data)
 
             # Get correlations between shots
-            self.shots_q0q1 = np.multiply(measured_values2, measured_values1)
-            # self.shots_q0 = measured_values1
-            # self.shots_q1 = measured_values2
-
             if self.start_shot != 0 or self.end_shot != -1:
                 self.shots_q0 = self.shots_q0[:, self.start_shot:self.end_shot]
                 self.shots_q1 = self.shots_q1[:, self.start_shot:self.end_shot]
-                self.shots_q0q1 = self.shots_q0q1[:, self.start_shot:self.end_shot]
             ########################################
             # Making  the first figure, tomo shots #
             ########################################
             avg_h1 = np.nanmean(measured_values1, axis=1)
             avg_h2 = np.nanmean(measured_values2, axis=1)
-            avg_h12 = np.nanmean(self.shots_q0q1, axis=1)
         else:
             avg_h1 = self.measured_values[0]
             avg_h2 = self.measured_values[1]
-            avg_h12 = self.measured_values[2]
 
         # Binning all the points required for the tomo
         h1_00 = np.nanmean(avg_h1[36:36+7])
@@ -978,35 +973,41 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         h2_01 = np.nanmean(avg_h2[43:43+7])
         h2_10 = np.nanmean(avg_h2[50:50+7])
         h2_11 = np.nanmean(avg_h2[57:])
+        # Substract avg of all traces
+        mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
+        mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
 
+        avg_h1 -= mean_h1
+        avg_h2 -= mean_h2
+
+        scale_h1 = (h1_00+h1_10-h1_01-h1_11)/4
+        scale_h2 = (h2_00+h2_01-h2_10-h2_11)/4
+
+        # normalizing all shots according to the calibration points
+        avg_h1 = (avg_h1)/scale_h1
+        avg_h2 = (avg_h2)/scale_h2
+
+        # creating the correlation data
+        if self.single_shots:
+            # Get correlations between shots
+            self.shots_q0q1 = np.multiply(measured_values2-mean_h2, measured_values1-mean_h1)
+            if self.start_shot != 0 or self.end_shot != -1:
+                self.shots_q0q1 = self.shots_q0q1[:, self.start_shot:self.end_shot]
+            avg_h12 = np.nanmean(self.shots_q0q1, axis=1)
+        else:
+            avg_h12 = self.measured_values[2]
+
+        #getting averages from the calibration points
         h12_00 = np.nanmean(avg_h12[36:36+7])
         h12_01 = np.nanmean(avg_h12[43:43+7])
         h12_10 = np.nanmean(avg_h12[50:50+7])
         h12_11 = np.nanmean(avg_h12[57:])
-
-        # std_arr = np.array( std_h2_00, std_h2_01, std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
-        # plt.plot(std_arr)
-        # plt.show()
-
-        # Substract avg of all traces
-        mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
-        mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
         mean_h12 = (h12_00+h12_11+h12_01+h12_10)/4
-
-        avg_h1 -= mean_h1
-        avg_h2 -= mean_h2
+        # print('check mean', mean_h12)
         avg_h12 -= mean_h12
-
-        scale_h1 = (h1_00+h1_10-h1_01-h1_11)/4
-        scale_h2 = (h2_00+h2_01-h2_10-h2_11)/4
         scale_h12 = (h12_00+h12_11-h12_01-h12_10)/4
-
-        # normalizing all shots according to the calibration points
-
-        avg_h1 = (avg_h1)/scale_h1
-        avg_h2 = (avg_h2)/scale_h2
         avg_h12 = (avg_h12)/scale_h12
-        # dived by scalefactor
+
 
         # applying pauli frame update here
         # first suptracting offsets and rescaling all individual shots
