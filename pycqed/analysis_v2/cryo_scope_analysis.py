@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from typing import Union
 from copy import deepcopy
+from scipy.stats import sem 
+from uncertainties import ufloat 
 from pycqed.analysis import analysis_toolbox as a_tools
 from collections import OrderedDict
 from pycqed.analysis import measurement_analysis as ma_old
@@ -84,7 +86,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
                 ch_range = a.data_file[self.ch_range_key].attrs['value']
             waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
             amp = ch_amp*ch_range/2*waveform_amp
-            # amp = ch_amp
+
             data = a.measured_values[self.ch_idx_cos] + 1j * \
                 a.measured_values[self.ch_idx_sin]
             # hacky but required for data saving
@@ -136,11 +138,13 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             label='',
             derivative_window_length: float=5e-9,
             norm_window_size: int=31,
-            nyquist_order: int =0,
+            nyquist_order: int ='auto',
             ch_amp_key: str='Snapshot/instruments/AWG8_8005'
         '/parameters/awgs_0_outputs_1_amplitude',
             ch_range_key: str='Snapshot/instruments/AWG8_8005'
         '/parameters/sigouts_0_range',
+            waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
+                 '/parameters/sq_amp',
             polycoeffs_freq_conv: Union[list, str] =
         'Snapshot/instruments/FL_LutMan_QR/parameters/polycoeffs_freq_conv/value',
             ch_idx_cos: int=0,
@@ -148,6 +152,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             input_wf_key: str=None,
             options_dict: dict=None,
             close_figs: bool=True,
+            extract_only: bool = False,
             auto=True):
         """
         Cryoscope analysis for an arbitrary waveform.
@@ -161,6 +166,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         # ch_range_keycan also be set to `None`, then the value will
         # default to 1 (no rescaling)
         self.ch_range_key = ch_range_key
+        self.waveform_amp_key = waveform_amp_key
 
         self.derivative_window_length = derivative_window_length
         self.norm_window_size = norm_window_size
@@ -170,7 +176,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         self.ch_idx_sin = ch_idx_sin
 
         super().__init__(
-            t_start=t_start, t_stop=t_stop, label=label,
+            t_start=t_start, t_stop=t_stop, label=label, extract_only=extract_only,
             options_dict=options_dict, close_figs=close_figs)
         if auto:
             self.run_analysis()
@@ -201,17 +207,21 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
                 timestamp=timestamp, auto=False, close_file=False)
             a.get_naming_and_values()
             if i == 0:
-                ch_amp = a.data_file[self.ch_amp_key].attrs['value']
+                if self.ch_amp_key is None: 
+                    ch_amp = 1
+                else: 
+                    ch_amp = a.data_file[self.ch_amp_key].attrs['value']
                 if self.ch_range_key is None:
                     ch_range = 2  # corresponds to a scale factor of 1
                 else:
                     ch_range = a.data_file[self.ch_range_key].attrs['value']
-                amp = ch_amp*ch_range/2
+                waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
+                amp = ch_amp*ch_range/2*waveform_amp
+
                 # read conversion polynomial from the datafile if not provided as input
                 if isinstance(self.polycoeffs_freq_conv, str):
                     self.polycoeffs_freq_conv = np.array(
                         a.data_file[self.polycoeffs_freq_conv])
-                    print(np.array(self.polycoeffs_freq_conv))
 
                 self.raw_data_dict['data'] =\
                     a.measured_values[self.ch_idx_cos] + \
@@ -233,6 +243,9 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
+        self.proc_data_dict['quantities_of_interest'] = {}
+        qoi = self.proc_data_dict['quantities_of_interest']
+
         self.proc_data_dict['derivative_window_length'] = \
             self.derivative_window_length
         self.proc_data_dict['norm_window_size'] = self.norm_window_size
@@ -245,7 +258,21 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             demod_smooth=None)
 
         self.ca.freq_to_amp = self.freq_to_amp
-        self.ca.nyquist_order = self.nyquist_order
+        if self.nyquist_order == 'auto':
+            amp = self.proc_data_dict['amps'][0]
+            nyquist_order = np.polyval(self.polycoeffs_freq_conv, amp)//(
+                self.ca.sampling_rate/2)
+            self.ca.nyquist_order = nyquist_order
+        else:
+            self.ca.nyquist_order = self.nyquist_order
+
+        # Storing specific quantities of interest 
+        qoi['nyquist_order'] = self.nyquist_order
+        qoi['mean_detuning'] = ufloat(np.mean(self.ca.real_detuning), 
+                                      sem(self.ca.real_detuning))
+
+
+
 
     def prepare_plots(self):
         # pass

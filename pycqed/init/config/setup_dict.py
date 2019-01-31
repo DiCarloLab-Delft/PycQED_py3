@@ -9,9 +9,7 @@
                                     # enumerate(hex(uuid.getnode())[2:].zfill(12)))[:-1]).upper()
 mac_dict = {'203178706891063': 'CDickel_Desktop',
             '203308017140376': 'Adriaans_Macbook',
-            # '54976059179008': 'Adriaans_Macbook',
             '963460802314': 'La_Ferrari',
-            '46390847648': 'TUD277449',
             '215977245841658': 'La_Maserati_JrJr',
             '215977245830009': 'La_Vespa',
             '13795386264098': 'Serwans_Laptop',
@@ -58,12 +56,11 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'Nathans_Laptop': r'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
                  'Bart_Laptop': r'C:\Experiments/NumericalOptimization/Data',
                  'Qudev_testbench' : r'E:\Control software\data',
-                # 'Florian_Desktop': r'\\131.180.82.190\\Experiments\\1605_NWv7A2\\Data' # To Maserati
-                 # 'Florian_Desktop': r'\\TUD277620\\Experiments\\1704_NWv74_Magnet\\Data' # To Ducati
-                 # 'Luthi_Desktop': r'\\TUD277620\\Experiments\\1607_NWv7A4_Magnet\\Data' # To Ducati Old
                  'Luthi_Desktop': r'\\TUD277620\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'Thijs_laptop' : 'C:\\Users\\Thijs\\Documents\\TUDelft\\PhD\\Data',
                  'Thijs_Desktop': r'\\TUD277620\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'LaAprilia_1' : r'D:\Experiments\\1802_IntelS7Airbridges'
+                 'LaVespa': r'D:\Experiments\18031_Intel_resonators',
+                 'LaAprilia_1' : r'D:\\Experiments\\1812_CZsims\\data',
                  #'LaAprilia_1' : r'D:\Experiments\1802_Argon\Data'
                  }

@@ -4,7 +4,8 @@ import numpy as np
 import h5py
 import json
 import datetime
-from pycqed.measurement import hdf5_data as h5d
+# from pycqed.measurement import hdf5_data as h5d
+from pycqed.measurement.hdf5_data import read_dict_from_hdf5, RepresentsInt
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
 import pycqed as pq
@@ -248,7 +249,7 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
 
             f = h5py.File(filepath, 'r')
             snapshot = {}
-            h5d.read_dict_from_hdf5(snapshot, h5_group=f['Snapshot'])
+            read_dict_from_hdf5(snapshot, h5_group=f['Snapshot'])
 
             if load_from_instr is None:
                 ins_group = snapshot['instruments'][instrument_name]
@@ -561,3 +562,5 @@ def check_keyboard_interrupt():
                     'Human "f" terminated experiment safely.')
     except Exception:
         pass
+
+

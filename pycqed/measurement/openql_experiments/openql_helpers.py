@@ -13,6 +13,7 @@ from openql.openql import Program, Kernel, Platform
 
 output_dir = join(dirname(__file__), 'output')
 ql.set_option('output_dir', output_dir)
+ql.set_option('scheduler', 'ALAP')
 
 
 def create_program(pname: str, platf_cfg: str, nregisters: int=0):
@@ -50,6 +51,9 @@ def create_kernel(kname: str, program):
     """
     Wrapper around constructor of openQL "Kernel" class.
     """
+    kname = kname.translate ({ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
+    kname = 'k_'+kname # prefix with k_
+
     k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
     return k
 
@@ -70,7 +74,8 @@ def compile(p):
 # Calibration points
 #############################################################################
 def add_single_qubit_cal_points(p, qubit_idx,
-                                f_state_cal_pts: bool=False):
+                                f_state_cal_pts: bool=False,
+                                measured_qubits=None):
     """
     Adds single qubit calibration points to an OpenQL program
 
@@ -78,19 +83,30 @@ def add_single_qubit_cal_points(p, qubit_idx,
         p
         platf
         qubit_idx
+        measured_qubits : selects which qubits to perform readout on
+            if measured_qubits == None, it will default to measuring the
+            qubit for which there are cal points.
     """
+    if measured_qubits==None:
+        measured_qubits = [qubit_idx]
 
     for i in np.arange(2):
         k = create_kernel("cal_gr_"+str(i), program=p)
         k.prepz(qubit_idx)
-        k.measure(qubit_idx)
+        k.gate('wait', measured_qubits, 0)
+        for measured_qubit in measured_qubits:
+            k.measure(measured_qubit)
+        k.gate('wait', measured_qubits, 0)
         p.add_kernel(k)
 
     for i in np.arange(2):
         k = create_kernel("cal_ex_"+str(i), program=p)
         k.prepz(qubit_idx)
         k.gate('rx180', [qubit_idx])
-        k.measure(qubit_idx)
+        k.gate('wait', measured_qubits, 0)
+        for measured_qubit in measured_qubits:
+            k.measure(measured_qubit)
+        k.gate('wait', measured_qubits, 0)
         p.add_kernel(k)
     if f_state_cal_pts:
         for i in np.arange(2):
@@ -98,13 +114,22 @@ def add_single_qubit_cal_points(p, qubit_idx,
             k.prepz(qubit_idx)
             k.gate('rx180', [qubit_idx])
             k.gate('rx12', [qubit_idx])
-            k.measure(qubit_idx)
+            k.gate('wait', measured_qubits, 0)
+            for measured_qubit in measured_qubits:
+                k.measure(measured_qubit)
+            k.gate('wait', measured_qubits, 0)
             p.add_kernel(k)
     return p
 
 
 def add_two_q_cal_points(p, q0: int, q1: int,
-                         reps_per_cal_pt: int =1):
+                         reps_per_cal_pt: int =1,
+                         f_state_cal_pts: bool=False,
+                         f_state_cal_pt_cw: int = 31,
+                         measured_qubits=None,
+                         interleaved_measured_qubits=None,
+                         interleaved_delay=None,
+                         nr_of_interleaves=1):
     """
     Returns a list of kernels containing calibration points for two qubits
 
@@ -112,6 +137,11 @@ def add_two_q_cal_points(p, q0: int, q1: int,
         p               : OpenQL  program to add calibration points to
         q0, q1          : ints of two qubits
         reps_per_cal_pt : number of times to repeat each cal point
+        f_state_cal_pts : if True, add calibration points for the 2nd exc. state
+        f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition.
+        measured_qubits : selects which qubits to perform readout on
+            if measured_qubits == None, it will default to measuring the
+            qubits for which there are cal points.
     Returns:
         kernel_list     : list containing kernels for the calibration points
     """
@@ -120,23 +150,52 @@ def add_two_q_cal_points(p, q0: int, q1: int,
                     ["01"]*reps_per_cal_pt +
                     ["10"]*reps_per_cal_pt +
                     ["11"]*reps_per_cal_pt)
+    if f_state_cal_pts:
+        extra_combs = (['02']*reps_per_cal_pt + ['20']*reps_per_cal_pt +
+                       ['22']*reps_per_cal_pt)
+        combinations += extra_combs
+
+    if measured_qubits == None:
+        measured_qubits = [q0, q1]
+
+
     for i, comb in enumerate(combinations):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
         k.prepz(q0)
         k.prepz(q1)
-        if comb[0] == '1':
-            k.gate('rx180', [q0])
-        else:
+        if interleaved_measured_qubits:
+            for j in range(nr_of_interleaves):
+                for q in interleaved_measured_qubits:
+                    k.measure(q)
+                k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
+                if interleaved_delay:
+                    k.gate('wait', [0, 1, 2, 3, 4, 5, 6], int(interleaved_delay*1e9))
+
+        if comb[0] =='0':
             k.gate('i', [q0])
-        if comb[1] == '1':
-            k.gate('rx180', [q1])
-        else:
+        elif comb[0] == '1':
+            k.gate('rx180', [q0])
+        elif comb[0] =='2':
+            k.gate('rx180', [q0])
+            # FIXME: this is a workaround
+            #k.gate('rx12', [q0])
+            k.gate('cw_31', [q0])
+
+        if comb[1] =='0':
             k.gate('i', [q1])
+        elif comb[1] == '1':
+            k.gate('rx180', [q1])
+        elif comb[1] =='2':
+            k.gate('rx180', [q1])
+            # FIXME: this is a workaround
+            #k.gate('rx12', [q1])
+            k.gate('cw_31', [q1])
+
         # Used to ensure timing is aligned
-        k.gate('wait', [q0, q1], 0)
-        k.measure(q0)
-        k.measure(q1)
-        k.gate('wait', [q0, q1], 0)
+        k.gate('wait', measured_qubits, 0)
+        for q in measured_qubits:
+            k.measure(q)
+        k.gate('wait', measured_qubits, 0)
         kernel_list.append(k)
         p.add_kernel(k)
 

@@ -2,6 +2,7 @@
 Currently empty should contain the plotting tools portion of the
 analysis toolbox
 '''
+import lmfit
 import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib import cm
@@ -12,7 +13,7 @@ import hsluv
 
 def set_xlabel(axis, label, unit=None, **kw):
     """
-    Takes in an axis object and add a unit aware label to it.
+    Add a unit aware x-label to an axis object.
 
     Args:
         axis: matplotlib axis object to set label on
@@ -38,7 +39,7 @@ def set_xlabel(axis, label, unit=None, **kw):
 
 def set_ylabel(axis, label, unit=None, **kw):
     """
-    Takes in an axis object and add a unit aware label to it.
+    Add a unit aware y-label to an axis object.
 
     Args:
         axis: matplotlib axis object to set label on
@@ -66,7 +67,7 @@ SI_PREFIXES = dict(zip(range(-24, 25, 3), 'yzafpnμm kMGTPEZY'))
 SI_PREFIXES[0] = ""
 
 # N.B. not all of these are SI units, however, all of these support SI prefixes
-SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms'.split(
+SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms,$\Phi_0$'.split(
     ',')
 
 
@@ -115,6 +116,18 @@ def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
         return return_type(val), unit
 
     return return_type(new_val), new_unit
+
+
+def format_lmfit_par(par_name: str, lmfit_par, end_char=''):
+    """Format an lmfit par to a string of value with uncertainty."""
+    val_string = par_name
+    val_string += ': {:.4f}'.format(lmfit_par.value)
+    if lmfit_par.stderr is not None:
+        val_string += r'$\pm$' + '{:.4f}'.format(lmfit_par.stderr)
+    else:
+        val_string += r'$\pm$' + 'NaN'
+    val_string += end_char
+    return val_string
 
 
 def data_to_table_png(data: list, filename: str, title: str='',
@@ -193,6 +206,75 @@ def get_color_order(i, max_num, cmap='viridis'):
 
 def get_color_from_cmap(i, max_num):
     pass
+
+
+def plot_lmfit_res(fit_res, ax, plot_init: bool=False,
+                   plot_numpoints: int=1000,
+                   plot_kw: dict ={}, plot_init_kw: dict = {}, **kw):
+    """
+    Plot the result of an lmfit optimization.
+
+    Args:
+        fit_res:        lmfit result object.
+        ax:             matplotlib axis object to plot on.
+        plot_init:      if True plots the initial guess of the fit.
+        plot_numpoints: number of points to use for interpolating the fit.
+        plot_kw:        dictionary of options to pass to the plot of the fit.
+        plot_init_kw    dictionary of options to pass to the plot of the
+                        initial guess.
+        **kw            **kwargs, unused only here to match call signature.
+
+    Return:
+        axis :          Returns matplotlib axis object on which the plot
+                        was performed.
+
+    """
+    if hasattr(fit_res, 'model'):
+        model = fit_res.model
+        # Testing input
+        if not (isinstance(model, lmfit.model.Model) or
+                isinstance(model, lmfit.model.ModelResult)):
+            raise TypeError(
+                'The passed item in "fit_res" needs to be'
+                ' a fitting model, but is {}'.format(type(model)))
+        if len(model.independent_vars) == 1:
+            independent_var = model.independent_vars[0]
+        else:
+            raise ValueError('Fit can only be plotted if the model function'
+                             ' has one independent variable.')
+
+        x_arr = fit_res.userkws[independent_var]
+        xvals = np.linspace(np.min(x_arr), np.max(x_arr),
+                            plot_numpoints)
+        yvals = model.eval(fit_res.params,
+                           **{independent_var: xvals})
+        if plot_init:
+            yvals_init = model.eval(fit_res.init_params,
+                                    **{independent_var: xvals})
+
+    else:  # case for the minimizer fit
+        # testing input
+        fit_xvals = fit_res.userkws
+        if len(fit_xvals.keys()) == 1:
+            independent_var = list(fit_xvals.keys())[0]
+        else:
+            raise ValueError('Fit can only be plotted if the model function'
+                             ' has one independent variable.')
+
+        x_arr = fit_res.userkws[independent_var]
+        xvals = np.linspace(np.min(x_arr), np.max(x_arr),
+                            plot_numpoints)
+        fit_fn = fit_res.fit_fn
+        yvals = fit_fn(**fit_res.params,
+                       **{independent_var: xvals})
+        if plot_init:
+            yvals_init = fit_fn(**fit_res.init_params,
+                                **{independent_var: xvals})
+    # acutal plotting
+    ax.plot(xvals, yvals, **plot_kw)
+    if plot_init:
+        ax.plot(xvals, yvals_init, **plot_init_kw)
+    return ax
 
 
 def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
@@ -358,7 +440,7 @@ def set_axeslabel_color(ax, color):
 
     This is useful when e.g., making a presentation on a dark background
     '''
-    ax.tick_params(color=color)
+    ax.tick_params(color=color, which='both')  # both major and minor ticks
     plt.setp(ax.get_xticklabels(), color=color)
     plt.setp(ax.get_yticklabels(), color=color)
     plt.setp(ax.yaxis.get_label(), color=color)
@@ -397,3 +479,14 @@ def make_anglemap(N=256, use_hpl=True):
 
 
 hsluv_anglemap = make_anglemap(use_hpl=False)
+
+
+def plot_fit(xvals, fit_res, ax, **plot_kws):
+    """
+    Evaluates a fit result at specified values to plot the fit.
+    """
+    model = fit_res.model
+    independent_var = model.independent_vars[0]
+    yvals = model.eval(fit_res.params, **{independent_var: xvals})
+    ax.plot(xvals, yvals, **plot_kws)
+

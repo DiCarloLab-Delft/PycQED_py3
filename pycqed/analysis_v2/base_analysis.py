@@ -1,6 +1,7 @@
 """
 File containing the BaseDataAnalyis class.
 """
+import warnings
 from inspect import signature
 import os
 import numpy as np
@@ -73,18 +74,25 @@ class BaseDataAnalysis(object):
         __init__ of the child classes:
             The __init__ of child classes  should implement the following
             functionality:
-                - call the ASB __init__ (this method)
+                - call the AbstractBaseClass __init__ (this method)
                 - define self.params_dict and self.numeric_params
                 - specify options specific to that analysis
                 - call self.run_analysis
 
+        Running analysis will add the following (important) attributes
+        to the analysis object:
 
-        This method sets several attributes of the analysis class.
-        These include assigning the arguments of this function to attributes.
-        Other arguments that get created are
+        Data and derived quantities:
+            self.raw_data_dict          (dict)
+            self.proc_data_dict         (dict)
+                self.proc_data_dict['quantities_of_interest'] (dict)
+            self.fit_res                (dict)
+
+        Figures:
             axs (dict)
             figs (dict)
             plot_dicts (dict)
+
 
         and a bunch of stuff specified in the options dict
         (TODO: should this not always be extracted from the
@@ -121,6 +129,10 @@ class BaseDataAnalysis(object):
                                 -'do_individual_traces'
                                 -'filter_no_analysis'
                                 -'exact_label_match'
+                                -'filter_dict'
+                                    dictionary of parameter names as keys and
+                                    values as values. Only datasets with specified values
+                                    of parameters will be extracted and used in analysis
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
         '''
@@ -145,7 +157,6 @@ class BaseDataAnalysis(object):
             self.labels = [scan_label]
         else:
             self.labels = scan_label
-
 
         # Initialize to None such that the attribute always exists.
         self.data_file_path = None
@@ -187,6 +198,9 @@ class BaseDataAnalysis(object):
         self.figs = OrderedDict()
         self.presentation_mode = self.options_dict.get(
             'presentation_mode', False)
+        if self.presentation_mode:
+            warnings.warn("presentation_mode is deprecated",
+                          DeprecationWarning)
         self.tight_fig = self.options_dict.get('tight_fig', True)
         # used in self.plot_text, here for future compatibility
         self.fancy_box_props = dict(boxstyle='round', pad=.4,
@@ -215,6 +229,7 @@ class BaseDataAnalysis(object):
     def run_analysis(self):
         """
         This function is at the core of all analysis and defines the flow.
+
         This function is typically called after the __init__.
         """
         self.extract_data()  # extract data specified in params dict
@@ -224,13 +239,16 @@ class BaseDataAnalysis(object):
             self.run_fitting()  # fitting to models
             self.save_fit_results()
             self.analyze_fit_results()  # analyzing the results of the fits
+        self.save_quantities_of_interest()
 
-        self.prepare_plots()  # specify default plots
         if not self.extract_only:
+            self.prepare_plots()  # specify default plots
             self.plot(key_list='auto')  # make the plots
 
-        if self.options_dict.get('save_figs', False):
-            self.save_figures(close_figs=self.options_dict.get('close_figs', True))
+            if self.options_dict.get('save_figs', False):
+                self.save_figures(
+                    close_figs=self.options_dict.get('close_figs', True),
+                    tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
     def get_timestamps(self):
         """
@@ -293,11 +311,13 @@ class BaseDataAnalysis(object):
         # this should always be extracted as it is used to determine where
         # the file is as required for datasaving
         self.params_dict['folder'] = 'folder'
+        filter_dict = self.options_dict.get('filter_dict', None)
         self.raw_data_dict = a_tools.get_data_from_timestamp_list(
             self.timestamps, param_names=self.params_dict,
             ma_type=self.ma_type,
             TwoD=TwoD, numeric_params=self.numeric_params,
-            filter_no_analysis=self.filter_no_analysis)
+            filter_no_analysis=self.filter_no_analysis,
+            filter_dict=filter_dict)
 
         # Use timestamps to calculate datetimes and add to dictionary
         self.raw_data_dict['datetime'] = [a_tools.datetime_from_timestamp(
@@ -379,22 +399,37 @@ class BaseDataAnalysis(object):
         """
         pass
 
-    def save_figures(self, savedir: str = None, savebase: str = None,
+    def save_figures(self, savedir: str = None,
                      tag_tstamp: bool = True,
                      fmt: str = 'png', key_list: list = 'auto',
                      close_figs: bool = True):
+        """
+        Save figures self.figs attribute.
+
+        Args:
+            savedir (str)       : directory to save figures to.
+                    raw_data_dict['folder'] if not specified
+                    raw_data_dict['folder'][-1] if folder is a list
+            tag_tstamp (bool)   : appends a timstamp in the figure filename
+            fmt (str)           : the format to save the figures in
+                    e.g., png, svg, pdf etc.
+            key_list (list)      : keys of figures to save, if 'auto',
+                saves all figures in self.figs.
+
+
+        """
         if savedir is None:
-            savedir = self.raw_data_dict.get('folder', '')
+            savedir = self.raw_data_dict.get('folder')
+            # for analyses that have more than one
             if isinstance(savedir, list):
                 savedir = savedir[0]
 
-        if savebase is None:
-            savebase = ''
         if tag_tstamp:
             tstag = '_' + self.raw_data_dict['timestamps'][0]
         else:
             tstag = ''
 
+        # FIXME: remove either auto or None as an option.
         if key_list == 'auto' or key_list is None:
             key_list = self.figs.keys()
 
@@ -408,12 +443,16 @@ class BaseDataAnalysis(object):
 
         for key in key_list:
             if self.presentation_mode:
-                savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
+                savename = os.path.join(
+                    savedir, key + tstag + 'presentation' + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
-                savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.svg')
-                self.figs[key].savefig(savename, bbox_inches='tight', fmt='svg')
+                savename = os.path.join(
+                    savedir, key + tstag + 'presentation' + '.svg')
+                self.figs[key].savefig(
+                    savename, bbox_inches='tight', fmt='svg')
             else:
-                savename = os.path.join(savedir, savebase + key + tstag + '.' + fmt)
+                savename = os.path.join(
+                    savedir, key + tstag + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
                 plt.close(self.figs[key])
@@ -476,7 +515,6 @@ class BaseDataAnalysis(object):
         # initialize everything to an empty dict if not overwritten
         self.fit_dicts = OrderedDict()
 
-
     def run_fitting(self):
         '''
         This function does the fitting and saving of the parameters
@@ -527,11 +565,11 @@ class BaseDataAnalysis(object):
                 model = fit_dict.get('model', lmfit.Model(fit_fn))
             fit_guess_fn = fit_dict.get('fit_guess_fn', None)
             if fit_guess_fn is None:
-                if  fitting_type == 'model' and fit_dict.get('fit_guess', True):
+                if fitting_type == 'model' and fit_dict.get('fit_guess', True):
                     fit_guess_fn = model.guess
+
             if guess_pars is None: # if you pass on guess_pars, immediately go to the fitting
                 if fit_guess_fn is not None: # Run the guess funtions here
-
                     if fitting_type is 'minimize':
                         guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
                         params = lmfit.Parameters()
@@ -571,27 +609,34 @@ class BaseDataAnalysis(object):
                         guess_pars = model.make_params()
             else:
                 if fitting_type is 'minimize':
-                    raise NotImplementedError('Conversion from guess_pars to params with lmfit.Parameters() needs to be implemented')
+                    raise NotImplementedError(
+                        'Conversion from guess_pars to params with lmfit.Parameters() needs to be implemented')
                     # TODO: write a method that converts the type model.make_params() to a lmfit.Parameters() object
-            if fitting_type is 'model': # Perform the fitting
+            if fitting_type is 'model':  # Perform the fitting
                 fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
                                                 params=guess_pars)
                 self.fit_res[key] = fit_dict['fit_res']
-            elif fitting_type is 'minimize': # Perform the fitting
+            elif fitting_type is 'minimize':  # Perform the fitting
+
                 fit_dict['fit_res'] = lmfit.minimize(fcn=_complex_residual_function,
-                        params=params,
-                        args=(fit_fn, fit_xvals, fit_yvals))
-                fit_dict['fit_res'].initial_params = params # save the initial params
-                fit_dict['fit_res'].userkws = fit_xvals # save the x values
-                fit_dict['fit_res'].fit_fn = fit_fn # save the fit function
+                                                     params=params,
+                                                     args=(fit_fn, fit_xvals, fit_yvals))
+                # save the initial params
+                fit_dict['fit_res'].initial_params = params
+                fit_dict['fit_res'].userkws = fit_xvals  # save the x values
+                fit_dict['fit_res'].fit_fn = fit_fn  # save the fit function
                 self.fit_res[key] = fit_dict['fit_res']
-
-
-
 
     def save_fit_results(self):
         """
-        Saves the fit results
+        Save fit_results that are part of self.fit_res.
+
+        Fit results from the self.fit_res dict are stored in the hdf5 file
+        under
+            Analysis/fr_key, where fr_key is the key in self.fit_res.
+
+        Fit results overwrite previously stored data if there is a conflict
+        in naming. This is so the most recent analysis ran is stored.
         """
 
         # Check weather there is any data to save
@@ -599,7 +644,8 @@ class BaseDataAnalysis(object):
             # Find the file to save to
             fn = self.options_dict.get('analysis_result_file', False)
             if fn == False:
-                fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
+                fn = a_tools.measurement_filename(
+                    a_tools.get_folder(self.timestamps[0]))
 
             try:
                 os.mkdir(os.path.dirname(fn))
@@ -631,6 +677,54 @@ class BaseDataAnalysis(object):
                     d = self._convert_dict_rec(copy.deepcopy(fit_res))
                     write_dict_to_hdf5(d, entry_point=fr_group)
 
+    def save_quantities_of_interest(self):
+        """
+        Save quantities of interest.
+
+        If self.proc_data_dict['quantities_of_interest'] exists, and it is
+        a dictionary it will attempt to store the contents in the datafile in
+        "Analysis/quantities_of_interest"
+
+        Previously stored quantities of interest are overwritten.
+        """
+
+        # Check weather there is any data to save
+        if 'quantities_of_interest' in self.proc_data_dict and isinstance(
+                self.proc_data_dict['quantities_of_interest'], dict):
+            # Find the file to save to
+            fn = self.options_dict.get('analysis_result_file', False)
+            if not fn:
+                fn = a_tools.measurement_filename(
+                    a_tools.get_folder(self.timestamps[0]))
+
+            try:
+                os.mkdir(os.path.dirname(fn))
+            except FileExistsError:
+                pass
+
+            if self.verbose:
+                print('Saving quantities of interest to %s' % fn)
+
+            qoi = 'quantities_of_interest'
+            # Save data to file
+            with h5py.File(fn, 'a') as data_file:
+                try:
+                    analysis_group = data_file.create_group('Analysis')
+                except ValueError:
+                    # If the analysis group already exists, re-use it
+                    # (as not to overwrite previous/other fits)
+                    analysis_group = data_file['Analysis']
+                try:
+
+                    qoi_group = analysis_group.create_group(qoi)
+                except ValueError:
+                    # Delete the old group and create a new group (overwrite).
+                    del analysis_group[qoi]
+                    qoi_group = analysis_group.create_group(qoi)
+
+                write_dict_to_hdf5(self.proc_data_dict['quantities_of_interest'],
+                                   entry_point=qoi_group)
+
     @staticmethod
     def _convert_dict_rec(obj):
         try:
@@ -658,8 +752,8 @@ class BaseDataAnalysis(object):
             for k in param.__dict__:
                 if not k.startswith('_') and k not in ['from_internal', ]:
                     dic['params'][param_name][k] = getattr(param, k)
-                if k in '_val':
-                    dic['params'][param_name]['value'] = getattr(param,k)
+            dic['params'][param_name]['value'] = getattr(param, 'value')
+
         return dic
 
     def plot(self, key_list=None, axs_dict=None,
@@ -788,7 +882,8 @@ class BaseDataAnalysis(object):
             for ii, this_yvals in enumerate(plot_yvals):
                 p_out.append(pfunc(plot_centers, this_yvals, width=plot_xwidth,
                                    color=gco(ii, len(plot_yvals) - 1),
-                                   label='%s%s' % (dataset_desc, dataset_label[ii]),
+                                   label='%s%s' % (
+                                       dataset_desc, dataset_label[ii]),
                                    **plot_barkws))
 
         else:
@@ -970,7 +1065,7 @@ class BaseDataAnalysis(object):
                           color=gco(ii, len(slice_idxs) - 1))
         if plot_xrange is None:
             xmin, xmax = np.min(plot_xvals) - plot_xvals_step / \
-                         2., np.max(plot_xvals) + plot_xvals_step / 2.
+                2., np.max(plot_xvals) + plot_xvals_step / 2.
         else:
             xmin, xmax = plot_xrange
         axs.set_xlim(xmin, xmax)
@@ -1143,8 +1238,8 @@ class BaseDataAnalysis(object):
             if plot_xwidth is not None:
                 xmin, xmax = min([min(xvals) - plot_xwidth[tt] / 2
                                   for tt, xvals in enumerate(plot_xvals)]), \
-                             max([max(xvals) + plot_xwidth[tt] / 2
-                                  for tt, xvals in enumerate(plot_xvals)])
+                    max([max(xvals) + plot_xwidth[tt] / 2
+                         for tt, xvals in enumerate(plot_xvals)])
             else:
                 xmin = np.min(plot_xvals) - plot_xvals_step / 2
                 xmax = np.max(plot_xvals) + plot_xvals_step / 2
@@ -1293,22 +1388,29 @@ class BaseDataAnalysis(object):
             else:
                 pdict['yvals'] = output
 
+            # plot parametrically
+            output_mod_fn_x = pdict.get('output_mod_fn_x', None)
+            if output_mod_fn_x is not None:
+                pdict['xvals'] = output_mod_fn_x(output)
+
         if plot_normed:
-            pdict['yvals']=pdict['yvals']/pdict['yvals'][0]
+            pdict['yvals'] = pdict['yvals']/pdict['yvals'][0]
 
         self.plot_line(pdict, axs)
 
         if plot_init:
             pdict_init = copy.copy(pdict)
             pdict_init['linestyle'] = plot_linestyle_init
-            if hasattr(pdict_init['fit_res'],'model'):
+            if hasattr(pdict_init['fit_res'], 'model'):
                 # The initial guess
                 pdict_init['yvals'] = model.eval(
                     **pdict_init['fit_res'].init_values,
+                    #This is probably a bug .init_values should be .init_params
+                    # not changing as I cannot test it right now.
                     **{independent_var: pdict_init['xvals']})
             else:
                 output = fit_fn(**pdict_init['fit_res'].initial_params,
-                            **{independent_var: pdict_init['xvals']})
+                                **{independent_var: pdict_init['xvals']})
                 output_mod_fn = pdict_init.get('output_mod_fn', None)
                 if output_mod_fn is not None:
                     pdict_init['yvals'] = output_mod_fn(output)
@@ -1317,7 +1419,6 @@ class BaseDataAnalysis(object):
 
             pdict_init['setlabel'] += ' init'
             self.plot_line(pdict_init, axs)
-
 
     def plot_text(self, pdict, axs):
         """
@@ -1409,11 +1510,11 @@ class BaseDataAnalysis(object):
 
     def plot_vlines_auto(self, pdict, axs):
         xs = pdict.get('xdata')
-        for i,x in enumerate(xs):
+        for i, x in enumerate(xs):
             d = {}
             for k in pdict:
                 lk = k[:-1]
-                #if lk in signature(axs.axvline).parameters:
+                # if lk in signature(axs.axvline).parameters:
                 if k not in ['xdata', 'plotfn', 'ax_id', 'do_legend']:
                     try:
                         d[lk] = pdict[k][i]
@@ -1434,7 +1535,6 @@ class BaseDataAnalysis(object):
         ax.set_title(title)
         set_xlabel(ax, xlabel, xunit)
         set_ylabel(ax, ylabel, yunit)
-
 
 
 def plot_scatter_errorbar(self, ax_id, xdata, ydata,
@@ -1464,6 +1564,8 @@ def plot_scatter_errorbar(self, ax_id, xdata, ydata,
             xs = 0 if xerr is None else np.min(xerr) / np.max(xdata)
             if ys < 1e-2 and xs < 1e-2:
                 pds['line_kws'] = {'fmt': 'o'}
+            else:
+                pds['line_kws'] = {'fmt': '.'}
     else:
         pds['func'] = 'scatter'
 

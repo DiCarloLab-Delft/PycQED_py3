@@ -38,6 +38,10 @@ reload(rba)
 import pycqed.analysis_v2.gate_set_tomography_analysis as gsa
 reload(gsa)
 
+import pycqed.analysis_v2.fluxing_analysis as fla
+reload(fla)
+
+
 from pycqed.analysis_v2.base_analysis import *
 from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic1DBinnedAnalysis,
@@ -60,18 +64,29 @@ from pycqed.analysis_v2.distortions_analysis import Scope_Trace_analysis
 
 
 from pycqed.analysis_v2.optimization_analysis import OptimizationAnalysis
-from pycqed.analysis_v2.timing_cal_analysis import Timing_Cal_Flux_Coarse, Timing_Cal_Flux_Fine
+from pycqed.analysis_v2.timing_cal_analysis import Timing_Cal_Flux_Coarse, \
+    Timing_Cal_Flux_Fine
 
-from pycqed.analysis_v2.coherence_analysis import CoherenceTimesAnalysis, \
+from pycqed.analysis_v2.coherence_analysis import CoherenceAnalysis, \
     CoherenceTimesAnalysisSingle, AliasedCoherenceTimesAnalysisSingle
-from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy
-from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency
-from pycqed.analysis_v2.quantum_efficiency_analysis import QuantumEfficiencyAnalysis, DephasingAnalysisSingleScans, DephasingAnalysisSweep, SSROAnalysisSingleScans, SSROAnalysisSweep, QuantumEfficiencyAnalysisTWPA
+from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, \
+    ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy
+from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency, \
+    FrequencySusceptibility
+from pycqed.analysis_v2.quantum_efficiency_analysis import \
+    QuantumEfficiencyAnalysis, DephasingAnalysisSingleScans, \
+    DephasingAnalysisSweep, SSROAnalysisSingleScans, SSROAnalysisSweep, \
+    QuantumEfficiencyAnalysisTWPA
 from pycqed.analysis_v2.cross_dephasing_analysis import CrossDephasingAnalysis
 from pycqed.analysis_v2.randomized_benchmarking_analysis import (
     RandomizedBenchmarking_SingleQubit_Analysis,
     RandomizedBenchmarking_TwoQubit_Analysis,
-    UnitarityBenchmarking_TwoQubit_Analysis)
+    UnitarityBenchmarking_TwoQubit_Analysis,
+    InterleavedRandomizedBenchmarkingAnalysis,
+    CharacterBenchmarking_TwoQubit_Analysis)
 from pycqed.analysis_v2.gate_set_tomography_analysis import \
     GST_SingleQubit_DataExtraction, GST_TwoQubit_DataExtraction
+
+
+from pycqed.analysis_v2.fluxing_analysis import Chevron_Analysis
 

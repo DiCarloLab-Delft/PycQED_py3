@@ -385,6 +385,27 @@ class TestFluxLutMan:
         np.testing.assert_almost_equal(integral, 0)
 
 
+    def test_czd_signs(self):
+        # Only tests get setting and validator does not test functionality. 
+        self.fluxlutman.czd_double_sided(True)
+        signs  = self.fluxlutman.czd_signs()
+        expected_signs = ['+', '-']
+        assert signs == expected_signs
+
+        with pytest.raises(Exception):
+            self.fluxlutman.czd_signs(['s', 1])
+
+
+        self.fluxlutman.czd_signs(['+', 0])
+        signs  = self.fluxlutman.czd_signs()
+        expected_signs = ['+', 0]
+        assert signs == expected_signs
+        self.fluxlutman.generate_standard_waveforms()
+
+        signs  = self.fluxlutman.czd_signs(['+', '-'])
+
+
+
     def test_render_wave(self):
         self.fluxlutman.render_wave('cz_z', time_units='lut_index')
         self.fluxlutman.render_wave('cz_z', time_units='s')
