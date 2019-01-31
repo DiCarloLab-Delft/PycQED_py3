@@ -1,6 +1,6 @@
 import numpy as np
 from pycqed.analysis import analysis_toolbox as a_tools
-from pycqed.scripts import Spectroscopy as Spec
+from pycqed.analysis_v2 import spectroscopy_analysis as Spec
 
 
 class ResonatorFieldSweep(ResonatorSpectroscopy):

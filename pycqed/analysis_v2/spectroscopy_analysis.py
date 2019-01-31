@@ -13,8 +13,6 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 
-from importlib import reload  # Useful for reloading while testing
-
 import importlib
 importlib.reload(ba)
 importlib.reload(fit_mods)

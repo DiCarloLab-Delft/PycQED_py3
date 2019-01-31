@@ -30,21 +30,15 @@ OSC.read_channels([ch])
 '''
 
 from qcodes import VisaInstrument
-from qcodes.utils.validators import Strings, Enum
-from qcodes import VisaInstrument, validators as vals
+from qcodes.utils.validators import Strings
 
 
-import csv
-# from instrument import Instrument
-import visa
-import types
 import logging
 # import socket
 # import select
-from time import sleep, time
+from time import sleep
 import ctypes as ct
 import numpy as np
-import datetime
 
 # def has_newline(ans):
 #     if len(ans) > 0 and ans.find('\n') != -1:
@@ -119,6 +113,7 @@ class RIGOL_DS4043(VisaInstrument):
         Output:
             None
         '''
+
         # logging.info(__name__ + ' : Initializing instrument')
         # Instrument.__init__(self, name, tags=['physical', 'source'])
         self._trig_modes = ['EDGE', 'PULS', 'SLOP','VID', 'PATT', 'RS232',
@@ -143,7 +138,7 @@ class RIGOL_DS4043(VisaInstrument):
         self.add_parameter('trigger_mode',
             get_cmd=':TRIG:MODE?',
             get_parser=str,
-            set_cmd=lambda s: self._set_trigger_mode(s))
+            set_cmd=self._set_trigger_mode)
         self.add_parameter('trigger_level',
             get_cmd=lambda: self._get_trig_func_par_value(
                                 self.trigger_mode(),
@@ -252,7 +247,7 @@ class RIGOL_DS4043(VisaInstrument):
 
     def _set_trigger_source(self, source, mode=None):
         if source in self._trig_sources:
-            string = ':TRIG:%s' % mode
+            # string = ':TRIG:%s' % mode
             self._set_trig_func_par_value(mode, 'SOUR', source)
         else:
             raise ValueError('invalid mode %s' % mode)
@@ -495,7 +490,7 @@ class RIGOL_DS4043(VisaInstrument):
         buff_size = 1024*1024*10
 
         buff = (ct.c_ubyte*buff_size)()
-        wfmBuf = (ct. c_char * len(buff)).from_buffer(buff)
+        # wfmBuf = (ct. c_char * len(buff)).from_buffer(buff)
 
         self.visawrite(':WAV:SOURce CHAN%s\n'% channel)
 

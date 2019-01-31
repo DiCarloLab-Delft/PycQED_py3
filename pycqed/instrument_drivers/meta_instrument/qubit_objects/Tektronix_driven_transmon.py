@@ -604,9 +604,10 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
 
-    def measure_flipping(self, number_of_flips=2*np.arange(20),
-                     MC=None, analyze=True, close_fig=True,
-                     verbose=False, upload=True):
+    def measure_flipping(self, number_of_flips=2*np.arange(20), equator=True,
+                         MC=None, analyze=True, close_fig=True, update=True,
+                         ax='x', angle='180'):
+
         # prepare for timedomain takes care of rescaling
         self.prepare_for_timedomain()
         if MC is None:

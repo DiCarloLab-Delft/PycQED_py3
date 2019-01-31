@@ -6,7 +6,6 @@ from pycqed.utilities.general import setInDict
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
-from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
 
 
@@ -255,7 +254,8 @@ class QX_RB_Sweep(Soft_Sweep):
             self.__qxc.create_circuit(c[0], c[1])
 
     def set_parameter(self, val):
-        assert(self.__cnt < self.num_circuits)
+        if not (self.__cnt < self.num_circuits):
+            raise AssertionError()
         self.__cnt = self.__cnt+1
 
 
@@ -297,7 +297,7 @@ class AWG_amp(Soft_Sweep):
     def prepare(self):
         pass
 
-    def set_parameter(self, val, **kw):
+    def set_parameter(self, val):
         self.AWG.stop()
         if type(self.channel) == int:
             exec('self.AWG.ch{}_amp({})'.format(self.channel, val))
@@ -488,7 +488,7 @@ class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
                  upload: bool=True, verbosity_level: int=1,
                  disable_compile_and_upload: bool = False,
                  identical_pulses: bool=True):
-        super(QASM_Sweep_v2, self).__init__()
+        super(QWG_flux_QASM_Sweep, self).__init__()
         self.name = 'QWG_flux_QASM_Sweep'
 
         self.qasm_fn = qasm_fn
@@ -738,7 +738,7 @@ class ZNB_VNA_sweep(Hard_Sweep):
         # get the list of frequency used in the span from the VNA
         self.sweep_points = self.VNA.get_stimulus()
 
-    def finish(self):
+    def finish(self, **kw):
         self.VNA.rf_off()
 
 class QWG_lutman_par(Soft_Sweep):
@@ -1172,7 +1172,7 @@ class FLsweep_QWG(Soft_Sweep):
         self.realtime_loading = realtime_loading
         self.other_waveform = other_waveform
 
-    def prepare(self):
+    def prepare(self, **kw):
         awg = self.lm.AWG.get_instr()
         awg.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
@@ -1197,7 +1197,7 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.qubit = qubit
         self.freqs = freqs
         self.par = par
-        self.nested_MC = nested_MC        
+        self.nested_MC = nested_MC
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
