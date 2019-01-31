@@ -783,7 +783,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                  nr_parity_check_rounds=1,
                  PF_tracking='first',
                  PF_parity_pattern=['ZZ'],
-                 blossom_record=None
+                 blossom_record=None,
                  **kw):
         self.label = label
         self.timestamp = timestamp
