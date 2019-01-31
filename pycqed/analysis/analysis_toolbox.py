@@ -319,20 +319,35 @@ def get_param_value_from_file(file_path, instr_name, param_name, h5mode='r+'):
 
     return param_val
 
-def get_qb_channel_map_from_file(qb_names, file_path, h5mode='r+'):
+
+def get_qb_channel_map_from_file(qb_names, file_path,
+                                 ro_type='', h5mode='r+'):
 
     data_file = h5py.File(measurement_filename(file_path), h5mode)
     instr_settings = data_file['Instrument settings']
     channel_map = {}
+
+    if len(ro_type) != 0:
+        if 'raw' in ro_type:
+            ro_type = 'raw w'
+        elif 'digitized' in ro_type:
+            ro_type = 'digitized w'
+        elif 'lin_trans' in ro_type:
+            ro_type = 'lin_trans w'
+        else:
+            raise ValueError('Unknown readout type "{}".'.format(ro_type))
+
     for qbn in qb_names:
         ro_acq_weight_type = instr_settings[qbn].attrs['ro_acq_weight_type']
         if ro_acq_weight_type in ['optimal', 'square_rot']:
-            channel_map[qbn] = [
-                instr_settings[qbn].attrs['RO_acq_weight_function_I']]
+            channel_map[qbn] = [ro_type + str(
+                instr_settings[qbn].attrs['RO_acq_weight_function_I'])]
         elif ro_acq_weight_type in ['SSB', 'DSB']:
             channel_map[qbn] = [
-                instr_settings[qbn].attrs['RO_acq_weight_function_I'],
-                instr_settings[qbn].attrs['RO_acq_weight_function_Q']]
+                ro_type +
+                str(instr_settings[qbn].attrs['RO_acq_weight_function_I']),
+                ro_type +
+                str(instr_settings[qbn].attrs['RO_acq_weight_function_Q'])]
         else:
             raise ValueError('Unknown ro_acq_weight_type "{}."'.format(
                 ro_acq_weight_type))

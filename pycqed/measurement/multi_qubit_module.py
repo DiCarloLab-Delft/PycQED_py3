@@ -2080,24 +2080,16 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            for qb in qubits:
-                RabiA = ma.Rabi_Analysis(
-                    label=label, qb_name=qb.name,
-                    RO_channels=RO_channels_dict[qb.name],
-                    NoCalPoints=4, close_fig=True,
-                    plot_title_suffix='_'+qb.name, **kw)
-
-                print(qb.name,  RabiA.rabi_amplitudes['piPulse'])
-                if update:
-                    rabi_amps = RabiA.rabi_amplitudes
-                    amp180 = rabi_amps['piPulse']
-                    amp90 = rabi_amps['piHalfPulse']
+            rabi_ana = tda.RabiAnalysis(qb_names=[qb.name for qb in qubits])
+            if update:
+                for qb in qubits:
                     try:
-                        qb.amp180(amp180)
+                        qb.amp180(rabi_ana.proc_data_dict[
+                                  'analysis_params_dict'][qb.name]['piPulse'])
                         qb.amp90_scale(0.5)
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
-                                        'updated.' % e)
+                                        'updated.'%e)
 
     # N-RABI
     if 'n_rabi' in sweep_points_dict:
@@ -2129,24 +2121,16 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            for qb in qubits:
-                RabiA = ma.Rabi_Analysis(
-                    label=label, qb_name=qb.name,
-                    RO_channels=RO_channels_dict[qb.name],
-                    NoCalPoints=4, close_fig=True,
-                    plot_title_suffix='_'+qb.name,
-                    new_sweep_points=sweep_points[qb.name], **kw)
-
-                if update:
-                    rabi_amps = RabiA.rabi_amplitudes
-                    amp180 = rabi_amps['piPulse']
-                    amp90 = rabi_amps['piHalfPulse']
+            rabi_ana = tda.RabiAnalysis(qb_names=[qb.name for qb in qubits])
+            if update:
+                for qb in qubits:
                     try:
-                        qb.amp180(amp180)
+                        qb.amp180(rabi_ana.proc_data_dict[
+                                   'analysis_params_dict'][qb.name]['piPulse'])
                         qb.amp90_scale(0.5)
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
-                                        'updated.' % e)
+                                        'updated.'%e)
 
     # RAMSEY
     if 'ramsey' in sweep_points_dict:
@@ -2168,7 +2152,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                   ((sp-sweep_points[0]) * artificial_detuning *
                                    360) % 360),
                        # 'basis_rotation': (lambda sp: 2*np.pi*zz_coupling *
-                       #                               (sp+drag_pulse_length)*180/np.pi)
+                       #                   (sp+drag_pulse_length)*180/np.pi)
                     }}),
 
             )
@@ -2193,23 +2177,20 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            for qb in qubits:
-                RamseyA = ma.Ramsey_Analysis(
-                    label=label, qb_name=qb.name,
-                    NoCalPoints=4, RO_channels=RO_channels_dict[qb.name],
-                    artificial_detuning=artificial_detuning,
-                    plot_title_suffix='_'+qb.name, **kw)
-
-                if update:
-                    new_qubit_freq = RamseyA.qubit_frequency
-                    T2_star = RamseyA.T2_star
+            ramsey_ana = tda.RamseyAnalysis(qb_names=[qb.name for qb in qubits])
+            if update:
+                for qb in qubits:
                     try:
-                        qb.f_qubit(new_qubit_freq)
+                        qb.f_qubit(ramsey_ana.proc_data_dict[
+                                   'analysis_params_dict'][qb.name][
+                                   'exp_decay_'+qb.name]['new_qb_freq'])
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
                     try:
-                        qb.T2_star(T2_star['T2_star'])
+                        qb.T2_star(ramsey_ana.proc_data_dict[
+                                       'analysis_params_dict'][qb.name][
+                                       'exp_decay_'+qb.name]['T2_star'])
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
@@ -2276,19 +2257,12 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            for qb in qubits:
-                qscaleA = ma.QScale_Analysis(
-                    label=label, qb_name=qb.name,
-                    NoCalPoints=4,
-                    RO_channels=RO_channels_dict[qb.name],
-                    plot_title_suffix='_'+qb.name, **kw)
-
-                if update:
-                    qscale_dict = qscaleA.optimal_qscale #dictionary of value, stderr
-                    qscale_value = qscale_dict['qscale']
-
+            qscale_ana = tda.QScaleAnalysis(qb_names=[qb.name for qb in qubits])
+            if update:
+                for qb in qubits:
                     try:
-                        qb.motzoi(qscale_value)
+                        qb.motzoi(qscale_ana.proc_data_dict[
+                                  'analysis_params_dict'][qb.name]['qscale'])
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
@@ -2323,15 +2297,12 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            for qb in qubits:
-                T1_Analysis = ma.T1_Analysis(
-                    label=label, qb_name=qb.name, NoCalPoints=4,
-                    RO_channels=RO_channels_dict[qb.name],
-                    plot_title_suffix='_'+qb.name, **kw)
-
-                if update:
+            T1_ana = tda.T1Analysis(qb_names=[qb.name for qb in qubits])
+            if update:
+                for qb in qubits:
                     try:
-                        qb.T1(T1_Analysis.T1_dict['T1'])
+                        qb.T1(T1_ana.proc_data_dict['analysis_params_dict'][
+                                  qb.name]['T1'])
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)

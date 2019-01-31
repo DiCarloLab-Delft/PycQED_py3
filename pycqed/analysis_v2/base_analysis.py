@@ -1366,7 +1366,11 @@ class BaseDataAnalysis(object):
             set_axis_label('x', axs, plot_xlabel, plot_xunit)
             set_axis_label('y', axs, plot_ylabel, plot_yunit)
         if plot_title is not None:
-            axs.set_title(plot_title)
+            axs.figure.text(0.5, 1, plot_title,
+                            horizontalalignment='center',
+                            verticalalignment='bottom',
+                            transform=axs.transAxes)
+            # axs.set_title(plot_title)
 
     def plot_colorbar(self, cax=None, key=None, pdict=None, axs=None,
                       orientation='vertical'):
