@@ -1987,6 +1987,51 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         UHFQC = qubits[0].UHFQC
     if pulsar is None:
         pulsar = qubits[0].AWG
+    artificial_detuning_echo = kw.pop('artificial_detuning_echo', None)
+
+    qubit_names = [qb.name for qb in qubits]
+    if len(qubit_names) == 1:
+        msmt_suffix = qubits[0].msmt_suffix
+    elif len(qubit_names) > 5:
+        msmt_suffix = '_{}qubits'.format(len(qubit_names))
+    else:
+        msmt_suffix = '_qbs{}'.format(''.join([i[-1] for i in qubit_names]))
+
+    for key, spts in sweep_points_dict.items():
+        if spts is None:
+            if key == 'n_rabi':
+                sweep_points_dict[key] = {}
+                for qb in qubits:
+                    sweep_points_dict[key][qb.name] = \
+                        np.linspace(
+                            (n_rabi_pulses-1)*qb.amp180()/n_rabi_pulses,
+                            min((n_rabi_pulses+1)*qb.amp180()/n_rabi_pulses,
+                                0.9), 41)
+            else:
+                raise ValueError('Sweep points for {} measurement are not '
+                                 'defined.'.format(key))
+
+    if cal_points:
+        sweep_points_dict = deepcopy(sweep_points_dict)
+        for key, spts in sweep_points_dict.items():
+            if key == 'qscale':
+                temp_array = np.zeros(3*spts.size)
+                np.put(temp_array, list(range(0, temp_array.size, 3)), spts)
+                np.put(temp_array, list(range(1, temp_array.size, 3)), spts)
+                np.put(temp_array, list(range(2, temp_array.size, 3)), spts)
+                spts = temp_array
+                step = np.abs(spts[-1]-spts[-2])
+            else:
+                step = np.abs(spts[-1]-spts[-4])
+            if no_cal_points == 4:
+                sweep_points_dict[key] = np.concatenate(
+                    [spts, [spts[-1]+step, spts[-1]+2*step,
+                            spts[-1]+3*step, spts[-1]+4*step]])
+            elif no_cal_points == 2:
+                sweep_points_dict[key] = np.concatenate(
+                    [spts, [spts[-1]+step, spts[-1]+2*step]])
+            else:
+                sweep_points_dict[key] = spts
 
     # set up multiplexed readout
     multiplexed_pulse(qubits, f_LO, upload=True)
@@ -2000,53 +2045,6 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     df = get_multiplexed_readout_detector_functions(
         qubits, UHFQC=UHFQC, pulsar=pulsar,
         nr_averages=nr_averages)[key + '_avg_det']
-
-    RO_channels_dict = {}
-    for i, qb in enumerate(qubits):
-        if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
-            RO_channels_dict[qb.name] = [2*i]
-            RO_channels_dict[qb.name] += [2*i+1]
-        else:
-            RO_channels_dict[qb.name] = [i]
-        qb.prepare_for_timedomain(multiplexed=True)
-
-    print(RO_channels_dict)
-    qubit_names = [qb.name for qb in qubits]
-
-    if len(qubit_names) == 1:
-        msmt_suffix = qubits[0].msmt_suffix
-    elif len(qubit_names) > 5:
-        msmt_suffix = '_{}qubits'.format(len(qubit_names))
-    else:
-        msmt_suffix = '_qbs{}'.format(''.join([i[-1] for i in qubit_names]))
-
-    if cal_points:
-        sweep_points_dict = deepcopy(sweep_points_dict)
-        for key, spts in sweep_points_dict.items():
-            if spts is None:
-                if key == 'n_rabi':
-                    sweep_points_dict[key] = {}
-                    for qb in qubits:
-                        sweep_points_dict[key][qb.name] = \
-                            np.linspace(
-                                (n_rabi_pulses-1)*qb.amp180()/n_rabi_pulses,
-                                 min((n_rabi_pulses+1)*qb.amp180()/n_rabi_pulses,
-                                 0.9), 41)
-                else:
-                   raise ValueError('Sweep points for {} measurement are not '
-                                    'defined.'.format(key))
-            else:
-                if key != 'qscale':
-                    step = np.abs(spts[-1]-spts[-2])
-                    if no_cal_points == 4:
-                        sweep_points_dict[key] = np.concatenate(
-                            [spts, [spts[-1]+step, spts[-1]+2*step,
-                                    spts[-1]+3*step, spts[-1]+4*step]])
-                    elif no_cal_points == 2:
-                        sweep_points_dict[key] = np.concatenate(
-                            [spts, [spts[-1]+step, spts[-1]+2*step]])
-                    else:
-                        sweep_points_dict[key] = spts
 
     # Do measurements
     # RABI
@@ -2080,7 +2078,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            rabi_ana = tda.RabiAnalysis(qb_names=[qb.name for qb in qubits])
+            rabi_ana = tda.RabiAnalysis(qb_names=qubit_names)
             if update:
                 for qb in qubits:
                     try:
@@ -2121,7 +2119,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            rabi_ana = tda.RabiAnalysis(qb_names=[qb.name for qb in qubits])
+            rabi_ana = tda.RabiAnalysis(qb_names=qubit_names)
             if update:
                 for qb in qubits:
                     try:
@@ -2177,7 +2175,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            ramsey_ana = tda.RamseyAnalysis(qb_names=[qb.name for qb in qubits])
+            ramsey_ana = tda.RamseyAnalysis(qb_names=qubit_names)
             if update:
                 for qb in qubits:
                     try:
@@ -2199,26 +2197,6 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     if 'qscale' in sweep_points_dict:
         exp_metadata = None
         sweep_points = sweep_points_dict['qscale']
-        temp_array = np.zeros(3*sweep_points.size)
-        np.put(temp_array, list(range(0, temp_array.size, 3)), sweep_points)
-        np.put(temp_array, list(range(1, temp_array.size, 3)), sweep_points)
-        np.put(temp_array, list(range(2, temp_array.size, 3)), sweep_points)
-        sweep_points = temp_array
-
-        if cal_points:
-            step = np.abs(sweep_points[-1]-sweep_points[-4])
-            if no_cal_points == 4:
-                sweep_points = np.concatenate(
-                    [sweep_points, [sweep_points[-1]+step,
-                                    sweep_points[-1]+2*step,
-                                    sweep_points[-1]+3*step,
-                                    sweep_points[-1]+4*step]])
-            elif no_cal_points == 2:
-                sweep_points = np.concatenate(
-                    [sweep_points, [sweep_points[-1]+step,
-                                    sweep_points[-1]+2*step]])
-            else:
-                pass
 
         if sweep_params is None:
             sweep_params = (
@@ -2257,7 +2235,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            qscale_ana = tda.QScaleAnalysis(qb_names=[qb.name for qb in qubits])
+            qscale_ana = tda.QScaleAnalysis(qb_names=qubit_names)
             if update:
                 for qb in qubits:
                     try:
@@ -2297,7 +2275,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         sweep_params = None
 
         if analyze:
-            T1_ana = tda.T1Analysis(qb_names=[qb.name for qb in qubits])
+            T1_ana = tda.T1Analysis(qb_names=qubit_names)
             if update:
                 for qb in qubits:
                     try:
@@ -2309,9 +2287,6 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     # T2 ECHO
     if 'T2' in sweep_points_dict:
         exp_metadata = None
-        if artificial_detuning is None:
-            raise ValueError('Specify an artificial_detuning for the Ramsey '
-                             'measurement.')
         sweep_points = sweep_points_dict['T2']
         if sweep_params is None:
             sweep_params = (
@@ -2320,12 +2295,13 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                          'pulse_delay': (lambda sp: sp/2)}}),
                 ('X90', {'pulse_pars': {
                     'refpoint': 'start',
-                    'pulse_delay': (lambda sp: sp/2),
-                    'phase': (lambda sp:
-                              ((sp-sweep_points[0]) * artificial_detuning *
-                               360) % 360)}})
-
+                    'pulse_delay': (lambda sp: sp/2)}})
             )
+
+        if artificial_detuning_echo is not None:
+            sweep_params[-1][1]['phase'] = \
+                lambda sp: ((sp-sweep_points[0]) *
+                            artificial_detuning * 360) % 360
 
         sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points,
@@ -2342,22 +2318,20 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         MC.set_detector_function(df)
         label = 'T2_echo' + msmt_suffix
         if isinstance(sweep_points, dict):
-            exp_metadata = {'sweep_points_dict': sweep_points}
+            exp_metadata = {'sweep_points_dict': sweep_points,
+                            'artificial_detuning': artificial_detuning_echo}
         MC.run(label, exp_metadata=exp_metadata)
         sweep_params = None
 
         if analyze:
-            for qb in qubits:
-                RamseyA = ma.Ramsey_Analysis(
-                    label=label, qb_name=qb.name,
-                    NoCalPoints=4, RO_channels=RO_channels_dict[qb.name],
-                    artificial_detuning=artificial_detuning,
-                    plot_title_suffix='_'+qb.name, **kw)
-
-                if update:
-                    T2_star = RamseyA.T2_star
+            echo_ana = tda.EchoAnalysis(
+                qb_names=qubit_names,
+                options_dict={'artificial_detuning': artificial_detuning_echo})
+            if update:
+                for qb in qubits:
                     try:
-                        qb.T2(T2_star['T2_star'])
+                        qb.T2(echo_ana.proc_data_dict[
+                               'analysis_params_dict'][qb.name]['T2_echo'])
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)

@@ -3055,20 +3055,8 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
 
 class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
 
-    def __init__(self, qb_names: list=None,  t_start: str=None, t_stop: str=None,
-                 data_file_path: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True):
-
-        super().__init__(qb_names=qb_names, t_start=t_start, t_stop=t_stop,
-                         data_file_path=data_file_path,
-                         options_dict=options_dict,
-                         extract_only=extract_only,
-                         do_fitting=do_fitting,
-                         auto=False)
-
-        if auto:
-            self.run_analysis()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
@@ -3311,20 +3299,8 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
 
 class T1Analysis(MultiQubit_TimeDomain_Analysis):
 
-    def __init__(self, qb_names: list=None,  t_start: str=None, t_stop: str=None,
-                 data_file_path: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True):
-
-        super().__init__(qb_names=qb_names, t_start=t_start, t_stop=t_stop,
-                         data_file_path=data_file_path,
-                         options_dict=options_dict,
-                         extract_only=extract_only,
-                         do_fitting=do_fitting,
-                         auto=False)
-
-        if auto:
-            self.run_analysis()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
@@ -3394,20 +3370,8 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
 
 class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
 
-    def __init__(self, qb_names: list=None,  t_start: str=None,
-                 t_stop: str=None, data_file_path: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True):
-
-        super().__init__(qb_names=qb_names, t_start=t_start, t_stop=t_stop,
-                         data_file_path=data_file_path,
-                         options_dict=options_dict,
-                         extract_only=extract_only,
-                         do_fitting=do_fitting,
-                         auto=False)
-
-        if auto:
-            self.run_analysis()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def prepare_fitting(self):
         if self.options_dict.get('fit_gaussian_decay', True):
@@ -3562,20 +3526,8 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
 
 class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
 
-    def __init__(self, qb_names: list=None,  t_start: str=None, t_stop: str=None,
-                 data_file_path: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True):
-
-        super().__init__(qb_names=qb_names, t_start=t_start, t_stop=t_stop,
-                         data_file_path=data_file_path,
-                         options_dict=options_dict,
-                         extract_only=extract_only,
-                         do_fitting=do_fitting,
-                         auto=False)
-
-        if auto:
-            self.run_analysis()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def process_data(self):
         super().process_data()
@@ -3795,4 +3747,39 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                             qbn]['sweep_points'][-1],
                         'colors': 'gray'}
 
+
+class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, *args, **kwargs):
+        auto = kwargs.pop('auto', True)
+        super().__init__(*args, **kwargs)
+
+        kwargs['auto'] = auto
+        if self.options_dict.get('artificial_detuning', None) is not None:
+            self.echo_analysis = RamseyAnalysis(*args, **kwargs)
+        else:
+            self.echo_analysis = T1Analysis(*args, **kwargs)
+
+        if auto:
+            self.analyze_fit_results()
+
+    def analyze_fit_results(self):
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+        for qbn in self.qb_names:
+            self.proc_data_dict['analysis_params_dict'][qbn] = OrderedDict()
+
+            params_dict = self.echo_analysis.proc_data_dict[
+                'analysis_params_dict'][qbn]
+            if 'T1' in params_dict:
+                self.proc_data_dict['analysis_params_dict'][qbn][
+                    'T2_echo'] = params_dict['T1']
+                self.proc_data_dict['analysis_params_dict'][qbn][
+                    'T2_echo_stderr'] = params_dict['T1_stderr']
+            else:
+                self.proc_data_dict['analysis_params_dict'][qbn][
+                    'T2_echo'] = params_dict['exp_decay_'+qbn][
+                    'T2_star']
+                self.proc_data_dict['analysis_params_dict'][qbn][
+                    'T2_echo_stderr'] = params_dict['exp_decay_'+qbn][
+                    'T2_star_stderr']
 

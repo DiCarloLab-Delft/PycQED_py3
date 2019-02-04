@@ -2492,9 +2492,8 @@ def general_multi_qubit_seq(
                         pulse_list += [pulse_pars_dict]
                     else:
                         for qb_name in qb_names:
-                            pulse_pars_dict = deepcopy(operation_dict[
-                                                           pulse_key + ' ' +
-                                                           qb_name])
+                            pulse_pars_dict = deepcopy(
+                                operation_dict[pulse_key + ' ' + qb_name])
                             if 'pulse_pars' in params_dict:
                                 for pulse_par_name, pulse_par in \
                                         params_dict['pulse_pars'].items():
@@ -2506,13 +2505,16 @@ def general_multi_qubit_seq(
                                         else:
                                             if pulse_par_name == \
                                                     'basis_rotation':
-                                                pulse_pars_dict[pulse_par_name] = {}
+                                                pulse_pars_dict[
+                                                    pulse_par_name] = {}
                                                 pulse_pars_dict[pulse_par_name][
-                                                    [qbn for qbn in qb_names if qbn!=qb_name][0]] = \
-                                                    -pulse_par(sweep_points[i])
+                                                    [qbn for qbn in qb_names if
+                                                    qbn != qb_name][0]] = \
+                                                    - pulse_par(sweep_points[i])
 
                                             else:
-                                                pulse_pars_dict[pulse_par_name] = \
+                                                pulse_pars_dict[
+                                                    pulse_par_name] = \
                                                     pulse_par(sweep_points[i])
                                     else:
                                         pulse_pars_dict[pulse_par_name] = \

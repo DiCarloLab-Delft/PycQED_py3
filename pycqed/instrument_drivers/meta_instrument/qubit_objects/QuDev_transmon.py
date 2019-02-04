@@ -3488,6 +3488,100 @@ class QuDev_transmon(Qubit):
 
         return
 
+    def find_T2_echo(self, times, artificial_detuning=None,
+                     upload=True, MC=None, label=None,
+                     cal_points=True, analyze=True,
+                     close_fig=True, update=False, **kw):
+        """
+        Finds the qubit T2 Echo.
+        Uses the EchoAnalysis class in timedomain_analysis.py.
+
+        WARNING: Does not automatically update the qubit freq and T2_star
+        parameters. Set update=True if you want this!
+
+        Arguments:
+            times                    array of times over which to sweep in
+                                        the Ramsey measurement
+            artificial_detuning:     difference between drive frequency and
+                                        qubit frequency estimated from
+                                        qubit spectroscopy. Must be a list with
+                                        one or two entries.
+            upload:                  upload sequence to AWG
+            update:                  update the qubit frequency and T2*
+                                        parameters
+            MC:                      the measurement control object
+            label:                   measurement label
+            cal_points:              use calibration points or not
+            analyze:                 perform analysis
+            close_fig:               close the resulting figure
+            update:                  update relevant parameters
+
+        Keyword arguments:
+            The time delays array 'times', or the parameter 'times_mean'
+            should be passed here (in seconds).
+
+        Returns:
+            Nothing
+        """
+        if not update:
+            logging.warning("Does not automatically update the qubit "
+                            "T2_echo parameter. "
+                            "Set update=True if you want this!")
+        if artificial_detuning == None:
+            logging.warning('Artificial_detuning is None; applying resonant '
+                            'drive.')
+        else:
+            if np.any(np.asarray(np.abs(artificial_detuning)) < 1e3):
+                logging.warning('The artificial detuning is too small.')
+        if np.any(times > 1e-3):
+            logging.warning('The values in the times array might be too large.')
+
+        if MC is None:
+            MC = self.MC
+
+        if label is None:
+            label = 'Echo' + self.msmt_suffix
+
+        if times is None:
+            times_span = kw.get('times_span', 5e-6)
+            times_mean = kw.get('times_mean', 2.5e-6)
+            nr_points = kw.get('nr_points', 50)
+            if times_mean == 0:
+                logging.warning("find_T2_echo does not know "
+                                "over which times to do Ramsey. Please "
+                                "specify the times_mean or the times "
+                                "function parameter.")
+                return 0
+            else:
+                times = np.linspace(times_mean - times_span/2,
+                                    times_mean + times_span/2,
+                                    nr_points)
+
+        # perform measurement
+        self.measure_echo(
+            times=times, artificial_detuning=artificial_detuning,
+            MC=MC, cal_points=cal_points,
+            close_fig=close_fig, upload=upload, label=label)
+
+        if analyze:
+            echo_ana = tda.EchoAnalysis(
+                qb_names=[self.name],
+                options_dict={'artificial_detuning': artificial_detuning,
+                              'fit_gaussian_decay':
+                                  kw.get('fit_gaussian_decay', True)})
+            T2_echo = echo_ana.proc_data_dict[
+                'analysis_params_dict'][self.name]['T2_echo']
+
+            if update:
+                try:
+                    self.T2(T2_echo)
+                except AttributeError as e:
+                    logging.warning('%s. This parameter will not be '
+                                    'updated.'%e)
+
+        return
+
+
     def find_qscale(self, qscales, label=None, for_ef=False, update=False,
                     MC=None, close_fig=True, last_ge_pulse=True, upload=True,
                     cal_points=True, no_cal_points=None, **kw):
