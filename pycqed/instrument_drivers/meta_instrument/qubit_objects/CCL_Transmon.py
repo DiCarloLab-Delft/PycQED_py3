@@ -9,6 +9,7 @@ import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
 from pycqed.measurement.openql_experiments import pygsti_oql
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
+from pycqed.analysis.tools import cryoscope_tools as ct
 
 from pycqed.utilities.general import gen_sweep_pts
 from .qubit_object import Qubit
@@ -542,6 +543,13 @@ class CCLight_Transmon(Qubit):
     def add_flux_parameters(self):
         # fl_dc_ is the prefix for DC flux bias related params
         self.add_parameter(
+            'flux_polycoeff',
+            docstring='Polynomial coefficients for current to frequency conversion',
+            vals=vals.Arrays(),
+            # initial value is chosen to not raise errors
+            initial_value=np.array([0, 0, -1e12, 0, 6e9]),
+            parameter_class=ManualParameter)
+        self.add_parameter(
             'fl_dc_V_per_phi0', label='Flux bias V/Phi0',
             docstring='Conversion factor for flux bias',
             vals=vals.Numbers(), unit='V', initial_value=1,
@@ -559,7 +567,7 @@ class CCLight_Transmon(Qubit):
         self.add_parameter(
             'fl_dc_ch',  docstring=(
                 'Flux bias channel'),
-            vals=vals.Ints(), initial_value=1,
+            vals=vals.Strings(), initial_value='',
             parameter_class=ManualParameter)
 
         # Currently this has only the parameters for 1 CZ gate.
@@ -3681,3 +3689,29 @@ class CCLight_Transmon(Qubit):
                     't_start': start_time, 't_stop': end_time}
         else:
             return {}
+
+
+    def calc_current_to_freq(self, curr: float):
+        """
+        Converts DC current to requency in Hz for a qubit
+        Args:
+            curr (float) : current in A
+        """
+        polycoeffs = self.flux_polycoeff()
+
+        return np.polyval(polycoeffs, curr)
+
+    def calc_freq_to_current(self, freq, kind='root_parabola', **kw):
+        """
+        Find the amplitude that corresponds to a given frequency, by
+        numerically inverting the fit.
+
+        freq: The frequency or set of frequencies.
+
+        **kw : get passed on to methods that implement the different "kind"
+            of calculations.
+        """
+
+        return ct.freq_to_amp_root_parabola(freq=freq,
+                                         poly_coeffs=self.flux_polycoeff(),
+                                         **kw)
