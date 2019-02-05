@@ -2,6 +2,8 @@
 # Modified by Adriaan Rol 9/2015
 # Modified by Ants Remm 5/2017
 
+
+
 import numpy as np
 import logging
 from qcodes.instrument.base import Instrument
@@ -438,8 +440,8 @@ class HDAWG8Pulsar:
                                         'point'.format(el['wfname']))
 
                     # Expected element names
-                    name_ch1 = el['wfname'] + '_' + ch1id
-                    name_ch2 = el['wfname'] + '_' + ch2id
+                    name_ch1 = str(el['wfname']) + '_' + ch1id
+                    name_ch2 = str(el['wfname']) + '_' + ch2id
 
                     # Check if element with such a name exists
                     # Ch1
@@ -1338,15 +1340,25 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                 return cname
         return None
 
-translate_from = ''.join(set(string.printable) - set(string.ascii_letters) -
-                         set(string.digits))
-translate_to = ''.join(['_'] * len(translate_from))
-translation_table = str.maketrans(translate_from, translate_to)
-def simplify_name(name):
-    if name is None:
-        return None
-    ret = name.translate(translation_table)
-    if len(ret) == 0 or ret[0] in string.digits:
-        return '_' + ret
-    else:
-        return ret
+# translate_from = ''.join(set(string.printable) - set(string.ascii_letters) -
+#                          set(string.digits))
+# translate_to = ''.join(['_'] * len(translate_from))
+# translation_table = str.maketrans(translate_from, translate_to)
+# def simplify_name(name):
+#     if name is None:
+#         return None
+#     ret = name.translate(translation_table)
+#     if len(ret) == 0 or ret[0] in string.digits:
+#         return '_' + ret
+#     else:
+#         return ret
+
+import base64
+import hashlib
+def simplify_name(s):
+    x = base64.urlsafe_b64encode(hashlib.sha1(
+        s.encode('ascii')).digest()).decode()[:20]
+    xnew = []
+    for c in x:
+        xnew.append(chr((ord(c) - ord('A'))%26 + ord('A')))
+    return ''.join(xnew)

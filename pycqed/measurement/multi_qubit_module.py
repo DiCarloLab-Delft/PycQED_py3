@@ -501,6 +501,7 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                pulsar=None,
                                                used_channels=None,
                                                correlations=None,
+                                               add_channels=None,
                                                **kw):
     max_int_len = 0
     for qb in qubits:
@@ -513,6 +514,8 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
         if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
             if qb.RO_acq_weight_function_Q() is not None:
                 channels += [qb.RO_acq_weight_function_Q()]
+    if add_channels is not None:
+        channels += add_channels
 
     if correlations is None:
         correlations = []
@@ -725,7 +728,8 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                               tomography_basis=(
                                   'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                               reset=True, preselection=False, ro_spacing=1e-6,
-                              skip_n_initial_parity_checks=0):
+                              skip_n_initial_parity_checks=0, skip_elem='RO',
+                              add_channels=None):
     """
     Important things to check when running the experiment:
         Is the readout separation commensurate with 225 MHz?
@@ -743,8 +747,15 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                     'parity_op': parity_op,
                     'prep_sequence': prep_sequence,
                     'skip_n_initial_parity_checks': 
-                        skip_n_initial_parity_checks,}
-    nr_ancilla_readouts = nr_parity_measurements - skip_n_initial_parity_checks
+                        skip_n_initial_parity_checks,
+                    'skip_elem': skip_elem}
+
+    if reset == 'simple':
+        nr_parity_measurements = 1
+
+    nr_ancilla_readouts = nr_parity_measurements
+    if skip_elem == 'RO':
+        nr_ancilla_readouts -= skip_n_initial_parity_checks
     if preselection:
         if prep_sequence == 'mixed':
             multiplexed_pulse([(qb0, qb1, qb2), (qb0, qb2)] +
@@ -785,27 +796,31 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
         dd_scheme=dd_scheme,
         nr_dd_pulses=nr_dd_pulses,
         skip_n_initial_parity_checks=skip_n_initial_parity_checks,
+        skip_elem=skip_elem,
         upload=upload, verbose=False)
 
-    if reset == 'simple':
-        nr_parity_measurements = 1
-
-    nr_readouts = 1 + nr_parity_measurements + (1 if preselection else 0)\
-     + (1 if prep_sequence == 'mixed' else 0)
+    nr_readouts = 1 + nr_ancilla_readouts + (1 if preselection else 0)\
+        + (1 if prep_sequence == 'mixed' else 0)
     nr_readouts *= len(tomography_basis)**2
     
     nr_shots *= nr_readouts
     df = get_multiplexed_readout_detector_functions(
-        qubits, nr_shots=nr_shots)['int_log_det']
+        qubits, nr_shots=nr_shots, add_channels=add_channels)['int_log_det']
 
     MC.set_sweep_function(sf)
     MC.set_sweep_points(np.arange(nr_shots))
     MC.set_sweep_function_2D(swf.Delayed_None_Sweep(mode='set_delay', delay=5))
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
-    
-    MC.run_2D(name='two_qubit_parity_{}_x{}{}{}-{}'.format(
-        parity_op, nr_parity_measurements,
+
+    if skip_n_initial_parity_checks == 0:
+        skip_str = ''
+    else:
+        skip_str = 'skip' + str(skip_n_initial_parity_checks)
+        skip_str += skip_elem.replace(' ', '')
+
+    MC.run_2D(name='two_qubit_parity_{}_x{}{}{}{}-{}'.format(
+        parity_op, nr_parity_measurements, skip_str,
         prep_sequence if prep_sequence=='mixed' else '',
         '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])),
         exp_metadata=exp_metadata)
@@ -2051,7 +2066,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     # Do measurements
     # RABI
     if 'rabi' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         sweep_points = sweep_points_dict['rabi']
 
         if sweep_params is None:
@@ -2101,7 +2116,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # N-RABI
     if 'n_rabi' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         sweep_points = sweep_points_dict['n_rabi']
         if sweep_params is None:
             sweep_params = (
@@ -2150,7 +2165,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # RAMSEY
     if 'ramsey' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         if artificial_detuning is None:
             raise ValueError('Specify an artificial_detuning for the Ramsey '
                              'measurement.')
@@ -2216,7 +2231,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # QSCALE
     if 'qscale' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         sweep_points = sweep_points_dict['qscale']
         temp_array = np.zeros(3*sweep_points.size)
         np.put(temp_array,list(range(0,temp_array.size,3)),sweep_points)
@@ -2295,7 +2310,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # T1
     if 'T1' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         sweep_points = sweep_points_dict['T1']
         if sweep_params is None:
             sweep_params = (
@@ -2337,7 +2352,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                         'updated.'%e)
     # T2 ECHO
     if 'T2' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         if artificial_detuning is None:
             raise ValueError('Specify an artificial_detuning for the Ramsey '
                              'measurement.')

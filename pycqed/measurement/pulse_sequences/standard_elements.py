@@ -1,3 +1,4 @@
+import numbers
 import logging
 import numpy as np
 from copy import deepcopy
@@ -228,7 +229,17 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
     # Retrigger the slave AWG-s
     if not trigger:
         slave_triggers = sequencer_config.get('slave_AWG_trig_channels', {})
-        for cname, delay in slave_triggers.items():
+        for cname, slave_AWG in slave_triggers.items():
+            if slave_AWG is None:
+                delay = 0
+            elif isinstance(slave_AWG, numbers.Number):
+                delay = slave_AWG
+            else:
+                slave_ch = [ch for ch in station.pulsar.channels
+                            if ch.startswith(slave_AWG)][0]
+                delay = station.pulsar.get(slave_ch + '_delay')
+                if station.pulsar.get(slave_ch + '_precompile'):
+                    continue
             el.add(bpl.SquarePulse(name='slave_trigger', channel=cname,
                                    amplitude=1, length=20e-9),
                    start=10e-9 - delay)

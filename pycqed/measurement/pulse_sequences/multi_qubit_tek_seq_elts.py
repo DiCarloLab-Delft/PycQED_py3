@@ -1583,7 +1583,7 @@ def parity_correction_seq(
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         parity_op='ZZ', upload=True, verbose=False, return_seq=False, 
         preselection=False, ro_spacing=1e-6, dd_scheme=None, nr_dd_pulses=4,
-        skip_n_initial_parity_checks=0):
+        skip_n_initial_parity_checks=0, skip_elem='RO'):
     """
 
     |              elem 1               |  elem 2  |  (elem 3, 2)  | elem 4
@@ -1637,6 +1637,10 @@ def parity_correction_seq(
         'length': operation_dict['RO mux']['length'],
         'pulse_delay': 0
     }
+    operation_dict['CZ1 skip'] = operation_dict[CZ_pulses[0]].copy()
+    operation_dict['CZ1 skip']['amplitude'] = 0
+    operation_dict['CZ2 skip'] = operation_dict[CZ_pulses[1]].copy()
+    operation_dict['CZ2 skip']['amplitude'] = 0
 
     if dd_scheme is None:
         dd_pulses = [{
@@ -1699,9 +1703,20 @@ def parity_correction_seq(
         op_sequence = prep_sequence + xx_sequence_first
     else:
         op_sequence = prep_sequence + zz_sequence_first
+
+    def skip_parity_check(op_sequence, skip_elem, CZ_pulses, qb2n):
+        if skip_elem == 'RO':
+            op_sequence = ['RO skip' if op == ('RO ' + qb2n) else op
+                           for op in op_sequence]
+        if skip_elem == 'CZ D1' or skip_elem == 'CZ both':
+            op_sequence = ['CZ1 skip' if op == CZ_pulses[0] else op
+                           for op in op_sequence]
+        if skip_elem == 'CZ D2' or skip_elem == 'CZ both':
+            op_sequence = ['CZ2 skip' if op == CZ_pulses[1] else op
+                           for op in op_sequence]
+        return op_sequence
     if skip_n_initial_parity_checks > 0:
-        op_sequence = ['RO skip' if op == ('RO ' + qb2n) else op 
-                       for op in op_sequence]
+        op_sequence = skip_parity_check(op_sequence, skip_elem, CZ_pulses, qb2n)
     pulse_list = [operation_dict[pulse] for pulse in op_sequence]
     pulse_list += dd_pulses
     if preselection:
@@ -1764,62 +1779,62 @@ def parity_correction_seq(
                                       name='rx', previous_element=el_fb)
         el_list.append(el_repeat_x)
     
-    # repeated parity measurement element(s) without acutal measurement. 
+    # repeated parity measurement element(s) with skipped parity check.
     if skip_n_initial_parity_checks > 1:
         if parity_op == 'ZZ':
-            op_sequence = ['RO skip' if op == ('RO ' + qb2n) else op 
-                           for op in zz_sequence_after_z]
+            op_sequence = skip_parity_check(zz_sequence_after_z,
+                                            skip_elem, CZ_pulses, qb2n)
             pulse_list = [operation_dict[pulse] for pulse in op_sequence]
             pulse_list += dd_pulses
-            el_repeat_skip_ro = multi_pulse_elt(0, station, pulse_list, 
-                                                trigger=False, name='rzs', 
-                                                previous_element=el_fb)
-            el_list.append(el_repeat_skip_ro)
+            el_repeat_skip = multi_pulse_elt(0, station, pulse_list,
+                                             trigger=False, name='rzs',
+                                             previous_element=el_fb)
+            el_list.append(el_repeat_skip)
         elif parity_op == 'XX':
-            op_sequence = ['RO skip' if op == ('RO ' + qb2n) else op 
-                           for op in xx_sequence_after_x]
+            op_sequence = skip_parity_check(xx_sequence_after_x,
+                                            skip_elem, CZ_pulses, qb2n)
             pulse_list = [operation_dict[pulse] for pulse in op_sequence]
             pulse_list += dd_pulses
-            el_repeat_skip_ro = multi_pulse_elt(0, station, pulse_list, 
-                                                trigger=False, name='rxs', 
-                                                previous_element=el_fb)
-            el_list.append(el_repeat_skip_ro)
+            el_repeat_skip = multi_pulse_elt(0, station, pulse_list,
+                                             trigger=False, name='rxs',
+                                             previous_element=el_fb)
+            el_list.append(el_repeat_skip)
         elif parity_op == 'ZZ,XX':
-            op_sequence = ['RO skip' if op == ('RO ' + qb2n) else op 
-                           for op in xx_sequence_after_z]
+            op_sequence = skip_parity_check(xx_sequence_after_z,
+                                            skip_elem, CZ_pulses, qb2n)
             pulse_list = [operation_dict[pulse] for pulse in op_sequence]
             pulse_list += dd_pulses
-            el_repeat_x_skip_ro = multi_pulse_elt(0, station, pulse_list, 
-                                                  trigger=False, name='rxs', 
-                                                  previous_element=el_fb)
-            el_list.append(el_repeat_x_skip_ro)
+            el_repeat_x_skip = multi_pulse_elt(0, station, pulse_list,
+                                               trigger=False, name='rxs',
+                                               previous_element=el_fb)
+            el_list.append(el_repeat_x_skip)
 
-            op_sequence = ['RO skip' if op == ('RO ' + qb2n) else op 
-                           for op in zz_sequence_after_x]
+            op_sequence = skip_parity_check(zz_sequence_after_x,
+                                            skip_elem, CZ_pulses, qb2n)
             pulse_list = [operation_dict[pulse] for pulse in op_sequence]
             pulse_list += dd_pulses
-            el_repeat_z_skip_ro = multi_pulse_elt(0, station, pulse_list, 
-                                                trigger=False, name='rzs', 
-                                                previous_element=el_fb)
-            el_list.append(el_repeat_z_skip_ro)
+            el_repeat_z_skip = multi_pulse_elt(0, station, pulse_list,
+                                               trigger=False, name='rzs',
+                                               previous_element=el_fb)
+            el_list.append(el_repeat_z_skip)
         elif parity_op == 'XX,ZZ':
-            op_sequence = ['RO skip' if op == ('RO ' + qb2n) else op 
-                           for op in zz_sequence_after_x]
+            op_sequence = skip_parity_check(zz_sequence_after_x,
+                                            skip_elem, CZ_pulses, qb2n)
             pulse_list = [operation_dict[pulse] for pulse in op_sequence]
             pulse_list += dd_pulses
-            el_repeat_z_skip_ro = multi_pulse_elt(0, station, pulse_list, 
-                                                trigger=False, name='rzs', 
-                                                previous_element=el_fb)
-            el_list.append(el_repeat_z_skip_ro)
+            el_repeat_z_skip = multi_pulse_elt(0, station, pulse_list,
+                                               trigger=False, name='rzs',
+                                               previous_element=el_fb)
+            el_list.append(el_repeat_z_skip)
 
-            op_sequence = ['RO skip' if op == ('RO ' + qb2n) else op 
-                           for op in xx_sequence_after_z]
+            op_sequence = skip_parity_check(xx_sequence_after_z,
+                                            skip_elem, CZ_pulses, qb2n)
             pulse_list = [operation_dict[pulse] for pulse in op_sequence]
             pulse_list += dd_pulses
-            el_repeat_x_skip_ro = multi_pulse_elt(0, station, pulse_list, 
-                                                  trigger=False, name='rxs', 
-                                                  previous_element=el_fb)
-            el_list.append(el_repeat_x_skip_ro)
+            el_repeat_x_skip = multi_pulse_elt(0, station, pulse_list,
+                                               trigger=False, name='rxs',
+                                               previous_element=el_fb)
+            el_list.append(el_repeat_x_skip)
 
     # check that the qubits do not acquire any phase over one round of parity 
     # correction
