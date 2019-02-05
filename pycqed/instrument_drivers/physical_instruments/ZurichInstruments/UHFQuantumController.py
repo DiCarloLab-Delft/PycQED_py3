@@ -193,7 +193,7 @@ class UHFQC(Instrument):
         # logger should average
         LOG2_RL_AVG_CNT = 0
 
-        # Load an AWG program (from Zurich Instruments/LabOne/WebServer/awg/src)
+        # Load an AWG program
         if upload_sequence:
             self.awg_sequence_acquisition()
 
@@ -363,6 +363,7 @@ class UHFQC(Instrument):
         if not comp_msg.endswith(succes_msg):
             success = False
 
+        # FIXME: cleanup code below
         if not success:
             # Printing is disabled because we put the waveform in the program
             # this should be changed when .csv waveforms are supported for UHFQC
@@ -398,6 +399,7 @@ class UHFQC(Instrument):
         #             ready = True
         # self._daq.unsubscribe(path)
 
+
     def awg_update_waveform(self, index, data):
         self.awgs_0_waveform_index(index)
         self.awgs_0_waveform_data(data)
@@ -416,6 +418,104 @@ class UHFQC(Instrument):
         # self._daq.sync()
         # deltat=time.time()-t0
         # print('UHFQC syncing took {}'.format(deltat))
+
+
+    def acquisition_poll(self, samples, arm=True,
+                         acquisition_time=0.010):
+        """
+        Polls the UHFQC for data.
+
+        Args:
+            samples (int): the expected number of samples
+            arm    (bool): if true arms the acquisition, disable when you
+                           need synchronous acquisition with some external dev
+            acquisition_time (float): time in sec between polls? # TODO check with Niels H
+            timeout (float): time in seconds before timeout Error is raised.
+
+        """
+        data = {k: [] for k, dummy in enumerate(self.acquisition_paths)}
+
+        # Start acquisition
+        if arm:
+            self.acquisition_arm()
+
+        # Acquire data
+        gotem = [False]*len(self.acquisition_paths)
+        accumulated_time = 0
+
+        while accumulated_time < self.timeout() and not all(gotem):
+            dataset = self._daq.poll(acquisition_time, 1, 4, True)
+
+            for n, p in enumerate(self.acquisition_paths):
+                if p in dataset:
+                    for v in dataset[p]:
+                        data[n] = np.concatenate((data[n], v['vector']))
+                        if len(data[n]) >= samples:
+                            gotem[n] = True
+
+                #if p in dataset:
+                #    for v in dataset[p]:
+                #        if n in data:
+                #            data[n] = np.concatenate((data[n], v['vector']))
+                #        else:
+                #            data[n] = v['vector']
+                #        if len(data[n]) >= samples:
+                #            gotem[n] = True
+            accumulated_time += acquisition_time
+
+        if not all(gotem):
+            self.acquisition_finalize()
+            for n, c in enumerate(self.acquisition_paths):
+                if n in data:
+                    print("\t: Channel {}: Got {} of {} samples".format(
+                          n, len(data[n]), samples))
+            raise TimeoutError("Error: Didn't get all results!")
+
+        return data
+
+
+    def acquisition(self, samples, acquisition_time=0.010, timeout=0,
+                    channels=(0, 1), mode='rl'):
+        self.timeout(timeout)
+        self.acquisition_initialize(channels, mode)
+        data = self.acquisition_poll(samples, True, acquisition_time)
+        self.acquisition_finalize()
+
+        return data
+
+
+    def acquisition_initialize(self, channels=(0, 1), mode='rl'):
+        # Define the channels to use and subscribe to them
+        self.acquisition_paths = []
+
+        if mode == 'rl':
+            readout = 0
+            for c in channels:
+                self.acquisition_paths.append(
+                    '/' + self._device + '/quex/rl/data/{}'.format(c))
+                readout += (1 << c)
+            self._daq.subscribe('/' + self._device + '/quex/rl/data/*')
+            # Enable automatic readout
+            self._daq.setInt('/' + self._device + '/quex/rl/readout', readout)
+        else:
+            for c in channels:
+                self.acquisition_paths.append(
+                    '/' + self._device + '/quex/iavg/data/{}'.format(c))
+            self._daq.subscribe('/' + self._device + '/quex/iavg/data/*')
+            # Enable automatic readout
+            self._daq.setInt('/' + self._device + '/quex/iavg/readout', 1)
+
+        self._daq.subscribe('/' + self._device + '/auxins/0/sample')
+
+        # Generate more dummy data
+        self._daq.setInt('/' + self._device + '/auxins/0/averaging', 8)
+
+
+    def acquisition_finalize(self):
+        for p in self.acquisition_paths:
+            self._daq.unsubscribe(p)
+        self._daq.unsubscribe('/' + self._device + '/auxins/0/sample')
+
 
     def acquisition_get(self, samples, acquisition_time=0.010,
                         timeout=0, channels=set([0, 1]), mode='rl'):
@@ -480,99 +580,6 @@ class UHFQC(Instrument):
 
         # print("data type {}".format(type(data)))
         return data
-
-    def acquisition_poll(self, samples, arm=True,
-                         acquisition_time=0.010):
-        """
-        Polls the UHFQC for data.
-
-        Args:
-            samples (int): the expected number of samples
-            arm    (bool): if true arms the acquisition, disable when you
-                           need synchronous acquisition with some external dev
-            acquisition_time (float): time in sec between polls? # TODO check with Niels H
-            timeout (float): time in seconds before timeout Error is raised.
-
-        """
-        data = {k: [] for k, dummy in enumerate(self.acquisition_paths)}
-
-        # Start acquisition
-        if arm:
-            self.acquisition_arm()
-
-        # Acquire data
-        gotem = [False]*len(self.acquisition_paths)
-        accumulated_time = 0
-
-        while accumulated_time < self.timeout() and not all(gotem):
-            dataset = self._daq.poll(acquisition_time, 1, 4, True)
-
-            for n, p in enumerate(self.acquisition_paths):
-                if p in dataset:
-                    for v in dataset[p]:
-                        data[n] = np.concatenate((data[n], v['vector']))
-                        if len(data[n]) >= samples:
-                            gotem[n] = True
-
-                #if p in dataset:
-                #    for v in dataset[p]:
-                #        if n in data:
-                #            data[n] = np.concatenate((data[n], v['vector']))
-                #        else:
-                #            data[n] = v['vector']
-                #        if len(data[n]) >= samples:
-                #            gotem[n] = True
-            accumulated_time += acquisition_time
-
-        if not all(gotem):
-            self.acquisition_finalize()
-            for n, c in enumerate(self.acquisition_paths):
-                if n in data:
-                    print("\t: Channel {}: Got {} of {} samples".format(
-                          n, len(data[n]), samples))
-            raise TimeoutError("Error: Didn't get all results!")
-
-        return data
-
-    def acquisition(self, samples, acquisition_time=0.010, timeout=0,
-                    channels=(0, 1), mode='rl'):
-        self.timeout(timeout)
-        self.acquisition_initialize(channels, mode)
-        data = self.acquisition_poll(samples, True, acquisition_time)
-        self.acquisition_finalize()
-
-        return data
-
-    def acquisition_initialize(self, channels=(0, 1), mode='rl'):
-        # Define the channels to use and subscribe to them
-        self.acquisition_paths = []
-
-        if mode == 'rl':
-            readout = 0
-            for c in channels:
-                self.acquisition_paths.append(
-                    '/' + self._device + '/quex/rl/data/{}'.format(c))
-                readout += (1 << c)
-            self._daq.subscribe('/' + self._device + '/quex/rl/data/*')
-            # Enable automatic readout
-            self._daq.setInt('/' + self._device + '/quex/rl/readout', readout)
-        else:
-            for c in channels:
-                self.acquisition_paths.append(
-                    '/' + self._device + '/quex/iavg/data/{}'.format(c))
-            self._daq.subscribe('/' + self._device + '/quex/iavg/data/*')
-            # Enable automatic readout
-            self._daq.setInt('/' + self._device + '/quex/iavg/readout', 1)
-
-        self._daq.subscribe('/' + self._device + '/auxins/0/sample')
-
-        # Generate more dummy data
-        self._daq.setInt('/' + self._device + '/auxins/0/averaging', 8)
-
-    def acquisition_finalize(self):
-        for p in self.acquisition_paths:
-            self._daq.unsubscribe(p)
-        self._daq.unsubscribe('/' + self._device + '/auxins/0/sample')
 
     ##########################################################################
     # 'public' functions: DIO support
