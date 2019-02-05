@@ -780,6 +780,34 @@ class UHFQC(Instrument):
     def getd(self, paths):
         return self._get(paths, float)
 
+    # FIXME: original
+    # def getv(self, paths):
+    #     if type(paths) is not list:
+    #         paths = [paths]
+    #         single = 1
+    #     else:
+    #         single = 0
+
+    #     paths = [self._make_full_path(p) for p in paths]
+    #     values = {}
+
+    #     for p in paths:
+    #         timeout = 0
+    #         while p not in values and timeout < 5:
+    #             try:
+    #                 tmp = self._daq.get(p, True, 0)
+    #                 values[p] = tmp[p]
+    #             except:
+    #                 print("Unexpected error: path =", p)
+    #                 timeout += 1    # FIXME: why?
+
+    #     if single:
+    #         return values[paths[0]]
+    #     else:
+    #         return values
+
+
+    # FIXME: update provided by Niels H, 20190205
     def getv(self, paths):
         if type(paths) is not list:
             paths = [paths]
@@ -792,13 +820,14 @@ class UHFQC(Instrument):
 
         for p in paths:
             timeout = 0
+            self._daq.getAsEvent(p)
             while p not in values and timeout < 5:
                 try:
-                    tmp = self._daq.get(p, True, 0)
+                    tmp = self._daq.poll(0.1, 500, 4, True)
                     values[p] = tmp[p]
                 except:
                     print("Unexpected error: path =", p)
-                    timeout += 1    # FIXME: why?
+                    timeout += 1
 
         if single:
             return values[paths[0]]
