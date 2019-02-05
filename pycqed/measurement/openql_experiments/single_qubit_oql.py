@@ -335,6 +335,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     p = oqh.create_program("echo", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
+
         k = oqh.create_kernel("echo_{}".format(i), p)
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
@@ -343,7 +344,14 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.gate('rx180', [qubit_idx])
         k.gate("wait", [qubit_idx], wait_nanoseconds)
-        k.gate('rx90', [qubit_idx])
+        #k.gate('rx90', [qubit_idx])
+        angle = (i*40)%360
+        cw_idx = angle//20 + 9
+        if angle == 0:
+            k.gate('rx90', [qubit_idx])
+        else:
+            k.gate('cw_{:02}'.format(cw_idx), [qubit_idx])
+
         k.measure(qubit_idx)
         p.add_kernel(k)
 

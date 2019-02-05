@@ -2974,6 +2974,8 @@ class CCLight_Transmon(Qubit):
                 'timesteps must be multiples of 2 modulation periods')
 
         self.prepare_for_timedomain()
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         p = sqo.echo(times, qubit_idx=self.cfg_qubit_nr(),
                      platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -2984,7 +2986,9 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('echo'+label+self.msmt_suffix)
-        a = ma.Echo_analysis(label='echo', auto=True, close_fig=True)
+        # FIXME: echo analysis v2 required that correctly handles 
+        # modulation of recovery pulse. 
+        a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
