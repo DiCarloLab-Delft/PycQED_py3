@@ -333,6 +333,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                          close_figs=close_figs,
                          extract_only=extract_only)
         # self.single_timestamp = False
+
         if use_chisqr:
             if 'F|1>' in tau_key:
                 chisquared_key = 'Analysis.Fitted Params F|1>.chisqr'
@@ -533,10 +534,14 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                                        xlabel='Flux Value', xunit='$\Phi_0$')
 
     def _prepare_plot(self, ax_id, xvals, yvals, xlabel, xunit, yerr=None):
+        if 'T1' in self.labels[0]:
+            ylab = '$T_1$'
+        else:
+            ylab = 'Coherence'
         plot_dict = {
             'xlabel': xlabel,
             'xunit': xunit,
-            'ylabel': 'Coherence',
+            'ylabel': ylab,
             'yrange': (0, 1.1 * np.max(yvals)),
             'yunit': 's',
             'marker': 'x',

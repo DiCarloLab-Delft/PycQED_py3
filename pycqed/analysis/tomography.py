@@ -425,25 +425,16 @@ class TomoAnalysis_JointRO():
         if type(weights) is bool:
             if not weights:
                 weights = np.ones(data.shape)
-        # print(measurement_operators[0])
         observables = [rot.dag() * measurement_operator *
                        rot for rot in self.rotation_vector for measurement_operator in measurement_operators]
         observablearray = np.array(
             [np.ravel(obs.full(), order='C') for obs in observables])
-        # print data.shape, weights.shape, observablearray.shape
-        # print(data)
-        # print(weights)
+
         out = np.concatenate((data, weights, observablearray), axis=1)
         if not filename:
             filename = 'temp' + str(uuid.uuid4())
         with open(directory+'/'+filename+'.tomo', 'w') as f:
             np.savetxt(f, out.view(float), fmt='%.11g', delimiter=',')
-    #             np.savetxt(f, out, delimiter=',')
-        # print f.name
-        # os.chdir(directory)
-        #sys.argv = ['pytomoc_fw', '-v', f.name]
-        # execfile('pytomoc_fw')
-
         pytomoc_fw.execute_pytomoc_fw({}, f.name)
         filename_rho = directory+'\\'+filename
 
@@ -783,6 +774,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                  nr_parity_check_rounds=1,
                  PF_tracking='first',
                  PF_parity_pattern=['ZZ'],
+                 blossom_record=None,
                  **kw):
         self.label = label
         self.timestamp = timestamp
@@ -809,6 +801,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.nr_parity_check_rounds = nr_parity_check_rounds
         self.PF_tracking = PF_tracking
         self.PF_parity_pattern = PF_parity_pattern
+        self.blossom_record = blossom_record
         kw['h5mode'] = 'r+'
         super(Tomo_Multiplexed, self).__init__(auto=auto, timestamp=timestamp,
                                                label=label, **kw)
@@ -824,8 +817,6 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.exp_name = os.path.split(self.folder)[-1][7:]
         nr_consecutive_mmts = self.nr_parity_check_rounds + \
             self.tomo_after_ancilla_mmt+self.q_post_select_initialisation
-        print('nr consecutive mmts per run', nr_consecutive_mmts)
-
         if self.single_shots:
             # data qubit tomo results:
             # only selecting the last data qubit outcome
@@ -841,7 +832,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 (self.nr_segments, nr_runs))
             measured_values2 = np.zeros(
                 (self.nr_segments, nr_runs))
-            if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus']:
+            if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom', 'PF_reset_selected_blossom']:
                 # preparing a Pauli record with dimensions according to the parity pattern
                 self.PF_record = np.zeros(
                     (self.nr_measurement_segments, nr_runs, len(self.PF_parity_pattern)))
@@ -858,18 +849,15 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                     measured_values_ancilla_select = measured_values_ancilla_preshaping[
                         j::nr_consecutive_mmts]
                     for i in range(self.nr_segments):
-                        measured_values_ancilla[i, j,
-                                                :] = measured_values_ancilla_select[i::self.nr_segments]
+                        measured_values_ancilla[i, j, :] = measured_values_ancilla_select[i::self.nr_segments]
 
             if self.q_post_select_initialisation:  # only initizilizing the ancilla
-                # only selecting the last data qubit outcome
                 measured_values_ancilla_preshaping = self.measured_values[
                     self.weight_channels[2]][0::nr_consecutive_mmts]
                 measured_values_ancilla_init = np.zeros(
                     (self.nr_segments, nr_runs))
                 for i in range(self.nr_segments):
-                    measured_values_ancilla_init[i,
-                                                 :] = measured_values_ancilla_preshaping[i::self.nr_segments]
+                    measured_values_ancilla_init[i,:] = measured_values_ancilla_preshaping[i::self.nr_segments]
 
             # digitizing and serivative of the ancilla outcomes and postselection of the data qubit outcomes
 
@@ -882,8 +870,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                         thresholds=[self.q_post_select_threshold],
                         init_measurements=[shots_qA_init],
                         positive_case=True)
-                    #measured_values1[i, :][post_select_indices_0] = np.nan
-                    #measured_values2[i, :][post_select_indices_0] = np.nan
+                    measured_values1[i, :][post_select_indices_0] = np.nan
+                    measured_values2[i, :][post_select_indices_0] = np.nan
 
                 if self.q_post_select:
                     # first digitize the 2D array
@@ -893,7 +881,6 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                         ancilla_outcomes = measured_values_ancilla[i, :-1, :]
                     else:
                         ancilla_outcomes = measured_values_ancilla[i, :, :]
-                    # print('shape ancilla outcomes raw ', np.shape(ancilla_outcomes))
                     # 2. digitize the trace to 0 (ground) and 1 (excited)
                     ancilla_outcomes = dm_tools.digitize(data=ancilla_outcomes,
                                                          threshold=self.q_post_select_threshold,
@@ -905,29 +892,30 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                         ancilla_outcomes=np.append(ancilla_outcomes, zeros, axis=0)
                     ancilla_outcomes_derivative = dm_tools.binary_derivative_2D(
                         ancilla_outcomes, axis=1)
-                    # print('shape ancilla outcomes derivative ', np.shape(ancilla_outcomes_derivative))
                     # getting the postselection indices based on the relevant postselection index
                     for index, state in zip(self.q_post_selection_indices, self.q_post_selection_states):
                         post_select_indices_0 = np.array(
                             np.where(ancilla_outcomes_derivative[index, :] != state)).flatten()
                         measured_values1[i, :][post_select_indices_0] = np.nan
                         measured_values2[i, :][post_select_indices_0] = np.nan
+                    if self.PF_tracking=='PF_reset_selected_blossom':
+                        #post-selecting outcomes where blossom has not detected a data-qubit error
+                        post_select_indices_0 = np.array(np.where(np.array(self.blossom_record)[i, :, 0] !=0)).flatten()
+                        if i==1:
+                            print(post_select_indices_0[:20])
+                        measured_values1[i, :][post_select_indices_0] = np.nan
+                        measured_values2[i, :][post_select_indices_0] = np.nan
                     # 4. make a Pauli record in case the pauli frame of tomography is to be updated
-                    if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus']:
+                    if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom','PF_reset_selected_blossom']:
                         for j in range(len(self.PF_parity_pattern)):
-                            # print('j', j)
-                            # print('axis', self.PF_parity_pattern[j])
                             parity_outcomes = ancilla_outcomes_derivative[j::len(
                                 self.PF_parity_pattern)]
-                            # print(self.PF_parity_pattern[j])
-                            # print(len(parity_outcomes))
                             # adding bell-state specific number
                             if self.PF_tracking=='PF_tracking':
                                 if self.q_post_selection_states[j]==1:
                                     added_nr = len(parity_outcomes)+1
                                 else:
                                     added_nr = 0
-                                # print(added_nr)
                                 self.PF_record[i, :, j] = np.sum(
                                     parity_outcomes, axis=0)+added_nr% 2
                             elif self.PF_tracking=='PF_reset':
@@ -935,14 +923,16 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                     self.PF_record[i, :, j] = parity_outcomes[-1]+1%2
                                 else:
                                     self.PF_record[i, :, j] = parity_outcomes[-1]
-                            elif self.PF_tracking=='PF_reset_all_phi_plus':
-                                # print('here',parity_outcomes)
-                                # print(len(parity_outcomes))
+                            elif self.PF_tracking== 'PF_reset_all_phi_plus':
                                 if len(parity_outcomes)==1:
                                     self.PF_record[i, :, j] = parity_outcomes
                                 else:
                                     self.PF_record[i, :, j] = parity_outcomes[-1]
-
+                            elif 'blossom' in self.PF_tracking:
+                                if len(self.PF_parity_pattern)==1:
+                                    self.PF_record[i, :, j] = np.array(self.blossom_record)[i, :, 1+j]
+                                elif len(self.PF_parity_pattern)==2:
+                                    self.PF_record[i, :, j] = np.array(self.blossom_record)[i, :, j]
 
             #calculate post-selection fraction
             if self.q_post_select:
@@ -950,26 +940,17 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 self.fraction=1-len(np.where(np.isnan(relevant_data))[0])/np.size(relevant_data)
 
             # Get correlations between shots
-            self.shots_q0q1 = np.multiply(measured_values2, measured_values1)
-            # self.shots_q0 = measured_values1
-            # self.shots_q1 = measured_values2
-
             if self.start_shot != 0 or self.end_shot != -1:
                 self.shots_q0 = self.shots_q0[:, self.start_shot:self.end_shot]
                 self.shots_q1 = self.shots_q1[:, self.start_shot:self.end_shot]
-                self.shots_q0q1 = self.shots_q0q1[
-                    :, self.start_shot:self.end_shot]
-            ##########################################
-            # Making  the first figure, tomo shots
-            ##########################################
-
+            ########################################
+            # Making  the first figure, tomo shots #
+            ########################################
             avg_h1 = np.nanmean(measured_values1, axis=1)
             avg_h2 = np.nanmean(measured_values2, axis=1)
-            avg_h12 = np.nanmean(self.shots_q0q1, axis=1)
         else:
             avg_h1 = self.measured_values[0]
             avg_h2 = self.measured_values[1]
-            avg_h12 = self.measured_values[2]
 
         # Binning all the points required for the tomo
         h1_00 = np.nanmean(avg_h1[36:36+7])
@@ -981,39 +962,43 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         h2_01 = np.nanmean(avg_h2[43:43+7])
         h2_10 = np.nanmean(avg_h2[50:50+7])
         h2_11 = np.nanmean(avg_h2[57:])
+        # Substract avg of all traces
+        mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
+        mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
 
+        avg_h1 -= mean_h1
+        avg_h2 -= mean_h2
+
+        scale_h1 = (h1_00+h1_10-h1_01-h1_11)/4
+        scale_h2 = (h2_00+h2_01-h2_10-h2_11)/4
+
+        # normalizing all shots according to the calibration points
+        avg_h1 = (avg_h1)/scale_h1
+        avg_h2 = (avg_h2)/scale_h2
+
+        # creating the correlation data
+        if self.single_shots:
+            # Get correlations between shots
+            self.shots_q0q1 = np.multiply(measured_values2-mean_h2, measured_values1-mean_h1)
+            if self.start_shot != 0 or self.end_shot != -1:
+                self.shots_q0q1 = self.shots_q0q1[:, self.start_shot:self.end_shot]
+            avg_h12 = np.nanmean(self.shots_q0q1, axis=1)
+        else:
+            avg_h12 = self.measured_values[2]
+
+        #getting averages from the calibration points
         h12_00 = np.nanmean(avg_h12[36:36+7])
         h12_01 = np.nanmean(avg_h12[43:43+7])
         h12_10 = np.nanmean(avg_h12[50:50+7])
         h12_11 = np.nanmean(avg_h12[57:])
-
-        # std_arr = np.array( std_h2_00, std_h2_01, std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
-        # plt.plot(std_arr)
-        # plt.show()
-
-        # Substract avg of all traces
-        mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
-        mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
         mean_h12 = (h12_00+h12_11+h12_01+h12_10)/4
-
-        avg_h1 -= mean_h1
-        avg_h2 -= mean_h2
+        # print('check mean', mean_h12)
         avg_h12 -= mean_h12
-
-        scale_h1 = (h1_00+h1_10-h1_01-h1_11)/4
-        scale_h2 = (h2_00+h2_01-h2_10-h2_11)/4
         scale_h12 = (h12_00+h12_11-h12_01-h12_10)/4
-
-        # normalizing all shots according to the calibration points
-
-        avg_h1 = (avg_h1)/scale_h1
-        avg_h2 = (avg_h2)/scale_h2
         avg_h12 = (avg_h12)/scale_h12
-        # dived by scalefactor
-
         # applying pauli frame update here
         # first suptracting offsets and rescaling all individual shots
-        if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus']:
+        if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus','PF_reset_all_blossom','PF_reset_selected_blossom']:
             # first subtracting offsets
             measured_values1 -= mean_h1
             measured_values2 -= mean_h2
@@ -1234,7 +1219,6 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                                                 self.q_post_selection_states,
                                                                 self.q_post_selection_indices)
             self.save_dict_to_analysis_group(pars_dict, name)
-            print('saved')
         # only works if MLE and target bell were specified
         except Exception as e:
             print(e)
@@ -1374,13 +1358,21 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                      ylabels=['00', '01', '10', '11'],
                                      fig=fig3,
                                      ax=fig3.add_subplot(122, projection='3d'))
-
-        figname = 'MLE-Tomography_decoding_{}_states_{}_indices_{}_Exp_{}.{}'.format(self.PF_tracking,
+        if self.PF_tracking=='no_error':
+            figname = 'MLE-Tomography_decoding_{}_states_{}_indices_{}_Exp_{}.{}'.format(self.PF_tracking,
+                                                                               self.q_post_selection_states[:len(self.PF_parity_pattern)],
+                                                                               self.q_post_selection_indices[:len(self.PF_parity_pattern)],
+                                                                               self.exp_name,
+                                                                               self.fig_format,
+                                                                               )
+        else:
+            figname = 'MLE-Tomography_decoding_{}_states_{}_indices_{}_Exp_{}.{}'.format(self.PF_tracking,
                                                                                self.q_post_selection_states,
                                                                                self.q_post_selection_indices,
                                                                                self.exp_name,
                                                                                self.fig_format,
                                                                                )
+
         fig3.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         savename = os.path.abspath(os.path.join(
             self.folder, figname))

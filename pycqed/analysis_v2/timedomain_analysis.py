@@ -889,8 +889,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         if self.cal_points == 'gef':
             # calibration point indices are when ignoring the f-state cal pts
             cal_points = [
-                [[-7, -5], [-6, -4], [-3, -1]],  # oscillating qubits
-                [[-7, -6], [-5, -4], [-2, -1]],  # spec qubit
+                [[-7, -6], [-5, -4], [-2, -1]],  # oscillating qubits
+                [[-7, -5], [-6, -4], [-3, -1]],  # spec qubit
             ]
         elif self.cal_points == 'ge':
             # calibration point indices are when ignoring the f-state cal pts

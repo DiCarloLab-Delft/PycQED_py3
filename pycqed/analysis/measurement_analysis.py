@@ -2153,7 +2153,7 @@ class Echo_analysis(TD_Analysis):
 
         params = model.guess(model, data=self.corr_data[:-self.NoCalPoints],
                              t=self.sweep_points[:-self.NoCalPoints],vary_n=self.vary_n)
-        
+
         self.fit_res = model.fit(data=self.corr_data[:-self.NoCalPoints],
                                  t=self.sweep_points[:-self.NoCalPoints],
                                  params=params)
@@ -8200,18 +8200,24 @@ class DoubleFrequency(TD_Analysis):
         fig, ax = plt.subplots()
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
 
-        f1 = fit_res.params['freq_1'].value
-        f2 = fit_res.params['freq_2'].value
-        A1 = fit_res.params['amp_1'].value
-        A2 = fit_res.params['amp_2'].value
-        tau1 = fit_res.params['tau_1'].value
-        tau2 = fit_res.params['tau_2'].value
+        fs = [fit_res.params['freq_1'].value, fit_res.params['freq_2'].value]
+        As = [fit_res.params['amp_1'].value, fit_res.params['amp_2'].value]
+        taus = [fit_res.params['tau_1'].value, fit_res.params['tau_2'].value]
+        min_index=fs.index(np.min(fs))
+        max_index=fs.index(np.max(fs))
+        self.f1=fs[min_index]
+        self.f2=fs[max_index]
+        self.A1=As[min_index]
+        self.A2=As[max_index]
+        self.tau1=taus[min_index]
+        self.tau2=taus[max_index]
 
-        textstr = ('$A_1$: {:.3f}       \t$A_2$: {:.3f} \n'.format(A1, A2) +
+
+        textstr = ('$A_1$: {:.3f}       \t$A_2$: {:.3f} \n'.format(self.A1, self.A2) +
                    '$f_1$: {:.3f} MHz\t$f_2$: {:.3f} MHz \n'.format(
-                       f1 * 1e-6, f2 * 1e-6) +
-                   r'$\tau _1$: {:.2f} $\mu$s'.format(tau1 * 1e6) +
-                   '  \t' + r'$\tau _2$: {:.2f}$\mu$s'.format(tau2 * 1e6))
+                       self.f1 * 1e-6, self.f2 * 1e-6) +
+                   r'$\tau _1$: {:.2f} $\mu$s'.format(self.tau1 * 1e6) +
+                   '  \t' + r'$\tau _2$: {:.2f}$\mu$s'.format(self.tau2 * 1e6))
 
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,

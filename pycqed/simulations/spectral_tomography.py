@@ -127,6 +127,25 @@ def f_to_parallelize_new(arglist):
                 mode='1D')
 
 
+    elif adaptive_pars['mode']=='spectral_tomo_nonmarkovian':
+        MC.set_sweep_functions([noise_parameters_CZ.repetitions])
+        MC.set_sweep_points(np.arange(1, adaptive_pars['n_points'], 2))
+        if noise_parameters_CZ.cluster():
+            dat = MC.run('1D sim_spectral_tomo_nonmarkovian double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D',exp_metadata=exp_metadata)
+
+        else:
+            if adaptive_pars['long_name']:
+                dat = MC.run('1D sim_spectral_tomo_nonmarkovian double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D',exp_metadata=exp_metadata)
+            else:
+                dat = MC.run('1D sim_spectral_tomo_nonmarkovian', 
+                exp_metadata=exp_metadata, 
+                mode='1D')
+
+
 
     fluxlutman.close()
     noise_parameters_CZ.close()
@@ -221,7 +240,7 @@ def compute_propagator(arglist):
     if noise_parameters_CZ.Z_rotations_length() != 0:
         tlist_singlequbitrotations = np.arange(0,noise_parameters_CZ.Z_rotations_length(),sim_step_new)
         amp_Z_rotation = np.zeros(len(tlist_singlequbitrotations))+amp_final[0]
-        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0)
+        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
         tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.Z_rotations_length(),sim_step_new,tlist_new)
 
     # We add the idle time at the end of the pulse (even if it's not at the end. It doesn't matter)
@@ -231,13 +250,13 @@ def compute_propagator(arglist):
         double_sided = fluxlutman.czd_double_sided()                # idle time is single-sided so we save the fluxlutman.czd_double_sided() value, set it to False
                                                                     # and later restore it to the original value
         fluxlutman.czd_double_sided(False)
-        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0)
+        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
         fluxlutman.czd_double_sided(double_sided)
         tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.total_idle_time(),sim_step_new,tlist_new)   # misleading name for the function sorry
 
 
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
-    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
+    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
 
 
     # We concatenate amp and f_pulse with the values they take during the Zrotations and idle_time.
@@ -262,7 +281,7 @@ def compute_propagator(arglist):
     #                            xlabel='Time (ns)',ylabel='Frequency (GHz)')
 
 
-    t_final = tlist_new[-1]+sim_step_new     # actual overall gate length
+    t_final = tlist_new[-1]+sim_step_new    # actual overall gate length
 
 
     ### Obtain jump operators for Lindblad equation
@@ -520,6 +539,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             for i in range(len(U_final_vec)):
                 if U_final_vec[i].type == 'oper':
                     U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
+                U_final_vec[i] = U_final_vec[i] ** self.noise_parameters_CZ.repetitions()
                 U_final_vec[i] = U_final_vec[i] * weights[i]
             U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting average propagator
             #print(czf.verify_CPTP(U_superop_average))

@@ -116,6 +116,14 @@ class NoiseParametersCZ(Instrument):
                            vals=vals.Strings(), initial_value='changeme')
 
 
+        # for spectral tomo
+
+        self.add_parameter('repetitions',
+                           label='Repetitions of CZ gate, used for spectral tomo',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=1)
+
+
         
 
 
