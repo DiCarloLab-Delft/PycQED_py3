@@ -738,9 +738,9 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
     # time-independent jump operators on q1
     if T2_q1 != 0:                                        # we use 0 to mean that it is infinite
         if T1_q1 != 0:                                    # if it's 0 it means that we want to simulate onle T_phi instead of T_2
-            Tphi01_q1 = Tphi_from_T1andT2(T1_q1,T2_q1) * noise_parameters_CZ.T2_scaling()
+            Tphi01_q1 = Tphi_from_T1andT2(T1_q1,T2_q1)
         else:
-            Tphi01_q1 = T2_q1 * noise_parameters_CZ.T2_scaling()
+            Tphi01_q1 = T2_q1
     else:
         Tphi01_q1 = 0
 
@@ -765,14 +765,15 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
         #                   xlabel='Frequency_q0 (GHz)', ylabel='T2 (mu s)')
 
         if T1_q0 != 0:
-            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec) * noise_parameters_CZ.T2_scaling()
+            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
         else:
-            Tphi01_q0_vec = T2_q0_vec * noise_parameters_CZ.T2_scaling() 
+            Tphi01_q0_vec = T2_q0_vec 
     else:
         Tphi01_q0_vec = []
 
 
-    c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
+    c_ops = c_ops_amplitudedependent(T1_q0 * noise_parameters_CZ.T2_scaling(),T1_q1 * noise_parameters_CZ.T2_scaling(),
+                                    Tphi01_q0_vec * noise_parameters_CZ.T2_scaling(),Tphi01_q1 * noise_parameters_CZ.T2_scaling())
     return c_ops
 
 
