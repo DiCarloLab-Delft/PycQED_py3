@@ -300,6 +300,10 @@ class UHFQC(Instrument):
     def clock_freq(self):
         return 1.8e9/(2**self.awgs_0_time())
 
+    # FIXME: add function to assure locking to ext clock
+
+    # FIXME: add function IDN
+
     ##########################################################################
     # 'public' functions: AWG/waveform support
     ##########################################################################
