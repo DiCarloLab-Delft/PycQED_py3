@@ -1,5 +1,6 @@
 import numpy as np
 from pycqed.analysis import measurement_analysis as ma
+# from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
@@ -11,7 +12,8 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
                                          stop_freq=None, center_freq=None,
                                          span=None, nr_avg=1, sweep_mode='auto',
                                          nbr_points=101, power=-20,
-                                         bandwidth=100, measure='S21'):
+                                         bandwidth=100, measure='S21',
+                                         options_dict=None):
     """
     Acquires a single trace from the VNA.
     Inputs:
@@ -64,8 +66,10 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     VNA_instr.timeout(10**4)
 
     MC_instr.run(name=file_name)
-#     ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
-    ma.VNA_Analysis(auto=True, label=file_name, linestyle="-")
+    # ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
+    # ma.VNA_Analysis(auto=True, label=file_name)
+    # ma2.VNA_Analysis(auto=True, label=file_name, options_dict=options_dict)
+
 
 
 def acquire_current_trace(file_name):
@@ -225,3 +229,60 @@ def acquire_2D_linear_frequency_span_vs_param(file_name, start_freq=None,
     MC_instr.run(name=file_name, mode='2D')
 #     ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
     ma.TwoD_Analysis(auto=True, label=file_name)
+
+
+def acquire_disjoint_frequency_traces(file_name, list_freq_ranges,
+                                      power=-20,
+                                      bandwidth=100, measure='S21'):
+    """
+    list_freq_ranges is a list that contains the arays defining all the ranges of interest.
+    """
+    for idx, range_array in enumerate(list_freq_ranges):
+        this_file = file_name + '_%d'%idx
+        acquire_single_linear_frequency_span(file_name = this_file,
+                                             start_freq=range_array[0],
+                                             stop_freq=range_array[-1],
+                                             nbr_points=len(range_array),
+                                             power=power,
+                                             bandwidth=bandwidth,
+                                             measure=measure)
+    packing_mmts(file_name, labels=file_name+'__', N=len(list_freq_ranges))
+
+def packing_mmts(file_name, labels, N):
+    # imports data
+    # stacks it toghether
+    for idx in range(N):
+        this_file = file_name + '_%d'%idx
+        ma_obj = ma.MeasurementAnalysis(label=this_file, auto=False)
+        ma_obj.get_naming_and_values()
+        if idx==0:
+            data_points = ma_obj.sweep_points
+            data_vector = ma_obj.measured_values
+        else:
+            data_points = np.hstack((data_points,ma_obj.sweep_points))
+            data_vector = np.hstack((data_vector,ma_obj.measured_values))
+        del ma_obj
+    data_vector = np.array(data_vector)
+    data_points = np.array(data_points)
+    sort_mask = np.argsort(data_points)
+    data_points = data_points[sort_mask]
+    data_vector = data_vector[:,sort_mask]
+
+    # keeps track of sweeppoints call
+    class call_counter:
+        def __init__(self):
+            self.counter=0
+    swp_points_counter = call_counter()
+
+    def wrapped_data_importing(counter):
+        counter.counter += 1
+        return data_vector[:,counter.counter-1]
+
+    detector_inst = det.Function_Detector_list(
+        sweep_function=wrapped_data_importing,
+        result_keys=['Amp', 'phase', 'I', 'Q'],
+        msmt_kw={'counter': swp_points_counter})
+    MC_instr.set_sweep_function(swf.None_Sweep(name='VNA sweep'))
+    MC_instr.set_sweep_points(data_points.flatten())
+    MC_instr.set_detector_function(detector_inst)
+    MC_instr.run(name=file_name)

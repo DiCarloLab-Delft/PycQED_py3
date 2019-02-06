@@ -322,8 +322,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     self.AWG.start()
 
                 data_raw=self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
-                                                     arm=False, acquisition_time=0.01,
-                                                     timeout=100)
+                                                     arm=False, acquisition_time=0.01)
                 data = np.array([data_raw[key] for key in data_raw.keys()])
 
                 #calculating transients

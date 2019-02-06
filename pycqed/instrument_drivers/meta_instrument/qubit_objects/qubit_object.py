@@ -184,11 +184,11 @@ class Qubit(Instrument):
     def measure_rabi(self):
         raise NotImplementedError()
 
-    def measure_flipping(self,  number_of_flips=2*np.arange(60),
-                         MC=None, label='',
-                         equator=True,
-                         analyze=True, close_fig=True, verbose=True):
-        raise NotImplementedError
+
+    def measure_flipping(self, number_of_flips=np.arange(20), equator=True,
+                         MC=None, analyze=True, close_fig=True, update=True,
+                         ax='x', angle='180'):
+        raise NotImplementedError()
 
     def measure_ramsey(self):
         raise NotImplementedError()
@@ -218,6 +218,7 @@ class Qubit(Instrument):
                      update: bool=True,
                      verbose: bool=True):
         raise NotImplementedError()
+
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
                              analyze=True, close_fig=True):
@@ -296,6 +297,7 @@ class Qubit(Instrument):
 
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
+                       artificial_periods=2.5,
                        freqs=None,
                        f_span=100e6,
                        use_max=False,
@@ -331,7 +333,8 @@ class Qubit(Instrument):
                 # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
             return self.calibrate_frequency_ramsey(
-                steps=steps, verbose=verbose, update=update,
+                steps=steps, artificial_periods=artificial_periods,
+                verbose=verbose, update=update,
                 close_fig=close_fig)
         return self.freq_qubit()
 
@@ -416,6 +419,7 @@ class Qubit(Instrument):
 
     def calibrate_frequency_ramsey(self,
                                    steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+                                   artificial_periods = 2.5,
                                    stepsize:float =20e-9,
                                    verbose: bool=True, update: bool=True,
                                    close_fig: bool=True):
@@ -434,7 +438,7 @@ class Qubit(Instrument):
         for n in steps:
             times = np.arange(self.mw_gauss_width()*4,
                               50*n*stepsize, n*stepsize)
-            artificial_detuning = 2.5/times[-1]
+            artificial_detuning = artificial_periods/times[-1]
             self.measure_ramsey(times,
                                 artificial_detuning=artificial_detuning,
                                 freq_qubit=cur_freq,
@@ -778,6 +782,7 @@ class Transmon(Qubit):
         raise NotImplementedError()
 
     def calibrate_frequency_ramsey(self, steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+                                   artificial_periods=2.5,
                                    stepsize=None, verbose=True, update=True,
                                    close_fig=True):
         if stepsize is None:
@@ -787,7 +792,7 @@ class Transmon(Qubit):
         for n in steps:
             times = np.arange(self.pulse_delay.get(),
                               50*n*stepsize, n*stepsize)
-            artificial_detuning = 2.5/times[-1]
+            artificial_detuning = artificial_periods/times[-1]
             self.measure_ramsey(times,
                                 artificial_detuning=artificial_detuning,
                                 f_qubit=cur_freq,
@@ -825,6 +830,7 @@ class Transmon(Qubit):
 
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
+                       artificial_periods = 2.5,
                        freqs=None,
                        f_span=100e6,
                        use_max=False,
@@ -862,8 +868,8 @@ class Transmon(Qubit):
                 # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
             return self.calibrate_frequency_ramsey(
-                steps=steps, verbose=verbose, update=update,
-                close_fig=close_fig)
+                steps=steps, artificial_periods=artificial_periods,
+                verbose=verbose, update=update, close_fig=close_fig)
         return self.f_qubit()
 
     def find_frequency_pulsed(self):
@@ -895,7 +901,7 @@ class Transmon(Qubit):
             ampl = a.fit_res[1].params['period'].value/2.
 
         if update:
-            self.Q_amp180.set(ampl)
+            self.amp180.set(ampl)
         return ampl
 
     def calibrate_pulse_amplitude_flipping(self,
@@ -1003,6 +1009,7 @@ class Transmon(Qubit):
             if n > max_n:
                 break
             else:
+
                 old_amp = ampl
                 ampl_span = 0.5*ampl/n
                 amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
@@ -1011,17 +1018,20 @@ class Transmon(Qubit):
                 # Decide which quadrature to take by comparing the contrast
                 if take_fit_I:
                     ampl = a.fit_res[0].params['x0'].value
-                elif (np.abs(max(a.measured_values[0]) -
-                             min(a.measured_values[0]))) > (
-                    np.abs(max(a.measured_values[1]) -
-                           min(a.measured_values[1]))):
+                elif min(amps)<a.fit_res[0].params['x0'].value<max(amps)\
+                        and min(amps)<a.fit_res[1].params['x0'].value<max(amps):
+                    if (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>\
+                        (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
+                        ampl = a.fit_res[0].params['x0'].value
+                    else:
+                        ampl = a.fit_res[1].params['x0'].value
+                elif min(amps)<a.fit_res[0].params['x0'].value<max(amps):
                     ampl = a.fit_res[0].params['x0'].value
-                else:
+                elif min(amps)<a.fit_res[1].params['x0'].value<max(amps):
                     ampl = a.fit_res[1].params['x0'].value
-                if not min(amps) < ampl < max(amps):
-                    ampl_span *= 2
-                    amps = np.linspace(old_amp-ampl_span,
-                                       old_amp+ampl_span, 15)
+                else:
+                    ampl_span*=1.5
+                    amps = np.linspace(old_amp-ampl_span, old_amp+ampl_span, 15)
                     self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                     a = ma.Rabi_parabola_analysis(close_fig=close_fig)
                     # Decide which quadrature to take by comparing the contrast
@@ -1037,8 +1047,9 @@ class Transmon(Qubit):
                 if verbose:
                     print('Found amplitude', ampl, '\n')
         if update:
-            self.Q_amp180.set(ampl)
-        return ampl
+            self.amp180.set(np.abs(ampl))
+
+
 
     def find_amp90_scaling(self, scales=0.5,
                            N_steps=[5, 9], max_n=100,
