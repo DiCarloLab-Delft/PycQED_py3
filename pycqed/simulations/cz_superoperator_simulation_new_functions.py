@@ -199,7 +199,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
     if T1_q1 != 0:
         c_ops.append(np.sqrt(1/T1_q1)*b)
 
-    rescaling_of_Tphi_02 = 4
+    rescaling_of_Tphi_02 = 2
     if rescaling_of_Tphi_02==2:
         rate_01_scaling = 4/9
         rate_02_scaling = 16/9
