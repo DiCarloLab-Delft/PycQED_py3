@@ -30,13 +30,13 @@ OSC.read_channels([ch])
 '''
 
 from qcodes import VisaInstrument
-from qcodes.utils.validators import Strings
+# from qcodes.utils.validators import Strings
 
 
 import logging
 # import socket
 # import select
-from time import sleep
+# from time import sleep
 import ctypes as ct
 import numpy as np
 
@@ -101,7 +101,6 @@ class RIGOL_DS4043(VisaInstrument):
     '''
 
     def __init__(self, name, address, **kwargs):
-        super().__init__(name, address, **kwargs)
         '''
         Initializes the RIGOL_DS4043, and communicates with the wrapper.
 
@@ -113,6 +112,8 @@ class RIGOL_DS4043(VisaInstrument):
         Output:
             None
         '''
+        super().__init__(name, address, **kwargs)
+
 
         # logging.info(__name__ + ' : Initializing instrument')
         # Instrument.__init__(self, name, tags=['physical', 'source'])

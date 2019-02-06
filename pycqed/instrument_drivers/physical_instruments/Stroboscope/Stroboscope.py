@@ -7,9 +7,9 @@
 
 
 from qcodes import VisaInstrument
-from qcodes.utils.validators import Strings, Enum
-from qcodes import VisaInstrument, validators as vals
-import time
+from qcodes.utils.validators import Strings
+from qcodes import validators as vals
+# import time
 
 
 class Stroboscope(VisaInstrument):
@@ -28,7 +28,6 @@ class Stroboscope(VisaInstrument):
     # def __init__(self, name, address, reset=False,
     #         change_display=True, change_autozero=True):
     def __init__(self, name, address, **kwargs):
-        super().__init__(name, address, **kwargs)
         '''
         Initializes the Keithley_2200, and communicates with the wrapper.
 
@@ -36,6 +35,8 @@ class Stroboscope(VisaInstrument):
             name (string)           : name of the instrument
             address (string)        : COM port
         '''
+
+        super().__init__(name, address, **kwargs)
 
         # Add some global constants
         self.MAX_DUTY = 698 ## milliseconds

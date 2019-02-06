@@ -1,6 +1,6 @@
 import numpy as np
 from pycqed.analysis import measurement_analysis as ma
-from pycqed.analysis_v2 import measurement_analysis as ma2
+# from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 

@@ -324,13 +324,13 @@ def T1_qp_seq(times,
     RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
-    '''
-    for every different tau:
-        make N pi pulses
-        append the T1 experiment
-        make an element out of the above sequence
-    send to the AWG
-    '''
+
+    # for every different tau:
+    #     make N pi pulses
+    #     append the T1 experiment
+    #     make an element out of the above sequence
+    # send to the AWG
+
     starting_X180 = deepcopy(pulses['X180'])
     starting_X180['refpoint'] = 'start'
     QP_X180_list = []

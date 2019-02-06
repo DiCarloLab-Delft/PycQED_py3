@@ -1,16 +1,16 @@
 import numpy as np
-from pycqed.analysis import analysis_toolbox as a_tools
+# from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis_v2 import spectroscopy_analysis as Spec
 
 
-class ResonatorFieldSweep(ResonatorSpectroscopy):
+class ResonatorFieldSweep(Spec.ResonatorSpectroscopy):
     def __init__(self, t_start,
                  options_dict,
                  t_stop = None,
                  do_fitting = True,
                  extract_only=False,
                  auto=True):
-        super(ResonatorFieldSweep, self).__init__(t_start, t_stop=t_stop,
+        super(Spec.ResonatorFieldSweep, self).__init__(t_start, t_stop=t_stop,
                                              options_dict=options_dict,
                                              do_fitting = True,
                                              extract_only=False,
@@ -21,7 +21,7 @@ class ResonatorFieldSweep(ResonatorSpectroscopy):
             self.run_analysis()
 
     def process_data(self):
-        super(ResonatorFieldSweep, self).process_data()
+        super(Spec.ResonatorFieldSweep, self).process_data()
         self.plot_xvals = self.options_dict.get('xvals',np.array([[tt] for tt in range(len(self.data_dict['timestamps']))]))
         self.data_dict['field'] = np.array(
                         [np.double(val) for val in self.data_dict['field']])

@@ -127,7 +127,8 @@ void loop()
     if(data == '\r')
     {
       command_buffer[i] = '\0';
-      uint8_t result = parse_command(command_buffer,i); // if our buffer is not empty, parse the command
+      //uint8_t result = parse_command(command_buffer,i); // if our buffer is not empty, parse the command
+      parse_command(command_buffer,i); // if our buffer is not empty, parse the command
       i = 0;
     }
   }
