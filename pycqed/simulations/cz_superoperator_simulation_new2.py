@@ -72,13 +72,13 @@ def f_to_parallelize_new(arglist):
              (adaptive_pars['lambda2_min'], adaptive_pars['lambda2_max'])]})
 
         if noise_parameters_CZ.cluster():
-            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
-                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='adaptive',exp_metadata=exp_metadata)
 
         else:
             if adaptive_pars['long_name']:
-                dat = MC.run('2D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                dat = MC.run('2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
                 fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='adaptive',exp_metadata=exp_metadata)
             else:
@@ -91,13 +91,13 @@ def f_to_parallelize_new(arglist):
         MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'], 
             adaptive_pars['theta_f_max'],adaptive_pars['n_points']))
         if noise_parameters_CZ.cluster():
-            dat = MC.run('1D simulation_new_cluster2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+            dat = MC.run('1D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
                 fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='1D',exp_metadata=exp_metadata)
 
         else:
             if adaptive_pars['long_name']:
-                dat = MC.run('1D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                dat = MC.run('1D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
                 fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='1D',exp_metadata=exp_metadata)
             else:
@@ -167,7 +167,7 @@ def compute_propagator(arglist):
         tlist_temp=np.concatenate((tlist,np.array([fluxlutman.cz_length(),fluxlutman.cz_length()+sim_step])))
         tlist_new = np.arange(0, fluxlutman.cz_length()+sim_step,
                        sim_step_new)
-    amp_temp=np.concatenate((amp,np.array([amp[0]])))    # amp should come back to the initial value, i.e. at the sweet spot
+    amp_temp=np.concatenate((amp,np.array([0])))    # amp should come back to the initial value, i.e. at the sweet spot
     amp_interp=interp1d(tlist_temp,amp_temp)
     amp=amp_interp(tlist_new)
 
@@ -195,28 +195,32 @@ def compute_propagator(arglist):
     #                          title='Pulse with distortions, difference',
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
 
+    ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
+    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
+
+
+
+    intervals_list = np.zeros(np.size(tlist_new)) + sim_step_new
+
 
     # We add the single qubit rotations at the end of the pulse
     if noise_parameters_CZ.Z_rotations_length() != 0:
-        tlist_singlequbitrotations = np.arange(0,noise_parameters_CZ.Z_rotations_length(),sim_step_new)
-        amp_Z_rotation = np.zeros(len(tlist_singlequbitrotations))+amp_final[0]
-        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0)
-        tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.Z_rotations_length(),sim_step_new,tlist_new)
+        actual_Z_rotations_length = np.arange(0,noise_parameters_CZ.Z_rotations_length(),sim_step_new)[-1]+sim_step_new
+        intervals_list = np.append(intervals_list,[actual_Z_rotations_length/2,actual_Z_rotations_length/2])
+        amp_Z_rotation=[0,0]
+        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
 
     # We add the idle time at the end of the pulse (even if it's not at the end. It doesn't matter)
     if noise_parameters_CZ.total_idle_time() != 0:
-        tlist_idle_time = np.arange(0,noise_parameters_CZ.total_idle_time(),sim_step_new)
-        amp_idle_time = np.zeros(len(tlist_idle_time))+amp_final[0]
+        actual_total_idle_time = np.arange(0,noise_parameters_CZ.total_idle_time(),sim_step_new)[-1]+sim_step_new
+        intervals_list = np.append(intervals_list,[actual_total_idle_time/2,actual_total_idle_time/2])
+        amp_idle_time=[0,0]
         double_sided = fluxlutman.czd_double_sided()                # idle time is single-sided so we save the fluxlutman.czd_double_sided() value, set it to False
                                                                     # and later restore it to the original value
         fluxlutman.czd_double_sided(False)
-        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0)
+        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
         fluxlutman.czd_double_sided(double_sided)
-        tlist_new = czf.concatenate_CZpulse_and_Zrotations(noise_parameters_CZ.total_idle_time(),sim_step_new,tlist_new)   # misleading name for the function sorry
 
-
-    ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
-    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0)
 
 
     # We concatenate amp and f_pulse with the values they take during the Zrotations and idle_time.
@@ -228,7 +232,7 @@ def compute_propagator(arglist):
         amp_final=np.concatenate((amp_final,amp_idle_time))
         f_pulse_final=np.concatenate((f_pulse_final,f_pulse_idle_time))
 
-    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final],
+    # czf.plot(x_plot_vec=[np.arange(0,np.size(intervals_list))],y_plot_vec=[amp_final],
     #                          title='Pulse with (possibly) single qubit rotations and idle time',
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
 
@@ -236,12 +240,12 @@ def compute_propagator(arglist):
     #                          title='Pulse with distortions and shift due to fluxbias_q0, difference',
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
     # amp_final = amp_final_new
-    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[f_pulse_final/1e9],
+    # czf.plot(x_plot_vec=[np.arange(0,np.size(intervals_list))],y_plot_vec=[f_pulse_final/1e9],
     #                          title='Pulse with distortions and shift due to fluxbias_q0',
     #                            xlabel='Time (ns)',ylabel='Frequency (GHz)')
 
 
-    t_final = tlist_new[-1]+sim_step_new     # actual overall gate length
+    t_final = np.sum(intervals_list)        # actual overall gate length
 
 
     ### Obtain jump operators for Lindblad equation
@@ -250,7 +254,7 @@ def compute_propagator(arglist):
 
     ### Compute propagator
     U_final = czf.time_evolution_new(c_ops=c_ops, noise_parameters_CZ=noise_parameters_CZ, 
-                                 fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new)
+                                 fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new, intervals_list=intervals_list)
     #print(czf.verify_CPTP(U_superop_average))    # simple check of CPTP property
 
     return [U_final, t_final]

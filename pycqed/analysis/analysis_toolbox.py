@@ -16,7 +16,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
 from scipy.signal import argrelextrema
 # to allow backwards compatibility with old a_tools code
-from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
@@ -120,7 +119,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     is newer than the date given by the timestamp newer_than is returned
 
     If no fitting data is found, an exception is raised.
-    Except when you specifically ask not to to
+    Except when you specifically ask not to do
     this in: raise_exc = False, then a 'False' is returned.
     return_all = True: returns all the folders that satisfy
         the requirements (Cristian)
@@ -452,33 +451,33 @@ def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
 def append_data_from_ma(ma, param_names, data, data_version=2,
                         numeric_params=None, filter_dict=None):
     """
-    Extract data from an analysis object and appends it to lists in a dict. 
+    Extract data from an analysis object and appends it to lists in a dict.
 
     params
     ------
-    ma: 
-        analysis class to be used to extract the data? 
-    param_names: 
-        parameters to extract. 
+    ma:
+        analysis class to be used to extract the data?
+    param_names:
+        parameters to extract.
     data: (dictionary)
-        dictionary containing lists of data. 
-    numeric_params 
+        dictionary containing lists of data.
+    numeric_params
         this parameter is ignored (TODO remove this)
-    filter_dict: 
-        dictionary to use to filter, keys correpond to parameter names, 
+    filter_dict:
+        dictionary to use to filter, keys correpond to parameter names,
         values correspond to desired values of these params. If a Value is not
-        equal to the filter param, no data from that dataset is loaded at all. 
+        equal to the filter param, no data from that dataset is loaded at all.
 
     Returns
     -------
-    nothing, the data object is modified inside the function scope. 
+    nothing, the data object is modified inside the function scope.
 
     """
     if filter_dict is not None:
         param_names_filter = list(param_names)+list(filter_dict.keys())
     else:
         param_names_filter = param_names
-        
+
     new_data = get_data_from_ma(ma, param_names_filter, data_version=data_version,
                                 numeric_params=numeric_params)
 
@@ -767,6 +766,9 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
 
         if exact_label_match:
             all_measdirs = [x for x in all_measdirs if label in x]
+            #BUG: does not compare the exact string, just a substring
+            #So 'q5_spectroscopy_f02' will be included in a search for
+            #'q5_spectroscopy'
         else:
             for each_label in label:
                 all_measdirs = [x for x in all_measdirs if each_label in x]
@@ -1673,7 +1675,7 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
 def datetime_from_timestamp(timestamp: str):
     """
-    Converst a timestamp instring in a datetime object. 
+    Converst a timestamp instring in a datetime object.
     """
     try:
         if len(timestamp) == 14:
@@ -2621,6 +2623,40 @@ def solve_quadratic_equation(a, b, c, verbose=False):
         if verbose:
             print("This equation has two solutions: ", x1, " or", x2)
         return [x1, x2]
+
+
+def calculate_f_qubit_from_power_scan(f_bare,f_shifted,g_coupling=65e6):
+    '''
+    Inputs are in Hz
+    f_bare: the resonator frequency without a coupled qubit
+    f_shifted: the reso freq shifted due to coupling of a qwubit
+    g_coupling: the coupling strengs
+    Output:
+    f_q: in Hz
+    '''
+    w_r = f_bare * 2* np.pi
+    w_shift = f_shifted * 2*np.pi
+    g = 2*np.pi * g_coupling
+    shift =(w_shift - w_r)/g**2
+    #f_shift > 0 when f_qubit<f_res
+    if (shift>0):
+        w_q = -1/(shift) + np.sqrt(1/(shift**2)+w_r**2)
+        #For the RWA approximation
+        # w_q_RWA = -1/shift + w_r
+    else:
+        w_q = 1/shift + np.sqrt(1/(shift**2)+w_r**2)
+
+        # w_q_RWA = 1/shift + w_r
+    return w_q/(2.*np.pi)
+
+def calculate_g_coupling_from_frequency_shift(f_bare,f_shifted,f_qubit):
+    w_r = 2*np.pi * f_bare
+    w_shift = 2*np.pi * f_shifted
+    w_q = 2*np.pi*f_qubit
+    shift = w_shift-w_r
+    rhs = 1./(w_q-w_r) + 1./(w_q+w_r)
+    # rhs_RWA = 1./(w_q-w_r)
+    return np.sqrt(np.abs(shift/rhs))/(2*np.pi)
 
 
 # def find_min(x, y, min_target=None, return_fit=False, perc=30):

@@ -62,16 +62,18 @@ from pycqed.analysis_v2.cryo_scope_analysis import RamZFluxArc, \
 from pycqed.analysis_v2.cryo_spectrumanalyzer_analysis import Cryospec_Analysis
 from pycqed.analysis_v2.distortions_analysis import Scope_Trace_analysis
 
+
 from pycqed.analysis_v2.optimization_analysis import OptimizationAnalysis
 from pycqed.analysis_v2.timing_cal_analysis import Timing_Cal_Flux_Coarse, \
     Timing_Cal_Flux_Fine
 
-from pycqed.analysis_v2.coherence_analysis import CoherenceTimesAnalysis, \
-    CoherenceTimesAnalysisSingle, AliasedCoherenceTimesAnalysisSingle
+from pycqed.analysis_v2.coherence_analysis import CoherenceAnalysis, \
+    CoherenceTimesAnalysisSingle, AliasedCoherenceTimesAnalysisSingle, \
+    CoherenceTimesAnalysis_old
 from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, \
     ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy
 from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency, \
-    FrequencySusceptibility
+    FrequencySusceptibility, DACarcPolyFit
 from pycqed.analysis_v2.quantum_efficiency_analysis import \
     QuantumEfficiencyAnalysis, DephasingAnalysisSingleScans, \
     DephasingAnalysisSweep, SSROAnalysisSingleScans, SSROAnalysisSweep, \
@@ -86,4 +88,6 @@ from pycqed.analysis_v2.randomized_benchmarking_analysis import (
 from pycqed.analysis_v2.gate_set_tomography_analysis import \
     GST_SingleQubit_DataExtraction, GST_TwoQubit_DataExtraction
 
+
 from pycqed.analysis_v2.fluxing_analysis import Chevron_Analysis
+

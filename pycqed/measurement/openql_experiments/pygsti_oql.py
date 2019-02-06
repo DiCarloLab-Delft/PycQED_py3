@@ -16,7 +16,9 @@ import logging
 gatemap = {'i': 'i',
            'x': 'rx90',
            'y': 'ry90',
-           'cphase': 'fl_cw_01'}
+           # 'cphase': 'fl_cw_01',
+            'cphase': 'fl_cw_03',
+           }
 
 
 def openql_program_from_pygsti_expList(expList, program_name: str,

@@ -5,6 +5,7 @@ using linear filtering (scipy.signal.lfilter).
 It is based on the kernel_object.DistortionsKernel
 """
 import numpy as np
+import logging
 from scipy import signal
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -68,7 +69,12 @@ class LinDistortionKernel(Instrument):
         change the latency that is introduced.
         """
         max_exp_filters = 5
-        AWG = self.instr_AWG.get_instr()
+        try:
+            AWG = self.instr_AWG.get_instr()
+        except Exception as e:
+            logging.warning(e)
+            logging.warning('Could not set realtime distortions to 0, AWG not found')
+            return
 
         # set exp_filters to 0
         for i in range(max_exp_filters):
@@ -137,11 +143,13 @@ class LinDistortionKernel(Instrument):
 
                         AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_timeconstant'.format(
-                                    self.cfg_awg_channel()-1, nr_real_time_exp_models),
+                                    self.cfg_awg_channel()-1,
+                                    nr_real_time_exp_models),
                                 filt['params']['tau'])
                         AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_amplitude'.format(
-                                    self.cfg_awg_channel()-1, nr_real_time_exp_models),
+                                    self.cfg_awg_channel()-1,
+                                    nr_real_time_exp_models),
                                 filt['params']['amp'])
                         AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_enable'.format(self.cfg_awg_channel()-1,
@@ -154,8 +162,7 @@ class LinDistortionKernel(Instrument):
                     else:
                         y_sig = kf.exponential_decay_correction(
                             y_sig, sampling_rate=self.cfg_sampling_rate(),
-                            inverse=inverse,
-                            **filt['params'])
+                            inverse=inverse, **filt['params'])
                 elif model == 'bounce':
                     if ('real-time' in filt.keys() and filt['real-time']):
                         AWG = self.instr_AWG.get_instr()
@@ -186,7 +193,10 @@ class LinDistortionKernel(Instrument):
                         raise KeyError('Real-time for {} model implemented'.format(model))
                     else:
                         fir_filter_coeffs = filt['params']['weights']
-                        y_sig = signal.lfilter(fir_filter_coeffs,1,y_sig)
+                        if not inverse:
+                            y_sig = signal.lfilter(fir_filter_coeffs, 1, y_sig)
+                        elif inverse:
+                            y_sig = signal.lfilter(np.ones(1), fir_filter_coeffs, y_sig)
 
                 else:
                     raise KeyError('Model {} not recognized'.format(model))

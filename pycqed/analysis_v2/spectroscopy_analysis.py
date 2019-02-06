@@ -13,6 +13,11 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 
+import importlib
+importlib.reload(ba)
+importlib.reload(fit_mods)
+
+
 class Spectroscopy(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str,

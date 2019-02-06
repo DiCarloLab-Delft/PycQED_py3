@@ -540,3 +540,89 @@ class FrequencySusceptibility(sa.Basic2DInterpolatedAnalysis):
                     'xpos': 0.98, 'ypos': 0.92,
                     'horizontalalignment': 'right',
                     'ax_id': 'correlations',}
+
+
+
+class DACarcPolyFit(ba.BaseDataAnalysis):
+          # todo docstring
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='',
+                 options_dict: dict=None, extract_only: bool=False,
+                 dac_key='Instrument settings.fluxcurrent.Q',
+                 frequency_key='Instrument settings.Q.freq_qubit',
+                 do_fitting=True,
+                 ):
+        '''
+        Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
+
+        :param t_start: start time of scan as a string of format YYYYMMDD_HHmmss
+        :param t_stop: end time of scan as a string of format YYYYMMDD_HHmmss
+        :param label: the label that was used to name the measurements (only necessary if non-relevant measurements are in the time range)
+        :param options_dict: Available options are the ones from the base_analysis and:
+                                - (todo)
+        :param extract_only: Should we also do the plots?
+        :param do_fitting: Should the run_fitting method be executed?
+        :param dac_key: key for the dac current values, e.g. 'Instrument settings.fluxcurrent.Q'
+        :param frequency_key: key for the dac current values, e.g. 'Instrument settings.Q.freq_qubit'
+        '''
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only,
+                         do_fitting=do_fitting)
+
+        self.params_dict = {'dac': dac_key,
+                            'qfreq': frequency_key,
+                            'measurementstring': 'measurementstring'}
+
+        self.numeric_params = ['dac', 'qfreq']
+
+        self.run_analysis()
+        # return self.proc_data_dict
+
+    def run_fitting(self):
+        dac = self.raw_data_dict['dac']
+        freq = self.raw_data_dict['qfreq']
+
+        polycoeffs = np.polyfit(dac,freq,4)
+
+        self.fit_res = {}
+        self.fit_res['fit_polycoeffs'] = polycoeffs
+        self.fit_res['fit_polynomial'] = np.poly1d(polycoeffs)
+
+    def save_fit_results(self):
+        # todo: if you want to save some results to a hdf5, do it here
+        pass
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['dac'],
+            'xlabel': 'Current',
+            'xunit': 'A',
+            'yvals': self.raw_data_dict['qfreq'],
+            'ylabel': 'Frequency',
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'linestyle': '',
+            'marker': 'o',
+            'setlabel': 'data',
+            'color': 'C0',
+        }
+
+        xs = np.linspace(min(self.raw_data_dict['dac']), max(self.raw_data_dict['dac']),301)
+        self.plot_dicts['fit'] = {
+            'plotfn': self.plot_line,
+            'xvals': xs,
+            'xlabel': 'Current',
+            'xunit': 'A',
+            'yvals': self.fit_res['fit_polynomial'](xs),
+            'ylabel': 'Frequency',
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'linestyle': '-',
+            'marker': '',
+            'setlabel': 'fit',
+            'color': 'C0',
+            'ax_id': 'main'
+        }

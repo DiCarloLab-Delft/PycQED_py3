@@ -1101,7 +1101,9 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                                     tomo_after=False,
                                     ro_time=500e-9,
                                     echo_during_ancilla_mmt: bool=False,
-                                    XY_echo: bool=False):
+                                    idling_time: float=40e-9,
+                                    idling_time_echo: float=20e-9,
+                                    idling_rounds: int=0):
     """
     Implements a circuit for repeated parity checks on two qubits.
 
@@ -1129,7 +1131,8 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
         initialization_msmt : whether to start with an initial measurement
                     to prepare the starting state.
     """
-    p = oqh.create_program("two_qubit_repeated_parity_check", platf_cfg)
+    print('new')
+    p = oqh.create_program("two_qubit_parity_check", platf_cfg)
     data_qubits=[qD0,qD1]
     if tomo:
         tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
@@ -1151,9 +1154,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                     # k.measure(qD1)
                     k.measure(qA)
                     if echo_during_ancilla_mmt:
-                        k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9+20))
-                    if XY_echo:
-                        k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9*2+40))
+                        k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
                     k.gate('wait', [qD0, qD1, qA], int(100)) #adding additional wait time to ensure good initialization
                     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
                 #state preparation
@@ -1203,14 +1204,14 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                                 k.gate('ry180', [qD0])
                                 k.gate('ry180', [qD1])
                                 k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
-                                if XY_echo:
-                                    k.gate('rx180', [qD0])
-                                    k.gate('rx180', [qD1])
-                                    k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
-                                    k.gate('ry180', [qD0])
-                                    k.gate('ry180', [qD1])
-                                    k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
                 k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #separating parity from tomo
+                if idling_rounds!=0:
+                    for j in np.arange(idling_rounds):
+                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], int(idling_time_echo*1e9)) #alignment workaround
+                        if echo_during_ancilla_mmt:
+                            k.gate('ry180', [qD0])
+                            k.gate('ry180', [qD1])
+                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], int((idling_time-idling_time_echo-20e-9)*1e9)) #alignment workaround
                 #tomography
                 if tomo:
                     k.gate("wait", [qD1, qD0], 0) #alignment workaround
@@ -1224,13 +1225,12 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                 k.measure(qD0)
                 k.measure(qD1)
                 p.add_kernel(k)
+
     if tomo:
         #only add calbration points when doing tomography
         interleaved_delay=ro_time
         if echo_during_ancilla_mmt:
-            interleaved_delay=ro_time+20e-9
-        if XY_echo:
-            interleaved_delay=3*ro_time+60e-9
+            interleaved_delay=ro_time
         if tomo_after:
             p = oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=7, measured_qubits=[qD0, qD1],
                                      interleaved_measured_qubits=[qA],

@@ -94,6 +94,26 @@ class Rabi(swf.Hard_Sweep):
                          n=self.n, return_seq=self.return_seq)
 
 
+class Flipping(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, RO_pars, upload=True, return_seq=False):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.name = 'Flipping'
+        self.parameter_name = 'Number of Pulses'
+        self.unit = '#'
+        self.return_seq = return_seq
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Flipping_seq(N=self.sweep_points,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         return_seq=self.return_seq)
+
+
 class two_qubit_tomo_cardinal(swf.Hard_Sweep):
 
     def __init__(self, cardinal, q0_pulse_pars, q1_pulse_pars,
@@ -175,25 +195,6 @@ class two_qubit_tomo_bell(swf.Hard_Sweep):
             self.AWG.set('{}_amp'.format(self.q0_flux_pars['channel']),
                          old_val_qS)
             self.upload = False
-
-class Flipping(swf.Hard_Sweep):
-
-    def __init__(self, pulse_pars, RO_pars, n=1, upload=True, return_seq=False):
-        super().__init__()
-        self.pulse_pars = pulse_pars
-        self.RO_pars = RO_pars
-        self.n = n
-        self.upload = upload
-        self.name = 'Rabi'
-        self.parameter_name = 'amplitude'
-        self.unit = 'V'
-        self.return_seq = return_seq
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs.Flipping_seq(pulse_pars=self.pulse_pars,
-                             RO_pars=self.RO_pars,
-                             n=self.n, return_seq=self.return_seq)
 
 
 class Rabi_amp90(swf.Hard_Sweep):
@@ -868,6 +869,57 @@ class T1(swf.Hard_Sweep):
                        pulse_pars=self.pulse_pars,
                        RO_pars=self.RO_pars)
 
+class T1_qp(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, RO_pars,
+                 N_pi_pulses, N_pi_pulse_delay,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.N_pi_pulses = N_pi_pulses
+        self.N_pi_pulse_delay = N_pi_pulse_delay
+        self.upload = upload
+        self.cal_points = cal_points
+        self.name = 'T1_qp'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.T1_qp_seq(times=self.sweep_points,
+                         N_pi_pulses = self.N_pi_pulses,
+                         N_pi_pulse_delay = self.N_pi_pulse_delay,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         cal_points=self.cal_points)
+class T1_2pi_qp(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, RO_pars,
+                 N_2pi_pulses, N_2pi_pulse_delay,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.N_2pi_pulses = N_2pi_pulses
+        self.N_2pi_pulse_delay = N_2pi_pulse_delay
+        self.upload = upload
+        self.cal_points = cal_points
+        self.name = 'T1_2pi_qp'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.T1_2pi_qp_seq(times=self.sweep_points,
+                         N_2pi_pulses = self.N_2pi_pulses,
+                         N_2pi_pulse_delay = self.N_2pi_pulse_delay,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         cal_points=self.cal_points)
+
 
 class AllXY(swf.Hard_Sweep):
 
@@ -1023,6 +1075,33 @@ class Echo(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs.Echo_seq(times=self.sweep_points,
+                         pulse_pars=self.pulse_pars,
+                         RO_pars=self.RO_pars,
+                         artificial_detuning=self.artificial_detuning,
+                         cal_points=self.cal_points)
+
+
+class CPMG(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, CPMG_order, RO_pars,
+                 artificial_detuning=None,
+                 cal_points=True,
+                 upload=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.CPMG_order = CPMG_order
+        self.upload = upload
+        self.cal_points = cal_points
+        self.artificial_detuning = artificial_detuning
+        self.name = 'CPMG'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.CPMG_seq(times=self.sweep_points,
+                         CPMG_order = self.CPMG_order,
                          pulse_pars=self.pulse_pars,
                          RO_pars=self.RO_pars,
                          artificial_detuning=self.artificial_detuning,

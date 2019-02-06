@@ -54,6 +54,10 @@ class NoiseParametersCZ(Instrument):
                            label='NB: different from the operating point in general',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+        self.add_parameter('w_q0_sweetspot',
+                           label='NB: different from the operating point in general',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
         self.add_parameter('Z_rotations_length', unit='s',
                            label='duration of the single qubit Z rotations at the end of the pulse',
                            parameter_class=ManualParameter,
@@ -110,6 +114,14 @@ class NoiseParametersCZ(Instrument):
                            label='determines initial state for ramsey_simulations_new',
                            parameter_class=ManualParameter,
                            vals=vals.Strings(), initial_value='changeme')
+
+
+        # for spectral tomo
+
+        self.add_parameter('repetitions',
+                           label='Repetitions of CZ gate, used for spectral tomo',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=1)
 
 
         
