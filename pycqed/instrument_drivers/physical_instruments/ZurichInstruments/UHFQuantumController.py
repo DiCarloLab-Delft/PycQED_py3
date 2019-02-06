@@ -305,7 +305,7 @@ class UHFQC(Instrument):
     # FIXME: add function IDN
 
     ##########################################################################
-    # 'public' functions: AWG/waveform support
+    # 'public' functions: generic AWG/waveform support
     ##########################################################################
 
     def awg(self, filename):
@@ -1195,7 +1195,7 @@ setTrigger(0);
         self.sigouts_0_enables_3(0)
         self.sigouts_1_enables_7(0)
 
-
+# FIXME: are the classes below actually used?
 class ziShellError(Exception):
     """Base class for exceptions in this module."""
     pass
