@@ -1752,7 +1752,8 @@ class CCLight_Transmon(Qubit):
         # anharmonicity measurement, bus crossing and photon number splitting with the bus
 
     def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None,
-                              f_12_power=None, MC=None, spec_source_2=None):
+                              f_12_power=None, MC=None, spec_source_2=None, f_01_span=24e6,
+                              f_12_span = 24e6):
         '''
         note measures anharmonicity of the transmon using three-tone
         spectroscopy. two usecases:
@@ -1783,8 +1784,8 @@ class CCLight_Transmon(Qubit):
         if spec_source_2 is None:
             spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source = self.instr_spec_source.get_instr()
-        freqs_q1 = np.arange(f_01-12e6, f_01+12e6, 0.7e6)
-        freqs_q2 = np.arange(f_12-12e6, f_12+12e6, 0.7e6)
+        freqs_q1 = np.arange(f_01-f_01_span/2, f_01+f_01_span/2, 0.7e6)
+        freqs_q2 = np.arange(f_12-f_12_span/2, f_12+f_12_span/2, 0.7e6)
 
         self.prepare_for_continuous_wave()
         self.int_avg_det_single._set_real_imag(False)
