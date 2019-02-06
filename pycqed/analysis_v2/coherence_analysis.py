@@ -396,27 +396,6 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                 freqs = np.array(self.raw_data_dict['dac'], dtype=float)
                 self.raw_data_dict['freq_sorted_dac'] = freqs[sorted_indices]
 
-        youngest = None
-        for qubit in self.all_analysis:
-
-            self.raw_data_dict[qubit] = {}
-            for typ in self.all_analysis[qubit]:
-                a = self.all_analysis[qubit][typ]
-                a.extract_data()
-                self.raw_data_dict[qubit][typ] = a.raw_data_dict
-                tmp_y = self.max_time(a.raw_data_dict["datetime"])
-                if not youngest or youngest < tmp_y:
-                    youngest = tmp_y
-
-        youngest += datetime.timedelta(seconds=1)
-
-        self.raw_data_dict['datetime'] = [youngest]
-        self.raw_data_dict['timestamps'] = [youngest.strftime("%Y%m%d_%H%M%S")]
-        self.timestamps = [youngest]
-        folder = a_tools.datadir + \
-            '/%s_coherence_analysis' % (youngest.strftime("%Y%m%d/%H%M%S"))
-        self.raw_data_dict['folder'] = [folder]
-
     def run_fitting(self):
         # This is not the proper way to do this!
         # TODO: move this to prepare_fitting
