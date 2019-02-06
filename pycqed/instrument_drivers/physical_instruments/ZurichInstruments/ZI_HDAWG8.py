@@ -1,3 +1,26 @@
+"""
+Changelog:
+
+20190206 WJV
+- manually checked against diverted branch HDAWG_V2_Verification:
+    - the following functions match:
+        - _find_valid_delays
+        - _set_dio_delay
+        - ensure_symmetric_strobe
+        - calibrate_dio_protocol(self, awgs_and_sequences, verbose=False)
+        - _get_edges
+        - _is_dio_strb_symmetric
+        - _analyze_dio_data
+    - the following are commented out here:
+        - _check_protocol
+        - _print_check_protocol_error_message
+        - calibrate_dio
+        - calibrate_dio_protocol(self)
+    So we conclude all relevant changes of HDAWG_V2_Verification made it here,
+    albeit in a different order that clutters the diff.
+
+"""
+
 import time
 import logging
 import os
