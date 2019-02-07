@@ -25,6 +25,9 @@ Changelog:
 - NB: none of the above should change anything for real
 - moved enabling of outputs to end in configure_codeword_protocol
 
+20190207 WJV
+- added assure_ext_clock()
+
 """
 
 from . import zishell_NH as zs
@@ -121,6 +124,42 @@ class ZI_HDAWG8(ZI_base_instrument):
                     'fpga_firmware': self._dev.geti('system/fpgarevision')
                     }
         return idn_dict
+
+    def assure_ext_clock(self):
+        """
+        Make sure the instrument is using an external reference clock
+
+        Based on: AWG8_V2_DIO_Calibrarion.ipynb
+        """
+
+        # get source:
+        #   1: external
+        #   0: internal (commanded so, or because of failure to sync to ext)
+        source = self.system_clocks_referenceclock_source()
+        if source == 1:
+            return
+
+        print('Switching to external clock. This could take a while!')
+        while True:
+            self.system_clocks_referenceclock_source(1)
+            while True:
+                # get status:
+                #   0: synced
+                #   1: syncing
+                #   2: sync failed (will force clock source to internal and retry)
+                status = self.system_clocks_referenceclock_status()
+                if status == 0:             # synced
+                    break
+                elif status == 1:           # syncing
+                    print('.', end='')
+                else:                       # sync failed
+                    print('X', end='')
+                time.sleep(0.1)
+            if self.system_clocks_referenceclock_source() != 1:
+                print('Switching to external clock failed. Trying again.')
+            else:
+                break
+        print('\nDone')
 
     def stop(self):
         """
@@ -261,6 +300,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                         # amp mode. It forces all AWGs of a pair to behave identical.
                         cw1 = cw0
                         # FIXME: the above is no longer true
+                        logger.warning('applied outdated flux channel duplication hack')
                     # if both wfs are triggered play both
                     if (cw0 != 0) and (cw1 != 0):
                         # if both waveforms exist, upload
@@ -520,18 +560,18 @@ class ZI_HDAWG8(ZI_base_instrument):
                 wf_name=wf_name, waveform=waveform)
         return write_func
 
-    def _gen_read_csv(self, wf_name):
-        def read_func():
-            return self._read_csv_waveform(
-                wf_name=wf_name)
-        return read_func
-
     def _write_csv_waveform(self, wf_name: str, waveform):
         filename = os.path.join(
             self.lab_one_webserver_path, 'awg', 'waves',
             self._devname+'_'+wf_name+'.csv')
         with open(filename, 'w') as f:
             np.savetxt(filename, waveform, delimiter=",")
+
+    def _gen_read_csv(self, wf_name):
+        def read_func():
+            return self._read_csv_waveform(
+                wf_name=wf_name)
+        return read_func
 
     def _read_csv_waveform(self, wf_name: str):
         filename = os.path.join(
@@ -575,10 +615,14 @@ class ZI_HDAWG8(ZI_base_instrument):
                     print('INFO   : Strobe bit(s) are not sampled symmetrically')
                 if verbose:
                     print("INFO   :   Disabling AWG's")
+
+                # save enabled state of AWGs, then disable them
                 enables = 4*[0]
                 for awg in range(0, 4):
                     enables[awg] = self._dev.geti('awgs/{}/enable'.format(awg))
                     self._dev.seti('awgs/{}/enable'.format(awg), 0)
+
+                # switch clock to internal and back to external
                 if verbose:
                     print("INFO   :   Switching to internal clock")
                 self.system_clocks_referenceclock_source(0)
@@ -587,10 +631,14 @@ class ZI_HDAWG8(ZI_base_instrument):
                     print("INFO   :   Switching to external clock")
                 self.system_clocks_referenceclock_source(1)
                 time.sleep(5)
+                # FIXME: check locking
+
+                # restore enabled state of AWGs
                 if verbose:
                     print("INFO   :   Enabling AWG's")
                 for awg in range(0, 4):
                     self._dev.seti('awgs/{}/enable'.format(awg), enables[awg])
+
                 good_shots = 0
                 bad_shots += 1
                 if bad_shots > 5:
@@ -695,6 +743,7 @@ class ZI_HDAWG8(ZI_base_instrument):
             print("INFO   : Found valid delays of {}".format(list(valid_delays)))
         return set(valid_delays)
 
+
     def _set_dio_delay(self, awg, strb_mask, data_mask, delay):
         """
         The function sets the DIO delay for a given FPGA. The valid delay range is
@@ -727,7 +776,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                 self._dev.seti('awgs/{}/dio/delay/value'.format(awg), 0)
 
 ##############################################################################
-# non class functions
+# non class functions: helpers for calibrate_dio_protocol()
 ##############################################################################
 
 def _get_edges(value, last_value, mask):
