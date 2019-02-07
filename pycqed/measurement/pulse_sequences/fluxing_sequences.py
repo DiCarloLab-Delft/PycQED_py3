@@ -2356,29 +2356,38 @@ def CZ_bleed_through_phase_seq(phases, qb_name, CZ_pulse_name, CZ_separation,
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    CZ_pulse1 = deepcopy(operation_dict[CZ_pulse_name])
-    CZ_pulse2 = deepcopy(operation_dict[CZ_pulse_name])
-    CZ_pulse2['pulse_delay'] = CZ_separation
-    for CZ_pulse in [CZ_pulse1, CZ_pulse2]:
-        extra_buffer_aux_pulse = deepcopy(CZ_pulse['extra_buffer_aux_pulse'])
-        delta_sep = CZ_pulse['buffer_length_start'] + \
-                    CZ_pulse['buffer_length_end'] - np.abs(CZ_separation)
-        if delta_sep < 2*extra_buffer_aux_pulse:
-            CZ_pulse['extra_buffer_aux_pulse'] = delta_sep/2
-
+    X90_1 = deepcopy(operation_dict['X90 ' + qb_name])
+    drag_pulse_len = deepcopy(X90_1['sigma']*X90_1['nr_sigma'])
+    X90_1['pulse_delay'] = CZ_separation - drag_pulse_len
     X90_2 = deepcopy(operation_dict['X90 ' + qb_name])
-    X90_2['pulse_delay'] = maximum_CZ_separation - CZ_separation
     RO_pars = deepcopy(operation_dict['RO ' + qb_name])
 
+    CZ_pulse1 = deepcopy(operation_dict[CZ_pulse_name])
+    CZ_pulse2 = deepcopy(operation_dict[CZ_pulse_name])
+    # CZ_pulse2['pulse_delay'] = CZ_separation
+    # for CZ_pulse in [CZ_pulse1, CZ_pulse2]:
+    #     extra_buffer_aux_pulse = deepcopy(CZ_pulse['extra_buffer_aux_pulse'])
+    #     delta_sep = CZ_pulse['buffer_length_start'] + \
+    #                 CZ_pulse['buffer_length_end'] - np.abs(CZ_separation)
+    #     if delta_sep < 2*extra_buffer_aux_pulse:
+    #         CZ_pulse['extra_buffer_aux_pulse'] = delta_sep/2
+    spacerpulse = {'pulse_type': 'SquarePulse',
+                   'channel': RO_pars['acq_marker_channel'],
+                   'amplitude': 0.0,
+                   'length': CZ_pulse1['pulse_length'] +
+                             CZ_pulse1['buffer_length_end'] +
+                             CZ_pulse1['buffer_length_start'],
+                   'refpoint': 'simultaneous',
+                   'pulse_delay': 0}
     if upload_all:
         upload_AWGs = 'all'
         upload_channels = 'all'
     else:
-        upload_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG')] + \
+        upload_AWGs = [station.pulsar.get(CZ_pulse1['channel'] + '_AWG')] + \
                       [station.pulsar.get(ch + '_AWG') for ch in
-                       CZ_pulse['aux_channels_dict']]
-        upload_channels = [CZ_pulse['channel']] + \
-                          list(CZ_pulse['aux_channels_dict'])
+                       CZ_pulse1['aux_channels_dict']]
+        upload_channels = [CZ_pulse1['channel']] + \
+                          list(CZ_pulse1['aux_channels_dict'])
 
     for i, theta in enumerate(phases):
         if theta == phases[-4]:
@@ -2394,11 +2403,11 @@ def CZ_bleed_through_phase_seq(phases, qb_name, CZ_pulse_name, CZ_separation,
                                   RO_pars])
         else:
             X90_2['phase'] = theta*180/np.pi
-
+            # CZ_pulse1['amplitude'] = 0
             el = multi_pulse_elt(i, station,
-                                 [operation_dict['X90 ' + qb_name],
-                                  CZ_pulse1,
-                                  CZ_pulse2,
+                                 [spacerpulse,
+                                  X90_1,
+                                  spacerpulse,
                                   X90_2,
                                   RO_pars])
         el_list.append(el)

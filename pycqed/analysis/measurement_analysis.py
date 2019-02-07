@@ -10277,7 +10277,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                 #             print('corrected: ',  phase_list[i])
         return phases
 
-    def fit_all(self, plot=False,
+    def fit_all(self,
                 extrapolate_phase=False,
                 return_ampl=False,
                 cal_points=None,
@@ -10287,9 +10287,16 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                 plot_title=None, **kw):
 
         only_cos_fits = kw.pop('only_cos_fits', False)
+        plot = kw.pop('plot', False)
 
         if cal_points is None:
             cal_points = self.cal_points
+            cal_one_points = [-2, -1]
+            cal_zero_points = [-4, -3]
+        else:
+            cal_one_points = None
+            cal_zero_points = None
+
 
         phase_list = [0]
         amplitude_list = []
@@ -10306,8 +10313,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         else:
             self.fig, self.ax = (None, None)
 
-        data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(
-            np.array([self.data[2], self.data[3]]))
+        data_rotated = a_tools.rotate_and_normalize_data(
+            np.array([self.data[2], self.data[3]]),
+            cal_one_points=cal_one_points, cal_zero_points=cal_zero_points)[0]
+
         if fit_range is None:
             i_start = 0
             i_end = length_single*len(self.sweep_points_2D)
@@ -10334,9 +10343,14 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
             if plot:
                 ax.plot(thetas, ampls, 'k.')
-                thetas_fit = np.linspace(thetas[0],thetas[-1], 128)
-                ampls_fit = fit_res.eval(t=thetas_fit)
+                if cal_points:
+                    thetas_fit = np.linspace(thetas[0], thetas[-5], 128)
+                    ampls_fit = fit_res.eval(t=thetas_fit)
+                else:
+                    thetas_fit = np.linspace(thetas[0],thetas[-1], 128)
+                    ampls_fit = fit_res.eval(t=thetas_fit)
                 ax.plot(thetas_fit, ampls_fit, 'r-')
+
 
         phase_list.pop(0)
 

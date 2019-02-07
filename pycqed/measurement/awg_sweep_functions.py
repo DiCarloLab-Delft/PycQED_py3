@@ -3043,12 +3043,11 @@ class CZ_bleed_through_phase_hard_sweep(swf.Hard_Sweep):
 
 class CZ_bleed_through_separation_time_soft_sweep(swf.Soft_Sweep):
 
-    def __init__(self, hard_sweep, upload=True, upload_channels='all'):
+    def __init__(self, hard_sweep, upload=True):
 
         super().__init__()
         self.hard_sweep = hard_sweep
         self.upload = upload
-        self.upload_channels = upload_channels
         self.is_first_sweeppoint = True
         self.name = 'CZ_bleed_through_separation_time'
         self.parameter_name = 't_sep'
@@ -3057,5 +3056,6 @@ class CZ_bleed_through_separation_time_soft_sweep(swf.Soft_Sweep):
     def set_parameter(self, val):
         self.hard_sweep.CZ_separation = val
         self.hard_sweep.upload = self.upload
-        self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
+        # self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
+        self.hard_sweep.prepare(upload_all=True)
         self.is_first_sweeppoint = False

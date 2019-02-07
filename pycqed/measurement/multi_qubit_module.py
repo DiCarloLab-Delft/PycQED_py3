@@ -2705,7 +2705,7 @@ def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
     MC.set_sweep_function_2D(s2)
     MC.set_sweep_points_2D(frequencies)
     MC.set_detector_function(qbr.int_avg_det)
-    MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
+    MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name, qbt.name))
 
     flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
         label='CPhase_measurement_{}_{}'.format(qbc.name, qbt.name),
@@ -2721,9 +2721,9 @@ def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
     return cphases, flux_pulse_ma
 
 
-def measure_CZ_bleed_through(qb, CZ_separation_times, phases,
-                             CZ_pulse_name, upload=True, cal_points=True,
-                             MC=None):
+def measure_CZ_bleed_through(qb, CZ_separation_times, phases, CZ_pulse_name,
+                             label=None, upload=True, cal_points=True,
+                             soft_avgs=1, analyze=True, MC=None):
 
     if MC is None:
         MC = qb.MC
@@ -2737,7 +2737,6 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases,
                       phases[-1]+3*step, phases[-1]+4*step]])
 
     operation_dict = qb.get_operation_dict()
-    CZ_channel = operation_dict[CZ_pulse_name]['channel']
 
     s1 = awg_swf.CZ_bleed_through_phase_hard_sweep(
         qb_name=qb.name,
@@ -2746,23 +2745,31 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases,
         operation_dict=operation_dict,
         maximum_CZ_separation=np.max(CZ_separation_times),
         verbose=False,
-        upload=True,
+        upload=False,
         return_seq=False,
         cal_points=cal_points)
 
     s2 = awg_swf.CZ_bleed_through_separation_time_soft_sweep(
-        s1, upload=upload, upload_channels=[CZ_channel])
-
+        s1, upload=upload)
     MC.set_sweep_function(s1)
     MC.set_sweep_points(phases)
     MC.set_sweep_function_2D(s2)
     MC.set_sweep_points_2D(CZ_separation_times)
     MC.set_detector_function(qb.int_avg_det)
-    idx = CZ_pulse_name.index('q')
-    MC.run_2D('CZ_bleed_through{}{}'.format(CZ_pulse_name[idx:idx+3],
-                                            qb.msmt_suffix))
+    MC.soft_avg(soft_avgs)
 
-    ma.MeasurementAnalysis(TwoD=True)
+    if label is None:
+        idx = CZ_pulse_name.index('q')
+        label = 'CZ_bleed_through_{}{}'.format(CZ_pulse_name[idx:idx+3],
+                                              qb.msmt_suffix)
+
+    if len(CZ_separation_times) == 1:
+        exp_metadata = {'CZ_separation_time': CZ_separation_times[0]}
+        MC.run(label, exp_metadata=exp_metadata)
+    else:
+        MC.run_2D(label)
+    if analyze:
+        ma.MeasurementAnalysis(TwoD=True)
 
 
 def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,
