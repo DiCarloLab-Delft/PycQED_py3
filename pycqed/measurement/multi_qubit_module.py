@@ -2000,6 +2000,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     for key, spts in sweep_points_dict.items():
         if spts is None:
             if key == 'n_rabi':
+                print('n_rabi')
                 sweep_points_dict[key] = {}
                 for qb in qubits:
                     sweep_points_dict[key][qb.name] = \
@@ -2014,24 +2015,48 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     if cal_points:
         sweep_points_dict = deepcopy(sweep_points_dict)
         for key, spts in sweep_points_dict.items():
-            if key == 'qscale':
-                temp_array = np.zeros(3*spts.size)
-                np.put(temp_array, list(range(0, temp_array.size, 3)), spts)
-                np.put(temp_array, list(range(1, temp_array.size, 3)), spts)
-                np.put(temp_array, list(range(2, temp_array.size, 3)), spts)
-                spts = temp_array
-                step = np.abs(spts[-1]-spts[-2])
+            if not isinstance(spts, dict):
+                if key == 'qscale':
+                    temp_array = np.zeros(3*spts.size)
+                    np.put(temp_array, list(range(0, temp_array.size, 3)), spts)
+                    np.put(temp_array, list(range(1, temp_array.size, 3)), spts)
+                    np.put(temp_array, list(range(2, temp_array.size, 3)), spts)
+                    spts = temp_array
+                    step = np.abs(spts[-1]-spts[-4])
+                else:
+                    step = np.abs(spts[-1]-spts[-2])
+                if no_cal_points == 4:
+                    sweep_points_dict[key] = np.concatenate(
+                        [spts, [spts[-1]+step, spts[-1]+2*step,
+                                spts[-1]+3*step, spts[-1]+4*step]])
+                elif no_cal_points == 2:
+                    sweep_points_dict[key] = np.concatenate(
+                        [spts, [spts[-1]+step, spts[-1]+2*step]])
+                else:
+                    sweep_points_dict[key] = spts
             else:
-                step = np.abs(spts[-1]-spts[-4])
-            if no_cal_points == 4:
-                sweep_points_dict[key] = np.concatenate(
-                    [spts, [spts[-1]+step, spts[-1]+2*step,
-                            spts[-1]+3*step, spts[-1]+4*step]])
-            elif no_cal_points == 2:
-                sweep_points_dict[key] = np.concatenate(
-                    [spts, [spts[-1]+step, spts[-1]+2*step]])
-            else:
-                sweep_points_dict[key] = spts
+                for k in spts:
+                    if key == 'qscale':
+                        temp_array = np.zeros(3*spts[k].size)
+                        np.put(temp_array, list(range(0, temp_array.size, 3)),
+                               spts[k])
+                        np.put(temp_array, list(range(1, temp_array.size, 3)),
+                               spts[k])
+                        np.put(temp_array, list(range(2, temp_array.size, 3)),
+                               spts[k])
+                        spts[k] = temp_array
+                        step = np.abs(spts[k][-1]-spts[k][-4])
+                    else:
+                        step = np.abs(spts[k][-1]-spts[k][-2])
+                    if no_cal_points == 4:
+                        sweep_points_dict[key][k] = np.concatenate(
+                            [spts[k], [spts[k][-1]+step, spts[k][-1]+2*step,
+                                    spts[k][-1]+3*step, spts[k][-1]+4*step]])
+                    elif no_cal_points == 2:
+                        sweep_points_dict[key][k] = np.concatenate(
+                            [spts[k], [spts[k][-1]+step, spts[k][-1]+2*step]])
+                    else:
+                        sweep_points_dict[key][k] = spts[k]
 
     # set up multiplexed readout
     multiplexed_pulse(qubits, f_LO, upload=True)
@@ -2046,10 +2071,13 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         qubits, UHFQC=UHFQC, pulsar=pulsar,
         nr_averages=nr_averages)[key + '_avg_det']
 
+    for qb in qubits:
+        qb.prepare_for_timedomain(multiplexed=True)
+
     # Do measurements
     # RABI
     if 'rabi' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         sweep_points = sweep_points_dict['rabi']
 
         if sweep_params is None:
@@ -2091,7 +2119,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # N-RABI
     if 'n_rabi' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         sweep_points = sweep_points_dict['n_rabi']
         if sweep_params is None:
             sweep_params = (
@@ -2132,7 +2160,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # RAMSEY
     if 'ramsey' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         if artificial_detuning is None:
             raise ValueError('Specify an artificial_detuning for the Ramsey '
                              'measurement.')
@@ -2195,7 +2223,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # QSCALE
     if 'qscale' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         sweep_points = sweep_points_dict['qscale']
 
         if sweep_params is None:
@@ -2247,7 +2275,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
     # T1
     if 'T1' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         sweep_points = sweep_points_dict['T1']
         if sweep_params is None:
             sweep_params = (
@@ -2286,7 +2314,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                         'updated.'%e)
     # T2 ECHO
     if 'T2' in sweep_points_dict:
-        exp_metadata = None
+        exp_metadata = {}
         sweep_points = sweep_points_dict['T2']
         if sweep_params is None:
             sweep_params = (
@@ -2299,9 +2327,9 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
             )
 
         if artificial_detuning_echo is not None:
-            sweep_params[-1][1]['phase'] = \
+            sweep_params[-1][1]['pulse_pars']['phase'] = \
                 lambda sp: ((sp-sweep_points[0]) *
-                            artificial_detuning * 360) % 360
+                            artificial_detuning_echo * 360) % 360
 
         sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points,

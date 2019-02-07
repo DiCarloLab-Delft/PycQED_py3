@@ -721,6 +721,9 @@ class BaseDataAnalysis(object):
                         plotfn(pdict=pdict,
                                axs=self.axs[pdict['fig_id']].flatten()[
                                pdict['ax_id']])
+                        self.axs[pdict['fig_id']].flatten()[
+                            pdict['ax_id']].figure.subplots_adjust(
+                            hspace=0.5)
 
                 # most normal plot functions also work, it is required
                 # that these accept an "ax" argument to plot on and **kwargs
@@ -731,8 +734,12 @@ class BaseDataAnalysis(object):
                     if pdict['ax_id'] is None:
                         plotfn(ax=self.axs[pdict['fig_id']], **pdict)
                     else:
-                        plotfn(ax=self.axs[pdict['fig_id']].flatten()[
-                            pdict['ax_id']], **pdict)
+                        plotfn(pdict=pdict,
+                               axs=self.axs[pdict['fig_id']].flatten()[
+                                   pdict['ax_id']])
+                        self.axs[pdict['fig_id']].flatten()[
+                            pdict['ax_id']].figure.subplots_adjust(
+                            hspace=0.5)
                 else:
                     raise ValueError(
                         '"{}" is not a valid plot function'.format(plotfn))
@@ -987,6 +994,8 @@ class BaseDataAnalysis(object):
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
+        fontsize = pdict.get('fontsize', 16)
+
         if pdict.get('color', False):
             plot_linekws['color'] = pdict.get('color')
 
@@ -1047,6 +1056,7 @@ class BaseDataAnalysis(object):
             axs.figure.text(0.5, 1, plot_title,
                             horizontalalignment='center',
                             verticalalignment='bottom',
+                            fontsize=fontsize,
                             transform=axs.transAxes)
             # axs.set_title(plot_title)
 
@@ -1358,6 +1368,7 @@ class BaseDataAnalysis(object):
         plot_ylabel = pdict['ylabel']
         plot_yunit = pdict['yunit']
         plot_title = pdict.get('title', None)
+        fontsize = pdict.get('fontsize', 16)
         if plot_transpose:
             # transpose switches X and Y
             set_axis_label('x', axs, plot_ylabel, plot_yunit)
@@ -1369,6 +1380,7 @@ class BaseDataAnalysis(object):
             axs.figure.text(0.5, 1, plot_title,
                             horizontalalignment='center',
                             verticalalignment='bottom',
+                            fontsize=fontsize,
                             transform=axs.transAxes)
             # axs.set_title(plot_title)
 
@@ -1464,6 +1476,7 @@ class BaseDataAnalysis(object):
         plot_ypos = pdict.get('ypos', .98)
         verticalalignment = pdict.get('verticalalignment', 'top')
         horizontalalignment = pdict.get('horizontalalignment', 'right')
+        fontsize = pdict.get('fontsize', 16)
 
         # fancy box props is based on the matplotlib legend
         box_props = pdict.get('box_props', 'fancy')
@@ -1475,6 +1488,7 @@ class BaseDataAnalysis(object):
               transform=axs.transAxes,
               verticalalignment=verticalalignment,
               horizontalalignment=horizontalalignment,
+              fontsize=fontsize,
               bbox=box_props)
 
     def plot_vlines(self, pdict, axs):

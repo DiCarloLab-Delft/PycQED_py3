@@ -178,7 +178,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                  t_start: str=None, t_stop: str=None,
                  data_file_path: str=None, single_timestamp: bool=False,
                  options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=False):
+                 do_fitting: bool=True, auto=True):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          data_file_path=data_file_path,
@@ -217,7 +217,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.plot_params_dict['plotsize'] = \
             self.options_dict.get('plotsize', (7, 4))
         self.plot_params_dict['fontsize'] = \
-            self.options_dict.get('fontsize', 11)
+            self.options_dict.get('fontsize', 16)
         self.plot_params_dict['markersize'] = \
             self.options_dict.get('markersize', None)
         self.plot_params_dict['linewidth'] = \
@@ -300,6 +300,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         self.num_cal_points = self.options_dict.get(
             'num_cal_points', self.metadata.get('num_cal_points', None))
+
         if self.num_cal_points is None:
             print('Using sweep_points[-4:-2] as |g> cal points, and '
                   'sweep_points[-2::] as |e> cal points.')
@@ -320,8 +321,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'cal_one_points', self.metadata.get('cal_one_points', None))
             zero_coord = self.options_dict.get('zero_coord', None)
             one_coord = self.options_dict.get('one_coord', None)
-            if np.all([cal_zero_points, cal_one_points, zero_coord, one_coord]
-                      is None):
+            if np.all([i is None for i in [cal_zero_points, cal_one_points,
+                                          zero_coord, one_coord]]):
                 print('Assuming two cal states, |g> and |e>.')
                 assert (self.num_cal_points % 2 == 0)
                 cal_zero_points = list(range(-self.num_cal_points,
@@ -541,11 +542,11 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 numplotsx = 1
                 numplotsy = 1
             elif len(raw_data_dict) == 2:
-                numplotsx = 2
-                numplotsy = 1
-            else:
-                numplotsx = len(raw_data_dict) // 2 + len(raw_data_dict) % 2
+                numplotsx = 1
                 numplotsy = 2
+            else:
+                numplotsx = 2
+                numplotsy = len(raw_data_dict) // 2 + len(raw_data_dict) % 2
 
             fig_title = (self.raw_data_dict['timestamps'][0] + ' ' +
                          self.raw_data_dict['measurementstring'][0] +
@@ -584,14 +585,14 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         'numplotsx': numplotsx,
                         'numplotsy': numplotsy,
                         'plotsize': (7*numplotsx, 4*numplotsy),
-                        'title': fig_title,
-                        'linestyle': 'none'}
+                        'title': fig_title}
 
     def prepare_projected_data_plot(
             self, plot_name, data, qb_name,
             title_suffix=None, plot_cal_points=True,
             ref_state_plot_labels=('exc_state', 'gnd_state')):
 
+        plotsize = (10, 8)
         if plot_cal_points and self.num_cal_points != 0:
             assert (len(ref_state_plot_labels) == len(self.cal_points))
             yvals = data[:-self.num_cal_points]
@@ -603,7 +604,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 self.plot_dicts[ref_state_plot_labels[i]] = {
                     'fig_id': plot_name,
                     'plotfn': self.plot_line,
-                    'plotsize': (7, 4),
+                    'plotsize': plotsize,
                     'xvals':
                         np.mean([self.raw_data_dict['sweep_points_dict'][qb_name]
                                      ['cal_points_sweep_points'][cal_pts_idxs],
@@ -621,7 +622,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
                 self.plot_dicts[ref_state_plot_labels[i]+'_line'] = {
                     'fig_id': plot_name,
-                    'plotsize': (7, 4),
+                    'plotsize': plotsize,
                     'plotfn': self.plot_hlines,
                     'y': np.mean(data[cal_pts_idxs]),
                     'xmin': self.raw_data_dict['sweep_points_dict'][qb_name][
@@ -655,7 +656,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         else:
             self.plot_dicts[plot_name] = {
                 'plotfn': self.plot_line,
-                'plotsize': (7, 4),
+                'plotsize': plotsize,
                 'xvals': xvals,
                 'xlabel': self.raw_data_dict['xlabel'][0],
                 'xunit': self.raw_data_dict['xunit'][0][0],
@@ -3200,7 +3201,19 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
         if self.do_fitting:
             for qbn in self.qb_names:
                 rabi_amplitudes = self.proc_data_dict['analysis_params_dict']
-                base_plot_name = 'base_plot_' + qbn
+                # rename base plot
+                base_plot_name = 'Rabi_' + qbn
+                self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
+                    'base_plot_' + qbn)
+                for ref_state_plot_label in ('exc_state_'+qbn,
+                                             'gnd_state_'+qbn):
+                    if ref_state_plot_label in self.plot_dicts:
+                        self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+                            base_plot_name
+                    if ref_state_plot_label+'_line' in self.plot_dicts:
+                        self.plot_dicts[ref_state_plot_label+'_line'][
+                            'fig_id'] = base_plot_name
+
                 fit_res = self.fit_dicts['cos_fit_' + qbn]['fit_res']
                 self.plot_dicts['fit_' + qbn] = {
                     'fig_id': base_plot_name,
@@ -3209,8 +3222,9 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                     'setlabel': 'cosine fit',
                     'color': 'r',
                     'do_legend': True,
-                    'legend_bbox_to_anchor': (1, 0.5),
-                    'legend_pos': 'center left'}
+                    'legend_ncol': 2,
+                    'legend_bbox_to_anchor': (1, -0.15),
+                    'legend_pos': 'upper right'}
 
                 self.plot_dicts['piamp_marker_' + qbn] = {
                     'fig_id': base_plot_name,
@@ -3222,11 +3236,12 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                     'setlabel': '$\pi$-Pulse amp',
                     'color': 'r',
                     'marker': 'o',
-                    'markersize': 10,
+                    'line_kws': {'markersize': 10},
                     'linestyle': '',
                     'do_legend': True,
-                    'legend_bbox_to_anchor': (1, 0.5),
-                    'legend_pos': 'center left'}
+                    'legend_ncol': 2,
+                    'legend_bbox_to_anchor': (1, -0.15),
+                    'legend_pos': 'upper right'}
 
                 self.plot_dicts['piamp_hline_' + qbn] = {
                     'fig_id': base_plot_name,
@@ -3250,11 +3265,12 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                     'setlabel': '$\pi /2$-Pulse amp',
                     'color': 'm',
                     'marker': 'o',
-                    'markersize': 10,
+                    'line_kws': {'markersize': 10},
                     'linestyle': '',
                     'do_legend': True,
-                    'legend_bbox_to_anchor': (1, 0.5),
-                    'legend_pos': 'center left'}
+                    'legend_ncol': 2,
+                    'legend_bbox_to_anchor': (1, -0.15),
+                    'legend_pos': 'upper right'}
 
                 self.plot_dicts['pihalfamp_hline_' + qbn] = {
                     'fig_id': base_plot_name,
@@ -3289,9 +3305,9 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                     old_pihalfpulse_val))
                 self.plot_dicts['text_msg_' + qbn] = {
                     'fig_id': base_plot_name,
-                    'ypos': -0.175,
-                    'xpos': 0.5,
-                    'horizontalalignment': 'center',
+                    'ypos': -0.2,
+                    'xpos': 0,
+                    'horizontalalignment': 'left',
                     'verticalalignment': 'top',
                     'plotfn': self.plot_text,
                     'text_string': textstr}
@@ -3338,7 +3354,19 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
 
         if self.do_fitting:
             for qbn in self.qb_names:
-                base_plot_name = 'base_plot_' + qbn
+                # rename base plot
+                base_plot_name = 'T1_' + qbn
+                self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
+                    'base_plot_' + qbn)
+                for ref_state_plot_label in ('exc_state_'+qbn,
+                                             'gnd_state_'+qbn):
+                    if ref_state_plot_label in self.plot_dicts:
+                        self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+                            base_plot_name
+                    if ref_state_plot_label+'_line' in self.plot_dicts:
+                        self.plot_dicts[ref_state_plot_label+'_line'][
+                            'fig_id'] = base_plot_name
+
                 self.plot_dicts['fit_' + qbn] = {
                     'fig_id': base_plot_name,
                     'plotfn': self.plot_fit,
@@ -3346,8 +3374,9 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
                     'setlabel': 'exp decay fit',
                     'do_legend': True,
                     'color': 'r',
-                    'legend_bbox_to_anchor': (1, 0.5),
-                    'legend_pos': 'center left'}
+                    'legend_ncol': 2,
+                    'legend_bbox_to_anchor': (1, -0.15),
+                    'legend_pos': 'upper right'}
 
                 old_T1_val = a_tools.get_param_value_from_file(
                     file_path=self.raw_data_dict['folder'][0],
@@ -3360,9 +3389,9 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
                           + '\nold $T_1$ = {:.2f} $\mu$s'.format(old_T1_val*1e6)
                 self.plot_dicts['text_msg_' + qbn] = {
                     'fig_id': base_plot_name,
-                    'ypos': -0.175,
-                    'xpos': 0.5,
-                    'horizontalalignment': 'center',
+                    'ypos': -0.2,
+                    'xpos': 0,
+                    'horizontalalignment': 'left',
                     'verticalalignment': 'top',
                     'plotfn': self.plot_text,
                     'text_string': textstr}
@@ -3452,7 +3481,17 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
         if self.do_fitting:
             ramsey_dict = self.proc_data_dict['analysis_params_dict']
             for qbn in self.qb_names:
-                base_plot_name = 'base_plot_' + qbn
+                base_plot_name = 'Ramsey_' + qbn
+                self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
+                    'base_plot_' + qbn)
+                for ref_state_plot_label in ('exc_state_'+qbn,
+                                             'gnd_state_'+qbn):
+                    if ref_state_plot_label in self.plot_dicts:
+                        self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+                            base_plot_name
+                    if ref_state_plot_label+'_line' in self.plot_dicts:
+                        self.plot_dicts[ref_state_plot_label+'_line'][
+                            'fig_id'] = base_plot_name
                 exp_decay_fit_key = self.fit_keys[0] + qbn
                 old_qb_freq = ramsey_dict[qbn][
                     exp_decay_fit_key]['old_qb_freq']
@@ -3470,8 +3509,8 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                             'gauss decay fit',
                         'do_legend': True,
                         'color': 'r' if i == 0 else 'C4',
-                        'legend_bbox_to_anchor': (1, 0.5),
-                        'legend_pos': 'center left'}
+                        'legend_bbox_to_anchor': (1, -0.15),
+                        'legend_pos': 'upper right'}
 
                     textstr += \
                         ('\n$f_{{qubit \_ new \_ {{{key}}} }}$ = '.format(
@@ -3506,9 +3545,9 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
 
                 self.plot_dicts['text_msg_' + qbn] = {
                     'fig_id': base_plot_name,
-                    'ypos': -0.175,
-                    'xpos': 0.5,
-                    'horizontalalignment': 'center',
+                    'ypos': -0.2, #-0.175,
+                    'xpos': 0,
+                    'horizontalalignment': 'left',
                     'verticalalignment': 'top',
                     'plotfn': self.plot_text,
                     'text_string': textstr}
@@ -3642,13 +3681,16 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                 if (ref_state_plot_label + '_line') in self.plot_dicts:
                     self.plot_dicts.pop(ref_state_plot_label + '_line')
 
-            base_plot_name = 'data_xx_' + qbn
+            base_plot_name = 'Qscale_' + qbn
             for msmt_label in ['_xx', '_xy', '_xmy']:
                 sweep_points = self.proc_data_dict['qscale_data'][qbn][
                     'sweep_points' + msmt_label]
                 data = self.proc_data_dict['qscale_data'][qbn][
                     'data' + msmt_label]
-                plot_name = 'data' + msmt_label + '_' + qbn
+                if msmt_label == '_xx':
+                    plot_name = base_plot_name
+                else:
+                    plot_name = 'data' + msmt_label + '_' + qbn
 
                 # plot data
                 self.plot_dicts[plot_name] = {
@@ -3659,7 +3701,7 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                     'yvals': data,
                     'ylabel': 'Excited state population',
                     'yunit': '',
-                    'setlabel': 'Data - ' + label_dict[msmt_label],
+                    'setlabel': 'Data\n' + label_dict[msmt_label],
                     'title': (self.raw_data_dict['timestamps'][0] + ' ' +
                               self.raw_data_dict['measurementstring'][0] +
                               '\n' + qbn),
@@ -3685,7 +3727,7 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                         'xvals': xfine,
                         'yvals': yvals,
                         'marker': '',
-                        'setlabel': 'Fit - ' + label_dict[msmt_label],
+                        'setlabel': 'Fit\n' + label_dict[msmt_label],
                         'do_legend': True,
                         'color': color_dict[msmt_label],
                         'legend_bbox_to_anchor': (1, 0.5),
@@ -3752,16 +3794,19 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
 
     def __init__(self, *args, **kwargs):
         auto = kwargs.pop('auto', True)
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, auto=False, **kwargs)
 
         kwargs['auto'] = auto
         if self.options_dict.get('artificial_detuning', None) is not None:
-            self.echo_analysis = RamseyAnalysis(*args, **kwargs)
+            self.echo_analysis = RamseyAnalysis(*args, extract_only=True,
+                                                **kwargs)
         else:
-            self.echo_analysis = T1Analysis(*args, **kwargs)
+            self.echo_analysis = T1Analysis(*args, extract_only=True,
+                                            **kwargs)
 
         if auto:
             self.analyze_fit_results()
+            self.prepare_plots()
 
     def analyze_fit_results(self):
         self.proc_data_dict['analysis_params_dict'] = OrderedDict()
@@ -3782,4 +3827,41 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
                 self.proc_data_dict['analysis_params_dict'][qbn][
                     'T2_echo_stderr'] = params_dict['exp_decay_'+qbn][
                     'T2_star_stderr']
+
+    def prepare_plots(self):
+        for qbn in self.qb_names:
+            # rename base plot
+            base_plot_name = 'Echo_' + qbn
+            if 'T1_' + qbn in self.echo_analysis.plot_dicts:
+                self.echo_analysis.plot_dicts[base_plot_name] = \
+                    self.echo_analysis.plot_dicts.pop('T1_' + qbn)
+            else:
+                self.echo_analysis.plot_dicts[base_plot_name] = \
+                    self.echo_analysis.plot_dicts.pop('Ramsey_' + qbn)
+
+            for plot_label in self.echo_analysis.plot_dicts:
+                if qbn in plot_label:
+                    if plot_label != base_plot_name and 'raw' not in plot_label:
+                        self.echo_analysis.plot_dicts[plot_label]['fig_id'] = \
+                            base_plot_name
+
+            old_T2e_val = a_tools.get_param_value_from_file(
+                file_path=self.echo_analysis.raw_data_dict['folder'][0],
+                instr_name=qbn, param_name='T2')
+            T2_dict = self.proc_data_dict['analysis_params_dict']
+            textstr = '$T_2$ echo = {:.2f} $\mu$s'.format(
+                T2_dict[qbn]['T2_echo']*1e6) \
+                      + ' $\pm$ {:.2f} $\mu$s'.format(
+                T2_dict[qbn]['T2_echo_stderr']*1e6) \
+                      + '\nold $T_2$ echo = {:.2f} $\mu$s'.format(
+                old_T2e_val*1e6)
+
+            self.echo_analysis.plot_dicts['text_msg_' + qbn][
+                'text_string'] = textstr
+
+        self.echo_analysis.plot(key_list='auto')
+        self.echo_analysis.save_figures(close_figs=True)
+
+
+
 

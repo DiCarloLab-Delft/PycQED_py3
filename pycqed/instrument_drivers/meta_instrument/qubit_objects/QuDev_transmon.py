@@ -3449,7 +3449,7 @@ class QuDev_transmon(Qubit):
 
                 #get new freq and T2* from analysis results
                 new_qubit_freq = ramsey_ana.qubit_frequency    #value
-                T2_star = ramsey_ana.T2_star                   #dict
+                T2_star = ramsey_ana.T2_star['T2_star']        #dict
             else:
                 ramsey_ana = tda.RamseyAnalysis(
                     qb_names=[self.name],
@@ -3470,7 +3470,7 @@ class QuDev_transmon(Qubit):
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
                     try:
-                        self.T2_star_ef(T2_star['T2_star'])
+                        self.T2_star_ef(T2_star)
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
@@ -3481,7 +3481,7 @@ class QuDev_transmon(Qubit):
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
                     try:
-                        self.T2_star(T2_star['T2_star'])
+                        self.T2_star(T2_star)
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
@@ -3723,7 +3723,7 @@ class QuDev_transmon(Qubit):
                                              last_ge_pulse=last_ge_pulse, **kw)
                 qscale = qscale_ana.optimal_qscale['qscale']
             else:
-                qscale_ana = ts.QScaleAnalysis(qb_names=[self.name])
+                qscale_ana = tda.QScaleAnalysis(qb_names=[self.name])
                 qscale = qscale_ana.proc_data_dict['analysis_params_dict'][
                     self.name]['qscale']
 
