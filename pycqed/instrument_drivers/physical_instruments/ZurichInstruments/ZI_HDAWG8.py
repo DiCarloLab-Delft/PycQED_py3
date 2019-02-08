@@ -793,6 +793,7 @@ def _get_edges(value, last_value, mask):
 
 
 def _is_dio_strb_symmetric(data, bits):
+    # FIXME: reports OK if there is no input
     count_ok = True
 
     for bit in bits:
