@@ -145,18 +145,18 @@ class ZI_HDAWG8(ZI_base_instrument):
             while True:
                 # get status:
                 #   0: synced
-                #   1: syncing
-                #   2: sync failed (will force clock source to internal and retry)
+                #   1: sync failed (will force clock source to internal and retry)
+                #   2: syncing
                 status = self.system_clocks_referenceclock_status()
                 if status == 0:             # synced
                     break
-                elif status == 1:           # syncing
+                elif status == 2:           # syncing
                     print('.', end='')
                 else:                       # sync failed
                     print('X', end='')
                 time.sleep(0.1)
             if self.system_clocks_referenceclock_source() != 1:
-                print('Switching to external clock failed. Trying again.')
+                print(' Switching to external clock failed. Trying again.')
             else:
                 break
         print('\nDone')
@@ -403,7 +403,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                 self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
                 # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-            else
+            else:
                 logging.error('unknown value for cfg_codeword_protocol')
                 # FIXME: exception?
 
