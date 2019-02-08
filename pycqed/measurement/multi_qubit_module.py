@@ -501,6 +501,7 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                pulsar=None,
                                                used_channels=None,
                                                correlations=None,
+                                               add_channels=None,
                                                **kw):
     max_int_len = 0
     for qb in qubits:
@@ -513,6 +514,8 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
         if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
             if qb.RO_acq_weight_function_Q() is not None:
                 channels += [qb.RO_acq_weight_function_Q()]
+    if add_channels is not None:
+        channels += add_channels
 
     if correlations is None:
         correlations = []
@@ -725,7 +728,8 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                               tomography_basis=(
                                   'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                               reset=True, preselection=False, ro_spacing=1e-6,
-                              skip_n_initial_parity_checks=0):
+                              skip_n_initial_parity_checks=0, skip_elem='RO',
+                              add_channels=None):
     """
     Important things to check when running the experiment:
         Is the readout separation commensurate with 225 MHz?
@@ -743,8 +747,15 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                     'parity_op': parity_op,
                     'prep_sequence': prep_sequence,
                     'skip_n_initial_parity_checks': 
-                        skip_n_initial_parity_checks,}
-    nr_ancilla_readouts = nr_parity_measurements - skip_n_initial_parity_checks
+                        skip_n_initial_parity_checks,
+                    'skip_elem': skip_elem}
+
+    if reset == 'simple':
+        nr_parity_measurements = 1
+
+    nr_ancilla_readouts = nr_parity_measurements
+    if skip_elem == 'RO':
+        nr_ancilla_readouts -= skip_n_initial_parity_checks
     if preselection:
         if prep_sequence == 'mixed':
             multiplexed_pulse([(qb0, qb1, qb2), (qb0, qb2)] +
@@ -785,27 +796,31 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
         dd_scheme=dd_scheme,
         nr_dd_pulses=nr_dd_pulses,
         skip_n_initial_parity_checks=skip_n_initial_parity_checks,
+        skip_elem=skip_elem,
         upload=upload, verbose=False)
 
-    if reset == 'simple':
-        nr_parity_measurements = 1
-
-    nr_readouts = 1 + nr_parity_measurements + (1 if preselection else 0)\
-     + (1 if prep_sequence == 'mixed' else 0)
+    nr_readouts = 1 + nr_ancilla_readouts + (1 if preselection else 0)\
+        + (1 if prep_sequence == 'mixed' else 0)
     nr_readouts *= len(tomography_basis)**2
     
     nr_shots *= nr_readouts
     df = get_multiplexed_readout_detector_functions(
-        qubits, nr_shots=nr_shots)['int_log_det']
+        qubits, nr_shots=nr_shots, add_channels=add_channels)['int_log_det']
 
     MC.set_sweep_function(sf)
     MC.set_sweep_points(np.arange(nr_shots))
     MC.set_sweep_function_2D(swf.Delayed_None_Sweep(mode='set_delay', delay=5))
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
-    
-    MC.run_2D(name='two_qubit_parity_{}_x{}{}{}-{}'.format(
-        parity_op, nr_parity_measurements,
+
+    if skip_n_initial_parity_checks == 0:
+        skip_str = ''
+    else:
+        skip_str = 'skip' + str(skip_n_initial_parity_checks)
+        skip_str += skip_elem.replace(' ', '')
+
+    MC.run_2D(name='two_qubit_parity_{}_x{}{}{}{}-{}'.format(
+        parity_op, nr_parity_measurements, skip_str,
         prep_sequence if prep_sequence=='mixed' else '',
         '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])),
         exp_metadata=exp_metadata)
@@ -2663,7 +2678,7 @@ def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
     MC.set_sweep_function_2D(s2)
     MC.set_sweep_points_2D(frequencies)
     MC.set_detector_function(qbr.int_avg_det)
-    MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
+    MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name, qbt.name))
 
     flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
         label='CPhase_measurement_{}_{}'.format(qbc.name, qbt.name),
@@ -2679,9 +2694,9 @@ def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
     return cphases, flux_pulse_ma
 
 
-def measure_CZ_bleed_through(qb, CZ_separation_times, phases,
-                             CZ_pulse_name, upload=True, cal_points=True,
-                             MC=None):
+def measure_CZ_bleed_through(qb, CZ_separation_times, phases, CZ_pulse_name,
+                             label=None, upload=True, cal_points=True,
+                             soft_avgs=1, analyze=True, MC=None):
 
     if MC is None:
         MC = qb.MC
@@ -2695,7 +2710,6 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases,
                       phases[-1]+3*step, phases[-1]+4*step]])
 
     operation_dict = qb.get_operation_dict()
-    CZ_channel = operation_dict[CZ_pulse_name]['channel']
 
     s1 = awg_swf.CZ_bleed_through_phase_hard_sweep(
         qb_name=qb.name,
@@ -2704,23 +2718,31 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases,
         operation_dict=operation_dict,
         maximum_CZ_separation=np.max(CZ_separation_times),
         verbose=False,
-        upload=True,
+        upload=False,
         return_seq=False,
         cal_points=cal_points)
 
     s2 = awg_swf.CZ_bleed_through_separation_time_soft_sweep(
-        s1, upload=upload, upload_channels=[CZ_channel])
-
+        s1, upload=upload)
     MC.set_sweep_function(s1)
     MC.set_sweep_points(phases)
     MC.set_sweep_function_2D(s2)
     MC.set_sweep_points_2D(CZ_separation_times)
     MC.set_detector_function(qb.int_avg_det)
-    idx = CZ_pulse_name.index('q')
-    MC.run_2D('CZ_bleed_through{}{}'.format(CZ_pulse_name[idx:idx+3],
-                                            qb.msmt_suffix))
+    MC.soft_avg(soft_avgs)
 
-    ma.MeasurementAnalysis(TwoD=True)
+    if label is None:
+        idx = CZ_pulse_name.index('q')
+        label = 'CZ_bleed_through_{}{}'.format(CZ_pulse_name[idx:idx+3],
+                                              qb.msmt_suffix)
+
+    if len(CZ_separation_times) == 1:
+        exp_metadata = {'CZ_separation_time': CZ_separation_times[0]}
+        MC.run(label, exp_metadata=exp_metadata)
+    else:
+        MC.run_2D(label)
+    if analyze:
+        ma.MeasurementAnalysis(TwoD=True)
 
 
 def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,

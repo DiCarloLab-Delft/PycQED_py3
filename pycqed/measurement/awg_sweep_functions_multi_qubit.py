@@ -471,8 +471,8 @@ class parity_correction(swf.Hard_Sweep):
                  nr_parity_measurements=1, parity_op='ZZ',
                  tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                  preselection=False, ro_spacing=1e-6, dd_scheme=None, 
-                 nr_dd_pulses=4, skip_n_initial_parity_checks=0, upload=True, 
-                 verbose=False):
+                 nr_dd_pulses=4, skip_n_initial_parity_checks=0, skip_elem='RO',
+                 upload=True, verbose=False):
         super().__init__()
         self.q0n = q0n
         self.q1n = q1n
@@ -490,6 +490,7 @@ class parity_correction(swf.Hard_Sweep):
         self.dd_scheme = dd_scheme
         self.nr_dd_pulses = nr_dd_pulses
         self.skip_n_initial_parity_checks = skip_n_initial_parity_checks
+        self.skip_elem = skip_elem
         self.upload = upload
         self.parameter_name = 'sample'
         self.unit = '#'
@@ -514,7 +515,8 @@ class parity_correction(swf.Hard_Sweep):
                     nr_dd_pulses=self.nr_dd_pulses,
                     nr_parity_measurements=self.nr_parity_measurements,
                     skip_n_initial_parity_checks=
-                        self.skip_n_initial_parity_checks
+                        self.skip_n_initial_parity_checks,
+                    skip_elem=self.skip_elem,
                     )
             elif self.reset == 'simple':
                 sqs2.parity_correction_no_reset_seq(
