@@ -747,6 +747,14 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
 
 def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                             label=None, exact_label_match=False, folder=None):
+    '''
+    Input parameters:
+        label: a string or list of strings to compare the experiment name to
+        exact_label_match: 'True' : the label should exactly match the folder name
+        (excluding "timestamp_"). 'False': the label must be a substring of the folder name
+
+
+    '''
     if folder is None:
         folder = datadir
 
@@ -765,11 +773,14 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         all_measdirs = [d for d in all_measdirs if not d.startswith('.')]
 
         if exact_label_match:
-            all_measdirs = [x for x in all_measdirs if label in x]
-            #BUG: does not compare the exact string, just a substring
-            #So 'q5_spectroscopy_f02' will be included in a search for
-            #'q5_spectroscopy'
+            if isinstance(label,str):
+                label = [label]
+            for each_label in label:
+                #Remove 'hhmmss_' timestamp and check if exactly equals
+                all_measdirs = [x for x in all_measdirs if each_label == x[7:]]
         else:
+            if isinstance(label,str):
+                label = [label]
             for each_label in label:
                 all_measdirs = [x for x in all_measdirs if each_label in x]
         if (date.date() - datetime_start.date()).days == 0:
