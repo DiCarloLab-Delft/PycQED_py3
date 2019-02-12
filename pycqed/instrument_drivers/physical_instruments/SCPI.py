@@ -1,4 +1,4 @@
-'''
+"""
 File:       SCPI.py
 Author:     Wouter Vlothuizen, TNO/QuTech
 Purpose:    base class for SCPI ('Standard Commands for Programmable
@@ -6,7 +6,7 @@ Purpose:    base class for SCPI ('Standard Commands for Programmable
 Usage:      don't use directly, use a derived class (e.g. QWG)
 Notes:
 Bugs:
-'''
+"""
 
 from qcodes import IPInstrument
 import socket
@@ -44,29 +44,30 @@ class SCPI(IPInstrument):
         FIXME: should be in parent class
         """
         return self._socket.makefile().readline().rstrip()
+
     ###
     # Helpers
     ###
 
     def _read_binary(self, size):
         data = self._socket.recv(size)
-        actLen = len(data)
-        expLen = size
+        act_len = len(data)
+        exp_len = size
         i = 1
-        while (actLen != expLen):
-            data += self._socket.recv(expLen-actLen)
-            actLen = len(data)
+        while (act_len != exp_len):
+            data += self._socket.recv(exp_len-act_len)
+            act_len = len(data)
             i = i+1
         return data
 
-    def _write_binary(self, binMsg):
-        self._socket.send(binMsg)       # FIXME: should be in parent class
+    def _write_binary(self, bin_msg):
+        self._socket.send(bin_msg)       # FIXME: should be in parent class
 
-    def ask_float(self, str):
-        return float(self.ask(str))
+    def ask_float(self, cmd_str):
+        return float(self.ask(cmd_str))
 
-    def ask_int(self, str):
-        return int(self.ask(str))
+    def ask_int(self, cmd_str):
+        return int(self.ask(cmd_str))
 
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
@@ -122,12 +123,12 @@ class SCPI(IPInstrument):
     # Required SCPI commands (SCPI std V1999.0 4.2.1)
     ###
 
-    def getError(self):
-        ''' Returns:    '0,"No error"' or <error message>
-        '''
+    def get_error(self):
+        """ Returns:    '0,"No error"' or <error message>
+        """
         return self.ask('system:err?')
 
-    def getSystemErrorCount(self):
+    def get_system_error_count(self):
         return self.ask_int('system:error:count?')
 
     def get_system_version(self):
@@ -137,42 +138,40 @@ class SCPI(IPInstrument):
     # IEEE 488.2 binblock handling
     ###
 
-    def binBlockWrite(self, binBlock, header):
-        '''
+    def bin_block_write(self, bin_block, cmd_str):
+        """
         write IEEE488.2 binblock
 
         Args:
-            binBlock (bytearray): binary data to send
-
-            header (string): command string to use
-        '''
-        totHdr = header + SCPI._build_header_string(len(binBlock))
-        binMsg = totHdr.encode() + binBlock
-        self._write_binary(binMsg)
+            bin_block (bytearray): binary data to send
+            cmd_str (string): command string to use
+        """
+        header = cmd_str + SCPI._build_header_string(len(bin_block))
+        bin_msg = header.encode() + bin_block
+        self._write_binary(bin_msg)
         self.write('')                  # add a Line Terminator
 
-    def binBlockRead(self):
-        # FIXME: untested
-        ''' read IEEE488.2 binblock
-        '''
+    def bin_block_read(self):
+        """ read IEEE488.2 binblock
+        """
         # get and decode header
-        headerA = self._read_binary(2)                        # read '#N'
-        headerAstr = headerA.decode()
-        if(headerAstr[0] != '#'):
-            s = 'SCPI header error: received {}'.format(headerA)
+        header_a = self._read_binary(2)                        # read '#N'
+        header_a_str = header_a.decode()
+        if(header_a_str[0] != '#'):
+            s = 'SCPI header error: received {}'.format(header_a)
             raise RuntimeError(s)
-        digitCnt = int(headerAstr[1])
-        headerB = self._read_binary(digitCnt)
-        byteCnt = int(headerB.decode())
-        binBlock = self._read_binary(byteCnt)
+        digit_cnt = int(header_a_str[1])
+        header_b = self._read_binary(digit_cnt)
+        byte_cnt = int(header_b.decode())
+        bin_block = self._read_binary(byte_cnt)
         self._read_binary(2)                                  # consume <CR><LF>
-        return binBlock
+        return bin_block
 
     @staticmethod
-    def _build_header_string(byteCnt):
-        ''' generate IEEE488.2 binblock header
-        '''
-        byteCntStr = str(byteCnt)
-        digitCntStr = str(len(byteCntStr))
-        binHeaderStr = '#' + digitCntStr + byteCntStr
-        return binHeaderStr
+    def _build_header_string(byte_cnt):
+        """ generate IEEE488.2 binblock header
+        """
+        byte_cnt_str = str(byte_cnt)
+        digit_cnt_str = str(len(byte_cnt_str))
+        bin_header_str = '#' + digit_cnt_str + byte_cnt_str
+        return bin_header_str

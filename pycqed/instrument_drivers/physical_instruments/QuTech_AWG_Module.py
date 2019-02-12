@@ -395,12 +395,12 @@ class QuTech_AWG_Module(SCPI):
         The SCPI protocol by default does not return errors. Therefore the user needs
         to ask for errors. This function retrieves all errors and will raise them.
         '''
-        errNr = self.getSystemErrorCount()
+        errNr = self.get_system_error_count()
 
         if errNr > 0:
             errMgs = [];
             for i in range(errNr):
-                errMgs.append(self.getError())
+                errMgs.append(self.get_error())
             raise RuntimeError(', '.join(errMgs))
 
     def JSON_parser(self, msg):
@@ -504,7 +504,7 @@ class QuTech_AWG_Module(SCPI):
         Compatibility: QWG
         '''
         self.write('wlist:waveform:data? "%s"' % name)
-        binBlock = self.binBlockRead()
+        binBlock = self.bin_block_read()
         # extract waveform
         if 1:   # high performance
             waveform = np.frombuffer(binBlock, dtype=np.float32)
@@ -550,7 +550,7 @@ class QuTech_AWG_Module(SCPI):
 
         # write binblock
         hdr = 'wlist:waveform:data "{}",'.format(name)
-        self.binBlockWrite(binBlock, hdr)
+        self.bin_block_write(binBlock, hdr)
 
     def createWaveformReal(self, name, waveform):
         """

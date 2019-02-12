@@ -55,7 +55,7 @@ class Qutech_CC(SCPI):
         """
         hdr = 'QUTech:SEQuence:PROGram'
         # convert program_string
-        self.binBlockWrite(binBlock, hdr)
+        self.bin_block_write(binBlock, hdr)
 
     # FIXME: add function to get assembly errors
 
@@ -85,7 +85,7 @@ class Qutech_CC(SCPI):
             id_string = id_string.replace("'", "\"")
             self.version_info = json.loads(id_string)
         except Exception as e:
-            logging.warn('Error: failed to retrieve IDN from CC, exception %s', str(e))
+            logging.warning('Error: failed to retrieve IDN from CC, exception %s', str(e))
 
         self.version_info["Driver Version"] = self.driver_version
 
@@ -226,7 +226,7 @@ class Qutech_CC(SCPI):
         # print("binblock size:", len(binBlock))
         # write binblock
         hdr = 'QUTech:UploadInstructions '
-        self.binBlockWrite(binBlock, hdr)
+        self.bin_block_write(binBlock, hdr)
         # print("CCL: Sending instructions to the hardware finished.")
 
         # write to last_loaded_instructions so it can conveniently be read back
@@ -253,7 +253,7 @@ class Qutech_CC(SCPI):
 
         # write binblock
         hdr = 'QUTech:UploadMicrocode '
-        self.binBlockWrite(binBlock, hdr)
+        self.bin_block_write(binBlock, hdr)
 
     def _upload_opcode_qmap(self, filename: str):
         success = self.QISA.loadQuantumInstructions(filename)

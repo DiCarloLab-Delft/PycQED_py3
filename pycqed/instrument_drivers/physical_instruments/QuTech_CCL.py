@@ -423,7 +423,7 @@ class CCL(SCPI):
         # print("binblock size:", len(binBlock))
         # write binblock
         hdr = 'QUTech:UploadInstructions '
-        self.binBlockWrite(binBlock, hdr)
+        self.bin_block_write(binBlock, hdr)
         # print("CCL: Sending instructions to the hardware finished.")
 
         # write to last_loaded_instructions so it can conveniently be read back
@@ -450,7 +450,7 @@ class CCL(SCPI):
 
         # write binblock
         hdr = 'QUTech:UploadMicrocode '
-        self.binBlockWrite(binBlock, hdr)
+        self.bin_block_write(binBlock, hdr)
 
     def _upload_opcode_qmap(self, filename: str):
         success = self.QISA.loadQuantumInstructions(filename)
