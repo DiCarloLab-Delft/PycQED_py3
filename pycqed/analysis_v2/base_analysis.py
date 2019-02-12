@@ -723,7 +723,7 @@ class BaseDataAnalysis(object):
                                pdict['ax_id']])
                         self.axs[pdict['fig_id']].flatten()[
                             pdict['ax_id']].figure.subplots_adjust(
-                            hspace=0.5)
+                            hspace=0.35)
 
                 # most normal plot functions also work, it is required
                 # that these accept an "ax" argument to plot on and **kwargs
@@ -739,7 +739,7 @@ class BaseDataAnalysis(object):
                                    pdict['ax_id']])
                         self.axs[pdict['fig_id']].flatten()[
                             pdict['ax_id']].figure.subplots_adjust(
-                            hspace=0.5)
+                            hspace=0.35)
                 else:
                     raise ValueError(
                         '"{}" is not a valid plot function'.format(plotfn))
@@ -994,7 +994,6 @@ class BaseDataAnalysis(object):
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
-        fontsize = pdict.get('fontsize', 16)
 
         if pdict.get('color', False):
             plot_linekws['color'] = pdict.get('color')
@@ -1056,7 +1055,6 @@ class BaseDataAnalysis(object):
             axs.figure.text(0.5, 1, plot_title,
                             horizontalalignment='center',
                             verticalalignment='bottom',
-                            fontsize=fontsize,
                             transform=axs.transAxes)
             # axs.set_title(plot_title)
 
@@ -1368,7 +1366,6 @@ class BaseDataAnalysis(object):
         plot_ylabel = pdict['ylabel']
         plot_yunit = pdict['yunit']
         plot_title = pdict.get('title', None)
-        fontsize = pdict.get('fontsize', 16)
         if plot_transpose:
             # transpose switches X and Y
             set_axis_label('x', axs, plot_ylabel, plot_yunit)
@@ -1380,7 +1377,6 @@ class BaseDataAnalysis(object):
             axs.figure.text(0.5, 1, plot_title,
                             horizontalalignment='center',
                             verticalalignment='bottom',
-                            fontsize=fontsize,
                             transform=axs.transAxes)
             # axs.set_title(plot_title)
 
@@ -1476,7 +1472,6 @@ class BaseDataAnalysis(object):
         plot_ypos = pdict.get('ypos', .98)
         verticalalignment = pdict.get('verticalalignment', 'top')
         horizontalalignment = pdict.get('horizontalalignment', 'right')
-        fontsize = pdict.get('fontsize', 16)
 
         # fancy box props is based on the matplotlib legend
         box_props = pdict.get('box_props', 'fancy')
@@ -1488,7 +1483,6 @@ class BaseDataAnalysis(object):
               transform=axs.transAxes,
               verticalalignment=verticalalignment,
               horizontalalignment=horizontalalignment,
-              fontsize=fontsize,
               bbox=box_props)
 
     def plot_vlines(self, pdict, axs):
@@ -1574,6 +1568,51 @@ class BaseDataAnalysis(object):
         :return: Global maximum
         '''
         return np.max([np.max(v) for v in array])
+
+    @staticmethod
+    def get_default_plot_params(set=True, **kwargs):
+        font_size = kwargs.get('font_size', 18)
+        marker_size = kwargs.get('marker_size', 6)
+        line_width = kwargs.get('line_width', 2.5)
+        axes_line_width = kwargs.get('axes_line_width', 1)
+        tick_length = kwargs.pop('tick_length', 5)
+        tick_width = kwargs.pop('tick_width', 1)
+        tick_color = kwargs.get('tick_color', 'k')
+        axes_labelcolor = kwargs.get('axes_labelcolor', 'k')
+
+        fig_size_dim = 10
+        golden_ratio = (1+np.sqrt(5))/2
+        fig_size = kwargs.get('fig_size',
+                              (fig_size_dim, fig_size_dim/golden_ratio))
+        dpi = kwargs.get('dpi', 300)
+
+        params = {'figure.figsize': fig_size,
+                  'figure.dpi': dpi,
+                  'savefig.dpi': dpi,
+                  'font.size': font_size,
+                  'figure.titlesize': font_size,
+                  'legend.fontsize': font_size,
+                  'axes.labelsize': font_size,
+                  'axes.labelcolor': axes_labelcolor,
+                  'axes.titlesize': font_size,
+                  'axes.linewidth': axes_line_width,
+                  'lines.markersize': marker_size,
+                  'lines.linewidth': line_width,
+                  'xtick.direction': 'in',
+                  'ytick.direction': 'in',
+                  'xtick.labelsize': font_size,
+                  'ytick.labelsize': font_size,
+                  'xtick.color': tick_color,
+                  'ytick.color': tick_color,
+                  'xtick.major.size': tick_length,
+                  'ytick.major.size': tick_length,
+                  'xtick.major.width': tick_width,
+                  'ytick.major.width': tick_width,
+                  'axes.formatter.useoffset': False,
+                  }
+        if set:
+            plt.rcParams.update(params)
+        return params
 
     def plot_vlines_auto(self, pdict, axs):
         xs = pdict.get('xdata')

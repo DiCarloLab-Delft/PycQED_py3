@@ -206,26 +206,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         self.single_timestamp = single_timestamp
         self.numeric_params = []
-        self.get_default_plot_params_dict()
 
         if auto:
             self.run_analysis()
-
-    def get_default_plot_params_dict(self):
-
-        self.plot_params_dict = {}
-        self.plot_params_dict['plotsize'] = \
-            self.options_dict.get('plotsize', (7, 4))
-        self.plot_params_dict['fontsize'] = \
-            self.options_dict.get('fontsize', 16)
-        self.plot_params_dict['markersize'] = \
-            self.options_dict.get('markersize', None)
-        self.plot_params_dict['linewidth'] = \
-            self.options_dict.get('linewidth', 2)
-        self.plot_params_dict['axes_linewidth'] = \
-            self.options_dict.get('axes_linewidth', 0.5)
-        self.plot_params_dict['dpi'] = \
-            self.options_dict.get('dpi', 300)
 
     def extract_data(self):
         super().extract_data()
@@ -548,6 +531,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 numplotsx = 2
                 numplotsy = len(raw_data_dict) // 2 + len(raw_data_dict) % 2
 
+            plotsize = self.get_default_plot_params(set=False)['figure.figsize']
             fig_title = (self.raw_data_dict['timestamps'][0] + ' ' +
                          self.raw_data_dict['measurementstring'][0] +
                          '\nRaw data ' + qb_name)
@@ -568,7 +552,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         'yunit': self.raw_data_dict['yunit'][0][0],
                         'numplotsx': numplotsx,
                         'numplotsy': numplotsy,
-                        'plotsize': (7*numplotsx, 4*numplotsy),
+                        'plotsize': (plotsize[0]*numplotsx,
+                                     plotsize[1]*numplotsy),
                         'title': fig_title,
                         'clabel': '{} (Vpeak)'.format(ro_channel)}
                 else:
@@ -584,7 +569,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         'yunit': '',
                         'numplotsx': numplotsx,
                         'numplotsy': numplotsy,
-                        'plotsize': (7*numplotsx, 4*numplotsy),
+                        'plotsize': (plotsize[0]*numplotsx,
+                                     plotsize[1]*numplotsy),
                         'title': fig_title}
 
     def prepare_projected_data_plot(
@@ -592,7 +578,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             title_suffix=None, plot_cal_points=True,
             ref_state_plot_labels=('exc_state', 'gnd_state')):
 
-        plotsize = (10, 8)
+        plotsize = self.get_default_plot_params(set=False)['figure.figsize']
+        plotsize = (plotsize[0], plotsize[0]/1.25)
         if plot_cal_points and self.num_cal_points != 0:
             assert (len(ref_state_plot_labels) == len(self.cal_points))
             yvals = data[:-self.num_cal_points]
@@ -3331,7 +3318,11 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
                 model=exp_decay_mod, data=data, t=sweep_points)
             guess_pars['amplitude'].vary = True
             guess_pars['tau'].vary = True
-            guess_pars['offset'].vary = True
+            if self.options_dict.get('vary_offset', False):
+                guess_pars['offset'].vary = True
+            else:
+                guess_pars['offset'].value = 0
+                guess_pars['offset'].vary = False
             key = 'exp_decay_' + qbn
             self.fit_dicts[key] = {
                 'fit_fn': exp_decay_mod.func,
@@ -3546,7 +3537,7 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                 self.plot_dicts['text_msg_' + qbn] = {
                     'fig_id': base_plot_name,
                     'ypos': -0.2, #-0.175,
-                    'xpos': 0,
+                    'xpos': -0.025,
                     'horizontalalignment': 'left',
                     'verticalalignment': 'top',
                     'plotfn': self.plot_text,
@@ -3802,6 +3793,7 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
                                                 **kwargs)
         else:
             self.echo_analysis = T1Analysis(*args, extract_only=True,
+                                            options_dict={'vary_offset': True},
                                             **kwargs)
 
         if auto:
@@ -3839,6 +3831,11 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
                 self.echo_analysis.plot_dicts[base_plot_name] = \
                     self.echo_analysis.plot_dicts.pop('Ramsey_' + qbn)
 
+            self.echo_analysis.plot_dicts[base_plot_name][
+                'legend_pos'] = 'upper right'
+            self.echo_analysis.plot_dicts[base_plot_name][
+                'legend_bbox_to_anchor'] = (1, -0.15)
+
             for plot_label in self.echo_analysis.plot_dicts:
                 if qbn in plot_label:
                     if plot_label != base_plot_name and 'raw' not in plot_label:
@@ -3858,6 +3855,8 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
 
             self.echo_analysis.plot_dicts['text_msg_' + qbn][
                 'text_string'] = textstr
+            # from pprint import pprint
+            # pprint(self.echo_analysis.plot_dicts)
 
         self.echo_analysis.plot(key_list='auto')
         self.echo_analysis.save_figures(close_figs=True)

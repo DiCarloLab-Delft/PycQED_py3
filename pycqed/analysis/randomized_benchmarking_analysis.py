@@ -16,30 +16,30 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 
-font_size = 18
-marker_size = 5
-fig_size_dim = 10
-line_width = 2
-axes_line_width = 1
-golden_ratio = (1+np.sqrt(5))/2
-params = {'figure.figsize': (fig_size_dim, fig_size_dim/golden_ratio),
-          'figure.dpi': 300,
-          'savefig.dpi': 300,
-          'font.size': font_size,
-          'figure.titlesize': font_size,
-          'legend.fontsize': font_size,
-          'axes.labelsize': font_size,
-          'axes.titlesize': font_size,
-          'axes.linewidth': axes_line_width,
-          'xtick.labelsize': font_size,
-          'ytick.labelsize': font_size,
-          'lines.markersize': marker_size,
-          'lines.linewidth': line_width,
-          'xtick.direction': 'in',
-          'ytick.direction': 'in',
-          'axes.formatter.useoffset': False,
-          }
-plt.rcParams.update(params)
+# font_size = 18
+# marker_size = 5
+# fig_size_dim = 10
+# line_width = 2
+# axes_line_width = 1
+# golden_ratio = (1+np.sqrt(5))/2
+# params = {'figure.figsize': (fig_size_dim, fig_size_dim/golden_ratio),
+#           'figure.dpi': 300,
+#           'savefig.dpi': 300,
+#           'font.size': font_size,
+#           'figure.titlesize': font_size,
+#           'legend.fontsize': font_size,
+#           'axes.labelsize': font_size,
+#           'axes.titlesize': font_size,
+#           'axes.linewidth': axes_line_width,
+#           'xtick.labelsize': font_size,
+#           'ytick.labelsize': font_size,
+#           'lines.markersize': marker_size,
+#           'lines.linewidth': line_width,
+#           'xtick.direction': 'in',
+#           'ytick.direction': 'in',
+#           'axes.formatter.useoffset': False,
+#           }
+# plt.rcParams.update(params)
 
 class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
 

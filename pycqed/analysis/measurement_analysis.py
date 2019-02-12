@@ -116,10 +116,10 @@ class MeasurementAnalysis(object):
         self.tick_labelcolor = kw.get('tick_labelcolor', 'k')
         self.axes_labelcolor = kw.get('axes_labelcolor', 'k')
 
-        params = {"ytick.color": self.tick_color,
-                  "xtick.color": self.tick_color,
-                  "axes.labelcolor": self.axes_labelcolor, }
-        plt.rcParams.update(params)
+        # params = {"ytick.color": self.tick_color,
+        #           "xtick.color": self.tick_color,
+        #           "axes.labelcolor": self.axes_labelcolor, }
+        # plt.rcParams.update(params)
 
     def load_hdf5data(self, folder=None, file_only=False, **kw):
         if folder is None:
