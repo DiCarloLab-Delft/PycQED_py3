@@ -1881,7 +1881,7 @@ def parity_correction_seq(
         seq.append('m_{}'.format(i), 'm', trigger_wait=True)
         seq.append('f_{}_0'.format(i), 'codeword', trigger_wait=False)
         for j in range(1, nr_parity_measurements):
-            if parity_op in ['XX', ['XX,ZZ', 'ZZ,XX'][j%2]]:
+            if parity_op in ['XX', ['XX,ZZ', 'ZZ,XX'][j % 2]]:
                 el_name = 'rx'
             else:
                 el_name = 'rz'
