@@ -12,6 +12,7 @@ from qcodes import Instrument
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from scipy.interpolate import interp1d
 import qutip as qtp
+import cma
 #np.set_printoptions(threshold=np.inf)
 
 
@@ -72,8 +73,8 @@ def f_to_parallelize_new(arglist):
              (adaptive_pars['lambda2_min'], adaptive_pars['lambda2_max'])]})
 
         if noise_parameters_CZ.cluster():
-            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
-                fluxlutman.cz_length()*1e9, noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='adaptive',exp_metadata=exp_metadata)
 
         else:
@@ -104,6 +105,38 @@ def f_to_parallelize_new(arglist):
                 dat = MC.run('1D simulation_new_2', 
                 exp_metadata=exp_metadata, 
                 mode='1D')
+
+    if adaptive_pars['mode']=='cma_optimizer': 
+        MC.set_sweep_functions([fluxlutman.cz_theta_f, fluxlutman.cz_lambda_2])
+        if adaptive_pars['uniform']: 
+            loss_per_triangle= adaptive.learner.learner2D.uniform_loss
+        else: 
+            loss_per_triangle=None
+        MC.set_adaptive_function_parameters(
+            {'adaptive_function': cma.fmin,
+             'x0': adaptive_pars['x0'], 'sigma0': adaptive_pars['sigma0'],
+             # options for the CMA algorithm can be found using
+             # "cma.CMAOptions()"
+             'options': {'maxfevals': adaptive_pars['n_points'],    # maximum function cals
+                         # Scaling for individual sigma's
+                         'cma_stds': [5, 6, 3],
+                         'ftarget': 0.005},     # Target function value
+             })
+
+        if noise_parameters_CZ.cluster():
+            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='adaptive',exp_metadata=exp_metadata)
+
+        else:
+            if adaptive_pars['long_name']:
+                dat = MC.run('2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='adaptive',exp_metadata=exp_metadata)
+            else:
+                dat = MC.run('2D simulation_new_2', 
+                exp_metadata=exp_metadata, 
+                mode='adaptive')
 
 
 
