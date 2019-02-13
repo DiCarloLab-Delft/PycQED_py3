@@ -318,7 +318,7 @@ class two_qubit_randomized_benchmarking_one_length(swf.Hard_Sweep):
 
     def __init__(self, qb1n, qb2n, operation_dict,
                  nr_cliffords_value,
-                 cl_seq=None,
+                 max_clifford_idx=11520,
                  CZ_pulse_name=None,
                  net_clifford=0,
                  clifford_decomposition_name='HZ',
@@ -331,7 +331,7 @@ class two_qubit_randomized_benchmarking_one_length(swf.Hard_Sweep):
         self.qb2n = qb2n
         self.operation_dict = operation_dict
         self.nr_cliffords_value = nr_cliffords_value
-        self.cl_seq = cl_seq
+        self.max_clifford_idx = max_clifford_idx
         self.CZ_pulse_name = CZ_pulse_name
         self.net_clifford = net_clifford
         self.clifford_decomposition_name = clifford_decomposition_name
@@ -349,9 +349,9 @@ class two_qubit_randomized_benchmarking_one_length(swf.Hard_Sweep):
         if self.upload:
             sqs2.two_qubit_randomized_benchmarking_seq(
                 qb1n=self.qb1n, qb2n=self.qb2n,
-                cl_seq=self.cl_seq,
                 operation_dict=self.operation_dict,
                 nr_cliffords_value=self.nr_cliffords_value,
+                max_clifford_idx=self.max_clifford_idx,
                 nr_seeds=self.sweep_points,
                 CZ_pulse_name=self.CZ_pulse_name,
                 net_clifford=self.net_clifford,

@@ -1134,7 +1134,8 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
 
         # If the element is too long, add in an extra wait elt
         # to skip a trigger
-        if resetless and nr_cliffords_value*pulse_pars['pulse_delay']*1.875 > 50e-6:
+        if resetless and nr_cliffords_value*pulse_pars[
+            'pulse_delay']*1.875 > 50e-6:
             el = multi_pulse_elt(i, station, [pulses['I']])
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)

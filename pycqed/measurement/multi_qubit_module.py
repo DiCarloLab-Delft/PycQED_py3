@@ -957,10 +957,10 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
 def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
                                               nr_cliffords_array,
                                               nr_seeds_value,
-                                              cl_seq=None,
+                                              character_rb=False,
                                               CZ_pulse_name=None,
                                               net_clifford=0,
-                                              nr_averages=4096,
+                                              nr_averages=None,
                                               clifford_decomposition_name='HZ',
                                               interleaved_gate=None,
                                               MC=None, UHFQC=None,
@@ -997,9 +997,7 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
         CZ_pulse_name = 'CZ ' + qb2n + ' ' + qb1n
 
     for qb in qubits:
-        qb.RO_acq_averages(nr_averages)
         qb.prepare_for_timedomain(multiplexed=True)
-
     multiplexed_pulse(qubits, f_LO, upload=True)
     operation_dict = get_operation_dict(qubits)
 
@@ -1007,7 +1005,7 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
     hard_sweep_func = awg_swf2.two_qubit_randomized_benchmarking_one_length(
         qb1n=qb1n, qb2n=qb2n, operation_dict=operation_dict,
         nr_cliffords_value=nr_cliffords_array[0],
-        cl_seq=cl_seq,
+        max_clifford_idx=24**2 if character_rb else 11520,
         CZ_pulse_name=CZ_pulse_name,
         net_clifford=net_clifford,
         clifford_decomposition_name=clifford_decomposition_name,
@@ -1025,7 +1023,8 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
 
     correlations = [(qb1.RO_acq_weight_function_I(),
                      qb2.RO_acq_weight_function_I())]
-
+    if nr_averages is None:
+        nr_averages = max(qb.RO_acq_averages() for qb in qubits)
     det_func = get_multiplexed_readout_detector_functions(
         qubits, nr_averages=nr_averages, UHFQC=UHFQC, pulsar=pulsar,
         correlations=correlations)['dig_corr_det']

@@ -1019,7 +1019,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
 def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
                                       nr_cliffords_value, #scalar
                                       nr_seeds,           #array
-                                      cl_seq=None,
+                                      max_clifford_idx=11520,
                                       CZ_pulse_name=None,
                                       net_clifford=0,
                                       clifford_decomposition_name='HZ',
@@ -1052,19 +1052,18 @@ def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-
     # Set Clifford decomposition
     tqc.gate_decomposition = rb.get_clifford_decomposition(
         clifford_decomposition_name)
 
     for i in nr_seeds:
-        # if cl_seq is None:
         cl_seq = rb.randomized_benchmarking_sequence_new(
             nr_cliffords_value,
             number_of_qubits=2,
+            max_clifford_idx=max_clifford_idx,
             interleaving_cl=interleaved_gate,
             desired_net_cl=net_clifford)
-        # print(cl_seq)
+
         pulse_list = []
         for idx in cl_seq:
             pulse_tuples_list = tqc.TwoQubitClifford(idx).gate_decomposition
@@ -1076,17 +1075,13 @@ def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
                 else:
                     qb_name = qb1n if '0' in pulse_tuple[1] else qb2n
                     pulse_name = pulse_tuple[0]
-                    if not 'Z' in pulse_name:
+                    if 'Z' not in pulse_name:
                         if qb_name not in pulsed_qubits:
                             pulse_name += 's'
                         else:
                             pulsed_qubits = set()
                         pulsed_qubits |= {qb_name}
                     pulse_list += [operation_dict[pulse_name + ' ' + qb_name]]
-
-
-        # from pprint import pprint
-        # pprint(pulse_list)
         pulse_list += [operation_dict['RO mux']]
 
         el = multi_pulse_elt(i, station, pulse_list)
