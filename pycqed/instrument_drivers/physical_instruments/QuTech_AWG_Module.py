@@ -1,14 +1,14 @@
-'''
-File:       QuTech_AWG_Module.py
-Author:     Wouter Vlothuizen, TNO/QuTech,
-            edited by Adriaan Rol, Gerco Versloot
-Purpose:    Instrument driver for Qutech QWG
-Usage:
-Notes:      It is possible to view the QWG log using ssh. To do this:
-            - connect using ssh e.g., "ssh root@192.168.0.10"
-            - view log using "tail -f /var/log/qwg.log"
-Bugs:
-'''
+"""
+    File:       QuTech_AWG_Module.py
+    Author:     Wouter Vlothuizen, TNO/QuTech,
+                edited by Adriaan Rol, Gerco Versloot
+    Purpose:    Instrument driver for Qutech QWG
+    Usage:
+    Notes:      It is possible to view the QWG log using ssh. To do this:
+                - connect using ssh e.g., "ssh root@192.168.0.10"
+                - view log using "tail -f /var/log/qwg.log"
+    Bugs:
+"""
 
 from .SCPI import SCPI
 
@@ -291,9 +291,9 @@ class QuTech_AWG_Module(SCPI):
                           docstring=doc_sSG)
 
     def stop(self):
-        '''
+        """
         Stop output on channels and check for errors or overflow
-        '''
+        """
         self.write('awgcontrol:stop:immediate')
 
         self.detect_overflow()
@@ -332,9 +332,9 @@ class QuTech_AWG_Module(SCPI):
         return self.getWaveformDataFloat(wf_name)
 
     def start(self):
-        '''
+        """
         Activates output on channels with the current settings. When started this function will check for possible warnings
-        '''
+        """
         run_mode = self.run_mode()
         if run_mode == 'NONE':
             raise RuntimeError('No run mode is specified')
@@ -349,12 +349,12 @@ class QuTech_AWG_Module(SCPI):
             warnings.warn(', '.join(warn_msg))
 
     def _setMatrix(self, chPair, mat):
-        '''
+        """
         Args:
             chPair(int): ckannel pair for operation, 1 or 3
 
             matrix(np.matrix): 2x2 matrix for mixer calibration
-        '''
+        """
         # function used internally for the parameters because of formatting
         self.write('qutech:output{:d}:matrix {:f},{:f},{:f},{:f}'.format(
                    chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))
@@ -369,9 +369,9 @@ class QuTech_AWG_Module(SCPI):
         return(M)
 
     def detect_overflow(self):
-        '''
+        """
         Will raise an error if on a channel overflow happened
-        '''
+        """
         status = self.get_system_status()
         err_msg = [];
         for channel in status["channels"]:
@@ -381,9 +381,9 @@ class QuTech_AWG_Module(SCPI):
             raise RuntimeError(err_msg)
 
     def detect_underdrive(self, status):
-        '''
+        """
         Will raise an warning if on a channel underflow is detected
-        '''
+        """
         msg = [];
         for channel in status["channels"]:
             if((channel["on"] == True) and (channel["underdrive"] == True)):
@@ -391,10 +391,10 @@ class QuTech_AWG_Module(SCPI):
         return msg;
 
     def getErrors(self):
-        '''
+        """
         The SCPI protocol by default does not return errors. Therefore the user needs
         to ask for errors. This function retrieves all errors and will raise them.
-        '''
+        """
         errNr = self.get_system_error_count()
 
         if errNr > 0:
@@ -404,12 +404,12 @@ class QuTech_AWG_Module(SCPI):
             raise RuntimeError(', '.join(errMgs))
 
     def JSON_parser(self, msg):
-        '''
+        """
         Converts the result of a SCPI message to a JSON.
 
         msg: SCPI message where the body is a JSON
         return: JSON object with the data of the SCPI message
-        '''
+        """
         result = str(msg)[1:-1]
         result = result.replace('\"\"', '\"') # SCPI/visa adds additional quotes
         return json.loads(result)
@@ -419,17 +419,17 @@ class QuTech_AWG_Module(SCPI):
     # AWG5014 functions: SEQUENCE
     ##########################################################################
     def setSeqLength(self, length):
-        '''
+        """
         Args:
             length (int): 0..max. Allocates new, or trims existing sequence
-        '''
+        """
         self.write('sequence:length %d' % length)
 
     def setSeqElemLoopInfiniteOn(self, element):
-        '''
+        """
         Args:
             element(int): 1..length
-        '''
+        """
         self.write('sequence:element%d:loop:infinite on' % element)
 
     ##########################################################################
@@ -439,16 +439,16 @@ class QuTech_AWG_Module(SCPI):
     #     return self.ask_int('wlist:size?')
 
     def _getWlistName(self, idx):
-        '''
+        """
         Args:
             idx(int): 0..size-1
-        '''
+        """
         return self.ask('wlist:name? %d' % idx)
 
     def _getWlist(self):
-        '''
+        """
         NB: takes a few seconds on 5014: our fault or Tek's?
-        '''
+        """
         size = self.WlistSize()
         wlist = []                                  # empty list
         for k in range(size):                       # build list of names
@@ -456,44 +456,44 @@ class QuTech_AWG_Module(SCPI):
         return wlist
 
     def deleteWaveform(self, name):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             'test'
-        '''
+        """
         self.write('wlist:waveform:delete "%s"' % name)
 
     def getWaveformType(self, name):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
 
         Returns:
             'INT' or 'REAL'
-        '''
+        """
         return self.ask('wlist:waveform:type? "%s"' % name)
 
     def getWaveformLength(self, name):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
-        '''
+        """
         return self.ask_int('wlist:waveform:length? "%s"' % name)
 
     def newWaveformReal(self, name, len):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
 
         NB: seems to do nothing (on Tek5014) if waveform already exists
-        '''
+        """
         self.write('wlist:waveform:new "%s",%d,real' % (name, len))
 
     def getWaveformDataFloat(self, name):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
@@ -502,7 +502,7 @@ class QuTech_AWG_Module(SCPI):
             waveform  (np.array of float): waveform data
 
         Compatibility: QWG
-        '''
+        """
         self.write('wlist:waveform:data? "%s"' % name)
         binBlock = self.bin_block_read()
         # extract waveform
@@ -585,8 +585,8 @@ class QuTech_AWG_Module(SCPI):
 
     # Tek_AWG functions: menu Setup|Waveform/Sequence
     def loadWaveformOrSequence(self, awgFileName):
-        ''' awgFileName:        name referring to AWG file system
-        '''
+        """ awgFileName:        name referring to AWG file system
+        """
         self.write('source:def:user "%s"' % awgFileName)
         # NB: we only  support default Mass Storage Unit Specifier "Main",
         # which is the internal harddisk
