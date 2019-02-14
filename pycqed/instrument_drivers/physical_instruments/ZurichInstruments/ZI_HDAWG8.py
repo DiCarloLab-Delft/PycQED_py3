@@ -28,20 +28,45 @@ Changelog:
 20190207 WJV
 - added assure_ext_clock()
 
-20190112 WJV
+20190212 WJV
 - separated off application independent stuff into ZI_HDAWG_core class, this
   file will keep application dependent stuff
 - addressed many warnings identified by PyCharm
 
+20190214 WJV
+- added activate_new_dio_triggering()
+- moved in _add_extra_parameters() and _add_codeword_parameters()
+- moved out _set_dio_delay()
+
 """
 
 from .ZI_HDAWG_core import ZI_HDAWG_core
+from qcodes.utils import validators as vals
+from qcodes.instrument.parameter import ManualParameter
 import time
 import logging
 import numpy as np
 
 
 class ZI_HDAWG8(ZI_HDAWG_core):
+
+    def __init__(self, name, device: str,
+                 server: str = 'localhost', port=8004,
+                 num_codewords: int = 32, **kw) -> None:
+        """
+        Input arguments:
+            name:           (str) name of the instrument as seen by the user
+            device          (str) the name of the device e.g., "dev8008"
+            server          (str) the ZI data server
+            port            (int) the port to connect to
+            FIXME: comment incomplete
+        """
+
+        t0 = time.time()
+        super.__init__(name, device, server, port, num_codewords, **kw)
+        self._add_extra_parameters()
+        self._add_codeword_parameters()
+        self.connect_message(begin_time=t0)
 
     ##########################################################################
     # 'public' functions: application specific/codeword support
@@ -162,7 +187,7 @@ class ZI_HDAWG8(ZI_HDAWG_core):
         The final step enables the signal output of each AWG and sets
         it to the right mode.
 
-        The parameter "cfg_codeword_protocol" defines what protocol is used.
+        The qcodes parameter "cfg_codeword_protocol" defines what protocol is used.
         There are three options:
             identical : all AWGs have the same configuration
             microwave : AWGs 0 and 1 share bits
@@ -296,6 +321,77 @@ class ZI_HDAWG8(ZI_HDAWG_core):
                 (cw_mask << cw_shift) | vld_mask, max_valid_delay)
 
         return True
+
+    def activate_new_dio_triggering(self):
+        # from: AWG8_V2_DIO_Calibration
+        # FIXME: cleanup
+        # Activate the new DIO triggering functionality where the instrument does not specifically use
+        # the flanks of the toggle signal  signal for sampling the DIO values, but an internally generated
+        # counter locked to the expected period of the toggle signal (in 300 MHz cyclees) and the first edge
+        # of the toggle signal
+        TOGGLE_PERIOD = 12
+        self._dev.seti('awgs/*/dio/strobe/width', 0)
+        self._dev.seti('awgs/*/dio/strobe/width', TOGGLE_PERIOD)
+        for i in range(4):
+            if self._dev.geti('awgs/{}/dio/strobe/width'.format(i)) != TOGGLE_PERIOD:
+                raise Exception(
+                    'Expected strobe width not configured correctly for AWG {}! Please rerun this cell!\n'.format(i))
+
+    ##########################################################################
+    # 'private' functions: parameter support for codewords
+    ##########################################################################
+
+    def _add_extra_parameters(self) -> None:
+        self.add_parameter('timeout', unit='s',
+                           initial_value=10,
+                           parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_num_codewords', label='Number of used codewords', docstring=(
+                'This parameter is used to determine how many codewords to '
+                'upload in "self.upload_codeword_program".'),
+            initial_value=self._num_codewords,
+            # FIXME: commented out numbers larger than self._num_codewords
+            # see also issue #358
+            vals=vals.Enum(2, 4, 8, 16, 32),  # , 64, 128, 256, 1024),
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'cfg_codeword_protocol', initial_value='identical',
+            vals=vals.Enum('identical', 'microwave', 'flux'), docstring=(
+                'Used in the configure codeword method to determine what DIO'
+                ' pins are used in for which AWG numbers.'),
+            parameter_class=ManualParameter)
+
+        for i in range(4):
+            self.add_parameter(
+                'awgs_{}_sequencer_program_crc32_hash'.format(i),
+                parameter_class=ManualParameter,
+                initial_value=0, vals=vals.Ints())
+
+    def _add_codeword_parameters(self) -> None:
+        """
+        Adds parameters that are used for uploading codewords.
+        It also contains initial values for each codeword to ensure
+        that the "upload_codeword_program" ... FIXME: comment ends
+
+        """
+        docst = ('Specifies a waveform to for a specific codeword. ' +
+                 'The waveforms must be uploaded using ' +
+                 '"upload_codeword_program". The channel number corresponds' +
+                 ' to the channel as indicated on the device (1 is lowest).')
+        self._params_to_skip_update = []
+        for ch in range(self._num_channels):
+            for cw in range(self._num_codewords):
+                parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
+                self.add_parameter(
+                    parname,
+                    label='Waveform channel {} codeword {:03}'.format(
+                        ch+1, cw),
+                    vals=vals.Arrays(),  # min_value, max_value = unknown
+                    set_cmd=self._gen_write_csv(parname),
+                    get_cmd=self._gen_read_csv(parname),
+                    docstring=docst)
+                self._params_to_skip_update.append(parname)
 
     ##########################################################################
     # 'private' functions: helpers for calibrate_dio_protocol()
@@ -454,37 +550,6 @@ class ZI_HDAWG8(ZI_HDAWG_core):
         if verbose:
             print("INFO   : Found valid delays of {}".format(list(valid_delays)))
         return set(valid_delays)
-
-    def _set_dio_delay(self, awg, strb_mask, data_mask, delay):
-        """
-        The function sets the DIO delay for a given FPGA. The valid delay range is
-        0 to 6. The delays are created by either delaying the data bits or the strobe
-        bit. The data_mask input represents all bits that are part of the codeword or
-        the valid bit. The strb_mask input represents the bit that define the strobe.
-        """
-        if delay < 0:
-            print('WARNING: Clamping delay to 0')
-        if delay > 6:
-            print('WARNING: Clamping delay to 6')
-            delay = 6
-
-        strb_delay = 0
-        data_delay = 0
-        if delay > 3:
-            strb_delay = delay-3
-        else:
-            data_delay = 3-delay
-
-        for i in range(32):
-            self._dev.seti('awgs/{}/dio/delay/index'.format(awg), i)
-            if strb_mask & (1 << i):
-                self._dev.seti(
-                    'awgs/{}/dio/delay/value'.format(awg), strb_delay)
-            elif data_mask & (1 << i):
-                self._dev.seti(
-                    'awgs/{}/dio/delay/value'.format(awg), data_delay)
-            else:
-                self._dev.seti('awgs/{}/dio/delay/value'.format(awg), 0)
 
 ##############################################################################
 # non class functions: helpers for calibrate_dio_protocol()

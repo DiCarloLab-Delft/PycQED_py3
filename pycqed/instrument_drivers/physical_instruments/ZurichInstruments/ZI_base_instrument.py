@@ -12,6 +12,7 @@ class ZI_base_instrument(Instrument):
     This is an abstract base class for Zurich Instruments instrument drivers.
     """
 
+    # FIXME: make 'private'
     def add_parameters_from_file(self, filename: str):
         """
         Takes in a node_doc JSON file auto generates parameters based on

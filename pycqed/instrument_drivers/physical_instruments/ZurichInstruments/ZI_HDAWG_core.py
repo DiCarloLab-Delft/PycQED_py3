@@ -1,19 +1,23 @@
 """
 Changelog:
 
-20190112 WJV
+20190212 WJV
 - separated off application independent stuff into this ZI_HDAWG_core class,
   file ZI_HDAWG8.py will keep application dependent stuff. The software
   interface remains unchanged.
 - addressed many warnings identified by PyCharm
 - started adding more type annotations
 
+20190214 WJV
+- added check_timing_error()
+- moved out _add_extra_parameters() and _add_codeword_parameters()
+- added load_default_settings()
+- moved in _set_dio_delay()
+
 """
 
 from . import zishell_NH as zs
 from .ZI_base_instrument import ZI_base_instrument
-from qcodes.utils import validators as vals
-from qcodes.instrument.parameter import ManualParameter
 import logging
 import os
 import time
@@ -45,10 +49,12 @@ class ZI_HDAWG_core(ZI_base_instrument):
             device          (str) the name of the device e.g., "dev8008"
             server          (str) the ZI data server
             port            (int) the port to connect to
+            FIXME: comment incomplete
         """
-        t0 = time.time()
-        self._num_codewords = num_codewords
 
+        super().__init__(name=name, **kw)
+
+        # determine path for LabOne web server
         if os.name == 'nt':
             dll = ctypes.windll.shell32
             buf = ctypes.create_unicode_buffer(MAX_PATH + 1)
@@ -61,18 +67,22 @@ class ZI_HDAWG_core(ZI_base_instrument):
         self._lab_one_webserver_path = os.path.join(
             _basedir, 'Zurich Instruments', 'LabOne', 'WebServer')
 
-        super().__init__(name=name, **kw)
+        # save some parameters
         self._devname = device
+        self._num_codewords = num_codewords
+
+        # connect to data server and device
         self._dev = zs.ziShellDevice()
         self._dev.connect_server(server, port)
         print("Trying to connect to device {}".format(self._devname))
         self._dev.connect_device(self._devname, '1GbE')
 
+        # add qcodes parameters based on JSON parameter file
         dir_path = os.path.dirname(os.path.abspath(__file__))
         base_fn = os.path.join(dir_path, 'zi_parameter_files')
         filename = os.path.join(base_fn, 'node_doc_HDAWG8.json')
         try:
-            self.add_parameters_from_file(filename=filename)
+            self.add_parameters_from_file(filename=filename)  # NB: defined in parent class
         except FileNotFoundError:
             logging.error("parameter file for data parameters"
                             " {} not found".format(filename))
@@ -80,6 +90,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
 
         self._add_ZIshell_device_methods_to_instrument()
 
+        # determine number of channels
         dev_type = self.get('features_devtype')
         if dev_type == 'HDAWG8':
             self._num_channels = 8
@@ -88,9 +99,16 @@ class ZI_HDAWG_core(ZI_base_instrument):
         else:
             raise Exception("Unknown device type '{}'".format(dev_type))
 
-        self._add_codeword_parameters()
-        self._add_extra_parameters()
-        self.connect_message(begin_time=t0)
+        self.load_default_settings
+
+    # FIXME: incomplete
+    def load_default_settings(self):
+        """
+        reset DIO parameters (bits, timing) and bring device into known state
+        """
+
+        for awg in range(4):
+            self._set_dio_delay(awg, 0, 0xFFFFFFFF, 0)  #
 
     def get_idn(self) -> dict:
         # FIXME, update using new parameters for this purpose
@@ -230,58 +248,6 @@ class ZI_HDAWG_core(ZI_base_instrument):
         self.restart_scope_module = self._dev.restart_scope_module
         self.restart_awg_module = self._dev.restart_awg_module
 
-    def _add_extra_parameters(self) -> None:
-        self.add_parameter('timeout', unit='s',
-                           initial_value=10,
-                           parameter_class=ManualParameter)
-        self.add_parameter(
-            'cfg_num_codewords', label='Number of used codewords', docstring=(
-                'This parameter is used to determine how many codewords to '
-                'upload in "self.upload_codeword_program".'),
-            initial_value=self._num_codewords,
-            # FIXME: commented out numbers larger than self._num_codewords
-            # see also issue #358
-            vals=vals.Enum(2, 4, 8, 16, 32),  # , 64, 128, 256, 1024),
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'cfg_codeword_protocol', initial_value='identical',
-            vals=vals.Enum('identical', 'microwave', 'flux'), docstring=(
-                'Used in the configure codeword method to determine what DIO'
-                ' pins are used in for which AWG numbers.'),
-            parameter_class=ManualParameter)
-
-        for i in range(4):
-            self.add_parameter(
-                'awgs_{}_sequencer_program_crc32_hash'.format(i),
-                parameter_class=ManualParameter,
-                initial_value=0, vals=vals.Ints())
-
-    def _add_codeword_parameters(self) -> None:
-        """
-        Adds parameters that are used for uploading codewords.
-        It also contains initial values for each codeword to ensure
-        that the "upload_codeword_program" ... FIXME: comment ends
-
-        """
-        docst = ('Specifies a waveform to for a specific codeword. ' +
-                 'The waveforms must be uploaded using ' +
-                 '"upload_codeword_program". The channel number corresponds' +
-                 ' to the channel as indicated on the device (1 is lowest).')
-        self._params_to_skip_update = []
-        for ch in range(self._num_channels):
-            for cw in range(self._num_codewords):
-                parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
-                self.add_parameter(
-                    parname,
-                    label='Waveform channel {} codeword {:03}'.format(
-                        ch+1, cw),
-                    vals=vals.Arrays(),  # min_value, max_value = unknown
-                    set_cmd=self._gen_write_csv(parname),
-                    get_cmd=self._gen_read_csv(parname),
-                    docstring=docst)
-                self._params_to_skip_update.append(parname)
-
     def _gen_write_csv(self, wf_name):
         def write_func(waveform):
             # The length of HDAWG waveforms should be a multiple of 8 samples.
@@ -316,3 +282,34 @@ class ZI_HDAWG_core(ZI_base_instrument):
             logging.warning(e)
             print(e)
             return None
+
+    def _set_dio_delay(self, awg, strb_mask, data_mask, delay):
+        """
+        The function sets the DIO delay for a given FPGA. The valid delay range is
+        0 to 6. The delays are created by either delaying the data bits or the strobe
+        bit. The data_mask input represents all bits that are part of the codeword or
+        the valid bit. The strb_mask input represents the bit that define the strobe.
+        """
+        if delay < 0:
+            print('WARNING: Clamping delay to 0')
+        if delay > 6:
+            print('WARNING: Clamping delay to 6')
+            delay = 6
+
+        strb_delay = 0
+        data_delay = 0
+        if delay > 3:
+            strb_delay = delay-3
+        else:
+            data_delay = 3-delay
+
+        for i in range(32):
+            self._dev.seti('awgs/{}/dio/delay/index'.format(awg), i)
+            if strb_mask & (1 << i):
+                self._dev.seti(
+                    'awgs/{}/dio/delay/value'.format(awg), strb_delay)
+            elif data_mask & (1 << i):
+                self._dev.seti(
+                    'awgs/{}/dio/delay/value'.format(awg), data_delay)
+            else:
+                self._dev.seti('awgs/{}/dio/delay/value'.format(awg), 0)
