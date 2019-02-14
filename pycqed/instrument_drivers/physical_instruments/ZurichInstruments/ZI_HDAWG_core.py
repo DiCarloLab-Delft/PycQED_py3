@@ -40,8 +40,9 @@ class ZI_HDAWG_core(ZI_base_instrument):
     # 'public' functions: device control
     ##########################################################################
 
-    def __init__(self, name, device: str,
-                 server: str = 'localhost', port=8004,
+    def __init__(self, name: str,
+                 device: str,
+                 server: str = 'localhost', port = 8004,
                  num_codewords: int = 32, **kw) -> None:
         """
         Input arguments:

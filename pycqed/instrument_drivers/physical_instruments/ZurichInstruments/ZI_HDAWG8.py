@@ -50,8 +50,9 @@ import numpy as np
 
 class ZI_HDAWG8(ZI_HDAWG_core):
 
-    def __init__(self, name, device: str,
-                 server: str = 'localhost', port=8004,
+    def __init__(self, name: str,
+                 device: str,
+                 server: str = 'localhost', port = 8004,
                  num_codewords: int = 32, **kw) -> None:
         """
         Input arguments:
@@ -63,7 +64,7 @@ class ZI_HDAWG8(ZI_HDAWG_core):
         """
 
         t0 = time.time()
-        super.__init__(name, device, server, port, num_codewords, **kw)
+        super().__init__(name, device, server, port, num_codewords, **kw)
         self._add_extra_parameters()
         self._add_codeword_parameters()
         self.connect_message(begin_time=t0)
