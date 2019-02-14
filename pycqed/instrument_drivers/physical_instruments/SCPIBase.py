@@ -24,6 +24,10 @@ class SCPIBase:
     # Helpers
     ###
 
+    def ask(self, cmd_str: str) -> str:
+        self._transport.write(cmd_str)
+        return self._transport.readline().rstrip()  # remove trailing white space, CR, LF
+
     def ask_float(self, cmd_str: str) -> float:
         return float(self._transport.ask(cmd_str))
 
@@ -87,13 +91,13 @@ class SCPIBase:
     def get_error(self) -> str:
         """ Returns:    '0,"No error"' or <error message>
         """
-        return self._transport.ask('system:err?')
+        return self.ask('system:err?')
 
     def get_system_error_count(self):
         return self.ask_int('system:error:count?')
 
     def get_system_version(self) -> str:
-        return self._transport.ask('system:version?')
+        return self.ask('system:version?')
 
     ###
     # IEEE 488.2 binblock handling

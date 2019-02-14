@@ -97,12 +97,10 @@ class QuTech_AWG_Module(SCPI):
                                parameter_class=HandshakeParameter,
                                label=('Transformation matrix channel' +
                                       'pair {}'.format(i)),
-                               get_cmd=self._gen_ch_get_func(
-                self._getMatrix, ch_pair),
-                set_cmd=self._gen_ch_set_func(
-                self._setMatrix, ch_pair),
-                # NB range is not a hardware limit
-                vals=vals.Arrays(-2, 2, shape=(2, 2)))
+                               get_cmd=self._gen_ch_get_func(self._getMatrix, ch_pair),
+                               set_cmd=self._gen_ch_set_func(self._setMatrix, ch_pair),
+                               # NB range is not a hardware limit
+                               vals=vals.Arrays(-2, 2, shape=(2, 2)))
 
         for i in range(1, self.device_descriptor.numTriggers+1):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)

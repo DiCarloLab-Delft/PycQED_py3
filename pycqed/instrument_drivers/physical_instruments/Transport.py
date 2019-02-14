@@ -29,7 +29,7 @@ class Transport:
     def read_binary(self, size: int) -> bytes:
         pass
 
-    def ask(self, cmd_str: str) -> str:
+    def readline(self) -> str:
         pass
 
 
@@ -79,15 +79,8 @@ class IPTransport(Transport):
             act_len = len(data)
         return data
 
-    def ask(self, cmd_str: str) -> str:
-        self.write(cmd_str)
-
-        # resp = self._socket.recv(4096)   # FIXME: do a readline
-        # is this allowed when timeout is active (i.e. non blocking
-        # socket)?
-        resp = self._socket.makefile().readline()
-        return resp.rstrip()                                # remove trailing white space, CR, LF
-#        return self._socket.makefile().readline().rstrip()
+    def readline(self) -> str:
+        return self._socket.makefile().readline()
 
 
 class VisaTransport(Transport):

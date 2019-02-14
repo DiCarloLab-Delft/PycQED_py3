@@ -25,7 +25,7 @@ from zlib import crc32
 
 class ZI_HDAWG_core(ZI_base_instrument):
     """
-    This is PycQED/QCoDeS driver driver for the Zurich Instruments HD AWG-8.
+    This is PycQED/QCoDeS driver driver for the Zurich Instruments HDAWG.
 
     Parameter files are generated from the python API of the instrument
     using the "create_parameter_file" method in the ZI_base_instrument class.
@@ -55,8 +55,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
             if dll.SHGetSpecialFolderPathW(None, buf, 0x0005, False):
                 _basedir = buf.value
             else:
-                logging.error('Could not extract my documents folder')
-                _basedir = ''  # FIXME: maybe better throw an exception
+                raise Exception('Could not extract my documents folder')
         else:
             _basedir = os.path.expanduser('~')
         self._lab_one_webserver_path = os.path.join(
@@ -71,14 +70,13 @@ class ZI_HDAWG_core(ZI_base_instrument):
 
         dir_path = os.path.dirname(os.path.abspath(__file__))
         base_fn = os.path.join(dir_path, 'zi_parameter_files')
-
+        filename = os.path.join(base_fn, 'node_doc_HDAWG8.json')
         try:
-            self.add_parameters_from_file(
-                filename=os.path.join(base_fn, 'node_doc_HDAWG8.json'))
+            self.add_parameters_from_file(filename=filename)
         except FileNotFoundError:
-            logging.warning("parameter file for data parameters"
-                            " {} not found".format(self._d_file_name))
-            # FIXME: fatal?
+            logging.error("parameter file for data parameters"
+                            " {} not found".format(filename))
+            raise
 
         self._add_ZIshell_device_methods_to_instrument()
 
@@ -88,14 +86,13 @@ class ZI_HDAWG_core(ZI_base_instrument):
         elif dev_type == 'HDAWG4':
             self._num_channels = 4
         else:
-            self._num_channels = 8
-            logging.warning('Unknown device type. Assuming eight channels.')    # FIXME: error/fatal?
+            raise Exception("Unknown device type '{}'".format(dev_type))
 
         self._add_codeword_parameters()
         self._add_extra_parameters()
         self.connect_message(begin_time=t0)
 
-    def get_idn(self):
+    def get_idn(self) -> dict:
         # FIXME, update using new parameters for this purpose
         idn_dict = {'vendor': 'ZurichInstruments',
                     'model': self._dev.daq.getByte(
@@ -144,14 +141,14 @@ class ZI_HDAWG_core(ZI_base_instrument):
 
     def stop(self) -> None:
         """
-        Stops the program on all AWG's part of this AWG8 unit
+        Stops the program on all AWG's part of this HDAWG unit
         """
         for i in range(int(self._num_channels/2)):
             self.set('awgs_{}_enable'.format(i), 0)
 
     def start(self) -> None:
         """
-        Starts the program on all AWG's part of this AWG8 unit
+        Starts the program on all AWG's part of this HDAWG unit
         """
         for i in range(int(self._num_channels/2)):
             self.set('awgs_{}_enable'.format(i), 1)
@@ -170,7 +167,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
     def configure_awg_from_string(self, awg_nr: int, program_string: str,
                                   timeout: float = 15) -> None:
         """
-        Uploads a program string to one of the AWGs of the AWG8.
+        Uploads a program string to one of the AWGs of the HDAWG.
         """
         self._dev.configure_awg_from_string(awg_nr=awg_nr,
                                             program_string=program_string,
@@ -278,7 +275,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
 
     def _gen_write_csv(self, wf_name):
         def write_func(waveform):
-            # The length of AWG8 waveforms should be a multiple of 8 samples.
+            # The length of HDAWG waveforms should be a multiple of 8 samples.
             if (len(waveform) % 8) != 0:
                 extra_zeros = 8-(len(waveform) % 8)
                 waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
