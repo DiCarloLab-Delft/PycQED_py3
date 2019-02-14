@@ -139,6 +139,15 @@ class ZI_HDAWG_core(ZI_base_instrument):
                 break
         print('\nDone')
 
+    # from IPython notebook AWG8_staircase_test.ipynb FIXME: return result
+    def check_timing_error(self, awgs):
+        for awg in awgs:
+            timing_error = self.geti('awgs/' + str(awg) + '/dio/error/timing')
+            if timing_error != 0:
+                print('Timing error detected on DIO of AWG {}: 0x{:08x}'.format(awg, timing_error))
+            else:
+                print('No timing error detected on DIO of AWG {}'.format(awg))
+
     def stop(self) -> None:
         """
         Stops the program on all AWG's part of this HDAWG unit
