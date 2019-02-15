@@ -100,16 +100,23 @@ class ZI_HDAWG_core(ZI_base_instrument):
         else:
             raise Exception("Unknown device type '{}'".format(dev_type))
 
-        self.load_default_settings
+        # FIXME: check features
+        # FIXME: check version
+
+        # NB: we don't want to load defaults automatically, but leave it up to the user
 
     # FIXME: incomplete
     def load_default_settings(self):
         """
-        reset DIO parameters (bits, timing) and bring device into known state
+        bring device into known state
         """
+        # clear output
 
+        # clear AWGs
+
+        # reset DIO parameters (bits, timing)
         for awg in range(4):
-            self._set_dio_delay(awg, 0, 0xFFFFFFFF, 0)  #
+            self._set_dio_delay(awg, 0, 0xFFFFFFFF, 0)  # set all delays to 0
 
     def get_idn(self) -> dict:
         # FIXME, update using new parameters for this purpose
@@ -166,6 +173,8 @@ class ZI_HDAWG_core(ZI_base_instrument):
                 print('Timing error detected on DIO of AWG {}: 0x{:08x}'.format(awg, timing_error))
             else:
                 print('No timing error detected on DIO of AWG {}'.format(awg))
+
+    # FIXME: add check_virt_mem_use(self)
 
     def stop(self) -> None:
         """
