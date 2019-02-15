@@ -13,6 +13,7 @@ Changelog:
 - moved out _add_extra_parameters() and _add_codeword_parameters()
 - added load_default_settings()
 - moved in _set_dio_delay()
+- replaced some warnings by Exceptions
 
 """
 
