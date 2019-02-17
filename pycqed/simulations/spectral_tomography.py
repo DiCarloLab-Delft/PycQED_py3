@@ -129,7 +129,7 @@ def f_to_parallelize_new(arglist):
 
     elif adaptive_pars['mode']=='spectral_tomo_nonmarkovian':
         MC.set_sweep_functions([noise_parameters_CZ.repetitions])
-        MC.set_sweep_points(np.arange(1, adaptive_pars['n_points'], 2))
+        MC.set_sweep_points(np.arange(0, adaptive_pars['n_points'], 1))
         if noise_parameters_CZ.cluster():
             dat = MC.run('1D sim_spectral_tomo_nonmarkovian double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
                 fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
@@ -448,7 +448,14 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             self.value_names.append('eig_imag_PTM_'+str(i))
         self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%']
         for i in range(0,95*2):
-            self.value_units.append('a.u.')
+        	self.value_units.append('a.u.')
+            
+
+        self.value_names.append('trace_PTM')
+        self.value_names.append('trace_GTM')
+        for i in [0,1]:
+        	self.value_units.append('a.u.')
+
 
         self.qois = qois
         if self.qois != 'all': 
@@ -583,6 +590,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             eig_T_PTM=np.linalg.eigvals(T_PTM)
 
 
+            trace_PTM=np.trace(T_PTM)
+            trace_GTM=np.trace(T_GTM)
+
+
         qoi_plot = np.array(qoi_plot)
 
         ## Uncomment to study the convergence properties of averaging over a Gaussian
@@ -604,9 +615,14 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             return_values.append(np.real(eig))
         for eig in eig_T_PTM:
             return_values.append(np.real(-1j*eig))
+
+        
+        return_values.append(np.real(trace_PTM))
+        return_values.append(np.real(trace_GTM))
+
+
         if self.qois != 'all': 
             return np.array(return_values)[self.qoi_mask]
-            
         else: 
             return return_values 
 
