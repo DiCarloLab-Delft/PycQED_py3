@@ -396,16 +396,16 @@ class dummy_UHFQC(Instrument):
         else:
             return '/' + self._device + '/' + path
 
-    def seti(self, path, value, async=False):
-        if async:
+    def seti(self, path, value, opt_async=False):
+        if opt_async:
             func = self._daq.asyncSetInt
         else:
             func = self._daq.setInt
 
         func(self._make_full_path(path), int(value))
 
-    def setd(self, path, value, async=False):
-        if async:
+    def setd(self, path, value, opt_async=False):
+        if opt_async:
             func = self._daq.asyncSetDouble
         else:
             func = self._daq.setDouble

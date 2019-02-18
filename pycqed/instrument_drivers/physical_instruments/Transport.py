@@ -1,9 +1,10 @@
 """
     File:       Transport.py
     Author:     Wouter Vlothuizen, TNO/QuTech
-    Purpose:    provide self contained data transport, similar to QCoDeS IPInstrument/VisaInstrument
+    Purpose:    provide self contained data transport
     Usage:
-    Notes:
+    Notes:      interface similar to that of QCoDeS IPInstrument/VisaInstrument
+                handles large data transfers properly (FIXME: partially)
     Bugs:
     Changelog:
 
@@ -16,6 +17,9 @@ class Transport:
     """
     abstract base class for data transport to instruments
     """
+
+    def __del__(self) -> None:
+        self.close()
 
     def close(self) -> None:
         pass
@@ -31,6 +35,7 @@ class Transport:
 
     def readline(self) -> str:
         pass
+
 
 
 class IPTransport(Transport):
@@ -49,9 +54,6 @@ class IPTransport(Transport):
         # beef up buffer, to prevent socket.send() not sending all our data in one go
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 512 * 1024)
         self._socket.connect((host, port))
-
-    def __del__(self) -> None:
-        self.close()
 
     def close(self) -> None:
         self._socket.close()

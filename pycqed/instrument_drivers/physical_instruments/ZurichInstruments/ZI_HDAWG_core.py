@@ -14,6 +14,7 @@ Changelog:
 - added load_default_settings()
 - moved in _set_dio_delay()
 - replaced some warnings by Exceptions
+- made some instance variables 'private'
 
 """
 
@@ -89,6 +90,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
             logging.error("parameter file for data parameters"
                             " {} not found".format(filename))
             raise
+            # FIXME: we need to be capable to generate file if none exists
 
         self._add_ZIshell_device_methods_to_instrument()
 
