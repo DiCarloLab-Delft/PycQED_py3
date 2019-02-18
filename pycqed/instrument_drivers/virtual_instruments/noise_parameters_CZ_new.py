@@ -122,6 +122,10 @@ class NoiseParametersCZ(Instrument):
                            label='Repetitions of CZ gate, used for spectral tomo',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=1)
+        self.add_parameter('time_series',
+                           label='',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(), initial_value=False)
 
 
         

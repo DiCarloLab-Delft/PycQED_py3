@@ -12,6 +12,7 @@ import lmfit
 import matplotlib.pyplot as plt
 from pycqed.analysis import measurement_analysis as ma
 import pycqed.analysis.tools.data_manipulation as dm_tools
+from functools import reduce
 
 
 class TomoAnalysis_JointRO():
@@ -832,7 +833,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 (self.nr_segments, nr_runs))
             measured_values2 = np.zeros(
                 (self.nr_segments, nr_runs))
-            if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom', 'PF_reset_selected_blossom']:
+            if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom', 'PF_no_error'] or 'selected_blossom' in self.PF_tracking:
                 # preparing a Pauli record with dimensions according to the parity pattern
                 self.PF_record = np.zeros(
                     (self.nr_measurement_segments, nr_runs, len(self.PF_parity_pattern)))
@@ -870,8 +871,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                         thresholds=[self.q_post_select_threshold],
                         init_measurements=[shots_qA_init],
                         positive_case=True)
-                    measured_values1[i, :][post_select_indices_0] = np.nan
-                    measured_values2[i, :][post_select_indices_0] = np.nan
+                    #measured_values1[i, :][post_select_indices_0] = np.nan
+                    #measured_values2[i, :][post_select_indices_0] = np.nan
 
                 if self.q_post_select:
                     # first digitize the 2D array
@@ -898,15 +899,37 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                             np.where(ancilla_outcomes_derivative[index, :] != state)).flatten()
                         measured_values1[i, :][post_select_indices_0] = np.nan
                         measured_values2[i, :][post_select_indices_0] = np.nan
-                    if self.PF_tracking=='PF_reset_selected_blossom':
-                        #post-selecting outcomes where blossom has not detected a data-qubit error
-                        post_select_indices_0 = np.array(np.where(np.array(self.blossom_record)[i, :, 0] !=0)).flatten()
-                        if i==1:
-                            print(post_select_indices_0[:20])
+                    if self.PF_tracking=='PF_no_error':
+                        if len(self.PF_parity_pattern)==2:
+                            parity_valuess = [[0, 0], [0, 1], [1, 0], [1, 1]]
+                            nr_rounds = int(self.nr_parity_check_rounds/2)
+                        elif len(self.PF_parity_pattern)==1:
+                            parity_valuess = [[0], [1]]
+                            nr_rounds = self.nr_parity_check_rounds
+                        post_select_indices_total=[]
+                        for parity_values in parity_valuess:
+                            parity_values=np.tile(parity_values,nr_rounds)
+                            indices = np.arange(nr_rounds*len(self.PF_parity_pattern))
+                            post_select_indices_sub=[]
+                            for indexnow, (index, state) in enumerate(zip(indices, parity_values)):
+                                post_indices = np.array(np.where(ancilla_outcomes_derivative[index, :] != state)).flatten()
+                                 # = post_indices
+                                post_select_indices_sub=np.unique(np.concatenate((post_indices, post_select_indices_sub)))
+                            post_select_indices_total.append(post_select_indices_sub)
+                        # self.post_select_indices=post_select_indices_total
+                        b=reduce(np.intersect1d, (post_select_indices_total))
+                        post_select_indices_0=[int(i) for i in b]
                         measured_values1[i, :][post_select_indices_0] = np.nan
                         measured_values2[i, :][post_select_indices_0] = np.nan
+
+                    if 'selected_blossom' in self.PF_tracking:
+                        #post-selecting outcomes where blossom has not detected a data-qubit error
+                        post_select_indices_0 = np.array(np.where(np.array(self.blossom_record)[i, :, 0] !=0)).flatten()
+                        measured_values1[i, :][post_select_indices_0] = np.nan
+                        measured_values2[i, :][post_select_indices_0] = np.nan
+
                     # 4. make a Pauli record in case the pauli frame of tomography is to be updated
-                    if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom','PF_reset_selected_blossom']:
+                    if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom', 'PF_no_error'] or 'selected_blossom' in self.PF_tracking:
                         for j in range(len(self.PF_parity_pattern)):
                             parity_outcomes = ancilla_outcomes_derivative[j::len(
                                 self.PF_parity_pattern)]
@@ -923,16 +946,16 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                     self.PF_record[i, :, j] = parity_outcomes[-1]+1%2
                                 else:
                                     self.PF_record[i, :, j] = parity_outcomes[-1]
-                            elif self.PF_tracking== 'PF_reset_all_phi_plus':
+                            elif self.PF_tracking in ['PF_reset_all_phi_plus', 'PF_no_error']:
                                 if len(parity_outcomes)==1:
                                     self.PF_record[i, :, j] = parity_outcomes
                                 else:
                                     self.PF_record[i, :, j] = parity_outcomes[-1]
                             elif 'blossom' in self.PF_tracking:
                                 if len(self.PF_parity_pattern)==1:
-                                    self.PF_record[i, :, j] = np.array(self.blossom_record)[i, :, 1+j]
+                                    self.PF_record[i, :, j] = np.array(self.blossom_record)[i, :, 2+j]
                                 elif len(self.PF_parity_pattern)==2:
-                                    self.PF_record[i, :, j] = np.array(self.blossom_record)[i, :, j]
+                                    self.PF_record[i, :, j] = np.array(self.blossom_record)[i, :, 1+j]
 
             #calculate post-selection fraction
             if self.q_post_select:
@@ -998,7 +1021,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         avg_h12 = (avg_h12)/scale_h12
         # applying pauli frame update here
         # first suptracting offsets and rescaling all individual shots
-        if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus','PF_reset_all_blossom','PF_reset_selected_blossom']:
+        if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus','PF_reset_all_blossom', 'PF_no_error'] or 'selected_blossom' in self.PF_tracking:
+            print('applying PF updates')
             # first subtracting offsets
             measured_values1 -= mean_h1
             measured_values2 -= mean_h2
@@ -1210,7 +1234,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                          'LSQ_name': self.q0_label,
                          'MSQ_name': self.q1_label,
                          'data_fraction': self.fraction}
-            if self.PF_tracking=='no_error':
+            if 'no_error' in self.PF_tracking:
                 name='tomography_results_decoding_{}_states_{}_indices_{}'.format(self.PF_tracking,
                                                                 self.q_post_selection_states[:len(self.PF_parity_pattern)],
                                                                 self.q_post_selection_indices[:len(self.PF_parity_pattern)])
@@ -1358,7 +1382,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                      ylabels=['00', '01', '10', '11'],
                                      fig=fig3,
                                      ax=fig3.add_subplot(122, projection='3d'))
-        if self.PF_tracking=='no_error':
+        if 'no_error' in self.PF_tracking:
             figname = 'MLE-Tomography_decoding_{}_states_{}_indices_{}_Exp_{}.{}'.format(self.PF_tracking,
                                                                                self.q_post_selection_states[:len(self.PF_parity_pattern)],
                                                                                self.q_post_selection_indices[:len(self.PF_parity_pattern)],
