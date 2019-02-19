@@ -85,8 +85,8 @@ class ZI_HDAWG_core(ZI_base_instrument):
         self._dev.connect_device(self._devname, '1GbE')
 
         # show some info
-        zi_version = self._dev.geti('/zi/version')      # LabOne version
-        zi_revision = self._dev.geti('/zi/revision')    # Data Server version
+        zi_version = self._dev.geti('/zi/about/version')      # LabOne version
+        zi_revision = self._dev.geti('/zi/about/revision')    # Data Server version
         logging.info('LabOne version {}, Data Server revision {}'.format(zi_version, zi_revision))
 
         # add qcodes parameters based on JSON parameter file

@@ -1,7 +1,7 @@
 """
     File:       Transport.py
     Author:     Wouter Vlothuizen, TNO/QuTech
-    Purpose:    provide self contained data transport
+    Purpose:    provide self contained data transport using several transport mechanisms
     Usage:
     Notes:      interface similar to that of QCoDeS IPInstrument/VisaInstrument
                 handles large data transfers properly (FIXME: partially)
@@ -43,12 +43,12 @@ class IPTransport(Transport):
     Based on: SCPI.py, QCoDeS::IPInstrument
     """
 
-    def __init__(self, host: str, port: int = 5025) -> None:
+    def __init__(self, host: str, port: int = 5025, timeout = 1.0) -> None:
         """
         establish connection, e.g. IPTransport('192.168.0.16', 4000)
         """
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.settimeout(1)  # first set timeout (before connect)
+        self._socket.settimeout(timeout)  # first set timeout (before connect)
         self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # send things immediately
 
         # beef up buffer, to prevent socket.send() not sending all our data in one go
