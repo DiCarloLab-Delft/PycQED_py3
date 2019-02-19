@@ -91,3 +91,7 @@ class VisaTransport(Transport):
 
 class FileTransport(Transport):
     pass
+
+
+class DummyTransport(Transport):
+    pass

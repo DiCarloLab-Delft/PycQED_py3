@@ -8,10 +8,10 @@
 
 """
 
+import logging
+
 from .SCPIBase import SCPIBase
 from .Transport import Transport
-
-import logging
 
 log = logging.getLogger(__name__)
 

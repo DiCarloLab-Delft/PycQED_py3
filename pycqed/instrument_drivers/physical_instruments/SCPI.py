@@ -15,8 +15,9 @@
 
 """
 
-from qcodes import IPInstrument
 import socket
+
+from qcodes import IPInstrument
 
 """
 FIXME: we would like to be able to choose the base class separately, so the

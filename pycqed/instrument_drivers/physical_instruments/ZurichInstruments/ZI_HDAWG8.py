@@ -40,13 +40,13 @@ Changelog:
 
 """
 
-from .ZI_HDAWG_core import ZI_HDAWG_core
-from qcodes.utils import validators as vals
-from qcodes.instrument.parameter import ManualParameter
 import time
 import logging
 import numpy as np
 
+from .ZI_HDAWG_core import ZI_HDAWG_core
+from qcodes.utils import validators as vals
+from qcodes.instrument.parameter import ManualParameter
 
 class ZI_HDAWG8(ZI_HDAWG_core):
 
@@ -337,6 +337,13 @@ class ZI_HDAWG8(ZI_HDAWG_core):
             if self._dev.geti('awgs/{}/dio/strobe/width'.format(i)) != TOGGLE_PERIOD:
                 raise Exception(
                     'Expected strobe width not configured correctly for AWG {}! Please rerun this cell!\n'.format(i))
+
+    def _debug_report_dio(self):
+        # FIXME: only DIO 0 for now
+        logging.info('DIO bits with timing errors:  0x%08X' % self._dev.geti('awgs/0/dio/error/timing'))
+        logging.info('DIO bits detected high:       0x%08X' % self._dev.geti('awgs/0/dio/highbits'))
+        logging.info('DIO bits detected low:        0x%08X' % self._dev.geti('awgs/0/dio/lowbits'))
+        # AWGS/0/DIO/ERROR/WIDTH
 
     ##########################################################################
     # 'private' functions: parameter support for codewords

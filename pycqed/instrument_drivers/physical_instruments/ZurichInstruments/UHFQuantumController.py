@@ -2,24 +2,33 @@
 Changelog:
 
 20190113 WJV
+- started Changelog
 - addressed many warnings identified by PyCharm
 - started adding type annotations
 - split of stuff into _add_node_pars()
 - made some properties 'private'
 
+20190219 WJV
+- tagged some dead code with FIXM.
+
+20190219:
+- made _array_to_combined_vector_string() a @staticmethod
+
 """
 
-import zhinst.ziPython as zi
-import zhinst.utils as zi_utils
-from qcodes.instrument.base import Instrument
-from qcodes.utils import validators as vals
-from qcodes.instrument.parameter import ManualParameter
 import time
 import json
 import os
 import logging
 import numpy as np
 from fnmatch import fnmatch
+
+from qcodes.instrument.base import Instrument
+from qcodes.utils import validators as vals
+from qcodes.instrument.parameter import ManualParameter
+
+import zhinst.ziPython as zi
+import zhinst.utils as zi_utils
 
 
 class UHFQC(Instrument):
@@ -392,6 +401,7 @@ class UHFQC(Instrument):
 
         # FIXME: cleanup code below
         if not success:
+            # FIXME:
             # Printing is disabled because we put the waveform in the program
             # this should be changed when .csv waveforms are supported for UHFQC
             # print("Compilation failed, printing program:")
@@ -406,6 +416,7 @@ class UHFQC(Instrument):
         print(self._awgModule.get('awgModule/compiler/statusstring')
               ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))
 
+        # FIXME:
         # path = '/' + self._device + '/awgs/0/ready'
         # self._daq.subscribe(path)
         # self._awgModule.set('awgModule/compiler/sourcestring', program_string)
@@ -475,6 +486,7 @@ class UHFQC(Instrument):
         # time.sleep(0.01)
         self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', single)
         self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
+        # FIXME:
         # t0=time.time()
         # time.sleep(0.001)
         # self._daq.sync()
@@ -514,6 +526,7 @@ class UHFQC(Instrument):
                         if len(data[n]) >= samples:
                             gotem[n] = True
 
+                # FIXME:
                 #if p in dataset:
                 #    for v in dataset[p]:
                 #        if n in data:
@@ -526,7 +539,7 @@ class UHFQC(Instrument):
 
         if not all(gotem):
             self.acquisition_finalize()
-            for n, c in enumerate(self._acquisition_paths):
+            for n, _c in enumerate(self._acquisition_paths):
                 if n in data:
                     print("\t: Channel {}: Got {} of {} samples".format(
                           n, len(data[n]), samples))
@@ -619,7 +632,7 @@ class UHFQC(Instrument):
             index(int): DIO bit index [0:31]
             value(int): delay value, [0:3] in 1/450 MHz = 2.222 ns steps
 
-        NB: UHFQC::awgs_0_dio_delay_index() should not be used, the index is
+        NB: UHFQC::awgs_0_dio_delay_index() should not be used directly, the index is
         encoded in the value. This is different from the AWG-8, and requires
         the maximum value for "awgs/0/dio/delay/value" in s_node_pars.txt to
         be changed to 1024
@@ -658,6 +671,7 @@ class UHFQC(Instrument):
         # ["quex/iavg", "quex/wint"]
         patterns = [
             "awgs", "sigins", "sigouts", "quex", "dios", "system/extclk"]
+        # FIXME:
         # json.dump([, s_file, default=int)
         # json.dump([, d_file, default=int)
         for pattern in patterns:
@@ -713,11 +727,11 @@ class UHFQC(Instrument):
                     '/' + self._device + '/', ''), node_types[s_node], min_values[s_node], max_values[s_node]]
                 print(line)
                 s_node_pars.append(line)
-                #json.dump(line, s_file, indent=2, default=int)
+                #json.dump(line, s_file, indent=2, default=int)  FIXME
 
             # extracting info from the data nodes
             d_nodes = list(d_nodes)
-            # default_values=self.getd(d_nodes)
+            # default_values=self.getd(d_nodes)  FIXME
             default_values = np.zeros(len(d_nodes))
             node_types = ['']*len(d_nodes)
 
@@ -738,12 +752,12 @@ class UHFQC(Instrument):
                         print("unknown type")
                 except:
                     node_types[i] = 'vector_s'
-                # , default_values[i]]
+                # , default_values[i]]  # FIXME
                 line = [
                     d_node.replace('/' + self._device + '/', ''), node_types[i]]
                 print(line)
                 d_node_pars.append(line)
-                #json.dump(line, d_file, indent=2, default=int)
+                #json.dump(line, d_file, indent=2, default=int)  FIXME
 
         with open(self._s_file_name, 'w') as s_file:
             json.dump(s_node_pars, s_file, default=int, indent=2)
@@ -872,7 +886,8 @@ class UHFQC(Instrument):
         else:
             self._daq.vectorWrite('/' + self._device + '/' + path, value)
 
-    def _array_to_combined_vector_string(self, array, name):
+    @staticmethod
+    def _array_to_combined_vector_string(array, name):
         # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
         # this is to avoid python crashes (was found to crash for vectors of
         # length> 1490)
@@ -1022,7 +1037,7 @@ class UHFQC(Instrument):
             'repeat(loop_cnt) {\n' +
             ' waitDIOTrigger();\n' +
             ' var dio = getDIOTriggered();\n' +
-            # now hardcoded for 7 bits (cc-light)
+            # FIXME: now hardcoded for 7 bits (cc-light)
             ' cw = (dio >> 17) & 0x1f;\n' +
             '  switch(cw) {\n')
         # adding the case statements
@@ -1043,7 +1058,7 @@ class UHFQC(Instrument):
                     ' wait(wait_delay);\n' +
                     ' setTrigger(WINT_EN + RO_TRIG);\n' +
                     ' setTrigger(WINT_EN);\n' +
-                    #' waitWave();\n'+ #removing this waitwave for now
+                    #' waitWave();\n'+ # FXIME: removing this waitwave for now
                     '}\n' +
                     'wait(300);\n' +
                     'setTrigger(0);\n')

@@ -31,7 +31,7 @@ def plot_timing_diagram(data, bits, line_length=30):
         plt.gca().axis('off')
         plt.show()
 
-    last = False
+#    last = False
     while len(data) > 0:
         if len(data) > line_length:
             d = data[0:line_length]
@@ -39,7 +39,7 @@ def plot_timing_diagram(data, bits, line_length=30):
         else:
             d = data
             data = []
-            last = True
+#            last = True
 
         _plot_timing_diagram(d, bits)
 

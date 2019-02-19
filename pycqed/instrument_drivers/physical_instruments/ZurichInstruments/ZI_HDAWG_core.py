@@ -16,10 +16,11 @@ Changelog:
 - replaced some warnings by Exceptions
 - made some instance variables 'private'
 
+20190219 WJV
+- removed unused open from _write_csv_waveform()
+
 """
 
-from . import zishell_NH as zs
-from .ZI_base_instrument import ZI_base_instrument
 import logging
 import os
 import time
@@ -27,6 +28,9 @@ import numpy as np
 import ctypes
 from ctypes.wintypes import MAX_PATH
 from zlib import crc32
+
+from . import zishell_NH as zs
+from .ZI_base_instrument import ZI_base_instrument
 
 
 class ZI_HDAWG_core(ZI_base_instrument):
@@ -80,6 +84,11 @@ class ZI_HDAWG_core(ZI_base_instrument):
         print("Trying to connect to device {}".format(self._devname))
         self._dev.connect_device(self._devname, '1GbE')
 
+        # show some info
+        zi_version = self._dev.geti('/zi/version')      # LabOne version
+        zi_revision = self._dev.geti('/zi/revision')    # Data Server version
+        logging.info('LabOne version {}, Data Server revision {}'.format(zi_version, zi_revision))
+
         # add qcodes parameters based on JSON parameter file
         dir_path = os.path.dirname(os.path.abspath(__file__))
         base_fn = os.path.join(dir_path, 'zi_parameter_files')
@@ -104,7 +113,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
             raise Exception("Unknown device type '{}'".format(dev_type))
 
         # FIXME: check features
-        # FIXME: check version
+        # FIXME: check version (also /ZI/VERSION ?)
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
 
@@ -120,6 +129,12 @@ class ZI_HDAWG_core(ZI_base_instrument):
         # reset DIO parameters (bits, timing)
         for awg in range(4):
             self._set_dio_delay(awg, 0, 0xFFFFFFFF, 0)  # set all delays to 0
+
+        # interesting nodes:
+        # SYSTEM/AWG/CHANNELGROUPING
+        # SYSTEM/CLOCKS/SAMPLECLOCK/FREQ
+        #
+
 
     def get_idn(self) -> dict:
         # FIXME, update using new parameters for this purpose
@@ -150,7 +165,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
         while True:
             self.system_clocks_referenceclock_source(1)
             while True:
-                # get status:
+                # get status (see docstring):
                 #   0: synced
                 #   1: sync failed (will force clock source to internal and retry)
                 #   2: syncing
@@ -167,6 +182,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
             else:
                 break
         print('\nDone')
+        # FIXME: also look at SYSTEM/CLOCKS/SAMPLECLOCK/STATUS ?
 
     # from IPython notebook AWG8_staircase_test.ipynb FIXME: return result
     def check_timing_error(self, awgs):
@@ -178,6 +194,10 @@ class ZI_HDAWG_core(ZI_base_instrument):
                 print('No timing error detected on DIO of AWG {}'.format(awg))
 
     # FIXME: add check_virt_mem_use(self)
+    # AWGS/0/SEQUENCER/MEMORYUSAGE
+    # AWGS/0/WAVEFORM/MEMORYUSAGE
+
+    # FIXME: add support for nodes: RAW/ERROR/*, see https://people.zhinst.com/%7Eniels/
 
     def stop(self) -> None:
         """
@@ -275,8 +295,9 @@ class ZI_HDAWG_core(ZI_base_instrument):
         filename = os.path.join(
             self._lab_one_webserver_path, 'awg', 'waves',
             self._devname+'_'+wf_name+'.csv')
-        with open(filename, 'w') as f:  # FIXME: unused
-            np.savetxt(filename, waveform, delimiter=",")
+#        with open(filename, 'w') as f:  # FIXME: unused
+#            np.savetxt(filename, waveform, delimiter=",")
+        np.savetxt(filename, waveform, delimiter=",")
 
     def _gen_read_csv(self, wf_name):
         def read_func():
