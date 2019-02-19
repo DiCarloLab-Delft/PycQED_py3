@@ -338,6 +338,15 @@ class ZI_HDAWG8(ZI_HDAWG_core):
                 raise Exception(
                     'Expected strobe width not configured correctly for AWG {}! Please rerun this cell!\n'.format(i))
 
+    # from IPython notebook AWG8_staircase_test.ipynb FIXME: return result
+    def check_timing_error(self, awgs):
+        for awg in awgs:
+            timing_error = self.geti('awgs/' + str(awg) + '/dio/error/timing')
+            if timing_error != 0:
+                print('Timing error detected on DIO of AWG {}: 0x{:08x}'.format(awg, timing_error))
+            else:
+                print('No timing error detected on DIO of AWG {}'.format(awg))
+
     def _debug_report_dio(self):
         # FIXME: only DIO 0 for now
         logging.info('DIO bits with timing errors:  0x%08X' % self._dev.geti('awgs/0/dio/error/timing'))

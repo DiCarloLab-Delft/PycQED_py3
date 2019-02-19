@@ -84,10 +84,10 @@ class ZI_HDAWG_core(ZI_base_instrument):
         print("Trying to connect to device {}".format(self._devname))
         self._dev.connect_device(self._devname, '1GbE')
 
-        # show some info
-        zi_version = self._dev.geti('/zi/about/version')      # LabOne version
-        zi_revision = self._dev.geti('/zi/about/revision')    # Data Server version
-        logging.info('LabOne version {}, Data Server revision {}'.format(zi_version, zi_revision))
+        # show some info. FIXME: fails
+        #zi_version = self._dev.geti('/zi/about/version')      # LabOne version
+        #zi_revision = self._dev.geti('/zi/about/revision')    # Data Server version
+        #logging.info('LabOne version {}, Data Server revision {}'.format(zi_version, zi_revision))
 
         # add qcodes parameters based on JSON parameter file
         dir_path = os.path.dirname(os.path.abspath(__file__))
@@ -183,15 +183,6 @@ class ZI_HDAWG_core(ZI_base_instrument):
                 break
         print('\nDone')
         # FIXME: also look at SYSTEM/CLOCKS/SAMPLECLOCK/STATUS ?
-
-    # from IPython notebook AWG8_staircase_test.ipynb FIXME: return result
-    def check_timing_error(self, awgs):
-        for awg in awgs:
-            timing_error = self.geti('awgs/' + str(awg) + '/dio/error/timing')
-            if timing_error != 0:
-                print('Timing error detected on DIO of AWG {}: 0x{:08x}'.format(awg, timing_error))
-            else:
-                print('No timing error detected on DIO of AWG {}'.format(awg))
 
     # FIXME: add check_virt_mem_use(self)
     # AWGS/0/SEQUENCER/MEMORYUSAGE
