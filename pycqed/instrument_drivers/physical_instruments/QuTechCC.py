@@ -16,7 +16,7 @@ from .Transport import Transport
 log = logging.getLogger(__name__)
 
 
-class QutechCC(SCPIBase):
+class QuTechCC(SCPIBase):
 
     ##########################################################################
     # 'public' functions for the end user

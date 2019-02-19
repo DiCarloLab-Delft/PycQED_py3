@@ -29,10 +29,10 @@ class SCPIBase:
         return self._transport.readline().rstrip()  # remove trailing white space, CR, LF
 
     def ask_float(self, cmd_str: str) -> float:
-        return float(self._transport.ask(cmd_str))
+        return float(self.ask(cmd_str))
 
     def ask_int(self, cmd_str: str) -> int:
-        return int(self._transport.ask(cmd_str))
+        return int(self.ask(cmd_str))
 
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
@@ -45,22 +45,22 @@ class SCPIBase:
         self._transport.write('*ESE %d' % value)
 
     def get_event_status_enable(self) -> str:
-        return self._transport.ask('*ESE?')
+        return self.ask('*ESE?')
 
     def get_event_status_enable_register(self) -> str:
-        return self._transport.ask('*ESR?')
+        return self.ask('*ESR?')
 
     def get_identity(self) -> str:
-        return self._transport.ask('*IDN?')
+        return self.ask('*IDN?')
 
     def operation_complete(self) -> None:
         self._transport.write('*OPC')
 
     def get_operation_complete(self) -> str:
-        return self._transport.ask('*OPC?')
+        return self.ask('*OPC?')
 
     def get_options(self) -> str:
-        return self._transport.ask('*OPT?')
+        return self.ask('*OPT?')
 
     def service_request_enable(self, value: int) -> None:
         self._transport.write('*SRE %d' % value)
@@ -111,7 +111,7 @@ class SCPIBase:
             bin_block (bytearray): binary data to send
             cmd_str (str): command string to use
         """
-        header = cmd_str + SCPI._build_header_string(len(bin_block))
+        header = cmd_str + SCPIBase._build_header_string(len(bin_block))
         bin_msg = header.encode() + bin_block
         self._transport.write_binary(bin_msg)
         self._transport.write('')                  # add a Line Terminator
