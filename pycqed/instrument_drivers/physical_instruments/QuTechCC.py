@@ -33,6 +33,7 @@ class QuTechCC(SCPIBase):
 
     def sequence_program(self, program_string: str) -> None:
         """
+        upload sequence program string
         """
         hdr = 'QUTech:SEQuence:PROGram'
         bin_block = program_string.encode('ascii')

@@ -29,10 +29,10 @@ class SCPIBase:
         return self._transport.readline().rstrip()  # remove trailing white space, CR, LF
 
     def ask_float(self, cmd_str: str) -> float:
-        return float(self.ask(cmd_str))
+        return float(self.ask(cmd_str))  # FIXME: can raise ValueError
 
     def ask_int(self, cmd_str: str) -> int:
-        return int(self.ask(cmd_str))
+        return int(self.ask(cmd_str))  # FIXME: can raise ValueError
 
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
