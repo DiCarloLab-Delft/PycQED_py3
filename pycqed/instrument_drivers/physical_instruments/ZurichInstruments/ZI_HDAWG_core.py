@@ -84,12 +84,9 @@ class ZI_HDAWG_core(ZI_base_instrument):
         print("Trying to connect to device {}".format(self._devname))
         self._dev.connect_device(self._devname, '1GbE')
 
-        # show some info. FIXME: fails
-        #zi_version = self._dev.geti('/zi/about/version')      # LabOne version
-        #zi_revision = self._dev.geti('/zi/about/revision')    # Data Server version
-        #logging.info('LabOne version {}, Data Server revision {}'.format(zi_version, zi_revision))
-
         # add qcodes parameters based on JSON parameter file
+        # FIXME: we might want to skip/remove/(add  to _params_to_skip_update) entries like AWGS/*/ELF/DATA,
+        #       AWGS/*/SEQUENCER/ASSEMBLY, AWGS/*/DIO/DATA
         dir_path = os.path.dirname(os.path.abspath(__file__))
         base_fn = os.path.join(dir_path, 'zi_parameter_files')
         filename = os.path.join(base_fn, 'node_doc_HDAWG8.json')
@@ -114,6 +111,11 @@ class ZI_HDAWG_core(ZI_base_instrument):
 
         # FIXME: check features
         # FIXME: check version (also /ZI/VERSION ?)
+        # show some info. FIXME: fails
+        #zi_version = self._dev.geti('/zi/about/version')      # LabOne version
+        #zi_revision = self._dev.geti('/zi/about/revision')    # Data Server version
+        #logging.info('LabOne version {}, Data Server revision {}'.format(zi_version, zi_revision))
+
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
 
@@ -203,13 +205,6 @@ class ZI_HDAWG_core(ZI_base_instrument):
         """
         for i in range(int(self._num_channels/2)):
             self.set('awgs_{}_enable'.format(i), 1)
-
-    def snapshot_base(self, update=False, params_to_skip_update=None):
-        if params_to_skip_update is None:
-            params_to_skip_update = self._params_to_skip_update
-        snap = super().snapshot_base(
-            update=update, params_to_skip_update=params_to_skip_update)
-        return snap
 
     ##########################################################################
     # 'public' functions: generic AWG/waveform support

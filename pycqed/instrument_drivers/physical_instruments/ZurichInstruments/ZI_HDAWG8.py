@@ -344,6 +344,15 @@ class ZI_HDAWG8(ZI_HDAWG_core):
         logging.info('DIO bits detected high:       0x%08X' % self._dev.geti('awgs/0/dio/highbits'))
         logging.info('DIO bits detected low:        0x%08X' % self._dev.geti('awgs/0/dio/lowbits'))
         # AWGS/0/DIO/ERROR/WIDTH
+        # AWGS/0/DIO/DATA
+
+    # override for InstrumentBase
+    def snapshot_base(self, update=False, params_to_skip_update=None):
+        if params_to_skip_update is None:
+            params_to_skip_update = self._params_to_skip_update
+        snap = super().snapshot_base(
+            update=update, params_to_skip_update=params_to_skip_update)
+        return snap
 
     ##########################################################################
     # 'private' functions: parameter support for codewords

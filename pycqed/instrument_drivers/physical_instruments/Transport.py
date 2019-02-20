@@ -3,8 +3,7 @@
     Author:     Wouter Vlothuizen, TNO/QuTech
     Purpose:    provide self contained data transport using several transport mechanisms
     Usage:
-    Notes:      interface similar to that of QCoDeS IPInstrument/VisaInstrument
-                handles large data transfers properly (FIXME: partially)
+    Notes:      handles large data transfers properly (FIXME: partially)
     Bugs:
     Changelog:
 
@@ -61,7 +60,7 @@ class IPTransport(Transport):
     def write(self, cmd_str: str) -> None:
         outStr = cmd_str + '\n'
         # FIXME: check return value, maybe encode() can be improved on by not using unicode strings?
-        self._socket.send(outStr.encode('ascii'))
+        self.write_binary(outStr.encode('ascii'))
 
     def write_binary(self, data: bytes) -> None:
         exp_len = len(data)

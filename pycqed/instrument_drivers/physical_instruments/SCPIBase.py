@@ -24,15 +24,15 @@ class SCPIBase:
     # Helpers
     ###
 
-    def ask(self, cmd_str: str) -> str:
+    def _ask(self, cmd_str: str) -> str:
         self._transport.write(cmd_str)
         return self._transport.readline().rstrip()  # remove trailing white space, CR, LF
 
-    def ask_float(self, cmd_str: str) -> float:
-        return float(self.ask(cmd_str))  # FIXME: can raise ValueError
+    def _ask_float(self, cmd_str: str) -> float:
+        return float(self._ask(cmd_str))  # FIXME: can raise ValueError
 
-    def ask_int(self, cmd_str: str) -> int:
-        return int(self.ask(cmd_str))  # FIXME: can raise ValueError
+    def _ask_int(self, cmd_str: str) -> int:
+        return int(self._ask(cmd_str))  # FIXME: can raise ValueError
 
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
@@ -45,35 +45,35 @@ class SCPIBase:
         self._transport.write('*ESE %d' % value)
 
     def get_event_status_enable(self) -> str:
-        return self.ask('*ESE?')
+        return self._ask('*ESE?')
 
     def get_event_status_enable_register(self) -> str:
-        return self.ask('*ESR?')
+        return self._ask('*ESR?')
 
     def get_identity(self) -> str:
-        return self.ask('*IDN?')
+        return self._ask('*IDN?')
 
     def operation_complete(self) -> None:
         self._transport.write('*OPC')
 
     def get_operation_complete(self) -> str:
-        return self.ask('*OPC?')
+        return self._ask('*OPC?')
 
     def get_options(self) -> str:
-        return self.ask('*OPT?')
+        return self._ask('*OPT?')
 
     def service_request_enable(self, value: int) -> None:
         self._transport.write('*SRE %d' % value)
 
     def get_service_request_enable(self) -> int:
-        return self.ask_int('*SRE?')
+        return self._ask_int('*SRE?')
 
     def get_status_byte(self) -> int:
-        return self.ask_int('*STB?')
+        return self._ask_int('*STB?')
 
     def get_test_result(self) -> int:
         # NB: result bits are device dependent
-        return self.ask_int('*TST?')
+        return self._ask_int('*TST?')
 
     def trigger(self) -> None:
         self._transport.write('*TRG')
@@ -91,13 +91,13 @@ class SCPIBase:
     def get_error(self) -> str:
         """ Returns:    '0,"No error"' or <error message>
         """
-        return self.ask('system:err?')
+        return self._ask('system:err?')
 
     def get_system_error_count(self):
-        return self.ask_int('system:error:count?')
+        return self._ask_int('system:error:count?')
 
     def get_system_version(self) -> str:
-        return self.ask('system:version?')
+        return self._ask('system:version?')
 
     ###
     # IEEE 488.2 binblock handling

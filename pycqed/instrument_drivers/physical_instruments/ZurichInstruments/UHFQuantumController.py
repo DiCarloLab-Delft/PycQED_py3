@@ -14,6 +14,12 @@ Changelog:
 20190219:
 - made _array_to_combined_vector_string() a @staticmethod
 
+
+Notes:
+- this driver builds on zhinst.ziPython and zhinst.utils directly, whereas the HDAWG driver inserts zishell_NH and
+  ZI_base_instrument on top of these.
+- some code (get*, set*) in this driver resembles code in zishell_NH and ZI_base_instrument
+
 """
 
 import time
