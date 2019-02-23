@@ -1101,7 +1101,6 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
                                                      operation_dict,
                                                      nr_cliffords_value, #scalar
                                                      nr_seeds,           #array
-                                                     # clifford_sequence_list=None,
                                                      net_clifford=0,
                                                      gate_decomposition='HZ',
                                                      interleaved_gate=None,
@@ -1126,7 +1125,9 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
         interleaved_gate (str): used for regular single qubit Clifford IRB
             string referring to one of the gates in the single qubit
             Clifford group
+        cal_points (bool): whether to use cal points
         upload (bool): upload sequence to AWG or not
+        upload_all (bool): whether to upload to all AWGs
         seq_name (str): name of this sequences
         verbose (bool): print runtime info
         return_seq (bool): if True, returns seq, element list;
@@ -1163,7 +1164,7 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
 
             pulse_keys_w_suffix = []
             for k, pk in enumerate(pulse_keys):
-                pk_name = pk if k==0 else pk+'s'
+                pk_name = pk if k == 0 else pk+'s'
                 pulse_keys_w_suffix.append(pk_name+' '+qubit_names_list[k % n])
 
             pulse_list = []
@@ -1175,7 +1176,7 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
 
             pulse_keys_w_suffix = []
             for k, pk in enumerate(pulse_keys):
-                pk_name = pk if k==0 else pk+'s'
+                pk_name = pk if k == 0 else pk+'s'
                 pulse_keys_w_suffix.append(pk_name+' '+qubit_names_list[k % n])
 
             pulse_list = []

@@ -11231,7 +11231,8 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
 
         delays = self.sweep_points
         freqs = self.sweep_points_2D
-        data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(self.data[2:, :])
+        data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(
+            self.data[2:, :])
 
         data_rotated = data_rotated.reshape(len(freqs), len(delays))
         self.data_rotated = data_rotated

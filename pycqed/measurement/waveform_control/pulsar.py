@@ -257,7 +257,7 @@ class HDAWG8Pulsar:
         self.add_parameter('{}_type'.format(name),
                            get_cmd=lambda: 'analog')
         self.add_parameter('{}_granularity'.format(name),
-                           get_cmd=lambda: 8)
+                           get_cmd=lambda: 16)
         self.add_parameter('{}_min_length'.format(name),
                            get_cmd=lambda: 8 / 2.4e9)
         self.add_parameter('{}_inter_element_deadtime'.format(name),
@@ -520,15 +520,20 @@ class HDAWG8Pulsar:
             reps) if reps != 1 else ''
         trigger_str = 'waitDigTrigger(1);\n'
         if name1 is None and name2 is None:
+            prefetch_str = ''
             play_str = 'playWaveDIO();\n'
         elif name1 is None:
+            prefetch_str = ''
             play_str = 'playWave(2, {});\n'.format(name2)
         elif name2 is None:
+            prefetch_str = ''
             play_str = 'playWave(1, {});\n'.format(name1)
         else:
+            prefetch_str = 'prefetch({}, {});\n'.format(name1, name2)
             play_str = 'playWave({}, {});\n'.format(name1, name2)
         repeat_close_str = '}\n' if reps != 1 else ''
-        return repeat_open_str + trigger_str + play_str + repeat_close_str
+        return repeat_open_str + prefetch_str+ trigger_str + \
+               play_str + repeat_close_str
 
     def _HDAWG8_active_AWGs(self, obj):
         result = set()

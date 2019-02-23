@@ -335,7 +335,10 @@ def get_qb_channel_map_from_file(qb_names, file_path,
         elif 'lin_trans' in ro_type:
             ro_type = 'lin_trans w'
         else:
-            raise ValueError('Unknown readout type "{}".'.format(ro_type))
+            input_ro_type = ro_type
+            ro_type = 'w'
+            logging.warning('Readout type "{}" does not have standard '
+                            'format.'.format(input_ro_type))
 
     for qbn in qb_names:
         ro_acq_weight_type = instr_settings[qbn].attrs['ro_acq_weight_type']

@@ -1570,7 +1570,7 @@ class BaseDataAnalysis(object):
         return np.max([np.max(v) for v in array])
 
     @staticmethod
-    def get_default_plot_params(set=True, **kwargs):
+    def get_default_plot_params(set_pars=True, **kwargs):
         font_size = kwargs.get('font_size', 18)
         marker_size = kwargs.get('marker_size', 6)
         line_width = kwargs.get('line_width', 2.5)
@@ -1610,7 +1610,7 @@ class BaseDataAnalysis(object):
                   'ytick.major.width': tick_width,
                   'axes.formatter.useoffset': False,
                   }
-        if set:
+        if set_pars:
             plt.rcParams.update(params)
         return params
 

@@ -491,7 +491,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'projected_data_dict'].items():
             if isinstance(corr_data, dict):
                 for ro_suffix, data in corr_data.items():
-                    plot_name = 'base_plot_' + qb_name + ro_suffix
+                    plot_name = 'projected_plot_' + qb_name + ro_suffix
                     self.prepare_projected_data_plot(
                         plot_name, data, qb_name=qb_name,
                         title_suffix=qb_name+ro_suffix,
@@ -502,7 +502,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             'gnd_state_' + qb_name + ro_suffix))
 
             else:
-                plot_name = 'base_plot_' + qb_name
+                plot_name = 'projected_plot_' + qb_name
                 self.prepare_projected_data_plot(
                     plot_name, corr_data, qb_name=qb_name,
                     title_suffix=qb_name,
@@ -572,7 +572,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         'plotsize': (plotsize[0]*numplotsx,
                                      plotsize[1]*numplotsy),
                         'title': fig_title}
-
+            if len(raw_data_dict) == 1:
+                self.plot_dicts[
+                    plot_name + '_' + list(raw_data_dict)[0]]['ax_id'] = None
     def prepare_projected_data_plot(
             self, plot_name, data, qb_name,
             title_suffix=None, plot_cal_points=True,
@@ -3191,7 +3193,7 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                 # rename base plot
                 base_plot_name = 'Rabi_' + qbn
                 self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
-                    'base_plot_' + qbn)
+                    'projected_plot_' + qbn)
                 for ref_state_plot_label in ('exc_state_'+qbn,
                                              'gnd_state_'+qbn):
                     if ref_state_plot_label in self.plot_dicts:
@@ -3348,7 +3350,7 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
                 # rename base plot
                 base_plot_name = 'T1_' + qbn
                 self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
-                    'base_plot_' + qbn)
+                    'projected_plot_' + qbn)
                 for ref_state_plot_label in ('exc_state_'+qbn,
                                              'gnd_state_'+qbn):
                     if ref_state_plot_label in self.plot_dicts:
@@ -3474,7 +3476,7 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
             for qbn in self.qb_names:
                 base_plot_name = 'Ramsey_' + qbn
                 self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
-                    'base_plot_' + qbn)
+                    'projected_plot_' + qbn)
                 for ref_state_plot_label in ('exc_state_'+qbn,
                                              'gnd_state_'+qbn):
                     if ref_state_plot_label in self.plot_dicts:
@@ -3486,7 +3488,7 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                 exp_decay_fit_key = self.fit_keys[0] + qbn
                 old_qb_freq = ramsey_dict[qbn][
                     exp_decay_fit_key]['old_qb_freq']
-                textstr = '$f_{qubit \_ old}$ = '+'{:.4f} GHz '.format(
+                textstr = '$f_{qubit \_ old}$ = '+'{:.6f} GHz '.format(
                         old_qb_freq*1e-9)
                 T2_star_str = ''
                 for i, key in enumerate([k + qbn for k in self.fit_keys]):
@@ -3665,7 +3667,7 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
         for qbn in self.qb_names:
             ref_state_plot_labels = ['exc_state_' + qbn,
                                      'gnd_state_' + qbn]
-            self.plot_dicts.pop('base_plot_' + qbn)
+            self.plot_dicts.pop('projected_plot_' + qbn)
             for ref_state_plot_label in ref_state_plot_labels:
                 if ref_state_plot_label in self.plot_dicts:
                     self.plot_dicts.pop(ref_state_plot_label)
@@ -3792,6 +3794,8 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
             self.echo_analysis = RamseyAnalysis(*args, extract_only=True,
                                                 **kwargs)
         else:
+            if 'options_dict' in kwargs:
+                kwargs.pop('options_dict')
             self.echo_analysis = T1Analysis(*args, extract_only=True,
                                             options_dict={'vary_offset': True},
                                             **kwargs)

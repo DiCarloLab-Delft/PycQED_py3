@@ -1039,11 +1039,12 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
                 qb_names=[qb1n, qb2n],
                 use_latest_data=True,
                 gate_decomp=clifford_decomposition_name,
-                add_correction=True)
+                add_correction=False,
+                single_fit=True)
 
 
 def measure_n_qubit_simultaneous_randomized_benchmarking(
-        qubits, f_LO, clifford_sequence_list=None,
+        qubits, f_LO,
         nr_cliffords=None, nr_seeds=50,
         gate_decomp='HZ', interleaved_gate=None,
         cal_points=False, nr_averages=None,
@@ -2011,6 +2012,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     else:
         msmt_suffix = '_qbs{}'.format(''.join([i[-1] for i in qubit_names]))
 
+    sweep_points_dict = deepcopy(sweep_points_dict)
     for key, spts in sweep_points_dict.items():
         if spts is None:
             if key == 'n_rabi':
@@ -2498,8 +2500,9 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
     MC.set_detector_function(qbr.int_avg_det)
     MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name),
               exp_metadata=exp_metadata)
-
-    ma.MeasurementAnalysis(TwoD=True)
+    # ma.MeasurementAnalysis(TwoD=True)
+    tda.MultiQubit_TimeDomain_Analysis(qb_names=[qbr.name],
+                                       options_dict={'TwoD': True})
 
 def measure_cphase(qbc, qbt, qbr, lengths, amps,
                        CZ_pulse_name=None,
@@ -2695,10 +2698,16 @@ def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
 
 def measure_CZ_bleed_through(qb, CZ_separation_times, phases, CZ_pulse_name,
                              label=None, upload=True, cal_points=True,
-                             soft_avgs=1, analyze=True, MC=None):
+                             oneCZ_msmt=False, soft_avgs=1, nr_cz_gates=1,
+                             TwoD=True, analyze=True, MC=None):
 
     if MC is None:
         MC = qb.MC
+
+    exp_metadata = {'CZ_pulse_name': CZ_pulse_name,
+                    'cal_points': cal_points,
+                    'oneCZ_msmt': oneCZ_msmt,
+                    'nr_cz_gates': nr_cz_gates}
 
     qb.prepare_for_timedomain()
 
@@ -2710,38 +2719,49 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases, CZ_pulse_name,
 
     operation_dict = qb.get_operation_dict()
 
-    s1 = awg_swf.CZ_bleed_through_phase_hard_sweep(
+    s1 = awg_swf.CZ_bleed_through_phase_hard_sweep_new(
         qb_name=qb.name,
         CZ_pulse_name=CZ_pulse_name,
         CZ_separation=CZ_separation_times[0],
         operation_dict=operation_dict,
-        maximum_CZ_separation=np.max(CZ_separation_times),
+        oneCZ_msmt=oneCZ_msmt,
+        nr_cz_gates=nr_cz_gates,
         verbose=False,
-        upload=False,
+        upload=(False if TwoD else upload),
         return_seq=False,
         cal_points=cal_points)
 
-    s2 = awg_swf.CZ_bleed_through_separation_time_soft_sweep(
-        s1, upload=upload)
     MC.set_sweep_function(s1)
     MC.set_sweep_points(phases)
-    MC.set_sweep_function_2D(s2)
-    MC.set_sweep_points_2D(CZ_separation_times)
+    if TwoD:
+        if len(CZ_separation_times) != 1:
+            s2 = awg_swf.CZ_bleed_through_separation_time_soft_sweep(
+                s1, upload=upload)
+            MC.set_sweep_function_2D(s2)
+            MC.set_sweep_points_2D(CZ_separation_times)
+        elif nr_cz_gates > 1:
+            exp_metadata['CZ_separation_time'] = CZ_separation_times[0]
+            s2 = awg_swf.CZ_bleed_through_nr_cz_gates_soft_sweep(
+                s1, upload=upload)
+            MC.set_sweep_function_2D(s2)
+            MC.set_sweep_points_2D(1+np.arange(nr_cz_gates))
     MC.set_detector_function(qb.int_avg_det)
     MC.soft_avg(soft_avgs)
 
     if label is None:
         idx = CZ_pulse_name.index('q')
-        label = 'CZ_bleed_through_{}{}'.format(CZ_pulse_name[idx:idx+3],
-                                              qb.msmt_suffix)
+        if oneCZ_msmt:
+            label = 'CZ_phase_msmt_{}{}'.format(CZ_pulse_name[idx:idx+3],
+                                                qb.msmt_suffix)
+        else:
+            label = str(nr_cz_gates)
+            label += 'CZ_bleed_through_{}{}'.format(CZ_pulse_name[idx:idx+3],
+                                                   qb.msmt_suffix)
+    MC.run(label, mode=('2D' if TwoD else '1D'), exp_metadata=exp_metadata)
 
-    if len(CZ_separation_times) == 1:
-        exp_metadata = {'CZ_separation_time': CZ_separation_times[0]}
-        MC.run(label, exp_metadata=exp_metadata)
-    else:
-        MC.run_2D(label)
     if analyze:
-        ma.MeasurementAnalysis(TwoD=True)
+        tda.MultiQubit_TimeDomain_Analysis(qb_names=[qb.name],
+                                           options_dict={'TwoD': TwoD})
 
 
 def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,

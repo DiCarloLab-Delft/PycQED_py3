@@ -16,12 +16,12 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 
-# font_size = 18
-# marker_size = 5
-# fig_size_dim = 10
-# line_width = 2
-# axes_line_width = 1
-# golden_ratio = (1+np.sqrt(5))/2
+font_size = 18
+marker_size = 5
+fig_size_dim = 10
+line_width = 2
+axes_line_width = 1
+golden_ratio = (1+np.sqrt(5))/2
 # params = {'figure.figsize': (fig_size_dim, fig_size_dim/golden_ratio),
 #           'figure.dpi': 300,
 #           'savefig.dpi': 300,
@@ -963,9 +963,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
             self.msmt_strings += [self.measurementstring]
             self.data_files += [self.data_file]
-        print(self.data_dict_raw['data'])
-        from pprint import pprint
-        pprint(self.data_dict_raw)
+
         # get RO channels and fit data
         self.n_cl = self.data_dict_raw['n_cl']
         for var_name, dset in self.data_dict_raw['data'].items():
@@ -981,8 +979,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
             self.fit_res_dict_raw[var_name] = \
                 self.fit_data(dset, self.n_cl, d=d,
-                              epsilon=
-                              self.var_data_dict[var_name], **kw)
+                              epsilon=self.var_data_dict[var_name], **kw)
             if self.epsilon is None:
                 self.epsilon_dict[var_name] = self.var_data_dict[var_name]
             else:
@@ -992,8 +989,12 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         two_qubits = kw.pop('two_qubits', True)
         find_empirical_variance = kw.pop('find_empirical_variance', True)
-
+        scaling_factor = kw.pop('scaling_factor', 1)
+        print(scaling_factor)
         self.get_naming_and_values_2D()
+        self.data[2::] = self.data[2:]/scaling_factor
+        for i in range(len(self.measured_values)):
+            self.measured_values[i] = self.measured_values[i]/scaling_factor
 
         if two_qubits:
             n_cl = np.unique(self.sweep_points_2D)
@@ -1175,18 +1176,22 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
             return
 
-    def fit_data(self, data, numCliff,
-                 print_fit_results=False,
-                 show_guess=False,
-                 plot_results=False, **kw):
+    def fit_data(self, data, numCliff, print_fit_results=False,
+                 show_guess=False,  plot_results=False, **kw):
 
+        guess_pars_dict = kw.pop('guess_pars_dict', {})
         d = kw.pop('d', 2)
         print('d in fit_data ', d)
 
         RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
-        RBModel.set_param_hint('Amplitude', value=0)
-        RBModel.set_param_hint('p', value=.99)
-        RBModel.set_param_hint('offset', value=.5)
+        RBModel.set_param_hint('Amplitude',
+                               value=guess_pars_dict.get('Amplitude', 0.9))
+        RBModel.set_param_hint('p',
+                               value=guess_pars_dict.get('p', 0.99),
+                               min=0, max=1)
+        RBModel.set_param_hint('offset',
+                               value=guess_pars_dict.get('offset', 0),
+                               vary=True)
         # From Magesan et al., Scalable and Robust Randomized Benchmarking
         # of Quantum Processes
         RBModel.set_param_hint('fidelity_per_Clifford',  # vary=False,
@@ -1553,10 +1558,6 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         else:
             ax.legend(loc='upper right', ncol=1, fancybox=True,
                       frameon=False, fontsize=font_size)
-
-        # ax.get_xaxis().get_major_formatter().set_scientific(False)
-        if self.data_dict['n_cl'][-1] >= 100:
-            ax.set_xticks(self.data_dict['n_cl'][0::2])
 
         ax_mirror.set_ylabel(self.ylabel_corr)
         ax_mirror.yaxis.label.set_color(line[0].get_color())
@@ -2212,13 +2213,6 @@ def plotting_function(x, y, fig, ax, marker='-o',
     if ylabel is not None:
         set_ylabel(ax, ylabel, unit=y_unit)
 
-    # majorLocator = MultipleLocator(50)
-    # majorFormatter = FormatStrFormatter('%d')
-    # minorLocator = MultipleLocator(10)
-    # ax.xaxis.set_major_locator(majorLocator)
-    # ax.xaxis.set_major_formatter(majorFormatter)
-    # ax.xaxis.set_minor_locator(minorLocator)
-
     ax.set_ylim([-0.15, 1.15])
     majorLocator = MultipleLocator(0.2)
     majorFormatter = FormatStrFormatter('%1.1f')
@@ -2226,8 +2220,6 @@ def plotting_function(x, y, fig, ax, marker='-o',
     ax.yaxis.set_major_locator(majorLocator)
     ax.yaxis.set_major_formatter(majorFormatter)
     ax.yaxis.set_minor_locator(minorLocator)
-
-    # ax.get_xaxis().get_major_formatter().set_scientific(False)
 
     fig.tight_layout()
 

@@ -22,7 +22,7 @@ class ZI_HDAWG8(ZI_base_instrument):
 
     def __init__(self, name, device: str,
                  server: str='localhost', port=8004,
-                 num_codewords: int = 32, **kw):
+                 num_codewords: int = 32, interface='USB', **kw):
         '''
         Input arguments:
             name:           (str) name of the instrument as seen by the user
@@ -51,7 +51,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._dev = zs.ziShellDevice()
         self._dev.connect_server(server, port)
         print("Trying to connect to device {}".format(self._devname))
-        self._dev.connect_device(self._devname, 'USB')
+        self._dev.connect_device(self._devname, interface)
 
         dir_path = os.path.dirname(os.path.abspath(__file__))
         base_fn = os.path.join(dir_path, 'zi_parameter_files')
