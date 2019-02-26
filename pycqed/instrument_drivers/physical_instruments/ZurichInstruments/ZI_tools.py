@@ -133,8 +133,10 @@ def print_timing_diagram_simple(data, bits, line_length=30):
 
 # From: Electronics_Design/CC_test_DIO_UHFQC.ipynb
 def check_dio_timing(data, strobe_index, bits):
-    global min_lo, min_hi
-    errSetupHold = 0  # return value
+    err_setup = False
+    err_hold = False
+    min_hi = 64  # FIXME
+    min_lo = 64
 
     prev_transition = 0
     prev_val = (data[0] >> strobe_index) & 1
@@ -162,11 +164,11 @@ def check_dio_timing(data, strobe_index, bits):
                         late = (data[idx + 1] >> bit) & 1
                         if early != prompt:
                             print('setup error on bit {} at sample {}'.format(bit, idx))
-                            errSetupHold = 1
+                            err_setup = True
                         if late != prompt:
                             print('hold error on bit {} at sample {}'.format(bit, idx))
-                            errSetupHold = 1
+                            err_hold = True
 
             prev_val = val
             prev_transition = idx
-    return errSetupHold
+    return dict(err_setup=err_setup, err_hold=err_hold, min_hi=min_hi, min_lo=min_lo)
