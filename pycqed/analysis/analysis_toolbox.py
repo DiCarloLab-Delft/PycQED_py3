@@ -2635,8 +2635,58 @@ def solve_quadratic_equation(a, b, c, verbose=False):
             print("This equation has two solutions: ", x1, " or", x2)
         return [x1, x2]
 
+"""Chirp z-Transform.
+As described in
+Rabiner, L.R., R.W. Schafer and C.M. Rader.
+The Chirp z-Transform Algorithm.
+IEEE Transactions on Audio and Electroacoustics, AU-17(2):86--92, 1969
+"""
 
-def calculate_f_qubit_from_power_scan(f_bare,f_shifted,g_coupling=65e6):
+def chirpz(x,A,W,M):
+    """Compute the chirp z-transform.
+    The discrete z-transform,
+    X(z) = \sum_{n=0}^{N-1} x_n z^{-n}
+    is calculated at M points,
+    z_k = AW^-k, k = 0,1,...,M-1
+    for A and W complex, which gives
+    X(z_k) = \sum_{n=0}^{N-1} x_n z_k^{-n}
+    """
+    A = np.complex(A)
+    W = np.complex(W)
+    if np.issubdtype(np.complex,x.dtype) or np.issubdtype(np.float,x.dtype):
+        dtype = x.dtype
+    else:
+        dtype = float
+
+    x = np.asarray(x,dtype=np.complex)
+
+    N = x.size
+    L = int(2**np.ceil(np.log2(M+N-1)))
+
+    n = np.arange(N,dtype=float)
+    y = np.power(A,-n) * np.power(W,n**2 / 2.) * x
+    Y = np.fft.fft(y,L)
+
+    v = np.zeros(L,dtype=np.complex)
+    v[:M] = np.power(W,-n[:M]**2/2.)
+    v[L-N+1:] = np.power(W,-n[N-1:0:-1]**2/2.)
+    V = np.fft.fft(v)
+
+    g = np.fft.ifft(V*Y)[:M]
+    k = np.arange(M)
+    g *= np.power(W,k**2 / 2.)
+
+    return g
+
+def zoom_fft(t,y,fmin,fmax):
+    m = len(t)
+    Fs = 1./(t[1]-t[0])
+    chirp_y = chirpz(y,M=m,A=np.exp(2*1j*np.pi*fmin/(Fs)),W=np.exp(-2*1j*np.pi*(fmax-fmin)/(m*Fs)))
+    chirp_x = fmin + np.arange(m)*(fmax-fmin)/m
+    return [chirp_x,chirp_y]
+
+
+def calculate_f_qubit_from_power_scan(f_bare,f_shifted,g_coupling=65e6,RWA = False):
     '''
     Inputs are in Hz
     f_bare: the resonator frequency without a coupled qubit
@@ -2650,14 +2700,12 @@ def calculate_f_qubit_from_power_scan(f_bare,f_shifted,g_coupling=65e6):
     g = 2*np.pi * g_coupling
     shift =(w_shift - w_r)/g**2
     #f_shift > 0 when f_qubit<f_res
-    if (shift>0):
+    #For the non-RWA result (only dispersive approximation)
+    if (RWA == False):
         w_q = -1/(shift) + np.sqrt(1/(shift**2)+w_r**2)
-        #For the RWA approximation
-        # w_q_RWA = -1/shift + w_r
+    #For the RWA approximation
     else:
-        w_q = 1/shift + np.sqrt(1/(shift**2)+w_r**2)
-
-        # w_q_RWA = 1/shift + w_r
+        w_q = -1/shift + w_r
     return w_q/(2.*np.pi)
 
 def calculate_g_coupling_from_frequency_shift(f_bare,f_shifted,f_qubit):
