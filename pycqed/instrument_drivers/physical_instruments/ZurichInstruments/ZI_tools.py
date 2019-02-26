@@ -1,4 +1,5 @@
-# Zurich Instrument utilities extracted from IPython notebooks
+# Zurich Instrument goodies extracted from IPython notebooks
+# author: Niels H
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -41,3 +42,90 @@ def plot_timing_diagram(data, bits, line_length=30):
 
         _plot_timing_diagram(d, bits)
 
+
+# From: iPython-Notebooks/Experiments/1709_M18/170918_UHFQC - LutMan testing
+def print_timing_diagram(data, bits, line_length=30):
+    def _print_timing_diagram(data, bits):
+        line_length = 0
+
+        for i in bits:
+            print('       ', end='')
+            last = (data[0] >> i) & 1
+            for d in data:
+                curr = (d >> i) & 1
+                if last == 0 and curr == 0:
+                    print('   ', end='')
+                elif last == 0 and curr == 1:
+                    print(' __', end='')
+                elif last == 1 and curr == 0:
+                    print('   ', end='')
+                elif last == 1 and curr == 1:
+                    print('___', end='')
+                last = curr
+            print('')
+            print('Bit {:2d}:'.format(i), end='')
+
+            last = (data[0] >> i) & 1
+            for d in data:
+                curr = (d >> i) & 1
+                if last == 0 and curr == 0:
+                    print('___', end='')
+                elif last == 0 and curr == 1:
+                    print('/  ', end='')
+                elif last == 1 and curr == 0:
+                    print('\\__', end='')
+                elif last == 1 and curr == 1:
+                    print('   ', end='')
+                last = curr
+            print('')
+
+    done = False
+    while len(data) > 0:
+        if len(data) > line_length:
+            d = data[0:line_length]
+            data = data[line_length:]
+        else:
+            d = data
+            data = []
+            done = True
+
+        _print_timing_diagram(d, bits)
+        if not done:
+            print('')
+            print('       ', end='')
+            print('-' * 3 * line_length)
+
+
+# simple version of above to better view timing
+def print_timing_diagram_simple(data, bits, line_length=30):
+    def _print_timing_diagram(data, bits):
+        line_length = 0
+
+        for i in bits:
+            print('Bit {:2d}:'.format(i), end='')
+
+            last = (data[0] >> i) & 1
+            for d in data:
+                curr = (d >> i) & 1
+                if curr == 0:
+                    print('0', end='')
+                elif curr == 1:
+                    print('1', end='')
+                last = curr
+            print('')
+
+    done = False
+    while len(data) > 0:
+        if len(data) > line_length:
+            d = data[0:line_length]
+            data = data[line_length:]
+        else:
+            d = data
+            data = []
+            done = True
+
+        _print_timing_diagram(d, bits)
+        if not done:
+            print('')
+            print('       ', end='')
+            print('-' * line_length)
