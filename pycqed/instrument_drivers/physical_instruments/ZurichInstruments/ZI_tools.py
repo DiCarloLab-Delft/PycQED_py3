@@ -1,5 +1,5 @@
 # Zurich Instrument goodies extracted from IPython notebooks
-# author: Niels H
+# authors: Niels H, Wouter Vlothuizen
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -129,3 +129,44 @@ def print_timing_diagram_simple(data, bits, line_length=30):
             print('')
             print('       ', end='')
             print('-' * line_length)
+
+
+# From: Electronics_Design/CC_test_DIO_UHFQC.ipynb
+def check_dio_timing(data, strobe_index, bits):
+    global min_lo, min_hi
+    errSetupHold = 0  # return value
+
+    prev_transition = 0
+    prev_val = (data[0] >> strobe_index) & 1
+    for idx in range(len(data)):
+        val = (data[idx] >> strobe_index) & 1
+        # print(val, end='')
+        if val != prev_val:
+            # print('transition {}{} at {}'.format(prev_val, val, i))
+            if prev_transition:  # did we already see a transition
+                # compute duration
+                duration = idx - prev_transition
+                if prev_val:  # we had a 1
+                    if duration < min_hi:
+                        min_hi = duration
+                else:  # we had a 0
+                    if duration < min_lo:
+                        min_lo = duration
+                        # print('{} period = {} samples'. format(prev_val, duration))
+
+                # test setup and hold
+                for bit in bits:
+                    if idx > 1 and idx < len(data) - 1:
+                        prompt = (data[idx] >> bit) & 1
+                        early = (data[idx - 1] >> bit) & 1
+                        late = (data[idx + 1] >> bit) & 1
+                        if early != prompt:
+                            print('setup error on bit {} at sample {}'.format(bit, idx))
+                            errSetupHold = 1
+                        if late != prompt:
+                            print('hold error on bit {} at sample {}'.format(bit, idx))
+                            errSetupHold = 1
+
+            prev_val = val
+            prev_transition = idx
+    return errSetupHold
