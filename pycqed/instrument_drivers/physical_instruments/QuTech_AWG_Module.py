@@ -17,6 +17,7 @@ import struct
 import json
 from qcodes import validators as vals
 import warnings
+from typing import List
 
 
 from qcodes.instrument.parameter import Parameter
@@ -205,17 +206,18 @@ class QuTech_AWG_Module(SCPI):
                             vals=vals.Ints(0, 15),
                             docstring='Get and set DIO calibration index\n' \
                                 'Index will also be stored in non-volatile memory\n' \
-                                'See dio_calibrate() paramater\n' \
-                            )
+                                'See dio_calibrate() paramater\n'
+                           )
 
         self.add_parameter('dio_suitable_indexes',
                             unit='',
                             label='DIO suitable indexes',
                             get_cmd='DIO:INDexes?',
+                            # TODO [versloot]: use scpi actual array and update _int_to_array
                             get_parser=self._int_to_array,
                             docstring='Get DIO all suitable indexes\n' \
                                     '\t- The array is ordered by most preferable index first\n'
-                            )
+                           )
 
         self.add_parameter('dio_calibrated_inputs',
                             unit='',
@@ -223,7 +225,7 @@ class QuTech_AWG_Module(SCPI):
                             get_cmd='DIO:INPutscalibrated?',
                             get_parser=int,
                             docstring='Get all DIO inputs channels which are calibrated\n'
-                            )
+                           )
 
         self.add_parameter('dio_signal',
                             unit='',
@@ -234,7 +236,7 @@ class QuTech_AWG_Module(SCPI):
                                 'Result:\n' \
                                 '\tTrue: Signal detected\n'\
                                 '\tFalse: No signal detected'
-                            )
+                           )
 
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
@@ -247,6 +249,8 @@ class QuTech_AWG_Module(SCPI):
             gain_adjust_cmd = 'DAC{}:GAIn:DRIFt:ADJust'.format(ch)
             dac_digital_value_cmd = 'DAC{}:DIGitalvalue'.format(ch)
             dac_bit_select_cmd = 'DAC{}:BITSelect'.format(ch)
+            # TODO [versloot]: bit map cmd is double defined
+            dac_bit_map_cmd = 'DAC{}:BITmap'
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -333,8 +337,10 @@ class QuTech_AWG_Module(SCPI):
             self.add_parameter('ch{}_bit_select'.format(ch),
                                unit='',
                                label=('Channel {}, set bit selection for this channel').format(ch),
-                               get_cmd=dac_bit_select_cmd + '?',
-                               set_cmd=dac_bit_select_cmd + ' {}',
+                               get_cmd=self._gen_ch_get_func(
+                               self._get_bit_select, ch),
+                               set_cmd=self._gen_ch_set_func(
+                               self._set_bit_select, ch),
                                vals=vals.Ints(0, self.device_descriptor.numCodewords),
                                get_parser=np.uint32,
                                docstring='Codeword bit select for a channel\n' \
@@ -353,6 +359,15 @@ class QuTech_AWG_Module(SCPI):
                                  +'So a bitSelect of ch1: 0b011, and ch2: 0b010 is not allowed. This will be checked on `start()`. Errors are reported by `getError()` or `getErrors()`.' \
                                  +'\n\n Get:\n' \
                                  +'\tResult:  Integer that represent the bit select of the channel\n')
+
+            self.add_parameter('ch{}_bit_map'.format(ch),
+                               unit='',
+                               label='Channel {}, set bit map for this channel'.format(ch),
+                               get_cmd=self._gen_ch_get_func(
+                                   self._get_bit_map, ch),
+                               set_cmd=self._gen_ch_set_func(
+                                   self._set_bit_map, ch),
+                               docstring='Codeword bit map for a channel\n')
 
             # Trigger parameters
             doc_trgs_log_inp = 'Reads the current input values on the all the trigger ' \
@@ -373,10 +388,10 @@ class QuTech_AWG_Module(SCPI):
                                docstring=doc_trgs_log_inp)
 
 
-        # Single paramaters
+        # Single parameters
         self.add_parameter('status_frontIO_temperature',
                            unit='C',
-                           label=('FrontIO temperature'),
+                           label='FrontIO temperature',
                            get_cmd='STATus:FrontIO:TEMperature?',
                            get_parser=float,
                            docstring='Reads the temperature of the frontIO.\n' \
@@ -414,7 +429,7 @@ class QuTech_AWG_Module(SCPI):
 
         self.add_parameter('get_system_status',
                            unit='JSON',
-                           label=('System status'),
+                           label="System status",
                            get_cmd='SYSTem:STAtus?',
                            vals=vals.Strings(),
                            get_parser=self.JSON_parser,
@@ -595,9 +610,29 @@ class QuTech_AWG_Module(SCPI):
             return []
         return msg.split(',')
 
+    def _set_bit_select(self, ch: type = int, selection: type = int):
+        bit_map = []
+        #if selection > self.
+        self._set_bit_map(ch, bit_map)
+
+    def _get_bit_select(self, ch: type = int):
+        result = self.ask(f"DAC{ch}:BITmap?")
+        print(f"result: {result}")
+        return result.split(",")
+
+    def _set_bit_map(self, ch: type = int, cw_input_select: type = List[int]):
+        array_raw = ','.join(str(x) for x in cw_input_select)
+        self.write(f"DAC{ch}:BITmap {len(cw_input_select)},{array_raw}")
+
+    def _get_bit_map(self, ch: type = int):
+        result = self.ask(f"DAC{ch}:BITmap?")
+        print(f"result: {result}")
+        return result.split(",")
+
     ##########################################################################
     # AWG5014 functions: SEQUENCE
     ##########################################################################
+
     def setSeqLength(self, length):
         '''
         Args:
