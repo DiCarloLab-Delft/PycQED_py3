@@ -1535,7 +1535,8 @@ class CCLight_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
         # Starting specmode if set in config
         if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+            UHFQC.spec_mode_on(acq_length=self.ro_acq_integration_length,
+                               IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
@@ -1719,7 +1720,8 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
-            # Starting specmode if set in config
+
+        # Starting specmode if set in config
         if self.cfg_spec_mode():
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
@@ -1802,12 +1804,12 @@ class CCLight_Transmon(Qubit):
             spec_source_2.frequency, retrieve_value=True))
         MC.set_sweep_points_2D(freqs_q2)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run_2D(name='Three_tone_'+self.msmt_suffix)
+        MC.run_2D(name='Two_tone_'+self.msmt_suffix)
         ma.TwoD_Analysis(auto=True)
         spec_source.off()
         spec_source_2.off()
         ma.Three_Tone_Spectroscopy_Analysis(
-            label='Three_tone',  f01=f_01, f12=f_12)
+            label='Two_tone',  f01=f_01, f12=f_12)
 
     def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10, 10, 1), MC=None, spec_source_2=None):
 
@@ -2966,7 +2968,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
-                     label: str=''):
+                     label: str='', prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -3000,7 +3002,8 @@ class CCLight_Transmon(Qubit):
             raise ValueError(
                 'timesteps must be multiples of 2 modulation periods')
 
-        self.prepare_for_timedomain()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         p = sqo.echo(times, qubit_idx=self.cfg_qubit_nr(),

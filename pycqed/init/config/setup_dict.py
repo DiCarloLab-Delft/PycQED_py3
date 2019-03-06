@@ -6,7 +6,7 @@
 # getnode()       <- this is the number you need
 # In order to double-check with hex mac-address of ipconfig \all, run this:
 # mac_address = ("".join(c + "-" if i % 2 else c for i, c in \
-                                    # enumerate(hex(uuid.getnode())[2:].zfill(12)))[:-1]).upper()
+#                                     enumerate(hex(uuid.getnode())[2:].zfill(12)))[:-1]).upper()
 mac_dict = {'203178706891063': 'CDickel_Desktop',
             '203308017140376': 'Adriaans_Macbook',
             '963460802314': 'La_Ferrari',
@@ -29,6 +29,7 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '26830024075025': 'Qudev_testbench',
             '88623634748008':'LaAprilia_1',
             '215977245830009': 'LaVespa',
+            '79497677591501':'PaganiMeas',
             }
 
 data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
@@ -61,4 +62,5 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'Thijs_Desktop': r'\\TUD277620\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'LaVespa': r'D:\Experiments\18031_Intel_resonators',
                  'LaAprilia_1' : r'D:\\Experiments\\1812_CZsims\\data',
+                 'PaganiMeas':r'D:\\Experiments\\1902_Zapmon_6-1_post-zapping\\data',
                  }

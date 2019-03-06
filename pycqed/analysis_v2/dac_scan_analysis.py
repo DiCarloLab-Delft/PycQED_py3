@@ -550,7 +550,7 @@ class DACarcPolyFit(ba.BaseDataAnalysis):
                  options_dict: dict=None, extract_only: bool=False,
                  dac_key='Instrument settings.fluxcurrent.Q',
                  frequency_key='Instrument settings.Q.freq_qubit',
-                 do_fitting=True,
+                 do_fitting=True, degree=4
                  ):
         '''
         Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
@@ -576,7 +576,8 @@ class DACarcPolyFit(ba.BaseDataAnalysis):
                             'measurementstring': 'measurementstring'}
 
         self.numeric_params = ['dac', 'qfreq']
-
+        self.degree = degree
+        
         self.run_analysis()
         # return self.proc_data_dict
 
@@ -584,7 +585,7 @@ class DACarcPolyFit(ba.BaseDataAnalysis):
         dac = self.raw_data_dict['dac']
         freq = self.raw_data_dict['qfreq']
 
-        polycoeffs = np.polyfit(dac,freq,4)
+        polycoeffs = np.polyfit(dac,freq,self.degree)
 
         self.fit_res = {}
         self.fit_res['fit_polycoeffs'] = polycoeffs

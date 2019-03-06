@@ -307,6 +307,9 @@ class complex_spectroscopy(Spectroscopy):
 class VNA_analysis(complex_spectroscopy):
     '''
     Performs as fit to the resonance using data acquired using VNA R&S ZNB 20
+
+    eg. to use complex model:
+    ma2.VNA_analysis(t_start='20010101_213600', options_dict={'fit_options': {'model': 'complex'}})
     '''
     def __init__(self, t_start,
                  options_dict=None,
