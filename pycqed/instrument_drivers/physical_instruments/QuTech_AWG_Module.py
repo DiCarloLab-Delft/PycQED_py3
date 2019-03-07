@@ -66,13 +66,23 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
         self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 5.0)
 
-        self.codeword_protocols = {
-            # Name              Ch1,    Ch2,    Ch3,    Ch4
-            'Flux' :            [0x03,  0x0C,   0x30,   0x0],
-            'Microwave' :       [0x3F,  0x3F,   0x3F,   0x3F],
-            'Flux_DIO' :        [0x03,  0x0C,   0x30,   0xC0],
-            'Microwave_DIO' :   [0xFF,  0xFF,   0xFF,   0xFF]
+        cw_protocol_mt = {
+            # Name          Ch1,    Ch2,    Ch3,    Ch4
+            'Flux':         [0x03,  0x0C,   0x30,   0x0],
+            'Microwave':    [0x5F,  0x5F,   0x5F,   0x5F],
         }
+
+        cw_protocol_dio = {
+            # Name          Ch1,   Ch2,  Ch3,  Ch4
+            'Flux':         [0x03, 0x0C, 0x30, 0xC0],
+            'Microwave':    [0xFF, 0xFF, 0xFF, 0xFF]
+        }
+
+        if self.device_descriptor.numCodewordsBits <= 7:
+            self.codeword_protocols = cw_protocol_mt
+        else:
+            self.codeword_protocols = cw_protocol_dio
+
 
         # FIXME: not in [V]
 
@@ -85,7 +95,7 @@ class QuTech_AWG_Module(SCPI):
         # QWG specific
         #######################################################################
 
-        # Channel pair paramaters
+        # Channel pair parameters
         for i in range(self.device_descriptor.numChannels//2):
             ch_pair = i*2+1
             sfreq_cmd = 'qutech:output{}:frequency'.format(ch_pair)
@@ -203,7 +213,7 @@ class QuTech_AWG_Module(SCPI):
                             get_cmd='DIO:INDexes:ACTive?',
                             set_cmd='DIO:INDexes:ACTive {}',
                             get_parser=np.uint32,
-                            vals=vals.Ints(0, 15),
+                            vals=vals.Ints(0, 20),
                             docstring='Get and set DIO calibration index\n' \
                                 'Index will also be stored in non-volatile memory\n' \
                                 'See dio_calibrate() paramater\n'
@@ -248,9 +258,6 @@ class QuTech_AWG_Module(SCPI):
             dac_temperature_cmd = 'STATus:DAC{}:TEMperature'.format(ch)
             gain_adjust_cmd = 'DAC{}:GAIn:DRIFt:ADJust'.format(ch)
             dac_digital_value_cmd = 'DAC{}:DIGitalvalue'.format(ch)
-            dac_bit_select_cmd = 'DAC{}:BITSelect'.format(ch)
-            # TODO [versloot]: bit map cmd is double defined
-            dac_bit_map_cmd = 'DAC{}:BITmap'
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -341,7 +348,6 @@ class QuTech_AWG_Module(SCPI):
                                self._get_bit_select, ch),
                                set_cmd=self._gen_ch_set_func(
                                self._set_bit_select, ch),
-                               vals=vals.Ints(0, self.device_descriptor.numCodewords),
                                get_parser=np.uint32,
                                docstring='Codeword bit select for a channel\n' \
                                  +'Set: \n' \
@@ -552,7 +558,8 @@ class QuTech_AWG_Module(SCPI):
         # function used internally for the parameters because of formatting
         protocol = self.codeword_protocols.get(protocol_name)
         if protocol is None:
-            raise RuntimeError("Invalid protocol")
+            allowed_protocols = ", ".join("{}".format(protocols_name) for protocols_name in self.codeword_protocols)
+            raise ValueError(f"Invalid protocol: actual: {protocol_name}, expected: {allowed_protocols}")
 
         for ch, bitSelect in enumerate(protocol):
             self.set("ch{}_bit_select".format(ch+1), bitSelect)
@@ -610,19 +617,37 @@ class QuTech_AWG_Module(SCPI):
             return []
         return msg.split(',')
 
-    def _set_bit_select(self, ch: type = int, selection: type = int):
+    def _set_bit_select(self, ch: int, selection: int):
         bit_map = []
-        #if selection > self.
+        if selection.bit_length() > self.device_descriptor.numCodewordsBits:
+            raise ValueError(f'Cannot set bit select; highest set bit is to high; '
+                             f'max: {self.device_descriptor.numCodewordsBits}, actual: {selection.bit_length()}')
+
+        for cw_bit_input in range(0, selection.bit_length()):
+            if (1 << cw_bit_input) & selection:
+                bit_map.append(cw_bit_input)
+
         self._set_bit_map(ch, bit_map)
 
     def _get_bit_select(self, ch: type = int):
         result = self.ask(f"DAC{ch}:BITmap?")
-        print(f"result: {result}")
         return result.split(",")
 
-    def _set_bit_map(self, ch: type = int, cw_input_select: type = List[int]):
-        array_raw = ','.join(str(x) for x in cw_input_select)
-        self.write(f"DAC{ch}:BITmap {len(cw_input_select)},{array_raw}")
+    def _set_bit_map(self, ch: int, bit_map: List[int]):
+        if len(bit_map) > 10:
+            raise ValueError(f'Cannot set bit map; Number of codeword bits inputs are too high; '
+                             f'max: 10, actual: {len(bit_map)}')
+        invalid_inputs = list(x for x in bit_map if x > (self.device_descriptor.numCodewordsBits - 1))
+        if invalid_inputs:
+            err_msg = ', '.join("input {} at index {}".format(cw_bit_input, bit_map.index(cw_bit_input) + 1)
+                                for index, cw_bit_input in enumerate(invalid_inputs))
+            raise ValueError(f'Cannot set bit map; invalid codeword bit input(s); '
+                             f'max: {self.device_descriptor.numCodewordsBits - 1}, actual: {err_msg}')
+
+        array_raw = ''
+        if bit_map:
+            array_raw = ',' + ','.join(str(x) for x in bit_map)
+        self.write(f"DAC{ch}:BITmap {len(bit_map)}{array_raw}")
 
     def _get_bit_map(self, ch: type = int):
         result = self.ask(f"DAC{ch}:BITmap?")
