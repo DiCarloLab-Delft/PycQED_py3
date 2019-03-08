@@ -75,7 +75,7 @@ class QuTech_AWG_Module(SCPI):
         cw_protocol_dio = {
             # Name          Ch1,   Ch2,  Ch3,  Ch4
             'Flux':         [0x03, 0x0C, 0x30, 0xC0],
-            'Microwave':    [0xFF, 0xFF, 0xFF, 0xFF]
+            'Microwave':    [0x3FF, 0x3FF, 0x3FF, 0x3FF]
         }
 
         if self.device_descriptor.numCodewordsBits <= 7:
