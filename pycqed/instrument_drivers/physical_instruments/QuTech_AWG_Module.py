@@ -248,6 +248,30 @@ class QuTech_AWG_Module(SCPI):
                                 '\tFalse: No signal detected'
                            )
 
+        self.add_parameter('dio_lvds',
+                           unit='bool',
+                           label='LVDS DIO connection detected',
+                           get_cmd='DIO:LVDS?',
+                           val_mapping={True: '1', False: '0'},
+                           docstring='Get the DIO LVDS connection status.\n'
+                                     'Result:\n'
+                                     '\tTrue: Cable detected\n'
+                                     '\tFalse: No cable detected'
+                           )
+
+        self.add_parameter('dio_interboard',
+                           unit='bool',
+                           label='DIO interboard detected',
+                           get_cmd='DIO:IB?',
+                           val_mapping={True: '1', False: '0'},
+                           docstring='Get the DIO interboard status.\n'
+                                     'Result:\n'
+                                     '\tTrue:  To master interboard connection detected\n'
+                                     '\tFalse: No interboard connection detected'
+                           )
+
+
+
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
             amp_cmd = 'SOUR{}:VOLT:LEV:IMM:AMPL'.format(ch)
