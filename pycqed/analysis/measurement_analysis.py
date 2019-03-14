@@ -7455,7 +7455,7 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, f01=None, f12=None,
                              amp_lims=[None, None], line_color='k',
-                             phase_lims=[-180, 180], **kw):
+                             phase_lims=[None, None], **kw):
         self.get_naming_and_values_2D()
         # figsize wider for colorbar
         fig1, ax1 = self.default_ax(figsize=(8, 5))
