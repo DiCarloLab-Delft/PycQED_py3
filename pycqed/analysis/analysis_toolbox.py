@@ -341,19 +341,23 @@ def get_qb_channel_map_from_file(qb_names, file_path,
                             'format.'.format(input_ro_type))
 
     for qbn in qb_names:
-        ro_acq_weight_type = instr_settings[qbn].attrs['ro_acq_weight_type']
-        if ro_acq_weight_type in ['optimal', 'square_rot']:
-            channel_map[qbn] = [ro_type + str(
-                instr_settings[qbn].attrs['RO_acq_weight_function_I'])]
-        elif ro_acq_weight_type in ['SSB', 'DSB']:
-            channel_map[qbn] = [
-                ro_type +
-                str(instr_settings[qbn].attrs['RO_acq_weight_function_I']),
-                ro_type +
-                str(instr_settings[qbn].attrs['RO_acq_weight_function_Q'])]
-        else:
-            raise ValueError('Unknown ro_acq_weight_type "{}."'.format(
-                ro_acq_weight_type))
+        try:
+            ro_acq_weight_type = instr_settings[qbn].attrs['ro_acq_weight_type']
+            if ro_acq_weight_type in ['optimal', 'square_rot']:
+                channel_map[qbn] = [ro_type + str(
+                    instr_settings[qbn].attrs['RO_acq_weight_function_I'])]
+            elif ro_acq_weight_type in ['SSB', 'DSB']:
+                channel_map[qbn] = [
+                    ro_type +
+                    str(instr_settings[qbn].attrs['RO_acq_weight_function_I']),
+                    ro_type +
+                    str(instr_settings[qbn].attrs['RO_acq_weight_function_Q'])]
+            else:
+                raise ValueError('Unknown ro_acq_weight_type "{}."'.format(
+                    ro_acq_weight_type))
+        except KeyError:
+            print('Could not get channels')
+            pass
     return channel_map
 
 
@@ -999,25 +1003,27 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
     # to look left and right. Should be 50MHz away.
     freq_range = sweep_pts[-1]-sweep_pts[0]
     num_points = sweep_pts.size
-    n = int(50e6*num_points/freq_range)
-    m = int(50e6*num_points/freq_range)
+    # n = int(50e6*num_points/freq_range)
+    # m = int(50e6*num_points/freq_range)
+    n = int(1e6*num_points/freq_range)
+    m = int(1e6*num_points/freq_range)
 
     # Search for 2nd peak (f_ge) to the right of the first (tallest)
-    while(int(len(sweep_pts)-1) <= int(tallest_peak_idx+n) and
-                  n>0):
+    while int(len(sweep_pts)-1) <= int(tallest_peak_idx+n) and n > 0:
         # Reduce n if outside of range
         n -= 1
     if (int(tallest_peak_idx+n)) == sweep_pts.size:
         # If n points to the right of tallest peak is the range edge:
         n = 0
+
     if not ((int(tallest_peak_idx+n)) >= sweep_pts.size):
         if verbose:
-            print('Searching for the gf/2 {:} {:} points to the right of the largest'
-                  ' in the range {:.5}-{:.5}'.format(
+            print('Searching for the second {:} starting at {:} points to the '
+                  'right of the largest in the range {:.5}-{:.5}'.format(
                   key,
                   n,
                   sweep_pts[int(tallest_peak_idx+n)],
-                  sweep_pts[-1]) )
+                  sweep_pts[-1]))
 
         peaks_right = peak_finder(
             sweep_pts[int(tallest_peak_idx+n)::],
@@ -1056,8 +1062,8 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         m = 0
     if not (int(tallest_peak_idx-m) <= 0):
         if verbose:
-            print('Searching for the gf/2 {:} {:} points to the left of the '
-                  'largest, in the range {:.5}-{:.5}'.format(
+            print('Searching for the second {:} starting at {:} points to the '
+                  'left of the largest, in the range {:.5}-{:.5}'.format(
                   key,
                   m,
                   sweep_pts[0],
@@ -1091,40 +1097,51 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         f0_gf_over_2_left = 0
         kappa_guess_ef_left = 0
 
-    if np.abs(val_left) > np.abs(val_right):
+    if key == 'peak':
+        compare_func = lambda x, y: x > y
+        compare_func_inv = lambda x, y: x < y
+    else:
+        compare_func = lambda x, y: x < y
+        compare_func_inv = lambda x, y: x > y
+
+    # if np.abs(val_left) > np.abs(val_right):
+    if compare_func(np.abs(val_left), np.abs(val_right)):
         # If peak on the left taller than peak on the right, then
         # the second peak is to the left of the tallest and it is indeed
         # the gf/2 peak, while the tallest is the ge peak.
-        if np.abs(f0_gf_over_2_left - tallest_peak) > 50e6:
-            # If the two peaks found are separated by at least 50MHz,
-            # then both the ge and gf/2 have been found.
-            if verbose:
-                print('Both f_ge and f_gf/2 '+key+'s have been found. '
-                      'f_ge was assumed to the LEFT of f_gf/2.')
-        else:
-            # If not, then it is just some other signal.
-            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
-                                    'the next largest '+key+' found.')
+        # if np.abs(f0_gf_over_2_left - tallest_peak) > 50e6:
+        #     # If the two peaks found are separated by at least 50MHz,
+        #     # then both the ge and gf/2 have been found.
+        if verbose:
+            print('Both largest (f0) and second-largest (f1) '+
+                  key + 's have been found. '
+                  'f0 was assumed to the LEFT of f1.')
+        # else:
+        #     # If not, then it is just some other signal.
+        #     logging.warning('The second '+key+' was not found. Fitting to '
+        #                             'the next largest '+key+' found.')
 
         f0 = f0_left
         kappa_guess = kappa_guess_left
         f0_gf_over_2 = f0_gf_over_2_left
         kappa_guess_ef = kappa_guess_ef_left
 
-    elif np.abs(val_left) < np.abs(val_right):
+    # elif np.abs(val_left) < np.abs(val_right):
+    elif compare_func_inv(np.abs(val_left), np.abs(val_right)):
         # If peak on the right taller than peak on the left, then
         # the second peak is to the right of the tallest and it is in fact
         # the ge peak, while the tallest is the gf/2 peak.
-        if np.abs(f0_right - tallest_peak) > 50e6:
-            # If the two peaks found are separated by at least 50MHz,
-            # then both the ge and gf/2 have been found.
-            if verbose:
-                print('Both f_ge and f_gf/2 have been found. '
-                      'f_ge was assumed to the RIGHT of f_gf/2.')
-        else:
-            # If not, then it is just some other signal.
-            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
-                                    'the next largest '+key+' found.')
+        # if np.abs(f0_right - tallest_peak) > 50e6:
+        #     # If the two peaks found are separated by at least 50MHz,
+        #     # then both the ge and gf/2 have been found.
+        if verbose:
+            print('Both largest (f0) and second-largest (f1) ' + key +
+                  's have been found. '
+                  'f0 was assumed to the RIGHT of f1.')
+        # else:
+        #     # If not, then it is just some other signal.
+        #     logging.warning('The second '+key+' was not found. Fitting to '
+        #                             'the next largest '+key+' found.')
         f0 = f0_right
         kappa_guess = kappa_guess_right
         f0_gf_over_2 = f0_gf_over_2_right
@@ -1133,7 +1150,7 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
     else:
         # If the peaks on the right and left are equal, or cannot be compared,
         # then there was probably no second peak, and only noise was found.
-        logging.warning('Only f_ge has been found.')
+        logging.warning('Only f0 has been found.')
         f0 = tallest_peak
         kappa_guess = tallest_peak_width
         f0_gf_over_2 = tallest_peak

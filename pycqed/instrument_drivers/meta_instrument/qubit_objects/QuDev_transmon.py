@@ -724,7 +724,7 @@ class QuDev_transmon(Qubit):
 
     def measure_qubit_spectroscopy_flux_sweep(self, freqs, voltages,
             flux_parameter=None, pulsed=True, MC=None, analyze=True,
-            close_fig=True, upload=True):
+            label=None, close_fig=True, upload=True):
 
         if MC is None:
             MC = self.MC
@@ -745,7 +745,9 @@ class QuDev_transmon(Qubit):
 
             self.cw_source.on()
             self.AWG.start()
-            MC.run_2D(name='qubit_spectroscopy_flux_sweep' + self.msmt_suffix)
+            if label is None:
+                label = 'qubit_spectroscopy_flux_sweep' + self.msmt_suffix
+            MC.run_2D(name=label)
 
         else:
             raise NotImplementedError()
@@ -754,8 +756,7 @@ class QuDev_transmon(Qubit):
         self.AWG.stop()
 
         if analyze:
-            ma.TwoD_Analysis(label='qubit_spectroscopy_flux_sweep',
-                             close_fig=close_fig, close_file=True,
+            ma.TwoD_Analysis(close_fig=close_fig, close_file=True,
                              qb_name=self.name)
 
 

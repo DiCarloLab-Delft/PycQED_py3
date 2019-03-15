@@ -519,8 +519,8 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
 
     if correlations is None:
         correlations = []
-    if used_channels is None:
-        used_channels = channels
+    # if used_channels is None:
+    #     used_channels = channels
 
     for qb in qubits:
         if UHFQC is None:
@@ -528,6 +528,7 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
         if pulsar is None:
             pulsar = qb.AWG
         break
+
     return {
         'int_log_det': det.UHFQC_integration_logging_det(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
@@ -2810,7 +2811,9 @@ def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,
     MC.set_sweep_function(Rams_swf)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(measured_qubit.int_avg_det)
-    MC.run(label, exp_metadata={'artificial_detuning': artificial_detuning})
+    MC.run(label, exp_metadata={'artificial_detuning': artificial_detuning,
+                                'measured_qubit': measured_qubit.name,
+                                'pulsed_qubit': pulsed_qubit.name})
 
     if analyze:
         ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
@@ -2853,7 +2856,8 @@ def measure_ramsey_add_pulse_sweep_phase(
     MC.set_sweep_function(Rams_swf)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(measured_qubit.int_avg_det)
-    MC.run(label, exp_metadata={'artificial_detuning': artificial_detuning})
+    MC.run(label, exp_metadata={'measured_qubit': measured_qubit.name,
+                                'pulsed_qubit': pulsed_qubit.name})
 
     if analyze:
         ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
