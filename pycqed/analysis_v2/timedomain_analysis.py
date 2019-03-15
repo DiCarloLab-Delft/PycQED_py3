@@ -33,6 +33,9 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
         zero_coord = self.options_dict.get('zero_coord', None)
         one_coord = self.options_dict.get('one_coord', None)
 
+
+        # FIXME THIS IS A HACK related to recent issue
+        self.data_dict = self.raw_data_dict
         if cal_points is None:
             # default for all standard Timedomain experiments
             cal_points = [list(range(-4, -2)), list(range(-2, 0))]
@@ -889,8 +892,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         if self.cal_points == 'gef':
             # calibration point indices are when ignoring the f-state cal pts
             cal_points = [
-                [[-7, -5], [-6, -4], [-3, -1]],  # oscillating qubits
-                [[-7, -6], [-5, -4], [-2, -1]],  # spec qubit
+                [[-7, -6], [-5, -4], [-2, -1]],  # oscillating qubits
+                [[-7, -5], [-6, -4], [-3, -1]],  # spec qubit
             ]
         elif self.cal_points == 'ge':
             # calibration point indices are when ignoring the f-state cal pts

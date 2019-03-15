@@ -738,9 +738,9 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
     # time-independent jump operators on q1
     if T2_q1 != 0:                                        # we use 0 to mean that it is infinite
         if T1_q1 != 0:                                    # if it's 0 it means that we want to simulate onle T_phi instead of T_2
-            Tphi01_q1 = Tphi_from_T1andT2(T1_q1,T2_q1) * noise_parameters_CZ.T2_scaling()
+            Tphi01_q1 = Tphi_from_T1andT2(T1_q1,T2_q1)
         else:
-            Tphi01_q1 = T2_q1 * noise_parameters_CZ.T2_scaling()
+            Tphi01_q1 = T2_q1
     else:
         Tphi01_q1 = 0
 
@@ -765,19 +765,22 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
         #                   xlabel='Frequency_q0 (GHz)', ylabel='T2 (mu s)')
 
         if T1_q0 != 0:
-            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec) * noise_parameters_CZ.T2_scaling()
+            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
         else:
-            Tphi01_q0_vec = T2_q0_vec * noise_parameters_CZ.T2_scaling() 
+            Tphi01_q0_vec = T2_q0_vec 
     else:
         Tphi01_q0_vec = []
 
 
-    c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
+    c_ops = c_ops_amplitudedependent(T1_q0 * noise_parameters_CZ.T2_scaling(),T1_q1 * noise_parameters_CZ.T2_scaling(),
+                                    Tphi01_q0_vec * noise_parameters_CZ.T2_scaling(),Tphi01_q1 * noise_parameters_CZ.T2_scaling())
     return c_ops
 
 
 def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
-                                    fluxbias_q1, amp, sim_step):
+                                    fluxbias_q1, amp, sim_step, intervals_list=[-1]):
+    if intervals_list[0]==-1:
+        intervals_list = np.zeros(np.size(amp))+sim_step
     """
     Calculates the propagator (either unitary or superoperator)
 
@@ -832,9 +835,9 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
                     c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_H.dag())    # c_ops are already in the H_0 basis
                 else:
                     c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
-            liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*sim_step).expm()
+            liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*intervals_list[i]).expm()
         else:
-            liouville_exp_t=(-1j*H*sim_step).expm()
+            liouville_exp_t=(-1j*H*intervals_list[i]).expm()
         exp_L_total=liouville_exp_t*exp_L_total
 
     #t1 = time.time()
@@ -1126,7 +1129,9 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ):
                                 'initial_state': noise_parameters_CZ.initial_state(),
                                 'total_idle_time': noise_parameters_CZ.total_idle_time(),
                                 'waiting_at_sweetspot': noise_parameters_CZ.waiting_at_sweetspot(),
-                                'w_q0_sweetspot': noise_parameters_CZ.w_q0_sweetspot()}
+                                'w_q0_sweetspot': noise_parameters_CZ.w_q0_sweetspot(),
+                                'repetitions': noise_parameters_CZ.repetitions(),
+                                'time_series': noise_parameters_CZ.time_series()}
 
     return fluxlutman_args, noise_parameters_CZ_args
 
@@ -1168,6 +1173,8 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     noise_parameters_CZ.total_idle_time(noise_parameters_CZ_args['total_idle_time'])
     noise_parameters_CZ.waiting_at_sweetspot(noise_parameters_CZ_args['waiting_at_sweetspot'])
     noise_parameters_CZ.w_q0_sweetspot(noise_parameters_CZ_args['w_q0_sweetspot'])
+    noise_parameters_CZ.repetitions(noise_parameters_CZ_args['repetitions'])
+    noise_parameters_CZ.time_series(noise_parameters_CZ_args['time_series'])
 
     return fluxlutman, noise_parameters_CZ
 
@@ -1379,7 +1386,7 @@ def calc_populations_new(rho_out,population_states):
 def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ):
 
     if initial_state == '11_dressed':
-        freq = fluxlutman.q_freq_01() + noise_parameters_CZ.detuning()
+        freq = noise_parameters_CZ.w_q0_sweetspot() + noise_parameters_CZ.detuning()
         amp = fluxlutman.calc_freq_to_amp(freq)
         H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
         eigs,eigvectors = H.eigenstates()

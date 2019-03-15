@@ -71,7 +71,7 @@ class UHFQC(Instrument):
         self._d_file_name = os.path.join(
             dir_path, 'zi_parameter_files', 'd_node_pars.txt')
 
-        init = True
+        init = True # gets set to False if param files cannot be loaded
         try:
             f = open(self._s_file_name).read()
             s_node_pars = json.loads(f)
@@ -192,8 +192,10 @@ class UHFQC(Instrument):
 
         # Load an AWG program (from Zurich
         # Instruments/LabOne/WebServer/awg/src)
+
         if upload_sequence:
             self.awg_sequence_acquisition()
+
 
         # Turn on both outputs
         self.sigouts_0_on(1)
@@ -329,7 +331,7 @@ class UHFQC(Instrument):
         if not self._awgModule:
             raise(ziShellModuleError())
 
-        self._awgModule.set('awgModule/index', awg_nr)
+        #self._awgModule.set('awgModule/index', awg_nr) 20180329 dirty hack by Niels  Bultink, this command is failing in python 3.5, firmware 5.2
         self._awgModule.set('awgModule/compiler/sourcestring', program_string)
 
         t0 = time.time()
@@ -741,16 +743,16 @@ class UHFQC(Instrument):
         else:
             return '/' + self._device + '/' + path
 
-    def seti(self, path, value, async=False):
-        if async:
+    def seti(self, path, value, asynchronous=False):
+        if asynchronous:
             func = self._daq.asyncSetInt
         else:
             func = self._daq.setInt
 
         func(self._make_full_path(path), int(value))
 
-    def setd(self, path, value, async=False):
-        if async:
+    def setd(self, path, value, asynchronous=False):
+        if asynchronous:
             func = self._daq.asyncSetDouble
         else:
             func = self._daq.setDouble
@@ -994,7 +996,7 @@ repeat(loop_cnt) {
 \tsetTrigger(WINT_EN +RO_TRIG);
 \twait(5);
 \tsetTrigger(WINT_EN);
-\twait(300);
+//\twait(300);
 }
 wait(1000);
 setTrigger(0);"""

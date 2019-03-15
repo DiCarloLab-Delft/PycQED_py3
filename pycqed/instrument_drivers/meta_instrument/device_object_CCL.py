@@ -848,7 +848,9 @@ class DeviceCCL(Instrument):
                                     tomo_after=False,
                                     ro_time=1000e-9,
                                     echo_during_ancilla_mmt: bool=True,
-                                    XY_echo: bool=False
+                                    idling_time=780e-9,
+                                    idling_time_echo=480e-9,
+                                    idling_rounds=0
                                     ):
         assert qD0 in self.qubits()
         assert qD1 in self.qubits()
@@ -875,7 +877,9 @@ class DeviceCCL(Instrument):
                                            tomo_after=tomo_after,
                                            ro_time=ro_time,
                                            echo_during_ancilla_mmt=echo_during_ancilla_mmt,
-                                           XY_echo=XY_echo)
+                                           idling_time=idling_time,
+                                           idling_time_echo=idling_time_echo,
+                                           idling_rounds=idling_rounds)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
 
@@ -1032,7 +1036,8 @@ class DeviceCCL(Instrument):
                                               selected_target=None,
                                               selected_measured=None,
                                               target_qubit_excited=False,
-                                              extra_echo=False):
+                                              extra_echo=False,
+                                              echo_delay=0e-9):
         '''
         Measures the msmt induced dephasing for readout the readout of qubits
         i on qubit j. Additionally measures the SNR as a function of amplitude

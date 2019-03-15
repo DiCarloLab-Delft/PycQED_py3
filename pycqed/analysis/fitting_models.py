@@ -236,6 +236,17 @@ def CosFunc(t, amplitude, frequency, phase, offset):
     '''
     return amplitude * np.cos(2 * np.pi * frequency * t + phase) + offset
 
+def CosFunc2(t, amplitude, frequency, phase, offset):
+    '''
+    parameters:
+        t, time in s
+        amplitude a.u.
+        frequency in Hz (f, not omega!)
+        phase in rad
+        offset a.u.
+    '''
+    return amplitude * np.cos(2 * np.pi * frequency * (t + phase)) + offset
+
 
 def ExpDecayFunc(t, tau, amplitude, offset, n):
     return amplitude * np.exp(-(t / tau) ** n) + offset
@@ -335,8 +346,10 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
         phi_0:  phase to account for propagation delay from sample
         slope:  slope of signal around the resonance
 
+
     The complex hanger function that has a list of parameters as input
     is now called hanger_func_complex_SI_pars
+
 
     '''
     slope_corr = (1+slope*(f-f0)/f0)
@@ -349,6 +362,7 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
 
 def hanger_func_complex_SI_pars(f,pars):
     '''
+
     This function is used in the minimization fitting which requires parameters.
     It calls the function hanger_func_complex_SI, see there for details.
     '''
@@ -1152,6 +1166,8 @@ def sum_int(x,y):
 # A valid reason to define it here would beexp_dec_guess if you want to add a guess function
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
+CosModel2 = lmfit.Model(CosFunc2)
+
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)
