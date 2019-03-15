@@ -1,0 +1,31 @@
+SMIS s0, { 0 }
+SMIS s1, { 1 }
+SMIS S2, { 2 }
+SMIS S3, { 3 }
+SMIS s4, { 4 }
+SMIS s5, { 5 }
+SMIS s6, { 6 }
+SMIS s7, { 7 }
+SMIS s8, { 8 }
+SMIS s9, { 9 }
+SMIS s10, { 10 }
+SMIS s11, { 11 }
+SMIS s12, { 12 }
+SMIS s13, { 13 }
+SMIS s14, { 14 }
+SMIS s15, { 15 }
+SMIS s16, { 16 }
+
+Loop: 
+    bs 2 CW_02 S1
+    bs 1 MeasZ S1
+
+    QWAIT 70
+
+    bs 1 C_CW_1 S1
+    bs 1 MeasZ S1
+    QWAIT 500
+
+    BR always, Loop
+    NOP
+    NOP

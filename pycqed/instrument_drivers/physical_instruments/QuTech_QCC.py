@@ -1,21 +1,20 @@
 """
-    File:               QuTech_CCL.py based from ccl.py (NV)
-    Author:             Kelvin Loh, QuTech
-    Purpose:            Python control of Qutech CC-Light
-    Prerequisites:      QCodes, QisaAs, CCLightMicrocode, SCPI
+    File:               QuTech_QCC.py based from QuTech_CCL.py (NV)
+    Author:             Kelvin Loh, Miguel Moreira (MSM)
+    Purpose:            Python control of Qutech QCC
+    Prerequisites:      QCodes, QisaAs v4.0.0, QCCMicrocode, SCPI
     Usage:
     Bugs:
     Tabs: 4
 Revision history:
- *    0.1.0   :            : KKL  : * Created this file.
- *    0.2.0   :            : XFu  : * Refined the intialization process.
- *    0.2.1   : 13-01-2018 : XFu  : * Change the parameters into integer.
+ *    0.0.0   :            : KKL  : * Created this file.
+ *    0.1.0   :            : MSM  : * Modified file for control of QCC and ensure QISA-AS driver v4.0.0 is present
 """
 
 
 from .SCPI import SCPI
 from qcodes.instrument.base import Instrument
-from ._CCL.CCLightMicrocode import CCLightMicrocode
+from ._QCC.QCCMicrocode import QCCMicrocode
 from qcodes import Parameter
 from collections import OrderedDict
 from qcodes.instrument.parameter import ManualParameter
@@ -30,11 +29,11 @@ import re
 
 
 try:
-    # qisa_as can be installed from the qisa-as folder in the ElecPrj_CCLight
-    # repostiory. Current version is 2.2.0 (Dec 18 2017)
+    # qisa_as can be installed from the qisa-as folder in the ElecPrj_QCC
+    # repostiory. Current version is 4.0.0 (Feb 15 2019)
     from qisa_as import QISA_Driver, qisa_qmap
 except ImportError as e:
-    # Do not raise error to be able to use a dummy CCL when no assembler
+    # Do not raise error to be able to use a dummy QCC when no assembler
     # is installed.
     logging.warning(e)
 
@@ -52,10 +51,10 @@ CHAR_MIN = -128
 
 MAX_NUM_INSN = 2**15
 
-class CCL(SCPI):
+class QCC(SCPI):
     """
     This is class is used to serve as the driver between the user and the
-    CC-Light hardware. The class starts by querying the hardware via the
+    QCC hardware. The class starts by querying the hardware via the
     SCPI interface. The hardware then responds by providing the available
     standard qcodes parameters. This class then uses qcodes to automatically
     generate the functions necessary for the user to control the hardware.
@@ -65,7 +64,7 @@ class CCL(SCPI):
     def __init__(self, name, address, port, log_level=False, **kwargs):
         self.model = name
         self._dummy_instr = False
-        self.driver_version = "0.2.1"
+        self.driver_version = "0.1.0"
         try:
             super().__init__(name, address, port, **kwargs)
         except Exception as e:
@@ -86,30 +85,31 @@ class CCL(SCPI):
         """
         The parser helper objects are initialized in this function.
         """
-        self.microcode = CCLightMicrocode()
+        self.microcode = QCCMicrocode()
         self.QISA = QISA_Driver()
 
         """
-        Only works with version 4.0.0 of the assembler
+        QCC only works with version 4.0.0 of the assembler
         """
+        if self.QISA.getVersion() != '4.0.0':
+            sys.exit('The QISA Assembler installed in the environment does not match version 4.0.0, the only supported for running QCC.')
+
         curdir = os.path.dirname(__file__)
-        print(f"Assembler version {self.QISA.getVersion()}")
-        if self.QISA.getVersion() == '4.0.0':
+        qmap_fn = os.path.join(curdir, '_QCC', 'qisa_opcodes.qmap')
 
-            """
-            Assembler now aditionally requires quantum layout information file
-            """
-            configureinput = os.path.join(curdir, '_CCL', 'quantum_layout_information_7.txt')
-            if not os.path.isfile(configureinput):
-                sys.exit('The QISA Assembler supporting QCC now expects a quantum_layout_information file in the Pycqed physical instruments directory.')
+        """
+        Assembler now aditionally requires quantum layout information file
+        """
+        configureinput = os.path.join(curdir, '_QCC', 'quantum_layout_information_17.txt')
+        if not os.path.isfile(configureinput):
+        	sys.exit('The QISA Assembler supporting QCC now expects a quantum_layout_information file in the Pycqed physical instruments directory.')
 
-            self.QISA.read(configureinput)
+        self.QISA.read(configureinput)
 
         self.QISA.enableScannerTracing(False)
         self.QISA.enableParserTracing(False)
         self.QISA.setVerbose(False)
 
-        qmap_fn = os.path.join(curdir, '_CCL', 'qisa_opcode.qmap')
         self.qisa_opcode(qmap_fn)
 
     def stop(self, getOperationComplete=True):
@@ -128,7 +128,7 @@ class CCL(SCPI):
 
     def add_standard_parameters(self):
         """
-        Function to automatically generate the CC-Light specific functions
+        Function to automatically generate the QCC specific functions
         from the qcodes parameters. The function uses the add_parameter
         function internally.
         """
@@ -192,12 +192,12 @@ class CCL(SCPI):
         these functions use the _upload_instructions and _upload_microcode
         functions internally, and they output binary data using the
         SCPI.py driver, which is not qcodes standard. Therefore,
-        we have to manually created them specifically for CC-Light.
+        we have to manually created them specifically for QCC.
         """
         self.add_parameter(
             'eqasm_program',
             label=('eQASM program'),
-            docstring='Uploads the eQASM program to the CC-Light. ' +
+            docstring='Uploads the eQASM program to the QCC. ' +
             'Valid input is a string representing the filename.',
             set_cmd=self._upload_instructions,
             vals=vals.Strings()
@@ -206,7 +206,7 @@ class CCL(SCPI):
         self.add_parameter(
             'control_store',
             label=('Control store'),
-            docstring='Uploads the microcode to the CC-Light. ' +
+            docstring='Uploads the microcode to the QCC. ' +
             'Valid input is a string representing the filename.',
             set_cmd=self._upload_microcode,
             vals=vals.Strings()
@@ -215,7 +215,7 @@ class CCL(SCPI):
         self.add_parameter(
             'qisa_opcode',
             label=('QISA opcode qmap'),
-            docstring='Uploads the opcode.qmap to the CC-Light assembler. ' +
+            docstring='Uploads the opcode.qmap to the QCC assembler. ' +
             'Valid input is a string representing the filename.',
             set_cmd=self._upload_opcode_qmap,
             vals=vals.Strings()
@@ -236,20 +236,20 @@ class CCL(SCPI):
         """
         dir_path = os.path.dirname(os.path.abspath(__file__))
 
-        param_file_dir = os.path.join(dir_path, '_CCL')
+        param_file_dir = os.path.join(dir_path, '_QCC')
 
         if not os.path.exists(param_file_dir):
             os.makedirs(param_file_dir)
 
         self.param_file_name = os.path.join(param_file_dir,
-                                            'ccl_param_nodes.json')
+                                            'qcc_param_nodes.json')
 
         open_file_success = False
         try:
             file = open(self.param_file_name, "r")
             open_file_success = True
         except Exception as e:
-            log.info("CC-Light local parameter file {} not found ({})".format(
+            log.info("QCC local parameter file {} not found ({})".format(
                             self.param_file_name, e))
 
         read_file_success = False
@@ -259,7 +259,7 @@ class CCL(SCPI):
                 file.close()
                 read_file_success = True
             except Exception as e:
-                log.info("Error while reading CC-Light local parameter file."
+                log.info("Error while reading QCC local parameter file."
                         " Will update it from the hardware.")
 
         if read_file_success:
@@ -269,7 +269,7 @@ class CCL(SCPI):
                     file_content["version"]["Embedded Software Build Time"]
 
             # check if the saved parameters have the same version number
-            # as CC-Light, if yes, return the saved one.
+            # as QCC, if yes, return the saved one.
             if (('Embedded Software Build Time' in self.version_info and
                   (self.version_info['Embedded Software Build Time'] ==
                   self.saved_param_version)) or
@@ -277,14 +277,14 @@ class CCL(SCPI):
                 results = file_content["parameters"]
                 return results
             else:
-                log.info("CC-Light local parameter file out of date."
+                log.info("QCC local parameter file out of date."
                     " Will update it from the hardware.")
 
         try:
             raw_param_string = self.ask('QUTech:PARAMeters?')
         except Exception as e:
             raise ValueError("Failed to retrieve parameter information"
-                " from CC-Light hardware: ", e)
+                " from QCC hardware: ", e)
 
         raw_param_string = raw_param_string.replace('\t', '\n')
 
@@ -292,7 +292,7 @@ class CCL(SCPI):
             results = json.loads(raw_param_string)["parameters"]
         except Exception as e:
             raise ValueError("Unrecognized parameter information received from "
-                "CC-Light: \n {}".format(raw_param_string))
+                "QCC: \n {}".format(raw_param_string))
 
         try:
             # file.write(raw_param_string)
@@ -304,7 +304,7 @@ class CCL(SCPI):
             file.write(par_str)
             file.close()
         except Exception as e:
-            log.info("Failed to update CC-Light local parameter file:", str(e))
+            log.info("Failed to update QCC local parameter file:", str(e))
 
         return results
 
@@ -316,7 +316,7 @@ class CCL(SCPI):
             id_string = id_string.replace("'", "\"")
             self.version_info = json.loads(id_string)
         except Exception as e:
-            logging.warn('Error: failed to retrive IDN from CC-Light.', str(e))
+            logging.warn('Error: failed to retrive IDN from QCC.', str(e))
 
         self.version_info["Driver Version"] = self.driver_version
 
@@ -328,14 +328,14 @@ class CCL(SCPI):
 
     def print_qisa_opcodes(self):
         if self.QISA is None:
-            log.info("The assembler of CCLight has not been initialized yet.")
+            log.info("The assembler of QCC has not been initialized yet.")
             return
 
         print(self.QISA.dumpInstructionsSpecification())
 
     def print_control_store(self):
         if self.microcode is None:
-            log.info("The microcode unit of CCLight has not been"
+            log.info("The microcode unit of QCC has not been"
                 " initialized yet.")
             return
 
@@ -343,12 +343,12 @@ class CCL(SCPI):
 
     def print_qisa_with_control_store(self):
         if self.microcode is None:
-            log.info("The microcode unit of CCLight has not been"
+            log.info("The microcode unit of QCC has not been"
                 " initialized yet.")
             return
 
         if self.QISA is None:
-            log.info("The assembler of CCLight has not been initialized yet.")
+            log.info("The assembler of QCC has not been initialized yet.")
             return
 
         q_arg = OrderedDict()
@@ -439,7 +439,7 @@ class CCL(SCPI):
         # write binblock
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
-        # print("CCL: Sending instructions to the hardware finished.")
+        # print("QCC: Sending instructions to the hardware finished.")
 
         # write to last_loaded_instructions so it can conveniently be read back
         self.last_loaded_instructions(filename)
@@ -448,7 +448,7 @@ class CCL(SCPI):
         """
         _upload_controls is different from send_instructions because we can
         generate the microcode from a text file and the generation of the
-        microcode is done by the CCLightMicrocode.py
+        microcode is done by the QCCMicrocode.py
         """
 
         if not isinstance(filename, str):
@@ -470,7 +470,7 @@ class CCL(SCPI):
     def _upload_opcode_qmap(self, filename: str):
         success = self.QISA.loadQuantumInstructions(filename)
         if not success:
-            logging.warning("Error: ", driver.getLastErrorMessage())
+            logging.warning("Error: ", self.QISA.getLastErrorMessage())
             logging.warning("Failed to load quantum instructions from dictionaries.")
 
         return success
@@ -497,9 +497,9 @@ class CCL(SCPI):
         fn = os.path.join(pathname, base_name + ext)
         return fn
 
-class dummy_CCL(CCL):
+class dummy_QCC(QCC):
     """
-    Dummy CCL all paramaters are manual and all other methods include pass
+    Dummy QCC all paramaters are manual and all other methods include pass
     statements
     """
 
@@ -593,7 +593,7 @@ class dummy_CCL(CCL):
         self.add_parameter(
             'eqasm_program',
             label=('Upload instructions'),
-            docstring='It uploads the instructions to the CC-Light. ' +
+            docstring='It uploads the instructions to the QCC. ' +
             'Valid input is a string representing the filename',
             parameter_class=ManualParameter,
             vals=vals.Strings()
@@ -602,7 +602,7 @@ class dummy_CCL(CCL):
         self.add_parameter(
             'control_store',
             label=('Upload microcode'),
-            docstring='It uploads the microcode to the CC-Light. ' +
+            docstring='It uploads the microcode to the QCC. ' +
             'Valid input is a string representing the filename',
             parameter_class=ManualParameter,
             vals=vals.Strings()
