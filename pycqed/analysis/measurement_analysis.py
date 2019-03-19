@@ -359,6 +359,7 @@ class MeasurementAnalysis(object):
             '\n' + '*' * 80 + '\n\n'
 
         fit_grp.attrs.create(name='chisqr', data=fit_res.chisqr)
+        fit_grp.attrs.create(name='redchi', data=fit_res.redchi)
         fit_grp.attrs.create(name='var_name', data=var_name.encode('utf-8'))
         if fit_res.covar is not None:
             if 'covar' in list(fit_grp.keys()):
@@ -1584,7 +1585,7 @@ class Rabi_Analysis(TD_Analysis):
         separate_fits     (default=False)
             if True, runs the original Rabi analysis routine which fits the
             I and Q points separately
-        NoCalPoints       (default=4)
+        NoCalPoints       (default=0)
             Number of calibration points
         for_ef            (default=False)
             analyze for EF transition
@@ -1677,7 +1678,7 @@ class Rabi_Analysis(TD_Analysis):
             # Set up fit parameters and perform fit
             cos_mod.set_param_hint('amplitude',
                                    value=amp_guess,
-                                   vary=False)
+                                   vary=True)
             cos_mod.set_param_hint('phase',
                                    value=0,
                                    vary=False)
@@ -2099,6 +2100,151 @@ class Rabi_Analysis(TD_Analysis):
         return amp180
 
 
+class Flipping_Analysis(TD_Analysis):
+
+    def __init__(self, label='Flipping', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+
+    def run_default_analysis(self, close_file=True, show_guess=False, **kw):
+        # Returns the drive scaling factor.
+        show = kw.pop('show', False)
+        self.add_analysis_datagroup_to_file()
+        self.get_naming_and_values()
+        fig1, fig2, ax, axarray = self.setup_figures_and_axes()
+
+        norm = self.normalize_data_to_calibration_points(
+            self.measured_values[0], self.NoCalPoints)
+        self.normalized_values = norm[0]
+        self.normalized_data_points = norm[1]
+        self.normalized_cal_vals = norm[2]
+        self.fit_Flipping()
+
+        # self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
+        self.plot_results(fig1, ax, show_guess=show_guess,
+                          ylabel=r'$F$ $|1 \rangle$')
+
+        for i, name in enumerate(self.value_names):
+            if len(self.value_names) == 4:
+                if i < 2:
+                    ax2 = axarray[0, i]
+                else:
+                    ax2 = axarray[1, i-2]
+            else:
+                ax2 = axarray[i]
+
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=fig2, ax=ax2,
+                                            xlabel=self.xlabel,
+                                            ylabel=self.ylabels[i],
+                                            save=False)
+
+        if show:
+            plt.show()
+        self.save_fig(fig1, figname=self.measurementstring+'_Flipping_fit', **kw)
+        self.save_fig(fig2, figname=self.measurementstring, **kw)
+        if close_file:
+            self.data_file.close()
+        return self.drive_scaling_factor
+
+    def plot_results(self, fig, ax, ylabel,show_guess=False):
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.normalized_values,
+                                        fig=fig, ax=ax,
+                                        xlabel=r'No. Pulses',
+                                        ylabel=ylabel,
+                                        save=False)
+        if show_guess:
+            y_init = fit_mods.ExpDampOscFunc(self.sweep_points,
+                **self.fit_res.init_values)
+            ax.plot(self.sweep_points, y_init, 'k--')
+
+        ax.plot(self.fit_plot_points_x, self.fit_plot_points_y, 'r-')
+
+    def fit_Flipping(self, **kw):
+        # Split it up in two cases, one where we have oscillations,
+        # one where we are already quite close
+        data = self.normalized_data_points
+        sweep_points = self.sweep_points[:-self.NoCalPoints]
+        w = np.abs(np.fft.fft(data)[1:len(data)//2])
+        if np.argmax(w)==0:
+            # This is the case where we don't have oscilaltions.
+            # We fit a parabola to it.
+            def quadratic_fit_data():
+                M = np.array([sweep_points**2, sweep_points, [1]*len(sweep_points)])
+                Minv = np.linalg.pinv(M)
+                [a, b, c] = np.dot(data, Minv)
+                fit_data = (a*sweep_points**2 + b*sweep_points + c)
+                return fit_data, (a, b, c)
+            self.fit_results_quadratic = quadratic_fit_data()
+            slope = self.fit_results_quadratic[1][1]
+            amplitude = np.average(self.normalized_cal_vals) / 2
+            drive_detuning = slope / (2 * np.pi * abs(amplitude))
+            self.drive_scaling_factor = 1. / (1. + drive_detuning)
+            self.fit_plot_points_x = sweep_points
+            self.fit_plot_points_y = self.fit_results_quadratic[0]
+        else:
+            # This is the case where we have oscilaltions.
+            # We fit a decaying cos to it.
+            def fit_dec_cos_mod(negative_amplitude=False):
+                model = fit_mods.CosModel
+                params = model.guess(model, data=data,
+                                     t=sweep_points)
+                new_mod = fit_mods.ExpDampOscModel
+                if negative_amplitude:
+                    new_mod.set_param_hint('amplitude',
+                                    value=-1*np.abs(params['amplitude'].value),
+                                    min=-1, max=0)
+                else:
+                    new_mod.set_param_hint('amplitude',
+                                    value=np.abs(params['amplitude'].value),
+                                    min=0, max=1)
+                new_mod.set_param_hint('frequency',
+                                    value=params['frequency'].value,
+                                    min=0.2/sweep_points[-1],
+                                    max=10./sweep_points[-1])
+                new_mod.set_param_hint('phase',
+                                    value=-np.pi/2, vary=False)
+                new_mod.set_param_hint('oscillation_offset',
+                                    value=0)
+                new_mod.set_param_hint('exponential_offset',
+                                    value=params['offset'].value)
+                new_mod.set_param_hint('n',
+                                    value=1, vary=False)
+                new_mod.set_param_hint('tau',
+                                    value=sweep_points[-1],
+                                    min=sweep_points[1],
+                                    max=sweep_points[-1]*10)
+                new_params = new_mod.make_params()
+                return new_mod.fit(data=data,
+                                    t=sweep_points, params=new_params)
+            pos_amp_fit = fit_dec_cos_mod(negative_amplitude=False)
+            neg_amp_fit = fit_dec_cos_mod(negative_amplitude=True)
+
+            if pos_amp_fit.chisqr>neg_amp_fit.chisqr:
+                self.fit_res = neg_amp_fit
+            else:
+                self.fit_res = pos_amp_fit
+
+            self.fit_plot_points_x = np.linspace(sweep_points[0],
+                                                 sweep_points[-1],200)
+            self.fit_plot_points_y = fit_mods.ExpDampOscFunc(
+                t=self.fit_plot_points_x,
+                amplitude=self.fit_res.values['amplitude'],
+                frequency=self.fit_res.values['frequency'],
+                phase=self.fit_res.values['phase'],
+                oscillation_offset=self.fit_res.values['oscillation_offset'],
+                exponential_offset=self.fit_res.values['exponential_offset'],
+                n=self.fit_res.values['n'],
+                tau=self.fit_res.values['tau'])
+            self.drive_detuning = self.fit_res.values['frequency']*\
+                np.sign(self.fit_res.values['amplitude'])
+            self.drive_scaling_factor = 1. / (1. + self.drive_detuning)
+
+
 class TD_UHFQC(TD_Analysis):
 
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
@@ -2126,7 +2272,6 @@ class TD_UHFQC(TD_Analysis):
 
 
 class Echo_analysis(TD_Analysis):
-
     def __init__(self,vary_n=False,**kw):
         self.vary_n = vary_n
         super(Echo_analysis, self).__init__(**kw)
@@ -2154,7 +2299,7 @@ class Echo_analysis(TD_Analysis):
 
         params = model.guess(model, data=self.corr_data[:-self.NoCalPoints],
                              t=self.sweep_points[:-self.NoCalPoints],vary_n=self.vary_n)
-        
+
         self.fit_res = model.fit(data=self.corr_data[:-self.NoCalPoints],
                                  t=self.sweep_points[:-self.NoCalPoints],
                                  params=params)
@@ -2198,6 +2343,463 @@ class Echo_analysis(TD_Analysis):
                      fontsize=11, verticalalignment='top',
                      bbox=self.box_props)
         self.save_fig(self.fig, fig_tight=True, **kw)
+
+class Echo_analysis_V15(TD_Analysis):
+    """
+    New echo analysis for varying phase pulses. Based on old ramsey analysis.
+    Should be replaced asap by a V2-style analysis
+
+    -Luc 
+    """ 
+
+    def __init__(self, label='echo', phase_sweep_only=False, **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        self.phase_sweep_only = phase_sweep_only
+        self.artificial_detuning = kw.pop('artificial_detuning', 0)
+        if self.artificial_detuning == 0:
+            logging.warning('Artificial detuning is unknown. Defaults to %s MHz. '
+                            'New qubit frequency might be incorrect.'
+                            % self.artificial_detuning)
+
+        # The routines for 2 art_dets does not use the self.fig and self.ax
+        # created in TD_Analysis for make_fig==False for TD_Analysis but
+        # still want make_fig to decide whether two_art_dets_analysis should
+        # make a figure
+        self.make_fig_two_dets = kw.get('make_fig', True)
+        if (type(self.artificial_detuning) is list) and \
+                (len(self.artificial_detuning) > 1):
+            kw['make_fig'] = False
+
+        super().__init__(**kw)
+
+    def fit_Echo(self, x, y, **kw):
+        self.add_analysis_datagroup_to_file()
+        print_fit_results = kw.pop('print_fit_results',False)
+        damped_osc_mod = lmfit.Model(fit_mods.ExpDampOscFunc)
+        average = np.mean(y)
+
+        ft_of_data = np.fft.fft(y)
+        index_of_fourier_maximum = np.argmax(np.abs(
+            ft_of_data[1:len(ft_of_data) // 2])) + 1
+        max_echo_delay = x[-1] - x[0]
+
+        fft_axis_scaling = 1 / (max_echo_delay)
+        freq_est = fft_axis_scaling * index_of_fourier_maximum
+        est_number_of_periods = index_of_fourier_maximum
+        if self.phase_sweep_only:
+            damped_osc_mod.set_param_hint('frequency',
+                                          value=1/360,
+                                          vary=False)
+            damped_osc_mod.set_param_hint('phase',
+                                          value=0, vary=True)
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=0.5*(max(self.normalized_data_points)-min(self.normalized_data_points)),
+                                          min=0.0, max=4.0)
+            fixed_tau=1e9
+            damped_osc_mod.set_param_hint('tau',
+                                          value=fixed_tau,
+                                          vary=False)
+        else:
+            if ((average > 0.7*max(y)) or
+                    (est_number_of_periods < 2) or
+                    est_number_of_periods > len(ft_of_data)/2.):
+                print('the trace is too short to find multiple periods')
+
+                if print_fit_results:
+                    print('Setting frequency to 0 and ' +
+                          'fitting with decaying exponential.')
+                damped_osc_mod.set_param_hint('frequency',
+                                              value=freq_est,
+                                              vary=False)
+                damped_osc_mod.set_param_hint('phase',
+                                              value=0,
+                                              vary=False)
+            else:
+                damped_osc_mod.set_param_hint('frequency',
+                                              value=freq_est,
+                                              vary=True,
+                                              min=(1/(100 *x[-1])),
+                                              max=(20/x[-1]))
+
+            if (np.average(y[:4]) >
+                    np.average(y[4:8])):
+                phase_estimate = 0
+            else:
+                phase_estimate = np.pi
+            damped_osc_mod.set_param_hint('phase',
+                                              value=phase_estimate, vary=True)
+
+            amplitude_guess = 1
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=amplitude_guess,
+                                          min=0.4,
+                                          max=4.0)
+            damped_osc_mod.set_param_hint('tau',
+                                          value=x[1]*10,
+                                          min=x[1],
+                                          max=x[1]*1000)
+        damped_osc_mod.set_param_hint('exponential_offset',
+                                      value=0.5,
+                                      min=0.4,
+                                      max=4.0)
+        damped_osc_mod.set_param_hint('oscillation_offset',
+                                      value=0,
+                                      vary=False)
+        damped_osc_mod.set_param_hint('n',
+                                      value=1,
+                                      vary=False)
+        self.params = damped_osc_mod.make_params()
+
+        fit_res = damped_osc_mod.fit(data=y,
+                                     t=x,
+                                     params=self.params)
+        if self.phase_sweep_only:
+            chi_sqr_bound = 0
+        else:
+            chi_sqr_bound = 0.35
+
+        if fit_res.chisqr > chi_sqr_bound:
+            logging.warning('Fit did not converge, varying phase')
+            fit_res_lst = []
+
+            for phase_estimate in np.linspace(0, 2 * np.pi, 8):
+                damped_osc_mod.set_param_hint('phase',
+                                              value=phase_estimate)
+                self.params = damped_osc_mod.make_params()
+                fit_res_lst += [damped_osc_mod.fit(
+                    data=y,
+                    t=x,
+                    params=self.params)]
+
+            chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
+            fit_res = fit_res_lst[np.argmin(chisqr_lst)]
+        self.fit_results.append(fit_res)
+
+        if print_fit_results:
+            print(fit_res.fit_report())
+        return fit_res
+
+    def plot_results(self, fit_res, show_guess=False, art_det=0,
+                     fig=None, ax=None, textbox=True):
+
+        self.units = SI_prefix_and_scale_factor(val=max(abs(ax.get_xticks())),
+                                                unit=self.sweep_unit[0])[1]  # list
+
+        if isinstance(art_det, list):
+            art_det = art_det[0]
+
+        if textbox:
+            textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
+                       % (self.qubit_freq_spec * 1e-9) +
+                       '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
+                       % (self.qubit_frequency * 1e-9,
+                          fit_res.params['frequency'].stderr * 1e-9) +
+                       '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
+                       % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
+                          fit_res.params['frequency'].stderr * 1e-6) +
+                       '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
+                       % (fit_res.params['frequency'].value * 1e-6,
+                          fit_res.params['frequency'].stderr * 1e-6) +
+                       '\n$T_2$ = %.6g '
+                       % (fit_res.params['tau'].value * self.scale) +
+                       self.units + ' $\pm$ (%.6g) '
+                       % (fit_res.params['tau'].stderr * self.scale) +
+                       self.units +
+                       '\nartificial detuning = %.2g MHz'
+                       % (art_det * 1e-6))
+
+            fig.text(0.5, 0, textstr, fontsize=self.font_size,
+                     transform=ax.transAxes,
+                     verticalalignment='top',
+                     horizontalalignment='center', bbox=self.box_props)
+
+        x = np.linspace(self.sweep_points[0],
+                        self.sweep_points[-self.NoCalPoints - 1],
+                        len(self.sweep_points) * 100)
+
+        if show_guess:
+            y_init = fit_mods.ExpDampOscFunc(x, **fit_res.init_values)
+            ax.plot(x, y_init, 'k--', linewidth=self.line_width)
+
+        best_vals = fit_res.best_values
+        y = fit_mods.ExpDampOscFunc(
+            x, tau=best_vals['tau'],
+            n=best_vals['n'],
+            frequency=best_vals['frequency'],
+            phase=best_vals['phase'],
+            amplitude=best_vals['amplitude'],
+            oscillation_offset=best_vals['oscillation_offset'],
+            exponential_offset=best_vals['exponential_offset'])
+        ax.plot(x, y, 'r-', linewidth=self.line_width)
+
+    def run_default_analysis(self, print_fit_results=False,
+                             close_file=False, **kw):
+
+        super().run_default_analysis(
+            close_file=close_file,
+            close_main_figure=True, save_fig=False, **kw)
+
+        verbose = kw.get('verbose', False)
+        # Get old values for qubit frequency
+        instr_set = self.data_file['Instrument settings']
+        try:
+            if self.for_ef:
+                self.qubit_freq_spec = \
+                    float(instr_set[self.qb_name].attrs['f_ef_qubit'])
+            elif 'freq_qubit' in kw.keys():
+                self.qubit_freq_spec = kw['freq_qubit']
+            else:
+                try:
+                    self.qubit_freq_spec = \
+                        float(instr_set[self.qb_name].attrs['f_qubit'])
+                except KeyError:
+                    self.qubit_freq_spec = \
+                        float(instr_set[self.qb_name].attrs['freq_qubit'])
+
+        except (TypeError, KeyError, ValueError):
+            logging.warning('qb_name is unknown. Setting previously measured '
+                            'value of the qubit frequency to 0. New qubit '
+                            'frequency might be incorrect.')
+            self.qubit_freq_spec = 0
+
+        self.scale = 1e6
+
+        # artificial detuning with one value can be passed as either an int or
+        # a list with one elements
+        if (type(self.artificial_detuning) is list) and \
+                (len(self.artificial_detuning) > 1):
+            if verbose:
+                print('Performing Ramsey Analysis for 2 artificial detunings.')
+            self.two_art_dets_analysis(**kw)
+        else:
+            if type(self.artificial_detuning) is list:
+                self.artificial_detuning = self.artificial_detuning[0]
+            if verbose:
+                print('Performing Ramsey Analysis for 1 artificial detuning.')
+            self.one_art_det_analysis(**kw)
+
+        self.save_computed_parameters(self.T2,
+                                      var_name=self.value_names[0])
+
+        # Print the T2 values on screen
+        unit = self.parameter_units[0][-1]
+        if kw.pop('print_parameters', False):
+            print('New qubit frequency = {:.7f} (GHz)'.format(
+                self.qubit_frequency * 1e-9) +
+                  '\t\tqubit frequency stderr = {:.7f} (MHz)'.format(
+                      self.ramsey_freq['freq_stderr'] * 1e-6) +
+                  '\nT2* = {:.5f} '.format(
+                      self.T2['T2'] * self.scale) + '(' + 'μ' + unit + ')' +
+                  '\t\tT2* stderr = {:.5f} '.format(
+                      self.T2['T2_stderr'] * self.scale) +
+                  '(' + 'μ' + unit + ')')
+        if close_file:
+            self.data_file.close()
+
+        return self.fit_res
+
+    def one_art_det_analysis(self, **kw):
+
+        # Perform fit and save fitted parameters
+        self.fit_res = self.fit_Echo(x=self.sweep_points[:-self.NoCalPoints],
+                                       y=self.normalized_data_points, **kw)
+        self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
+        self.get_measured_freq(fit_res=self.fit_res, **kw)
+
+        # Calculate new qubit frequency
+        self.qubit_frequency = self.qubit_freq_spec + self.artificial_detuning \
+                               - self.echo_freq['freq']
+
+        # Extract T2 and save it
+        self.get_measured_T2(fit_res=self.fit_res, **kw)
+        # the call above defines self.T2 as a dict; units are seconds
+
+        self.total_detuning = self.fit_res.params['frequency'].value
+        self.detuning_stderr = self.fit_res.params['frequency'].stderr
+        self.detuning = self.total_detuning - self.artificial_detuning
+
+        if self.make_fig:
+            # Plot results
+            show_guess = kw.pop('show_guess', False)
+            show = kw.pop('show', False)
+            self.plot_results(self.fit_res, show_guess=show_guess,
+                              art_det=self.artificial_detuning,
+                              fig=self.fig, ax=self.ax)
+
+            # dispaly figure
+            if show:
+                plt.show()
+
+            # save figure
+            self.save_fig(self.fig, figname=self.measurementstring + '_Echo_fit',
+                          **kw)
+
+    def two_art_dets_analysis(self, **kw):
+
+        # Extract the data for each echo
+        len_art_det = len(self.artificial_detuning)
+        sweep_pts_1 = self.sweep_points[0:-self.NoCalPoints:len_art_det]
+        sweep_pts_2 = self.sweep_points[1:-self.NoCalPoints:len_art_det]
+        echo_data_1 = self.normalized_values[0:-self.NoCalPoints:len_art_det]
+        echo_data_2 = self.normalized_values[1:-self.NoCalPoints:len_art_det]
+
+        # Perform fit
+        fit_res_1 = self.fit_Echo(x=sweep_pts_1,
+                                    y=echo_data_1, **kw)
+        fit_res_2 = self.fit_Echo(x=sweep_pts_2,
+                                    y=echo_data_2, **kw)
+
+        self.save_fitted_parameters(fit_res_1, var_name=(self.value_names[0] +
+                                                         ' ' + str(self.artificial_detuning[0] * 1e-6) + ' MHz'))
+        self.save_fitted_parameters(fit_res_2, var_name=(self.value_names[0] +
+                                                         ' ' + str(self.artificial_detuning[1] * 1e-6) + ' MHz'))
+
+        echo_freq_dict_1 = self.get_measured_freq(fit_res=fit_res_1, **kw)
+        echo_freq_1 = echo_freq_dict_1['freq']
+        echo_freq_dict_2 = self.get_measured_freq(fit_res=fit_res_2, **kw)
+        echo_freq_2 = echo_freq_dict_2['freq']
+
+        # Calculate possible detunings from real qubit frequency
+        self.new_qb_freqs = {
+            '0': self.qubit_freq_spec + self.artificial_detuning[0] + echo_freq_1,
+            '1': self.qubit_freq_spec + self.artificial_detuning[0] - echo_freq_1,
+            '2': self.qubit_freq_spec + self.artificial_detuning[1] + echo_freq_2,
+            '3': self.qubit_freq_spec + self.artificial_detuning[1] - echo_freq_2}
+
+        print('The 4 possible cases for the new qubit frequency give:')
+        pprint(self.new_qb_freqs)
+
+        # Find which ones match
+        self.diff = {}
+        self.diff.update({'0': self.new_qb_freqs['0'] - self.new_qb_freqs['2']})
+        self.diff.update({'1': self.new_qb_freqs['1'] - self.new_qb_freqs['3']})
+        self.diff.update({'2': self.new_qb_freqs['1'] - self.new_qb_freqs['2']})
+        self.diff.update({'3': self.new_qb_freqs['0'] - self.new_qb_freqs['3']})
+        self.correct_key = np.argmin(np.abs(list(self.diff.values())))
+        # Get new qubit frequency
+        self.qubit_frequency = self.new_qb_freqs[str(self.correct_key)]
+
+        if self.correct_key < 2:
+            # art_det 1 was correct direction
+            # print('Artificial detuning {:.1f} MHz gave the best results.'.format(
+            #     self.artificial_detuning[0]*1e-6))
+            self.fit_res = fit_res_1
+            self.echo_data = echo_data_1
+            self.sweep_pts = sweep_pts_1
+            self.good_echo_freq = echo_freq_1
+            qb_stderr = echo_freq_dict_1['freq_stderr']
+
+        else:
+            # art_det 2 was correct direction
+            # print('Artificial detuning {:.1f} MHz gave the best results.'.format(
+            #     self.artificial_detuning[1]*1e-6))
+            self.fit_res = fit_res_2
+            self.echo_data = echo_data_2
+            self.sweep_pts = sweep_pts_2
+            self.good_echo_freq = echo_freq_2
+            qb_stderr = echo_freq_dict_2['freq_stderr']
+
+        # Extract T2 and save it
+        self.get_measured_T2(fit_res=self.fit_res, **kw)  # defines self.T2 as a dict;
+        # units are seconds
+
+        ################
+        # Plot results #
+        ################
+        if self.make_fig_two_dets:
+            show_guess = kw.pop('show_guess', False)
+            show = kw.pop('show', False)
+
+            if self.for_ef:
+                ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
+            else:
+                ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+            if self.no_of_columns == 2:
+                figsize = (3.375, 2.25 * len_art_det)
+            else:
+                figsize = (7, 4 * len_art_det)
+            self.fig, self.axs = plt.subplots(len_art_det, 1,
+                                              figsize=figsize,
+                                              dpi=self.dpi)
+
+            fit_res_array = [fit_res_1, fit_res_2]
+            echo_data_dict = {'0': echo_data_1,
+                                '1': echo_data_2}
+
+            for i in range(len_art_det):
+                ax = self.axs[i]
+                self.plot_results_vs_sweepparam(x=self.sweep_pts,
+                                                y=echo_data_dict[str(i)],
+                                                fig=self.fig, ax=ax,
+                                                xlabel=self.sweep_name,
+                                                x_unit=self.sweep_unit[0],
+                                                ylabel=ylabel,
+                                                marker='o-',
+                                                save=False)
+                self.plot_results(fit_res_array[i], show_guess=show_guess,
+                                  art_det=self.artificial_detuning[i],
+                                  fig=self.fig, ax=ax, textbox=False)
+
+                textstr = ('artificial detuning = %.2g MHz'
+                           % (self.artificial_detuning[i] * 1e-6) +
+                           '\n$f_{Echo}$ = %.5g $ MHz \pm$ (%.5g) MHz'
+                           % (fit_res_array[i].params['frequency'].value * 1e-6,
+                              fit_res_array[i].params['frequency'].stderr * 1e6) +
+                           '\n$T_2$ = %.3g '
+                           % (fit_res_array[i].params['tau'].value * self.scale) +
+                           self.units + ' $\pm$ (%.3g) '
+                           % (fit_res_array[i].params['tau'].stderr * self.scale) +
+                           self.units)
+                ax.annotate(textstr, xy=(0.99, 0.98), xycoords='axes fraction',
+                            fontsize=self.font_size, bbox=self.box_props,
+                            horizontalalignment='right', verticalalignment='top')
+
+                if i == (len_art_det - 1):
+                    textstr_main = ('$f_{qubit \_ old}$ = %.5g GHz'
+                                    % (self.qubit_freq_spec * 1e-9) +
+                                    '\n$f_{qubit \_ new}$ = %.5g $ GHz \pm$ (%.5g) GHz'
+                                    % (self.qubit_frequency * 1e-9,
+                                       qb_stderr * 1e-9) +
+                                    '\n$T_2$ = %.3g '
+                                    % (self.T2['T2'] * self.scale) +
+                                    self.units + ' $\pm$ (%.3g) '
+                                    % (self.T2['T2_stderr'] * self.scale) +
+                                    self.units)
+
+                    self.fig.text(0.5, 0, textstr_main, fontsize=self.font_size,
+                                  transform=self.axs[i].transAxes,
+                                  verticalalignment='top',
+                                  horizontalalignment='center', bbox=self.box_props)
+
+            # dispaly figure
+            if show:
+                plt.show()
+
+            # save figure
+            self.save_fig(self.fig, figname=self.measurementstring + '_Echo_fit',
+                          **kw)
+
+    def get_measured_freq(self, fit_res, **kw):
+        freq = fit_res.params['frequency'].value
+        freq_stderr = fit_res.params['frequency'].stderr
+
+        self.echo_freq = {'freq': freq, 'freq_stderr': freq_stderr}
+
+        return self.echo_freq
+
+    def get_measured_T2(self, fit_res, **kw):
+        '''
+        Returns measured T2 from the fit to the Ical data.
+         return T2, T2_stderr
+        '''
+        T2 = fit_res.params['tau'].value
+        T2_stderr = fit_res.params['tau'].stderr
+
+        self.T2 = {'T2': T2, 'T2_stderr': T2_stderr}
+
+        return self.T2
+
 
 
 class Rabi_parabola_analysis(Rabi_Analysis):
@@ -3645,6 +4247,20 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.frac1_1 = frac1_1
         self.F_d = F_d
         self.SNR = SNR
+        # Add the fit and data to the analysis object
+        self.n0 = n0 # x-Data for the histograms
+        self.n1 = n1 # x-Data for the histograms
+        self.bins0 = bins0 # y-Data for the histograms
+        self.bins1 = bins1 # y-Data for the histograms
+        self.norm0 = norm0 # x-values of histogram fit
+        self.y0 = y0 # y-values of histogram fit
+        self.y0_0 = y0_0
+        self.y0_1 = y0_1
+        self.norm0 = norm0 # x-values of histogram fit
+        self.y1 = y1 # y-values of histogram fit
+        self.y1_0 = y1_0
+        self.y1_1 = y1_1
+
 
     def plot_2D_histograms(self, shots_I_0, shots_Q_0, shots_I_1, shots_Q_1,
                            **kw):
@@ -5806,6 +6422,7 @@ class VNA_Analysis(MeasurementAnalysis):
 
         # prepare figure in log scale
         data_amp = self.measured_values[0]
+        print(data_amp)
 
         fig, ax = self.default_ax()
         self.plot_dB_from_linear(x=self.sweep_points,
@@ -6070,6 +6687,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def fit_data(self, analyze_ef=False, **kw):
 
+
         percentile = kw.get('percentile', 20)
         num_sigma_threshold = kw.get('num_sigma_threshold', 5)
         window_len_filter = kw.get('window_len_filter', 3)
@@ -6157,8 +6775,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                            max=max(self.sweep_points),
                                            value=f0)
             LorentzianModel.set_param_hint('A',
-                                           value=amplitude_guess)  # ,
-            # min=4*np.var(self.data_dist))
+                                           value=amplitude_guess)
+
             LorentzianModel.set_param_hint('offset',
                                            value=np.mean(self.data_dist),
                                            vary=True)
@@ -7744,18 +8362,24 @@ class DoubleFrequency(TD_Analysis):
         fig, ax = plt.subplots()
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
 
-        f1 = fit_res.params['freq_1'].value
-        f2 = fit_res.params['freq_2'].value
-        A1 = fit_res.params['amp_1'].value
-        A2 = fit_res.params['amp_2'].value
-        tau1 = fit_res.params['tau_1'].value
-        tau2 = fit_res.params['tau_2'].value
+        fs = [fit_res.params['freq_1'].value, fit_res.params['freq_2'].value]
+        As = [fit_res.params['amp_1'].value, fit_res.params['amp_2'].value]
+        taus = [fit_res.params['tau_1'].value, fit_res.params['tau_2'].value]
+        min_index=fs.index(np.min(fs))
+        max_index=fs.index(np.max(fs))
+        self.f1=fs[min_index]
+        self.f2=fs[max_index]
+        self.A1=As[min_index]
+        self.A2=As[max_index]
+        self.tau1=taus[min_index]
+        self.tau2=taus[max_index]
 
-        textstr = ('$A_1$: {:.3f}       \t$A_2$: {:.3f} \n'.format(A1, A2) +
+
+        textstr = ('$A_1$: {:.3f}       \t$A_2$: {:.3f} \n'.format(self.A1, self.A2) +
                    '$f_1$: {:.3f} MHz\t$f_2$: {:.3f} MHz \n'.format(
-                       f1 * 1e-6, f2 * 1e-6) +
-                   r'$\tau _1$: {:.2f} $\mu$s'.format(tau1 * 1e6) +
-                   '  \t' + r'$\tau _2$: {:.2f}$\mu$s'.format(tau2 * 1e6))
+                       self.f1 * 1e-6, self.f2 * 1e-6) +
+                   r'$\tau _1$: {:.2f} $\mu$s'.format(self.tau1 * 1e6) +
+                   '  \t' + r'$\tau _2$: {:.2f}$\mu$s'.format(self.tau2 * 1e6))
 
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
@@ -7765,7 +8389,7 @@ class DoubleFrequency(TD_Analysis):
         ax.set_ylabel(r'$F |1\rangle$')
         ax.set_title('%s: Double Frequency analysis' % self.timestamp)
         ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x * 1e6, y, 'o')
+        ax.plot(plot_x * 1e6, y, 'o-')
         ax.plot(plot_x[:-4] * 1e6, self.fit_plot, '-')
         fig.tight_layout()
         self.save_fig(fig, **kw)

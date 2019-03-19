@@ -7,7 +7,10 @@ from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
-from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
+try:
+    from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
+except ImportError:
+    pass # This is to make the lutman work if no OpenQL is installed.
 from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel

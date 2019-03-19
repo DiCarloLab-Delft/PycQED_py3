@@ -9,6 +9,7 @@ import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
 from pycqed.measurement.openql_experiments import pygsti_oql
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
+from pycqed.analysis.tools import cryoscope_tools as ct
 
 from pycqed.utilities.general import gen_sweep_pts
 from .qubit_object import Qubit
@@ -542,6 +543,13 @@ class CCLight_Transmon(Qubit):
     def add_flux_parameters(self):
         # fl_dc_ is the prefix for DC flux bias related params
         self.add_parameter(
+            'flux_polycoeff',
+            docstring='Polynomial coefficients for current to frequency conversion',
+            vals=vals.Arrays(),
+            # initial value is chosen to not raise errors
+            initial_value=np.array([0, 0, -1e12, 0, 6e9]),
+            parameter_class=ManualParameter)
+        self.add_parameter(
             'fl_dc_V_per_phi0', label='Flux bias V/Phi0',
             docstring='Conversion factor for flux bias',
             vals=vals.Numbers(), unit='V', initial_value=1,
@@ -559,7 +567,7 @@ class CCLight_Transmon(Qubit):
         self.add_parameter(
             'fl_dc_ch',  docstring=(
                 'Flux bias channel'),
-            vals=vals.Ints(), initial_value=1,
+            vals=vals.Strings(), initial_value='',
             parameter_class=ManualParameter)
 
         # Currently this has only the parameters for 1 CZ gate.
@@ -1527,7 +1535,8 @@ class CCLight_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
         # Starting specmode if set in config
         if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+            UHFQC.spec_mode_on(acq_length=self.ro_acq_integration_length,
+                               IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
@@ -1711,7 +1720,8 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
-            # Starting specmode if set in config
+
+        # Starting specmode if set in config
         if self.cfg_spec_mode():
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
@@ -1744,7 +1754,8 @@ class CCLight_Transmon(Qubit):
         # anharmonicity measurement, bus crossing and photon number splitting with the bus
 
     def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None,
-                              f_12_power=None, MC=None, spec_source_2=None):
+                              f_12_power=None, MC=None, spec_source_2=None, f_01_span=24e6,
+                              f_12_span = 24e6):
         '''
         note measures anharmonicity of the transmon using three-tone
         spectroscopy. two usecases:
@@ -1775,8 +1786,8 @@ class CCLight_Transmon(Qubit):
         if spec_source_2 is None:
             spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source = self.instr_spec_source.get_instr()
-        freqs_q1 = np.arange(f_01-12e6, f_01+12e6, 0.7e6)
-        freqs_q2 = np.arange(f_12-12e6, f_12+12e6, 0.7e6)
+        freqs_q1 = np.arange(f_01-f_01_span/2, f_01+f_01_span/2, 0.7e6)
+        freqs_q2 = np.arange(f_12-f_12_span/2, f_12+f_12_span/2, 0.7e6)
 
         self.prepare_for_continuous_wave()
         self.int_avg_det_single._set_real_imag(False)
@@ -1793,12 +1804,12 @@ class CCLight_Transmon(Qubit):
             spec_source_2.frequency, retrieve_value=True))
         MC.set_sweep_points_2D(freqs_q2)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run_2D(name='Three_tone_'+self.msmt_suffix)
+        MC.run_2D(name='Two_tone_'+self.msmt_suffix)
         ma.TwoD_Analysis(auto=True)
         spec_source.off()
         spec_source_2.off()
         ma.Three_Tone_Spectroscopy_Analysis(
-            label='Three_tone',  f01=f_01, f12=f_12)
+            label='Two_tone',  f01=f_01, f12=f_12)
 
     def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10, 10, 1), MC=None, spec_source_2=None):
 
@@ -2796,7 +2807,10 @@ class CCLight_Transmon(Qubit):
                        artificial_detuning: float=None,
                        freq_qubit: float=None,
                        label: str='',
-                       analyze=True, close_fig=True, update=True):
+                       prepare_for_timedomain=True,
+                       analyze=True, close_fig=True, update=True,
+                       detector=False,
+                       double_fit=False):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -2821,8 +2835,8 @@ class CCLight_Transmon(Qubit):
                                  times[-1]+2*dt,
                                     times[-1]+3*dt,
                                     times[-1]+4*dt)])
-
-        self.prepare_for_timedomain()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
 
         # adding 'artificial' detuning by detuning the qubit LO
         if freq_qubit is None:
@@ -2849,7 +2863,22 @@ class CCLight_Transmon(Qubit):
                                    artificial_detuning=artificial_detuning)
             if update:
                 self.T2_star(a.T2_star['T2_star'])
-                return a.T2_star
+            if double_fit:
+                b=ma.DoubleFrequency()
+                res = {
+                'T2star1': b.tau1,
+                'T2star2': b.tau2,
+                 'frequency1': b.f1,
+                 'frequency2': b.f2
+                    }
+                return res
+
+            else:
+                res = {
+                    'T2star': a.T2_star['T2_star'],
+                 'frequency': a.qubit_frequency,
+                    }
+                return res
 
     def measure_msmt_induced_dephasing(self, MC=None, sequence='ramsey',
                                        label: str='',
@@ -2888,7 +2917,7 @@ class CCLight_Transmon(Qubit):
             readout_pulse_length += self.ro_pulse_down_length0()
             readout_pulse_length += self.ro_pulse_down_length1()
             if extra_echo:
-                wait_time = readout_pulse_length/2+20e-9
+                wait_time = readout_pulse_length/2+0e-9
             else:
                 wait_time = 0
 
@@ -2939,7 +2968,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
-                     label: str=''):
+                     label: str='', prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -2973,7 +3002,10 @@ class CCLight_Transmon(Qubit):
             raise ValueError(
                 'timesteps must be multiples of 2 modulation periods')
 
-        self.prepare_for_timedomain()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         p = sqo.echo(times, qubit_idx=self.cfg_qubit_nr(),
                      platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -2984,7 +3016,9 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('echo'+label+self.msmt_suffix)
-        a = ma.Echo_analysis(label='echo', auto=True, close_fig=True)
+        # FIXME: echo analysis v2 required that correctly handles 
+        # modulation of recovery pulse. 
+        a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
@@ -3663,3 +3697,29 @@ class CCLight_Transmon(Qubit):
                     't_start': start_time, 't_stop': end_time}
         else:
             return {}
+
+
+    def calc_current_to_freq(self, curr: float):
+        """
+        Converts DC current to requency in Hz for a qubit
+        Args:
+            curr (float) : current in A
+        """
+        polycoeffs = self.flux_polycoeff()
+
+        return np.polyval(polycoeffs, curr)
+
+    def calc_freq_to_current(self, freq, kind='root_parabola', **kw):
+        """
+        Find the amplitude that corresponds to a given frequency, by
+        numerically inverting the fit.
+
+        freq: The frequency or set of frequencies.
+
+        **kw : get passed on to methods that implement the different "kind"
+            of calculations.
+        """
+
+        return ct.freq_to_amp_root_parabola(freq=freq,
+                                         poly_coeffs=self.flux_polycoeff(),
+                                         **kw)
