@@ -204,9 +204,6 @@ class DeviceCCL(Instrument):
         # Setting the latencies in the CCL
         CCL = self.instr_CC.get_instr()
         for i, (key, val) in enumerate(latencies.items()):
-            CCL.set('dio{}_out_delay'.format(i+1), val //
-                    20e-9)  # Convert to CCL dio value
-
             for qbt in self.qubits():
                 # get qubit objects
                 q = self.find_instrument(qbt)
@@ -217,6 +214,11 @@ class DeviceCCL(Instrument):
                     q.flux_fine_delay(val % 20e-9)
                 elif key in ('mw_latency_0'):
                     q.mw_fine_delay(val % 20e-9)
+
+            CCL.set('dio{}_out_delay'.format(i+1), val //
+                    20e-9)  # Convert to CCL dio value
+
+
 
     def prepare_readout(self, qubits):
         self._prep_ro_setup_qubits(qubits=qubits)

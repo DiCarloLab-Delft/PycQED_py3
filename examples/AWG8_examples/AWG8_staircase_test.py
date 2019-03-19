@@ -90,7 +90,8 @@ waveform_type = 'square'
 if waveform_type == 'square':
     for ch in range(8):
         for i in range(32):
-            AWG8.set('wave_ch{}_cw{:03}'.format(ch+1, i), (np.ones(48)*i/32))
+            # AWG8.set('wave_ch{}_cw{:03}'.format(ch+1, i), (np.ones(48)*i/32))
+            AWG8.set('wave_ch{}_cw{:03}'.format(ch+1, i), (np.ones(64)*i/32))
 elif waveform_type == 'sin':
     for ch in range(8):
         for i in range(32):
