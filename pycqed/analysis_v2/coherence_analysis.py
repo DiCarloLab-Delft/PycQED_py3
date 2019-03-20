@@ -29,23 +29,50 @@ class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
              chi_shift: float=None, savename: str= 'coherence_analysis',
              **kwargs):
 
-    super().__init__(t_start=t_start, t_stop=t_stop, label=label,
-                     options_dict=options_dict, close_figs=close_figs,
-                     **kwargs)
+        super().__init__(t_start=t_start, t_stop=t_stop, label=label,
+                         options_dict=options_dict, close_figs=close_figs,
+                         **kwargs)
 
+        params_dict_TD = XXXXXXXXX
+        numeric_params = XXXXX
 
+        if t_stop is not None:
+            self.options_dict['save_figs'] = False
+        self._coherence_table = coherence_table
+        self._freq_resonator = freq_resonator
+        self._Qc = Qc
+        self._chi_shift = chi_shift
 
-    if t_stop is not None:
-        self.options_dict['save_figs'] = False
-    self._coherence_table = coherence_table
-    self._freq_resonator = freq_resonator
-    self._Qc = Qc
-    self._chi_shift = chi_shift
-
-    if auto:
-        self.run_analysis()
+        if auto:
+            self.run_analysis()
 
     # Define a function that extracts all the T1, Ramsey and Echo
+    def extract_data(self,t_start,t_stop,T1_label,TEcho_label,TRamsey_label,
+                        params_dict_TD,numeric_params,filter_no_analysis):
+        '''
+        Extract all the T1, TEcho and TRamsey data in the timestamp range
+        '''
+        T1_timestamps = a_tools.get_timestamp_in_range(t_start,t_stop,label=T1_label)
+        TEcho_timestamps = a_tools.get_timestamp_in_range(t_start,t_stop,label=TEcho_label)
+        TRamsey_timestamps = a_tools.get_timestamp_in_range(t_start,t_stop,label=TRamsey_label)
+        params_dict_TD = 
+        numeric_params
+        self.T1_dict = a_tools.get_data_from_timestamp_list(T1_timestamps,
+                    params_dict_TD, numeric_params=numeric_params,
+                    filter_no_analysis=filter_no_analysis)
+        self.TEcho_dict = a_tools.get_data_from_timestamp_list(TEcho_timestamps,
+            params_dict_TD, numeric_params=numeric_params,
+            filter_no_analysis=filter_no_analysis)
+        self.TRamsey_dict = a_tools.get_data_from_timestamp_list(TRamsey_timestamps,
+            params_dict_TD, numeric_params=numeric_params,
+            filter_no_analysis=filter_no_analysis)
+
+
+    def filter_data(self,filter_dics):
+        
+
+
+
 
 
     # Define a function that generates the filter mask
