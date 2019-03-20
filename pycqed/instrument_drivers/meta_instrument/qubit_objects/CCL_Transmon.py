@@ -2839,6 +2839,7 @@ class CCLight_Transmon(Qubit):
 
         if artificial_detuning is None:
             artificial_detuning = 3/times[-1]
+            artificial_detuning = 5/times[-1]
 
         # append the calibration points, times are for location in plot
         dt = times[1] - times[0]
@@ -3736,6 +3737,138 @@ class CCLight_Transmon(Qubit):
                     't_start': start_time, 't_stop': end_time}
         else:
             return {}
+
+    def find_sweet_spot(self, current_step_size=1e-3, frequency_step_size=10e6,
+                    f_span=40e6, f_step=0.5e6):
+        """
+        Uses find_frequency routine iteratively to find a sweet spot.
+        The routine does not retune the readout
+        resonator and it needs spectroscopy to work reliably.
+
+        The routine starts by stepping current by a given step_size.
+        Later, it makes frequency_step_size large steps (but no larger
+        than step_size), based on parabolic extrapolation from the data.
+
+        When the sweet spot is found it goes to points at f_ss-2 MHz and f_ss-4 MHz
+        at positive and negative flux, to ensure the reasonable range around
+        the ss was measured for the final identification of ss.
+        """
+
+        # get flux parameter and initial value
+        flux_parameter = self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()]
+        initial_fluxcurrent = flux_parameter()
+
+        # measure three qubit frequencies at 0 ans +- stepsize
+        flux_datapoints = np.linspace(-1,1,3)*current_step_size+initial_fluxcurrent
+        freq_datapoints = []
+        for fl in flux_datapoints:
+            flux_parameter(fl)
+            print('Measuring at current {}'.format(flux_parameter()))
+            freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+self.freq_qubit())
+            freq_datapoints = np.append(freq_datapoints, freq)
+
+        i = 0
+        while(i<20):
+            i += 1
+
+            # get an initial guess of a parabola
+            arc_polycoeffs = np.polyfit(flux_datapoints, freq_datapoints, 2)
+            arc_poly = np.poly1d(arc_polycoeffs)
+
+            # find maximum of a parabola
+            ss_flux = arc_poly.deriv().roots
+            ss_freq = arc_poly(ss_flux)
+
+            print(ss_flux, ss_freq)
+            print(flux_datapoints)
+            print(freq_datapoints)
+            print(arc_polycoeffs)
+
+            # check if estimated sweet spot in within +-10 MHz of any of points
+            # and within +-step_size
+            if np.min(np.abs(freq_datapoints-ss_freq))<frequency_step_size:
+                # go to sweet spot if there is at least one point on both sides of sweet-spot.
+                # if np.min(np.abs(flux_datapoints-ss_flux))<current_step_size:
+                if any((flux_datapoints-ss_flux)>0) and \
+                            any((ss_flux-flux_datapoints)<0):
+                    print('Found swet spot branch!')
+                    new_flux = ss_flux
+                    new_freq = ss_freq
+                    flux_parameter(float(new_flux))
+                # if sweets spot is further than current_step_size, step current
+                # by current_step_size
+                else:
+                    print('Step by current_step_size branch!')
+                    if any((ss_flux-flux_datapoints)>0):
+                        new_flux = float(np.max(flux_datapoints)+current_step_size)
+                        new_freq = arc_poly(new_flux)
+                        flux_parameter(new_flux)
+                    elif any((ss_flux-flux_datapoints)<0):
+                        new_flux = float(np.min(flux_datapoints)-current_step_size)
+                        new_freq = arc_poly(new_flux)
+                        flux_parameter(new_flux)
+            else:
+                print('Step by 10 MHz branch!')
+                # if sweet spot further away than 10 MHz
+                # step by 10 MHz, but no more than current_step_size
+                new_freq = np.max(freq_datapoints)+frequency_step_size
+                roots = np.sort((arc_poly-new_freq).roots)
+                # check which solution is closer to recently measured points
+                # go to that solution
+                if np.abs(roots[0]-np.mean(flux_datapoints))<np.abs(roots[1]-np.mean(flux_datapoints)):
+                    furthest_current_point = np.max(flux_datapoints)+current_step_size
+                    new_flux = float(min(roots[0], furthest_current_point))
+                    new_freq = arc_poly(new_flux)
+                    flux_parameter(new_flux)
+                else:
+                    furthest_current_point = np.min(flux_datapoints)-current_step_size
+                    new_flux = float(max(roots[1], furthest_current_point))
+                    new_freq = arc_poly(new_flux)
+                    flux_parameter(new_flux)
+
+            # measure frequency and add datapoints
+            print('Measuring at current {}'.format(flux_parameter()))
+            freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+new_freq)
+            # if measured freq differs too much from predicted, remeasure
+            if np.abs(freq - new_freq)>5e6:
+                freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+new_freq)
+            freq_datapoints = np.append(freq_datapoints, freq)
+            flux_datapoints = np.append(flux_datapoints, flux_parameter())
+
+            print(i, flux_parameter(), freq)
+
+            if np.abs(ss_freq-freq)<0.5e6:
+                break
+
+        # additional measuerments around sweet spot
+        roots_2MHz = np.sort((arc_poly-freq+2e6).roots)
+        roots_4MHz = np.sort((arc_poly-freq+4e6).roots)
+        roots = np.concatenate((roots_2MHz, roots_4MHz))
+        dets = (-2e6,-2e6,-4e6,-4e6)
+
+        for fl,det in zip(roots,dets):
+            flux_parameter(fl)
+            print('Measuring at current {}'.format(flux_parameter()))
+            freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+ss_freq+det)
+            freq_datapoints = np.append(freq_datapoints, freq)
+            flux_datapoints = np.append(flux_datapoints, flux_parameter())
+
+
+        arc_polycoeffs = np.polyfit(flux_datapoints, freq_datapoints, 2)
+        arc_poly = np.poly1d(arc_polycoeffs)
+
+        # find maximum of a parabola
+        ss_flux = arc_poly.deriv().roots
+        ss_freq = arc_poly(ss_flux)
+
+        # got to maximum and make one last measurement
+        new_flux = ss_flux
+        new_freq = ss_freq
+        flux_parameter(float(new_flux))
+        freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+ss_freq)
+
+
+        return flux_parameter(), freq
 
 
     def calc_current_to_freq(self, curr: float):
