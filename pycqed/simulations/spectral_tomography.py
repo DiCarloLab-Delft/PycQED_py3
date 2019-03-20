@@ -431,10 +431,11 @@ def extract_T_matrix(PTM):
     return PTM
 
 
-def time_series(U_final_vec_timeseries,S,weights,repetitions):
+def time_series(U_final_vec_timeseries,S,weights,repetitions,samplingpoints_gaussian_q0,axis_overrotation):
 
     trace_PTM_vec=[]
     trace_GTM_vec=[]
+
 
     for n_rep in range(repetitions):
         print(n_rep)
@@ -444,6 +445,11 @@ def time_series(U_final_vec_timeseries,S,weights,repetitions):
         for i in range(len(U_final_vec)):
             if U_final_vec[i].type == 'oper':
                 U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
+                
+                over_rot=czf.qubit_to_2qutrit_unitary(czf.bloch_sphere_rotation(samplingpoints_gaussian_q0[i], 
+                                                            axis_overrotation),'right')
+                U_final_vec[i]=qtp.to_super(over_rot)*U_final_vec[i]
+
                 U_final_vec[i] = U_final_vec[i] ** n_rep
             U_final_vec[i] = U_final_vec[i] * weights[i]
         U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting average propagator
@@ -591,6 +597,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 for j_q1 in range(len(samplingpoints_gaussian_q1)): 
                     fluxbias_q1 = samplingpoints_gaussian_q1[j_q1]                 # q1 spectator qubit
 
+                    if self.noise_parameters_CZ.overrotation_sims():
+                        fluxbias_q0=0
+                        fluxbias_q1=0
+
                     input_point = {'fluxbias_q0': fluxbias_q0,                  
                                    'fluxbias_q1': fluxbias_q1,
                                    'fluxlutman': self.fluxlutman,
@@ -605,10 +615,16 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
             U_final_vec = []
             t_final_vec = []
-            for input_arglist in input_to_parallelize:
-                result_list = compute_propagator(input_arglist)
-                U_final_vec.append(result_list[0])
-                t_final_vec.append(result_list[1])
+            if self.noise_parameters_CZ.overrotation_sims():
+                result_list = compute_propagator(input_to_parallelize[0])
+                for i in range(len(input_to_parallelize)):
+                    U_final_vec.append(result_list[0])
+                    t_final_vec.append(result_list[1])
+            else:
+                for input_arglist in input_to_parallelize:
+                    result_list = compute_propagator(input_arglist)
+                    U_final_vec.append(result_list[0])
+                    t_final_vec.append(result_list[1])
             U_final_vec_timeseries = np.copy(U_final_vec)
 
 
@@ -673,7 +689,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 trace_PTM=np.trace(T_PTM)
                 trace_GTM=np.trace(T_GTM)
             else:
-                trace_GTM_vec, trace_PTM_vec = time_series(U_final_vec_timeseries,S,weights,self.noise_parameters_CZ.repetitions())
+                trace_GTM_vec, trace_PTM_vec = time_series(U_final_vec_timeseries,S,weights,
+                                self.noise_parameters_CZ.repetitions(),samplingpoints_gaussian_q0,
+                                self.noise_parameters_CZ.axis_overrotation())
 
 
         qoi_plot = np.array(qoi_plot)
