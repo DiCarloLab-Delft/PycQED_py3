@@ -35,7 +35,7 @@ class QuTechCC(SCPIBase):
         """
         upload sequence program string
         """
-        hdr = 'QUTech:SEQuence:PROGram'
+        hdr = 'QUTech:SEQuence:PROGram ' # NB: include space as separator for binblock parameter
         bin_block = program_string.encode('ascii')
         self.bin_block_write(bin_block, hdr)
 
@@ -50,4 +50,3 @@ class QuTechCC(SCPIBase):
         """
         """
         self._transport.write('awgcontrol:stop:immediate')
-

@@ -4,7 +4,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# from: AWG8_staircase_test
+# from: AWG8_staircase_test.ipynb
 def plot_timing_diagram(data, bits, line_length=30):
     def _plot_lines(ax, pos, *args, **kwargs):
         if ax == 'x':
@@ -43,7 +43,7 @@ def plot_timing_diagram(data, bits, line_length=30):
         _plot_timing_diagram(d, bits)
 
 
-# From: iPython-Notebooks/Experiments/1709_M18/170918_UHFQC - LutMan testing
+# From: iPython-Notebooks/Experiments/1709_M18/170918_UHFQC - LutMan testing.ipynb
 def print_timing_diagram(data, bits, line_length=30):
     def _print_timing_diagram(data, bits):
         line_length = 0
@@ -135,8 +135,8 @@ def print_timing_diagram_simple(data, bits, line_length=30):
 def check_dio_timing(data, strobe_index, bits):
     err_setup = False
     err_hold = False
-    min_hi = 64  # FIXME
-    min_lo = 64
+    min_hi = len(data)
+    min_lo = len(data)
 
     prev_transition = 0
     prev_val = (data[0] >> strobe_index) & 1
@@ -146,7 +146,7 @@ def check_dio_timing(data, strobe_index, bits):
         if val != prev_val:
             # print('transition {}{} at {}'.format(prev_val, val, i))
             if prev_transition:  # did we already see a transition
-                # compute duration
+                # compute duration of strobe hi/lo
                 duration = idx - prev_transition
                 if prev_val:  # we had a 1
                     if duration < min_hi:
@@ -156,7 +156,8 @@ def check_dio_timing(data, strobe_index, bits):
                         min_lo = duration
                         # print('{} period = {} samples'. format(prev_val, duration))
 
-                # test setup and hold
+                # test setup and hold of data bits versus strobe rising/falling edge
+                # FIXME: aloow choosing edge, no need for prev_transition
                 for bit in bits:
                     if idx > 1 and idx < len(data) - 1:
                         prompt = (data[idx] >> bit) & 1
