@@ -18,67 +18,6 @@ from pycqed.analysis.tools.plotting import SI_val_to_msg_str, \
 
 from pycqed.analysis import analysis_toolbox as a_tools
 
-class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
-    """
-    Extractor of dac values, frequency, T1, T2star and T2echo for use in
-    CoherenceAnalysis.
-    """
-    def __init__(self, t_start: str=None, t_stop: str=None, label='',
-             options_dict: dict=None, auto: bool=True, close_figs=True,
-             freq_resonator: float=None, Qc: float=None,
-             chi_shift: float=None, savename: str= 'coherence_analysis',
-             **kwargs):
-
-        super().__init__(t_start=t_start, t_stop=t_stop, label=label,
-                         options_dict=options_dict, close_figs=close_figs,
-                         **kwargs)
-
-        params_dict_TD = XXXXXXXXX
-        numeric_params = XXXXX
-
-        if t_stop is not None:
-            self.options_dict['save_figs'] = False
-        self._coherence_table = coherence_table
-        self._freq_resonator = freq_resonator
-        self._Qc = Qc
-        self._chi_shift = chi_shift
-
-        if auto:
-            self.run_analysis()
-
-    # Define a function that extracts all the T1, Ramsey and Echo
-    def extract_data(self,t_start,t_stop,T1_label,TEcho_label,TRamsey_label,
-                        params_dict_TD,numeric_params,filter_no_analysis):
-        '''
-        Extract all the T1, TEcho and TRamsey data in the timestamp range
-        '''
-        T1_timestamps = a_tools.get_timestamp_in_range(t_start,t_stop,label=T1_label)
-        TEcho_timestamps = a_tools.get_timestamp_in_range(t_start,t_stop,label=TEcho_label)
-        TRamsey_timestamps = a_tools.get_timestamp_in_range(t_start,t_stop,label=TRamsey_label)
-        params_dict_TD = 
-        numeric_params
-        self.T1_dict = a_tools.get_data_from_timestamp_list(T1_timestamps,
-                    params_dict_TD, numeric_params=numeric_params,
-                    filter_no_analysis=filter_no_analysis)
-        self.TEcho_dict = a_tools.get_data_from_timestamp_list(TEcho_timestamps,
-            params_dict_TD, numeric_params=numeric_params,
-            filter_no_analysis=filter_no_analysis)
-        self.TRamsey_dict = a_tools.get_data_from_timestamp_list(TRamsey_timestamps,
-            params_dict_TD, numeric_params=numeric_params,
-            filter_no_analysis=filter_no_analysis)
-
-
-    def filter_data(self,filter_dics):
-        
-
-
-
-
-
-    # Define a function that generates the filter mask
-    # Filters could e.g. be given as a 
-
-
 
 class CoherenceAnalysis(ba.BaseDataAnalysis):
     """
@@ -1302,6 +1241,227 @@ class CoherenceTimesAnalysis_old(ba.BaseDataAnalysis):
             # self.raw_data_dict[qubit][typ] = a.raw_data_dict
 
 
+class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
+    """
+    Extractor of dac values, frequency, T1, T2star and T2echo for use in
+    CoherenceAnalysis.
+    """
+    def __init__(self, t_start: str=None, t_stop: str=None, label='',
+             options_dict: dict=None, auto: bool=True, close_figs=True,
+             params_dict_TD: dict=None, numeric_params: list=None,
+             chi_shift: float=None, savename: str= 'coherence_analysis',
+             **kwargs):
+
+        # super().__init__(t_start=t_start, t_stop=t_stop, label=label,
+        #                  options_dict=options_dict, close_figs=close_figs,
+        #                  **kwargs)
+
+        dac_key = 'Instrument settings.fluxcurrent.FBL_X'
+        frequency_key = 'Instrument settings.X.freq_qubit'
+
+
+        T1_analysis = CoherenceTimesAnalysisSingle(t_start=self.t_start,t_stop=self.t_stop,
+            label='T1',options_dict=options_dict,extract_only=True,do_fitting=False,
+            tau_key='Analysis.Fitted Params F|1>.tau.value',
+             tau_std_key='Analysis.Fitted Params F|1>.tau.stderr',
+             use_chisqr=False,
+             plot_versus_dac=False,
+             dac_key=dac_key,
+             plot_versus_frequency=False,
+             frequency_key=frequency_key,
+             fit_qubit_Q_factor=False)
+
+    
+
+
+
+
+
+
+#             if 'F|1>' in tau_key:
+#                 chisquared_key = 'Analysis.Fitted Params F|1>.chisqr'
+#             elif 'raw' in tau_key:
+#                 chisquared_key = 'Analysis.Fitted Params raw w0.chisqr'
+#             elif 'corr_data' in tau_key:
+#                 chisquared_key = 'Analysis.Fitted Params corr_data.chisqr'
+#             self.params_dict = {'tau_T1': tau_key,
+#                                 'tau_stderr': tau_std_key,
+#                                 'chisquared': chisquared_key
+#                                 }
+#             self.numeric_params = ['tau', 'tau_stderr', 'chisquared']
+
+#         if params_dict_TD is None:
+#             params_dict_TD = {'tau':'Fitted Params F|1>.tau.value',
+#                       'tau_err':'Fitted Params F|1>.tau.stderr',
+#                       'chi_squared_reduced':'Fitted Params F|1>.redchi',
+#                       'dac':'IVVI.dac1', # We do nothing with dac
+#                       'frequency':qubit_label+'.f_qubit',
+#                       'plot_data':'Corrected data',
+#                       'plot_times':'sweep_points',
+# #                       'temperatures':'LaDucati.temperatures', # Does not exist any more
+#                       'field':'Magnet.field'}
+        
+#         if numeric_params is None:
+#             numeric_params = ['tau','tau_err','dac','frequency', 
+#             'plot_data','plot_times','Attenuation','field']
+
+#         if t_stop is not None:
+#             self.options_dict['save_figs'] = False
+#         self._coherence_table = coherence_table
+#         self._freq_resonator = freq_resonator
+#         self._Qc = Qc
+#         self._chi_shift = chi_shift
+
+#         if auto:
+#             self.run_analysis()
+
+#     # Define a function that extracts all the T1, Ramsey and Echo
+#     # def extract_data(self,t_start,t_stop,T1_label,TEcho_label,TRamsey_label,
+#     #                     params_dict_TD,numeric_params,filter_no_analysis):
+#     #     '''
+#     #     Extract all the T1, TEcho and TRamsey data in the timestamp range
+#     #     '''
+#     #     T1_timestamps = a_tools.get_timestamp_in_range(t_start,t_stop,label=T1_label)
+#     #     TEcho_timestamps = a_tools.get_timestamp_in_range(t_start,t_stop,label=TEcho_label)
+#     #     TRamsey_timestamps = a_tools.get_timestamp_in_range(t_start,t_stop,label=TRamsey_label)
+#     #     self.T1_dict = a_tools.get_data_from_timestamp_list(T1_timestamps,
+#     #                 params_dict_TD, numeric_params=numeric_params,
+#     #                 filter_no_analysis=filter_no_analysis)
+#     #     self.TEcho_dict = a_tools.get_data_from_timestamp_list(TEcho_timestamps,
+#     #         params_dict_TD, numeric_params=numeric_params,
+#     #         filter_no_analysis=filter_no_analysis)
+#     #     self.TRamsey_dict = a_tools.get_data_from_timestamp_list(TRamsey_timestamps,
+#     #         params_dict_TD, numeric_params=numeric_params,
+#     #         filter_no_analysis=filter_no_analysis)
+
+
+#     def extract_data(self):
+#         # load data
+#         super().extract_data()
+#         tau = np.array(self.raw_data_dict['tau_T1'], dtype=float)
+#         tau_std = np.array(self.raw_data_dict['tau_T1_stderr'], dtype=float)
+#         # sort data
+
+#         if self.plot_versus_dac:
+#             dacs = np.array(self.raw_data_dict['dac'], dtype=float)
+#             sorted_indices = dacs.argsort()
+#             self.raw_data_dict['dac_sorted'] = dacs[sorted_indices]
+#             self.raw_data_dict['dac_sorted_tau'] = tau[sorted_indices]
+#             self.raw_data_dict['dac_sorted_tau_stderr'] = tau_std[sorted_indices]
+#             if self.plot_versus_frequency:
+#                 freqs = np.array(self.raw_data_dict['qfreq'], dtype=float)
+#                 self.raw_data_dict['dac_sorted_freq'] = freqs[sorted_indices]
+
+#         if self.plot_versus_frequency:
+#             freqs = np.array(self.raw_data_dict['qfreq'], dtype=float)
+#             sorted_indices = freqs.argsort()
+#             self.raw_data_dict['freq_sorted'] = freqs[sorted_indices]
+#             self.raw_data_dict['freq_sorted_tau'] = tau[sorted_indices]
+#             self.raw_data_dict['freq_sorted_tau_stderr'] = tau_std[sorted_indices]
+#             if self.plot_versus_dac:
+#                 freqs = np.array(self.raw_data_dict['dac'], dtype=float)
+#                 self.raw_data_dict['freq_sorted_dac'] = freqs[sorted_indices]
+
+
+
+
+#     def filter_data(self,filter_dics):
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#         if use_chisqr:
+#             if 'F|1>' in tau_key:
+#                 chisquared_key = 'Analysis.Fitted Params F|1>.chisqr'
+#             elif 'raw' in tau_key:
+#                 chisquared_key = 'Analysis.Fitted Params raw w0.chisqr'
+#             elif 'corr_data' in tau_key:
+#                 chisquared_key = 'Analysis.Fitted Params corr_data.chisqr'
+#             self.params_dict = {'tau': tau_key,
+#                                 'tau_stderr': tau_std_key,
+#                                 'chisquared': chisquared_key
+#                                 }
+#             self.numeric_params = ['tau', 'tau_stderr', 'chisquared']
+#         else:
+#             self.params_dict = {'tau': tau_key,
+#                                 'tau_stderr': tau_std_key,
+#                                 # 'chisquared' : chisquared_key
+#                                 }
+#             self.numeric_params = ['tau', 'tau_stderr']  # , 'chisquared'
+
+#         self.fit_qubit_Q_factor = fit_qubit_Q_factor
+
+#         self.plot_versus_dac = plot_versus_dac
+#         if plot_versus_dac:
+#             self.params_dict['dac'] = dac_key
+
+#         self.plot_versus_frequency = plot_versus_frequency
+#         if plot_versus_frequency:
+#             self.params_dict['qfreq'] = frequency_key
+
+#         self.numeric_params = []
+
+#         if auto:
+#             self.run_analysis()
+#         # return self.proc_data_dict
+
+#     def extract_data(self):
+#         # load data
+#         super().extract_data()
+#         tau = np.array(self.raw_data_dict['tau'], dtype=float)
+#         tau_std = np.array(self.raw_data_dict['tau_stderr'], dtype=float)
+#         # sort data
+
+#         if self.plot_versus_dac:
+#             dacs = np.array(self.raw_data_dict['dac'], dtype=float)
+#             sorted_indices = dacs.argsort()
+#             self.raw_data_dict['dac_sorted'] = dacs[sorted_indices]
+#             self.raw_data_dict['dac_sorted_tau'] = tau[sorted_indices]
+#             self.raw_data_dict['dac_sorted_tau_stderr'] = tau_std[sorted_indices]
+#             if self.plot_versus_frequency:
+#                 freqs = np.array(self.raw_data_dict['qfreq'], dtype=float)
+#                 self.raw_data_dict['dac_sorted_freq'] = freqs[sorted_indices]
+
+#         if self.plot_versus_frequency:
+#             freqs = np.array(self.raw_data_dict['qfreq'], dtype=float)
+#             sorted_indices = freqs.argsort()
+#             self.raw_data_dict['freq_sorted'] = freqs[sorted_indices]
+#             self.raw_data_dict['freq_sorted_tau'] = tau[sorted_indices]
+#             self.raw_data_dict['freq_sorted_tau_stderr'] = tau_std[sorted_indices]
+#             if self.plot_versus_dac:
+#                 freqs = np.array(self.raw_data_dict['dac'], dtype=float)
+#                 self.raw_data_dict['freq_sorted_dac'] = freqs[sorted_indices]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # Define a function that generates the filter mask
+    # Filters could e.g. be given as a 
+
+
+
 def calculate_n_avg(freq_resonator: float, Qc: float,
                     chi_shift: float, intercept: float):
     """
@@ -1712,3 +1872,6 @@ def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
     ax.set_xlabel(r'$|\partial f/\partial\Phi|$ (GHz/$\Phi_0$)')
     set_ylabel(ax, '$\Gamma_{\phi}$', 'Hz')
     ax.set_ylim(0, np.max(Gamma_phi_ramsey)*1.05)
+
+
+

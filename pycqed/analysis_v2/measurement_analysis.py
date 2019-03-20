@@ -69,7 +69,7 @@ from pycqed.analysis_v2.timing_cal_analysis import Timing_Cal_Flux_Coarse, \
 
 from pycqed.analysis_v2.coherence_analysis import CoherenceAnalysis, \
     CoherenceTimesAnalysisSingle, AliasedCoherenceTimesAnalysisSingle, \
-    CoherenceTimesAnalysis_old
+    CoherenceTimesAnalysis_old, CoherenceAnalysisDataExtractor
 from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, \
     ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy, VNA_DAC_Analysis
 from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency, \
