@@ -456,13 +456,16 @@ class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None,
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True):
+                 do_fitting: bool=True, auto=True,
+                 normalized_probability=False):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
         self.single_timestamp = False
+
+        self.normalized_probability = normalized_probability
 
         self.params_dict = {'xlabel': 'sweep_name',
                             'xvals': 'sweep_points',
@@ -553,8 +556,11 @@ class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
             'title': (self.proc_data_dict['timestamps'][0] + ' \n' +
                       self.proc_data_dict['measurementstring'][0]),
             'do_legend': True,
-            'yrange': (0, 1),
             'legend_pos': 'upper right'}
+
+        if self.normalized_probability:
+            self.plot_dicts['main']['yrange'] =  (0, 1)
+
 
         self.plot_dicts['on'] = {
             'plotfn': self.plot_line,

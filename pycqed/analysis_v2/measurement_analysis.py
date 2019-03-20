@@ -71,9 +71,9 @@ from pycqed.analysis_v2.coherence_analysis import CoherenceAnalysis, \
     CoherenceTimesAnalysisSingle, AliasedCoherenceTimesAnalysisSingle, \
     CoherenceTimesAnalysis_old
 from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, \
-    ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy
+    ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy, VNA_DAC_Analysis
 from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency, \
-    FrequencySusceptibility, DACarcPolyFit
+    Susceptibility_to_Flux_Bias, DACarcPolyFit
 from pycqed.analysis_v2.quantum_efficiency_analysis import \
     QuantumEfficiencyAnalysis, DephasingAnalysisSingleScans, \
     DephasingAnalysisSweep, SSROAnalysisSingleScans, SSROAnalysisSweep, \
