@@ -1056,9 +1056,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             waveform = self.add_compensation_pulses(waveform)
 
         if self.cfg_distort():
+            # This is where the fixed length waveform is 
+            # set to cfg_max_wf_length
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
         else:
+            # This is where the fixed length waveform is 
+            # set to cfg_max_wf_length
             waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
 
@@ -1217,9 +1221,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             waveform = self.add_compensation_pulses(waveform)
 
         if self.cfg_distort():
+            # This is where the fixed length waveform is 
+            # set to cfg_max_wf_length
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
         else:
+            # This is where the fixed length waveform is 
+            # set to cfg_max_wf_length
             waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
 
@@ -1499,6 +1507,9 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         else:
             waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
+
+        # N.B. method identical to AWG8 version with the exception 
+        # of AWG.stop() and AWG.start() 
         self.AWG.get_instr().stop()
         self.AWG.get_instr().set(codeword, waveform)
         self.AWG.get_instr().start()
@@ -1510,6 +1521,9 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         Distortions are corrected using the kernel object.
         Modified to implement also normal kernels.
         """
+
+        # FIXME: this function looks identical to the one in the parent class 
+        # maybe this should be deleted/cleaned up? -MAR Jan 2019
         k = self.instr_distortion_kernel.get_instr()
 
         # Prepend zeros to delay waveform to correct for fine timing
@@ -1624,3 +1638,6 @@ def phase_corr_sine_series_half(a_i, nr_samples):
     for i, a in enumerate(a_i):
         s += a*np.sin(((i+1)*x)/2)
     return s
+
+def roundup1024(n):
+    return int(np.ceil(n/1024)*1024)
