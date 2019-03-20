@@ -297,7 +297,7 @@ class Qubit(Instrument):
 
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
-                       artificial_periods=2.5,
+                       artificial_periods=4,
                        freqs=None,
                        f_span=100e6,
                        use_max=False,
