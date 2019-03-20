@@ -92,7 +92,7 @@ class QCC(SCPI):
         QCC only works with version 4.0.0 of the assembler
         """
         if self.QISA.getVersion() != '4.0.0':
-            sys.exit('The QISA Assembler installed in the environment does not match version 4.0.0, the only supported for running QCC.')
+            raise RuntimeError('The QISA Assembler installed in the environment does not match version 4.0.0, the only supported for running QCC.')
 
         curdir = os.path.dirname(__file__)
         qmap_fn = os.path.join(curdir, '_QCC', 'qisa_opcodes.qmap')
@@ -102,7 +102,7 @@ class QCC(SCPI):
         """
         configureinput = os.path.join(curdir, '_QCC', 'quantum_layout_information_17.txt')
         if not os.path.isfile(configureinput):
-        	sys.exit('The QISA Assembler supporting QCC now expects a quantum_layout_information file in the Pycqed physical instruments directory.')
+        	raise RuntimeError('The QISA Assembler supporting CC_Light and QCC now expects a quantum_layout_information file in' + configureinput)
 
         self.QISA.read(configureinput)
 
@@ -295,7 +295,6 @@ class QCC(SCPI):
                 "QCC: \n {}".format(raw_param_string))
 
         try:
-            # file.write(raw_param_string)
             # load dump combination is to sort and indent
             param_dict = json.loads(raw_param_string)
             file = open(self.param_file_name, 'w')
@@ -435,11 +434,10 @@ class QCC(SCPI):
 
 
         binBlock = bytearray(array.array('L', intarray))
-        # print("binblock size:", len(binBlock))
+
         # write binblock
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
-        # print("QCC: Sending instructions to the hardware finished.")
 
         # write to last_loaded_instructions so it can conveniently be read back
         self.last_loaded_instructions(filename)

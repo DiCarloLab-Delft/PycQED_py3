@@ -81,8 +81,8 @@ class QCCMicrocode():
             [Type | Codeword]
           - Type: a 2-bit value indicating which kind of control to trigger:
             - 0 this microinstruction is not a valid one. Ignored by QuMA.
-            - 1 --> AWG-8 for microwave control.
-            - 2 --> AWG-8 for flux control
+            - 1 --> AWG for microwave control.
+            - 2 --> AWG for flux control
             - 3 --> UHFQC for Measurement
           - Codeword: An 8-bit value.
             - For microwave control, all 8 bits can be used.
@@ -98,9 +98,7 @@ class QCCMicrocode():
         final_val = (condition << 20) + (op_type_left << 18) +\
             (cw_left << 10) + (op_type_right << 8) + cw_right
 
-        # return final_val
         bin_str = get_bin(final_val, 32)
-        # hex_str = bin_to_hex(bin_str, 8)  # commented as not used
 
         if present_format is True:
             bin_str = get_bin(condition, 2) + "|"
