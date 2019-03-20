@@ -518,7 +518,7 @@ class VNA_TwoD_Analysis(MA.TwoD_Analysis):
   TwoD analysis of a 2D-VNA resonator scan. Plot points on all resonator frequencies,
   by fitting resonators to the linecuts
   """
-  def __init__(self, timestamp,
+  def __init__(self, t_start,
                  options_dict=None,
                  do_fitting=True,
                  extract_only=False,
@@ -536,6 +536,21 @@ class VNA_TwoD_Analysis(MA.TwoD_Analysis):
             f0s.append(res.values['f0']*1e9)
         self.f0s = np.array(f0s)
         self.run_full_analysis()
+
+  # Better: try to define the fitting dictionaries like in the complex VNA fit MA
+
+          # if len(self.raw_data_dict['timestamps']) == 1:
+          #   if fitting_model == 'complex':
+          #       ### do the initial guess
+          #       complex_data = np.add(self.proc_data_dict['real'],1.j*self.proc_data_dict['imag'])
+          #       self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
+          #                                     'guess_dict':complex_guess,
+          #                                     'fit_yvals': {'data': complex_data},
+          #                                     'fit_xvals': {'f': self.proc_data_dict['plot_frequency']},
+          #                                     'fitting_type':'minimize'}
+
+
+
 
 
   def fit_linecuts(self):
@@ -774,15 +789,19 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
       fit_res_list = []
       min_freq = 0
       max_freq = 4/(max(DAC_values)-min(DAC_values))
-      test_freqs = np.linspace(min_freq,max_freq,51)
+      test_freqs = np.linspace(min_freq,max_freq,21)
+      DAC_range = max(DAC_values)-min(DAC_values)
+      test_phases = np.linspace(min(DAC_values)+0.25*DAC_range,min(DAC_values)+0.75*DAC_range,21)
       for freq in test_freqs:
-        Model = fit_mods.CosModel2
-        Model.set_param_hint('frequency', value=freq,min=0, max = max_freq)
-        Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s), max=max(f0s))
-        Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2,min=0,max=max(f0s)-min(f0s))
-        Model.set_param_hint('phase', value=0, min = min(DAC_values), max = max(DAC_values))
-        params = Model.make_params()
-        fit_res_list.append(Model.fit(data=f0s,t=DAC_values, verbose=False))
+        for phase in test_phases:
+          print(phase)
+          Model = fit_mods.CosModel2
+          Model.set_param_hint('frequency', value=freq,min=0, max = max_freq)
+          Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s), max=max(f0s))
+          Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2,min=0,max=max(f0s)-min(f0s))
+          Model.set_param_hint('phase', value=phase, min = min(DAC_values), max = max(DAC_values))
+          params = Model.make_params()
+          fit_res_list.append(Model.fit(data=f0s,t=DAC_values, verbose=False))
       chi_sqrs = []
       for fit_res in fit_res_list:
         chi_sqrs.append(fit_res.chisqr)

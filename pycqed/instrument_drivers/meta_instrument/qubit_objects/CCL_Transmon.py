@@ -365,7 +365,8 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mw_awg_ch', parameter_class=ManualParameter,
-                           initial_value=1)
+                           initial_value=1,
+                           vals=vals.Ints())
         self.add_parameter('mw_gauss_width', unit='s',
                            initial_value=10e-9,
                            parameter_class=ManualParameter)
@@ -834,6 +835,12 @@ class CCLight_Transmon(Qubit):
                 real_imag=True, single_int_avg=True,
                 integration_length=self.ro_acq_integration_length())
 
+            self.UHFQC_spec_det = det.UHFQC_spectroscopy_detector(
+                UHFQC=UHFQC, ro_freq_mod=self.ro_freq_mod(),
+                AWG=self.instr_CC.get_instr(), channels=ro_channels,
+                nr_averages=self.ro_acq_averages(),
+                integration_length=self.ro_acq_integration_length())
+
             self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
                 channels=ro_channels,
@@ -1033,7 +1040,6 @@ class CCLight_Transmon(Qubit):
                             self.ro_acq_weight_chQ()), 1.0)
                         UHFQC.set('quex_rot_{}_imag'.format(
                             self.ro_acq_weight_chQ()), 1.0)
-
 
         else:
             raise NotImplementedError(
@@ -1535,7 +1541,7 @@ class CCLight_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
         # Starting specmode if set in config
         if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(acq_length=self.ro_acq_integration_length,
+            UHFQC.spec_mode_on(acq_length=self.ro_acq_integration_length(),
                                IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
         # Snippet here to create and upload the CCL instructions
@@ -1712,12 +1718,14 @@ class CCLight_Transmon(Qubit):
             ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
-                             analyze=True, close_fig=True, label=''):
+                             analyze=True, close_fig=True, label='',
+                             prepare_for_continuous_wave=True):
         if not pulsed:
             logging.warning('CCL transmon can only perform '
                             'pulsed spectrocsopy')
         UHFQC = self.instr_acquisition.get_instr()
-        self.prepare_for_continuous_wave()
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1741,8 +1749,12 @@ class CCLight_Transmon(Qubit):
         spec_source.on()
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
-        self.int_avg_det_single._set_real_imag(False)
-        MC.set_detector_function(self.int_avg_det_single)
+        if self.cfg_spec_mode():
+          print('Enter loop')
+          MC.set_detector_function(self.UHFQC_spec_det)
+        else:
+          self.int_avg_det_single._set_real_imag(False)
+          MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='spectroscopy_'+self.msmt_suffix+label)
         # Stopping specmode
         if self.cfg_spec_mode():
@@ -3024,7 +3036,7 @@ class CCLight_Transmon(Qubit):
         return a
 
     def measure_flipping(self, number_of_flips=np.arange(0, 40, 2), equator=True,
-                         MC=None, analyze=True, close_fig=True, update=True,
+                         MC=None, analyze=True, close_fig=True, update=False,
                          ax='x', angle='180'):
 
         if MC is None:
@@ -3056,6 +3068,31 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma2.FlippingAnalysis(
                 options_dict={'scan_label': 'flipping'})
+
+        if update:
+            chisqr_cos = a.fit_res['cos_fit'].chisqr
+            chisqr_line = a.fit_res['line_fit'].chisqr
+            
+            scale_factor_cos = a._get_scale_factor_cos()
+            scale_factor_line = a._get_scale_factor_line()
+
+            if chisqr_cos<chisqr_line:
+                scale_factor = scale_factor_cos
+            else:
+                scale_factor = scale_factor_line
+
+            if abs(scale_factor-1)<2e-3:
+                print('Pulse amplitude accurate within 0.2%. Amplitude not updated.')
+                return a    
+
+            if self.cfg_with_vsm():
+                amp_old = self.mw_vsm_G_amp()
+                self.mw_vsm_G_amp(scale_factor*amp_old)
+            else:
+                amp_old = self.mw_channel_amp()
+                self.mw_channel_amp(scale_factor*amp_old)
+
+            print('Pulse amplitude changed from {:.3f} to {:.3f}'.format(amp_old,amp_old*amp_old))
         return a
 
     def measure_motzoi(self, motzoi_amps=None,
@@ -3109,14 +3146,16 @@ class CCLight_Transmon(Qubit):
             if self.ro_acq_weight_type() == 'optimal':
                 a = ma2.Intersect_Analysis(
                     options_dict={'ch_idx_A': 0,
-                                  'ch_idx_B': 1})
+                                  'ch_idx_B': 1},
+                                  normalized_probability=True)
             else:
                 # if statement required if 2 channels readout
                 logging.warning(
                     'It is recommended to do this with optimal weights')
                 a = ma2.Intersect_Analysis(
                     options_dict={'ch_idx_A': 0,
-                                  'ch_idx_B': 2})
+                                  'ch_idx_B': 1},
+                                  normalized_probability=False)
             return a
 
     def measure_single_qubit_randomized_benchmarking(

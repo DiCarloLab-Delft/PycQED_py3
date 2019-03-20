@@ -304,7 +304,8 @@ class Qubit(Instrument):
                        f_step=1e6,
                        verbose=True,
                        update=True,
-                       close_fig=True):
+                       close_fig=True,
+                       MC=None):
         """
         Finds the qubit frequency using either the spectroscopy or the Ramsey
         method.
@@ -318,7 +319,7 @@ class Qubit(Instrument):
                                   f_qubit_estimate + f_span/2,
                                   f_step)
             # args here should be handed down from the top.
-            self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
+            self.measure_spectroscopy(freqs, pulsed=pulsed, MC=MC,
                                       analyze=True, close_fig=close_fig)
 
             label = 'spec'
@@ -336,7 +337,7 @@ class Qubit(Instrument):
                 steps=steps, artificial_periods=artificial_periods,
                 verbose=verbose, update=update,
                 close_fig=close_fig)
-        return self.freq_qubit()
+        return analysis_spec.fitted_freq
 
     def calibrate_motzoi(self, MC=None, verbose=True, update=True):
         motzois = gen_sweep_pts(center=0, span=1, num=31)

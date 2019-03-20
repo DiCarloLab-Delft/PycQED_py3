@@ -78,7 +78,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
         self.extract_fitparams = extract_fitparams
         if extract_fitparams:
             if is_spectroscopy:
-                default_key = 'Fitted Params distance.f0.value'
+                default_key = 'Analysis.Fitted Params distance.f0.value'
             else:
                 default_key = 'Fitted Params HM.f0.value'
 
@@ -347,7 +347,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                         self.fit_res_dicts['E_J'] * 1e-9)  # , self.fit_res_dicts['E_J_std'] * 1e-9
                 dac_fit_text += '$\omega_{ss}/2 \pi = %.2f(\pm %.3f)$ GHz\n' % (
                     self.fit_res_dicts['f_sweet_spot'] * 1e-9, self.fit_res_dicts['f_sweet_spot_std'] * 1e-9)
-                dac_fit_text += '$I_{ss}/2 \pi = %.2f(\pm %.3f)$ mA\n' % (
+                dac_fit_text += '$I_{ss} = %.2f(\pm %.3f)$ mA\n' % (
                     self.fit_res_dicts['dac_sweet_spot'] * custom_multiplier * 1e3,
                     self.fit_res_dicts['dac_sweet_spot_std'] * custom_multiplier * 1e3)
                 dac_fit_text += '$I/\Phi_0 = %.2f(\pm %.3f)$ mA/$\Phi_0$' % (
@@ -361,10 +361,12 @@ class FluxFrequency(ba.BaseDataAnalysis):
                         self.fit_res_dicts['f_0_res'] * 1e-9, self.fit_res_dicts['f_0_res_std'] * 1e-9)
                 self.plot_dicts['text_msg_' + ax] = {
                     'ax_id': ax,
-                    'ypos': 0.18,
+                    'xpos': 1.3,
+                    'ypos': 0.6,
                     'plotfn': self.plot_text,
                     'box_props': 'fancy',
                     'text_string': dac_fit_text,
+                    'horizontalalignment': 'left'
                 }
 
         # Now plot temperatures
@@ -410,7 +412,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 self.plot_dicts['temperature_' + k + '_time_relation'] = temp_dict2
 
 
-class FrequencySusceptibility(sa.Basic2DInterpolatedAnalysis):
+class Susceptibility_to_Flux_Bias(sa.Basic2DInterpolatedAnalysis):
 
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
