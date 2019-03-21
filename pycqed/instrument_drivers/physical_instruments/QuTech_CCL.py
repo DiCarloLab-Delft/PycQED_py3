@@ -101,7 +101,7 @@ class CCL(SCPI):
             """
             configureinput = os.path.join(curdir, '_CCL', 'quantum_layout_information_7.txt')
             if not os.path.isfile(configureinput):
-                sys.exit('The QISA Assembler supporting QCC now expects a quantum_layout_information file in the Pycqed physical instruments directory.')
+                raise RuntimeError('The QISA Assembler supporting CC-Light and QCC now expects a quantum_layout_information file in the Pycqed physical instruments directory.')
 
             self.QISA.read(configureinput)
 

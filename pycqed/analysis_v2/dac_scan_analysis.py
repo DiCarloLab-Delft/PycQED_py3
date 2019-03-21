@@ -548,10 +548,10 @@ class Susceptibility_to_Flux_Bias(sa.Basic2DInterpolatedAnalysis):
 class DACarcPolyFit(ba.BaseDataAnalysis):
           # todo docstring
     def __init__(self, t_start: str=None, t_stop: str=None,
-                 label: str='',
+                 label: str='spectroscopy',
                  options_dict: dict=None, extract_only: bool=False,
                  dac_key='Instrument settings.fluxcurrent.Q',
-                 frequency_key='Instrument settings.Q.freq_qubit',
+                 frequency_key='Analysis.Fitted Params HM.f0.value',
                  do_fitting=True, degree=2
                  ):
         '''
