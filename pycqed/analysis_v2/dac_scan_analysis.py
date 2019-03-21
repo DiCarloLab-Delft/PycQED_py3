@@ -552,7 +552,7 @@ class DACarcPolyFit(ba.BaseDataAnalysis):
                  options_dict: dict=None, extract_only: bool=False,
                  dac_key='Instrument settings.fluxcurrent.Q',
                  frequency_key='Instrument settings.Q.freq_qubit',
-                 do_fitting=True, degree=4
+                 do_fitting=True, degree=2
                  ):
         '''
         Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.

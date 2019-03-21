@@ -786,27 +786,46 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
       DAC_values = self.sweep_points_2D
       f0s = self.f0s
 
-      fit_res_list = []
-      min_freq = 0
-      max_freq = 4/(max(DAC_values)-min(DAC_values))
-      test_freqs = np.linspace(min_freq,max_freq,21)
-      DAC_range = max(DAC_values)-min(DAC_values)
-      test_phases = np.linspace(min(DAC_values)+0.25*DAC_range,min(DAC_values)+0.75*DAC_range,21)
-      for freq in test_freqs:
-        for phase in test_phases:
-          print(phase)
-          Model = fit_mods.CosModel2
-          Model.set_param_hint('frequency', value=freq,min=0, max = max_freq)
-          Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s), max=max(f0s))
-          Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2,min=0,max=max(f0s)-min(f0s))
-          Model.set_param_hint('phase', value=phase, min = min(DAC_values), max = max(DAC_values))
-          params = Model.make_params()
-          fit_res_list.append(Model.fit(data=f0s,t=DAC_values, verbose=False))
-      chi_sqrs = []
-      for fit_res in fit_res_list:
-        chi_sqrs.append(fit_res.chisqr)
-      best_fit_index = np.argmin(np.array(chi_sqrs))
-      return fit_res_list[best_fit_index]
+      max_index = np.where(f0s==max(f0s))[0]
+      min_index = np.where(f0s==min(f0s))[0]
+      max_DAC = DAC_values[max_index]
+      min_DAC = DAC_values[min_index]
+
+      freq = 1/(np.abs(max_DAC-min_DAC)*2)
+
+      Model = fit_mods.CosModel2
+      Model.set_param_hint('frequency', value=freq, min=0)#, max = max_freq)
+      Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s), max=max(f0s))
+      Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2, min=0, max=max(f0s)-min(f0s))
+      Model.set_param_hint('phase', value=-max_DAC)#, min = min(DAC_values), max = max(DAC_values))
+      params = Model.make_params()
+      fit_res = Model.fit(data=f0s,t=DAC_values, verbose=False)
+
+      print(fit_res.params)
+
+      return fit_res
+
+      # fit_res_list = []
+      # min_freq = 0
+      # max_freq = 4/(max(DAC_values)-min(DAC_values))
+      # test_freqs = np.linspace(min_freq,max_freq,21)
+      # DAC_range = max(DAC_values)-min(DAC_values)
+      # test_phases = np.linspace(min(DAC_values)+0.25*DAC_range,min(DAC_values)+0.75*DAC_range,21)
+      # for freq in test_freqs:
+      #   for phase in test_phases:
+      #     print(phase)
+      #     Model = fit_mods.CosModel2
+      #     Model.set_param_hint('frequency', value=freq,min=0)#, max = max_freq)
+      #     Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s), max=max(f0s))
+      #     Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2,min=0,max=max(f0s)-min(f0s))
+      #     Model.set_param_hint('phase', value=phase)#, min = min(DAC_values), max = max(DAC_values))
+      #     params = Model.make_params()
+      #     fit_res_list.append(Model.fit(data=f0s,t=DAC_values, verbose=False))
+      # chi_sqrs = []
+      # for fit_res in fit_res_list:
+      #   chi_sqrs.append(fit_res.chisqr)
+      # best_fit_index = np.argmin(np.array(chi_sqrs))
+      # return fit_res_list[best_fit_index]
 
   def plot_fit_result(self,normalize=False, plot_linecuts=True,
                                linecut_log=False, colorplot_log=False,
@@ -852,7 +871,7 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
                          **kw)
 
       plot_dacs = np.linspace(min(self.sweep_points_2D),max(self.sweep_points_2D),101)
-      plot_freqs = fit_mods.CosFunc(plot_dacs,**self.dac_fit_res.params)
+      plot_freqs = fit_mods.CosFunc2(plot_dacs,**self.dac_fit_res.params)
 
       ax.plot(self.f0s,self.sweep_points_2D,'ro-')
       ax.plot(plot_freqs,plot_dacs,'b')
