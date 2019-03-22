@@ -244,92 +244,124 @@ class HDAWG8Pulsar:
 
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._create_parameters(name, id, obj)
-
-        if id not in {'ch{}'.format(i) for i in range(1, 9)}:
+        
+        if id in {'ch{}'.format(i) for i in range(1, 9)} or 
+           if in {'ch{}m'.format(i) for i in range(1, 9)}:
+            self.add_parameter('{}_id'.format(name),
+                               get_cmd=lambda _=id: _)
+            self.add_parameter('{}_AWG'.format(name),
+                               get_cmd=lambda _=obj.name: _)
+            self.add_parameter('{}_options'.format(name),
+                               get_cmd=lambda _=options.copy(): _)
+            self.add_parameter('{}_granularity'.format(name),
+                               get_cmd=lambda: 8)
+            self.add_parameter('{}_min_length'.format(name),
+                               get_cmd=lambda: 8 / 2.4e9)
+            self.add_parameter('{}_inter_element_deadtime'.format(name),
+                               # get_cmd=lambda: 80 / 2.4e9)
+                               get_cmd=lambda: 8 / 2.4e9)
+                               # get_cmd=lambda: 0 / 2.4e9)
+            self.add_parameter('{}_precompile'.format(name), 
+                               initial_value=False, vals=vals.Bool()
+                               label='{} precompile segments'.format(name),
+                               parameter_class=ManualParameter)
+            self.add_parameter('{}_delay'.format(name), initial_value=0,
+                               label='{} delay'.format(name), unit='s',
+                               parameter_class=ManualParameter,
+                               docstring="Global delay applied to this "
+                                         "channel. Positive values move pulses"
+                                         " on this channel forward in time")
+            self.add_parameter('{}_active'.format(name), initial_value=True,
+                               label='{} active'.format(name),
+                               vals=vals.Bool(),
+                               parameter_class=ManualParameter)
+        else:
             raise KeyError('Invalid HDAWG8 channel id: {}'.format(id))
-
-        self.add_parameter('{}_id'.format(name),
-                           get_cmd=lambda _=id: _)
-        self.add_parameter('{}_AWG'.format(name),
-                           get_cmd=lambda _=obj.name: _)
-        self.add_parameter('{}_options'.format(name),
-                           get_cmd=lambda _=options.copy(): _)
-        self.add_parameter('{}_type'.format(name),
-                           get_cmd=lambda: 'analog')
-        self.add_parameter('{}_granularity'.format(name),
-                           get_cmd=lambda: 16)
-        self.add_parameter('{}_min_length'.format(name),
-                           get_cmd=lambda: 8 / 2.4e9)
-        self.add_parameter('{}_inter_element_deadtime'.format(name),
-                           # get_cmd=lambda: 80 / 2.4e9)
-                           get_cmd=lambda: 8 / 2.4e9)
-                           # get_cmd=lambda: 0 / 2.4e9)
-        self.add_parameter('{}_precompile'.format(name), initial_value=False,
-                           label='{} precompile segments'.format(name),
-                           parameter_class=ManualParameter, vals=vals.Bool())
-        self.add_parameter('{}_delay'.format(name), initial_value=0,
-                           label='{} delay'.format(name), unit='s',
-                           parameter_class=ManualParameter,
-                           docstring="Global delay applied to this channel. "
-                                     "Positive values move pulses on this "
-                                     "channel forward in time")
-        self.add_parameter('{}_offset'.format(name),
-                           label='{} offset'.format(name), unit='V',
-                           set_cmd=self._HDAWG8_setter(obj, id, 'offset'),
-                           get_cmd=self._HDAWG8_getter(obj, id, 'offset'),
-                           vals=vals.Numbers())
-        self.add_parameter('{}_amp'.format(name),
-                           label='{} amplitude'.format(name), unit='V',
-                           set_cmd=self._HDAWG8_setter(obj, id, 'amp'),
-                           get_cmd=self._HDAWG8_getter(obj, id, 'amp'),
-                           vals=vals.Numbers(0.01, 5.0))
-        self.add_parameter('{}_active'.format(name), initial_value=True,
-                           label='{} active'.format(name), vals=vals.Bool(),
-                           parameter_class=ManualParameter)
-        self.add_parameter('{}_distortion'.format(name),
-                           label='{} distortion mode'.format(name),
-                           initial_value='off',
-                           vals=vals.Enum('off', 'precalculate'),
-                           parameter_class=ManualParameter)
-        self.add_parameter('{}_distortion_dict'.format(name),
-                           label='{} distortion dictionary'.format(name),
-                           vals=vals.Dict(),
-                           parameter_class=ManualParameter)
-        self.add_parameter('{}_charge_buildup_compensation'.format(name),
-                           parameter_class=ManualParameter,
-                           vals=vals.Bool(), initial_value=False)
-        self.add_parameter('{}_discharge_timescale'.format(name),
-                           parameter_class=ManualParameter,
-                           vals=vals.MultiType(vals.Numbers(0),
-                                               vals.Enum(None)),
-                           initial_value=None)
-        self.add_parameter('{}_compensation_pulse_scale'.format(name),
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(0., 1.), initial_value=0.5)
+        
+        if id[-1] != 'm':
+            self.add_parameter('{}_type'.format(name),
+                               get_cmd=lambda: 'analog')
+            self.add_parameter('{}_offset'.format(name),
+                               label='{} offset'.format(name), unit='V',
+                               set_cmd=self._HDAWG8_setter(obj, id, 'offset'),
+                               get_cmd=self._HDAWG8_getter(obj, id, 'offset'),
+                               vals=vals.Numbers())
+            self.add_parameter('{}_amp'.format(name),
+                               label='{} amplitude'.format(name), unit='V',
+                               set_cmd=self._HDAWG8_setter(obj, id, 'amp'),
+                               get_cmd=self._HDAWG8_getter(obj, id, 'amp'),
+                               vals=vals.Numbers(0.01, 5.0))
+            self.add_parameter('{}_distortion'.format(name),
+                               label='{} distortion mode'.format(name),
+                               initial_value='off',
+                               vals=vals.Enum('off', 'precalculate'),
+                               parameter_class=ManualParameter)
+            self.add_parameter('{}_distortion_dict'.format(name),
+                               label='{} distortion dictionary'.format(name),
+                               vals=vals.Dict(),
+                               parameter_class=ManualParameter)
+            self.add_parameter('{}_charge_buildup_compensation'.format(name),
+                               parameter_class=ManualParameter,
+                               vals=vals.Bool(), initial_value=False)
+            self.add_parameter('{}_discharge_timescale'.format(name),
+                               parameter_class=ManualParameter,
+                               vals=vals.MultiType(vals.Numbers(0),
+                                                   vals.Enum(None)),
+                               initial_value=None)
+            self.add_parameter('{}_compensation_pulse_scale'.format(name),
+                               parameter_class=ManualParameter,
+                               vals=vals.Numbers(0., 1.), initial_value=0.5)
+        else:
+            self.add_parameter('{}_type'.format(name),
+                            get_cmd=lambda: 'marker')
+            self.add_parameter('{}_offset'.format(name),
+                               label='{} offset'.format(name), unit='V',
+                               set_cmd=self._HDAWG8_setter(obj, id, 'offset'),
+                               get_cmd=self._HDAWG8_getter(obj, id, 'offset'),
+                               vals=vals.Numbers())
+            self.add_parameter('{}_amp'.format(name),
+                               label='{} amplitude'.format(name), unit='V',
+                               set_cmd=self._HDAWG8_setter(obj, id, 'amp'),
+                               get_cmd=self._HDAWG8_getter(obj, id, 'amp'),
+                               vals=vals.Numbers(0.01, 5.0))
+            
 
     @staticmethod
     def _HDAWG8_setter(obj, id, par):
         if par == 'offset':
-            def s(val):
-                obj.set('sigouts_{}_offset'.format(int(id[2])-1), val)
+            if id[-1] != 'm':
+                def s(val):
+                    obj.set('sigouts_{}_offset'.format(int(id[2])-1), val)
+            else:
+                s = None
         elif par == 'amp':
-            def s(val):
-                obj.set('sigouts_{}_range'.format(int(id[2])-1), 2*val)
+            if id[-1] != 'm':
+                def s(val):
+                    obj.set('sigouts_{}_range'.format(int(id[2])-1), 2*val)
+            else:
+                s = None
         else:
             raise NotImplementedError('Unknown parameter {}'.format(par))
         return s
 
     def _HDAWG8_getter(self, obj, id, par):
         if par == 'offset':
-            def g():
-                return obj.get('sigouts_{}_offset'.format(int(id[2])-1))
+            if id[-1] != 'm':
+                def g():
+                    return obj.get('sigouts_{}_offset'.format(int(id[2])-1))
+            else:
+                return 0
         elif par == 'amp':
-            def g():
-                if self._AWGs_prequeried_state:
-                    return obj.parameters['sigouts_{}_range'
-                        .format(int(id[2])-1)].get_latest()/2
-                else:
-                    return obj.get('sigouts_{}_range'.format(int(id[2])-1))/2
+            if id[-1] != 'm':
+                def g():
+                    if self._AWGs_prequeried_state:
+                        return obj.parameters['sigouts_{}_range' \
+                            .format(int(id[2])-1)].get_latest()/2
+                    else:
+                        return obj.get('sigouts_{}_range' \
+                            .format(int(id[2])-1))/2
+            else:
+                return 1
         else:
             raise NotImplementedError('Unknown parameter {}'.format(par))
         return g
@@ -347,9 +379,12 @@ class HDAWG8Pulsar:
 
         for awg_nr in [0, 1, 2, 3]:
             ch1id = 'ch{}'.format(awg_nr * 2 + 1)
+            ch1mid = 'ch{}m'.format(awg_nr * 2 + 1)
             ch2id = 'ch{}'.format(awg_nr * 2 + 2)
+            ch2mid = 'ch{}m'.format(awg_nr * 2 + 2)
 
-            prev_dio_valid_polarity = obj.get('awgs_{}_dio_valid_polarity'.format(awg_nr))
+            prev_dio_valid_polarity = obj.get(
+                'awgs_{}_dio_valid_polarity'.format(awg_nr))
 
             # Create waveform definitions
             header = ""
@@ -359,7 +394,7 @@ class HDAWG8Pulsar:
             wf_name_map = {} # maps waveform name from element to an older copy
             # i = 0
             for (_, el), cid_wfs in sorted(el_wfs.items()):
-                for cid in [ch1id, ch2id]:
+                for cid in [ch1id, ch1mid, ch2id, ch2mid]:
                     if cid in cid_wfs:
                         wfname = str(el) + '_' + cid
                         cid_wf = cid_wfs[cid]
@@ -385,10 +420,7 @@ class HDAWG8Pulsar:
 
                         if len(cid_wf) > 0 and cid_wf[0] != 0.:
                             elements_with_non_zero_first_points.append(el)
-                        #header += 'wave {} = ramp({}, 0, {});\n'.format(
-                        #    simplify_name(wfname), len(cid_wf), 1 / i
-                        #)
-                        #i += 1
+                        
 
             # Create waveform table
             waveform_table = ""
@@ -397,24 +429,64 @@ class HDAWG8Pulsar:
                     if el == wfname:
                         if ch1id in cid_wfs and ch2id in cid_wfs:
                             wfname1 = wf_name_map[wfname + '_' + ch1id]
+                            wfname1 = '"{}_{}"'.format(
+                                obj._devname,
+                                simplify_name(wfname1)
+                            )
+                            if ch1mid in cid_wfs:
+                                wfname1m = wf_name_map[wfname + '_' + ch1mid]
+                                wfname1m = '"{}_{}"'.format(
+                                    obj._devname,
+                                    simplify_name(wfname1m)
+                                )
+                                wfname1 = wfname1 + " + " + wfname1m
                             wfname2 = wf_name_map[wfname + '_' + ch2id]
+                            wfname2 = '"{}_{}"'.format(
+                                obj._devname,
+                                simplify_name(wfname2)
+                            )
+                            if ch2mid in cid_wfs:
+                                wfname2m = wf_name_map[wfname + '_' + ch2mid]
+                                wfname2m = '"{}_{}"'.format(
+                                    obj._devname,
+                                    simplify_name(wfname2m)
+                                )
+                                wfname2 = wfname2 + " + " + wfname2m
+                            
                             waveform_table += \
-                                'setWaveDIO({0}, "{1}_{2}", "{1}_{3}");\n' \
-                                .format(cw, obj._devname,
-                                        simplify_name(wfname1),
-                                        simplify_name(wfname2))
+                                'setWaveDIO({}, {}, {});\n' \
+                                .format(cw, wfname1, wfname2)
+                            
                         elif ch1id in cid_wfs and ch2id not in cid_wfs:
                             wfname1 = wf_name_map[wfname + '_' + ch1id]
+                            wfname1 = '"{}_{}"'.format(
+                                obj._devname,
+                                simplify_name(wfname1)
+                            )
+                            if ch1mid in cid_wfs:
+                                wfname1m = wf_name_map[wfname + '_' + ch1mid]
+                                wfname1m = '"{}_{}"'.format(
+                                    obj._devname,
+                                    simplify_name(wfname1m)
+                                )
+                                wfname1 = wfname1 + " + " + wfname1m
                             waveform_table += \
-                                'setWaveDIO({}, 1, "{}_{}");\n' \
-                                .format(cw, obj._devname,
-                                        simplify_name(wfname1))
+                                'setWaveDIO({}, 1, {});\n'.format(cw, wfname1)
                         elif ch1id not in cid_wfs and ch2id in cid_wfs:
                             wfname2 = wf_name_map[wfname + '_' + ch2id]
+                            wfname2 = '"{}_{}"'.format(
+                                obj._devname,
+                                simplify_name(wfname2)
+                            )
+                            if ch2mid in cid_wfs:
+                                wfname2m = wf_name_map[wfname + '_' + ch2mid]
+                                wfname2m = '"{}_{}"'.format(
+                                    obj._devname,
+                                    simplify_name(wfname2m)
+                                )
+                                wfname2 = wfname2 + " + " + wfname2m
                             waveform_table += \
-                                'setWaveDIO({}, 2, "{}_{}");\n' \
-                                .format(cw, obj._devname,
-                                        simplify_name(wfname2))
+                                'setWaveDIO({}, 2, {});\n'.format(cw, wfname2)
 
             # Create main loop and footer
             if loop:
@@ -441,26 +513,28 @@ class HDAWG8Pulsar:
 
                     # Expected element names
                     name_ch1 = str(el['wfname']) + '_' + ch1id
+                    name_ch1m = str(el['wfname']) + '_' + ch1mid
                     name_ch2 = str(el['wfname']) + '_' + ch2id
-
+                    name_ch2m = str(el['wfname']) + '_' + ch2mid
+                    
                     # Check if element with such a name exists
-                    # Ch1
-                    if name_ch1 in wf_name_map:
-                        name_ch1 = wf_name_map[name_ch1]
-                    else:
-                        name_ch1 = None
-                    # Ch2
-                    if name_ch2 in wf_name_map:
-                        name_ch2 = wf_name_map[name_ch2]
-                    else:
-                        name_ch2 = None
-
+                    name_ch1 = wf_name_map.get(name_ch1, None)
+                    name_ch1m = wf_name_map.get(name_ch1m, None)
+                    name_ch2 = wf_name_map.get(name_ch2, None)
+                    name_ch2m = wf_name_map.get(name_ch2m, None)
+                    
                     if name_ch1 is not None:
                         name_ch1 = '"{}_{}"'.format(obj._devname,
                                                     simplify_name(name_ch1))
+                        if name_ch1m is not None:
+                            name_ch1 += ' + "{}_{}"'.format(obj._devname,
+                                                      simplify_name(name_ch1m))
                     if name_ch2 is not None:
                         name_ch2 = '"{}_{}"'.format(obj._devname,
                                                     simplify_name(name_ch2))
+                        if name_ch2m is not None:
+                            name_ch2 += ' + "{}_{}"'.format(obj._devname,
+                                                      simplify_name(name_ch2m))
                     if name_ch1 is not None or name_ch2 is not None:
                         main_loop += self._HDAWG8_element_seqc(
                             el['repetitions'], el['trigger_wait'],
@@ -523,10 +597,10 @@ class HDAWG8Pulsar:
             prefetch_str = ''
             play_str = 'playWaveDIO();\n'
         elif name1 is None:
-            prefetch_str = ''
+            prefetch_str = 'prefetch({});\n'.format(name2)
             play_str = 'playWave(2, {});\n'.format(name2)
         elif name2 is None:
-            prefetch_str = ''
+            prefetch_str = 'prefetch({});\n'.format(name1)
             play_str = 'playWave(1, {});\n'.format(name1)
         else:
             prefetch_str = 'prefetch({}, {});\n'.format(name1, name2)
@@ -1358,8 +1432,6 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
 #     else:
 #         return ret
 
-import base64
-import hashlib
 def simplify_name(s):
     x = base64.urlsafe_b64encode(hashlib.sha1(
         s.encode('ascii')).digest()).decode()[:20]
