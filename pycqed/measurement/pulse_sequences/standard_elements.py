@@ -48,7 +48,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                                 'Buffer_RO_MW': 0,
                                 'Buffer_RO_RO': 0,
                                 'Flux_comp_dead_time': 3e-6,
-                                'slave_AWG_trig_channels': [],
+                                'slave_AWG_trig_channels': {}},
                                 }
 
     ##########################

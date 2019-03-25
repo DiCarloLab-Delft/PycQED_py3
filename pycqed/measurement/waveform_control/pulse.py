@@ -37,9 +37,10 @@ class Pulse:
     See the examples for more information.
     """
 
-    def __init__(self, name):
+    def __init__(self, name,element_name):
         self.length = None
         self.name = name
+        self.element_name = element_name
         self.channels = []
         self.start_offset = 0
         # the time within (or outside) the pulse that is the 'logical' start
@@ -73,13 +74,18 @@ class Pulse:
 
         return wfs
 
-    def t0(self):
+    # not used yet!!
+    def chip_time(self, val=None):
         """
-        returns start time of the pulse. This is typically
-        set by the sequence element at the time the pulse is added to the
-        element.
+        Getter/Setter for the start time of the pulse.
         """
-        return self._t0
+        if val is None:
+            return self._t0
+        else:
+            self._t0 = val
+
+    def element_time(self, element_start_time):
+        return self.chip_time() - element_start_time
 
     def effective_start(self):
         return self._t0 + self.start_offset
@@ -100,8 +106,8 @@ class Pulse:
 # Some simple pulse definitions.
 class SquarePulse(Pulse):
 
-    def __init__(self, channel=None, channels=None, name='square pulse', **kw):
-        Pulse.__init__(self, name)
+    def __init__(self, element_name, channel=None, channels=None, name='square pulse', **kw):
+        Pulse.__init__(self, name, element_name)
         if channel is None and channels is None:
             raise ValueError('Must specify either channel or channels')
         elif channels is None:
@@ -127,8 +133,8 @@ class SquarePulse(Pulse):
 
 class CosPulse(Pulse):
 
-    def __init__(self, channel, name='cos pulse', **kw):
-        Pulse.__init__(self, name)
+    def __init__(self, channel, element_name, name='cos pulse', **kw):
+        Pulse.__init__(self, name, element_name)
 
         self.channel = channel  # this is just for convenience, internally
         self.channels.append(channel)
@@ -153,8 +159,8 @@ class CosPulse(Pulse):
 
 class CosPulse_gauss_rise(Pulse):
 
-    def __init__(self, channel, name='cos pulse', **kw):
-        Pulse.__init__(self, name)
+    def __init__(self, channel, element_name, name='cos pulse', **kw):
+        Pulse.__init__(self, name, element_name)
 
         self.channel = channel  # this is just for convenience, internally
         self.channels.append(channel)
@@ -189,8 +195,8 @@ class CosPulse_gauss_rise(Pulse):
 
 class CosPulse_gauss_fall(Pulse):
 
-    def __init__(self, channel, name='cos pulse', **kw):
-        Pulse.__init__(self, name)
+    def __init__(self, channel, element_name, name='cos pulse', **kw):
+        Pulse.__init__(self, name, element_name)
 
         self.channel = channel  # this is just for convenience, internally
         self.channels.append(channel)
@@ -226,9 +232,9 @@ class CosPulse_gauss_fall(Pulse):
 
 class LinearPulse(Pulse):
 
-    def __init__(self, channel=None, channels=None, name='linear pulse', **kw):
+    def __init__(self, element_name, channel=None, channels=None, name='linear pulse', **kw):
         """ Pulse that performs linear interpolation between two setpoints """
-        Pulse.__init__(self, name)
+        Pulse.__init__(self, name, element_name)
         if channel is None and channels is None:
             raise ValueError('Must specify either channel or channels')
         elif channels is None:
@@ -259,8 +265,8 @@ class LinearPulse(Pulse):
 
 class clock_train(Pulse):
 
-    def __init__(self, channel, name='clock train', **kw):
-        Pulse.__init__(self, name)
+    def __init__(self, channel, element_name, name='clock train', **kw):
+        Pulse.__init__(self, name, element_name)
 
         self.channel = channel
         self.channels.append(channel)
@@ -291,8 +297,8 @@ class clock_train(Pulse):
 
 class marker_train(Pulse):
 
-    def __init__(self, channel, name='marker train', **kw):
-        Pulse.__init__(self, name)
+    def __init__(self, channel, element_name, name='marker train', **kw):
+        Pulse.__init__(self, name, element_name)
         self.channel = channel
         self.channels.append(channel)
 

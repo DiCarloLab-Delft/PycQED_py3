@@ -1,5 +1,6 @@
 from copy import copy
 
+
 class Sequence:
     """
     Class that contains a sequence.
@@ -38,8 +39,13 @@ class Sequence:
         self.elements = []
         self.codewords = {}
 
-    def _make_element_spec(self, name, wfname, repetitions, trigger_wait,
-                           goto_target=None, flags=None):
+    def _make_element_spec(self,
+                           name,
+                           wfname,
+                           repetitions,
+                           trigger_wait,
+                           goto_target=None,
+                           flags=None):
         if flags is None:
             flags = set()
         elt = {
@@ -52,15 +58,22 @@ class Sequence:
         }
         return elt
 
-    def insert(self, name, wfname, pos=None, repetitions=1, trigger_wait=False,
-               goto_target=None, flags=None):
+    def insert(self,
+               name,
+               wfname,
+               pos=None,
+               repetitions=1,
+               trigger_wait=False,
+               goto_target=None,
+               flags=None):
         """Creates a new element and adds it to the sequence."""
         for elt in self.elements:
             if elt['name'] == name:
-                raise KeyError("Dyplicate element {}. Element names in sequence"
-                               " must be unique.".format(name))
-        elt = self._make_element_spec(name, wfname, repetitions,
-                                      trigger_wait, goto_target, flags)
+                raise KeyError(
+                    "Dyplicate element {}. Element names in sequence"
+                    " must be unique.".format(name))
+        elt = self._make_element_spec(name, wfname, repetitions, trigger_wait,
+                                      goto_target, flags)
         if pos is None:
             pos = len(self.elements)
 
@@ -130,27 +143,37 @@ class Sequence:
 
         while True:
             # add first element of the precompiled element
+            # sequence.elements are dictionaries containing
+            # info about the added elements
             visited |= {i_elt}
             elt = self.elements[i_elt]
             if elt['trigger_wait']:
                 for i in range(elt['repetitions']):
-                    precompiled_sequence.elements.append(
-                        {'name': [elt['name'] + '_' + str(i)],
-                         'wfname': [elt['wfname']],
-                         'repetitions': 1,
-                         'trigger_wait': elt['trigger_wait'],
-                         'goto_target': None,
-                         'flags': elt['flags'].copy()}
-                    )
+                    precompiled_sequence.elements.append({
+                        'name': [elt['name'] + '_' + str(i)],
+                        'wfname': [elt['wfname']],
+                        'repetitions':
+                        1,
+                        'trigger_wait':
+                        elt['trigger_wait'],
+                        'goto_target':
+                        None,
+                        'flags':
+                        elt['flags'].copy()
+                    })
             else:
-                precompiled_sequence.elements.append(
-                    {'name': [elt['name'] + 'x' + str(elt['repetitions'])],
-                     'wfname': [elt['wfname']]*elt['repetitions'],
-                     'repetitions': 1,
-                     'trigger_wait': False,
-                     'goto_target': None,
-                     'flags': elt['flags'].copy()}
-                )
+                precompiled_sequence.elements.append({
+                    'name': [elt['name'] + 'x' + str(elt['repetitions'])],
+                    'wfname': [elt['wfname']] * elt['repetitions'],
+                    'repetitions':
+                    1,
+                    'trigger_wait':
+                    False,
+                    'goto_target':
+                    None,
+                    'flags':
+                    elt['flags'].copy()
+                })
                 if 'readout' in elt['flags'] and elt['repetitions'] > 1:
                     precompiled_sequence.elements[-1]['flags'] |= \
                         {'readout_in_middle'}
@@ -165,6 +188,7 @@ class Sequence:
                 return precompiled_sequence
 
             # add all following elements that should not wait for a trigger
+            # if there is a triggerwait add the element separately
             while not self.elements[i_elt]['trigger_wait']:
                 visited |= {i_elt}
                 elt = self.elements[i_elt]

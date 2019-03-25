@@ -56,7 +56,7 @@ class UHFQCPulsar:
             raise KeyError('Invalid UHFQC channel id: {}'.format(id))
 
         self.add_parameter('{}_id'.format(name),
-                           get_cmd=lambda _=id: _)
+                           get_cmd=(lambda _=id: _))
         self.add_parameter('{}_AWG'.format(name),
                            get_cmd=lambda _=obj.name: _)
         self.add_parameter('{}_options'.format(name),
@@ -1193,16 +1193,22 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         elements = {el.name: el for el in elements}
         if len(precompiled_awgs) > 0:
             precompiled_sequence = sequence.precompiled_sequence()
+            #elements is a list of dictionaries with info about the element
+            # a segment consists of elements that have been merged by precompiled_seq
             for segment in precompiled_sequence.elements:
                 element_list = []
+                # segment['wavename'] is a tuple having all the wfnames
                 for wf in segment['wfname']:
                     if wf == 'codeword':
                         for wfname in precompiled_sequence.codewords.values():
                             wf_new = wfname
+                            break
                     else:
                             wf_new = wf
+                    # wvnames are used to reference objects of the class Elements
                     element_list.append(elements[wf_new])
                 new_elt = element.combine_elements(element_list)
+
                 segment['wfname'] = new_elt.name
                 elements[new_elt.name] = new_elt
             self.precompiled_sequence = precompiled_sequence
@@ -1215,13 +1221,17 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         #           dict(channel id ->
         #                waveform data)))
         AWG_wfs = {}
-
+        #elements is dictionary containing all elements. 
         for i, el in enumerate(elements.values()):
+            #for precompiled elements: the name is a tuple created by combine_elements 
+            #containing all the names of the elements, otherwise it is just a normal string
             if isinstance(el.name, tuple):
                 _, waveforms = el.normalized_waveforms(precompiled_channels)
+                #waveforms is dictionary with channels as keys and amplitudes as values
             else:
                 _, waveforms = el.normalized_waveforms(normal_channels)
             for cname in waveforms:
+                #goes through all channel names in waveforms
                 if cname not in channels:
                     continue
                 if not self.get('{}_active'.format(cname)):
@@ -1231,16 +1241,23 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                 if cAWG not in AWGs:
                     continue
                 if cAWG not in AWG_wfs:
+                    #creates a new dictionary for the AWG
                     AWG_wfs[cAWG] = {}
                 if (i, el.name) not in AWG_wfs[cAWG]:
+                    #for the tuple (i, el.name) as key we create a new dictionary
                     AWG_wfs[cAWG][i, el.name] = {}
                 AWG_wfs[cAWG][i, el.name][cid] = waveforms[cname]
+                #dictionary which keys are names of AWGs and dictionaries as values which
+                #have tuples (i, el.name) as keys and dictionaries as values which have
+                #channel id as keys and the corresponding waveforms as values
 
         self.AWG_wfs = AWG_wfs
 
         for AWG in AWG_wfs:
             obj = self.AWG_obj(AWG=AWG)
+            #returns the instance of the class AWG that is requested
             if AWG in normal_awgs:
+                #programs the AWG to play the elements in the order as in sequence
                 self._program_awg(obj, sequence, AWG_wfs[AWG], loop=loop)
             else:
                 self._program_awg(obj, precompiled_sequence, AWG_wfs[AWG],
@@ -1322,7 +1339,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             self._clocks = {}
             for c in self.channels:
                 self._clocks[c] = self.clock(c)
-                self.get(c + '_amp')
+                self.get(c + '_amp') # prequery also the output amplitude values
             self._AWGs_prequeried_state = True
         else:
             self._AWGs_prequeried_state = False
