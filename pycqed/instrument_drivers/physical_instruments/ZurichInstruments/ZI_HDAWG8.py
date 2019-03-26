@@ -67,8 +67,20 @@ class ZI_HDAWG8(ZI_base_instrument):
 
         self._add_codeword_parameters()
         self._add_extra_parameters()
+        self.set_default_values()
+
         self.connect_message(begin_time=t0)
 
+    def set_default_values(self):
+        self.triggers_out_0_source(4)
+        self.triggers_out_1_source(6)
+        self.triggers_out_2_source(4)
+        self.triggers_out_3_source(6)
+        self.triggers_out_4_source(4)
+        self.triggers_out_5_source(6)
+        self.triggers_out_6_source(4)
+        self.triggers_out_7_source(6)
+        
     def _add_extra_parameters(self):
         self.add_parameter('timeout', unit='s',
                            initial_value=10,

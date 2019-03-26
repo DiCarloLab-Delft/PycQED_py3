@@ -223,9 +223,14 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             value_names = self.raw_data_dict['value_names']
             if hasattr(value_names, '__iter__'):
                 value_names = value_names[0]
-            self.channel_map = a_tools.get_qb_channel_map_from_file(
-                self.qb_names, ro_type=value_names[0],
-                file_path=self.raw_data_dict['folder'][0])
+            if 'w' in value_names[0]:
+                self.channel_map = a_tools.get_qb_channel_map_from_file(
+                    self.qb_names, ro_type=value_names[0],
+                    file_path=self.raw_data_dict['folder'][0])
+            else:
+                self.channel_map = {}
+                for qbn in self.qb_names:
+                    self.channel_map[qbn] = value_names
 
     def process_data(self):
         """
@@ -256,9 +261,11 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         measured_RO_channels = list(self.raw_data_dict[
                                         'measured_values_ord_dict'])
+        print(measured_RO_channels)
         meas_results_per_qb_per_ROch = {}
         for qb_name, RO_channels in self.channel_map.items():
             meas_results_per_qb_per_ROch[qb_name] = {}
+            print(qb_name, RO_channels)
             if isinstance(RO_channels, str):
                 meas_ROs_per_qb = [RO_ch for RO_ch in measured_RO_channels
                                    if RO_channels in RO_ch]
@@ -487,30 +494,31 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         return rotated_data_dict
 
     def prepare_plots(self):
-        for qb_name, corr_data in self.proc_data_dict[
-                'projected_data_dict'].items():
-            if isinstance(corr_data, dict):
-                for ro_suffix, data in corr_data.items():
-                    plot_name = 'projected_plot_' + qb_name + ro_suffix
+        if self.options_dict.get('plot_proj_data', True):
+            for qb_name, corr_data in self.proc_data_dict[
+                    'projected_data_dict'].items():
+                if isinstance(corr_data, dict):
+                    for ro_suffix, data in corr_data.items():
+                        plot_name = 'projected_plot_' + qb_name + ro_suffix
+                        self.prepare_projected_data_plot(
+                            plot_name, data, qb_name=qb_name,
+                            title_suffix=qb_name+ro_suffix,
+                            plot_cal_points=(
+                                not self.options_dict.get('TwoD', False)),
+                            ref_state_plot_labels=(
+                                'exc_state_' + qb_name + ro_suffix,
+                                'gnd_state_' + qb_name + ro_suffix))
+
+                else:
+                    plot_name = 'projected_plot_' + qb_name
                     self.prepare_projected_data_plot(
-                        plot_name, data, qb_name=qb_name,
-                        title_suffix=qb_name+ro_suffix,
+                        plot_name, corr_data, qb_name=qb_name,
+                        title_suffix=qb_name,
                         plot_cal_points=(
                             not self.options_dict.get('TwoD', False)),
                         ref_state_plot_labels=(
-                            'exc_state_' + qb_name + ro_suffix,
-                            'gnd_state_' + qb_name + ro_suffix))
-
-            else:
-                plot_name = 'projected_plot_' + qb_name
-                self.prepare_projected_data_plot(
-                    plot_name, corr_data, qb_name=qb_name,
-                    title_suffix=qb_name,
-                    plot_cal_points=(
-                        not self.options_dict.get('TwoD', False)),
-                    ref_state_plot_labels=(
-                        'exc_state_' + qb_name,
-                        'gnd_state_' + qb_name))
+                            'exc_state_' + qb_name,
+                            'gnd_state_' + qb_name))
 
         if self.options_dict.get('plot_raw_data', True):
             self.prepare_raw_data_plots()
@@ -575,6 +583,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             if len(raw_data_dict) == 1:
                 self.plot_dicts[
                     plot_name + '_' + list(raw_data_dict)[0]]['ax_id'] = None
+
     def prepare_projected_data_plot(
             self, plot_name, data, qb_name,
             title_suffix=None, plot_cal_points=True,
@@ -3060,6 +3069,7 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
             guess_pars = fit_mods.Cos_guess(
                 model=cos_mod, t=sweep_points, data=data)
             guess_pars['amplitude'].vary = True
+            guess_pars['amplitude'].min = -10
             guess_pars['offset'].vary = True
             guess_pars['frequency'].vary = True
             guess_pars['phase'].vary = True
@@ -3155,20 +3165,25 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
         except ValueError:
             cov_freq_phase = 0
 
-        piPulse_std = self.calculate_pulse_stderr(
-            f=freq_fit,
-            phi=phase_fit,
-            f_err=freq_std,
-            phi_err=phase_std,
-            period_num=n_pi_pulse,
-            cov=cov_freq_phase)
-        piHalfPulse_std = self.calculate_pulse_stderr(
-            f=freq_fit,
-            phi=phase_fit,
-            f_err=freq_std,
-            phi_err=phase_std,
-            period_num=n_piHalf_pulse,
-            cov=cov_freq_phase)
+        try:
+            piPulse_std = self.calculate_pulse_stderr(
+                f=freq_fit,
+                phi=phase_fit,
+                f_err=freq_std,
+                phi_err=phase_std,
+                period_num=n_pi_pulse,
+                cov=cov_freq_phase)
+            piHalfPulse_std = self.calculate_pulse_stderr(
+                f=freq_fit,
+                phi=phase_fit,
+                f_err=freq_std,
+                phi_err=phase_std,
+                period_num=n_piHalf_pulse,
+                cov=cov_freq_phase)
+        except Exception as e:
+            print(e)
+            piPulse_std = 0
+            piHalfPulse_std = 0
 
         rabi_amplitudes = {'piPulse': piPulse,
                            'piPulse_stderr': piPulse_std,
@@ -3866,5 +3881,109 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
         self.echo_analysis.save_figures(close_figs=True)
 
 
+class OverUnderRotationAnalysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        for qbn in self.qb_names:
+            data = self.proc_data_dict['projected_data_dict'][qbn]
+            sweep_points = self.raw_data_dict['sweep_points_dict'][qbn][
+                'msmt_sweep_points']
+            if self.num_cal_points != 0:
+                data = data[:-self.num_cal_points]
+            model = lmfit.models.LinearModel()
+            guess_pars = model.guess(data=data, x=sweep_points)
+            guess_pars['intercept'].value = 0.5
+            guess_pars['intercept'].vary = False
+            key = 'fit_' + qbn
+            self.fit_dicts[key] = {
+                'fit_fn': model.func,
+                'fit_xvals': {'x': sweep_points},
+                'fit_yvals': {'data': data},
+                'guess_pars': guess_pars}
+
+    def analyze_fit_results(self):
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+        for qbn in self.qb_names:
+            old_amp180 = a_tools.get_param_value_from_file(
+                file_path=self.raw_data_dict['folder'][0],
+                instr_name=qbn, param_name='amp180')
+            self.proc_data_dict['analysis_params_dict'][qbn] = OrderedDict()
+            self.proc_data_dict['analysis_params_dict'][qbn][
+                'corrected_amp'] = old_amp180 - self.fit_dicts[
+                'fit_' + qbn]['fit_res'].best_values['slope']*old_amp180
+            self.proc_data_dict['analysis_params_dict'][qbn][
+                'corrected_amp_stderr'] = self.fit_dicts[
+                'fit_' + qbn]['fit_res'].params['slope'].stderr*old_amp180
+
+    def prepare_plots(self):
+        super().prepare_plots()
+
+        if self.do_fitting:
+            for qbn in self.qb_names:
+                # rename base plot
+                if self.fit_dicts['fit_' + qbn][
+                        'fit_res'].best_values['slope'] >= 0:
+                    base_plot_name = 'OverRotation_' + qbn
+                else:
+                    base_plot_name = 'UnderRotation_' + qbn
+                self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
+                    'projected_plot_' + qbn)
+                for ref_state_plot_label in ('exc_state_'+qbn,
+                                             'gnd_state_'+qbn):
+                    if ref_state_plot_label in self.plot_dicts:
+                        self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+                            base_plot_name
+                    if ref_state_plot_label+'_line' in self.plot_dicts:
+                        self.plot_dicts[ref_state_plot_label+'_line'][
+                            'fig_id'] = base_plot_name
+
+                self.plot_dicts['fit_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': self.plot_fit,
+                    'fit_res': self.fit_dicts['fit_' + qbn]['fit_res'],
+                    'setlabel': 'linear fit',
+                    'do_legend': True,
+                    'color': 'r',
+                    'legend_ncol': 2,
+                    'legend_bbox_to_anchor': (1, -0.15),
+                    'legend_pos': 'upper right'}
+
+                old_amp180 = a_tools.get_param_value_from_file(
+                    file_path=self.raw_data_dict['folder'][0],
+                    instr_name=qbn, param_name='amp180')
+                correction_dict = self.proc_data_dict['analysis_params_dict']
+                fit_res = self.fit_dicts['fit_' + qbn]['fit_res']
+                textstr = '$\pi$-Amp = {:.4f} mV'.format(
+                    correction_dict[qbn]['corrected_amp']*1e3) \
+                          + ' $\pm$ {:.1e} mV'.format(
+                    correction_dict[qbn]['corrected_amp_stderr']*1e3) \
+                          + '\nold $\pi$-Amp = {:.4f} mV'.format(
+                    old_amp180*1e3) \
+                          + '\namp. correction = {:.4f} mV'.format(
+                              fit_res.best_values['slope']*old_amp180*1e3) \
+                          + '\nintercept = {:.2f}'.format(
+                              fit_res.best_values['intercept'])
+                self.plot_dicts['text_msg_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'ypos': -0.2,
+                    'xpos': 0,
+                    'horizontalalignment': 'left',
+                    'verticalalignment': 'top',
+                    'plotfn': self.plot_text,
+                    'text_string': textstr}
+
+                self.plot_dicts['half_hline_' + qbn] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': self.plot_hlines,
+                    'y': 0.5,
+                    'xmin': self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][0],
+                    'xmax': self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][-1],
+                    'colors': 'gray'}
 
 

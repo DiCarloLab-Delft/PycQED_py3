@@ -1185,6 +1185,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
         RBModel.set_param_hint('Amplitude',
+                               min=0, max=1,
                                value=guess_pars_dict.get('Amplitude', 0.9))
         RBModel.set_param_hint('p',
                                value=guess_pars_dict.get('p', 0.99),

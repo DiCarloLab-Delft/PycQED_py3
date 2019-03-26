@@ -2624,65 +2624,53 @@ def measurement_induced_dephasing_seq(phases, qbn_dephased, ro_op,
 
 
 def get_dd_pulse_list(operation_dict, qb_names, dd_time, nr_pulses=4, 
-                      dd_scheme='cpmg', udd_buffer=0,
-                      init_buffer=0):
-    pulse_length = (operation_dict['X180 ' + qb_names[-1]]['nr_sigma'] * \
-                      operation_dict['X180 ' + qb_names[-1]]['sigma'])
+                      dd_scheme='cpmg', init_buffer=0, refpoint='end'):
+    drag_pulse_length = (operation_dict['X180 ' + qb_names[-1]]['nr_sigma'] * \
+                         operation_dict['X180 ' + qb_names[-1]]['sigma'])
     pulse_list = []
-    if init_buffer>0:
-        dd_time -= init_buffer
-        delay_pulse = {
-            'pulse_type': 'SquarePulse',
-            'channel': operation_dict['X180 ' + qb_names[0]]['I_channel'],
-            'amplitude': 0.0,
-            'length': init_buffer,
-            'pulse_delay': 0}
-        pulse_list.append(delay_pulse)
-
-    def cpmg_delay(i, nr_pulses=nr_pulses, dd_time=dd_time, 
-                   pulse_length=pulse_length):
-        delay = (dd_time - nr_pulses*pulse_length)/nr_pulses
+    def cpmg_delay(i, nr_pulses=nr_pulses):
         if i == 0 or i == nr_pulses:
-            return delay/2
+            return 1/nr_pulses/2
         else:
-            return delay
-    def udd_delay(i, nr_pulses=nr_pulses, dd_time=dd_time, 
-                  pulse_length=pulse_length, buffer=udd_buffer):
-        if i == 0 or i == nr_pulses:
-            return buffer
+            return 1/nr_pulses
+
+    def udd_delay(i, nr_pulses=nr_pulses):
         delay = np.sin(0.5*np.pi*(i + 1)/(nr_pulses + 1))**2
         delay -= np.sin(0.5*np.pi*i/(nr_pulses + 1))**2
-        delay *= dd_time - pulse_length - 2*buffer
-        delay -= pulse_length
         return delay
 
     if dd_scheme == 'cpmg':
-        delay_func = cpmg_delay 
+        delay_func = cpmg_delay
     elif dd_scheme == 'udd':
         delay_func = udd_delay
     else:
         raise ValueError('Unknown decoupling scheme "{}"'.format(dd_scheme))
 
-    for i in range(nr_pulses):
+    for i in range(nr_pulses+1):
         delay_pulse = {
             'pulse_type': 'SquarePulse',
             'channel': operation_dict['X180 ' + qb_names[0]]['I_channel'],
             'amplitude': 0.0,
-            'length': delay_func(i),
+            'length': dd_time*delay_func(i),
             'pulse_delay': 0}
+        if i == 0:
+            delay_pulse['pulse_delay'] = init_buffer
+            delay_pulse['refpoint'] = refpoint
+        if i == 0 or i == nr_pulses:
+            delay_pulse['length'] -= drag_pulse_length/2
+        else:
+            delay_pulse['length'] -= drag_pulse_length
         if delay_pulse['length'] > 0:
             pulse_list.append(delay_pulse)
-        for j, qbn in enumerate(qb_names):
-            pulse_name = 'X180 ' if j == 0 else 'X180s '
-            pulse_pulse = deepcopy(operation_dict[pulse_name + qbn])
-            pulse_list.append(pulse_pulse)
-    delay_pulse = {
-        'pulse_type': 'SquarePulse',
-        'channel': operation_dict['X180 ' + qb_names[0]]['I_channel'],
-        'amplitude': 0.0,
-        'length': delay_func(nr_pulses),
-        'pulse_delay': 0}
-    pulse_list.append(delay_pulse)
+        else:
+            raise Exception("Dynamical decoupling pulses don't fit in the "
+                            "specified dynamical decoupling duration "
+                            "{:.2f} ns".format(dd_time*1e9))
+        if i != nr_pulses:
+            for j, qbn in enumerate(qb_names):
+                pulse_name = 'X180 ' if j == 0 else 'X180s '
+                pulse_pulse = deepcopy(operation_dict[pulse_name + qbn])
+                pulse_list.append(pulse_pulse)
     return pulse_list
 
 def get_DD_pulse_list(operation_dict, qb_names, DD_time,

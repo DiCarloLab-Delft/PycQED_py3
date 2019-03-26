@@ -467,7 +467,7 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
         else:
             X90_separation = tau - DRAG_length
             if cpmg_scheme:
-                if i==0:
+                if i == 0:
                     print('cpmg')
                 echo_pulse_delay = (X90_separation -
                                     nr_echo_pulses*DRAG_length) / \
@@ -489,7 +489,7 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                     pulse_pars_x2['pulse_delay'] = start_end_delay
                     pulse_dict_list += [pulse_pars_x2, RO_pars]
             else:
-                if i==0:
+                if i == 0:
                     print('UDD')
                 pulse_positions_func = \
                     lambda idx, N: np.sin(np.pi*idx/(2*N+2))**2
@@ -1105,7 +1105,6 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
 
     # pulse_keys_list = []
     for i in nr_seeds:
-
         if cal_points and (i == (len(nr_seeds)-4) or
                                    i == (len(nr_seeds)-3)):
             el = multi_pulse_elt(i, station,
@@ -1567,3 +1566,37 @@ def Z(theta=0, pulse_pars=None):
 
     return Z_gate
 
+
+def over_under_rotation_seq(qb_name, nr_pi_pulses_array, operation_dict,
+                            pi_pulse_amp=None, cal_points=True, upload=True):
+    seq_name = 'Over-under rotation sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    X90 = deepcopy(operation_dict['X90 ' + qb_name])
+    X180 = deepcopy(operation_dict['X180 ' + qb_name])
+    if pi_pulse_amp is not None:
+        X90['amplitude'] = pi_pulse_amp/2
+        X180['amplitude'] = pi_pulse_amp
+
+    for i, N in enumerate(nr_pi_pulses_array):
+        if cal_points and (i == (len(nr_pi_pulses_array)-4) or
+                                   i == (len(nr_pi_pulses_array)-3)):
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['I ' + qb_name],
+                                  operation_dict['RO ' + qb_name]])
+        elif cal_points and (i == (len(nr_pi_pulses_array)-2) or
+                                     i == (len(nr_pi_pulses_array)-1)):
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X180 ' + qb_name],
+                                  operation_dict['RO ' + qb_name]])
+        else:
+            pulse_list = [X90]
+            pulse_list += N*[X180]
+            pulse_list += [operation_dict['RO ' + qb_name]]
+            el = multi_pulse_elt(i, station, pulse_list)
+
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, AWGs='all', channels='all')
+    return

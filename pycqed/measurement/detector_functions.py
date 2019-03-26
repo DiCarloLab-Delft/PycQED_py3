@@ -1889,7 +1889,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
     '''
 
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
-                 nr_averages=1024, rotate=False, real_imag=True,
+                 nr_averages=1024,  real_imag=True,
                  channels: list = [0, 1], correlations: list=[(0, 1)],
                  used_channels=None,
                  value_names=None,
@@ -1902,6 +1902,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             seg_per_point=seg_per_point, single_int_avg=single_int_avg,
             result_logging_mode='raw',  # FIXME -> do the proper thing (MAR)
             **kw)
+
         self.correlations = correlations
         self.thresholding = thresholding
 
@@ -1953,18 +1954,21 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
     def define_correlation_channels(self):
         self.correlation_channels = []
+        used_channels = deepcopy(self.used_channels)
         for corr in self.correlations:
+            print(corr)
+            print(self.channels)
+            print(used_channels)
             # Start by assigning channels
-            if corr[0] not in self.used_channels or \
-                            corr[1] not in self.used_channels:
+            if corr[0] not in used_channels or corr[1] not in used_channels:
                 raise ValueError('Correlations should be in used channels')
 
             correlation_channel = -1
 
-            # # 4 is the (current) max number of weights in the UHFQC (v5)
-            for ch in range(5):
+            # # 9 is the (current) max number of weights in the UHFQA
+            for ch in range(9):
                 # Find the first unused channel to set up as correlation
-                if ch not in self.used_channels:
+                if ch not in used_channels:
                     # selects the lowest available free channel
                     correlation_channel = ch
                     self.channels += [ch]
@@ -1979,6 +1983,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
             if correlation_channel < 0:
                 raise ValueError('No free channel available for correlation.')
+            else:
+                used_channels += [ch]
 
     def set_up_correlation_weights(self):
         if self.thresholding:
@@ -2060,11 +2066,9 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                 # data.append(np.array(data_raw[key])/0.00146484375)
                 data.append(np.array(data_raw[key]))
         else:
-            #print(self.scaling_factor)
-            #print(self.nr_averages)
             for key in sorted(data_raw.keys()):
                 if key in self.correlation_channels:
-                    data.append(np.array(data_raw[key]) *
+                    data.append(3*np.array(data_raw[key]) *
                                 (self.scaling_factor**2 / self.nr_averages))
                 else:
                     data.append(np.array(data_raw[key]) *

@@ -8842,7 +8842,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                  label=None,
                  timestamp=None,
                  transpose=True,
-                 cmap='viridis',
+                 cmap='viridis', filter_data=False,
                  filt_func_a=None, filt_func_x0=None, filt_func_y0=None,
                  filter_idx_low=[], filter_idx_high=[], filter_threshold=15e6,
                  f1_guess=None, f2_guess=None, cross_flux_guess=None,
@@ -8854,26 +8854,35 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         self.get_naming_and_values_2D()
 
         flux = self.Y[:, 0]
-        peaks_low, peaks_high = self.find_peaks()
+        peaks_low, peaks_high = self.find_peaks(**kw)
         self.f, self.ax = self.make_unfiltered_figure(peaks_low, peaks_high,
                                                       transpose=transpose, cmap=cmap,
                                                       add_title=add_title,
                                                       xlabel=xlabel, ylabel=ylabel)
+        if filter_data:
+            filtered_dat = self.filter_data(flux, peaks_low, peaks_high,
+                                            a=filt_func_a, x0=filt_func_x0,
+                                            y0=filt_func_y0,
+                                            filter_idx_low=filter_idx_low,
+                                            filter_idx_high=filter_idx_high,
+                                            filter_threshold=filter_threshold)
+            filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high, \
+            filter_func = filtered_dat
+            self.f, self.ax = self.make_filtered_figure(
+                filt_flux_low, filt_flux_high,
+                filt_peaks_low, filt_peaks_high, filter_func,
+                add_title=add_title,
+                transpose=transpose, cmap=cmap,
+                xlabel=xlabel, ylabel=ylabel)
+        else:
+            min_freq_sep_estimate = kw.pop('min_freq_sep_estimate', 4e6)
+            self.freq_mask = np.abs(peaks_high-peaks_low) > min_freq_sep_estimate
+            filt_flux_low = self.Y[:, 0][self.freq_mask ]
+            filt_flux_high = self.Y[:, 0]
+            filt_peaks_low = peaks_low[self.freq_mask ]
+            filt_peaks_high = peaks_high
 
-        filtered_dat = self.filter_data(flux, peaks_low, peaks_high,
-                                        a=filt_func_a, x0=filt_func_x0,
-                                        y0=filt_func_y0,
-                                        filter_idx_low=filter_idx_low,
-                                        filter_idx_high=filter_idx_high,
-                                        filter_threshold=filter_threshold)
-        filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high, \
-        filter_func = filtered_dat
 
-        self.f, self.ax = self.make_filtered_figure(filt_flux_low, filt_flux_high,
-                                                    filt_peaks_low, filt_peaks_high, filter_func,
-                                                    add_title=add_title,
-                                                    transpose=transpose, cmap=cmap,
-                                                    xlabel=xlabel, ylabel=ylabel)
         if break_before_fitting:
             return
         self.fit_res = self.fit_avoided_crossing(
@@ -8896,11 +8905,26 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         pass
 
     def find_peaks(self, **kw):
-
+        key = kw.pop('key', 'dip')
         peaks = np.zeros((len(self.X), 2))
         for i in range(len(self.X)):
-            p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i])
-            peaks[i, :] = np.sort(p_dict[:2])
+            # p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i],
+            #                                 perc=10, window_len=0)
+            # peaks[i, :] = np.sort(p_dict[:2])
+            peak_dict = a_tools.peak_finder(self.X[i], self.Z[0][i],
+                                            optimize=True,
+                                            window_len=0)
+            f_high = peak_dict[key]
+            # f1_idx = peak_dict['dip_idx']
+            f0, f0_gf_over_2, kappa_guess, kappa_guess_ef = \
+                a_tools.find_second_peak(self.X[i], self.Z[0][i],
+                                         key=key,
+                                         peaks=peak_dict,
+                                         percentile=10,
+                                         verbose=False)
+            f_low = [f for f in [f0, f0_gf_over_2] if f != f_high][0]
+            # f2_idx = a_tools.nearest_idx(self.X[i], f2)
+            peaks[i, :] = np.array([f_low, f_high])
 
         peaks_low = peaks[:, 0]
         peaks_high = peaks[:, 1]
@@ -8922,7 +8946,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
             x0 = np.mean(flux)
         if y0 is None:
             y0 = np.mean(np.concatenate([peaks_low, peaks_high]))
-
+        print(filter_threshold)
         filter_func = lambda x: a * (x - x0) + y0
 
         filter_mask_high = [True] * len(peaks_high)
@@ -9099,6 +9123,14 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         else:
             c1_guess = c2_guess + (f2_guess - f1_guess) / cross_flux_guess
 
+        g_guess = np.min(np.abs(upper_freqs[self.freq_mask]-lower_freqs))
+        f2_guess = np.mean(lower_freqs)
+        f1_guess = np.mean(upper_freqs)
+        c1_guess = (upper_freqs[-1] - upper_freqs[0]) / \
+                   (upper_flux[-1] - upper_flux[0])
+        c2_guess = (lower_freqs[-1] - lower_freqs[0]) / \
+                   (lower_flux[-1] - lower_flux[0])
+
         av_crossing_model.set_param_hint(
             'g', min=0., max=0.5e9, value=g_guess, vary=True)
         av_crossing_model.set_param_hint(
@@ -9113,6 +9145,9 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         fit_res = av_crossing_model.fit(data=np.array(total_freqs),
                                         flux=np.array(total_flux),
                                         params=params)
+        for par in fit_res.params:
+            if fit_res.params[par].stderr is None:
+                fit_res.params[par].stderr = 0
         return fit_res
 
 
@@ -11243,7 +11278,8 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
         self.fit_all()
 
         fig, ax = plt.subplots()
-        im = ax.pcolormesh(delays/1e-9, freqs/1e9, data_rotated/1e-3, cmap='viridis')
+        im = ax.pcolormesh(delays/1e-9, freqs/1e9, data_rotated/1e-3,
+                           cmap='viridis')
         ax.autoscale(tight=True)
 
         axc = plt.colorbar(im)
@@ -11253,7 +11289,7 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
         ax.set_ylabel(r'drive frequency, $f_d$ (GHz)')
         ax.set_title('{} {}'.format(self.timestamp_string, self.measurementstring))
 
-        ax.plot(delays/1e-9,self.fitted_freqs/1e9,'r',label='fitted freq.')
+        ax.plot(delays/1e-9, self.fitted_freqs/1e9, 'r', label='fitted freq.')
         ax.legend()
 
         plt.savefig('{}//{}_flux_pulse_scope_{}.png'.format(self.folder,
