@@ -74,8 +74,7 @@ class Pulse:
 
         return wfs
 
-    # not used yet!!
-    def chip_time(self, val=None):
+    def algorithm_time(self, val=None):
         """
         Getter/Setter for the start time of the pulse.
         """
@@ -85,7 +84,10 @@ class Pulse:
             self._t0 = val
 
     def element_time(self, element_start_time):
-        return self.chip_time() - element_start_time
+        """
+        Returns the pulse time in the element frame.
+        """
+        return self.algorithm_time() - element_start_time
 
     def effective_start(self):
         return self._t0 + self.start_offset
@@ -129,6 +131,7 @@ class SquarePulse(Pulse):
 
     def chan_wf(self, chan, tvals):
         return np.ones(len(tvals)) * self.amplitude
+        
 
 
 class CosPulse(Pulse):

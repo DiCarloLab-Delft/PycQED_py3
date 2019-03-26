@@ -26,7 +26,12 @@ class Segment:
 
         pars_copy = deepcopy(pulse_pars)
 
-        if pars_copy.get('name', None) == None:
+        if pars_copy.get('name') in [
+                pulse.pulse_obj.name for pulse in self.unresolved_pulses
+        ]:
+            raise ValueError('Name of added pulse already exists!')
+
+        elif pars_copy.get('name', None) == None:
             pars_copy['name'] = pulse_pars['pulse_type'] + '_' + str(
                 len(self.unresolved_pulses))
 
@@ -69,7 +74,7 @@ class Segment:
 
         return pulses
 
-    def find_AWGs(self):
+    def gen_AWG_dict(self):
         """
         Generates a dictionary with element names as keys and a set of used
         AWGs for each element as value.
@@ -94,7 +99,7 @@ class Segment:
         self.find_element_start_end()
 
         trigger_pulses = []
-        AWG_dict = self.find_AWGs()
+        AWG_dict = self.gen_AWG_dict()
         trigger_pars = {'length': 20e-9, 'amplitude': 1}
 
         for element in AWG_dict:
@@ -109,13 +114,12 @@ class Segment:
                     'trigger_element', channel=AWG + "_Master",
                     **trigger_pars)  # think about Master channel name!
 
-                trig_pulse._t0 = self.element_start_end[
-                    element] - self.pulsar.get(AWG + '_delay')
+                trig_pulse.algorithm_time(self.element_start_end[element] -
+                                          self.pulsar.get(AWG + '_delay'))
 
                 trigger_pulses.append(trig_pulse)
 
         self.resolved_pulses += trigger_pulses
-        self.test_overlap()
 
     def test_overlap(self):
         """
@@ -147,8 +151,8 @@ class Segment:
             if pulse.pulse_obj.name in pulses:
                 ref_points.append((pulse.pulse_obj.name, pulse))
 
-            pulse.pulse_obj._t0 = \
-                pulse.delay - pulse.ref_point_new*pulse.pulse_obj.length
+            pulse.pulse_obj.algorithm_time(
+                pulse.delay - pulse.ref_point_new * pulse.pulse_obj.length)
 
         if len(visited_pulses) == 0:
             raise ValueError('No pulse references to the segment start!')
@@ -168,9 +172,10 @@ class Segment:
                     if p.pulse_obj.name in pulses:
                         new_ref_points.append((p.pulse_obj.name, p))
 
-                    p.pulse_obj._t0 = pulse.pulse_obj._t0 + p.delay \
-                        - p.ref_point_new*p.pulse_obj.length \
-                            + p.ref_point*pulse.pulse_obj.length
+                    p.pulse_obj.algorithm_time(
+                        pulse.pulse_obj.algorithm_time() + p.delay -
+                        p.ref_point_new * p.pulse_obj.length +
+                        p.ref_point * pulse.pulse_obj.length)
 
             ref_points = new_ref_points
 
@@ -180,8 +185,6 @@ class Segment:
         self.resolved_pulses = \
             [pulse.pulse_obj for pulse in self.unresolved_pulses]
 
-        self.gen_trigger_el()
-
     def time_sort(self):
         """
         Given a segment, this method sorts the entries of the elements 
@@ -189,7 +192,7 @@ class Segment:
         """
 
         for element in self.elements:
-            old_list = [(pulse._t0,pulse) \
+            old_list = [(pulse.algorithm_time(),pulse) \
                 for pulse in self.elements[element]]
 
             new_list = sorted(old_list)
@@ -207,10 +210,10 @@ class Segment:
         unordered_end_times = {}
 
         for element in self.elements:
-            unordered_start_times.append((self.elements[element][0]._t0,
-                                          element))
+            unordered_start_times.append(
+                (self.elements[element][0].algorithm_time(), element))
             unordered_end_times[element] = self.elements[element][
-                -1]._t0 + self.elements[element][-1].length
+                -1].algorithm_time() + self.elements[element][-1].length
 
         for (t0, element) in sorted(unordered_start_times):
             self.element_start_end[element] = \
@@ -220,7 +223,7 @@ class Segment:
 
         segment_t0 = float('inf')
         for pulse in self.unresolved_pulses:
-            segment_t0 = min(segment_t0, pulse.pulse_obj._t0)
+            segment_t0 = min(segment_t0, pulse.pulse_obj.algorithm_time())
 
         for pulse in self.unresolved_pulses:
             pulse.delay -= segment_t0
