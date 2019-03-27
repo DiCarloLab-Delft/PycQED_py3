@@ -251,7 +251,7 @@ class HDAWG8Pulsar:
                            get_cmd=lambda: 8 / 2.4e9)
                            # get_cmd=lambda: 0 / 2.4e9)
         self.add_parameter('{}_precompile'.format(awg.name), 
-                           initial_value=False, vals=vals.Bool()
+                           initial_value=False, vals=vals.Bool(),
                            label='{} precompile segments'.format(name),
                            parameter_class=ManualParameter)
         self.add_parameter('{}_delay'.format(awg.name), 
@@ -272,9 +272,11 @@ class HDAWG8Pulsar:
             id = 'ch{}'.format(ch_nr + 1)
             name = channel_name_map.get(id, awg.name + '_' + id)
             self._hdawg_create_analog_channel_parameters(id, name, awg)
+            self.channels.add(name)
             id = 'ch{}m'.format(ch_nr + 1)
             name = channel_name_map.get(id, awg.name + '_' + id)
             self._hdawg_create_marker_channel_parameters(id, name, awg)
+            self.channels.add(name)
 
     def _hdawg_create_analog_channel_parameters(self, id, name, awg):
         self.add_parameter('{}_id'.format(name), get_cmd=lambda _=id: _)
@@ -804,7 +806,7 @@ class AWG5014Pulsar:
         return obj.clock_freq()
     
 
-     def _create_awg_parameters(self, awg, channel_name_map):
+    def _create_awg_parameters(self, awg, channel_name_map):
         if not isinstance(awg, AWG5014Pulsar._supportedAWGtypes):
             return super()._create_awg_parameters(awg, channel_name_map)
         
@@ -837,12 +839,15 @@ class AWG5014Pulsar:
             id = 'ch{}'.format(ch_nr + 1)
             name = channel_name_map.get(id, awg.name + '_' + id)
             self._awg5014_create_analog_channel_parameters(id, name, awg)
+            self.channels.add(name)
             id = 'ch{}m1'.format(ch_nr + 1)
             name = channel_name_map.get(id, awg.name + '_' + id)
             self._awg5014_create_marker_channel_parameters(id, name, awg)
+            self.channels.add(name)
             id = 'ch{}m2'.format(ch_nr + 1)
             name = channel_name_map.get(id, awg.name + '_' + id)
             self._awg5014_create_marker_channel_parameters(id, name, awg)
+            self.channels.add(name)
 
     def _awg5014_create_analog_channel_parameters(self, id, name, awg):
         self.add_parameter('{}_id'.format(name), get_cmd=lambda _=id: _)
