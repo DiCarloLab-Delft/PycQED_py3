@@ -799,7 +799,7 @@ class QuDev_transmon(Qubit):
 
     def measure_spectroscopy(self, freqs=None, pulsed=False, MC=None,
                              trigger_separation=3e-6, RO_marker_length=5e-9,
-                             analyze=True, close_fig=True,upload=True,
+                             analyze=True, close_fig=True, upload=True,
                              label=None):
         """ Varies qubit drive frequency and measures the resonator
         transmittance """
@@ -2864,7 +2864,7 @@ class QuDev_transmon(Qubit):
                 label = 'high_power_' + label
 
             self.measure_spectroscopy(freqs, pulsed=True, MC=MC, label=label,
-                                      close_fig=close_fig,upload=upload)
+                                      close_fig=close_fig, upload=upload)
 
 
         if analyze:

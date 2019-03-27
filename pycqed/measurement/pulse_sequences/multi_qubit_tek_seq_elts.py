@@ -2893,7 +2893,7 @@ def ro_dynamic_phase_seq(qbp_name, qbr_names,
                          upload=True, return_seq=False):
 
     """
-    RO cross-dephasing measurement sequence. Measured the dynamic phase induced
+    RO cross-dephasing measurement sequence. Measures the dynamic phase induced
     on qbr by a measurement tone on the pulsed qubit (qbp).
     Args:
         qbp_name: pulsed qubit name; RO pulse is applied on this qubit

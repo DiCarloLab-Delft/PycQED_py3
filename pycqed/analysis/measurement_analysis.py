@@ -573,7 +573,7 @@ class MeasurementAnalysis(object):
                     cmap_chosen=self.cmap_chosen,
                     **kw)
 
-                ax.set_title(self.zlabels[i], y=1.05, size=self.font_size)
+                ax.set_title(self.zlabels[i], size=self.font_size)
                 ax.xaxis.label.set_size(self.font_size)
                 ax.yaxis.label.set_size(self.font_size)
                 ax.tick_params(labelsize=self.font_size,
@@ -582,20 +582,21 @@ class MeasurementAnalysis(object):
                 cbar.ax.tick_params(labelsize=self.font_size,
                                     length=self.tick_length,
                                     width=self.tick_width)
+                if i == 0:
+                    plot_title = '{measurement}\n{timestamp}'.format(
+                        timestamp=self.timestamp_string,
+                        measurement=self.measurementstring)
+                    fig.text(0.5, 1.1, plot_title, fontsize=self.font_size,
+                             horizontalalignment='center',
+                             verticalalignment='bottom',
+                             transform=ax.transAxes)
 
             fig.subplots_adjust(hspace=1.5)
 
             # Make space for title
             # fig.tight_layout(h_pad=1.5)
             # fig.subplots_adjust(top=3.0)
-            plot_title = '{measurement}\n{timestamp}'.format(
-                timestamp=self.timestamp_string,
-                measurement=self.measurementstring)
             # fig.suptitle(plot_title)
-            fig.text(0.5, 1, plot_title, fontsize=self.font_size,
-                     horizontalalignment='center',
-                     verticalalignment='bottom',
-                     transform=ax.transAxes)
             if show:
                 plt.show()
 
