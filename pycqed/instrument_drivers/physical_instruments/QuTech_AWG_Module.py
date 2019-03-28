@@ -166,7 +166,7 @@ class QuTech_AWG_Module(SCPI):
                                     '\t\tDisables SE and DIFF inputs\n' )
 
         self.add_function('dio_calibrate',
-                            call_cmd='DIO:CALibrate',
+                            call_cmd='DIO:CALibrate:ALL',
                             docstring='Calibrate the DIO input signals.\n' \
                                 'Will analyze the input signals for each DIO '\
                                 'inputs (used to transfer codeword bits), secondly, '\
@@ -270,7 +270,30 @@ class QuTech_AWG_Module(SCPI):
                                      '\tFalse: No interboard connection detected'
                            )
 
+        # TODO [versloot] : remove
+        self.add_function('_dio_calibrate_input',
+                          call_cmd='DIO:CALibrate:INPut',
+                          docstring='Calibrate only the DIO input signals.\n')
 
+        self.add_function('_dio_calibrate_ref_clock',
+                          call_cmd='DIO:CALibrate:REFclock',
+                          docstring='Calibrate only the DIO reference clock.\n')
+
+        self.add_function('_dio_ref_clock_shift',
+                          call_cmd='DIO:SHIFtrefclock',
+                          docstring='Shift the DIO reference clock\n')
+
+        self.add_parameter('_dio_ref_clock_signal',
+                           get_cmd='DIO:REF:SIGNal',
+                           docstring='Get the DIO reference clock data')
+
+        self.add_parameter('_dio_ref_clock_bitdiffs',
+                           get_cmd='DIO:REF:BITDiff',
+                           docstring='Get the DIO reference clock bitDiffs')
+
+        self.add_parameter('_dio_bit_diff_table',
+                           get_cmd=self._get_bit_diff_table,
+                           docstring='Get the DIO bit diff table of the last calibration')
 
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
@@ -675,8 +698,11 @@ class QuTech_AWG_Module(SCPI):
 
     def _get_bit_map(self, ch: type = int):
         result = self.ask(f"DAC{ch}:BITmap?")
-        print(f"result: {result}")
-        return result.split(",")
+        if result == "\"\"":
+                result = []
+        else:
+            result = result.split(",")
+        return result
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
@@ -842,6 +868,10 @@ class QuTech_AWG_Module(SCPI):
 
         self.newWaveformReal(name, waveLen)
         self.sendWaveformDataReal(name, waveform)
+
+    # TODO [versloot]: remove
+    def _get_bit_diff_table(self):
+        return self.ask("DIO:BDT").replace("\"", '').replace(",", "\n")
 
     ##########################################################################
     # Generic (i.e. at least AWG520 and AWG5014) Tektronix AWG functions
