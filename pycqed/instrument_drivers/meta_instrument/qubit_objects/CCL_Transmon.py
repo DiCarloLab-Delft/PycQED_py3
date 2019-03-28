@@ -1763,8 +1763,139 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-        # anharmonicity measurement, bus crossing and photon number splitting with the bus
 
+    def find_bus_frequency(self,freqs,spec_source_bus,bus_power,f01=None,label='',
+                        close_fig=True,analyze=True,MC=None,prepare_for_continuous_wave=True):
+        '''
+        Drive the qubit and sit at the spectroscopy peak while the bus is driven with 
+        bus_spec_source
+
+        Input parameters:
+        - freqs: list of frequencies of the second drive tone (at bus frequency)
+        - spec_source_bus =: rf source used for the second spectroscopy tone
+        - bus_power: power of the second spectroscopy tone
+        - f_01: frequency of 01 transition (default: self.freq_qubit())
+        '''
+
+        if f01==None:
+          f01 = self.freq_qubit()
+
+        UHFQC = self.instr_acquisition.get_instr()
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        # Starting specmode if set in config
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+                               ro_amp=self.ro_pulse_amp_CW())
+
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        # CCL gets started in the int_avg detector
+
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        spec_source.frequency(f01)
+        # spec_source.power(self.spec_pow())
+        spec_source_bus.on()
+        spec_source_bus.power(bus_power)
+        MC.set_sweep_function(spec_source_bus.frequency)
+        MC.set_sweep_points(freqs)
+        if self.cfg_spec_mode():
+          print('Enter loop')
+          MC.set_detector_function(self.UHFQC_spec_det)
+        else:
+          self.int_avg_det_single._set_real_imag(False)
+          MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Bus_spectroscopy_'+self.msmt_suffix+label)
+        spec_source_bus.off()
+        # Stopping specmode
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_off()
+            self._prep_ro_pulse(upload=True)
+        if analyze:
+            ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+    def (self,freqs,spec_source_bus,bus_power,dacs,dac_param,f01=None,label='',
+                        close_fig=True,analyze=True,MC=None,
+                        prepare_for_continuous_wave=True):
+        '''
+        Drive the qubit and sit at the spectroscopy peak while the bus is driven with 
+        bus_spec_source. At the same time sweep dac channel specified by dac_param over
+        set of values sepcifeid by dacs.
+        
+        Practical comments:
+        - sweep flux bias of different (neighbour) qubit than the one measured
+        - set spec_power of the first tone high (say, +15 dB relative to value optimal
+                for sharp spectroscopy). This makes you less sensitive to flux crosstalk.
+
+        Input parameters:
+        - freqs: list of frequencies of the second drive tone (at bus frequency)
+        - spec_source_bus =: rf source used for the second spectroscopy tone
+        - bus_power: power of the second spectroscopy tone
+        - dacs: valuses of current bias to measure
+        - dac_param: parameter corresponding to the sweeped current bias
+        - f_01: frequency of 01 transition (default: self.freq_qubit())
+        '''
+        if f01==None:
+            f01 = self.freq_qubit()
+
+        UHFQC = self.instr_acquisition.get_instr()
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        # Starting specmode if set in config
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+                               ro_amp=self.ro_pulse_amp_CW())
+
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        # CCL gets started in the int_avg detector
+
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        spec_source.frequency(f01)
+        # spec_source.power(self.spec_pow())
+        spec_source_bus.on()
+        spec_source_bus.power(bus_power)
+
+        MC.set_sweep_function(spec_source_bus.frequency)
+        MC.set_sweep_points(freqs)
+
+        MC.set_sweep_function_2D(dac_param)
+        MC.set_sweep_points_2D(dacs)
+
+        if self.cfg_spec_mode():
+            print('Enter loop')
+            MC.set_detector_function(self.UHFQC_spec_det)
+        else:
+            self.int_avg_det_single._set_real_imag(False)
+            MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Bus_flux_sweep_'+self.msmt_suffix+label,mode='2D')
+        spec_source_bus.off()
+
+        # Stopping specmode
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_off()
+            self._prep_ro_pulse(upload=True)
+        if analyze:
+            ma.TwoD_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+
+    # anharmonicity measurement, bus crossing and photon number splitting with the bus
     def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None,
                               f_12_power=None, MC=None, spec_source_2=None, f_01_span=24e6,
                               f_12_span = 24e6):
@@ -3737,139 +3868,6 @@ class CCLight_Transmon(Qubit):
                     't_start': start_time, 't_stop': end_time}
         else:
             return {}
-
-    def find_sweet_spot(self, current_step_size=1e-3, frequency_step_size=10e6,
-                    f_span=40e6, f_step=0.5e6):
-        """
-        Uses find_frequency routine iteratively to find a sweet spot.
-        The routine does not retune the readout
-        resonator and it needs spectroscopy to work reliably.
-
-        The routine starts by stepping current by a given step_size.
-        Later, it makes frequency_step_size large steps (but no larger
-        than step_size), based on parabolic extrapolation from the data.
-
-        When the sweet spot is found it goes to points at f_ss-2 MHz and f_ss-4 MHz
-        at positive and negative flux, to ensure the reasonable range around
-        the ss was measured for the final identification of ss.
-        """
-
-        # get flux parameter and initial value
-        flux_parameter = self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()]
-        initial_fluxcurrent = flux_parameter()
-
-        # measure three qubit frequencies at 0 ans +- stepsize
-        flux_datapoints = np.linspace(-1,1,3)*current_step_size+initial_fluxcurrent
-        freq_datapoints = []
-        for fl in flux_datapoints:
-            flux_parameter(fl)
-            print('Measuring at current {}'.format(flux_parameter()))
-            freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+self.freq_qubit())
-            freq_datapoints = np.append(freq_datapoints, freq)
-
-        i = 0
-        while(i<20):
-            i += 1
-
-            # get an initial guess of a parabola
-            arc_polycoeffs = np.polyfit(flux_datapoints, freq_datapoints, 2)
-            arc_poly = np.poly1d(arc_polycoeffs)
-
-            # find maximum of a parabola
-            ss_flux = arc_poly.deriv().roots
-            ss_freq = arc_poly(ss_flux)
-
-            print(ss_flux, ss_freq)
-            print(flux_datapoints)
-            print(freq_datapoints)
-            print(arc_polycoeffs)
-
-            # check if estimated sweet spot in within +-10 MHz of any of points
-            # and within +-step_size
-            if np.min(np.abs(freq_datapoints-ss_freq))<frequency_step_size:
-                # go to sweet spot if there is at least one point on both sides of sweet-spot.
-                # if np.min(np.abs(flux_datapoints-ss_flux))<current_step_size:
-                if any((flux_datapoints-ss_flux)>0) and \
-                            any((ss_flux-flux_datapoints)<0):
-                    print('Found swet spot branch!')
-                    new_flux = ss_flux
-                    new_freq = ss_freq
-                    flux_parameter(float(new_flux))
-                # if sweets spot is further than current_step_size, step current
-                # by current_step_size
-                else:
-                    print('Step by current_step_size branch!')
-                    if any((ss_flux-flux_datapoints)>0):
-                        new_flux = float(np.max(flux_datapoints)+current_step_size)
-                        new_freq = arc_poly(new_flux)
-                        flux_parameter(new_flux)
-                    elif any((ss_flux-flux_datapoints)<0):
-                        new_flux = float(np.min(flux_datapoints)-current_step_size)
-                        new_freq = arc_poly(new_flux)
-                        flux_parameter(new_flux)
-            else:
-                print('Step by 10 MHz branch!')
-                # if sweet spot further away than 10 MHz
-                # step by 10 MHz, but no more than current_step_size
-                new_freq = np.max(freq_datapoints)+frequency_step_size
-                roots = np.sort((arc_poly-new_freq).roots)
-                # check which solution is closer to recently measured points
-                # go to that solution
-                if np.abs(roots[0]-np.mean(flux_datapoints))<np.abs(roots[1]-np.mean(flux_datapoints)):
-                    furthest_current_point = np.max(flux_datapoints)+current_step_size
-                    new_flux = float(min(roots[0], furthest_current_point))
-                    new_freq = arc_poly(new_flux)
-                    flux_parameter(new_flux)
-                else:
-                    furthest_current_point = np.min(flux_datapoints)-current_step_size
-                    new_flux = float(max(roots[1], furthest_current_point))
-                    new_freq = arc_poly(new_flux)
-                    flux_parameter(new_flux)
-
-            # measure frequency and add datapoints
-            print('Measuring at current {}'.format(flux_parameter()))
-            freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+new_freq)
-            # if measured freq differs too much from predicted, remeasure
-            if np.abs(freq - new_freq)>5e6:
-                freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+new_freq)
-            freq_datapoints = np.append(freq_datapoints, freq)
-            flux_datapoints = np.append(flux_datapoints, flux_parameter())
-
-            print(i, flux_parameter(), freq)
-
-            if np.abs(ss_freq-freq)<0.5e6:
-                break
-
-        # additional measuerments around sweet spot
-        roots_2MHz = np.sort((arc_poly-freq+2e6).roots)
-        roots_4MHz = np.sort((arc_poly-freq+4e6).roots)
-        roots = np.concatenate((roots_2MHz, roots_4MHz))
-        dets = (-2e6,-2e6,-4e6,-4e6)
-
-        for fl,det in zip(roots,dets):
-            flux_parameter(fl)
-            print('Measuring at current {}'.format(flux_parameter()))
-            freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+ss_freq+det)
-            freq_datapoints = np.append(freq_datapoints, freq)
-            flux_datapoints = np.append(flux_datapoints, flux_parameter())
-
-
-        arc_polycoeffs = np.polyfit(flux_datapoints, freq_datapoints, 2)
-        arc_poly = np.poly1d(arc_polycoeffs)
-
-        # find maximum of a parabola
-        ss_flux = arc_poly.deriv().roots
-        ss_freq = arc_poly(ss_flux)
-
-        # got to maximum and make one last measurement
-        new_flux = ss_flux
-        new_freq = ss_freq
-        flux_parameter(float(new_flux))
-        freq = self.find_frequency(update=False,freqs=np.arange(-f_span/2,f_span/2,f_step)+ss_freq)
-
-
-        return flux_parameter(), freq
-
 
     def calc_current_to_freq(self, curr: float):
         """

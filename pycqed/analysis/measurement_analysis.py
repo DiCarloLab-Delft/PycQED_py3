@@ -7462,7 +7462,7 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, f01=None, f12=None,
                              amp_lims=[None, None], line_color='k',
-                             phase_lims=[-180, 180], **kw):
+                             **kw):
         self.get_naming_and_values_2D()
         # figsize wider for colorbar
         fig1, ax1 = self.default_ax(figsize=(8, 5))
@@ -7484,13 +7484,14 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
         # figsize wider for colorbar
         fig2, ax2 = self.default_ax(figsize=(8, 5))
         fig2_title = self.timestamp_string + self.measurementstring + '_' + 'Phase'
+        if (measured_phases>170).any() and (measured_phases<-170).any():
+            measured_phases = np.mod(measured_phases, 360)
         a_tools.color_plot(x=self.sweep_points,
                            y=self.sweep_points_2D,
                            z=measured_phases.transpose(),
                            xlabel=self.xlabel,
                            ylabel=self.ylabel,
                            zlabel=self.zlabels[1],
-                           clim=phase_lims,
                            plot_title=fig2_title,
                            fig=fig2, ax=ax2)
 
@@ -7623,6 +7624,7 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                 f0 = np.zeros(len(self.sweep_points_2D))
                 for u, power in enumerate(self.sweep_points_2D):
                     f0[u] = self.fit_results[str(power)].values['f0']
+                self.f0 = f0
                 fig, ax = self.default_ax(figsize=(8, 5))
                 self.fig_array.append(fig)
                 self.ax_array.append(ax)
