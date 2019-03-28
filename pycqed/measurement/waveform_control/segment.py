@@ -2,7 +2,7 @@ import numpy as np
 from copy import deepcopy
 import pycqed.measurement.waveform_control.pulse_library as pl
 import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
-from pycqed.measurement.waveform_control import pulsar as ps
+import pycqed.measurement.waveform_control.pulsar as ps
 
 
 class Segment:
@@ -16,11 +16,11 @@ class Segment:
         self.name = name
         self.pulsar = pulsar
         self.unresolved_pulses = []
-        self.resolved_pulses = None
         self.previous_pulse = None
         self.elements = {}
         self.element_start_end = {}
         self.elements_on_AWG = {}
+        self.trigger_pars = {'length': 20e-9, 'amplitude': 1}
 
     def add(self, pulse_pars):
 
@@ -45,24 +45,15 @@ class Segment:
 
         self.unresolved_pulses.append(new_pulse)
 
-        # create an entry in the elements dictionary
-        if new_pulse.pulse_obj.element_name not in self.elements:
-            self.elements[new_pulse.pulse_obj.element_name] = [
-                new_pulse.pulse_obj
-            ]
-        elif new_pulse.pulse_obj.element_name in self.elements:
-            self.elements[new_pulse.pulse_obj.element_name].append(
-                new_pulse.pulse_obj)
-
         self.previous_pulse = new_pulse
-        # if resolved_pulses is None, the resolve_timing function has to be
+        # if self.elements is None, the resolve_timing function has to be
         # called prior to generating the waveforms
-        self.resolved_pulses = None
+        self.elements = {}
 
     def gen_refpoint_dict(self):
         """
-        Returns a dictionary of unresolved pulses with reference points as 
-        keys to easily refer to pulses
+        Returns a dictionary of UnresolvedPulses with their reference_points as 
+        keys.
         """
         pulses = {}
 
@@ -76,9 +67,12 @@ class Segment:
 
     def gen_AWG_dict(self):
         """
-        Generates a dictionary with element names as keys and a set of used
+        Returns a dictionary with element names as keys and a set of used
         AWGs for each element as value.
         """
+
+        if self.elements == {}:
+            self.resolve_timing()
 
         AWG_dict = {}
 
@@ -86,45 +80,118 @@ class Segment:
             AWG_dict[element] = set()
 
             for pulse in self.elements[element]:
-                AWG_dict[element].add(self.pulsar.get(pulse.channel + '_AWG'))
+                for channel in pulse.channels:
+                    AWG_dict[element].add(self.pulsar.get(channel + '_awg'))
 
         return AWG_dict
 
-    def gen_trigger_el(self):
+    def gen_elements_on_AWG(self):
         """
-        Adds the trigger pulses for each element to the resolved_pulses list 
-        and updates the elements_on_AWG dictionary.
+        Updates the self.elements_on_AWG dictionary
         """
 
-        self.find_element_start_end()
+        if self.elements == {}:
+            self.resolve_timing()
 
-        trigger_pulses = []
+        self.elements_on_AWG = {}
+
         AWG_dict = self.gen_AWG_dict()
-        trigger_pars = {'length': 20e-9, 'amplitude': 1}
 
         for element in AWG_dict:
             for AWG in AWG_dict[element]:
-                # add element to elements_on_AWG
                 if AWG in self.elements_on_AWG:
                     self.elements_on_AWG[AWG].append(element)
                 elif AWG not in self.elements_on_AWG:
                     self.elements_on_AWG[AWG] = [element]
 
-                trig_pulse = bpl.SquarePulse(
-                    'trigger_element', channel=AWG + "_Master",
-                    **trigger_pars)  # think about Master channel name!
+    def gen_trigger_el(self):
+        """
+        For each element:
+            For each AWG the element is played on, this method:
+                * adds the element to the elements_on_AWG dictionary
+                * instatiates a trigger pulse on the triggering channel of the 
+                  AWG, placed in a suitable element on the triggering AWG,
+                  taking AWG delay into account.
+                * adds the trigger pulse to the elements list 
+        """
 
-                trig_pulse.algorithm_time(self.element_start_end[element] -
-                                          self.pulsar.get(AWG + '_delay'))
+        if self.elements == {}:
+            self.resolve_timing()
 
-                trigger_pulses.append(trig_pulse)
+        self.gen_elements_on_AWG()
 
-        self.resolved_pulses += trigger_pulses
+        AWG_dict = self.gen_AWG_dict()
+
+        for element in AWG_dict:
+            for AWG in AWG_dict[element]:
+                if self.pulsar.get('{}_trigger_channels'.format(AWG)) == None:
+                    continue
+
+                trigger_pulse_time = self.element_start_end[element][
+                    0] - self.pulsar.get(AWG + '_delay')
+
+                # Find the AWGs that trigger the AWG
+                trigger_AWGs = set()
+                for channel in self.pulsar.get(
+                        '{}_trigger_channels'.format(AWG)):
+                    trigger_AWGs.add(self.pulsar.get('{}_awg'.format(channel)))
+
+                # For each trigger_AWG, ind the elements to play the trigger
+                # pulse in
+                trigger_elements = {}
+                for trigger_AWG in trigger_AWGs:
+                    if self.elements_on_AWG.get(trigger_AWG, None) == None:
+                        trigger_elements[trigger_AWG] = 'trigger_element'
+                    else:
+                        trigger_elements[
+                            trigger_AWG] = self.find_trigger_element(
+                                trigger_AWG, trigger_pulse_time)
+
+                for channel_name in self.pulsar.get(
+                        '{}_trigger_channels'.format(AWG)):
+                    trig_pulse = bpl.SquarePulse(
+                        trigger_elements[self.pulsar.get(
+                            '{}_awg'.format(channel_name))],
+                        channel=channel_name,
+                        **self.trigger_pars)
+
+                    trig_pulse.algorithm_time(trigger_pulse_time)
+
+                    if trig_pulse.element_name in self.elements:
+                        self.elements[trig_pulse.element_name].append(
+                            trig_pulse)
+                    else:
+                        self.elements[trig_pulse.element_name] = [trig_pulse]
+
+        self.test_overlap()
+
+    def find_trigger_element(self, trigger_AWG, trigger_pulse_time):
+        """
+        For a trigger_AWG that is used for generating triggers as well as 
+        normal pulses, this method returns the name of the element to which the 
+        trigger pulse is closest.
+        """
+
+        time_distance = []
+
+        for element in self.elements_on_AWG[trigger_AWG]:
+            for i in [0, 1]:
+                time_distance.append([
+                    abs(trigger_pulse_time + self.trigger_pars['length'] -
+                        self.element_start_end[element][i]), element
+                ])
+
+        trigger_element = min(time_distance)[1]
+
+        return trigger_element
 
     def test_overlap(self):
         """
         Tests for all AWGs if any of their elements overlap.
         """
+
+        self.find_element_start_end()
+        self.gen_elements_on_AWG()
 
         for AWG in self.elements_on_AWG:
             for i in range(len(self.elements_on_AWG[AWG]) - 1):
@@ -132,11 +199,16 @@ class Segment:
                 prev_el = self.elements_on_AWG[AWG][i]
                 if self.element_start_end[next_el][0] < \
                         self.element_start_end[prev_el][1]:
-                    raise ValueError('Elements on {} overlap!'.format(AWG))
+                    raise ValueError('{} and {} on {} overlap!'.format(
+                        self.elements_on_AWG[AWG][i],
+                        self.elements_on_AWG[AWG][i + 1], AWG))
 
     def resolve_timing(self):
         """
-        Resolves the timing for all UnresolvedPulses by updating pulse_obj._t0
+        For each pulse in the unresolved_pulses list, this method:
+            * updates the _t0 of the pulse by using the timing description of
+              the UnresolvedPulse
+            * saves the resolved pulse in the elements dictionary
         """
 
         visited_pulses = set()
@@ -153,6 +225,13 @@ class Segment:
 
             pulse.pulse_obj.algorithm_time(
                 pulse.delay - pulse.ref_point_new * pulse.pulse_obj.length)
+
+            # create an entry in the elements dictionary
+            if pulse.pulse_obj.element_name not in self.elements:
+                self.elements[pulse.pulse_obj.element_name] = [pulse.pulse_obj]
+            elif pulse.pulse_obj.element_name in self.elements:
+                self.elements[pulse.pulse_obj.element_name].append(
+                    pulse.pulse_obj)
 
         if len(visited_pulses) == 0:
             raise ValueError('No pulse references to the segment start!')
@@ -177,13 +256,19 @@ class Segment:
                         p.ref_point_new * p.pulse_obj.length +
                         p.ref_point * pulse.pulse_obj.length)
 
+                    # create an entry in the elements dictionary
+                    if p.pulse_obj.element_name not in self.elements:
+                        self.elements[p.pulse_obj.element_name] = [p.pulse_obj]
+                    elif p.pulse_obj.element_name in self.elements:
+                        self.elements[p.pulse_obj.element_name].append(
+                            p.pulse_obj)
+
             ref_points = new_ref_points
 
         if len(visited_pulses) != len(self.unresolved_pulses):
             raise ValueError('Not all pulses have been added!')
 
-        self.resolved_pulses = \
-            [pulse.pulse_obj for pulse in self.unresolved_pulses]
+        self.find_element_start_end()
 
     def time_sort(self):
         """
@@ -191,33 +276,47 @@ class Segment:
         dictionary (which are list of UnresolvedPulses) by accending _t0.
         """
 
+        if self.elements == {}:
+            self.resolve_timing()
+
         for element in self.elements:
-            old_list = [(pulse.algorithm_time(),pulse) \
-                for pulse in self.elements[element]]
+            # i takes care of pulses happening at the same time, to sort
+            # by order in which they were added
+            i = 0
+            old_list = []
+            for pulse in self.elements[element]:
+                old_list.append([pulse.algorithm_time(), i, pulse])
+                i += 1
 
             new_list = sorted(old_list)
-            self.elements[element] = [pulse for (t0, pulse) in new_list]
+            self.elements[element] = [pulse for (t0, i, pulse) in new_list]
 
     def find_element_start_end(self):
         """
-        Given a segment, this method finds the start and end times for each 
-        element and saves them in a dictionary, ordered by accending start time.
+        Given a segment, this method:
+            * finds the start and end times for each element 
+            * saves them in element_start_end, ordered by accending start time
+            * changes the order of self.elements dictionary by order of start 
+              times 
         """
 
         # sorts the pulses in the elements in accending order
         self.time_sort()
-        unordered_start_times = []
-        unordered_end_times = {}
+        unordered_start_end = []
+        new_elements = {}
 
         for element in self.elements:
-            unordered_start_times.append(
-                (self.elements[element][0].algorithm_time(), element))
-            unordered_end_times[element] = self.elements[element][
-                -1].algorithm_time() + self.elements[element][-1].length
+            unordered_start_end.append(
+                (self.elements[element][0].algorithm_time(),
+                 self.elements[element][-1].algorithm_time() +
+                 self.elements[element][-1].length, element))
 
-        for (t0, element) in sorted(unordered_start_times):
+        for (t_start, t_end, element) in sorted(unordered_start_end):
             self.element_start_end[element] = \
-                [t0, unordered_end_times[element]]
+                [t_start, t_end]
+            new_elements[element] = self.elements[element]
+
+        self.elements = new_elements
 
     def reduce_to_segment_start(self):
 
