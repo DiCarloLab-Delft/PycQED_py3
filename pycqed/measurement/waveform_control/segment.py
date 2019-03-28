@@ -191,7 +191,7 @@ class Segment:
         """
 
         self.find_element_start_end()
-        self.gen_elements_on_AWG()
+        self.test_trigger_AWG()
 
         for AWG in self.elements_on_AWG:
             for i in range(len(self.elements_on_AWG[AWG]) - 1):
@@ -202,6 +202,19 @@ class Segment:
                     raise ValueError('{} and {} on {} overlap!'.format(
                         self.elements_on_AWG[AWG][i],
                         self.elements_on_AWG[AWG][i + 1], AWG))
+
+    def test_trigger_AWG(self):
+        """
+        Checks if there is more than one element on the AWGs that are not 
+        triggered by another AWG.
+        """
+        self.gen_elements_on_AWG()
+
+        for AWG in self.elements_on_AWG:
+            if self.pulsar.get('{}_trigger_channels'.format(AWG)) == None:
+                if len(self.elements_on_AWG[AWG]) > 1:
+                    raise ValueError(
+                        'There is more than one element on {}'.format(AWG))
 
     def resolve_timing(self):
         """
@@ -320,12 +333,108 @@ class Segment:
 
     def reduce_to_segment_start(self):
 
+        # not used at the moment, change to self.elements
+
         segment_t0 = float('inf')
         for pulse in self.unresolved_pulses:
             segment_t0 = min(segment_t0, pulse.pulse_obj.algorithm_time())
 
         for pulse in self.unresolved_pulses:
             pulse.delay -= segment_t0
+
+    def waveforms(self):
+        """
+        After all the pulses have been added, the timing resolved and the 
+        trigger pulses added, the waveforms of the segment can be compiled.
+        """
+
+        AWG_wfs = {}
+
+        for AWG in self.elements_on_AWG:
+            AWG_wfs[AWG] = {}
+            channel_list = self.find_AWG_channels(AWG)
+            for (i, element) in enumerate(self.elements_on_AWG[AWG]):
+                AWG_wfs[AWG][(i, element)] = {}
+                tvals = self.tvals(channel_list, element)
+
+                wfs = {}
+                for channel in channel_list:
+                    wfs[channel] = np.zeros(len(tvals[channel]))
+
+                element_start_time = self.element_start_end[element][0]
+                for pulse in self.elements[element]:
+                    # checks whether pulse is played on AWG
+                    if set(pulse.channels) & set(channel_list) == set():
+                        continue
+                    chan_tvals = {}
+                    for channel in pulse.channels:
+                        # checks if pulse is played on AWG
+                        if channel not in channel_list:
+                            continue
+                        pulse_start = self.time2sample(
+                            pulse.element_time(element_start_time), channel)
+                        pulse_end = self.time2sample(
+                            pulse.element_time(element_start_time) +
+                            pulse.length, channel)
+                        chan_tvals[channel] = tvals[channel].copy(
+                        )[pulse_start:pulse_end]
+
+                    pulse_wfs = pulse.get_wfs(chan_tvals)
+
+                    for channel in pulse.channels:
+                        # checks if pulse is played on AWG
+                        if channel not in channel_list:
+                            continue
+                        pulse_start = self.time2sample(
+                            pulse.element_time(element_start_time), channel)
+                        pulse_end = self.time2sample(
+                            pulse.element_time(element_start_time) +
+                            pulse.length, channel)
+                        wfs[channel][pulse_start:
+                                     pulse_end] += pulse_wfs[channel]
+
+                for channel in channel_list:
+                    AWG_wfs[AWG][(i, element)][self.pulsar.get(
+                        '{}_id'.format(channel))] = (wfs[channel])
+
+        return AWG_wfs
+
+    def tvals(self, channel_list, element):
+        """
+        Returns a dictionary with channel names of the used channels in the
+        element as keys and the tvals array for the channel as values.
+        """
+
+        tvals = {}
+
+        for channel in channel_list:
+            samples = self.element_samples(element, channel)
+            tvals[channel] = np.arange(samples) / self.pulsar.clock(
+                channel) + self.element_start_end[element][0]  # + delay?
+
+        return tvals
+
+    def find_AWG_channels(self, AWG):
+        channel_list = []
+        for channel in self.pulsar.channels:
+            if self.pulsar.get('{}_awg'.format(channel)) == AWG:
+                channel_list.append(channel)
+
+        return channel_list
+
+    def element_samples(self, element, channel):
+        """
+        Returns the number of samples the element occupies for the channel.
+        """
+        el_time = self.element_start_end[element][1] - self.element_start_end[
+            element][0]
+        return self.time2sample(el_time, channel)
+
+    def time2sample(self, t, channel):
+        """
+        Converts time to a number of samples for a channel.
+        """
+        return int(t * self.pulsar.clock(channel) + 0.5)
 
 
 class UnresolvedPulse:
