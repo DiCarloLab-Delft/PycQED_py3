@@ -22,6 +22,9 @@ import colorsys as colors
 from matplotlib import cm
 from pycqed.analysis import composite_analysis as RA
 
+import qutip as qp
+import qutip.metrics as qpmetrics
+
 from matplotlib.colors import LogNorm
 
 datadir = get_default_datadir()
@@ -2036,7 +2039,7 @@ def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
         return transitions[:no_transitions]
 
 
-def calculate_transmon_and_resonator_transitions(EC, EJ, f_r, g_01,
+def calculate_transmon_and_resonator_transitions_old(EC, EJ, f_r, g_01,
                                                  dim=None, ng=0, f_01=None,
                                                  f_12=None,
                                                  g_12_approximation=1):
@@ -2077,6 +2080,136 @@ def calculate_transmon_and_resonator_transitions(EC, EJ, f_r, g_01,
 
     return f_01_d, f_12_d, f_r_d, f_01_res_shifted, f_r_qubit_shifted
 
+def calculate_transmon_and_resonator_transitions(Ec, Ej, f_bus, gs, ng=0):
+    """
+    Calculate dressed qubit and bus frequencies based on several physical parameters
+    Input:
+    - Ec: transmon charging energy
+    - Ej: transmon josephson energy
+    - f_bus: the bare bus frequency (float or list of floats)
+    - g: qubit-bus coupling (float or list of floats)
+    Output:
+    - f01_dressed: 01 transition of a dressed qubit
+    - f12_dressed: 12 transition of a dressed qubit
+    - f_bus_transitions: dressed bus transition with qubit in a ground state
+    - photon_splittings: a qubit photon splitting (difference between f01_dressed with
+        and without a photon in this resonator).
+    - f_bus_shifted_transitions: dressed bus transition with qubit in an excited state
+
+    Replacement for the previous calculate_transmon_and_resonator_transitions function,
+    which was assuming only one bus. That one is temporarily kept as
+    'calculate_transmon_and_resonator_transitions_old'. It is verified to produce
+    the same result to 6 decimal places.
+    """
+    if isinstance(f_bus, float) or isinstance(f_bus, int):
+        f_bus = [f_bus]
+    if isinstance(gs, float) or isinstance(gs, int):
+        gs = [gs]
+    
+    # max photons
+    max_ph = 2
+    
+    # number of buses
+    n_bus = len(f_bus)
+
+    # qubit operators
+    (f01, f12), injs = calculate_transmon_transitions(Ec, Ej, asym=0,
+                                                        reduced_flux=0,
+                                                        no_transitions=2,
+                                                        ng=ng, dim=10,
+                                                        return_injs=True)
+    H_q = qp.Qobj(np.diag((0, f01, f01+f12)))
+    H_q = qp.tensor(H_q, *[qp.qeye(max_ph+1)]*n_bus)
+    a_q = qp.Qobj(np.diag((1,np.abs(injs[2, 1]/injs[1, 0])),k=1))
+    a_q = qp.tensor(a_q, *[qp.qeye(max_ph+1)]*n_bus)
+
+
+    # bus operators
+    n_r_list = []
+    a_r_list = []
+
+    a_r_generating_list = [qp.destroy(max_ph+1)] + [qp.qeye(max_ph+1)]*(n_bus-1)
+    for fb, g in zip(f_bus, gs):
+        a_r = qp.tensor(qp.qeye(3), *a_r_generating_list)
+        a_r_list.append(a_r)
+        n_r_list.append(a_r.dag() * a_r)
+        a_r_generating_list = a_r_generating_list[-1:]+a_r_generating_list[:-1]
+
+    # full hamiltonian
+    H = deepcopy(H_q)
+    for fb, g, a_r, n_r in zip(f_bus, gs, a_r_list, n_r_list):
+        H += fb*n_r
+        H += g*(a_q*a_r.dag() + a_q.dag()*a_r)
+
+    # eigenenergies and eigenstates
+    ees, ess = H.eigenstates()
+
+    # define bare qubit states
+    qubit_g = qp.tensor(qp.fock(3,0),*[qp.fock(max_ph+1,0)]*n_bus)
+    qubit_e = qp.tensor(qp.fock(3,1),*[qp.fock(max_ph+1,0)]*n_bus)
+    qubit_f = qp.tensor(qp.fock(3,2),*[qp.fock(max_ph+1,0)]*n_bus)
+
+    # define bare bus states
+    bus_e_list = []
+    bus_e_qubit_e_list = []
+    bus_e_generating_list = [qp.fock(max_ph+1,1)] + [qp.fock(max_ph+1,0)]*(n_bus-1)
+    for fb, g in zip(f_bus, gs):
+        bus_e = qp.tensor(qp.fock(3,0), *bus_e_generating_list)
+        bus_e_list.append(bus_e)
+        bus_e_qubit_e = qp.tensor(qp.fock(3,1), *bus_e_generating_list)
+        bus_e_qubit_e_list.append(bus_e_qubit_e)
+        bus_e_generating_list = bus_e_generating_list[-1:]+bus_e_generating_list[:-1]
+
+    # find states with the largest overlap to specific state
+    def largest_overlap_index(state, ess, ees):
+        max_fid = 0
+        best_index = 0
+        for i,es in enumerate(ess):
+            fid = qpmetrics.fidelity(state,es)**2
+            if fid>max_fid:
+                max_fid = fid
+                best_index = i
+            if max_fid>0.5:
+                break
+        return i, max_fid, ees[i]
+
+    # find states with the largest overlap to specific state
+    def largest_overlap_energy(state, ess, ees):
+        return largest_overlap_index(state, ess, ees)[2]
+
+    # ground state energy
+    E_g = largest_overlap_energy(qubit_g, ess, ees)
+    # excited state energy
+    E_e = largest_overlap_energy(qubit_e, ess, ees)
+    # second_excited state energy
+    E_f = largest_overlap_energy(qubit_f, ess, ees)
+
+    # transitions of dressed states
+    f01_dressed = E_e - E_g
+    f12_dressed = E_f - E_e
+
+    # bus transition with qubit in ground state
+    f_bus_transitions = []
+    # bus transition with qubit in excited state
+    f_bus_shifted_transitions = []
+    # qubit 01 transition with a photon in a bus
+    f01_dressed_shifted = []
+
+    # dressed bus transitions
+    for bus_qubit_g, bus_qubit_e in zip(bus_e_list, bus_e_qubit_e_list):
+        E_b_g = largest_overlap_energy(bus_qubit_g, ess, ees)
+        E_b_e = largest_overlap_energy(bus_qubit_e, ess, ees)
+
+        f_bus_transitions.append(E_b_g-E_g)
+        f_bus_shifted_transitions.append(E_b_e-E_e)
+        f01_dressed_shifted.append(E_b_e - E_b_g)
+    
+    if n_bus == 1:
+        f_bus_transitions = f_bus_transitions[0]
+        f_bus_shifted_transitions = f_bus_shifted_transitions[0]
+        f01_dressed_shifted = f01_dressed_shifted[0]
+    
+    return f01_dressed, f12_dressed, f_bus_transitions, f01_dressed_shifted, f_bus_shifted_transitions
 
 def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
                                          dim=None, ng=0, f_01=None, f_12=None,
