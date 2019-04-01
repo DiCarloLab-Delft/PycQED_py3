@@ -1822,7 +1822,7 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-    def (self,freqs,spec_source_bus,bus_power,dacs,dac_param,f01=None,label='',
+    def bus_frequency_flux_sweep(self,freqs,spec_source_bus,bus_power,dacs,dac_param,f01=None,label='',
                         close_fig=True,analyze=True,MC=None,
                         prepare_for_continuous_wave=True):
         '''
@@ -2496,6 +2496,7 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
+        ma.Rabi_Analysis(label='rabi_')
         return True
 
     def measure_allxy(self, MC=None,
@@ -3112,7 +3113,8 @@ class CCLight_Transmon(Qubit):
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
-                     label: str='', prepare_for_timedomain=True):
+                     label: str='', prepare_for_timedomain=True,
+                     analyze=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -3162,7 +3164,8 @@ class CCLight_Transmon(Qubit):
         MC.run('echo'+label+self.msmt_suffix)
         # FIXME: echo analysis v2 required that correctly handles 
         # modulation of recovery pulse. 
-        a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
+        if analyze:
+            a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
