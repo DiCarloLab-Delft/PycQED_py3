@@ -3113,8 +3113,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
-                     label: str='', prepare_for_timedomain=True,
-                     analyze=True):
+                     label: str='', prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
