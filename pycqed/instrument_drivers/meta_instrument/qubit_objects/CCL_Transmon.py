@@ -1691,8 +1691,11 @@ class CCLight_Transmon(Qubit):
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
         if 'ivvi' in self.instr_FluxCtrl().lower():
-            IVVI = self.instr_FluxCtrl.get_instr()
-            dac_par = IVVI.parameters['dac{}'.format(self.cfg_dc_flux_ch())]
+            if fluxChan is None:
+                IVVI = self.instr_FluxCtrl.get_instr()
+                dac_par = IVVI.parameters['dac{}'.format(self.cfg_dc_flux_ch())]
+            else:
+                dac_par = IVVI.parameters[fluxChan]
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
