@@ -1509,6 +1509,22 @@ def calc_diag_pauli_transfer_matrix(U,U_target):
 
 
 
+### Study of leakage
+
+def two_qutrit_state(i,j):
+    ket = qtp.tensor(qtp.ket([i], dim=[3]),
+                                   qtp.ket([j], dim=[3])) #notice it's a ket
+    rho = qtp.operator_to_vector(qtp.ket2dm(ket))
+    return rho
+
+
+def population_transfer(U_superop,state_in,state_out):
+	return np.abs((state_out.dag()*U_superop*state_in).data[0,0])**2
+
+
+def test_population_transfer(pop1,pop2):
+	tot=pop1+pop2
+	print(tot)
 
 
 

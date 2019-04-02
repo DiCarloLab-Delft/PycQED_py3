@@ -39,7 +39,7 @@ Loop:
     # bs 1 MeasZ s7
     # qwait 100
     # bs 1 MeasZ s8
-    qwait 1048574
+    qwait 100
     BR always, loop
     NOP
     NOP
