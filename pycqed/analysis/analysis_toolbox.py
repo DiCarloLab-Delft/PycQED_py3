@@ -15,6 +15,7 @@ from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
 from scipy.signal import argrelextrema
+from scipy import optimize
 # to allow backwards compatibility with old a_tools code
 from .tools.data_manipulation import *
 from .tools.plotting import *
@@ -2211,6 +2212,61 @@ def calculate_transmon_and_resonator_transitions(Ec, Ej, f_bus, gs, ng=0):
     
     return f01_dressed, f12_dressed, f_bus_transitions, f01_dressed_shifted, f_bus_shifted_transitions
 
+def fit_Ec_Ej_fbus_g(f01, f12, fbus, f01_shifted):
+    '''
+    Use the qubit anharmonicity and photon splitting to calculate
+    Ec, Ej, resonator frequency, and coupling to resonator
+    
+    Input:
+    - f01: qubit frequency
+    - f12: e-f transition frequency
+    - fbus: resonator frequency (bus of RO resonator; dressed i.e. as measured)
+    - f01_shifted: qubit frequency in presence of a single photon in the resonator
+    
+    Output:
+    tuple containing:
+    - Ec: charging energy
+    - Ej: josephson energy
+    - fbus: bare resonator frequency (bus of RO resonator)
+    - g: coupling between qubit and resonator
+    '''
+    
+    # pack measured values into an array
+    measured = np.array([f01, f12, fbus, f01_shifted])
+    
+    # guess initial parameters
+    
+    # Ec is smaller that f01-f12 because of a bus so let's use
+    # f01_shifted-f12 as a guess
+    Ec_guess = f01_shifted - f12
+    # and let's use large Ej/Ec limit for Ej guess
+    Ej_guess = (f01 + Ec_guess) ** 2 / (8 * Ec_guess)
+    # detuning is roughly (fbus-f01) so I use it to guess g and fbus
+    # in a dispersive regime
+    g_guess = np.sqrt(np.abs(fbus-f01) * np.abs(f01-f01_shifted) * 2)
+    fbus_guess = fbus+g_guess**2/(fbus-f01)
+
+    # pack all quesses into an array
+    guesses = np.array([Ec_guess, Ej_guess, fbus_guess, g_guess])
+    
+    # define a penalty function to minimize
+    def penalty_function(params):
+        # calculate frequencies based on parameters
+        calc = np.array(calculate_transmon_and_resonator_transitions(*params))
+        # remove last element which is the bus frequency for qubit in 1 state
+        calc = calc[:-1]
+
+        # calculate difference between calculated and measured frequencies
+        errors = calc - measured
+        return errors**2
+    
+    # optimize
+    out = optimize.leastsq(penalty_function,guesses, full_output=1)
+    
+#     print('Measured frequencies: '+str(measured))
+#     print('Frequencies after fitting: '+str(np.around(calculate_transmon_and_resonator_transitions(*out[0]), decimals=4)[:-1]))
+    return tuple(out[0])
+
 def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
                                          dim=None, ng=0, f_01=None, f_12=None,
                                          g_12_approximation=1):
@@ -2659,7 +2715,6 @@ def fit_EC_EJ_g_f_res_ng(flux_01, f_01, flux_12, f_12, flux_r, f_r, ng=0,
     as a function of thier respective flux settings by numerical optimization.
     for initial guess it takes the maximum of the inputs
     """
-    from scipy import optimize
     # initial guesses
     g_01_ss_guess = 300e6
     EC_guess = np.max(f_01) - np.max(f_12)
@@ -2725,7 +2780,6 @@ def fit_EC_EJ(f01, f12):
     """
     Calculates EC and EJ from f01 and f12 by numerical optimization.
     """
-    from scipy import optimize
     # initial guesses
     EC0 = f01 - f12
     EJ0 = (f01 + EC0) ** 2 / (8 * EC0)
