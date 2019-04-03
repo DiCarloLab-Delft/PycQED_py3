@@ -1286,6 +1286,11 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     infid_vec=[]
     leakage_dephased_vec=[]
     infid_dephased_vec=[]
+    popul_in_20=[]
+    popul_in_02=[]
+    popul_in_21from12=[]
+    popul_test=[]
+    popul_in_10from01=[]
 
     dimensions = U_superop_average.dims
 
@@ -1296,7 +1301,8 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     U_temp[38,20]=0
     U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
 
-    for n in range(1,200,2):        # we consider only odd n so that in theory it should be always a CZ
+    number_CZ_repetitions=200
+    for n in range(1,number_CZ_repetitions,2):        # we consider only odd n so that in theory it should be always a CZ
         U_superop_n=U_superop_average**n
         U_superop_dephased_n = U_superop_dephased**n
         qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
@@ -1305,16 +1311,61 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
         infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
         leakage_dephased_vec.append(qoi_dephased['L1'])
         infid_dephased_vec.append(1-qoi_dephased['avgatefid_compsubspace_pc'])
+        popul_in_20.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,1]],states_out=[[2,0]]))
+        popul_in_02.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,1]],states_out=[[0,2]]))
+        popul_in_21from12.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out=[[2,1]]))
+        popul_test.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in='compsub',states_out='leaksub'))
+        popul_in_10from01.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[0,1]],states_out=[[1,0]]))
 
-    plot(x_plot_vec=[np.arange(1,200,2)],
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(leakage_vec)*100,np.array(leakage_dephased_vec)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Leakage (%)',
                   legend_labels=['Using directly the $CZ$ from the simulations','Depolarizing the leakage subspace'])
 
-    print(leakage_vec)
-    print(leakage_dephased_vec)
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_in_20)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['11 to 20'])
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_in_02)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['11 to 02'])
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_in_21from12)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['12 to 21'])
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_test)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['test'])
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_in_10from01)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['01 to 10'])
+
+    print('leakage_vec',leakage_vec)
+    print('leakage_dephased_vec',leakage_dephased_vec)
+    print('popul_in_20_from_11',popul_in_20)
+    print('popul_in_02_from_11',popul_in_02)
+    print('popul_in_21_from_12',popul_in_21from12)
+    print('popul_test',popul_test)
+    print('popul_in_10_from_01',popul_in_10from01)
 
 
 def add_waiting_at_sweetspot(tlist,amp,waiting_at_sweetspot):
@@ -1519,12 +1570,42 @@ def two_qutrit_state(i,j):
 
 
 def population_transfer(U_superop,state_in,state_out):
-	return np.abs((state_out.dag()*U_superop*state_in).data[0,0])**2
+	return np.abs((state_out.dag()*U_superop*state_in).data[0,0])
 
 
 def test_population_transfer(pop1,pop2):
 	tot=pop1+pop2
 	print(tot)
+
+
+def average_population_transfer_subspace_to_subspace(U_superop,states_in,states_out):
+
+	if states_in == 'compsub':
+		states_in = [[0,0],[0,1],[1,0],[1,1]]
+	if states_out == 'leaksub':
+		states_out = [[2,0],[0,2],[1,2],[2,1],[2,2]]
+
+	sump=0
+	for indeces_list_in in states_in:
+		state_in = two_qutrit_state(indeces_list_in[0],indeces_list_in[1])
+		for indeces_list_out in states_out:
+			state_out = two_qutrit_state(indeces_list_out[0],indeces_list_out[1])
+
+			sump += population_transfer(U_superop,state_in,state_out)
+
+	sump/=len(states_in)
+
+	return sump
+
+
+
+
+
+
+
+
+
+
 
 
 
