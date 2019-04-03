@@ -271,9 +271,18 @@ class QuTech_AWG_Module(SCPI):
                            )
 
         # TODO [versloot] : remove
-        self.add_function('_dio_calibrate_input',
-                          call_cmd='DIO:CALibrate:INPut',
-                          docstring='Calibrate only the DIO input signals.\n')
+        self.add_parameter('_dio_calibrate_input',
+                           unit='S',
+                           label='Only calibrate DIO input with a specified time',
+                           set_cmd='DIO:CALibrate:INPut {}',
+                           vals=vals.Numbers(1e-6, 10),
+                           docstring='Calibrate only the DIO input signals.\n'
+                                     'Parameter:'
+                                     '\tMeasurement time between bitDiffs in seconds, resolution of 1e-6 s\n'
+                                     'Note that when select a measurement time longer than 25e-2 S the scpi connection '
+                                     'will timeout, the calibration is than still running. This will happen on the '
+                                     'first `get` parameter\n'
+                                     'Calibration duration = time * 20')
 
         self.add_function('_dio_calibrate_ref_clock',
                           call_cmd='DIO:CALibrate:REFclock',
