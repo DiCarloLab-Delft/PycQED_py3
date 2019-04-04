@@ -37,7 +37,7 @@ class Pulse:
     See the examples for more information.
     """
 
-    def __init__(self, name,element_name):
+    def __init__(self, name, element_name):
         self.length = None
         self.name = name
         self.element_name = element_name
@@ -103,6 +103,13 @@ class Pulse:
 
     def effective_length(self):
         return self.length - self.start_offset - self.stop_offset
+
+# Z virtual pulse
+class Z_Pulse(Pulse):
+
+    def __init__(self, element_name, name='Z pulse', **kw):
+        super().__init__(name, element_name)
+        self.length = 0
 
 
 # Some simple pulse definitions.
