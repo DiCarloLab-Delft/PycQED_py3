@@ -1286,11 +1286,18 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     infid_vec=[]
     leakage_dephased_vec=[]
     infid_dephased_vec=[]
+
     popul_in_20=[]
     popul_in_02=[]
     popul_in_21from12=[]
     popul_test=[]
     popul_in_10from01=[]
+
+    popul_in_20_dephased=[]
+    popul_in_02_dephased=[]
+    popul_in_21from12_dephased=[]
+    popul_test_dephased=[]
+    popul_in_10from01_dephased=[]
 
     dimensions = U_superop_average.dims
 
@@ -1299,6 +1306,11 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     U_temp[38,40]=0
     U_temp[22,20]=0
     U_temp[38,20]=0
+
+    U_temp[68,70]=0             # matrix elements corresponding to the coherences between 12 and 21
+    U_temp[52,70]=0
+    U_temp[68,50]=0
+    U_temp[52,50]=0
     U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
 
     number_CZ_repetitions=200
@@ -1311,11 +1323,18 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
         infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
         leakage_dephased_vec.append(qoi_dephased['L1'])
         infid_dephased_vec.append(1-qoi_dephased['avgatefid_compsubspace_pc'])
+
         popul_in_20.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,1]],states_out=[[2,0]]))
         popul_in_02.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,1]],states_out=[[0,2]]))
         popul_in_21from12.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out=[[2,1]]))
         popul_test.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in='compsub',states_out='leaksub'))
         popul_in_10from01.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[0,1]],states_out=[[1,0]]))
+
+        popul_in_20_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,1]],states_out=[[2,0]]))
+        popul_in_02_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,1]],states_out=[[0,2]]))
+        popul_in_21from12_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out=[[2,1]]))
+        popul_test_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in='compsub',states_out='leaksub'))
+        popul_in_10from01_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[0,1]],states_out=[[1,0]]))
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
@@ -1326,38 +1345,38 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
-                  y_plot_vec=[np.array(popul_in_20)*100],
+                  y_plot_vec=[np.array(popul_in_02)*100,np.array(popul_in_02_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
-                  legend_labels=['11 to 20'])
+                  legend_labels=['11 to 02','11 to 02, dephased case'])
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
-                  y_plot_vec=[np.array(popul_in_02)*100],
+                  y_plot_vec=[np.array(popul_in_20)*100,np.array(popul_in_20_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
-                  legend_labels=['11 to 02'])
+                  legend_labels=['11 to 20','11 to 20, dephased case'])
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
-                  y_plot_vec=[np.array(popul_in_21from12)*100],
+                  y_plot_vec=[np.array(popul_in_21from12)*100,np.array(popul_in_21from12_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
-                  legend_labels=['12 to 21'])
+                  legend_labels=['12 to 21','12 to 21, dephased case'])
+
+    # plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+    #               #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+    #               y_plot_vec=[np.array(popul_test)*100,np.array(popul_test_dephased)*100],
+    #               title='Repeated $CZ$ gates',
+    #               xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+    #               legend_labels=['test','test, dephased case'])
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
-                  y_plot_vec=[np.array(popul_test)*100],
+                  y_plot_vec=[np.array(popul_in_10from01)*100,np.array(popul_in_10from01_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
-                  legend_labels=['test'])
-
-    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
-                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
-                  y_plot_vec=[np.array(popul_in_10from01)*100],
-                  title='Repeated $CZ$ gates',
-                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
-                  legend_labels=['01 to 10'])
+                  legend_labels=['01 to 10','01 to 10, dephased case'])
 
     print('leakage_vec',leakage_vec)
     print('leakage_dephased_vec',leakage_dephased_vec)
