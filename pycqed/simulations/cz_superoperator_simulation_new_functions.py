@@ -1603,6 +1603,8 @@ def average_population_transfer_subspace_to_subspace(U_superop,states_in,states_
 		states_in = [[0,0],[0,1],[1,0],[1,1]]
 	if states_out == 'leaksub':
 		states_out = [[2,0],[0,2],[1,2],[2,1],[2,2]]
+	if states_out == 'all':
+		states_out = [[0,0],[0,1],[1,0],[1,1],[2,0],[0,2],[1,2],[2,1],[2,2]]
 
 	sump=0
 	for indeces_list_in in states_in:
