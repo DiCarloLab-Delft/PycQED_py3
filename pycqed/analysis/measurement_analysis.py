@@ -7979,13 +7979,15 @@ class DoubleFrequency(TD_Analysis):
             window_len=1, perc=85)
         #Now do Bertocco's algorithm
         #From [Metrology and Measurement Systems] Frequency and Damping Estimation Methods - An Overview.pdf
+        only_one_peak = False
         if (len(fourier_max_pos)==1): #If there is still only one peak
             print('Only one strong frequency found: not a Double Frequency?')
-            fourier_max_pos = fourier_max_pos + np.array([-1,1])
-        fourier_max_pos = fourier_max_pos[0:2]
-        # Two peaks
+            only_one_peak = True
+        else:
+            fourier_max_pos = fourier_max_pos[0:2]
+
         freq_guess = chirp_x[fourier_max_pos]
-        n_shift =3
+        n_shift =6
         Ratio = chirp_y[fourier_max_pos]/chirp_y[fourier_max_pos+n_shift]
         Omega_freq = 2*np.pi*dt*freq_guess
         dOmega_freq = 2*np.pi*dt*(chirp_x[fourier_max_pos + n_shift]-chirp_x[fourier_max_pos])
@@ -7994,33 +7996,71 @@ class DoubleFrequency(TD_Analysis):
         tau_guess= dt/np.real(np.log(expvalue_res))
         # Now get A and phi from a leastsqrs fit since we know f and tau
         # See article above for more information
-        expvals = np.array([2j*np.pi*freq_guess[0] - 1/tau_guess[0],-2j*np.pi*freq_guess[0] - 1/tau_guess[0],
-           2j*np.pi*freq_guess[1] - 1/tau_guess[1],-2j*np.pi*freq_guess[1] - 1/tau_guess[1],0.])
-        E = np.zeros((len(measured_values),5),dtype=complex)
-        for ii in range(len(measured_values)):
-            for jj in range(5):
-                E[ii,:]=np.exp(expvals*sweep_values[ii])
-        coeff = np.linalg.lstsq(E,measured_values,rcond=None)[0]
-        amp_guess = 2*np.abs(coeff[[0,2]])
-        phi_guess = np.angle(coeff[[0,2]])
+
+        while (any(np.array(tau_guess)<0) and n_shift>=2):
+            if (n_shift>=3):
+                n_shift -=2
+            else:
+                n_shift -=1
+            Ratio = chirp_y[fourier_max_pos]/chirp_y[fourier_max_pos+n_shift]
+            Omega_freq = 2*np.pi*dt*freq_guess
+            dOmega_freq = 2*np.pi*dt*(chirp_x[fourier_max_pos + n_shift]-chirp_x[fourier_max_pos])
+            expvalue_res = np.exp(1j*Omega_freq)*(Ratio-1)/(Ratio*np.exp(-1j*dOmega_freq)-1)
+            #    freq_guess= np.imag(np.log(lambda_result))/(2*np.pi*dt)
+            tau_guess= dt/np.real(np.log(expvalue_res))
+        if (only_one_peak):
+            expvals = np.array([2j*np.pi*freq_guess[0] - 1/tau_guess[0],-2j*np.pi*freq_guess[0] - 1/tau_guess[0], 0.])
+            E = np.zeros((len(measured_values),3),dtype=complex)
+            for ii in range(len(measured_values)):
+                for jj in range(3):
+                    E[ii,:]=np.exp(expvals*sweep_values[ii])
+            coeff = np.linalg.lstsq(E,measured_values,rcond=None)[0]
+            amp_guess = 2*np.abs(coeff[[0]])
+            phi_guess = np.angle(coeff[[0]])
+        else:
+            expvals = np.array([2j*np.pi*freq_guess[0] - 1/tau_guess[0],-2j*np.pi*freq_guess[0] - 1/tau_guess[0],
+               2j*np.pi*freq_guess[1] - 1/tau_guess[1],-2j*np.pi*freq_guess[1] - 1/tau_guess[1],0.])
+            E = np.zeros((len(measured_values),5),dtype=complex)
+            for ii in range(len(measured_values)):
+                for jj in range(5):
+                    E[ii,:]=np.exp(expvals*sweep_values[ii])
+            coeff = np.linalg.lstsq(E,measured_values,rcond=None)[0]
+            amp_guess = 2*np.abs(coeff[[0,2]])
+            phi_guess = np.angle(coeff[[0,2]])
+        print(tau_guess)
+        print(freq_guess)
+        print(amp_guess)
+        print(phi_guess)
 
         Double_Cos_Model.set_param_hint(
-            'tau_1', value=tau_guess[0], vary=True, min=0)
-        Double_Cos_Model.set_param_hint(
-            'tau_2', value=tau_guess[1], vary=True, min=0)
+            'tau_1', value=tau_guess[0], vary=True, min=0, max=6*tau_guess[0])
         Double_Cos_Model.set_param_hint(
             'freq_1', value=freq_guess[0], min=0)
-        Double_Cos_Model.set_param_hint(
-            'freq_2', value=freq_guess[1], min=0)
         Double_Cos_Model.set_param_hint('phase_1', value=phi_guess[0])
-        Double_Cos_Model.set_param_hint('phase_2', value=phi_guess[1])
-        Double_Cos_Model.set_param_hint(
-            'amp_1', value=amp_guess[0], min=0.05, max=0.5, vary=True)
-        Double_Cos_Model.set_param_hint(
-            'amp_2', value=amp_guess[1], min=0.05, max=0.5, vary=True)
-
-
         Double_Cos_Model.set_param_hint('osc_offset', value=0.5, min=0, max=1)
+        if (only_one_peak):
+            Double_Cos_Model.set_param_hint(
+                'tau_2', value=0, vary=False, min=0)
+            Double_Cos_Model.set_param_hint(
+                'freq_2', value=0, vary=False)
+            Double_Cos_Model.set_param_hint('phase_2', value=0, vary=False)
+            Double_Cos_Model.set_param_hint(
+                'amp_1', value=amp_guess[0], min=0.05, max=0.8, vary=True)
+            Double_Cos_Model.set_param_hint(
+                'amp_2', value=0, vary=False)
+
+        else:
+            Double_Cos_Model.set_param_hint(
+                'tau_2', value=tau_guess[1], vary=True, min=0, max=6*tau_guess[1])
+            Double_Cos_Model.set_param_hint(
+                'freq_2', value=freq_guess[1], min=0)
+            Double_Cos_Model.set_param_hint('phase_2', value=phi_guess[1])
+
+            Double_Cos_Model.set_param_hint(
+                'amp_1', value=amp_guess[0], min=0.05, max=1.1, vary=True)
+            Double_Cos_Model.set_param_hint(
+                'amp_2', value=amp_guess[1], min=0.05, max=1.1, vary=True)
+
         params = Double_Cos_Model.make_params()
         fit_res = Double_Cos_Model.fit(data=measured_values,
                                        t=sweep_values,
