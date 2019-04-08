@@ -1450,6 +1450,7 @@ class UHFQC_input_average_detector(Hard_Detector):
             self.AWG.stop()
 
 
+
 class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
     '''
     Detector used for acquiring averaged input traces withe the UHFQC.
@@ -1480,6 +1481,27 @@ class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
             ret_data = np.array([amp, phase])
 
         return ret_data
+
+
+class UHFQC_spectroscopy_detector(Soft_Detector):
+    '''
+    Detector used for the spectroscopy mode
+    '''
+    def __init__(self, UHFQC, ro_freq_mod,
+                 AWG=None, channels=(0, 1),
+                 nr_averages=1024, integration_length=4096, **kw):
+        super().__init__()
+        #UHFQC=UHFQC, AWG=AWG, channels=channels,
+                         # nr_averages=nr_averages, nr_samples=nr_samples, **kw
+        self.UHFQC = UHFQC
+        self.ro_freq_mod = ro_freq_mod
+
+    def acquire_data_point(self):
+        RESULT_LENGTH = 1600
+        vals = self.UHFQC.acquisition(samples=RESULT_LENGTH, acquisition_time=0.010, timeout=10)
+        a = max(np.abs(fft.fft(vals[0][1:int(len(RESULT_LENGTH)/2)])))
+        b = max(np.abs(fft.fft(vals[1][1:int(len(RESULT_LENGTH)/2)])))
+        return a+b
 
 
 class UHFQC_integrated_average_detector(Hard_Detector):

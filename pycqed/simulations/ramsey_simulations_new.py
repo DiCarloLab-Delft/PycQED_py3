@@ -110,7 +110,7 @@ def compute_propagator(arglist):
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
     #   Since we assume the hamiltonian to be constant on each side of the pulse, we just need two time steps
     if fluxlutman.czd_double_sided():
-        amp_final=[amp_final[0],-amp_final[0]]    # Echo-Z
+        amp_final=[amp_final[0],fluxlutman.calc_freq_to_amp(freq,positive_branch=False)]    # Echo-Z
     else:
         amp_final=[amp_final[0],amp_final[0]]     # Ram-Z
     sim_step_new=sim_step_new/2

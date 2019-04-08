@@ -236,6 +236,17 @@ def CosFunc(t, amplitude, frequency, phase, offset):
     '''
     return amplitude * np.cos(2 * np.pi * frequency * t + phase) + offset
 
+def CosFunc2(t, amplitude, frequency, phase, offset):
+    '''
+    parameters:
+        t, time in s
+        amplitude a.u.
+        frequency in Hz (f, not omega!)
+        phase in rad
+        offset a.u.
+    '''
+    return amplitude * np.cos(2 * np.pi * frequency * (t + phase)) + offset
+
 
 def ExpDecayFunc(t, tau, amplitude, offset, n):
     return amplitude * np.exp(-(t / tau) ** n) + offset
@@ -1155,6 +1166,8 @@ def sum_int(x,y):
 # A valid reason to define it here would beexp_dec_guess if you want to add a guess function
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
+CosModel2 = lmfit.Model(CosFunc2)
+
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)

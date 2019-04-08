@@ -6637,6 +6637,9 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     Possible kw parameters:
 
+        frequency_guess         (default=None)
+            manually set the initial guess for qubit frequency
+
         analyze_ef              (default=False)
             whether to look for a second peak/dip, which would be the at f_gf/2
 
@@ -6687,7 +6690,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def fit_data(self, analyze_ef=False, **kw):
 
-
+        frequency_guess = kw.get('frequency_guess', None)
         percentile = kw.get('percentile', 20)
         num_sigma_threshold = kw.get('num_sigma_threshold', 5)
         window_len_filter = kw.get('window_len_filter', 3)
@@ -6722,7 +6725,11 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                          window_len=0)
 
         # extract highest peak -> ge transition
-        if self.peaks['dip'] is None:
+        if frequency_guess is not None:
+            f0 = frequency_guess
+            kappa_guess = (max(self.sweep_points)-min(self.sweep_points))/20
+            key = 'peak'
+        elif self.peaks['dip'] is None:
             f0 = self.peaks['peak']
             kappa_guess = self.peaks['peak_width'] / 4
             key = 'peak'
@@ -7455,7 +7462,7 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, f01=None, f12=None,
                              amp_lims=[None, None], line_color='k',
-                             phase_lims=[-180, 180], **kw):
+                             **kw):
         self.get_naming_and_values_2D()
         # figsize wider for colorbar
         fig1, ax1 = self.default_ax(figsize=(8, 5))
@@ -7477,13 +7484,14 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
         # figsize wider for colorbar
         fig2, ax2 = self.default_ax(figsize=(8, 5))
         fig2_title = self.timestamp_string + self.measurementstring + '_' + 'Phase'
+        if (measured_phases>170).any() and (measured_phases<-170).any():
+            measured_phases = np.mod(measured_phases, 360)
         a_tools.color_plot(x=self.sweep_points,
                            y=self.sweep_points_2D,
                            z=measured_phases.transpose(),
                            xlabel=self.xlabel,
                            ylabel=self.ylabel,
                            zlabel=self.zlabels[1],
-                           clim=phase_lims,
                            plot_title=fig2_title,
                            fig=fig2, ax=ax2)
 
@@ -7616,6 +7624,7 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                 f0 = np.zeros(len(self.sweep_points_2D))
                 for u, power in enumerate(self.sweep_points_2D):
                     f0[u] = self.fit_results[str(power)].values['f0']
+                self.f0 = f0
                 fig, ax = self.default_ax(figsize=(8, 5))
                 self.fig_array.append(fig)
                 self.ax_array.append(ax)

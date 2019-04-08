@@ -1131,7 +1131,9 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ):
                                 'waiting_at_sweetspot': noise_parameters_CZ.waiting_at_sweetspot(),
                                 'w_q0_sweetspot': noise_parameters_CZ.w_q0_sweetspot(),
                                 'repetitions': noise_parameters_CZ.repetitions(),
-                                'time_series': noise_parameters_CZ.time_series()}
+                                'time_series': noise_parameters_CZ.time_series(),
+                                'overrotation_sims': noise_parameters_CZ.overrotation_sims(),
+                                'axis_overrotation': noise_parameters_CZ.axis_overrotation()}
 
     return fluxlutman_args, noise_parameters_CZ_args
 
@@ -1175,6 +1177,8 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     noise_parameters_CZ.w_q0_sweetspot(noise_parameters_CZ_args['w_q0_sweetspot'])
     noise_parameters_CZ.repetitions(noise_parameters_CZ_args['repetitions'])
     noise_parameters_CZ.time_series(noise_parameters_CZ_args['time_series'])
+    noise_parameters_CZ.overrotation_sims(noise_parameters_CZ_args['overrotation_sims'])
+    noise_parameters_CZ.axis_overrotation(noise_parameters_CZ_args['axis_overrotation'])
 
     return fluxlutman, noise_parameters_CZ
 
@@ -1283,6 +1287,18 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     leakage_dephased_vec=[]
     infid_dephased_vec=[]
 
+    popul_in_20=[]
+    popul_in_02=[]
+    popul_in_21from12=[]
+    popul_test=[]
+    popul_in_10from01=[]
+
+    popul_in_20_dephased=[]
+    popul_in_02_dephased=[]
+    popul_in_21from12_dephased=[]
+    popul_test_dephased=[]
+    popul_in_10from01_dephased=[]
+
     dimensions = U_superop_average.dims
 
     U_temp = U_superop_average.full()
@@ -1290,9 +1306,15 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     U_temp[38,40]=0
     U_temp[22,20]=0
     U_temp[38,20]=0
+
+    U_temp[68,70]=0             # matrix elements corresponding to the coherences between 12 and 21
+    U_temp[52,70]=0
+    U_temp[68,50]=0
+    U_temp[52,50]=0
     U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
 
-    for n in range(1,200,2):        # we consider only odd n so that in theory it should be always a CZ
+    number_CZ_repetitions=200
+    for n in range(1,number_CZ_repetitions,2):        # we consider only odd n so that in theory it should be always a CZ
         U_superop_n=U_superop_average**n
         U_superop_dephased_n = U_superop_dephased**n
         qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
@@ -1302,15 +1324,67 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
         leakage_dephased_vec.append(qoi_dephased['L1'])
         infid_dephased_vec.append(1-qoi_dephased['avgatefid_compsubspace_pc'])
 
-    plot(x_plot_vec=[np.arange(1,200,2)],
+        popul_in_20.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,1]],states_out=[[2,0]]))
+        popul_in_02.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,1]],states_out=[[0,2]]))
+        popul_in_21from12.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out=[[2,1]]))
+        popul_test.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in='compsub',states_out='leaksub'))
+        popul_in_10from01.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[0,1]],states_out=[[1,0]]))
+
+        popul_in_20_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,1]],states_out=[[2,0]]))
+        popul_in_02_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,1]],states_out=[[0,2]]))
+        popul_in_21from12_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out=[[2,1]]))
+        popul_test_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in='compsub',states_out='leaksub'))
+        popul_in_10from01_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[0,1]],states_out=[[1,0]]))
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(leakage_vec)*100,np.array(leakage_dephased_vec)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Leakage (%)',
                   legend_labels=['Using directly the $CZ$ from the simulations','Depolarizing the leakage subspace'])
 
-    print(leakage_vec)
-    print(leakage_dephased_vec)
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_in_02)*100,np.array(popul_in_02_dephased)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['11 to 02','11 to 02, dephased case'])
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_in_20)*100,np.array(popul_in_20_dephased)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['11 to 20','11 to 20, dephased case'])
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_in_21from12)*100,np.array(popul_in_21from12_dephased)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['12 to 21','12 to 21, dephased case'])
+
+    # plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+    #               #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+    #               y_plot_vec=[np.array(popul_test)*100,np.array(popul_test_dephased)*100],
+    #               title='Repeated $CZ$ gates',
+    #               xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+    #               legend_labels=['test','test, dephased case'])
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_in_10from01)*100,np.array(popul_in_10from01_dephased)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['01 to 10','01 to 10, dephased case'])
+
+    print('leakage_vec',leakage_vec)
+    print('leakage_dephased_vec',leakage_dephased_vec)
+    print('popul_in_20_from_11',popul_in_20)
+    print('popul_in_02_from_11',popul_in_02)
+    print('popul_in_21_from_12',popul_in_21from12)
+    print('popul_test',popul_test)
+    print('popul_in_10_from_01',popul_in_10from01)
 
 
 def add_waiting_at_sweetspot(tlist,amp,waiting_at_sweetspot):
@@ -1501,6 +1575,52 @@ def calc_diag_pauli_transfer_matrix(U,U_target):
                   y_plot_vec=[diag],
                   title='Diagonal of the Pauli transfer matrix',
                   xlabel='Pauli index',ylabel='Value')
+
+
+
+
+### Study of leakage
+
+def two_qutrit_state(i,j):
+    ket = qtp.tensor(qtp.ket([i], dim=[3]),
+                                   qtp.ket([j], dim=[3])) #notice it's a ket
+    rho = qtp.operator_to_vector(qtp.ket2dm(ket))
+    return rho
+
+
+def population_transfer(U_superop,state_in,state_out):
+	return np.abs((state_out.dag()*U_superop*state_in).data[0,0])
+
+
+def test_population_transfer(pop1,pop2):
+	tot=pop1+pop2
+	print(tot)
+
+
+def average_population_transfer_subspace_to_subspace(U_superop,states_in,states_out):
+
+	if states_in == 'compsub':
+		states_in = [[0,0],[0,1],[1,0],[1,1]]
+	if states_out == 'leaksub':
+		states_out = [[2,0],[0,2],[1,2],[2,1],[2,2]]
+
+	sump=0
+	for indeces_list_in in states_in:
+		state_in = two_qutrit_state(indeces_list_in[0],indeces_list_in[1])
+		for indeces_list_out in states_out:
+			state_out = two_qutrit_state(indeces_list_out[0],indeces_list_out[1])
+
+			sump += population_transfer(U_superop,state_in,state_out)
+
+	sump/=len(states_in)
+
+	return sump
+
+
+
+
+
+
 
 
 
