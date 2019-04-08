@@ -9,10 +9,14 @@ import matplotlib.pyplot as plt
 np.set_printoptions(threshold=np.inf)
 
 
+n_levels_q0 = 4
+n_levels_q1 = 3
+
+
 
 # operators
-b = qtp.tensor(qtp.destroy(3), qtp.qeye(3))  # spectator qubit
-a = qtp.tensor(qtp.qeye(3), qtp.destroy(3))  # fluxing qubit
+b = qtp.tensor(qtp.destroy(n_levels_q1), qtp.qeye(n_levels_q0))  # spectator qubit
+a = qtp.tensor(qtp.qeye(n_levels_q1), qtp.destroy(n_levels_q0))  # fluxing qubit
 n_q0 = a.dag() * a
 n_q1 = b.dag() * b
 
@@ -21,40 +25,68 @@ n_q1 = b.dag() * b
 
 # target in the case with no noise
 # note that the Hilbert space is H_q1 /otimes H_q0
-# so the ordering of basis states below is 00,01,02,10,11,12,20,21,22
-U_target = qtp.Qobj([[1, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 1, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, -1, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 1, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, -1, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 1, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 1, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 1, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 1]],
-                    type='oper',
-                    dims=[[3, 3], [3, 3]])
+# E.g. for two qutrits the ordering of basis states is 00,01,02,10,11,12,20,21,22
+def target_CZ():
+    U_target = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0))
+    state11 = basis_state(1,1,to_vector=False)
+    state02 = basis_state(0,2,to_vector=False)
+    U_target = U_target - 2*state11*state_11.dag()
+    U_target = U_target - 2*state02*state_02.dag()
+    return U_target
 
-U_target_diffdims = qtp.Qobj([[1, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 1, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, -1, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 1, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, -1, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 1, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 1, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 1, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 1]],
-                    type='oper',
-                    dims=[[9], [9]])     # otherwise average_gate_fidelity doesn't work
+U_target = target_CZ()
+
+U_target_diffdims = target_CZ()     # otherwise average_gate_fidelity doesn't work
+U_target_diffdims.dims = [[n_levels_q0*n_levels_q1],[n_levels_q0*n_levels_q1]]
 
 
 '''
 remember that qutip uses the Liouville (matrix) representation for superoperators,
 with column stacking.
-This means that 
+E.g. for qutrits this means that 
 rho_{xy,x'y'}=rho[3*x+y,3*x'+y']
 rho_{xy,x'y'}=operator_to_vector(rho)[3*x+y+27*x'+9*y']
 where xy is the row and x'y' is the column
 '''
+def index_in_ket(indeces):
+    x = indeces[0]
+    y = indeces[1]
+    return n_levels_q0*x+y
+
+def index_in_vector_of_dm_matrix_element(ket_indeces,bra_indeces):
+    x = ket_indeces[0]
+    y = ket_indeces[1]
+    x_prime = bra_indeces[0]
+    y_prime = bra_indeces[1]
+    return x*n_levels_q0 + y + x_prime*n_levels_q0**2*n_levels_q1 + y_prime
+
+
+
+def list_of_vector_indeces(subspace):
+    full_list = []
+    for i in range(0,n_levels_q1):
+        for j in range(0,n_levels_q0):
+            full_list.append([i,j])
+    compsub_list = []
+    for i in range(0,2):
+        for j in range(0,2):
+            compsub_list.append([i,j])
+
+    if subspace == 'leaksub':
+        return_list=full_list
+        for elem in compsub_list:
+            return_list.remove(elem)
+
+    if subspace = 'compsub':
+        return_list=compsub_list
+
+    if subspace == 'all':
+        return_list=full_list
+
+    return return_list
+
+
+
 
 
 hadamard_singleq = qtp.Qobj([[1,1,0],
@@ -63,20 +95,23 @@ hadamard_singleq = qtp.Qobj([[1,1,0],
 hadamard_q0 = qtp.tensor(qtp.qeye(3),hadamard_singleq)
 
 def qubit_to_2qutrit_unitary(U_2q,right_or_left):
-    # Transforms a unitary for a qubit into a unitary for a two-qutrit system.
+    # Transforms a unitary for a qubit into a unitary for a two-qudit system (possibly different qudits).
     # right_or_left ('right' or 'left') specifies whether U_2q acts on QR or QL
-    U_temp = np.zeros([3,3],dtype=complex)
-    U_temp[2,2]=1
+    if right_or_left == 'right':
+        d = n_levels_q0
+    elif right_or_left == 'left':
+        d = n_levels_q1
+    U_temp = qtp.qeye(d).full()
     U_2q_matrix=U_2q.full()
     for i in range(np.size(U_2q_matrix,axis=0)):
         for j in range(np.size(U_2q_matrix,axis=1)):
             U_temp[i,j]=U_2q_matrix[i,j]
-    U_temp=qtp.Qobj(U_temp,type='oper',dims=[[3],[3]])
+    U_temp=qtp.Qobj(U_temp,type='oper',dims=[[d],[d]])
             
     if right_or_left == 'right':
-        return qtp.tensor(qtp.qeye(3),U_temp)
+        return qtp.tensor(qtp.qeye(n_levels_q1),U_temp)
     elif right_or_left == 'left':
-        return qtp.tensor(U_temp,qtp.qeye(3))
+        return qtp.tensor(U_temp,qtp.qeye(n_levels_q0))
 
 
 def bloch_sphere_rotation(angle, unit_vector):
@@ -261,21 +296,42 @@ def phases_from_superoperator(U):
     Returns the phases from the unitary or superoperator U
     """
     if U.type=='oper':
-        phi_00 = np.rad2deg(np.angle(U[0, 0]))  # expected to equal 0 because of our
+        index_00=index_in_ket([0,0])
+        phi_00 = np.rad2deg(np.angle(U[index_00, index_00]))  # expected to equal 0 because of our
                                                 # choice for the energy, not because of rotating frame. But not guaranteed including the coupling
-        phi_01 = np.rad2deg(np.angle(U[1, 1]))
-        phi_10 = np.rad2deg(np.angle(U[3, 3]))
-        phi_11 = np.rad2deg(np.angle(U[4, 4]))
-        phi_02 = np.rad2deg(np.angle(U[2, 2]))  # used only for avgatefid_superoperator_phasecorrected
-        phi_20 = np.rad2deg(np.angle(U[6, 6]))  # used only for avgatefid_superoperator_phasecorrected
+
+        index_01=index_in_ket([0,1])
+        phi_01 = np.rad2deg(np.angle(U[index_01, index_01]))
+
+        index_10=index_in_ket([1,0])
+        phi_10 = np.rad2deg(np.angle(U[index_10, index_10]))
+
+        index_11=index_in_ket([1,1])
+        phi_11 = np.rad2deg(np.angle(U[index_11, index_11]))
+
+        index_02=index_in_ket([0,2])
+        phi_02 = np.rad2deg(np.angle(U[index_02, index_02]))  # used only for avgatefid_superoperator_phasecorrected
+
+        index_20=index_in_ket([2,0])
+        phi_20 = np.rad2deg(np.angle(U[index_20, index_20]))  # used only for avgatefid_superoperator_phasecorrected
 
     elif U.type=='super':
         phi_00 = 0   # we set it to 0 arbitrarily but it is indeed not knowable
-        phi_01 = np.rad2deg(np.angle(U[1, 1]))   # actually phi_01-phi_00 etc
-        phi_10 = np.rad2deg(np.angle(U[3, 3]))
-        phi_11 = np.rad2deg(np.angle(U[4, 4]))
-        phi_02 = np.rad2deg(np.angle(U[2, 2]))
-        phi_20 = np.rad2deg(np.angle(U[6, 6]))
+        index_01=index_in_vector_of_dm_matrix_element([0,1],[0,0])
+        phi_01 = np.rad2deg(np.angle(U[index_01, index_01]))   # actually phi_01-phi_00 etc
+
+        index_10=index_in_vector_of_dm_matrix_element([1,0],[0,0])
+        phi_10 = np.rad2deg(np.angle(U[index_10, index_10]))
+
+        index_11=index_in_vector_of_dm_matrix_element([1,1],[0,0])
+        phi_11 = np.rad2deg(np.angle(U[index_11, index_11]))
+
+        index_02=index_in_vector_of_dm_matrix_element([0,2],[0,0])
+        phi_02 = np.rad2deg(np.angle(U[index_02, index_02]))
+
+        index_20=index_in_vector_of_dm_matrix_element([2,0],[0,0])
+        phi_20 = np.rad2deg(np.angle(U[index_20, index_20]))
+
 
     phi_cond = (phi_11 - phi_01 - phi_10 + phi_00) % 360  # still the right formula independently from phi_00
 
@@ -295,10 +351,10 @@ def leakage_from_superoperator(U):
         sump = 0
         for i in range(4):
             for j in range(4):
-                bra_i = qtp.tensor(qtp.ket([i//2], dim=[3]),
-                                   qtp.ket([i % 2], dim=[3])).dag()
-                ket_j = qtp.tensor(qtp.ket([j//2], dim=[3]),
-                                   qtp.ket([j % 2], dim=[3]))
+                bra_i = qtp.tensor(qtp.ket([i//2], dim=[n_levels_q1]),
+                                   qtp.ket([i % 2], dim=[n_levels_q0])).dag()
+                ket_j = qtp.tensor(qtp.ket([j//2], dim=[n_levels_q1]),
+                                   qtp.ket([j % 2], dim=[n_levels_q0]))
                 p = np.abs((bra_i*U*ket_j).data[0, 0])**2
                 sump += p
         sump /= 4  # divide by dimension of comp subspace
@@ -317,11 +373,11 @@ def leakage_from_superoperator(U):
         sump = 0
         for i in range(4):
             for j in range(4):
-                ket_i = qtp.tensor(qtp.ket([i//2], dim=[3]),
-                                   qtp.ket([i % 2], dim=[3])) #notice it's a ket
+                ket_i = qtp.tensor(qtp.ket([i//2], dim=[n_levels_q1]),
+                                   qtp.ket([i % 2], dim=[n_levels_q0])) #notice it's a ket
                 rho_i=qtp.operator_to_vector(qtp.ket2dm(ket_i))
-                ket_j = qtp.tensor(qtp.ket([j//2], dim=[3]),
-                                   qtp.ket([j % 2], dim=[3]))
+                ket_j = qtp.tensor(qtp.ket([j//2], dim=[n_levels_q1]),
+                                   qtp.ket([j % 2], dim=[n_levels_q0]))
                 rho_j=qtp.operator_to_vector(qtp.ket2dm(ket_j))
                 p = (rho_i.dag()*U*rho_j).data[0, 0]
                 sump += p
@@ -342,30 +398,30 @@ def seepage_from_superoperator(U):
     """
     if U.type=='oper':
         sump = 0
-        for i_list in [[0,2],[1,2],[2,0],[2,1],[2,2]]:
-            for j_list in [[0,2],[1,2],[2,0],[2,1],[2,2]]:
-                bra_i = qtp.tensor(qtp.ket([i_list[0]], dim=[3]),
-                                   qtp.ket([i_list[1]], dim=[3])).dag()
-                ket_j = qtp.tensor(qtp.ket([j_list[0]], dim=[3]),
-                                   qtp.ket([j_list[1]], dim=[3]))
+        for i_list in list_of_vector_indeces('leaksub'):
+            for j_list in list_of_vector_indeces('leaksub'):
+                bra_i = qtp.tensor(qtp.ket([i_list[0]], dim=[n_levels_q1]),
+                                   qtp.ket([i_list[1]], dim=[n_levels_q0])).dag()
+                ket_j = qtp.tensor(qtp.ket([j_list[0]], dim=[n_levels_q1]),
+                                   qtp.ket([j_list[1]], dim=[n_levels_q0]))
                 p = np.abs((bra_i*U*ket_j).data[0, 0])**2
                 sump += p
-        sump /= 5  # divide by number of non-computational states
+        sump /= n_levels_q1*n_levels_q0-4  # divide by number of non-computational states
         L1 = 1-sump
         return np.real(L1)
     elif U.type=='super':
         sump = 0
-        for i_list in [[0,2],[1,2],[2,0],[2,1],[2,2]]:
-            for j_list in [[0,2],[1,2],[2,0],[2,1],[2,2]]:
-                ket_i = qtp.tensor(qtp.ket([i_list[0]], dim=[3]),
-                                   qtp.ket([i_list[1]], dim=[3]))
+        for i_list in list_of_vector_indeces('leaksub'):
+            for j_list in list_of_vector_indeces('leaksub'):
+                ket_i = qtp.tensor(qtp.ket([i_list[0]], dim=[n_levels_q1]),
+                                   qtp.ket([i_list[1]], dim=[n_levels_q0]))
                 rho_i=qtp.operator_to_vector(qtp.ket2dm(ket_i))
-                ket_j = qtp.tensor(qtp.ket([j_list[0]], dim=[3]),
-                                   qtp.ket([j_list[1]], dim=[3]))
+                ket_j = qtp.tensor(qtp.ket([j_list[0]], dim=[n_levels_q1]),
+                                   qtp.ket([j_list[1]], dim=[n_levels_q0]))
                 rho_j=qtp.operator_to_vector(qtp.ket2dm(ket_j))
                 p = (rho_i.dag()*U*rho_j).data[0, 0]
                 sump += p
-        sump /= 5  # divide by number of non-computational states
+        sump /= n_levels_q1*n_levels_q0-4  # divide by number of non-computational states
         sump=np.real(sump)
         L1 = 1-sump
         return L1
@@ -384,10 +440,10 @@ def calc_population_02_state(U):
         sump = 0
         for i_list in [[0,2]]:
             for j_list in [[1,1]]:
-                bra_i = qtp.tensor(qtp.ket([i_list[0]], dim=[3]),
-                                   qtp.ket([i_list[1]], dim=[3])).dag()
-                ket_j = qtp.tensor(qtp.ket([j_list[0]], dim=[3]),
-                                   qtp.ket([j_list[1]], dim=[3]))
+                bra_i = qtp.tensor(qtp.ket([i_list[0]], dim=[n_levels_q1]),
+                                   qtp.ket([i_list[1]], dim=[n_levels_q0])).dag()
+                ket_j = qtp.tensor(qtp.ket([j_list[0]], dim=[n_levels_q1]),
+                                   qtp.ket([j_list[1]], dim=[n_levels_q0]))
                 p = np.abs((bra_i*U*ket_j).data[0, 0])**2
                 sump += p
         return np.real(sump)
@@ -395,11 +451,11 @@ def calc_population_02_state(U):
         sump = 0
         for i_list in [[0,2]]:
             for j_list in [[1,1]]:
-                ket_i = qtp.tensor(qtp.ket([i_list[0]], dim=[3]),
-                                   qtp.ket([i_list[1]], dim=[3]))
+                ket_i = qtp.tensor(qtp.ket([i_list[0]], dim=[n_levels_q1]),
+                                   qtp.ket([i_list[1]], dim=[n_levels_q0]))
                 rho_i=qtp.operator_to_vector(qtp.ket2dm(ket_i))
-                ket_j = qtp.tensor(qtp.ket([j_list[0]], dim=[3]),
-                                   qtp.ket([j_list[1]], dim=[3]))
+                ket_j = qtp.tensor(qtp.ket([j_list[0]], dim=[n_levels_q1]),
+                                   qtp.ket([j_list[1]], dim=[n_levels_q0]))
                 rho_j=qtp.operator_to_vector(qtp.ket2dm(ket_j))
                 p = (rho_i.dag()*U*rho_j).data[0, 0]
                 sump += p
@@ -417,7 +473,7 @@ def pro_avfid_superoperator_compsubspace(U,L1):
 
     if U.type=='oper':
         inner = U.dag()*U_target
-        part_idx = [0, 1, 3, 4]  # only computational subspace
+        part_idx = [index_in_ket([0,0]), index_in_ket([0,1]), index_in_ket([1,0]), index_in_ket([1,1])]  # only computational subspace
         ptrace = 0
         for i in part_idx:
             ptrace += inner[i, i]
@@ -428,7 +484,7 @@ def pro_avfid_superoperator_compsubspace(U,L1):
     elif U.type=='super':
         kraus_form = qtp.to_kraus(U)
         dim=4 # 2 qubits in the computational subspace
-        part_idx = [0, 1, 3, 4]  # only computational subspace
+        part_idx = [index_in_ket([0,0]), index_in_ket([0,1]), index_in_ket([1,0]), index_in_ket([1,1])]  # only computational subspace
         psum=0
         for A_k in kraus_form:
             ptrace = 0
@@ -450,22 +506,24 @@ def pro_avfid_superoperator_compsubspace_phasecorrected(U,L1,phases):
             If this is not the case, one need to change the basis to that one, before calling this function.
     """
 
-    Ucorrection = qtp.Qobj([[np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, np.exp(-1j*np.deg2rad(phases[1])), 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[3]-phases[-1])), 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[1])), 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0]))]],
-                    type='oper',
-                    dims=[[3, 3], [3, 3]])
+    # Ucorrection = qtp.Qobj([[np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0, 0],
+    #                  [0, np.exp(-1j*np.deg2rad(phases[1])), 0, 0, 0, 0, 0, 0, 0],
+    #                  [0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0],
+    #                  [0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0, 0],
+    #                  [0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[3]-phases[-1])), 0, 0, 0, 0],
+    #                  [0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0],
+    #                  [0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0],
+    #                  [0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[1])), 0],
+    #                  [0, 0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0]))]],
+    #                 type='oper',
+    #                 dims=[[3, 3], [3, 3]])
+
+    Ucorrection = phase_correction_U(U,states_to_fix=[[0,1],[1,0]])
 
     if U.type=='oper':
         U=Ucorrection*U
         inner = U.dag()*U_target
-        part_idx = [0, 1, 3, 4]  # only computational subspace
+        part_idx = [index_in_ket([0,0]), index_in_ket([0,1]), index_in_ket([1,0]), index_in_ket([1,1])]  # only computational subspace
         ptrace = 0
         for i in part_idx:
             ptrace += inner[i, i]
@@ -477,7 +535,7 @@ def pro_avfid_superoperator_compsubspace_phasecorrected(U,L1,phases):
         U=qtp.to_super(Ucorrection)*U
         kraus_form = qtp.to_kraus(U)
         dim=4 # 2 qubits in the computational subspace
-        part_idx = [0, 1, 3, 4]  # only computational subspace
+        part_idx = [index_in_ket([0,0]), index_in_ket([0,1]), index_in_ket([1,0]), index_in_ket([1,1])]  # only computational subspace
         psum=0
         for A_k in kraus_form:
             ptrace = 0
@@ -502,22 +560,24 @@ def pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U,L1,pha
             If this is not the case, one need to change the basis to that one, before calling this function.
     """
 
-    Ucorrection = qtp.Qobj([[np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0]))]],
-                    type='oper',
-                    dims=[[3, 3], [3, 3]])
+    # Ucorrection = qtp.Qobj([[np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0, 0],
+    #                  [0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0],
+    #                  [0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0],
+    #                  [0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0, 0],
+    #                  [0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0],
+    #                  [0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0],
+    #                  [0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0],
+    #                  [0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0],
+    #                  [0, 0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0]))]],
+    #                 type='oper',
+    #                 dims=[[3, 3], [3, 3]])
+
+    Ucorrection = phase_correction_U(U,states_to_fix=[[1,0]])
 
     if U.type=='oper':
         U=Ucorrection*U
         inner = U.dag()*U_target
-        part_idx = [0, 1, 3, 4]  # only computational subspace
+        part_idx = [index_in_ket([0,0]), index_in_ket([0,1]), index_in_ket([1,0]), index_in_ket([1,1])]  # only computational subspace
         ptrace = 0
         for i in part_idx:
             ptrace += inner[i, i]
@@ -529,7 +589,7 @@ def pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U,L1,pha
         U=qtp.to_super(Ucorrection)*U
         kraus_form = qtp.to_kraus(U)
         dim=4 # 2 qubits in the computational subspace
-        part_idx = [0, 1, 3, 4]  # only computational subspace
+        part_idx = [index_in_ket([0,0]), index_in_ket([0,1]), index_in_ket([1,0]), index_in_ket([1,1])]  # only computational subspace
         psum=0
         for A_k in kraus_form:
             ptrace = 0
@@ -550,7 +610,7 @@ def pro_avfid_superoperator(U):
     """
     if U.type=='oper':
         ptrace = np.abs((U.dag()*U_target).tr())**2
-        dim = 9  # dimension of the whole space
+        dim = n_levels_q1*n_levels_q0  # dimension of the whole space
         return np.real((ptrace+dim)/(dim*(dim+1)))
 
     elif U.type=='super':
@@ -566,22 +626,24 @@ def pro_avfid_superoperator_phasecorrected(U,phases):
             If this is not the case, one need to change the basis to that one, before calling this function.
     This function is quite useless because we are always interested in the computational subspace only.
     """
-    Ucorrection = qtp.Qobj([[np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, np.exp(-1j*np.deg2rad(phases[1])), 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, np.exp(-1j*np.deg2rad(phases[4]-phases[-1])), 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[3]-phases[-1])), 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[4]-phases[-1]+phases[2]-phases[0])), 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[5])), 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[5]+phases[1]-phases[0])), 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[4]-phases[-1]+phases[5]-phases[0]))]],
-                    type='oper',
-                    dims=[[3, 3], [3, 3]])
+    # Ucorrection = qtp.Qobj([[np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0, 0],
+    #                  [0, np.exp(-1j*np.deg2rad(phases[1])), 0, 0, 0, 0, 0, 0, 0],
+    #                  [0, 0, np.exp(-1j*np.deg2rad(phases[4]-phases[-1])), 0, 0, 0, 0, 0, 0],
+    #                  [0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0, 0],
+    #                  [0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[3]-phases[-1])), 0, 0, 0, 0],
+    #                  [0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[4]-phases[-1]+phases[2]-phases[0])), 0, 0, 0],
+    #                  [0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[5])), 0, 0],
+    #                  [0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[5]+phases[1]-phases[0])), 0],
+    #                  [0, 0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[4]-phases[-1]+phases[5]-phases[0]))]],
+    #                 type='oper',
+    #                 dims=[[3, 3], [3, 3]])
+
+    phase_correction_U(U,states_to_fix=[[0,1],[1,0],[2,0],[0,2]])
 
     if U.type=='oper':
         U=Ucorrection*U
         ptrace = np.abs((U.dag()*U_target).tr())**2
-        dim = 9  # dimension of the whole space
+        dim = n_levels_q1*n_levels_q0  # dimension of the whole space
         return np.real((ptrace+dim)/(dim*(dim+1)))
 
     elif U.type=='super':
@@ -1428,6 +1490,36 @@ def correct_phases(U):
     return U
 
 
+def phase_correction_U(U,states_to_fix):
+
+    phases=phases_from_superoperator(U)
+    
+    Ucorrection = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0))
+
+    for state in states_to_fix:
+
+        if state == [0,1]:
+            corr = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0)) + \
+                    (np.exp(-1j*np.deg2rad(phases[1]))-1) * qtp.tensor(qtp.qeye(n_levels_q1), qtp.ket2dm(qtp.ket([1],[n_levels_q0])))
+
+        if state == [1,0]:
+            corr = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0)) + \
+                    (np.exp(-1j*np.deg2rad(phases[2]))-1) * qtp.tensor(qtp.ket2dm(qtp.ket([1],[n_levels_q1])), qtp.qeye(n_levels_q0))
+
+        if state == [0,2]:                      # !!!! correction for this state is currently wrong because it kills the conditional phase of 02
+            corr = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0)) + \
+                    (np.exp(-1j*np.deg2rad(phases[4]))-1) * qtp.ket2dm(basis_state(0,2,to_vector=False))
+
+        if state == [2,0]:
+            corr = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0)) + \
+                    (np.exp(-1j*np.deg2rad(phases[5]))-1) * qtp.ket2dm(basis_state(2,0,to_vector=False))
+
+        Ucorrection = corr*Ucorrection
+
+    return Ucorrection
+
+
+
 def compute_sweetspot_frequency(polycoeff,freq_at_0_amp):
     return polycoeff[1]**2/2/polycoeff[0]-polycoeff[2]+freq_at_0_amp
 
@@ -1581,10 +1673,13 @@ def calc_diag_pauli_transfer_matrix(U,U_target):
 
 ### Study of leakage
 
-def two_qutrit_state(i,j):
-    ket = qtp.tensor(qtp.ket([i], dim=[3]),
-                                   qtp.ket([j], dim=[3])) #notice it's a ket
-    rho = qtp.operator_to_vector(qtp.ket2dm(ket))
+def basis_state(i,j,to_vector=True):
+    ket = qtp.tensor(qtp.ket([i], dim=[n_levels_q1]),
+                                   qtp.ket([j], dim=[n_levels_q0])) #notice it's a ket
+    if to_vector:
+        rho = qtp.operator_to_vector(qtp.ket2dm(ket))
+    else:
+        rho=ket
     return rho
 
 
@@ -1608,9 +1703,9 @@ def average_population_transfer_subspace_to_subspace(U_superop,states_in,states_
 
 	sump=0
 	for indeces_list_in in states_in:
-		state_in = two_qutrit_state(indeces_list_in[0],indeces_list_in[1])
+		state_in = basis_state(indeces_list_in[0],indeces_list_in[1])
 		for indeces_list_out in states_out:
-			state_out = two_qutrit_state(indeces_list_out[0],indeces_list_out[1])
+			state_out = basis_state(indeces_list_out[0],indeces_list_out[1])
 
 			sump += population_transfer(U_superop,state_in,state_out)
 

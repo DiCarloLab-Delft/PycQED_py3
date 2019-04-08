@@ -446,8 +446,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
-            population_transfer_12_21 = czf.population_transfer(U_superop_average,czf.two_qutrit_state(1,2),czf.two_qutrit_state(2,1))
-            #czf.test_population_transfer(population_transfer_12_21,czf.population_transfer(U_superop_average,czf.two_qutrit_state(1,2),czf.two_qutrit_state(1,2)))
+            population_transfer_12_21 = czf.population_transfer(U_superop_average,czf.basis_state(1,2),czf.basis_state(2,1))
+            #czf.test_population_transfer(population_transfer_12_21,czf.population_transfer(U_superop_average,czf.basis_state(1,2),czf.basis_state(1,2)))
 
             if self.noise_parameters_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
                                                                                         # then we optimize the search via higher-order cost function
