@@ -447,10 +447,31 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._realtime_w0 = w0
         self._realtime_w1 = w1
 
+        # Checked and everything matches
+        #print(self)
+        #print(hex(id(self)))
+        #print(self._dev)
+        #print(hex(id(self._dev)))
+
         c = np.vstack((w0, w1)).reshape((-2,), order='F')
+        self._dev.seti('awgs/{}/enable'.format(awg_nr), 0)
+        self._dev.subs('awgs/{}/ready'.format(awg_nr))
         self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
-        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
-        self._dev.seti('awgs/{}/enable'.format(awg_nr), wf_nr)
+        #self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
+        # Try as float32 instead
+        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c.astype(np.float32))
+
+        data = self._dev.poll()
+        t0 = time.time()
+        while not data: 
+            data = self._dev.poll()
+            if time.time()-t0> self.timeout(): 
+                raise TimeoutError
+        self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
+        self._dev.seti('awgs/{}/enable'.format(awg_nr), 1)
+
+
+
 
     def upload_codeword_program(self, awgs=np.arange(4)):
         """
