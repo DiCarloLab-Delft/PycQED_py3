@@ -230,7 +230,7 @@ class UHFQC(Instrument):
 
         # Configure the codeword protocol
         if self.DIO:
-            self.awgs_0_dio_strobe_index(31)
+            self.awgs_0_dio_strobe_index(15) # 15 for QCC, 31 for CCL 
             self.awgs_0_dio_strobe_slope(1)  # rising edge
             self.awgs_0_dio_valid_index(16)
             self.awgs_0_dio_valid_polarity(2)  # high polarity
