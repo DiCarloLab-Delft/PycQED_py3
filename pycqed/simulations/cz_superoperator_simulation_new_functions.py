@@ -67,7 +67,7 @@ def index_in_vector_of_dm_matrix_element(ket_indeces,bra_indeces):
     y = ket_indeces[1]
     x_prime = bra_indeces[0]
     y_prime = bra_indeces[1]
-    return x*n_levels_q0 + y + x_prime*n_levels_q0**2*n_levels_q1 + y_prime
+    return x*n_levels_q0 + y + x_prime*n_levels_q0**2*n_levels_q1 + y_prime*n_levels_q0*n_levels_q1
 
 
 
@@ -695,6 +695,8 @@ def offset_difference_and_missing_fraction(U):
             population_in_0_q1 = U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]+ \
                                 U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,1],[0,1])]+\
                                 U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,2],[0,2])]
+            if n_levels_q0 == 4:
+                population_in_0_q1 += U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,3],[0,3])]
             population_in_0_q1=np.real(population_in_0_q1)
 
             if not pi_pulse:
