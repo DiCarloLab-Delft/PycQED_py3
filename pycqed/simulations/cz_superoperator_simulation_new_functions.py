@@ -1404,6 +1404,15 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     U_temp[index_in_vector_of_dm_matrix_element([2,1],[1,2]),index_in_vector_of_dm_matrix_element([2,1],[2,1])]=0
     U_temp[index_in_vector_of_dm_matrix_element([1,2],[2,1]),index_in_vector_of_dm_matrix_element([1,2],[1,2])]=0
     U_temp[index_in_vector_of_dm_matrix_element([2,1],[1,2]),index_in_vector_of_dm_matrix_element([1,2],[1,2])]=0
+
+    if n_levels_q0 >= 4:
+        popul_in_03from12=[]
+        popul_in_03from12_dephased=[]
+        U_temp[index_in_vector_of_dm_matrix_element([1,2],[2,1]),index_in_vector_of_dm_matrix_element([0,3],[0,3])]=0             # matrix elements corresponding to the coherences between 12 and 03
+        U_temp[index_in_vector_of_dm_matrix_element([0,3],[1,2]),index_in_vector_of_dm_matrix_element([0,3],[0,3])]=0
+        U_temp[index_in_vector_of_dm_matrix_element([1,2],[0,3]),index_in_vector_of_dm_matrix_element([1,2],[1,2])]=0
+        U_temp[index_in_vector_of_dm_matrix_element([0,3],[1,2]),index_in_vector_of_dm_matrix_element([1,2],[1,2])]=0
+
     U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
 
     number_CZ_repetitions=200
@@ -1428,6 +1437,11 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
         popul_in_21from12_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out=[[2,1]]))
         popul_test_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in='compsub',states_out='leaksub'))
         popul_in_10from01_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[0,1]],states_out=[[1,0]]))
+
+        if n_levels_q0 >= 4:
+            popul_in_03from12.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out=[[0,3]]))
+            popul_in_03from12_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out=[[0,3]]))
+
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
@@ -1457,6 +1471,14 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['12 to 21','12 to 21, dephased case'])
 
+    if n_levels_q0 >= 4:
+        plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_in_03from12)*100,np.array(popul_in_03from12_dephased)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['12 to 03','12 to 03, dephased case'])
+
     # plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
     #               #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
     #               y_plot_vec=[np.array(popul_test)*100,np.array(popul_test_dephased)*100],
@@ -1470,6 +1492,7 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['01 to 10','01 to 10, dephased case'])
+
 
     print('leakage_vec',leakage_vec)
     print('leakage_dephased_vec',leakage_dephased_vec)
