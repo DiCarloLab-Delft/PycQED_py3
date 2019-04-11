@@ -243,6 +243,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
     if T1_q1 != 0:
         c_ops.append(np.sqrt(1/T1_q1)*b)
 
+
     rescaling_of_Tphi_02 = 2
     if rescaling_of_Tphi_02==2:
         rate_01_scaling = 4/9
@@ -255,47 +256,58 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
     else:
         logging.warning('Unsupported rescaling of Tphi_02.')
 
+
     if Tphi01_q1 != 0:                                 
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,-1,0],
                                     [0,0,0]])
-        collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
+        collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(n_levels_q0))
         c_ops.append(collapse*np.sqrt(rate_01_scaling/(2*Tphi01_q1)))
 
         Tphi12_q1=Tphi01_q1
         sigmaZinqutrit = qtp.Qobj([[0,0,0],
                                     [0,1,0],
                                     [0,0,-1]])
-        collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
+        collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(n_levels_q0))
         c_ops.append(collapse*np.sqrt(rate_12_scaling/(2*Tphi12_q1)))
 
         Tphi02_q1=Tphi01_q1
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,0,0],
                                     [0,0,-1]])
-        collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
+        collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(n_levels_q0))
         c_ops.append(collapse*np.sqrt(rate_02_scaling/(2*Tphi02_q1)))
 
-    if Tphi01_q0_vec != []:                                 
-        sigmaZinqutrit = qtp.Qobj([[1,0,0],
-                                    [0,-1,0],
-                                    [0,0,0]])
-        collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
-        c_ops.append([collapse,np.sqrt(rate_01_scaling/(2*Tphi01_q0_vec))])
 
-        Tphi12_q0_vec=Tphi01_q0_vec
-        sigmaZinqutrit = qtp.Qobj([[0,0,0],
-                                    [0,1,0],
-                                    [0,0,-1]])
-        collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
-        c_ops.append([collapse,np.sqrt(rate_12_scaling/(2*Tphi12_q0_vec))])
+    if n_levels_q0 == 3:
 
-        Tphi02_q0_vec=Tphi01_q0_vec
-        sigmaZinqutrit = qtp.Qobj([[1,0,0],
-                                    [0,0,0],
-                                    [0,0,-1]])
-        collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
-        c_ops.append([collapse,np.sqrt(rate_02_scaling/(2*Tphi02_q0_vec))])
+        if Tphi01_q0_vec != []:                                 
+            sigmaZinqutrit = qtp.Qobj([[1,0,0],
+                                        [0,-1,0],
+                                        [0,0,0]])
+            collapse=qtp.tensor(qtp.qeye(n_levels_q1),sigmaZinqutrit)
+            c_ops.append([collapse,np.sqrt(rate_01_scaling/(2*Tphi01_q0_vec))])
+
+            Tphi12_q0_vec=Tphi01_q0_vec
+            sigmaZinqutrit = qtp.Qobj([[0,0,0],
+                                        [0,1,0],
+                                        [0,0,-1]])
+            collapse=qtp.tensor(qtp.qeye(n_levels_q1),sigmaZinqutrit)
+            c_ops.append([collapse,np.sqrt(rate_12_scaling/(2*Tphi12_q0_vec))])
+
+            Tphi02_q0_vec=Tphi01_q0_vec
+            sigmaZinqutrit = qtp.Qobj([[1,0,0],
+                                        [0,0,0],
+                                        [0,0,-1]])
+            collapse=qtp.tensor(qtp.qeye(n_levels_q1),sigmaZinqutrit)
+            c_ops.append([collapse,np.sqrt(rate_02_scaling/(2*Tphi02_q0_vec))])
+
+    elif n_levels_q0 >= 4:
+
+        if Tphi01_q0_vec != []:
+
+            dephasing_op_q0 = a.dag()*a
+            c_ops.append([dephasing_op_q0,np.sqrt(2/Tphi01_q0_vec)])
 
     return c_ops
 
