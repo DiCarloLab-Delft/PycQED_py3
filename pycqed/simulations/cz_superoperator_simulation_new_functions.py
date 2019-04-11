@@ -693,15 +693,15 @@ def offset_difference_and_missing_fraction(U):
             U_tot = post_operations * U * pre_operations
 
             population_in_0_q0 = U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]+ \
-                                U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([1,0],[1,0])]+\
-                                U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([2,0],[2,0])]
+                                 U_tot[index_in_vector_of_dm_matrix_element([1,0],[1,0]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]+\
+                                 U_tot[index_in_vector_of_dm_matrix_element([2,0],[2,0]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]
             population_in_0_q0=np.real(population_in_0_q0)
 
             population_in_0_q1 = U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]+ \
-                                U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,1],[0,1])]+\
-                                U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,2],[0,2])]
+                                 U_tot[index_in_vector_of_dm_matrix_element([0,1],[0,1]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]+\
+                                 U_tot[index_in_vector_of_dm_matrix_element([0,2],[0,2]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]
             if n_levels_q0 == 4:
-                population_in_0_q1 += U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,3],[0,3])]
+                population_in_0_q1 += U_tot[index_in_vector_of_dm_matrix_element([0,3],[0,3]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]
             population_in_0_q1=np.real(population_in_0_q1)
 
             if not pi_pulse:
@@ -948,7 +948,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
     L2 = seepage_from_superoperator(U_final)
     avgatefid = pro_avfid_superoperator_phasecorrected(U_final,phases)
     avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)     # leakage has to be taken into account, see Woods & Gambetta
-    coherent_leakage11 = np.abs(U_final[index_in_vector_of_dm_matrix_element([1,1],[1,1]),index_in_vector_of_dm_matrix_element([1,1],[0,2])])
+    coherent_leakage11 = np.abs(U_final[index_in_vector_of_dm_matrix_element([1,1],[0,2]),index_in_vector_of_dm_matrix_element([1,1],[1,1])])
     #print('avgatefid_compsubspace',avgatefid_compsubspace)
     offset_difference, missing_fraction = offset_difference_and_missing_fraction(U_final)
 
@@ -1587,7 +1587,7 @@ def calc_populations(U):
     elif U.type == 'super':
         U_pi2_pulsed = qtp.to_super(hadamard_q0) * U * qtp.to_super(hadamard_q0)
         populations = {'population_lower_state': np.real(U_pi2_pulsed[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]),
-                       'population_higher_state': np.real(U_pi2_pulsed[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,0],[0,1])])}
+                       'population_higher_state': np.real(U_pi2_pulsed[index_in_vector_of_dm_matrix_element([0,0],[0,1]),index_in_vector_of_dm_matrix_element([0,0],[0,0])])}
 
     return populations
 
