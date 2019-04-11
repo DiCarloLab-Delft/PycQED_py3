@@ -96,13 +96,6 @@ def list_of_vector_indeces(subspace):
 
 
 
-
-
-hadamard_singleq = qtp.Qobj([[1,1,0],
-                                    [1,-1,0],
-                                    [0,0,1]])/np.sqrt(2)
-hadamard_q0 = qtp.tensor(qtp.qeye(3),hadamard_singleq)
-
 def qubit_to_2qutrit_unitary(U_2q,right_or_left):
     # Transforms a unitary for a qubit into a unitary for a two-qudit system (possibly different qudits).
     # right_or_left ('right' or 'left') specifies whether U_2q acts on QR or QL
@@ -902,8 +895,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
         print('operating frequency of q1 should be lower than its sweet spot frequency.')
         w_q1 = w_q1_sweetspot
 
-    w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(
-        f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
+    w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
 
     fluxlutman.q_freq_10(w_q1_biased)     # we insert the change to w_q1 in this way because then J1 is also tuned appropriately
 
@@ -1129,7 +1121,7 @@ def verify_phicond(U):          # benchmark to check that cond phase is computed
         U=qtp.to_super(U)
     def calc_phi(U,list):
         # lists of 4 matrix elements 0 or 1
-        number=3*list[0]+list[1]+list[2]*27+list[3]*9
+        number=index_in_vector_of_dm_matrix_element([list[0],list[1]],[list[2],list[3]])
         phase=np.rad2deg(np.angle(U[number,number]))
         return phase
 
@@ -1194,7 +1186,7 @@ def verify_CPTP(U):
     # returns: trace dist of the partial trace that should be the identity, i.e. trace dist should be zero for TP maps
     choi = qtp.to_choi(U)
     candidate_identity = choi.ptrace([0,1])    # 3 since we have a qutrit
-    ptrace = qtp.tracedist(candidate_identity,qtp.tensor(qtp.qeye(3),qtp.qeye(3)))
+    ptrace = qtp.tracedist(candidate_identity,qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0)))
     return ptrace
 
 
@@ -1423,7 +1415,7 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
 
     U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
 
-    number_CZ_repetitions=200
+    number_CZ_repetitions=500
     step_repetitions=2
     for n in range(1,number_CZ_repetitions,step_repetitions):        # we consider only odd n so that in theory it should be always a CZ
         U_superop_n=U_superop_average**n
@@ -1585,12 +1577,17 @@ def compute_sweetspot_frequency(polycoeff,freq_at_0_amp):
 def calc_populations(U):
     # calculate populations for Ram/Echo-Z experiment
 
+    hadamard_q0 = bloch_sphere_rotation(-np.pi,[1/np.sqrt(2),0,1/np.sqrt(2)])
+    hadamard_q0 = qubit_to_2qutrit_unitary(hadamard_q0,'right')
+
     if U.type == 'oper':
         U_pi2_pulsed = hadamard_q0 * U * hadamard_q0
-        populations = {'population_lower_state': np.abs(U_pi2_pulsed[0,0])**2, 'population_higher_state': np.abs(U_pi2_pulsed[0,1])**2}
+        populations = {'population_lower_state': np.abs(U_pi2_pulsed[index_in_ket([0,0]),index_in_ket([0,0])])**2, 
+                       'population_higher_state': np.abs(U_pi2_pulsed[index_in_ket([0,0]),index_in_ket([0,1])])**2}
     elif U.type == 'super':
         U_pi2_pulsed = qtp.to_super(hadamard_q0) * U * qtp.to_super(hadamard_q0)
-        populations = {'population_lower_state': np.real(U_pi2_pulsed[0,0]), 'population_higher_state': np.real(U_pi2_pulsed[0,10])}
+        populations = {'population_lower_state': np.real(U_pi2_pulsed[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]),
+                       'population_higher_state': np.real(U_pi2_pulsed[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,0],[0,1])])}
 
     return populations
 
@@ -1660,7 +1657,7 @@ def calc_chi_matrix(U):
         for y_prime in [0,1]:
             for x in [0,1]:
                 for y in [0,1]:
-                    indexlist.append(3*x+y+27*x_prime+9*y_prime)
+                    indexlist.append(index_in_vector_of_dm_matrix_element([x,y],[x_prime,y_prime]))
 
     for i in range(Pauli_gr_size):              # projecting over the two qubit subspace
         for j in range(Pauli_gr_size):
@@ -1695,27 +1692,19 @@ def calc_chi_matrix(U):
 def calc_diag_pauli_transfer_matrix(U,U_target):
     # not useful function because it is not immediate to infer the pauli error rates from it. Use calc_chi_matrix
 
-    identity=qtp.Qobj([[1,0,0],
-                       [0,1,0],
-                       [0,0,1]])
-    sigmax=qtp.Qobj([[0,1,0],
-                     [1,0,0],
-                     [0,0,1]])
-    sigmay=qtp.Qobj([[0,-1j,0],
-                     [1j,0,0],
-                     [0,0,1]])
-    sigmaz=qtp.Qobj([[1,0,0],
-                     [0,-1,0],
-                     [0,0,1]])
-    pauli_list = [identity,sigmax,sigmay,sigmaz]
+    pauli_list_q1 = [qubit_to_2qutrit_unitary(qtp.qeye(2),'left'),qubit_to_2qutrit_unitary(qtp.sigmax(),'left'),
+                     qubit_to_2qutrit_unitary(qtp.sigmay(),'left'),qubit_to_2qutrit_unitary(qtp.sigmaz(),'left')]
+    pauli_list_q0 = [qubit_to_2qutrit_unitary(qtp.qeye(2),'right'),qubit_to_2qutrit_unitary(qtp.sigmax(),'right'),
+                     qubit_to_2qutrit_unitary(qtp.sigmay(),'right'),qubit_to_2qutrit_unitary(qtp.sigmaz(),'right')]
+
     diag=[]
     paulis_label=['II','IX','IY','IZ','XI','XX','XY','XZ','YI','YX','YY','YZ','ZI','ZX','ZY','ZZ']
 
     for pauli_1 in pauli_list:
         for pauli_2 in pauli_list:
-            pauli=qtp.tensor(pauli_1,pauli_2)
+            pauli=pauli_1 * pauli_2
             pauli_vec=qtp.operator_to_vector(pauli)
-            diag_elem=1/9*(pauli_vec.dag()*qtp.to_super(U_target)*U*pauli_vec).data[0,0]
+            diag_elem=1/(n_levels_q0*n_levels_q1) * (pauli_vec.dag()*qtp.to_super(U_target)*U*pauli_vec).data[0,0]
             diag.append(np.real(diag_elem))
     print(diag)
     czf.plot(x_plot_vec=[paulis_label],
