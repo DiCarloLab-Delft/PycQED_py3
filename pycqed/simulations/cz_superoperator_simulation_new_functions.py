@@ -1097,14 +1097,14 @@ def matrix_change_of_variables(H_0):
         eigvectors_ordered_according2basis.append(eigvectors[0].full())   # 00 state
         eigvectors_ordered_according2basis.append(eigvectors[2].full())   # 01 state
         eigvectors_ordered_according2basis.append(eigvectors[5].full())   # 02 state
-        eigvectors_ordered_according2basis.append(eigvectors[7].full())   # 03 state
+        eigvectors_ordered_according2basis.append(eigvectors[8].full())   # 03 state
         eigvectors_ordered_according2basis.append(eigvectors[1].full())   # 10 state
         eigvectors_ordered_according2basis.append(eigvectors[4].full())   # 11 state
-        eigvectors_ordered_according2basis.append(eigvectors[8].full())   # 12 state
-        eigvectors_ordered_according2basis.append(eigvectors[9].full())   # 13 state
+        eigvectors_ordered_according2basis.append(eigvectors[7].full())   # 12 state
+        eigvectors_ordered_according2basis.append(eigvectors[10].full())  # 13 state
         eigvectors_ordered_according2basis.append(eigvectors[3].full())   # 20 state
         eigvectors_ordered_according2basis.append(eigvectors[6].full())   # 21 state
-        eigvectors_ordered_according2basis.append(eigvectors[10].full())  # 22 state
+        eigvectors_ordered_according2basis.append(eigvectors[9].full())   # 22 state
         eigvectors_ordered_according2basis.append(eigvectors[11].full())  # 23 state
 
     S=np.hstack(eigvectors_ordered_according2basis)
@@ -1278,7 +1278,7 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
 
 def plot_spectrum(fluxlutman,noise_parameters_CZ):
     eig_vec=[]
-    amp_vec=np.arange(.4,.5,.01)
+    amp_vec=np.arange(0,1.5,.01)
     for amp in amp_vec:
         H=calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
         eigs=H.eigenenergies()
@@ -1287,10 +1287,10 @@ def plot_spectrum(fluxlutman,noise_parameters_CZ):
     eig_plot=[]
     for j in range(len(eig_vec[0])):
         eig_plot.append(eig_vec[:,j])
-    plot(x_plot_vec=[amp_vec],
+    plot(x_plot_vec=[fluxlutman.calc_amp_to_freq(amp_vec,'01')/1e9],
                           y_plot_vec=eig_plot,
                           title='Spectrum',
-                          xlabel='Amplitude (V)',ylabel='Frequency (GHz)')
+                          xlabel=r'$\omega_{q0}$ (GHz)',ylabel='Frequency (GHz)')
 
 
 def conditional_frequency(amp,fluxlutman,noise_parameters_CZ):
@@ -1392,31 +1392,28 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     popul_test_dephased=[]
     popul_in_10from01_dephased=[]
 
-    dimensions = U_superop_average.dims
-
-    U_temp = U_superop_average.full()
-    U_temp[index_in_vector_of_dm_matrix_element([1,1],[0,2]),index_in_vector_of_dm_matrix_element([1,1],[1,1])]=0             # matrix elements corresponding to the coherences between 11 and 02
-    U_temp[index_in_vector_of_dm_matrix_element([0,2],[1,1]),index_in_vector_of_dm_matrix_element([1,1],[1,1])]=0
-    U_temp[index_in_vector_of_dm_matrix_element([1,1],[0,2]),index_in_vector_of_dm_matrix_element([0,2],[0,2])]=0
-    U_temp[index_in_vector_of_dm_matrix_element([0,2],[1,1]),index_in_vector_of_dm_matrix_element([0,2],[0,2])]=0
-
-    U_temp[index_in_vector_of_dm_matrix_element([1,2],[2,1]),index_in_vector_of_dm_matrix_element([2,1],[2,1])]=0             # matrix elements corresponding to the coherences between 12 and 21
-    U_temp[index_in_vector_of_dm_matrix_element([2,1],[1,2]),index_in_vector_of_dm_matrix_element([2,1],[2,1])]=0
-    U_temp[index_in_vector_of_dm_matrix_element([1,2],[2,1]),index_in_vector_of_dm_matrix_element([1,2],[1,2])]=0
-    U_temp[index_in_vector_of_dm_matrix_element([2,1],[1,2]),index_in_vector_of_dm_matrix_element([1,2],[1,2])]=0
-
     if n_levels_q0 >= 4:
         popul_in_03from12=[]
         popul_in_03from12_dephased=[]
-        U_temp[index_in_vector_of_dm_matrix_element([1,2],[2,1]),index_in_vector_of_dm_matrix_element([0,3],[0,3])]=0             # matrix elements corresponding to the coherences between 12 and 03
-        U_temp[index_in_vector_of_dm_matrix_element([0,3],[1,2]),index_in_vector_of_dm_matrix_element([0,3],[0,3])]=0
-        U_temp[index_in_vector_of_dm_matrix_element([1,2],[0,3]),index_in_vector_of_dm_matrix_element([1,2],[1,2])]=0
-        U_temp[index_in_vector_of_dm_matrix_element([0,3],[1,2]),index_in_vector_of_dm_matrix_element([1,2],[1,2])]=0
+
+
+    dimensions = U_superop_average.dims
+
+    U_temp = U_superop_average.full()
+
+    U_temp = nullify_coherence(U_temp,[1,1],[0,2])
+    U_temp = nullify_coherence(U_temp,[1,2],[2,1])
+
+    if n_levels_q0 >= 4:
+        U_temp = nullify_coherence(U_temp,[1,2],[0,3])
+        U_temp = nullify_coherence(U_temp,[2,1],[0,3])
+
 
     U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
 
     number_CZ_repetitions=200
-    for n in range(1,number_CZ_repetitions,2):        # we consider only odd n so that in theory it should be always a CZ
+    step_repetitions=2
+    for n in range(1,number_CZ_repetitions,step_repetitions):        # we consider only odd n so that in theory it should be always a CZ
         U_superop_n=U_superop_average**n
         U_superop_dephased_n = U_superop_dephased**n
         qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
@@ -1429,13 +1426,13 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
         popul_in_20.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,1]],states_out=[[2,0]]))
         popul_in_02.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,1]],states_out=[[0,2]]))
         popul_in_21from12.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out=[[2,1]]))
-        popul_test.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in='compsub',states_out='leaksub'))
+        popul_test.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out='all'))
         popul_in_10from01.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[0,1]],states_out=[[1,0]]))
 
         popul_in_20_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,1]],states_out=[[2,0]]))
         popul_in_02_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,1]],states_out=[[0,2]]))
         popul_in_21from12_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out=[[2,1]]))
-        popul_test_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in='compsub',states_out='leaksub'))
+        popul_test_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out='all'))
         popul_in_10from01_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[0,1]],states_out=[[1,0]]))
 
         if n_levels_q0 >= 4:
@@ -1443,28 +1440,28 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
             popul_in_03from12_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out=[[0,3]]))
 
 
-    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(leakage_vec)*100,np.array(leakage_dephased_vec)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Leakage (%)',
                   legend_labels=['Using directly the $CZ$ from the simulations','Depolarizing the leakage subspace'])
 
-    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_02)*100,np.array(popul_in_02_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['11 to 02','11 to 02, dephased case'])
 
-    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_20)*100,np.array(popul_in_20_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['11 to 20','11 to 20, dephased case'])
 
-    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_21from12)*100,np.array(popul_in_21from12_dephased)*100],
                   title='Repeated $CZ$ gates',
@@ -1472,21 +1469,21 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
                   legend_labels=['12 to 21','12 to 21, dephased case'])
 
     if n_levels_q0 >= 4:
-        plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+        plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_03from12)*100,np.array(popul_in_03from12_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['12 to 03','12 to 03, dephased case'])
 
-    # plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
-    #               #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
-    #               y_plot_vec=[np.array(popul_test)*100,np.array(popul_test_dephased)*100],
-    #               title='Repeated $CZ$ gates',
-    #               xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
-    #               legend_labels=['test','test, dephased case'])
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
+                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
+                  y_plot_vec=[np.array(popul_test)*100,np.array(popul_test_dephased)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
+                  legend_labels=['test','test, dephased case'])
 
-    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,2)],
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
                   #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_10from01)*100,np.array(popul_in_10from01_dephased)*100],
                   title='Repeated $CZ$ gates',
@@ -1501,6 +1498,8 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     print('popul_in_21_from_12',popul_in_21from12)
     print('popul_test',popul_test)
     print('popul_in_10_from_01',popul_in_10from01)
+    if n_levels_q0 >= 4:
+        print('popul_in_03_from_12',popul_in_03from12)
 
 
 def add_waiting_at_sweetspot(tlist,amp,waiting_at_sweetspot):
@@ -1749,7 +1748,19 @@ def average_population_transfer_subspace_to_subspace(U_superop,states_in,states_
 	return sump
 
 
+def nullify_coherence(U_temp,state_A,state_B):
+    # U_temp: superop
+    # state_X: list e.g. [0,1]
 
+    for x_prime in range(0,n_levels_q1):
+        for y_prime in range(0,n_levels_q0):
+            for x in range(0,n_levels_q1):
+                for y in range(0,n_levels_q0):
+
+                    U_temp[index_in_vector_of_dm_matrix_element(state_A,state_B),index_in_vector_of_dm_matrix_element([x,y],[x_prime,y_prime])]=0            
+                    U_temp[index_in_vector_of_dm_matrix_element(state_B,state_A),index_in_vector_of_dm_matrix_element([x,y],[x_prime,y_prime])]=0
+
+    return U_temp
 
 
 

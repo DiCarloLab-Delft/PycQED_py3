@@ -468,6 +468,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             #czf.repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0)
 
 
+            #czf.plot_spectrum(self.fluxlutman,self.noise_parameters_CZ)
+
+
         qoi_plot = np.array(qoi_plot)
 
         ## Uncomment to study the convergence properties of averaging over a Gaussian
