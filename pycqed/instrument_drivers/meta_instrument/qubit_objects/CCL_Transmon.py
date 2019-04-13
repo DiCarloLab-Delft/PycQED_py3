@@ -1770,7 +1770,7 @@ class CCLight_Transmon(Qubit):
     def find_bus_frequency(self,freqs,spec_source_bus,bus_power,f01=None,label='',
                         close_fig=True,analyze=True,MC=None,prepare_for_continuous_wave=True):
         '''
-        Drive the qubit and sit at the spectroscopy peak while the bus is driven with 
+        Drive the qubit and sit at the spectroscopy peak while the bus is driven with
         bus_spec_source
 
         Input parameters:
@@ -1829,10 +1829,10 @@ class CCLight_Transmon(Qubit):
                         close_fig=True,analyze=True,MC=None,
                         prepare_for_continuous_wave=True):
         '''
-        Drive the qubit and sit at the spectroscopy peak while the bus is driven with 
+        Drive the qubit and sit at the spectroscopy peak while the bus is driven with
         bus_spec_source. At the same time sweep dac channel specified by dac_param over
         set of values sepcifeid by dacs.
-        
+
         Practical comments:
         - sweep flux bias of different (neighbour) qubit than the one measured
         - set spec_power of the first tone high (say, +15 dB relative to value optimal
@@ -3164,13 +3164,12 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('echo'+label+self.msmt_suffix)
-        # FIXME: echo analysis v2 required that correctly handles 
-        # modulation of recovery pulse. 
         if analyze:
+            # N.B. v1.5 analysis
             a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
-        if update:
-            self.T2_echo(a.fit_res.params['tau'].value)
-        return a
+            if update:
+                self.T2_echo(a.fit_res.params['tau'].value)
+            return a
 
     def measure_flipping(self, number_of_flips=np.arange(0, 40, 2), equator=True,
                          MC=None, analyze=True, close_fig=True, update=False,
@@ -3209,7 +3208,7 @@ class CCLight_Transmon(Qubit):
         if update:
             chisqr_cos = a.fit_res['cos_fit'].chisqr
             chisqr_line = a.fit_res['line_fit'].chisqr
-            
+
             scale_factor_cos = a._get_scale_factor_cos()
             scale_factor_line = a._get_scale_factor_line()
 
@@ -3220,7 +3219,7 @@ class CCLight_Transmon(Qubit):
 
             if abs(scale_factor-1)<2e-3:
                 print('Pulse amplitude accurate within 0.2%. Amplitude not updated.')
-                return a    
+                return a
 
             if self.cfg_with_vsm():
                 amp_old = self.mw_vsm_G_amp()
