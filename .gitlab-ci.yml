@@ -8,8 +8,10 @@ stages:
   - deploy
 
 variables:
-  OPENQL_STABLE_TAG: "0.5.3"
-  QCODES_STABLE_TAG: "v0.1.11"
+  OPENQL_STABLE: "master"
+  QCODES_STABLE: "v0.1.11"
+  OPENQL_UNSTABLE: "develop"
+  QCODES_UNSTABLE: "master"
 
 before_script:
   - mkdir -p /kaniko/.docker
@@ -69,8 +71,8 @@ build base image:manual:
 .docker-testing-template-stable:
   extends: .docker-testing-template
   variables:
-    OPENQL_REVISION: $OPENQL_STABLE_TAG
-    QCODES_REVISION: $QCODES_STABLE_TAG
+    OPENQL_REVISION: $OPENQL_STABLE
+    QCODES_REVISION: $QCODES_STABLE
     DOCKER_TAG: $CI_REF
   # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
 
@@ -78,8 +80,8 @@ build base image:manual:
   extends: .docker-testing-template
   variables:
     DOCKER_TAG: "devel"
-    OPENQL_REVISION: "develop"
-    QCODES_REVISION: "master"
+    OPENQL_REVISION: $OPENQL_UNSTABLE
+    QCODES_REVISION: $QCODES_UNSTABLE
   # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
 
 build stable testing image:master:
@@ -120,8 +122,8 @@ build develop testing image:manual:
 run tests stable:
   extends: .run-tests-template
   variables:
-    OPENQL_REVISION: $OPENQL_STABLE_TAG
-    QCODES_REVISION: $QCODES_STABLE_TAG
+    OPENQL_REVISION: $OPENQL_STABLE
+    QCODES_REVISION: $QCODES_STABLE
 
 run tests develop:on-schedule:
   extends: .run-tests-template
@@ -129,8 +131,8 @@ run tests develop:on-schedule:
   dependencies:
     - build develop testing image:on-schedule
   variables:
-    OPENQL_REVISION: "develop"
-    QCODES_REVISION: "master"
+    OPENQL_REVISION: $OPENQL_UNSTABLE
+    QCODES_REVISION: $QCODES_UNSTABLE
   only:
     # daily
     - schedules
@@ -141,8 +143,8 @@ run tests develop:manual:
   dependencies:
     - build develop testing image:manual
   variables:
-    OPENQL_REVISION: "develop"
-    QCODES_REVISION: "master"
+    OPENQL_REVISION: $OPENQL_UNSTABLE
+    QCODES_REVISION: $QCODES_UNSTABLE
   when: manual
 
 upload code quality reports:
