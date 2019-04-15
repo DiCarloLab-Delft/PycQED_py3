@@ -3,29 +3,8 @@ from copy import deepcopy
 import pycqed.measurement.waveform_control.pulse_library as pl
 import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
 import pycqed.measurement.waveform_control.pulsar as ps
+import pycqed.measurement.waveform_control.fluxpulse_predistortion as flux_dist
 from collections import OrderedDict as odict
-
-
-class Sequence:
-    """
-    A Sequence consists of several segments, which can be played back on the 
-    AWGs sequentially.
-    """
-
-    def __init__(self, name, pulsar):
-        self.name = name
-        self.pulsar = pulsar
-        self.segments = []
-
-    def gen_waveforms(self):
-        """
-        Returns a dictionary containing for each AWG, for each element on that
-        AWG, for each channel the waveforms of all segments, as well as a 
-        list providing the order in which the elements should be played on the
-        AWGs.
-        """
-
-        return None
 
 
 class Segment:
@@ -35,27 +14,42 @@ class Segment:
     as well as an instance of class Pulse.
     """
 
-    def __init__(self, name, pulsar):
+    def __init__(self, name, pulsar, pulse_pars_list=[]):
         self.name = name
-        self.pulsar = pulsar
+        self.pulsar = ps.Pulsar.get_instance()
         self.unresolved_pulses = []
         self.previous_pulse = None
         self.elements = odict()
         self.element_start_end = {}
-        self.elements_on_AWG = {}
+        self.elements_on_awg = {}
         self.trigger_pars = {'length': 20e-9, 'amplitude': 1}
         self._pulse_names = set()
+        self.acquisition_elements = set()
+
+        for pulse_pars in pulse_pars_list:
+            self.add(pulse_pars)
+
+        if pulse_pars_list != []:
+            self.resolve_timing()
+            self.gen_trigger_el()
 
     def add(self, pulse_pars):
 
         pars_copy = deepcopy(pulse_pars)
 
+        # Makes sure that pulse name is unique
         if pars_copy.get('name') in self._pulse_names:
             raise ValueError('Name of added pulse already exists!')
         if pars_copy.get('name', None) is None:
             pars_copy['name'] = pulse_pars['pulse_type'] + '_' + str(
                 len(self.unresolved_pulses))
         self._pulse_names.add(pars_copy['name'])
+
+        # Makes sure that element name is unique within sequence of segments
+        if pars_copy.get('element_name', None) == None:
+            pars_copy['element_name'] = 'default_{}'.format(self.name)
+        else:
+            pars_copy['element_name'] += '_' + self.name
 
         new_pulse = UnresolvedPulse(pars_copy)
 
@@ -65,12 +59,31 @@ class Segment:
             else:
                 raise ValueError('No previous pulse has been added!')
 
+        # check whether pulse is acquistion. If so, add the element to
+        # self.acquisition_elements
+
+        if new_pulse.flags.get('RO', False):
+            self.acquisition_elements.add(new_pulse.pulse_obj.element_name)
+
         self.unresolved_pulses.append(new_pulse)
 
         self.previous_pulse = new_pulse
         # if self.elements is odict(), the resolve_timing function has to be
         # called prior to generating the waveforms
         self.elements = odict()
+
+    def resolve_segment(self):
+        """
+        Top layer method of Segment class. After having addded all pulses,
+            * the timing is resolved
+            * the virtual Z gates are resolved
+            * the trigger pulses are generated
+            * the charge compensation pulses are added
+        """
+        self.resolve_timing()
+        self.resolve_Z_gates()
+        self.gen_trigger_el()
+        self.add_charge_compensation()
 
     def resolve_timing(self):
         """
@@ -147,8 +160,94 @@ class Segment:
 
         self.unresolved_pulses = ordered_unres_pulses
 
-        self.find_element_start_end()
-        self.resolve_Z_gates()
+    def add_charge_compensation(self):
+        t_end = -float('inf')
+
+        pulse_area = {}
+        compensation_chan = []
+
+        for c in self.pulsar.channels:
+            if self.pulsar.get('{}_type'.format(c)) != 'analog':
+                continue
+            if self.pulsar.get('{}_charge_buildup_compensation'.format(c)):
+                compensation_chan.append(c)
+
+        # * generate the pulse_area dictionarry containing for each channel
+        #   that has to be compensated the sum of all pulse areas on that
+        #   channel + the name of the last element
+        # * and find the end time of the last pulse of the segment
+        for element in self.elements:
+
+            tvals = self.tvals(compensation_chan, element)
+
+            for pulse in self.elements[element]:
+                t_end = max(t_end, pulse.algorithm_time() + pulse.length)
+
+                for c in pulse.channels:
+                    awg = self.pulsar.get('{}_awg'.format(c))
+                    element_start_time = self.get_element_start(element, awg)
+                    if c not in compensation_chan:
+                        continue
+
+                    pulse_start = self.time2sample(
+                        pulse.element_time(element_start_time), channel=c)
+                    pulse_end = self.time2sample(
+                        pulse.element_time(element_start_time) + pulse.length,
+                        channel=c)
+
+                    if c in pulse_area:
+                        pulse_area[c][0] += pulse.pulse_area(
+                            c, tvals[c][pulse_start:pulse_end])
+                        pulse_area[c][1] = element
+                    else:
+                        pulse_area[c] = [
+                            pulse.pulse_area(
+                                c, tvals[c][pulse_start:pulse_end]), element
+                        ]
+
+        # Add all compensation pulses to the last element after the last pulse
+        # of the segment
+        i = 1
+        for c in pulse_area:
+            comp_delay = self.pulsar.get(
+                '{}_compensation_pulse_delay'.format(c))
+            amp = self.pulsar.get('{}_amp'.format(c))
+            amp *= self.pulsar.get('{}_compensation_pulse_scale'.format(c))
+
+            if pulse_area[c][0] < 0:
+                amp = -amp
+
+            # If pulse lenght was smaller than min_length, the amplitude will
+            # be reduced
+            length = pulse_area[c][0] / amp
+            awg = self.pulsar.get('{}_awg'.format(c))
+            min_length = self.pulsar.get(
+                '{}_compensation_pulse_min_length'.format(awg))
+            if length < min_length:
+                length = min_length
+                amp = pulse_area[c][0] / length
+                if pulse_area[c][0] < 0:
+                    amp = -amp
+
+            last_element = pulse_area[c][1]
+            kw = {
+                'amplitude': amp,
+                'buffer_length_start': comp_delay,
+                'buffer_length_end': comp_delay,
+                'pulse_length': length
+            }
+            pulse = pl.BufferedSquarePulse(
+                last_element, c, name='compensation_pulse_{}'.format(i), **kw)
+            i += 1
+
+            pulse.algorithm_time(t_end)
+
+            # Add compensation pulse length to element_start_end of the
+            # respective element
+            self.element_start_end[last_element][awg][1] += self.time2sample(
+                length, awg=awg)
+
+            self.elements[last_element].append(pulse)
 
     def gen_refpoint_dict(self):
         """
@@ -166,7 +265,7 @@ class Segment:
 
         return pulses
 
-    def gen_AWG_dict(self):
+    def gen_awg_dict(self):
         """
         Returns a dictionary with element names as keys and a set of used
         AWGs for each element as value.
@@ -175,18 +274,18 @@ class Segment:
         if self.elements == odict():
             self.resolve_timing()
 
-        AWG_dict = {}
+        awg_dict = {}
 
         for element in self.elements:
-            AWG_dict[element] = set()
+            awg_dict[element] = set()
 
             for pulse in self.elements[element]:
                 for channel in pulse.channels:
-                    AWG_dict[element].add(self.pulsar.get(channel + '_awg'))
+                    awg_dict[element].add(self.pulsar.get(channel + '_awg'))
 
-        return AWG_dict
+        return awg_dict
 
-    def gen_elements_on_AWG(self):
+    def gen_elements_on_awg(self):
         """
         Updates the self.elements_on_AWG dictionary
         """
@@ -194,17 +293,55 @@ class Segment:
         if self.elements == odict():
             self.resolve_timing()
 
-        self.elements_on_AWG = {}
+        self.elements_on_awg = {}
 
         for element in self.elements:
             for pulse in self.elements[element]:
                 for channel in pulse.channels:
-                    AWG = self.pulsar.get(channel + '_awg')
-                    if AWG in self.elements_on_AWG and \
-                        element not in self.elements_on_AWG[AWG]:
-                        self.elements_on_AWG[AWG].append(element)
-                    elif AWG not in self.elements_on_AWG:
-                        self.elements_on_AWG[AWG] = [element]
+                    awg = self.pulsar.get(channel + '_awg')
+                    if awg in self.elements_on_awg and \
+                        element not in self.elements_on_awg[awg]:
+                        self.elements_on_awg[awg].append(element)
+                    elif awg not in self.elements_on_awg:
+                        self.elements_on_awg[awg] = [element]
+
+    def find_awg_hierarchy(self):
+        master = self.pulsar.master_awg()
+
+        # generate dictionary triggering_awgs (keys are trigger AWGs and
+        # values triggered AWGs) and tirggered_awgs (keys are triggered AWGs
+        # and values triggering AWGs)
+        triggering_awgs = {}
+        triggered_awgs = {}
+        awgs = set(self.pulsar.awgs) - {master}
+        for awg in awgs:
+            for channel in self.pulsar.get('{}_trigger_channels'.format(awg)):
+                trigger_awg = self.pulsar.get('{}_awg'.format(channel))
+                if trigger_awg in triggering_awgs:
+                    triggering_awgs[trigger_awg].append(awg)
+                else:
+                    triggering_awgs[trigger_awg] = [awg]
+                if awg in triggered_awgs:
+                    triggered_awgs[awg].append(trigger_awg)
+                else:
+                    triggered_awgs[awg] = [trigger_awg]
+
+        # impletment Kahn's algorithm to sort the AWG by hierarchy
+        trigger_awgs = {master}
+        awg_hierarchy = []
+
+        while trigger_awgs != set():
+            awg = trigger_awgs.pop()
+            awg_hierarchy.append(awg)
+            if awg not in triggering_awgs:
+                continue
+            for triggered_awg in triggering_awgs[awg]:
+                triggered_awgs[triggered_awg].remove(awg)
+                if len(triggered_awgs[triggered_awg]) == 0:
+                    trigger_awgs.add(triggered_awg)
+
+        awg_hierarchy.reverse()
+        return awg_hierarchy
 
     def gen_trigger_el(self):
         """
@@ -217,47 +354,55 @@ class Segment:
                 * adds the trigger pulse to the elements list 
         """
 
-        if self.elements == odict():
-            self.resolve_timing()
+        # Generate the dictionary elements_on_awg, that for each AWG contains
+        # a list of the elements on that AWG
+        self.gen_elements_on_awg()
 
-        AWG_dict = self.gen_AWG_dict()
+        # Find the AWG hierarchy. Needed to add the trigger pulses first to
+        # the AWG that do not trigger any other AWGs, then the AWGs trigger
+        # these AWGs and so on.
+        awg_hierarchy = self.find_awg_hierarchy()
 
-        for element in AWG_dict:
-            for AWG in AWG_dict[element]:
+        for awg in awg_hierarchy:
+            if awg not in self.elements_on_awg:
+                continue
+            for element in self.elements_on_awg[awg]:
+                [el_start, _] = self.element_start_length(element, awg)
 
-                if self.pulsar.get('{}_trigger_channels'.format(AWG)) == None:
+                # for master AWG no trigger_pulse has to be added
+                if self.pulsar.get('{}_trigger_channels'.format(awg)) == None:
                     continue
 
-                trigger_pulse_time = self.element_start_end[element][
-                    0] - self.pulsar.get(AWG + '_delay')
+                trigger_pulse_time = el_start - self.pulsar.get(awg + '_delay')
 
                 # Find the trigger_AWGs that trigger the AWG
-                trigger_AWGs = set()
+                trigger_awgs = set()
                 for channel in self.pulsar.get(
-                        '{}_trigger_channels'.format(AWG)):
-                    trigger_AWGs.add(self.pulsar.get('{}_awg'.format(channel)))
+                        '{}_trigger_channels'.format(awg)):
+                    trigger_awgs.add(self.pulsar.get('{}_awg'.format(channel)))
 
-                # For each trigger_AWG, find the elements to play the trigger
+                # For each trigger_AWG, find the element to play the trigger
                 # pulse in
                 trigger_elements = {}
-                for trigger_AWG in trigger_AWGs:
+                for trigger_awg in trigger_awgs:
                     # if there is no element on that AWG create a new element
-                    if self.elements_on_AWG.get(trigger_AWG, None) == None:
-                        trigger_elements[trigger_AWG] = 'trigger_element'
+                    if self.elements_on_awg.get(trigger_awg, None) == None:
+                        trigger_elements[trigger_awg] = 'trigger_element'
                     # else find the element that is closest to the
                     # trigger pulse
                     else:
                         trigger_elements[
-                            trigger_AWG] = self.find_trigger_element(
-                                trigger_AWG, trigger_pulse_time)
+                            trigger_awg] = self.find_trigger_element(
+                                trigger_awg, trigger_pulse_time)
 
-                # add the trigger pulse to all triggering channels
-                for channel_name in self.pulsar.get(
-                        '{}_trigger_channels'.format(AWG)):
+                # Add the trigger pulse to all triggering channels
+                for channel in self.pulsar.get(
+                        '{}_trigger_channels'.format(awg)):
+
+                    trigger_awg = self.pulsar.get('{}_awg'.format(channel))
                     trig_pulse = bpl.SquarePulse(
-                        trigger_elements[self.pulsar.get(
-                            '{}_awg'.format(channel_name))],
-                        channel=channel_name,
+                        trigger_elements[trigger_awg],
+                        channel=channel,
                         **self.trigger_pars)
 
                     trig_pulse.algorithm_time(trigger_pulse_time)
@@ -268,11 +413,73 @@ class Segment:
                     else:
                         self.elements[trig_pulse.element_name] = [trig_pulse]
 
+                    # Add the trigger_element to elements_on_awg[trigger_awg]
+                    if trigger_awg not in self.elements_on_awg:
+                        self.elements_on_awg[trigger_awg] = [
+                            trigger_elements[trigger_awg]
+                        ]
+                    elif trigger_elements[
+                            trigger_awg] not in self.elements_on_awg[
+                                trigger_awg]:
+                        self.elements_on_awg[trigger_awg].append(
+                            trigger_elements[trigger_awg])
+
+        # if self.elements == odict():
+        #     self.resolve_timing()
+
+        # awg_dict = self.gen_awg_dict()
+
+        # for element in awg_dict:
+        #     for awg in awg_dict[element]:
+
+        #         if self.pulsar.get('{}_trigger_channels'.format(awg)) == None:
+        #             continue
+
+        #         trigger_pulse_time = self.get_element_start(
+        #             element, awg) - self.pulsar.get(awg + '_delay')
+
+        #         # Find the trigger_AWGs that trigger the AWG
+        #         trigger_awgs = set()
+        #         for channel in self.pulsar.get(
+        #                 '{}_trigger_channels'.format(awg)):
+        #             trigger_awgs.add(self.pulsar.get('{}_awg'.format(channel)))
+
+        #         # For each trigger_AWG, find the element to play the trigger
+        #         # pulse in
+        #         trigger_elements = {}
+        #         for trigger_awg in trigger_awgs:
+        #             # if there is no element on that AWG create a new element
+        #             if self.elements_on_awg.get(trigger_awg, None) == None:
+        #                 trigger_elements[trigger_awg] = 'trigger_element'
+        #             # else find the element that is closest to the
+        #             # trigger pulse
+        #             else:
+        #                 trigger_elements[
+        #                     trigger_awg] = self.find_trigger_element(
+        #                         trigger_awg, trigger_pulse_time)
+
+        #         # add the trigger pulse to all triggering channels
+        #         for channel_name in self.pulsar.get(
+        #                 '{}_trigger_channels'.format(awg)):
+        #             trig_pulse = bpl.SquarePulse(
+        #                 trigger_elements[self.pulsar.get(
+        #                     '{}_awg'.format(channel_name))],
+        #                 channel=channel_name,
+        #                 **self.trigger_pars)
+
+        #             trig_pulse.algorithm_time(trigger_pulse_time)
+
+        #             if trig_pulse.element_name in self.elements:
+        #                 self.elements[trig_pulse.element_name].append(
+        #                     trig_pulse)
+        #             else:
+        #                 self.elements[trig_pulse.element_name] = [trig_pulse]
+
         # tests if any of the elements overlap. True indicates that element
         # dictionary will be time sorted prior to testing.
         self.test_overlap(True)
 
-    def find_trigger_element(self, trigger_AWG, trigger_pulse_time):
+    def find_trigger_element(self, trigger_awg, trigger_pulse_time):
         """
         For a trigger_AWG that is used for generating triggers as well as 
         normal pulses, this method returns the name of the element to which the 
@@ -281,16 +488,63 @@ class Segment:
 
         time_distance = []
 
-        for element in self.elements_on_AWG[trigger_AWG]:
-            for i in [0, 1]:
-                time_distance.append([
-                    abs(trigger_pulse_time + self.trigger_pars['length'] -
-                        self.element_start_end[element][i]), element
-                ])
+        for element in self.elements_on_awg[trigger_awg]:
+            [el_start, samples] = self.element_start_length(
+                element, trigger_awg)
+            el_end = el_start + self.sample2time(samples, awg=trigger_awg)
+            distance_start_end = [
+                [
+                    abs(trigger_pulse_time + self.trigger_pars['length'] / 2 -
+                        el_start), element
+                ],
+                [
+                    abs(trigger_pulse_time + self.trigger_pars['length'] / 2 -
+                        el_end), element
+                ]
+            ]
+
+            time_distance += distance_start_end
 
         trigger_element = min(time_distance)[1]
 
         return trigger_element
+
+        # time_distance = []
+
+        # for element in self.elements_on_awg[trigger_awg]:
+        #     element_start = self.get_element_start(element, trigger_awg)
+        #     element_end = self.get_element_end(element, trigger_awg)
+        #     distance_start_end = [
+        #         [
+        #             abs(trigger_pulse_time + self.trigger_pars['length'] / 2 -
+        #                 element_start), element
+        #         ],
+        #         [
+        #             abs(trigger_pulse_time + self.trigger_pars['length'] / 2 -
+        #                 element_end), element
+        #         ]
+        #     ]
+
+        #     time_distance += distance_start_end
+
+        # trigger_element = min(time_distance)[1]
+
+        # return trigger_element
+
+    def get_element_end(self, element, awg):
+        """
+        This method returns the end of an element on an AWG in algorithm_time 
+        """
+
+        samples = self.element_start_end[element][awg][1]
+        length = self.sample2time(samples, awg=awg)
+        return self.element_start_end[element][awg][0] + length
+
+    def get_element_start(self, element, awg):
+        """
+        This method returns the start of an element on an AWG in algorithm_time 
+        """
+        return self.element_start_end[element][awg][0]
 
     def test_overlap(self, sort=False):
         """
@@ -298,39 +552,61 @@ class Segment:
         indicates that element dictionary will be time sorted prior to testing.
         """
 
+        for awg in self.elements_on_awg:
+            el_list = []
+            i = 0
+            for el in self.elements_on_awg[awg]:
+                el_list.append([self.element_start_end[el][awg][0], i, el])
+                i += 1
+
+            el_list.sort()
+
+            for i in range(len(el_list) - 1):
+                prev_el = el_list[i][2]
+                el_prev_end = self.get_element_end(prev_el, awg)
+                el_new_start = el_list[i + 1][0]
+                if el_prev_end > el_new_start:
+                    raise ValueError('{} and {} overlap on {}'.format(
+                        prev_el, el_list[i + 1][2], awg))
+
         # find new start and end times of all elements and sort them by
         # accending t0
 
-        if sort:
-            self.find_element_start_end(True)
+        # if sort:
+        #     self.find_element_start_end(True)
 
-        self._test_trigger_AWG()
-        self.gen_elements_on_AWG
+        # self._test_trigger_awg()
+        # self.gen_elements_on_awg()
 
-        for AWG in self.elements_on_AWG:
-            for i in range(len(self.elements_on_AWG[AWG]) - 1):
-                next_el = self.elements_on_AWG[AWG][i + 1]
-                prev_el = self.elements_on_AWG[AWG][i]
-                if self.element_start_end[next_el][0] < \
-                        self.element_start_end[prev_el][1]:
-                    raise ValueError('{} and {} on {} overlap!'.format(
-                        self.elements_on_AWG[AWG][i],
-                        self.elements_on_AWG[AWG][i + 1], AWG))
+        # for awg in self.elements_on_awg:
+        #     for i in range(len(self.elements_on_awg[awg]) - 1):
+        #         next_el = self.elements_on_awg[awg][i + 1]
+        #         prev_el = self.elements_on_awg[awg][i]
+        #         if self.get_element_start(next_el, awg) < \
+        #                 self.get_element_end(prev_el, awg):
+        #             raise ValueError('{} and {} on {} overlap!'.format(
+        #                 self.elements_on_awg[awg][i],
+        #                 self.elements_on_awg[awg][i + 1], awg))
 
-    def _test_trigger_AWG(self):
+    def _test_trigger_awg(self):
         """
         Checks if there is more than one element on the AWGs that are not 
         triggered by another AWG.
         """
-        self.gen_elements_on_AWG()
+        self.gen_elements_on_awg()
 
-        for AWG in self.elements_on_AWG:
-            if self.pulsar.get('{}_trigger_channels'.format(AWG)) == None:
-                if len(self.elements_on_AWG[AWG]) > 1:
+        for awg in self.elements_on_awg:
+            if self.pulsar.get('{}_trigger_channels'.format(awg)) == None:
+                if len(self.elements_on_awg[awg]) > 1:
                     raise ValueError(
-                        'There is more than one element on {}'.format(AWG))
+                        'There is more than one element on {}'.format(awg))
 
     def resolve_Z_gates(self):
+        """
+        The phase of a basis rotation is acquired by an basis pulse, if the 
+        middle of the basis rotation pulse happens before the middle of the 
+        basis pulse.
+        """
         qubit_phases = {}
 
         for pulse in self.unresolved_pulses:
@@ -340,23 +616,54 @@ class Segment:
                 else:
                     qubit_phases[qubit] = pulse.basis_rotation[qubit]
 
-            if pulse.operation_type[0] == 'MW':
+            if 'basis' in pulse.flags:
                 try:
-                    pulse.pulse_obj.phase -= qubit_phases[
-                        pulse.operation_type[1]]
+                    pulse.pulse_obj.phase -= qubit_phases[pulse.flags.get(
+                        'basis')]
                 except KeyError:
-                    qubit_phases[pulse.operation_type[1]] = 0
+                    qubit_phases[pulse.flags.get('basis')] = 0
 
-    def find_element_start_end(self, sort=False):
+    def element_start_length(self, element, awg):
+        if element not in self.element_start_end:
+            self.element_start_end[element] = {}
+
+        t_start = float('inf')
+        t_end = -float('inf')
+
+        for pulse in self.elements[element]:
+            t_start = min(pulse.algorithm_time(), t_start)
+            t_end = max(pulse.algorithm_time() + pulse.length, t_end)
+
+        length = t_end - t_start
+        # make sure that element length is multiple of
+        # sample granularity
+        gran = self.pulsar.get('{}_granularity'.format(awg))
+        samples = self.time2sample(length, awg=awg)
+        if samples % gran != 0:
+            samples += gran - samples % gran
+
+        # make sure that element start is a multiple of element
+        # start granularity
+        start_gran = self.pulsar.get(
+            '{}_element_start_granularity'.format(awg))
+
+        if start_gran != None:
+            t_start_awg = int(t_start / start_gran) * start_gran
+        else:
+            t_start_awg = t_start
+
+        self.element_start_end[element][awg] = [t_start_awg, samples]
+        return [t_start_awg, samples]
+
+    def find_element_start_end(self, sort=False, awg_list=[]):
         """
         Given a segment, this method:
-            * finds the start and end times for each element 
+            * finds the start time and number of samples for each element for 
+              each AWG 
             * saves them in element_start_end, ordered by accending start time
-            * changes the order of self.elements dictionary by order of start 
-              times 
+            * if sort: changes the order of self.elements dictionary by order 
+              of start times 
         """
-
-        self.element_start_end = {}
 
         if self.elements == odict():
             self.resolve_timing()
@@ -376,16 +683,41 @@ class Segment:
 
             self.elements = new_elements
 
-        for element in self.elements:
-            t_start_list = []
-            t_end_list = []
-            for pulse in self.elements[element]:
-                t_start_list.append(pulse.algorithm_time())
-                t_end_list.append(pulse.algorithm_time() + pulse.length)
+        awg_dict = self.gen_awg_dict()
 
-            t_start = min(t_start_list)
-            t_end = max(t_end_list)
-            self.element_start_end[element] = [t_start, t_end]
+        for element in self.elements:
+            if element not in self.element_start_end:
+                self.element_start_end[element] = {}
+
+            t_start = float('inf')
+            t_end = -float('inf')
+
+            for pulse in self.elements[element]:
+                t_start = min(pulse.algorithm_time(), t_start)
+                t_end = max(pulse.algorithm_time() + pulse.length, t_end)
+
+            length = t_end - t_start
+            for awg in awg_dict[element]:
+                if awg_list != [] and awg not in awg_list:
+                    continue
+                # make sure that element length is multiple of
+                # sample granularity
+                gran = self.pulsar.get('{}_granularity'.format(awg))
+                samples = self.time2sample(length, awg=awg)
+                if samples % gran != 0:
+                    samples += gran - samples % gran
+
+                # make sure that element start is a multiple of element
+                # start granularity
+                start_gran = self.pulsar.get(
+                    '{}_element_start_granularity'.format(awg))
+
+                if start_gran != None:
+                    t_start_awg = int(t_start / start_gran) * start_gran
+                else:
+                    t_start_awg = t_start
+
+                self.element_start_end[element][awg] = [t_start_awg, samples]
 
     def time_sort(self):
         """
@@ -419,7 +751,7 @@ class Segment:
         for pulse in self.unresolved_pulses:
             pulse.delay -= segment_t0
 
-    def waveforms(self):
+    def waveforms(self, awgs=None, channels=None):
         """
         After all the pulses have been added, the timing resolved and the 
         trigger pulses added, the waveforms of the segment can be compiled.
@@ -427,67 +759,120 @@ class Segment:
         AWG_wfs = 
           = {AWG_name: 
                 {(position_of_element, element_name): 
-                    {channel_id: channel_waveforms}
+                    {codeword:
+                        {channel_id: channel_waveforms}
+                    ...
+                    }
                 ...
                 }
             ...
             }
         """
+        if awgs == None:
+            awgs = self.elements_on_awg
+        if channels == None:
+            channels = set(self.pulsar.channels)
 
-        AWG_wfs = {}
+        awg_wfs = {}
 
-        for AWG in self.elements_on_AWG:
-            AWG_wfs[AWG] = {}
-            channel_list = self.find_AWG_channels(AWG)
-            for (i, element) in enumerate(self.elements_on_AWG[AWG]):
-                AWG_wfs[AWG][(i, element)] = {}
+        for awg in awgs:
+            if awg not in self.elements_on_awg:
+                continue
+            awg_wfs[awg] = {}
+            channel_list = set(self.pulsar.find_awg_channels(awg)) & channels
+            if channel_list == set():
+                continue
+            channel_list = list(channel_list)
+            for (i, element) in enumerate(self.elements_on_awg[awg]):
+                awg_wfs[awg][(i, element)] = {}
                 tvals = self.tvals(channel_list, element)
 
                 wfs = {}
-                for channel in channel_list:
-                    wfs[channel] = np.zeros(len(tvals[channel]))
 
-                element_start_time = self.element_start_end[element][0]
+                element_start_time = self.get_element_start(element, awg)
                 for pulse in self.elements[element]:
                     # checks whether pulse is played on AWG
-                    if set(pulse.channels) & set(channel_list) == set():
+                    pulse_channels = set(pulse.channels) & set(channel_list)
+                    if pulse_channels == set():
                         continue
-                    chan_tvals = {}
-                    for channel in pulse.channels:
-                        # checks if pulse is played on AWG
-                        if channel not in channel_list:
-                            continue
 
-                        pulse_start = self.time2sample(
-                            pulse.element_time(element_start_time), channel)
-                        pulse_end = self.time2sample(
-                            pulse.element_time(element_start_time) +
-                            pulse.length, channel)
+                    # fills wfs with zeros for used channels
+                    if pulse.codeword not in wfs:
+                        wfs[pulse.codeword] = {}
+                        for channel in pulse_channels:
+                            wfs[pulse.codeword][channel] = np.zeros(
+                                len(tvals[channel]))
+                    else:
+                        for channel in pulse_channels:
+                            if channel not in wfs[pulse.codeword]:
+                                wfs[pulse.codeword][channel] = np.zeros(
+                                    len(tvals[channel]))
+
+                    chan_tvals = {}
+                    pulse_start = self.time2sample(
+                        pulse.element_time(element_start_time), awg=awg)
+                    pulse_end = self.time2sample(
+                        pulse.element_time(element_start_time) + pulse.length,
+                        awg=awg)
+                    for channel in pulse_channels:
                         chan_tvals[channel] = tvals[channel].copy(
                         )[pulse_start:pulse_end]
-                        print(channel)
-                        print(pulse_start, pulse_end)
-                        print(len(tvals[channel]))
 
                     pulse_wfs = pulse.get_wfs(chan_tvals)
 
-                    for channel in pulse.channels:
-                        # checks if pulse is played on AWG
-                        if channel not in channel_list:
+                    for channel in pulse_channels:
+                        wfs[pulse.codeword][channel][
+                            pulse_start:pulse_end] += pulse_wfs[channel]
+
+                # for codewords: add the pulses that do not have a codeword to
+                # all codewords
+                if 'no_codeword' in wfs:
+                    for codeword in wfs:
+                        if codeword is not 'no_codeword':
+                            for channel in wfs['no_codeword']:
+                                if channel in wfs[codeword]:
+                                    wfs[codeword][channel] += wfs[
+                                        'no_codeword'][channel]
+                                else:
+                                    wfs[codeword][channel] = wfs[
+                                        'no_codeword'][channel]
+
+                # do predistortion
+                for codeword in wfs:
+                    for c in wfs[codeword]:
+                        if not self.pulsar.get(
+                                '{}_type'.format(c)) == 'analog':
                             continue
-                        pulse_start = self.time2sample(
-                            pulse.element_time(element_start_time), channel)
-                        pulse_end = self.time2sample(
-                            pulse.element_time(element_start_time) +
-                            pulse.length, channel)
-                        wfs[channel][pulse_start:
-                                     pulse_end] += pulse_wfs[channel]
+                        if not self.pulsar.get(
+                                '{}_distortion'.format(c)) == 'precalculate':
+                            continue
 
-                for channel in channel_list:
-                    AWG_wfs[AWG][(i, element)][self.pulsar.get(
-                        '{}_id'.format(channel))] = (wfs[channel])
+                        wf = wfs[codeword][c]
 
-        return AWG_wfs
+                        distortion_dictionary = self.pulsar.get(
+                            '{}_distortion_dict'.format(c))
+                        fir_kernels = distortion_dictionary.get('FIR', None)
+                        if fir_kernels is not None:
+                            if hasattr(fir_kernels, '__iter__') and not \
+                            hasattr(fir_kernels[0], '__iter__'): # 1 kernel only
+                                wf = flux_dist.filter_fir(fir_kernels, wf)
+                            else:
+                                for kernel in fir_kernels:
+                                    wf = flux_dist.filter_fir(kernel, wf)
+                        iir_filters = distortion_dictionary.get('IIR', None)
+                        if iir_filters is not None:
+                            wf = flux_dist.filter_iir(iir_filters[0],
+                                                      iir_filters[1], wf)
+                        wfs[codeword][c] = wf
+
+                for codeword in wfs:
+                    awg_wfs[awg][(i, element)][codeword] = {}
+                    for channel in wfs[codeword]:
+                        awg_wfs[awg][(i, element)][codeword][self.pulsar.get(
+                            '{}_id'.format(channel))] = (
+                                wfs[codeword][channel])
+
+        return awg_wfs
 
     def tvals(self, channel_list, element):
         """
@@ -498,41 +883,47 @@ class Segment:
         tvals = {}
 
         for channel in channel_list:
-            samples = self.element_samples(element, channel)
+            samples = self.get_element_samples(element, channel)
+            awg = self.pulsar.get('{}_awg'.format(channel))
             tvals[channel] = np.arange(samples) / self.pulsar.clock(
-                channel) + self.element_start_end[element][0]  # + delay?
+                channel=channel) + self.get_element_start(element, awg)
 
         return tvals
 
-    def find_AWG_channels(self, AWG):
-        channel_list = []
-        for channel in self.pulsar.channels:
-            if self.pulsar.get('{}_awg'.format(channel)) == AWG:
-                channel_list.append(channel)
+    def get_element_samples(self, element, instrument_ref):
+        """
+        Returns the number of samples the element occupies for the channel or
+        AWG.
+        """
 
-        return channel_list
+        if instrument_ref in self.pulsar.channels:
+            awg = self.pulsar.get('{}_awg'.format(instrument_ref))
+        elif instrument_ref in self.pulsar.awgs:
+            awg = instrument_ref
+        else:
+            raise Exception('instrument_ref has to be channel or AWG name!')
 
-    def element_samples(self, element, channel):
-        """
-        Returns the number of samples the element occupies for the channel.
-        """
-        el_time = self.element_start_end[element][1] - self.element_start_end[
-            element][0]
-        return self.time2sample(el_time, channel)
+        return self.element_start_end[element][awg][1]
 
-    def time2sample(self, t, channel):
+    def time2sample(self, t, **kw):
         """
-        Converts time to a number of samples for a channel.
+        Converts time to a number of samples for a channel or AWG.
         """
-        return int(t * self.pulsar.clock(channel) + 0.5)
+        return int(t * self.pulsar.clock(**kw) + 0.5)
+
+    def sample2time(self, samples, **kw):
+        """
+        Converts nubmer of samples to time for a channel or AWG.
+        """
+        return samples / self.pulsar.clock(**kw)
 
 
 class UnresolvedPulse:
     """
     pulse_pars: dictionary containing pulse parameters
-    reference_point: 'segment_start', 'previous_pulse', pulse.name
-    ref_point: 'start', 'end' -- reference point of the reference pulse
-    ref_point_new: 'start', 'end' -- reference point of the new pulse
+    reference_pulse: 'segment_start', 'previous_pulse', pulse.name
+    ref_point: 'start', 'end', 'middle', reference point of the reference pulse
+    ref_point_new: 'start', 'end', 'middle', reference point of the new pulse
     """
 
     def __init__(self, pulse_pars):
@@ -554,15 +945,8 @@ class UnresolvedPulse:
 
         self.delay = pulse_pars['pulse_delay']
         self.original_phase = pulse_pars.get('phase', 0)
-        self.operation_type = pulse_pars.pop('operation_type', ("Other", ))
+        self.flags = pulse_pars.get('flags', {})
         self.basis_rotation = pulse_pars.pop('basis_rotation', {})
-
-        if self.operation_type[0] == 'MW':
-            try:
-                self.operation_type[1]
-            except:
-                raise Exception('For MW pulses a target qubit has to be \
-                    specified!')
 
         try:
             # Look for the function in pl = pulse_lib
@@ -577,3 +961,9 @@ class UnresolvedPulse:
 
         self.pulse_obj = \
             pulse_func(**pulse_pars)
+
+        if self.pulse_obj.codeword != 'no_codeword' and \
+            self.basis_rotation != {}:
+            raise Exception(
+                'Codeword pulse {} does not support basis_rotation!'.format(
+                    self.pulse_obj.name))
