@@ -614,20 +614,20 @@ class DeviceCCL(Instrument):
         """
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        for q in [q0, q1]:
-            # This can be
-            mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
-
-            lm = mw_lutman.LutMap()
-            # we hardcode the X on the ef transition to CW 31 here.
-            lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
-            # load_phase_pulses will also upload other waveforms
-            mw_lutman.load_phase_pulses_to_AWG_lookuptable()
-            mw_lutman.load_waveforms_onto_AWG_lookuptable(
-                regenerate_waveforms=True)
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0, q1])
+            for q in [q0, q1]:
+                # This can be
+                mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+
+                lm = mw_lutman.LutMap()
+                # we hardcode the X on the ef transition to CW 31 here.
+                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+                # load_phase_pulses will also upload other waveforms
+                mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+                mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                    regenerate_waveforms=True)
 
         if MC is None:
             MC = self.instr_MC.get_instr()

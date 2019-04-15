@@ -460,7 +460,7 @@ class CCLight_Transmon(Qubit):
             AWG = lutman.find_instrument(lutman.AWG())
             using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
             if using_QWG:
-                logging.warning('CCL transmon is using QWG. Not implemented.')
+                logging.warning('CCL transmon is using QWG. mw_fine_delay not supported.')
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_I()-1), val)
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_Q()-1), val)
@@ -475,7 +475,7 @@ class CCLight_Transmon(Qubit):
         AWG = lutman.find_instrument(lutman.AWG())
         using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
         if using_QWG:
-            logging.warning('CCL transmon is using QWG. Not implemented.')
+            logging.warning('CCL transmon is using QWG. flux_fine_delay not supported.')
         else:
             AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
             # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))

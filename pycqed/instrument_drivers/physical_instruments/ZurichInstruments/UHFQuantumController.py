@@ -883,6 +883,9 @@ class UHFQC(Instrument):
         # adding the final part of the sequence including a default wave
         sequence = (sequence +
                     '  default:\n' +
+                    # the default wave should never trigger, noneteless if it does trigger 
+                    # it indicates that 1. the correct codeword can not be triggered and 
+                    # 2. that there are triggers bio received. 
                     '   playWave(ones(36), ones(36));\n' +
                     ' }\n' +
                     ' wait(wait_delay);\n' +
