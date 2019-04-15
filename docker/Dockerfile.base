@@ -10,6 +10,7 @@ RUN apt-get update && \
         cmake \
         gcc \
         g++ \
+        libxkbcommon-x11-0 \
         make \
         swig \
         xvfb && \
