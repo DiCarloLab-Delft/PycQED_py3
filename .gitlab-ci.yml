@@ -43,7 +43,6 @@ build base image:on-schedule:
     variables:
     # For weekly schedules
     - $SCHEDULE_FREQUENCY == "weekly"
-  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/245
   allow_failure: true
 
 build base image:manual:
@@ -62,8 +61,6 @@ build base image:manual:
     --context $CI_PROJECT_DIR
     --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.testing
     --destination $CI_REGISTRY_IMAGE/testing:$DOCKER_TAG
-    --build-arg GITHUB_PULL_USER=$GITHUB_PULL_USER
-    --build-arg GITHUB_PULL_TOKEN=$GITHUB_PULL_TOKEN
     --build-arg OPENQL_REVISION=$OPENQL_REVISION
     --build-arg QCODES_REVISION=$QCODES_REVISION
     --verbosity warn
@@ -74,7 +71,6 @@ build base image:manual:
     OPENQL_REVISION: $OPENQL_STABLE
     QCODES_REVISION: $QCODES_STABLE
     DOCKER_TAG: $CI_REF
-  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
 
 .docker-testing-template-devel:
   extends: .docker-testing-template
@@ -82,7 +78,6 @@ build base image:manual:
     DOCKER_TAG: "devel"
     OPENQL_REVISION: $OPENQL_UNSTABLE
     QCODES_REVISION: $QCODES_UNSTABLE
-  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
 
 build stable testing image:master:
   extends: .docker-testing-template-stable
