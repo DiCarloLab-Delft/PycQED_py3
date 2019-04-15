@@ -8,3 +8,4 @@ coverage:
           - "!pycqed/tests"
         threshold: 5
         base: auto
+    patch: no
