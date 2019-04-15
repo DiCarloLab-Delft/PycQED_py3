@@ -1,0 +1,10 @@
+coverage:
+  status:
+    project:
+      default: false
+      pycqed:
+        paths:
+          - "pycqed/"
+          - "!pycqed/tests"
+        threshold: 5
+        base: auto

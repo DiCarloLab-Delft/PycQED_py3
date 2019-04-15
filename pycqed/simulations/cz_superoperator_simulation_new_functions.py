@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 np.set_printoptions(threshold=np.inf)
 
 
+# Hardcoded number of levels for the two transmons.
+# Currently only 3,3 or 4,3 are supported. The bottleneck is the function 
+# that changes to the dressed basis at sweet spot (matrix_change_of_variables)
 n_levels_q0 = 4
 n_levels_q1 = 3
 
@@ -24,6 +27,7 @@ n_q1 = b.dag() * b
 
 
 def basis_state(i,j,to_vector=True):
+	# Returns ket |ij> as ket or vector in Liouville representation
     ket = qtp.tensor(qtp.ket([i], dim=[n_levels_q1]),
                                    qtp.ket([j], dim=[n_levels_q0])) #notice it's a ket
     if to_vector:
@@ -36,6 +40,8 @@ def basis_state(i,j,to_vector=True):
 # note that the Hilbert space is H_q1 /otimes H_q0
 # E.g. for two qutrits the ordering of basis states is 00,01,02,10,11,12,20,21,22
 def target_CZ():
+	# ideal CZ performed with avoided crossing 11-02
+	# (note that both states receive a minus)
     U_target = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0))
     state11 = basis_state(1,1,to_vector=False)
     state02 = basis_state(0,2,to_vector=False)
@@ -58,11 +64,16 @@ rho_{xy,x'y'}=operator_to_vector(rho)[3*x+y+27*x'+9*y']
 where xy is the row and x'y' is the column
 '''
 def index_in_ket(indeces):
+	# returns vector index of ket |xy>
+	# Input(list): [x,y]
     x = indeces[0]
     y = indeces[1]
     return n_levels_q0*x+y
 
+
 def index_in_vector_of_dm_matrix_element(ket_indeces,bra_indeces):
+	# returns vector index of density matrix |xy><x_prime y_prime|
+	# Input(list): [x,y], [x_prime,y_prime]
     x = ket_indeces[0]
     y = ket_indeces[1]
     x_prime = bra_indeces[0]
@@ -70,8 +81,9 @@ def index_in_vector_of_dm_matrix_element(ket_indeces,bra_indeces):
     return x*n_levels_q0 + y + x_prime*n_levels_q0**2*n_levels_q1 + y_prime*n_levels_q0*n_levels_q1
 
 
-
 def list_of_vector_indeces(subspace):
+	# returns list of 2-element lists depending on 'subspace'
+	# See below for valid keywords
     full_list = []
     for i in range(0,n_levels_q1):
         for j in range(0,n_levels_q0):
@@ -98,7 +110,7 @@ def list_of_vector_indeces(subspace):
 
 def qubit_to_2qutrit_unitary(U_2q,right_or_left):
     # Transforms a unitary for a qubit into a unitary for a two-qudit system (possibly different qudits).
-    # right_or_left ('right' or 'left') specifies whether U_2q acts on QR or QL
+    # right_or_left ('right' or 'left') specifies whether U_2q acts on q0 or q1
     if right_or_left == 'right':
         d = n_levels_q0
     elif right_or_left == 'left':
@@ -295,7 +307,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
             collapse=qtp.tensor(qtp.qeye(n_levels_q1),sigmaZinqutrit)
             c_ops.append([collapse,np.sqrt(rate_02_scaling/(2*Tphi02_q0_vec))])
 
-    elif n_levels_q0 >= 4:
+    elif n_levels_q0 >= 4:    # currently, when q0 is a 4-dit, we use simple model where decay is quadratic with sensitivity
 
         if Tphi01_q0_vec != []:
 
@@ -700,7 +712,7 @@ def offset_difference_and_missing_fraction(U):
             population_in_0_q1 = U_tot[index_in_vector_of_dm_matrix_element([0,0],[0,0]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]+ \
                                  U_tot[index_in_vector_of_dm_matrix_element([0,1],[0,1]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]+\
                                  U_tot[index_in_vector_of_dm_matrix_element([0,2],[0,2]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]
-            if n_levels_q0 == 4:
+            if n_levels_q0 >= 4:
                 population_in_0_q1 += U_tot[index_in_vector_of_dm_matrix_element([0,3],[0,3]),index_in_vector_of_dm_matrix_element([0,0],[0,0])]
             population_in_0_q1=np.real(population_in_0_q1)
 
@@ -1082,6 +1094,8 @@ def linear_with_offset(x, a, b):
 def matrix_change_of_variables(H_0):
     # matrix diagonalizing H_0 as
     #       S.dag()*H_0*S = diagonal
+
+    # order enforced manually based on what we know of the two coupled-transmon system
     eigs,eigvectors=H_0.eigenstates()
 
     eigvectors_ordered_according2basis = []
@@ -1445,28 +1459,24 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
 
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
-                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(leakage_vec)*100,np.array(leakage_dephased_vec)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Leakage (%)',
                   legend_labels=['Using directly the $CZ$ from the simulations','Depolarizing the leakage subspace'])
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
-                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_02)*100,np.array(popul_in_02_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['11 to 02','11 to 02, dephased case'])
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
-                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_20)*100,np.array(popul_in_20_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['11 to 20','11 to 20, dephased case'])
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
-                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_21from12)*100,np.array(popul_in_21from12_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
@@ -1474,21 +1484,19 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
 
     if n_levels_q0 >= 4:
         plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
-                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_03from12)*100,np.array(popul_in_03from12_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['12 to 03','12 to 03, dephased case'])
 
+    # test should give back always 1
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
-                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_test)*100,np.array(popul_test_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['test','test, dephased case'])
 
     plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
-                  #y_plot_vec=[np.array(leakage_vec)*100,np.array(infid_vec)*100,np.array(leakage_dephased_vec)*100,np.array(infid_dephased_vec)*100],
                   y_plot_vec=[np.array(popul_in_10from01)*100,np.array(popul_in_10from01_dephased)*100],
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
@@ -1538,6 +1546,7 @@ def correct_phases(U):
 
 
 def phase_correction_U(U,states_to_fix):
+	# function that apply phase corrections for adequate computation of fidelity to a CZ.
 
     phases=phases_from_superoperator(U)
     
@@ -1723,11 +1732,16 @@ def population_transfer(U_superop,state_in,state_out):
 
 
 def test_population_transfer(pop1,pop2):
+	# should give back always 1
 	tot=pop1+pop2
 	print(tot)
 
 
 def average_population_transfer_subspace_to_subspace(U_superop,states_in,states_out):
+	# computes population that goes from input to output state,
+	# or average population going from one subspace to another.
+	# Input: superoperator U_superop
+	#        list of 2-element lists as states_in and states_out, or keywords specified below
 
 	if states_in == 'compsub':
 		states_in = list_of_vector_indeces('compsub')
@@ -1752,6 +1766,8 @@ def average_population_transfer_subspace_to_subspace(U_superop,states_in,states_
 def nullify_coherence(U_temp,state_A,state_B):
     # U_temp: superop
     # state_X: list e.g. [0,1]
+    # This function sets to 0 the coherence between state_A and state_B in the output density matrix (whatever the input)
+    # by setting to 0 the appropriate matrix element in the superoperator.
 
     for x_prime in range(0,n_levels_q1):
         for y_prime in range(0,n_levels_q0):
