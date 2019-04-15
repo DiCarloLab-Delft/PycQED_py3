@@ -23,7 +23,10 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
-from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
+from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL, CCL
+from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC, QCC
+
+
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
@@ -52,6 +55,7 @@ class Test_Device_obj(unittest.TestCase):
         self.UHFQC = dummy_UHFQC('UHFQC')
 
         self.CCL = dummy_CCL('CCL')
+        self.QCC = dummy_QCC('QCC')
         self.VSM = Dummy_Duplexer('VSM')
 
         self.MC = measurement_control.MeasurementControl(
@@ -111,6 +115,61 @@ class Test_Device_obj(unittest.TestCase):
         self.CCL_qubit.mw_mixer_offs_GQ(.2)
         self.CCL_qubit.mw_mixer_offs_DI(.3)
         self.CCL_qubit.mw_mixer_offs_DQ(.4)
+
+        # Set up the device object and set required params
+        self.device = do.DeviceCCL('device')
+        self.device.qubits([self.CCL_qubit.name])
+        self.device.instr_CC(self.CCL.name)
+
+    def test_get_dio_map(self):
+        self.device.instr_CC(self.CCL.name)
+        dio_map = self.device.dio_map()
+        expected_dio_map = {'ro_0': 1,
+                            'ro_1': 2,
+                            'flux_0': 3,
+                            'mw_0': 4,
+                            'mw_1': 5}
+        assert dio_map == expected_dio_map
+
+        self.device.instr_CC(self.QCC.name)
+        dio_map = self.device.dio_map()
+        expected_dio_map = {'ro_0': 1,
+                            'ro_1': 2,
+                            'ro_2': 3,
+                            'flux_0': 4,
+                            'flux_1': 5,
+                            'flux_2': 6,
+                            'mw_0': 7,
+                            'mw_1': 8,
+                            }
+        assert dio_map == expected_dio_map
+
+    def test_prepare_timing_CCL(self):
+        self.device.instr_CC(self.CCL.name)
+        self.device.tim_ro_latency_0(200e-9)
+        self.device.tim_ro_latency_1(180e-9)
+        self.device.tim_flux_latency_0(-40e-9)
+        self.device.tim_mw_latency_0(20e-9)
+        self.device.tim_mw_latency_1(0e-9)
+
+        self.device.prepare_timing()
+
+        # DIO timing map for CCL:
+        # dio1: ro_latency_0
+        # dio2: ro_latency_1
+        # dio3: flux_latency_0
+        # dio4: mw_latency_0
+        # dio5: mw_latency_1
+
+        assert(self.CCL.dio1_out_delay() == 12)
+        assert(self.CCL.dio2_out_delay() == 11)
+        assert(self.CCL.dio3_out_delay() == 0)
+        assert(self.CCL.dio4_out_delay() == 3)
+        assert(self.CCL.dio5_out_delay() == 2)
+
+    def test_prepare_timing_QCC(self):
+        self.device.tim_ro_latency_0(200e-9)
+        self.device.prepare_timing()
 
     @classmethod
     def tearDownClass(self):
