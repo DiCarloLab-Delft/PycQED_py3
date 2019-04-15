@@ -33,6 +33,7 @@ before_script:
     --context $CI_PROJECT_DIR
     --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.base
     --destination $CI_REGISTRY_IMAGE/base:$CI_REF
+    --verbosity warn
 
 build base image:on-schedule:
   extends: .docker-base-template
@@ -63,6 +64,7 @@ build base image:manual:
     --build-arg GITHUB_PULL_TOKEN=$GITHUB_PULL_TOKEN
     --build-arg OPENQL_REVISION=$OPENQL_REVISION
     --build-arg QCODES_REVISION=$QCODES_REVISION
+    --verbosity warn
 
 .docker-testing-template-stable:
   extends: .docker-testing-template
