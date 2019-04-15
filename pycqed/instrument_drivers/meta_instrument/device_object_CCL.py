@@ -136,31 +136,49 @@ class DeviceCCL(Instrument):
         # Timing related parameters
         self.add_parameter('tim_ro_latency_0',
                            unit='s',
-                           label='readout latency DIO 1',
+                           label='Readout latency 0',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
         self.add_parameter('tim_ro_latency_1',
                            unit='s',
-                           label='readout latency DIO 2',
+                           label='Readout latency 1',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_ro_latency_2',
+                           unit='s',
+                           label='Readout latency 2',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
         self.add_parameter('tim_flux_latency_0',
                            unit='s',
-                           label='flux latency DIO 3',
+                           label='Flux latency 0',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_flux_latency_1',
+                           unit='s',
+                           label='Flux latency 1',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_flux_latency_2',
+                           unit='s',
+                           label='Flux latency 2',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
         self.add_parameter('tim_mw_latency_0',
                            unit='s',
-                           label='microwave latency DIO 4',
+                           label='Microwave latency 0',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
         self.add_parameter('tim_mw_latency_1',
                            unit='s',
-                           label='microwave latency DIO 5',
+                           label='Microwave latency 1',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
@@ -180,14 +198,14 @@ class DeviceCCL(Instrument):
                        'mw_1': 5}
         elif isinstance(CC, QCC):
             dio_map = {'ro_0': 1,
-                           'ro_1': 2,
-                           'ro_2': 3,
-                           'flux_0': 4,
-                           'flux_1': 5,
-                           'flux_2': 6,
-                           'mw_0': 7,
-                           'mw_1': 8,
-                           }
+                       'ro_1': 2,
+                       'ro_2': 3,
+                       'flux_0': 4,
+                       'flux_1': 5,
+                       'flux_2': 6,
+                       'mw_0': 7,
+                       'mw_1': 8,
+                       }
         else:
             return ValueError('CC type not recognized')
         return dio_map
@@ -214,11 +232,14 @@ class DeviceCCL(Instrument):
         N.B. As latencies here are controlled through the DIO delays it can only be controlled in multiples of 20 ns.
         """
         # 2. Setting the latencies
-        latencies = OrderedDict([('ro_latency_0', self.tim_ro_latency_0()),
-                                 ('ro_latency_1', self.tim_ro_latency_1()),
-                                 ('flux_latency_0', self.tim_flux_latency_0()),
-                                 ('mw_latency_0', self.tim_mw_latency_0()),
-                                 ('mw_latency_1', self.tim_mw_latency_1())])
+        latencies = OrderedDict([('ro_0', self.tim_ro_latency_0()),
+                                 ('ro_1', self.tim_ro_latency_1()),
+                                 ('ro_2', self.tim_ro_latency_2()),
+                                 ('flux_0', self.tim_flux_latency_0()),
+                                 ('flux_1', self.tim_flux_latency_1()),
+                                 ('flux_2', self.tim_flux_latency_2()),
+                                 ('mw_0', self.tim_mw_latency_0()),
+                                 ('mw_1', self.tim_mw_latency_1())])
 
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
@@ -228,31 +249,23 @@ class DeviceCCL(Instrument):
         for key, val in latencies.items():
             latencies[key] = val - lowest_value
 
+        # FIXME: it is not clear what this snippet does threats one of the
+        # latencies as special. This should probably be removed.
         # ensuring that RO latency is a multiple of 20 ns
-        ro_latency_modulo_20 = latencies['ro_latency_0'] % 20e-9
+        ro_latency_modulo_20 = latencies['ro_0'] % 20e-9
         for key, val in latencies.items():
             latencies[key] = val + (20e-9 - ro_latency_modulo_20) % 20e-9
 
         # Setting the latencies in the CCL
-        CCL = self.instr_CC.get_instr()
-        for i, (key, val) in enumerate(latencies.items()):
+        CC = self.instr_CC.get_instr()
+        dio_map = self.dio_map()
 
-            # This functionality sets the fine delays on a per qubit basis.
-            # As this does not include per channel settings this is
-            # removed for now.
-            # for qbt in self.qubits():
-            #     # get qubit objects
-            #     q = self.find_instrument(qbt)
-            #     # set delay AWGs and channels
-            #     if key in ('ro_latency_0'):
-            #         pass
-            #     elif key in ('flux_latency_0'):
-            #         q.flux_fine_delay(val % 20e-9)
-            #     elif key in ('mw_latency_0'):
-            #         q.mw_fine_delay(val % 20e-9)
-
-            CCL.set('dio{}_out_delay'.format(i+1),
-                    int(val // 20e-9))  # Convert to CCL dio value
+        # Iterate over keys in dio_map as this ensures only relevant
+        # timing setting are set.
+        for lat_key, dio_ch in dio_map.items():
+            lat = latencies[lat_key]
+            CC.set('dio{}_out_delay'.format(dio_ch),
+                   int(lat // 20e-9))  # Convert to CC dio value
 
     def prepare_readout(self, qubits):
         self._prep_ro_setup_qubits(qubits=qubits)

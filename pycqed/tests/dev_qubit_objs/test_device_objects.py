@@ -168,8 +168,23 @@ class Test_Device_obj(unittest.TestCase):
         assert(self.CCL.dio5_out_delay() == 2)
 
     def test_prepare_timing_QCC(self):
+        self.device.instr_CC(self.QCC.name)
         self.device.tim_ro_latency_0(200e-9)
+        self.device.tim_ro_latency_1(180e-9)
+        self.device.tim_flux_latency_0(-40e-9)
+        self.device.tim_flux_latency_1(100e-9)
+        self.device.tim_mw_latency_0(20e-9)
+        self.device.tim_mw_latency_1(0e-9)
+
         self.device.prepare_timing()
+
+        assert(self.QCC.dio1_out_delay() == 12)
+        assert(self.QCC.dio2_out_delay() == 11)
+        assert(self.QCC.dio4_out_delay() == 0)
+        assert(self.QCC.dio5_out_delay() == 7)
+
+        assert(self.QCC.dio7_out_delay() == 3)
+        assert(self.QCC.dio8_out_delay() == 2)
 
     @classmethod
     def tearDownClass(self):
