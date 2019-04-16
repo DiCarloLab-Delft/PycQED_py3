@@ -275,7 +275,7 @@ class QuTech_AWG_Module(SCPI):
                            unit='S',
                            label='Only calibrate DIO input with a specified time',
                            set_cmd='DIO:CALibrate:INPut {}',
-                           vals=vals.Numbers(1e-6, 10),
+                           vals=vals.Numbers(1e-6),
                            docstring='Calibrate only the DIO input signals.\n'
                                      'Parameter:'
                                      '\tMeasurement time between bitDiffs in seconds, resolution of 1e-6 s\n'
