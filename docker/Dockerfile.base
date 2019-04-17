@@ -10,6 +10,7 @@ RUN apt-get update && \
         cmake \
         gcc \
         g++ \
+        libxkbcommon-x11-0 \
         make \
         swig \
         xvfb && \
@@ -41,7 +42,7 @@ RUN pip install --upgrade --no-cache-dir pip && \
         networkx \
         spirack \
         pyzmq \
-        pygsti \
+        "pygsti<0.9.6" \
         pyqtgraph \
         pyserial \
         pytest \
