@@ -461,13 +461,15 @@ class ZI_HDAWG8(ZI_base_instrument):
         # Try as float32 instead
         self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c.astype(np.float32))
 
-        data = self._dev.poll()
-        t0 = time.time()
-        while not data: 
-            data = self._dev.poll()
-            if time.time()-t0> self.timeout(): 
-                raise TimeoutError
-        self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
+        # Commented out checking if ready. 
+        # creates too much time overhead.
+        # data = self._dev.poll()
+        # t0 = time.time()
+        # while not data: 
+        #     data = self._dev.poll()
+        #     if time.time()-t0> self.timeout(): 
+        #         raise TimeoutError
+        # self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
         self._dev.seti('awgs/{}/enable'.format(awg_nr), 1)
 
 
