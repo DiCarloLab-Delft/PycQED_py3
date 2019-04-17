@@ -344,6 +344,9 @@ def phases_from_superoperator(U):
         index_12=index_in_ket([1,2])
         phi_12 = np.rad2deg(np.angle(U[index_12, index_12]))
 
+        index_21=index_in_ket([2,1])
+        phi_21 = np.rad2deg(np.angle(U[index_21, index_21]))
+
     elif U.type=='super':
         phi_00 = 0   # we set it to 0 arbitrarily but it is indeed not knowable
         index_01=index_in_vector_of_dm_matrix_element([0,1],[0,0])
@@ -364,10 +367,13 @@ def phases_from_superoperator(U):
         index_12=index_in_vector_of_dm_matrix_element([1,2],[0,0])
         phi_12 = np.rad2deg(np.angle(U[index_12, index_12]))
 
+        index_21=index_in_vector_of_dm_matrix_element([2,1],[0,0])
+        phi_21 = np.rad2deg(np.angle(U[index_21, index_21]))
+
 
     phi_cond = (phi_11 - phi_01 - phi_10 + phi_00) % 360  # still the right formula independently from phi_00
 
-    return phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_12, phi_cond
+    return phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_12, phi_21, phi_cond
 
 
 def leakage_from_superoperator(U):
@@ -971,6 +977,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
     offset_difference, missing_fraction = offset_difference_and_missing_fraction(U_final)
 
     phase_diff_12_02 = (phases[6]-phases[4]) % 360
+    phase_diff_21_20 = (phases[7]-phases[5]) % 360
 
 
     H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=0, J=0)
@@ -994,7 +1001,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
             'avgatefid_compsubspace_pc_onlystaticqubit': avgatefid_compsubspace_pc_onlystaticqubit, 'population_02_state': population_02_state,
             'cond_phase02': cond_phase02, 'coherent_leakage11': coherent_leakage11,
             'offset_difference': offset_difference, 'missing_fraction': missing_fraction,
-            'phase_diff_12_02': phase_diff_12_02}
+            'phase_diff_12_02': phase_diff_12_02, 'phase_diff_21_20': phase_diff_21_20}
 
 
 
