@@ -50,3 +50,18 @@ class QuTechCC(SCPIBase):
         """
         """
         self._transport.write('awgcontrol:stop:immediate')
+
+
+    def get_status_questionable_frequency_condition(self):
+        return self._ask_int('STATus:QUEStionable:FREQ:CONDition?')
+
+    def get_status_questionable_frequency_event(self):
+        return self._ask_int('STATus:QUEStionable:FREQ:EVENt?')
+
+    def set_status_questionable_frequency_enable(self, val):
+        self._transport.write('STATus:QUEStionable:FREQ:ENABle {}'.format(val))
+
+    def get_status_questionable_frequency_enable(self):
+        return self._ask_int('STATus:QUEStionable:FREQ:ENABle?')
+
+

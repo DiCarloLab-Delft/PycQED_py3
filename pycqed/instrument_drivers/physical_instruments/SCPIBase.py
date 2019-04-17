@@ -47,7 +47,7 @@ class SCPIBase:
     def get_event_status_enable(self) -> str:
         return self._ask('*ESE?')
 
-    def get_event_status_enable_register(self) -> str:
+    def get_event_status_register(self) -> str:
         return self._ask('*ESR?')
 
     def get_identity(self) -> str:
@@ -144,6 +144,35 @@ class SCPIBase:
     # FIXME: additions
     # enter_critical
     # exit_critical
+
+    def get_status_questionable_condition(self):
+        return self._ask_int('STATus:QUEStionable:CONDition?')
+
+    def get_status_questionable_event(self):
+        return self._ask_int('STATus:QUEStionable:EVENt?')
+
+    def set_status_questionable_enable(self, val):
+        self._transport.write('STATus:QUEStionable:ENABle {}'.format(val))
+
+    def get_status_questionable_enable(self):
+        return self._ask_int('STATus:QUEStionable:ENABle?')
+
+
+    def set_status_preset(self):
+        self._transport.write('STATus:PRESet')
+
+
+    def get_status_operation_condition(self):
+        return self._ask_int('STATus:OPERation:CONDition?')
+
+    def get_status_operation_event(self):
+        return self._ask_int('STATus:OPERation:EVENt?')
+
+    def set_status_operation_enable(self, val):
+        self._transport.write('STATus:OPERation:ENABle {}'.format(val))
+
+    def get_status_operation_enable(self):
+        return self._ask_int('STATus:OPERation:ENABle?')
 
 
     ###

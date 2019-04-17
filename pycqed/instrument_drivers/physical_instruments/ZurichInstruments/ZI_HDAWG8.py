@@ -38,6 +38,9 @@ Changelog:
 - moved in _add_extra_parameters() and _add_codeword_parameters()
 - moved out _set_dio_delay()
 
+20190417 WJV
+- merged branch 'develop' into 'feature/cc'
+
 """
 
 import time
@@ -166,8 +169,8 @@ class ZI_HDAWG8(ZI_HDAWG_core):
                             'wave_ch{}_cw{:03}'.format(ch, cw0))))
                     # if no wfs are triggered play only zeros
                     else:
-                        wf0_cmd = 'zeros({})'.format(928)
-                        wf1_cmd = 'zeros({})'.format(928)
+                        wf0_cmd = 'zeros({})'.format(928) # this length is to account for #109
+                        wf1_cmd = 'zeros({})'.format(928) # this length is to account for #109
 
                     waveform_table += 'setWaveDIO({}, {}, {});\n'.format(
                         cw, wf0_cmd, wf1_cmd)
