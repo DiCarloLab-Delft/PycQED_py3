@@ -27,8 +27,9 @@ class Sequence:
 
     def sequence_for_awg(self):
         """
-        Returns for an AWG a sequence with the ordered tuples containing
-        element names and 'RO' flag for readout elements
+        Returns for an AWG a sequence with the ordered lists containing
+        element name, segment name and 'RO' flag for readout elements and 
+        'codeword' flag for codeword elements
         """
 
         self.awg_sequence = {}
@@ -42,7 +43,8 @@ class Sequence:
                     continue
 
                 for element in seg.elements_on_awg[awg]:
+                    self.awg_sequence[awg].append([element, segment])
                     if element in seg.acquisition_elements:
-                        self.awg_sequence[awg].append((element, segment,'RO'))
-                    else:
-                        self.awg_sequence[awg].append((element, segment, ))
+                        self.awg_sequence[awg][-1].append('RO')
+                    if element in seg.codeword_elements:
+                        self.awg_sequence[awg][-1].append('codeword')

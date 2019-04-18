@@ -25,6 +25,7 @@ class Segment:
         self.trigger_pars = {'length': 20e-9, 'amplitude': 1}
         self._pulse_names = set()
         self.acquisition_elements = set()
+        self.codeword_elements = set()
 
         for pulse_pars in pulse_pars_list:
             self.add(pulse_pars)
@@ -795,6 +796,10 @@ class Segment:
                     pulse_channels = set(pulse.channels) & set(channel_list)
                     if pulse_channels == set():
                         continue
+
+                    # adds the element to codeword_elements set
+                    if pulse.codeword != 'no_codeword':
+                        self.codeword_elements.add(element)
 
                     # fills wfs with zeros for used channels
                     if pulse.codeword not in wfs:

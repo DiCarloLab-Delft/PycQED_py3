@@ -102,7 +102,105 @@ class UHFQCPulsar:
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(0., 1.), initial_value=0.5)
 
-    def _program_awg(self, obj, sequence, el_wfs, loop=True):
+    def _program_awg(self, obj, sequence):
+        if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
+            return super()._program_awg(obj, sequence)
+
+        header = "const TRIGGER1  = 0x00000001;\n" \
+                 "const TRIGGER2  = 0x00000002;\n" \
+                 "const WINT_TRIG = 0x00000010;\n" \
+                 "const IAVG_TRIG = 0x00000020;\n" \
+                 "const WINT_EN   = 0x01ff0000;\n" \
+                 "setTrigger(WINT_EN);\n" \
+                 "var loop_cnt = getUserReg(0);\n" \
+                 "var RO_TRIG;\n" \
+                 "if (getUserReg(1)) {\n" \
+                 "  RO_TRIG=IAVG_TRIG;\n" \
+                 "} else {\n" \
+                 "  RO_TRIG=WINT_TRIG;\n" \
+                 "}\n\n"
+            
+        main_loop = "repeat (loop_cnt) {\n"
+
+        footer = "}\n" \
+                 "wait(1000);\n" \
+                 "setTrigger(0);\n"
+
+        waveform_data = {}
+
+        ch_has_waveforms = {'ch1': False, 'ch2': False}
+
+        for segment in sequence.segments:
+            wfs = sequence.segments[segment].waveforms(awgs=[obj.name])
+            if obj.name not in wfs:
+                continue
+            wfs = wfs[obj.name]
+            for (i, el) in wfs:
+                if len(set(wfs[(i, el)].keys()) - {'no_codeword'}) != 0:
+                    raise NotImplementedError('UHFQC sequencer does currently\
+                                               not support codewords!')
+                
+                channel_wfs = wfs[(i, el)]['no_codeword']
+                
+                # save waveforms in waveform_data
+                for cid in ['ch1', 'ch2']:
+                    if cid not in channel_wfs:
+                        continue
+                    # Set ch_has_waveforms True for this channel (only
+                    # for non marker channels)
+                    
+                    ch_has_waveforms[cid] = True
+                    wfname = str(el) + '_' + cid
+                    cid_wf = channel_wfs[cid]
+                    waveform_data[wfname] = cid_wf
+                    if len(cid_wf) > 0 and cid_wf[0] != 0.:
+                        log.warning(
+                            'Pulsar: Trigger wait set for element {} with a non-zero first '
+                            'point'.format(el))
+                            
+        if not (ch_has_waveforms['ch1'] or ch_has_waveforms['ch1']):
+            ### Turn off all channels and return ###
+            return
+        
+        for el_info in sequence.awg_sequence[obj.name]:
+                # Expected element names
+                el = el_info[0]
+                name_ch1 = el + '_ch1'
+                name_ch2 = el + '_ch2'
+
+                # if channel name not in waveform_data None has to be
+                # passed to _hdawg_element_seqc()
+                if name_ch1 not in waveform_data:
+                    name_ch1 = None
+                else:
+                    name_ch1 = wf_name(el, 'ch1', '', obj._devname, False)
+
+                if name_ch2 not in waveform_data:
+                    name_ch2 = None
+                else:
+                    name_ch2 = wf_name(el, 'ch2', '', obj._devname, False)
+
+                if name_ch1 is not None or name_ch2 is not None:
+                    main_loop += self._UHFQC_element_seqc(name_ch1, name_ch2, 'RO' in el_info)
+
+        awg_str = header + main_loop + footer
+
+        # write waveforms to csv file
+        for wfname, data in waveform_data.items():
+            obj._write_csv_waveform(simplify_name(wfname), np.array(data))
+
+        log.info("Programming {} sequence '{}'".format(obj.name, sequence.name))
+
+        # here we want to use a timeout value longer than the obj.timeout()
+        # as programming the AWGs takes more time than normal communications
+        obj.configure_awg_from_string(awg_nr, awg_str, timeout=600)
+
+        obj.set('awgs_{}_dio_valid_polarity'.format(awg_nr),
+                prev_dio_valid_polarity)
+
+        
+    
+    def _old_program_awg(self, obj, sequence, el_wfs, loop=True):
         if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
             return super()._program_awg(obj, sequence, el_wfs, loop)
 
@@ -192,14 +290,12 @@ class UHFQCPulsar:
 
         return obj.awgs_0_enable() != 0
 
-    def _UHFQC_element_seqc(self, reps, wait, name1, name2, readout):
+    def _UHFQC_element_seqc(self, name1, name2, readout):
         """
         Generates a part of the sequence code responsible for playing back a
         single element
 
         Args:
-            reps: number of repetitions for this code
-            wait: boolean flag, whether to wait for trigger
             name1: name of the wave to be played on channel 1
             name2: name of the wave to be played on channel 2
             readout: boolean flag, whether to acquire a datapoint after the
@@ -207,10 +303,9 @@ class UHFQCPulsar:
         Returns:
             string for playing back an element
         """
-        repeat_open_str = '\trepeat ({}) {{\n'.format(
-            reps) if reps != 1 else ''
+
         wait_wave_str = '\t\twaitWave();\n'
-        trigger_str = '\t\twaitDigTrigger(1, 1);\n' if wait else ''
+        trigger_str = '\t\twaitDigTrigger(1, 1);\n'
         if name1 is None:
             play_str = '\t\tplayWave(2, {});\n'.format(name2)
         elif name2 is None:
@@ -219,9 +314,7 @@ class UHFQCPulsar:
             play_str = '\t\tplayWave({}, {});\n'.format(name1, name2)
         readout_str = '\t\tsetTrigger(WINT_EN+RO_TRIG);\n' if readout else ''
         readout_str += '\t\tsetTrigger(WINT_EN);\n' if readout else ''
-        repeat_close_str = '\t}\n' if reps != 1 else ''
-        return repeat_open_str + wait_wave_str + trigger_str + play_str + \
-               readout_str + repeat_close_str
+        return wait_wave_str + trigger_str + play_str + readout_str
 
     def _clock(self, obj):
         if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
@@ -239,11 +332,13 @@ class HDAWG8Pulsar:
         if not isinstance(awg, HDAWG8Pulsar._supportedAWGtypes):
             return super()._create_awg_parameters(awg, channel_name_map)
         
+        name = awg.name
+
         self.add_parameter('{}_granularity'.format(awg.name),
                            get_cmd=lambda: 16)
         self.add_parameter('{}_element_start_granularity'.format(awg.name),
                            get_cmd=lambda: 8/(2.4e9))
-        self.add_parameter('{}_min_length'.format(name),
+        self.add_parameter('{}_min_length'.format(awg.name),
                            get_cmd=lambda: 16 / 2.4e9)
         self.add_parameter('{}_inter_element_deadtime'.format(awg.name),
                            # get_cmd=lambda: 80 / 2.4e9)
@@ -251,7 +346,7 @@ class HDAWG8Pulsar:
                            # get_cmd=lambda: 0 / 2.4e9)
         self.add_parameter('{}_precompile'.format(awg.name), 
                            initial_value=False, vals=vals.Bool(),
-                           label='{} precompile segments'.format(name),
+                           label='{} precompile segments'.format(awg.name),
                            parameter_class=ManualParameter)
         self.add_parameter('{}_delay'.format(awg.name), 
                            initial_value=0, label='{} delay'.format(name), 
@@ -264,7 +359,7 @@ class HDAWG8Pulsar:
                            label='{} trigger channel'.format(awg.name), 
                            parameter_class=ManualParameter)
         self.add_parameter('{}_active'.format(awg.name), initial_value=True,
-                           label='{} active'.format(name),
+                           label='{} active'.format(awg.name),
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
         for ch_nr in range(8):
@@ -283,13 +378,13 @@ class HDAWG8Pulsar:
         self.add_parameter('{}_type'.format(name), get_cmd=lambda: 'analog')
         self.add_parameter('{}_offset'.format(name),
                            label='{} offset'.format(name), unit='V',
-                           set_cmd=self._HDAWG8_setter(awg, id, 'offset'),
-                           get_cmd=self._HDAWG8_getter(awg, id, 'offset'),
+                           set_cmd=self._hdawg_setter(awg, id, 'offset'),
+                           get_cmd=self._hdawg_getter(awg, id, 'offset'),
                            vals=vals.Numbers())
         self.add_parameter('{}_amp'.format(name),
                             label='{} amplitude'.format(name), unit='V',
-                            set_cmd=self._HDAWG8_setter(awg, id, 'amp'),
-                            get_cmd=self._HDAWG8_getter(awg, id, 'amp'),
+                            set_cmd=self._hdawg_setter(awg, id, 'amp'),
+                            get_cmd=self._hdawg_getter(awg, id, 'amp'),
                             vals=vals.Numbers(0.01, 5.0))
         self.add_parameter('{}_distortion'.format(name),
                             label='{} distortion mode'.format(name),
@@ -360,9 +455,153 @@ class HDAWG8Pulsar:
                 return 1
         else:
             raise NotImplementedError('Unknown parameter {}'.format(par))
-        return g
+        return g 
 
-    def _program_awg(self, obj, sequence, el_wfs, loop=True):
+    def _program_awg(self, obj, sequence):
+        if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
+            return super()._program_awg(obj, sequence)
+
+        # delete previous cache files
+        obj._delete_chache_files()
+        log.info('Previous AWG8 cache files have been deleted.')
+        # delete old csv files
+        obj._delete_csv_files()
+        log.info('Previous AWG8 csv files have been deleted.')
+
+        ch_has_waveforms = {'ch{}'.format(i+1): False for i in range(8)}
+
+        for awg_nr in [0, 1, 2, 3]:
+            ch1id = 'ch{}'.format(awg_nr * 2 + 1)
+            ch1mid = 'ch{}m'.format(awg_nr * 2 + 1)
+            ch2id = 'ch{}'.format(awg_nr * 2 + 2)
+            ch2mid = 'ch{}m'.format(awg_nr * 2 + 2)
+
+            prev_dio_valid_polarity = obj.get(
+                'awgs_{}_dio_valid_polarity'.format(awg_nr))
+
+            # Create waveform definitions
+            header = ""
+
+            waveform_data = {}  
+            waveform_table = ""
+
+            for segment in sequence.segments:
+                wfs = sequence.segments[segment].waveforms(awgs=[obj.name])
+                if obj.name not in wfs:
+                    continue
+                wfs = wfs[obj.name]
+                for (i, el) in wfs:
+                    nr_cw = len(set(wfs[(i, el)].keys()) - {'no_codeword'})
+                    
+                    
+                    if nr_cw == 1:
+                        log.warning(
+                            'Only one codeword has been set for {}'.format(el))
+                    for (cw, cw_wfs) in wfs[(i, el)].items():
+                        if nr_cw != 0 and cw == 'no_codeword':
+                            # 'no_codeword' element not processed for codeword
+                            # elements
+                            continue
+                        
+                        # save waveforms in waveform_data
+                        for cid in [ch1id, ch1mid, ch2id, ch2mid]:
+                            if cid not in wfs[(i, el)][cw]:
+                                continue
+                            # set ch_has_waveforms True for this channel (only
+                            # for non marker channels)
+                            if cid != ch1mid and cid != ch2mid:
+                                ch_has_waveforms[cid] = True
+                            wfname = str(el) + '_' + cid
+                            cid_wf = wfs[(i, el)][cw][cid]
+                            waveform_data[wfname] = cid_wf
+                            if len(cid_wf) > 0 and cid_wf[0] != 0.:
+                                log.warning(
+                                    'Pulsar: Trigger wait set for element {} with a non-zero first '
+                                    'point'.format(el))
+                             
+
+                        # generate codeword table
+                        if cw == 'no_codeword':
+                            continue
+                        wfname1 = wf_name(el, ch1id, ch1mid, obj._devname, 
+                            ch1mid in cw_wfs) if ch1id in cw_wfs else None
+                        wfname2 = wf_name(el, ch2id, ch2mid, obj._devname, 
+                            ch2mid in cw_wfs) if ch2id in cw_wfs else None
+                        command = {
+                            (True, True): 'setWaveDIO({0}, {1}, {2});\n',
+                            (True, False): 'setWaveDIO({0}, 1, {1});\n',
+                            (False, True): 'setWaveDIO({0}, 2, {2});\n',
+                            (False, False): '',
+                        }[(wfname1 is not None, wfname2 is not None)]
+                        waveform_table += command.format(cw, wfname1, wfname2)
+
+            if not (ch_has_waveforms[ch1id] or ch_has_waveforms[ch2id]):
+                continue
+
+            main_loop = "while(1) {\n"
+            footer = "}\nwait(1000);\n"
+
+            for el_info in sequence.awg_sequence[obj.name]:
+                if 'codeword' in el_info:
+                    main_loop += self._hdawg_element_seqc(None, None)
+                    continue
+                
+                # Expected element names
+                el = el_info[0]
+                name_ch1 = str(el) + '_' + ch1id
+                name_ch1m = str(el) + '_' + ch1mid
+                name_ch2 = str(el) + '_' + ch2id
+                name_ch2m = str(el) + '_' + ch2mid
+
+                # if channel name not in waveform_data None has to be
+                # passed to _hdawg_element_seqc()
+                if name_ch1 not in waveform_data:
+                    name_ch1 = None
+                else:
+                    marker_ch = name_ch1m in waveform_data
+                    name_ch1 = wf_name(el, ch1id, ch1mid, obj._devname,
+                                    marker_ch)
+                                    
+                if name_ch2 not in waveform_data:
+                    name_ch2 = None
+                else:
+                    marker_ch = name_ch2m in waveform_data
+                    name_ch2 = wf_name(el, ch2id, ch2mid, obj._devname,
+                                    marker_ch)
+
+                if name_ch1 is not None or name_ch2 is not None:
+                    main_loop += self._hdawg_element_seqc(name_ch1, name_ch2)
+
+            awg_str = header + waveform_table + main_loop + footer
+
+            # write waveforms to csv file
+            for wfname, data in waveform_data.items():
+                obj._write_csv_waveform(simplify_name(wfname), np.array(data))
+
+            log.info("Programming {} vawg{} sequence '{}'".format(
+                obj.name, awg_nr, sequence.name))
+
+            # here we want to use a timeout value longer than the obj.timeout()
+            # as programming the AWGs takes more time than normal communications
+            obj.configure_awg_from_string(awg_nr, awg_str, timeout=600)
+
+            obj.set('awgs_{}_dio_valid_polarity'.format(awg_nr),
+                    prev_dio_valid_polarity)
+
+        # Turn on/off channels with/without waveforms and add AWG to set 
+        # awgs_with_waveforms if there is one channel with waveforms
+        one_channel_has_wfs = False
+        for ch in ch_has_waveforms:
+            if ch_has_waveforms[ch]:
+                obj.set('sigouts_{}_on'.format(ch), 1)
+                one_channel_has_wfs = True
+            else: 
+                obj.set('sigouts_{}_on'.format(ch), 0)
+
+        if one_channel_has_wfs:
+            self.awgs_with_waveforms(obj.name)
+    
+    def _old_program_awg(self, obj, sequence, el_wfs, loop=True):
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._program_awg(obj, sequence, el_wfs, loop)
 
@@ -573,20 +812,17 @@ class HDAWG8Pulsar:
             return super()._clock(obj, cid)
         return obj.clock_freq(0)
 
-    def _hdawg_element_seqc(self, reps, wait, name1, name2):
+    def _hdawg_element_seqc(self, name1, name2):
         """
         Generates a part of the sequence code responsible for playing back a
         single element
 
         Args:
-            reps: number of repetitions for this code
-            wait: boolean flag, whether to wait for trigger
             name1: name of the wave to be played on channel 1
             name2: name of the wave to be played on channel 2
         Returns:
             string for playing back an element
         """
-        repeat_open_str = 'repeat ({}) {{\n'.format(reps) if reps != 1 else ''
         trigger_str = 'waitDigTrigger(1);\n'
         if name1 is None and name2 is None:
             prefetch_str = ''
@@ -600,9 +836,7 @@ class HDAWG8Pulsar:
         else:
             prefetch_str = 'prefetch({}, {});\n'.format(name1, name2)
             play_str = 'playWave({}, {});\n'.format(name1, name2)
-        repeat_close_str = '}\n' if reps != 1 else ''
-        return repeat_open_str + prefetch_str+ trigger_str + \
-               play_str + repeat_close_str
+        return prefetch_str+ trigger_str + play_str
 
     def _hdawg_active_awgs(self, obj):
         return [0,1,2,3]
@@ -631,14 +865,16 @@ class AWG5014Pulsar:
 
         # Generate waveforms for all segments in the sequence
         seg_wfs = {}
-        awg_active = False
+        awg_has_waveforms = False
         for segment in sequence.segments:
             seg_wfs[segment] = {}
             wfs = sequence.segments[segment].waveforms(awgs=[obj.name])
             if obj.name not in wfs:
                 continue
             wfs = wfs[obj.name]
-            awg_active = True
+            awg_has_waveforms = True
+            # add AWG to the set of AWGs with waveforms
+            self.awgs_with_waveforms(obj.name)
 
             for (i,el) in wfs:
                 if len(wfs[(i,el)]) > 1 or 'no_codeword' not in wfs[(i,el)]:
@@ -646,7 +882,7 @@ class AWG5014Pulsar:
                 seg_wfs[segment][(i,el)] = wfs[(i,el)]['no_codeword']
 
         # if none of the channels has waveforms, all channels are deactivated
-        if not awg_active:
+        if not awg_has_waveforms:
             self._awg5014_activate_channels([], obj.name)
             return
 
@@ -752,7 +988,10 @@ class AWG5014Pulsar:
         hardware_offsets = False
         for grp in grps:
             cname = self._id_channel(grp, obj.name)
-            options = self.get('{}_options'.format(cname))
+            try:
+                options = self.get('{}_options'.format(cname))
+            except:
+                    options = {}
             offset_mode = options.get('offset_mode', 'software')
             if offset_mode == 'hardware':
                 hardware_offsets = True
@@ -760,8 +999,6 @@ class AWG5014Pulsar:
             obj.DC_output(1)
         else:
             obj.DC_output(0)
-
-        print(awg_file)
 
         return awg_file
 
@@ -1144,26 +1381,22 @@ class AWG5014Pulsar:
         for grp in grps:
             self.AWG_obj(awg=awg).set('{}_state'.format(grp), 1)
 
-    def _programmed_awg(self):
-        """
-        Returns True if at least one channel on the AWG is active
-        """
-        res = False
-        for i in range(1,5):
-            res = res or self.AWG_obj(awg=awg).get('ch{}_state'.format(i))
-
-        return res
-
     def _awg5014_chan_cfg(self, awg):
         channel_cfg = {}
         for channel in self.channels:
             if self.get('{}_awg'.format(channel)) != awg:
                 continue
-            options = self.get('{}_options'.format(channel))
+            try:
+                options = self.get('{}_options'.format(channel))
+            except KeyError:
+                options = {}
             offset_mode = options.get('offset_mode', 'software')
             cid = self.get('{}_id'.format(channel))
             amp = self.get('{}_amp'.format(channel)) * 2
-            off = self.get('{}_offset'.format(channel))
+            try:
+                off = self.get('{}_offset'.format(channel))
+            except:
+                off = 0
             if cid in ['ch1', 'ch2', 'ch3', 'ch4']:
                 channel_cfg['ANALOG_METHOD_' + cid[2]] = 1
                 channel_cfg['ANALOG_AMPLITUDE_' + cid[2]] = amp
@@ -1183,12 +1416,12 @@ class AWG5014Pulsar:
                 channel_cfg['MARKER{}_HIGH_{}'.format(cid[-1], cid[2])] = \
                     off + amp
             channel_cfg['CHANNEL_STATE_' + cid[2]] = 0
-        for channel in self.channels:
-            if self.get('{}_awg'.format(channel)) != awg:
-                continue
-            if self.get('{}_active'.format(channel)):
-                cid = self.get('{}_id'.format(channel))
-                channel_cfg['CHANNEL_STATE_' + cid[2]] = 1
+        # for channel in self.channels:
+        #     if self.get('{}_awg'.format(channel)) != awg:
+        #         continue
+        #     if self.get('{}_active'.format(channel)):
+        #         cid = self.get('{}_id'.format(channel))
+        #         channel_cfg['CHANNEL_STATE_' + cid[2]] = 1
         return channel_cfg
 
 
@@ -1220,6 +1453,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, Instrument):
         self.awgs = set() # AWG names
         self.last_sequence = None
         self.last_elements = None
+        self._awgs_with_waveforms = set()
 
         self._awgs_prequeried_state = False
 
@@ -1251,13 +1485,14 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, Instrument):
             raise KeyError("AWG '{}' already added to pulsar".format(awg.name))
 
         fail = None
-        try:
-            super()._create_awg_parameters(awg, channel_name_map)
-        except AttributeError as e:
-            fail = e
-        if fail is not None:
-            raise TypeError('Unsupported AWG instrument: {} of type {}. '
-                            .format(awg.name, type(obj)) + str(fail))
+        super()._create_awg_parameters(awg, channel_name_map)
+        # try:
+        #     super()._create_awg_parameters(awg, channel_name_map)
+        # except AttributeError as e:
+        #     fail = e
+        # if fail is not None:
+        #     raise TypeError('Unsupported AWG instrument: {}. '
+        #                     .format(awg.name) + str(fail))
         
         self.awgs.add(awg.name)
 
@@ -1334,18 +1569,15 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, Instrument):
         """
         return {awg for awg in self.awgs if self.get('{}_active'.format(awg))}
 
-    def programmed_awgs(self):
+    def awgs_with_waveforms(self, awg=None):
         """
-        Returns a set of AWG with at least one active channel.
+        Adds an awg to the set of AWGs with waveforms programmed, or returns 
+        set of said AWGs.
         """
-        programmed_awgs = set()
-        for awg in self.awgs:
-            obj = self.AWG_obj(awg=awg)
-            if super()._programmed_awg(obj):
-                programmed_awgs.add(awg)
-
-        return programmed_awgs
-
+        if awg == None:
+            return self._awgs_with_waveforms
+        else:
+            self._awgs_with_waveforms.add(awg)
 
     def start(self):
         """
@@ -1357,8 +1589,8 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, Instrument):
 
         # Start only the AWGs which have at least one channel programmed, i.e.
         # where at least one channel has state = 1. 
-        programmed_awgs = self.programmed_awgs()
-        used_awgs = set(self.active_awgs()) & programmed_awgs
+        awgs_with_waveforms = self.awgs_with_waveforms()
+        used_awgs = set(self.active_awgs()) & awgs_with_waveforms
 
         if self.master_awg() is None:
             for awg in used_awgs:
@@ -1387,8 +1619,8 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, Instrument):
         Stop all active AWGs.
         """
 
-        programmed_awgs = set(self.programmed_awgs())
-        used_awgs = set(self.active_awgs()) & programmed_awgs
+        awgs_with_waveforms = set(self.awgs_with_waveforms())
+        used_awgs = set(self.active_awgs()) & awgs_with_waveforms
 
         for awg in used_awgs:
             self._stop_awg(awg)
@@ -1397,6 +1629,9 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, Instrument):
         
         # Stores the last uploaded sequence for easy access and plotting
         self.last_sequence = sequence
+
+        # initializes the set of AWGs with waveforms
+        self._awgs_with_waveforms = set()
 
         if awgs == 'all':
             awgs = self.active_awgs()
@@ -1651,9 +1886,31 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, Instrument):
 #         return ret
 
 def simplify_name(s):
-    x = base64.urlsafe_b64encode(hashlib.sha1(
-        s.encode('ascii')).digest()).decode()[:20]
-    xnew = []
-    for c in x:
-        xnew.append(chr((ord(c) - ord('A'))%26 + ord('A')))
-    return ''.join(xnew)
+    """
+    Changes all non alphanumerics of a string to '_'
+    """
+    s = list(s)
+    for i in range(len(s)):
+        s[i] = '_' if s[i].isalnum() or s[i] == '-' else s[i]
+    
+    return ''.join(s)
+
+def wf_name(el, chid, chmid, devname, marker_ch):
+        """
+        Input:
+            * el: element name
+            * chid: channel id
+            * chimd: marker channel id
+            * devname: AWG device name
+            * marker_ch: boolean wich is True if there are waveforms on the 
+                        marker channel
+        Returns: the waveform name for codewords in the format used for HDAWG8
+        """
+        wfname = el + '_' + chid
+        wfname = '"{}_{}"'.format(devname, wfname)
+        wfname = simplify_name(wfname)
+        if marker_ch:
+            wfnamem = el + '_' + chmid
+            wfnamem = simplify_name('"{}_{}"'.format(devname, wfnamem))
+            wfname = wfname + " + " + wfnamem
+        return wfname
