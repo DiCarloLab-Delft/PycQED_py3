@@ -352,8 +352,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
                             'cond_phase02', 'coherent_leakage11', 'offset_difference', 'missing_fraction', '12_21_population_transfer', '12_03_population_transfer',
-                            'phase_diff_12_02', 'phase_diff_21_20']
-        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%', '%', '%', 'deg', 'deg']
+                            'phase_diff_12_02', 'phase_diff_21_20', 'cond_phase12', 'cond_phase21', 'cond_phase03', 'cond_phase20']
+        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%', '%', '%', 'deg', 'deg', 'deg', 'deg', 'deg', 'deg']
 
         self.qois = qois
         if self.qois != 'all': 
@@ -431,7 +431,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
-            w_q0, w_q1, alpha_q0 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
+            w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
 
 
             ## Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
@@ -446,7 +446,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             #print(czf.verify_CPTP(U_superop_average))
 
 
-            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0,alpha_q1=alpha_q1)
             population_transfer_12_21 = czf.average_population_transfer_subspace_to_subspace(U_superop_average,states_in=[[1,2]],states_out=[[2,1]])
             population_transfer_12_03 = czf.average_population_transfer_subspace_to_subspace(U_superop_average,states_in=[[1,2]],states_out=[[0,3]])
             #population_transfer_12_03 = -1        # to use if simulations use two qutrits
@@ -462,7 +462,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                              qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100,
                              qoi['cond_phase02'], qoi['coherent_leakage11']*100, qoi['offset_difference']*100, qoi['missing_fraction']*100, 
                              population_transfer_12_21*100,population_transfer_12_03*100,
-                             qoi['phase_diff_12_02'], qoi['phase_diff_21_20']]
+                             qoi['phase_diff_12_02'], qoi['phase_diff_21_20'], qoi['cond_phase12'], qoi['cond_phase21'], qoi['cond_phase03'], qoi['cond_phase20']]
             qoi_vec=np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
 
@@ -486,7 +486,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         return_values = [qoi_plot[0,0], qoi_plot[0,1], qoi_plot[0,2], qoi_plot[0,3], \
             qoi_plot[0,4], qoi_plot[0,5], qoi_plot[0,6], \
             qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10], \
-            qoi_plot[0,11], qoi_plot[0,12], qoi_plot[0,13], qoi_plot[0,14], qoi_plot[0,15], qoi_plot[0,16], qoi_plot[0,17], qoi_plot[0,18]]
+            qoi_plot[0,11], qoi_plot[0,12], qoi_plot[0,13], qoi_plot[0,14], qoi_plot[0,15], qoi_plot[0,16], qoi_plot[0,17], qoi_plot[0,18],
+            qoi_plot[0,19], qoi_plot[0,20], qoi_plot[0,21], qoi_plot[0,22]]
         if self.qois != 'all': 
             return np.array(return_values)[self.qoi_mask]
             
