@@ -54,7 +54,7 @@ class UHFQC(Instrument):
         else:
             self._device = device
             self._daq.connectDevice(self._device, interface)
-        #self._device = zi_utils.autoDetect(self._daq)
+            #self._device = zi_utils.autoDetect(self._daq)
         self._awgModule = self._daq.awgModule()
         self._awgModule.set('awgModule/device', self._device)
         self._awgModule.execute()

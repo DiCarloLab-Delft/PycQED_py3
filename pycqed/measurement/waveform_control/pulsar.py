@@ -245,8 +245,8 @@ class HDAWG8Pulsar:
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._create_parameters(name, id, obj)
         
-        if id in {'ch{}'.format(i) for i in range(1, 9)} or 
-           if in {'ch{}m'.format(i) for i in range(1, 9)}:
+        if id in {'ch{}'.format(i) for i in range(1, 9)} or \
+            id in {'ch{}m'.format(i) for i in range(1, 9)}:
             self.add_parameter('{}_id'.format(name),
                                get_cmd=lambda _=id: _)
             self.add_parameter('{}_AWG'.format(name),
@@ -262,7 +262,7 @@ class HDAWG8Pulsar:
                                get_cmd=lambda: 8 / 2.4e9)
                                # get_cmd=lambda: 0 / 2.4e9)
             self.add_parameter('{}_precompile'.format(name), 
-                               initial_value=False, vals=vals.Bool()
+                               initial_value=False, vals=vals.Bool(),
                                label='{} precompile segments'.format(name),
                                parameter_class=ManualParameter)
             self.add_parameter('{}_delay'.format(name), initial_value=0,
@@ -350,7 +350,7 @@ class HDAWG8Pulsar:
                 def g():
                     return obj.get('sigouts_{}_offset'.format(int(id[2])-1))
             else:
-                return 0
+                return lambda: 0
         elif par == 'amp':
             if id[-1] != 'm':
                 def g():
@@ -361,7 +361,7 @@ class HDAWG8Pulsar:
                         return obj.get('sigouts_{}_range' \
                             .format(int(id[2])-1))/2
             else:
-                return 1
+                return lambda: 1
         else:
             raise NotImplementedError('Unknown parameter {}'.format(par))
         return g
