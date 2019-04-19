@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 from copy import deepcopy
 import pycqed.measurement.waveform_control.pulse_library as pl
 import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
@@ -425,60 +426,7 @@ class Segment:
                         self.elements_on_awg[trigger_awg].append(
                             trigger_elements[trigger_awg])
 
-        # if self.elements == odict():
-        #     self.resolve_timing()
-
-        # awg_dict = self.gen_awg_dict()
-
-        # for element in awg_dict:
-        #     for awg in awg_dict[element]:
-
-        #         if self.pulsar.get('{}_trigger_channels'.format(awg)) == None:
-        #             continue
-
-        #         trigger_pulse_time = self.get_element_start(
-        #             element, awg) - self.pulsar.get(awg + '_delay')
-
-        #         # Find the trigger_AWGs that trigger the AWG
-        #         trigger_awgs = set()
-        #         for channel in self.pulsar.get(
-        #                 '{}_trigger_channels'.format(awg)):
-        #             trigger_awgs.add(self.pulsar.get('{}_awg'.format(channel)))
-
-        #         # For each trigger_AWG, find the element to play the trigger
-        #         # pulse in
-        #         trigger_elements = {}
-        #         for trigger_awg in trigger_awgs:
-        #             # if there is no element on that AWG create a new element
-        #             if self.elements_on_awg.get(trigger_awg, None) == None:
-        #                 trigger_elements[trigger_awg] = 'trigger_element'
-        #             # else find the element that is closest to the
-        #             # trigger pulse
-        #             else:
-        #                 trigger_elements[
-        #                     trigger_awg] = self.find_trigger_element(
-        #                         trigger_awg, trigger_pulse_time)
-
-        #         # add the trigger pulse to all triggering channels
-        #         for channel_name in self.pulsar.get(
-        #                 '{}_trigger_channels'.format(awg)):
-        #             trig_pulse = bpl.SquarePulse(
-        #                 trigger_elements[self.pulsar.get(
-        #                     '{}_awg'.format(channel_name))],
-        #                 channel=channel_name,
-        #                 **self.trigger_pars)
-
-        #             trig_pulse.algorithm_time(trigger_pulse_time)
-
-        #             if trig_pulse.element_name in self.elements:
-        #                 self.elements[trig_pulse.element_name].append(
-        #                     trig_pulse)
-        #             else:
-        #                 self.elements[trig_pulse.element_name] = [trig_pulse]
-
-        # tests if any of the elements overlap. True indicates that element
-        # dictionary will be time sorted prior to testing.
-        self.test_overlap(True)
+        self.test_overlap()
 
     def find_trigger_element(self, trigger_awg, trigger_pulse_time):
         """
@@ -510,28 +458,6 @@ class Segment:
 
         return trigger_element
 
-        # time_distance = []
-
-        # for element in self.elements_on_awg[trigger_awg]:
-        #     element_start = self.get_element_start(element, trigger_awg)
-        #     element_end = self.get_element_end(element, trigger_awg)
-        #     distance_start_end = [
-        #         [
-        #             abs(trigger_pulse_time + self.trigger_pars['length'] / 2 -
-        #                 element_start), element
-        #         ],
-        #         [
-        #             abs(trigger_pulse_time + self.trigger_pars['length'] / 2 -
-        #                 element_end), element
-        #         ]
-        #     ]
-
-        #     time_distance += distance_start_end
-
-        # trigger_element = min(time_distance)[1]
-
-        # return trigger_element
-
     def get_element_end(self, element, awg):
         """
         This method returns the end of an element on an AWG in algorithm_time 
@@ -547,7 +473,7 @@ class Segment:
         """
         return self.element_start_end[element][awg][0]
 
-    def test_overlap(self, sort=False):
+    def test_overlap(self):
         """
         Tests for all AWGs if any of their elements overlap. sort=True 
         indicates that element dictionary will be time sorted prior to testing.
@@ -569,25 +495,6 @@ class Segment:
                 if el_prev_end > el_new_start:
                     raise ValueError('{} and {} overlap on {}'.format(
                         prev_el, el_list[i + 1][2], awg))
-
-        # find new start and end times of all elements and sort them by
-        # accending t0
-
-        # if sort:
-        #     self.find_element_start_end(True)
-
-        # self._test_trigger_awg()
-        # self.gen_elements_on_awg()
-
-        # for awg in self.elements_on_awg:
-        #     for i in range(len(self.elements_on_awg[awg]) - 1):
-        #         next_el = self.elements_on_awg[awg][i + 1]
-        #         prev_el = self.elements_on_awg[awg][i]
-        #         if self.get_element_start(next_el, awg) < \
-        #                 self.get_element_end(prev_el, awg):
-        #             raise ValueError('{} and {} on {} overlap!'.format(
-        #                 self.elements_on_awg[awg][i],
-        #                 self.elements_on_awg[awg][i + 1], awg))
 
     def _test_trigger_awg(self):
         """
@@ -787,7 +694,7 @@ class Segment:
             for (i, element) in enumerate(self.elements_on_awg[awg]):
                 awg_wfs[awg][(i, element)] = {}
                 tvals = self.tvals(channel_list, element)
-
+                print(tvals.keys(),awg)
                 wfs = {}
 
                 element_start_time = self.get_element_start(element, awg)
@@ -869,6 +776,30 @@ class Segment:
                             wf = flux_dist.filter_iir(iir_filters[0],
                                                       iir_filters[1], wf)
                         wfs[codeword][c] = wf
+
+                        # truncate all values that are out of bounds and 
+                        # normalize the waveforms
+                        amp = self.pulsar.get('{}_amp'.format(c))
+                        if self.pulsar.get('{}_type'.format(c)) == 'analog':
+                            if np.max(wfs[codeword][c]) > amp:
+                                logging.warning(
+                                    'Clipping waveform {} > {}'.format(
+                                        np.max(wfs[codeword][c]), amp))
+                            if np.min(wfs[codeword][c]) < -amp:
+                                logging.warning(
+                                    'Clipping waveform {} < {}'.format(
+                                        np.min(wfs[codeword][c]), -amp))
+                            np.clip(
+                                wfs[codeword][c],
+                                -amp,
+                                amp,
+                                out=wfs[codeword][c])
+                            # normalize wfs
+                            wfs[codeword][c] = wfs[codeword][c]/amp
+                        # marker channels have to be 1 or 0
+                        elif self.pulsar.get('{}_type'.format(c)) == 'marker':
+                            wfs[codeword][c][wfs[codeword][c] > 0] = 1
+                            wfs[codeword][c][wfs[codeword][c] <= 0] = 0
 
                 for codeword in wfs:
                     awg_wfs[awg][(i, element)][codeword] = {}

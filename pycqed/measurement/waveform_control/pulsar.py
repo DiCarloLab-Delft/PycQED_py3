@@ -193,10 +193,7 @@ class UHFQCPulsar:
 
         # here we want to use a timeout value longer than the obj.timeout()
         # as programming the AWGs takes more time than normal communications
-        obj.configure_awg_from_string(awg_nr, awg_str, timeout=600)
-
-        obj.set('awgs_{}_dio_valid_polarity'.format(awg_nr),
-                prev_dio_valid_polarity)
+        obj.awg_string(awg_str)
 
         
     
@@ -441,7 +438,7 @@ class HDAWG8Pulsar:
                 def g():
                     return obj.get('sigouts_{}_offset'.format(int(id[2])-1))
             else:
-                return 0
+                return lambda: 0
         elif par == 'amp':
             if id[-1] != 'm':
                 def g():
@@ -452,7 +449,7 @@ class HDAWG8Pulsar:
                         return obj.get('sigouts_{}_range' \
                             .format(int(id[2])-1))/2
             else:
-                return 1
+                return lambda: 1
         else:
             raise NotImplementedError('Unknown parameter {}'.format(par))
         return g 
@@ -576,6 +573,8 @@ class HDAWG8Pulsar:
 
             # write waveforms to csv file
             for wfname, data in waveform_data.items():
+                log.warning(wfname)
+                log.warning(simplify_name(wfname))
                 obj._write_csv_waveform(simplify_name(wfname), np.array(data))
 
             log.info("Programming {} vawg{} sequence '{}'".format(
@@ -593,10 +592,10 @@ class HDAWG8Pulsar:
         one_channel_has_wfs = False
         for ch in ch_has_waveforms:
             if ch_has_waveforms[ch]:
-                obj.set('sigouts_{}_on'.format(ch), 1)
+                obj.set('sigouts_{}_on'.format(int(ch[2])-1), 1)
                 one_channel_has_wfs = True
             else: 
-                obj.set('sigouts_{}_on'.format(ch), 0)
+                obj.set('sigouts_{}_on'.format(int(ch[2])-1), 0)
 
         if one_channel_has_wfs:
             self.awgs_with_waveforms(obj.name)
@@ -1386,18 +1385,11 @@ class AWG5014Pulsar:
         for channel in self.channels:
             if self.get('{}_awg'.format(channel)) != awg:
                 continue
-            try:
-                options = self.get('{}_options'.format(channel))
-            except KeyError:
-                options = {}
-            offset_mode = options.get('offset_mode', 'software')
             cid = self.get('{}_id'.format(channel))
             amp = self.get('{}_amp'.format(channel)) * 2
-            try:
-                off = self.get('{}_offset'.format(channel))
-            except:
-                off = 0
-            if cid in ['ch1', 'ch2', 'ch3', 'ch4']:
+            off = self.get('{}_offset'.format(channel))
+            if self.get('{}_type'.format(channel)) == 'analog':
+                offset_mode = self.get('{}_offset_mode'.format(channel))
                 channel_cfg['ANALOG_METHOD_' + cid[2]] = 1
                 channel_cfg['ANALOG_AMPLITUDE_' + cid[2]] = amp
                 if offset_mode == 'software':
@@ -1416,12 +1408,6 @@ class AWG5014Pulsar:
                 channel_cfg['MARKER{}_HIGH_{}'.format(cid[-1], cid[2])] = \
                     off + amp
             channel_cfg['CHANNEL_STATE_' + cid[2]] = 0
-        # for channel in self.channels:
-        #     if self.get('{}_awg'.format(channel)) != awg:
-        #         continue
-        #     if self.get('{}_active'.format(channel)):
-        #         cid = self.get('{}_id'.format(channel))
-        #         channel_cfg['CHANNEL_STATE_' + cid[2]] = 1
         return channel_cfg
 
 
@@ -1891,7 +1877,7 @@ def simplify_name(s):
     """
     s = list(s)
     for i in range(len(s)):
-        s[i] = '_' if s[i].isalnum() or s[i] == '-' else s[i]
+        s[i] = '_' if not s[i].isalnum() or s[i] == '-' else s[i]
     
     return ''.join(s)
 

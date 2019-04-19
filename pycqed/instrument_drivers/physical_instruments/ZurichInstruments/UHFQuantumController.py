@@ -177,6 +177,18 @@ class UHFQC(Instrument):
 
         print('Initialized UHFQC', self._device,
               'in %.2fs' % (t1-t0))
+        
+        if os.name == 'nt':
+            dll = ctypes.windll.shell32
+            buf = ctypes.create_unicode_buffer(MAX_PATH + 1)
+            if dll.SHGetSpecialFolderPathW(None, buf, 0x0005, False):
+                _basedir = buf.value
+            else:
+                logging.warning('Could not extract my documents folder')
+        else:
+            _basedir = os.path.expanduser('~')
+        self.lab_one_webserver_path = os.path.join(
+            _basedir, 'Zurich Instruments', 'LabOne', 'WebServer')
 
     def load_default_settings(self):
         # standard configurations adapted from Haendbaek's notebook
@@ -313,6 +325,13 @@ class UHFQC(Instrument):
         with open(filename, 'r') as awg_file:
             sourcestring = awg_file.read()
             self.awg_string(sourcestring)
+    
+    def _write_csv_waveform(self, wf_name: str, waveform):
+        filename = os.path.join(
+            self.lab_one_webserver_path, 'awg', 'waves',
+            self._devname+'_'+wf_name+'.csv')
+        # with open(filename, 'w') as f:
+        np.savetxt(filename, waveform, delimiter=",")
 
     def _do_set_AWG_file(self, filename):
         self.awg('UHFLI_AWG_sequences/'+filename)

@@ -438,13 +438,14 @@ class Element:
             if self.pulsar.get('{}_type'.format(wf)) == 'analog':
                 wfs[wf] = wfs[wf] / amp
             if self.pulsar.get('{}_type'.format(wf)) == 'marker':
-                #this changes all values in np.array wfs[wf] that are bigger to 0 to 1
-                #and all values that are smaller than 0 to 0
+                #this changes all values in np.array wfs[wf] that are bigger
+                #  than 0 to 1 and all values that are smaller than 0 to 0.
                 wfs[wf][wfs[wf] > 0] = 1
                 wfs[wf][wfs[wf] <= 0] = 0
+        # returns a dictionary wfs containing
+        # channel names as keys and the normalized (-1 to 1)
+        # amplitudes as list in values
         return tvals, wfs
-        #returns a dictionary wfs containing
-        #channel names as keys and the normalized (-1 to 1) amplitudes as list in values
 
     # testing and inspection
     def print_overview(self, pulses=True):

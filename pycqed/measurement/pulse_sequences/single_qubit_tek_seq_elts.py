@@ -4,7 +4,7 @@ from copy import deepcopy
 from ..waveform_control import element
 from ..waveform_control.element import calculate_time_correction
 from ..waveform_control import pulse
-from ..waveform_control import sequence
+from ..waveform_control import sequence_old as sequence
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts

@@ -20,9 +20,14 @@ class ZI_HDAWG8(ZI_base_instrument):
     These are used to add parameters to the instrument.
     """
 
-    def __init__(self, name, device: str,
-                 server: str='localhost', port=8004,
-                 num_codewords: int = 32, interface='USB', **kw):
+    def __init__(self,
+                 name,
+                 device: str,
+                 server: str = 'localhost',
+                 port=8004,
+                 num_codewords: int = 32,
+                 interface='USB',
+                 **kw):
         '''
         Input arguments:
             name:           (str) name of the instrument as seen by the user
@@ -80,13 +85,17 @@ class ZI_HDAWG8(ZI_base_instrument):
         self.triggers_out_5_source(6)
         self.triggers_out_6_source(4)
         self.triggers_out_7_source(6)
-        
+
     def _add_extra_parameters(self):
-        self.add_parameter('timeout', unit='s',
-                           initial_value=10,
-                           parameter_class=ManualParameter)
         self.add_parameter(
-            'cfg_num_codewords', label='Number of used codewords', docstring=(
+            'timeout',
+            unit='s',
+            initial_value=10,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_num_codewords',
+            label='Number of used codewords',
+            docstring=(
                 'This parameter is used to determine how many codewords to '
                 'upload in "self.upload_codeword_program".'),
             initial_value=self._num_codewords,
@@ -96,8 +105,10 @@ class ZI_HDAWG8(ZI_base_instrument):
             parameter_class=ManualParameter)
 
         self.add_parameter(
-            'cfg_codeword_protocol', initial_value='identical',
-            vals=vals.Enum('identical', 'microwave', 'flux'), docstring=(
+            'cfg_codeword_protocol',
+            initial_value='identical',
+            vals=vals.Enum('identical', 'microwave', 'flux'),
+            docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
@@ -124,13 +135,19 @@ class ZI_HDAWG8(ZI_base_instrument):
         self.restart_awg_module = self._dev.restart_awg_module
 
     def get_idn(self):
-        idn_dict = {'vendor': 'ZurichInstruments',
-                    'model': self._dev.daq.getByte(
-                        '/{}/features/devtype'.format(self._devname)),
-                    'serial': self._devname,
-                    'firmware': int(self._dev.geti('system/fwrevision')),
-                    'fpga_firmware': int(self._dev.geti('system/fpgarevision'))
-                    }
+        idn_dict = {
+            'vendor':
+            'ZurichInstruments',
+            'model':
+            self._dev.daq.getByte('/{}/features/devtype'.format(
+                self._devname)),
+            'serial':
+            self._devname,
+            'firmware':
+            int(self._dev.geti('system/fwrevision')),
+            'fpga_firmware':
+            int(self._dev.geti('system/fpgarevision'))
+        }
         return idn_dict
 
     def stop(self):
@@ -149,8 +166,9 @@ class ZI_HDAWG8(ZI_base_instrument):
 
     def _check_protocol(self, awg):
         # TODO: Add docstrings and make this more clear (Oct 2017)
-        mask = self._dev.geti('awgs/' + str(awg) + '/dio/mask/value') << self._dev.geti(
-            'awgs/' + str(awg) + '/dio/mask/shift')
+        mask = self._dev.geti('awgs/' + str(awg) +
+                              '/dio/mask/value') << self._dev.geti(
+                                  'awgs/' + str(awg) + '/dio/mask/shift')
         strobe = 1 << self._dev.geti('awgs/' + str(awg) + '/dio/strobe/index')
         valid = 1 << self._dev.geti('awgs/' + str(awg) + '/dio/valid/index')
         #print('Codeword mask: {:08x}'.format(mask))
@@ -176,38 +194,37 @@ class ZI_HDAWG8(ZI_base_instrument):
             curr_valid = (d & valid) != 0
 
             if count_high:
-              if curr_strobe:
-                strobe_high += 1
-              else:
-                if (strobe_low > 0) and (strobe_low != strobe_high):
-                    count_ok = False
+                if curr_strobe:
+                    strobe_high += 1
+                else:
+                    if (strobe_low > 0) and (strobe_low != strobe_high):
+                        count_ok = False
 
             if count_low:
-              if not curr_strobe:
-                strobe_low += 1
-              else:
-                if (strobe_high > 0) and (strobe_low != strobe_high):
-                    count_ok = False
+                if not curr_strobe:
+                    strobe_low += 1
+                else:
+                    if (strobe_high > 0) and (strobe_low != strobe_high):
+                        count_ok = False
 
             if (last_strobe != None):
-              if (curr_strobe and not last_strobe):
-                got_strobe_re = True
-                strobe_high = 0
-                count_high = True
-                count_low = False
-                index_high = n
-              elif (not curr_strobe and last_strobe):
-                got_strobe_fe = True
-                strobe_low = 0
-                count_low = True
-                count_high = False
-                index_low = n
+                if (curr_strobe and not last_strobe):
+                    got_strobe_re = True
+                    strobe_high = 0
+                    count_high = True
+                    count_low = False
+                    index_high = n
+                elif (not curr_strobe and last_strobe):
+                    got_strobe_fe = True
+                    strobe_low = 0
+                    count_low = True
+                    count_high = False
+                    index_low = n
 
             if (last_valid != None) and (curr_valid and not last_valid):
                 got_valid_re = True
             if (last_valid != None) and (not curr_valid and last_valid):
                 got_valid_fe = True
-
 
             got_bits |= (d & mask)
             last_strobe = curr_strobe
@@ -261,7 +278,7 @@ class ZI_HDAWG8(ZI_base_instrument):
     def calibrate_dio_protocol(self):
         # TODO: add docstrings to make it more clear
         print("Checking DIO protocol...")
-        done = 4*[False]
+        done = 4 * [False]
         timeout = 5
         while not all(done):
             ok = True
@@ -277,7 +294,9 @@ class ZI_HDAWG8(ZI_base_instrument):
                     done[i] = True
                     print('[SUCCESS]')
             if not ok:
-                print("  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps.")
+                print(
+                    "  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps."
+                )
                 self._dev.seti('awgs/*/enable', 0)
                 self._dev.seti('system/clocks/referenceclock/source', 0)
                 # self._dev.seti('system/extclk', 0)
@@ -321,11 +340,11 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._params_to_skip_update = []
         for ch in range(self._num_channels):
             for cw in range(self._num_codewords):
-                parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
+                parname = 'wave_ch{}_cw{:03}'.format(ch + 1, cw)
                 self.add_parameter(
                     parname,
                     label='Waveform channel {} codeword {:03}'.format(
-                        ch+1, cw),
+                        ch + 1, cw),
                     vals=vals.Arrays(),  # min_value, max_value = unknown
                     set_cmd=self._gen_write_csv(parname),
                     get_cmd=self._gen_read_csv(parname),
@@ -336,29 +355,27 @@ class ZI_HDAWG8(ZI_base_instrument):
         def write_func(waveform):
             # The lenght of AWG8 waveforms should be a multiple of 8 samples.
             if (len(waveform) % 8) != 0:
-                extra_zeros = 8-(len(waveform) % 8)
+                extra_zeros = 8 - (len(waveform) % 8)
                 waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
-            return self._write_csv_waveform(
-                wf_name=wf_name, waveform=waveform)
+            return self._write_csv_waveform(wf_name=wf_name, waveform=waveform)
+
         return write_func
 
     def _gen_read_csv(self, wf_name):
         def read_func():
-            return self._read_csv_waveform(
-                wf_name=wf_name)
+            return self._read_csv_waveform(wf_name=wf_name)
+
         return read_func
 
     def _write_csv_waveform(self, wf_name: str, waveform):
-        filename = os.path.join(
-            self.lab_one_webserver_path, 'awg', 'waves',
-            self._devname+'_'+wf_name+'.csv')
+        filename = os.path.join(self.lab_one_webserver_path, 'awg', 'waves',
+                                self._devname + '_' + wf_name + '.csv')
         # with open(filename, 'w') as f:
         np.savetxt(filename, waveform, delimiter=",")
 
     def _read_csv_waveform(self, wf_name: str):
-        filename = os.path.join(
-            self.lab_one_webserver_path, 'awg', 'waves',
-            self._devname+'_'+wf_name+'.csv')
+        filename = os.path.join(self.lab_one_webserver_path, 'awg', 'waves',
+                                self._devname + '_' + wf_name + '.csv')
         try:
             return np.genfromtxt(filename, delimiter=',')
         except OSError as e:
@@ -368,14 +385,13 @@ class ZI_HDAWG8(ZI_base_instrument):
             return None
 
     def _delete_chache_files(self):
-        cache_dir = os.path.join(self.lab_one_webserver_path,
-                                 'awg', 'waves', '.cache')
+        cache_dir = os.path.join(self.lab_one_webserver_path, 'awg', 'waves',
+                                 '.cache')
         for f in os.listdir(cache_dir):
             os.remove(os.path.join(cache_dir, f))
 
     def _delete_csv_files(self):
-        csv_dir = os.path.join(self.lab_one_webserver_path,
-                                 'awg', 'waves')
+        csv_dir = os.path.join(self.lab_one_webserver_path, 'awg', 'waves')
         for f in os.listdir(csv_dir):
             if f.endswith(".csv"):
                 os.remove(os.path.join(csv_dir, f))
@@ -418,12 +434,14 @@ class ZI_HDAWG8(ZI_base_instrument):
         """
         t0 = time.time()
         wf = np.zeros(32)
-        waveform_params = [value for key, value in self.parameters.items()
-                           if 'wave_ch' in key.lower()]
+        waveform_params = [
+            value for key, value in self.parameters.items()
+            if 'wave_ch' in key.lower()
+        ]
         for par in waveform_params:
             par(wf)
         t1 = time.time()
-        print('Set all zeros waveforms in {:.1f} s'.format(t1-t0))
+        print('Set all zeros waveforms in {:.1f} s'.format(t1 - t0))
 
     def awg_update_waveform(self, awg_nr: int, index: int, data1, data2=None):
         """Immediately updates the waveform with the given index.
@@ -453,7 +471,10 @@ class ZI_HDAWG8(ZI_base_instrument):
         elif data2 is None:
             data = data1
         else:
-            data = np.vstack((data1, data2,)).reshape((-1,), order='F')
+            data = np.vstack((
+                data1,
+                data2,
+            )).reshape((-1, ), order='F')
         self.set('awgs_{}_waveform_index'.format(awg_nr), index)
         self.set('awgs_{}_waveform_data'.format(awg_nr), data)
         self._dev.daq.sync()  # Is this necessary?
@@ -469,7 +490,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         # Type conversion to ensure lists do not produce weird results
         awgs = np.array(awgs)
         # because awg_channels come in pairs and are numbered from 1-8 in API
-        awg_channels = awgs*2+1
+        awg_channels = awgs * 2 + 1
 
         for awg_nr in awgs:
             # disable all AWG channels
@@ -489,16 +510,17 @@ class ZI_HDAWG8(ZI_base_instrument):
                     wf0_name = '{}_wave_ch{}_cw{:03}'.format(
                         self._devname, ch, cw)
                     wf1_name = '{}_wave_ch{}_cw{:03}'.format(
-                        self._devname, ch+1, cw)
+                        self._devname, ch + 1, cw)
                     waveform_table += 'setWaveDIO({}, "{}", "{}");\n'.format(
                         cw, wf0_name, wf1_name)
                 program = waveform_table + codeword_mode_snippet
                 # N.B. awg_nr in goes from 0 to 3 in API while in LabOne
                 # it is 1 to 4
-                awg_nr = ch//2  # channels are coupled in pairs of 2
-                self.configure_awg_from_string(awg_nr=int(awg_nr),
-                                               program_string=program,
-                                               timeout=self.timeout())
+                awg_nr = ch // 2  # channels are coupled in pairs of 2
+                self.configure_awg_from_string(
+                    awg_nr=int(awg_nr),
+                    program_string=program,
+                    timeout=self.timeout())
         else:  # if protocol is flux
             for ch in awg_channels:
                 waveform_table = '//Flux mode\n// Define the waveform table\n'
@@ -509,8 +531,8 @@ class ZI_HDAWG8(ZI_base_instrument):
                 for cw in range(8):
                     cw0 = cw & mask_0
                     cw1 = (cw & mask_1) >> 3
-                # FIXME: this is a hack because not all AWG8 channels support
-                # amp mode. It forces all AWG8's of a pair to behave identical.
+                    # FIXME: this is a hack because not all AWG8 channels support
+                    # amp mode. It forces all AWG8's of a pair to behave identical.
                     cw1 = cw0
                     # if both wfs are triggered play both
                     if (cw0 != 0) and (cw1 != 0):
@@ -518,20 +540,20 @@ class ZI_HDAWG8(ZI_base_instrument):
                         wf0_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
                             self._devname, ch, cw0)
                         wf1_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
-                            self._devname, ch+1, cw1)
+                            self._devname, ch + 1, cw1)
 
                     # if single wf is triggered fill the other with zeros
                     elif (cw0 == 0) and (cw1 != 0):
-                        wf0_cmd = 'zeros({})'.format(len(self.get(
-                            'wave_ch{}_cw{:03}'.format(ch, cw1))))
+                        wf0_cmd = 'zeros({})'.format(
+                            len(self.get('wave_ch{}_cw{:03}'.format(ch, cw1))))
                         wf1_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
-                            self._devname, ch+1, cw1)
+                            self._devname, ch + 1, cw1)
 
                     elif (cw0 != 0) and (cw1 == 0):
                         wf0_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
                             self._devname, ch, cw0)
-                        wf1_cmd = 'zeros({})'.format(len(self.get(
-                            'wave_ch{}_cw{:03}'.format(ch, cw0))))
+                        wf1_cmd = 'zeros({})'.format(
+                            len(self.get('wave_ch{}_cw{:03}'.format(ch, cw0))))
                     # if no wfs are triggered play only zeros
                     else:
                         wf0_cmd = 'zeros({})'.format(42)
@@ -543,16 +565,17 @@ class ZI_HDAWG8(ZI_base_instrument):
 
                 # N.B. awg_nr in goes from 0 to 3 in API while in LabOne it
                 # is 1 to 4
-                awg_nr = ch//2  # channels are coupled in pairs of 2
-                self.configure_awg_from_string(awg_nr=int(awg_nr),
-                                               program_string=program,
-                                               timeout=self.timeout())
+                awg_nr = ch // 2  # channels are coupled in pairs of 2
+                self.configure_awg_from_string(
+                    awg_nr=int(awg_nr),
+                    program_string=program,
+                    timeout=self.timeout())
         self.configure_codeword_protocol()
 
     def clock_freq(self, awg_nr):
-        return 2.4e9 / (2 ** self.get('awgs_{}_time'.format(awg_nr)))
+        return 2.4e9 / (2**self.get('awgs_{}_time'.format(awg_nr)))
 
-    def configure_codeword_protocol(self, default_dio_timing: bool=False):
+    def configure_codeword_protocol(self, default_dio_timing: bool = False):
         """
         This method configures the AWG-8 codeword protocol.
         It includes specifying what bits are used to specify codewords
@@ -601,7 +624,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         # Configure the DIO interface for triggering on
 
         for awg_nr in range(4):
-                # This is the bit index of the valid bit,
+            # This is the bit index of the valid bit,
             self.set('awgs_{}_dio_valid_index'.format(awg_nr), 31)
             # Valid polarity is 'high' (hardware value 2),
             # 'low' (hardware value 1), 'no valid needed' (hardware value 0)
@@ -619,15 +642,15 @@ class ZI_HDAWG8(ZI_base_instrument):
             # only the 2 Least Significant Bits.
             # N.B. cfg_num_codewords must be a power of 2
             self.set('awgs_{}_dio_mask_value'.format(awg_nr),
-                     self.cfg_num_codewords()-1)
+                     self.cfg_num_codewords() - 1)
 
             if self.cfg_codeword_protocol() == 'identical':
-                    # In the identical protocol all bits are used to trigger
-                    # the same codewords on all AWG's
+                # In the identical protocol all bits are used to trigger
+                # the same codewords on all AWG's
 
-                    # N.B. The shift is applied before the mask
-                    # The relevant bits can be selected by first shifting them
-                    # and then masking them.
+                # N.B. The shift is applied before the mask
+                # The relevant bits can be selected by first shifting them
+                # and then masking them.
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
 
             # In the mw protocol bits [0:7] -> CW0 and bits [(8+1):15] -> CW1
@@ -645,21 +668,20 @@ class ZI_HDAWG8(ZI_base_instrument):
 
                 # FIXME: this is a protocol that does identical flux pulses
                 # on each channel.
-                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
+                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3 - 1)
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
 
         ####################################################
         # Turn on device
         ####################################################
         time.sleep(.05)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/enable', 1)
+        self._dev.daq.setInt('/' + self._dev.device + '/awgs/*/enable', 1)
 
         # Turn on all outputs
         self._dev.daq.setInt('/' + self._dev.device + '/sigouts/*/on', 1)
         # Disable all function generators
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/sigouts/*/enables/*', 0)
+        self._dev.daq.setInt('/' + self._dev.device + '/sigouts/*/enables/*',
+                             0)
         # Switch all outputs into direct mode
         if self.cfg_codeword_protocol() == 'flux':
             for ch in range(8):

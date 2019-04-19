@@ -63,6 +63,8 @@ class Pulse:
         wfs = {}
         for c in self.channels:
             if type(tvals) == dict:
+                if c not in tvals:
+                    continue
                 wfs[c] = self.chan_wf(c, tvals[c])
             else:
                 if hasattr(self, 'chan_wf'):
