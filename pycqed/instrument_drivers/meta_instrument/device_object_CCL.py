@@ -200,11 +200,11 @@ class DeviceCCL(Instrument):
             dio_map = {'ro_0': 1,
                        'ro_1': 2,
                        'ro_2': 3,
-                       'flux_0': 4,
-                       'flux_1': 5,
-                       'flux_2': 6,
-                       'mw_0': 7,
-                       'mw_1': 8,
+                       'mw_0': 4,
+                       'mw_1': 5,
+                       'flux_0': 6,
+                       'flux_1': 7,
+                       'flux_2': 8,
                        }
         else:
             return ValueError('CC type not recognized')
@@ -235,11 +235,12 @@ class DeviceCCL(Instrument):
         latencies = OrderedDict([('ro_0', self.tim_ro_latency_0()),
                                  ('ro_1', self.tim_ro_latency_1()),
                                  ('ro_2', self.tim_ro_latency_2()),
+                                 ('mw_0', self.tim_mw_latency_0()),
+                                 ('mw_1', self.tim_mw_latency_1()),
                                  ('flux_0', self.tim_flux_latency_0()),
                                  ('flux_1', self.tim_flux_latency_1()),
-                                 ('flux_2', self.tim_flux_latency_2()),
-                                 ('mw_0', self.tim_mw_latency_0()),
-                                 ('mw_1', self.tim_mw_latency_1())])
+                                 ('flux_2', self.tim_flux_latency_2())]
+                                 )
 
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
@@ -265,13 +266,13 @@ class DeviceCCL(Instrument):
         for lat_key, dio_ch in dio_map.items():
             lat = latencies[lat_key]
             CC.set('dio{}_out_delay'.format(dio_ch),
-                   int(lat // 20e-9))  # Convert to CC dio value
+                   int(lat*1e9 // 20))  # Convert to CC dio value
 
     def prepare_readout(self, qubits):
         self._prep_ro_setup_qubits(qubits=qubits)
         self._prep_ro_sources(qubits=qubits)
         # commented out because it conflicts with setting in the qubit object
-        # self._prep_ro_pulses()
+        self._prep_ro_pulses(qubits=qubits)
         self._prep_ro_integration_weights(qubits=qubits)
         self._prep_ro_instantiate_detectors(qubits=qubits)
 
@@ -330,7 +331,7 @@ class DeviceCCL(Instrument):
             qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
             qb._prep_ro_pulse(upload=False)
         # only call it once with upload after setting all pulses.
-        qb._prep_ro_pulse(upload=True)
+        #qb._prep_ro_pulse(upload=True)
 
     def _prep_ro_integration_weights(self, qubits):
         """
@@ -362,36 +363,45 @@ class DeviceCCL(Instrument):
 
         w0 = q0.ro_acq_weight_chI()
         w1 = q1.ro_acq_weight_chI()
-
-        d = det.UHFQC_correlation_detector(
-            UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
-            thresholding=self.ro_acq_digitized(),
-            AWG=self.instr_CC.get_instr(),
-            channels=[w0, w1], correlations=[(w0, w1)],
-            nr_averages=self.ro_acq_averages(),
-            integration_length=q0.ro_acq_integration_length(),
-            single_int_avg=single_int_avg,
-            seg_per_point=seg_per_point)
-        d.value_names = ['{} ch{}'.format(qubits[0], w0),
-                         '{} ch{}'.format(qubits[1], w1),
-                         'Corr ({}, {})'.format(qubits[0], qubits[1])]
+        if q0.instr_acquisition.get_instr()==q1.instr_acquisition.get_instr():
+            d = det.UHFQC_correlation_detector(
+                UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
+                thresholding=self.ro_acq_digitized(),
+                AWG=self.instr_CC.get_instr(),
+                channels=[w0, w1], correlations=[(w0, w1)],
+                nr_averages=self.ro_acq_averages(),
+                integration_length=q0.ro_acq_integration_length(),
+                single_int_avg=single_int_avg,
+                seg_per_point=seg_per_point)
+            d.value_names = ['{} ch{}'.format(qubits[0], w0),
+                             '{} ch{}'.format(qubits[1], w1),
+                             'Corr ({}, {})'.format(qubits[0], qubits[1])]
+        else:
+            d=self.get_int_avg_det(qubits=qubits)
         return d
 
     def get_int_logging_detector(self, qubits,
                                  result_logging_mode='lin_trans'):
-        acq_instrs, ro_ch_idx, value_names = \
+        acq_instruments, ro_ch_idx, value_names = \
             self._get_ro_channels_and_labels(qubits)
-
-        UHFQC = self.find_instrument(acq_instrs[0])
-        int_log_det = det.UHFQC_integration_logging_det(
-            UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-            channels=ro_ch_idx,
-            result_logging_mode=result_logging_mode,
-            integration_length=self.ro_acq_integration_length())
-
-        int_log_det.value_names = value_names
-
-        return int_log_det
+        int_log_dets=[]
+        for acq_instrument in np.unique(acq_instruments):
+            #selecting the readout channesla that are applicable to each acq instrument
+            indexes=[i for i in range(len(acq_instruments)) if acq_instruments[i]==acq_instrument]
+            ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
+            if acq_instrument==np.unique(acq_instruments)[0]: #CC should only be controlled by last detector
+                CC=self.instr_CC.get_instr()
+            else:
+                CC=None
+            UHFQC = self.find_instrument(acq_instrument)
+            int_log_dets.append(det.UHFQC_integration_logging_det(
+                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
+                channels=ro_ch_idx_instr,
+                result_logging_mode=result_logging_mode,
+                integration_length=self.ro_acq_integration_length()))
+        self.int_log_det = det.Multi_Detector(detectors=int_log_dets)
+        self.int_log_det.value_names = value_names
+        return self.int_log_det
 
     def _get_ro_channels_and_labels(self, qubits):
         """
@@ -421,11 +431,11 @@ class DeviceCCL(Instrument):
                                       'w{} {} Q'.format(ch_idx, qb_name)))
 
         # for now, implement only working with one UHFLI
-        acq_instruments = list(set([inst for inst, _, _ in channels_list]))
-        if len(acq_instruments) != 1:
-            raise NotImplementedError("Only one acquisition"
-                                      "instrument supported so far")
-
+        # acq_instruments = list(set([inst for inst, _, _ in channels_list]))
+        # if len(acq_instruments) != 1:
+        #     raise NotImplementedError("Only one acquisition"
+        #                               "instrument supported so far")
+        acq_instruments = [inst for inst, _, _ in channels_list]
         ro_ch_idx = [ch for _, ch, _ in channels_list]
         value_names = [n for _, _, n in channels_list]
 
@@ -446,28 +456,42 @@ class DeviceCCL(Instrument):
                 result_logging_mode = 'digitized'
         else:
             result_logging_mode = 'raw'
+        
+        input_average_detectors=[]
+        int_avg_det_singles=[]
 
-        if 'UHFQC' in acq_instruments[0]:
-            UHFQC = self.find_instrument(acq_instruments[0])
+        for acq_instrument in np.unique(acq_instruments):
+            #selecting the readout channesla that are applicable to each acq instrument
+            indexes=[i for i in range(len(acq_instruments)) if acq_instruments[i]==acq_instrument]
 
-            self.input_average_detector = det.UHFQC_input_average_detector(
+            ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
+            if acq_instrument==np.unique(acq_instruments)[0]: #CC should only be controlled by last detector
+                CC=self.instr_CC.get_instr()
+            else:
+                CC=None
+
+            UHFQC = self.find_instrument(acq_instrument)
+            input_average_detectors.append(det.UHFQC_input_average_detector(
                 UHFQC=UHFQC,
-                AWG=self.instr_CC.get_instr(),
+                AWG=CC,
                 nr_averages=self.ro_acq_averages(),
-                nr_samples=int(self.ro_acq_integration_length()*1.8e9))
+                nr_samples=int(self.ro_acq_integration_length()*1.8e9)))
 
-            self.int_avg_det = self.get_int_avg_det(qubits=qubits)
-            self.int_avg_det.value_names = value_names
-
-            self.int_avg_det_single = det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-                channels=ro_ch_idx,
+            int_avg_det_singles.append(det.UHFQC_integrated_average_detector(
+                UHFQC=UHFQC, AWG=CC,
+                channels= ro_ch_idx_instr,
                 result_logging_mode=result_logging_mode,
                 nr_averages=self.ro_acq_averages(),
                 real_imag=True, single_int_avg=True,
-                integration_length=self.ro_acq_integration_length())
+                integration_length=self.ro_acq_integration_length()))
+        print(len(input_average_detectors))
 
-            self.int_avg_det_single.value_names = value_names
+        self.input_average_detector = det.Multi_Detector(detectors=input_average_detectors)
+        self.int_avg_det_single = det.Multi_Detector(detectors=int_avg_det_singles)
+        
+        self.int_avg_det = self.get_int_avg_det(qubits=qubits)
+        self.int_avg_det.value_names = value_names
+        self.int_avg_det_single.value_names = value_names
 
     def get_int_avg_det(self, qubits, **kw):
         """
@@ -486,14 +510,23 @@ class DeviceCCL(Instrument):
         acq_instruments, ro_ch_idx, value_names = \
             self._get_ro_channels_and_labels(qubits=qubits)
 
-        int_avg_det = det.UHFQC_integrated_average_detector(
-            channels=ro_ch_idx,
-            UHFQC=self.find_instrument(acq_instruments[0]),
-            AWG=self.instr_CC.get_instr(),
-            result_logging_mode=result_logging_mode,
-            nr_averages=self.ro_acq_averages(),
-            integration_length=self.ro_acq_integration_length(), **kw)
-
+        int_avg_dets=[]
+        for acq_instrument in np.unique(acq_instruments):
+            #selecting the readout channesla that are applicable to each acq instrument
+            indexes=[i for i in range(len(acq_instruments)) if acq_instruments[i]==acq_instrument]
+            ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
+            if acq_instrument==np.unique(acq_instruments)[0]: #CC should only be controlled by last detector
+                CC=self.instr_CC.get_instr()
+            else:
+                CC=None
+            int_avg_dets.append(det.UHFQC_integrated_average_detector(
+                channels=ro_ch_idx_instr,
+                UHFQC=self.find_instrument(acq_instrument),
+                AWG=CC,
+                result_logging_mode=result_logging_mode,
+                nr_averages=self.ro_acq_averages(),
+                integration_length=self.ro_acq_integration_length(), **kw))
+        int_avg_det = det.Multi_Detector(detectors=int_avg_dets)
         return int_avg_det
 
     def _prep_ro_sources(self, qubits):
@@ -507,13 +540,13 @@ class DeviceCCL(Instrument):
             LO.power(self.ro_pow_LO())
             LO.on()
 
-    def _prep_ro_pulses(self):
+    def _prep_ro_pulses(self, qubits):
         """
         configure lutmans to measure the qubits and
         let the lutman configure the readout AWGs.
         """
         # these are the qubits that should be possible to read out
-        ro_qb_list = self.qubits()
+        ro_qb_list = qubits
         if ro_qb_list == []:
             ro_qb_list = self.qubits()
 
@@ -527,7 +560,7 @@ class DeviceCCL(Instrument):
 
             ro_lm = qb.instr_LutMan_RO.get_instr()
             lutmans_to_configure[ro_lm.name] = ro_lm
-            res_nr = qb.cfg_qubit_nr()()
+            res_nr = qb.cfg_qubit_nr()
 
             # extend the list of combinations to be set for the lutman
 
@@ -569,6 +602,7 @@ class DeviceCCL(Instrument):
                       qb.ro_pulse_down_amp1())
             ro_lm.set('M_down_phi1_R{}'.format(res_nr),
                       qb.ro_pulse_down_phi1())
+        print('lm to configure',lutmans_to_configure)
 
         for ro_lm_name, ro_lm in lutmans_to_configure.items():
             if self.ro_always_all():
@@ -1045,7 +1079,7 @@ class DeviceCCL(Instrument):
             # right is LSQ
             d = self.get_int_logging_detector(qubits,
                                               result_logging_mode='lin_trans')
-            d.nr_shots = 4088  # To ensure proper data binning
+            #d.nr_shots = 4088  # To ensure proper data binning
         else:
             d = detector
 

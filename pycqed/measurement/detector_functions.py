@@ -81,7 +81,9 @@ class Multi_Detector(Detector_Function):
     def get_values(self):
         values_list = []
         for detector in self.detectors:
-            new_values = detector.get_values()
+            detector.arm()
+        for detector in self.detectors:
+            new_values = detector.get_values(arm=False)
             values_list.append(new_values)
         values = np.concatenate(values_list)
         return values
@@ -1661,13 +1663,18 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def _get_readout(self):
         return sum([(1 << c) for c in self.channels])
 
-    def get_values(self):
+    def arm(self):
+        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+
+    def get_values(self, arm=True):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+        if arm:
+            self.arm()
+        
         # starting AWG
 
         if self.AWG is not None:
@@ -2018,13 +2025,18 @@ class UHFQC_integration_logging_det(Hard_Detector):
     def _get_readout(self):
         return sum([(1 << c) for c in self.channels])
 
-    def get_values(self):
+    def arm(self):
+        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+
+
+    def get_values(self, arm=True):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+        if arm:
+            self.arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()

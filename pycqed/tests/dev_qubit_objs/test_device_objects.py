@@ -136,11 +136,11 @@ class Test_Device_obj(unittest.TestCase):
         expected_dio_map = {'ro_0': 1,
                             'ro_1': 2,
                             'ro_2': 3,
-                            'flux_0': 4,
-                            'flux_1': 5,
-                            'flux_2': 6,
-                            'mw_0': 7,
-                            'mw_1': 8,
+                            'mw_0': 4,
+                            'mw_1': 5,
+                            'flux_0': 6,
+                            'flux_1': 7,
+                            'flux_2': 8,
                             }
         assert dio_map == expected_dio_map
 
@@ -180,11 +180,11 @@ class Test_Device_obj(unittest.TestCase):
 
         assert(self.QCC.dio1_out_delay() == 12)
         assert(self.QCC.dio2_out_delay() == 11)
-        assert(self.QCC.dio4_out_delay() == 0)
-        assert(self.QCC.dio5_out_delay() == 7)
+        assert(self.QCC.dio4_out_delay() == 3)
+        assert(self.QCC.dio5_out_delay() == 2)
+        assert(self.QCC.dio6_out_delay() == 0)
+        assert(self.QCC.dio7_out_delay() == 7)
 
-        assert(self.QCC.dio7_out_delay() == 3)
-        assert(self.QCC.dio8_out_delay() == 2)
 
     @classmethod
     def tearDownClass(self):

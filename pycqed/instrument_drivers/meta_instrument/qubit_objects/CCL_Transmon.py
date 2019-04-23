@@ -623,7 +623,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter,
                            vals=vals.Strings())
         self.add_parameter(
-            'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 7),
+            'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 16),
             parameter_class=ManualParameter, initial_value=0,
             docstring='The qubit number is used in the OpenQL compiler. ')
 
