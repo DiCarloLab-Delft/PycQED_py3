@@ -962,6 +962,7 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
                                               CZ_pulse_name=None,
                                               net_clifford=0,
                                               nr_averages=None,
+                                              upload=True,
                                               clifford_decomposition_name='HZ',
                                               interleaved_gate=None,
                                               MC=None, UHFQC=None,
@@ -1015,7 +1016,7 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
 
     soft_sweep_points = nr_cliffords_array
     soft_sweep_func = awg_swf2.two_qubit_randomized_benchmarking_nr_cliffords(
-        two_qubit_RB_sweepfunction=hard_sweep_func)
+        two_qubit_RB_sweepfunction=hard_sweep_func, upload=upload)
 
     MC.set_sweep_function(hard_sweep_func)
     MC.set_sweep_points(hard_sweep_points)
@@ -1543,17 +1544,16 @@ def cphase_gate_tuneup(qb_control, qb_target,
 
 
 def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
-                                  std_deviations: list = [20e-9,0.02],
-                                  phases = None, MC = None,
-                                  estimator = 'GRNN_neupy',
-                                  hyper_parameter_dict : dict = None,
-                                  sampling_numbers: list = [70,30],
-                                  max_measurements = 2,
-                                  tol = [0.016,0.05],
-                                  timestamps : list = None,
-                                  update = False,
-                                  full_output = True,
-                                  fine_tune = True, fine_tune_minmax=None):
+                                  std_deviations: list=[20e-9, 0.02],
+                                  phases=None, MC=None,
+                                  estimator='GRNN_neupy',
+                                  hyper_parameter_dict : dict=None,
+                                  sampling_numbers: list=[70, 30],
+                                  max_measurements=2,
+                                  tol=[0.016, 0.05],
+                                  timestamps: list=None,
+                                  update=False, full_output=True,
+                                  fine_tune=True, fine_tune_minmax=None):
     '''
     Args:
         qb_control (QuDev_Transmon): control qubit (with flux pulses)
@@ -1781,7 +1781,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
           .format(population_recovery_opt),
           '@ flux pulse Paramters: \n',
           'Pulse Length: {:0.1f} ns \n'.format(pulse_length_best*1e9),
-          'Pulse Length: {:0.4f} V \n'.format(pulse_amplitude_best))
+          'Pulse Ampllitude: {:0.4f} V \n'.format(pulse_amplitude_best))
     if update:
         qbc.set('CZ_{}_amp'.format(qbt.name), pulse_amplitude_best)
         qbc.set('CZ_{}_length'.format(qbt.name), pulse_length_best)
@@ -1895,7 +1895,7 @@ def measure_measurement_induced_dephasing(qb_dephased, qb_targeted, phases, amps
 class Averaged_Cphase_Measurement():
 
     def __init__(self, qbc, qbt, qbr, n_phases, MC, n_average=5,
-                 tol= [0.016, 0.05]):
+                 tol=[0.016, 0.05]):
         if MC is None:
             self.MC = qbc.MC
         self.qbc = qbc
@@ -1927,6 +1927,7 @@ class Averaged_Cphase_Measurement():
                                                     self.qbr,
                                                     test_lengths,
                                                     test_amps,
+                                                    alphas=None,
                                                     phases=self.phases,
                                                     plot=True,
                                                     MC=self.MC,
@@ -1937,7 +1938,7 @@ class Averaged_Cphase_Measurement():
         self.pop_losses.append(np.mean(population_losses_opt))
         self.check_convergence()
 
-        return self.cphases[-1],self.pop_losses[-1]
+        return self.cphases[-1], self.pop_losses[-1]
 
     def check_convergence(self):
 
@@ -2383,7 +2384,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
 
 def measure_cz_frequency_sweep(qbc, qbt, qbr, frequencies, length, amplitude,
-                    cal_points=True, upload=True,
+                    cal_points=True, upload=True, upload_all=True,
                     verbose=False, return_seq=False,
                     MC=None, soft_averages=1):
 
@@ -2396,10 +2397,22 @@ def measure_cz_frequency_sweep(qbc, qbt, qbr, frequencies, length, amplitude,
     for qb in [qbc, qbt, qbr]:
         qb.prepare_for_timedomain()
 
+    if cal_points:
+        step = np.abs(frequencies[-1]-frequencies[-2])
+        sweep_points = np.concatenate(
+            [frequencies, [frequencies[-1]+step,  frequencies[-1]+2*step,
+                           frequencies[-1]+3*step, frequencies[-1]+4*step]])
+
+    TwoD = hasattr(amplitude, '__iter__')
+    amp_for_s1 = amplitude
+    if TwoD:
+        amp_for_s1 = amp_for_s1[0]
+        upload_all = True
+
     sf1 = awg_swf.Chevron_frequency_hard_swf(
-        frequencies=frequencies,
+        frequencies=sweep_points,
         length=length,
-        flux_pulse_amp=amplitude,
+        flux_pulse_amp=amp_for_s1,
         qbc_name=qbc.name,
         qbt_name=qbt.name,
         qbr_name=qbr.name,
@@ -2407,15 +2420,25 @@ def measure_cz_frequency_sweep(qbc, qbt, qbr, frequencies, length, amplitude,
         CZ_pulse_name=CZ_pulse_name,
         operation_dict=operation_dict,
         verbose=verbose, cal_points=cal_points,
-        upload=upload, return_seq=return_seq)
+        upload=(False if TwoD else upload),
+        upload_all=upload_all, return_seq=return_seq)
     MC.soft_avg(soft_averages)
     MC.set_sweep_function(sf1)
-    MC.set_sweep_points(frequencies)
-
+    MC.set_sweep_points(sweep_points)
+    if TwoD:
+        sf2 = awg_swf.Chevron_ampl_swf_new(hard_sweep=sf1)
+        MC.set_sweep_function_2D(sf2)
+        MC.set_sweep_points_2D(amplitude)
     MC.set_detector_function(qbr.int_avg_det)
-    MC.run('CZ_Frequency_Sweep_{}{}'.format(qbc.name, qbt.name))
-
-    ma.MeasurementAnalysis()
+    exp_metadata = {'flux_pulse_length': length}
+    if not TwoD:
+        exp_metadata['flux_pulse_amplitude'] = amplitude
+    MC.run('CZ_Frequency_Sweep_{}{}'.format(qbc.name, qbt.name),
+           mode='2D' if TwoD else '1D',
+           exp_metadata=exp_metadata)
+    tda.MultiQubit_TimeDomain_Analysis(qb_names=[qbr.name],
+                                       options_dict={'TwoD': TwoD})
+    ma.MeasurementAnalysis(TwoD=TwoD)
 
 
 def measure_fgge_frequency_sweep(qbc, qbt, qbm, fgge_pulse_name,
@@ -2452,7 +2475,8 @@ def measure_fgge_frequency_sweep(qbc, qbt, qbm, fgge_pulse_name,
     ma.MeasurementAnalysis()
 
 
-def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
+def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
+                    frequencies=None, alphas=None,
                     cal_points=True, upload=True,
                     verbose=False, return_seq=False,
                     MC=None, soft_averages=1):
@@ -2463,15 +2487,25 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
     operation_dict = get_operation_dict([qbc, qbt, qbr])
     CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
 
+    if frequencies is None:
+        frequencies = [operation_dict[CZ_pulse_name].get('frequency', 0)]
+    if alphas is None:
+        alphas = [operation_dict[CZ_pulse_name].get('alpha', 1)]
+
     for qb in [qbc, qbt, qbr]:
         qb.prepare_for_timedomain()
 
-    flux_channel = operation_dict[CZ_pulse_name]['channel']
+    if cal_points:
+        step = np.abs(lengths[-1]-lengths[-2])
+        sweep_points = np.concatenate(
+            [lengths, [lengths[-1]+step,  lengths[-1]+2*step,
+                           lengths[-1]+3*step, lengths[-1]+4*step]])
 
     sf1 = awg_swf.Chevron_length_swf_new(
-                lengths=lengths,
+                lengths=sweep_points,
                 flux_pulse_amp=amplitudes[0],
                 frequency=frequencies[0],
+                alpha=alphas[0],
                 qbc_name=qbc.name,
                 qbt_name=qbt.name,
                 qbr_name=qbr.name,
@@ -2482,18 +2516,28 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
                 upload=False, return_seq=return_seq)
     MC.soft_avg(soft_averages)
     MC.set_sweep_function(sf1)
-    MC.set_sweep_points(lengths)
+    MC.set_sweep_points(sweep_points)
 
     if len(amplitudes) > 1:
         sf2 = awg_swf.Chevron_ampl_swf_new(hard_sweep=sf1)
         sweep_points_2D = amplitudes
         exp_metadata = {'CZ_frequency': frequencies[0]}
+        if operation_dict[CZ_pulse_name]['pulse_type'] == 'NZBufferedCZPulse':
+            exp_metadata['alpha'] = alphas[0]
     elif len(frequencies) > 1:
         sf2 = awg_swf.Chevron_freq_swf_new(hard_sweep=sf1)
         sweep_points_2D = frequencies
         exp_metadata = {'CZ_amplitude': amplitudes[0]}
+        if operation_dict[CZ_pulse_name]['pulse_type'] == 'NZBufferedCZPulse':
+            exp_metadata['alpha'] = alphas[0]
+    elif len(alphas) > 1:
+        sf2 = awg_swf.Chevron_alpha_swf_new(hard_sweep=sf1)
+        sweep_points_2D = alphas
+        exp_metadata = {'CZ_amplitude': amplitudes[0],
+                        'CZ_frequency': frequencies[0]}
     else:
-        raise ValueError('At least amplitudes or frequencies must have len > 1')
+        raise ValueError('At least amplitudes or frequencies or alphas '
+                         'must have len > 1')
 
 
     MC.set_sweep_function_2D(sf2)
@@ -2505,37 +2549,40 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes, frequencies,
     tda.MultiQubit_TimeDomain_Analysis(qb_names=[qbr.name],
                                        options_dict={'TwoD': True})
 
-def measure_cphase(qbc, qbt, qbr, lengths, amps,
+def measure_cphase(qbc, qbt, qbr, lengths, amps, alphas=None,
                        CZ_pulse_name=None,
                        phases=None, MC=None,
                        cal_points=False, plot=False,
                        save_plot=True,
                        prepare_for_timedomain=True,
                        output_measured_values=False,
-                       upload=True,**kw):
+                       analyze=True, upload=True,**kw):
     '''
-    method to measure the phase acquired during a flux pulse conditioned on the state
-    of the control qubit (self).
+    method to measure the phase acquired during a flux pulse conditioned on the
+    state of the control qubit (self).
     In this measurement, the phase from two Ramsey type measurements
-    on qb_target is measured, once with the control qubit in the excited state and once
-    in the ground state. The conditional phase is calculated as the difference.
+    on qb_target is measured, once with the control qubit in the excited state
+    and once in the ground state. The conditional phase is calculated as the
+    difference.
 
 
     Args:
         qb_target (QuDev_transmon): target qubit / non-fluxed qubit
         amps (list): list or array of flux pulse amplitudes
-        lengths (list):  list or array of flux pulse lengths (must have same dimension as
-                         amps)
+        lengths (list):  list or array of flux pulse lengths (must have same
+                         dimension as amps)
         phases (array): phases used for the Ramsey type phase sweep
         spacing (float): spacing between flux pulse and Ramsey pulses in s
         MC (optional): measurement control
         cal_points (bool): if True, calibration points are measured
         plot (bool): if true, the phase fit is shown
-        return_population_loss: if true, the population loss (loss of contrast when having
-                                the control qubit in the excited state is returned)
+        return_population_loss: if true, the population loss (loss of contrast
+                                when having the control qubit in the excited
+                                state is returned)
         upload_AWGs (list): list of the AWGs to be uploaded
         upload_channels (list): list of channels to be uploaded
-        prepare_for_timedomain (bool): if False, the self.prepare_for_timedomain()
+        prepare_for_timedomain (bool): if False, the
+                                       self.prepare_for_timedomain()
                                        is NOT called
 
     Returns:
@@ -2543,67 +2590,238 @@ def measure_cphase(qbc, qbt, qbr, lengths, amps,
                               (amps[i], lengths[i])
     '''
     if len(amps) != len(lengths):
-        logging.warning('amps and lengths must have the same '
-                        'dimension.')
+        raise ValueError('amps and lengths must have the same '
+                         'dimension.')
 
     if MC is None:
         MC = qbc.MC
 
     if phases is None:
         phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
-        phases = np.concatenate((phases,phases))
-
+        phases = np.concatenate((phases, phases))
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
     if CZ_pulse_name is None:
         CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
-    CZ_pulse_channel = qbc.flux_pulse_channel()
-    max_flux_length = np.max(lengths)
 
-    s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new(phases,
-                                                qbc.name,
-                                                qbt.name,
-                                                qbr.name,
-                                                CZ_pulse_name,
-                                                CZ_pulse_channel,
-                                                operation_dict,
-                                                max_flux_length,
-                                                cal_points=cal_points,
-                                                reference_measurements=True,
+    optimize_nz_pulse = False
+    # if operation_dict[CZ_pulse_name]['pulse_type'] == 'NZBufferedCZPulse':
+    #     optimize_nz_pulse = True
+    #     if alphas is None:
+    #         raise ValueError('alphas is None')
+    #     if len(alphas) != len(amps):
+    #         raise ValueError('alphas must have the same dimension as '
+    #                          'amps and lengths.')
+
+    CZ_pulse_channel = operation_dict[CZ_pulse_name]['channel']
+    max_flux_length = np.max(lengths)
+    if optimize_nz_pulse:
+        s1 = awg_swf.CPhase_NZ_hard_swf(phases,
+                                        qbc.name,
+                                        qbt.name,
+                                        CZ_pulse_name,
+                                        CZ_pulse_channel,
+                                        operation_dict,
+                                        max_flux_length,
+                                        cal_points=cal_points,
+                                        reference_measurements=True,
+                                        upload=upload)
+        s2 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='length',
                                                 upload=upload)
-    s2 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='length',
-                                                  upload=upload)
-    s3 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='amplitude',
-                                    upload=upload)
+        s3 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='amplitude',
+                                                upload=upload)
+        s4 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='alpha',
+                                                upload=upload)
+        MC.set_sweep_functions([s1, s2, s3, s4])
+        MC.set_sweep_points(phases)
+        #Here the order of the parameters matters! Paramters must be
+        #set in the same order as their sweepfunctions!
+        MC.set_sweep_points_2D(np.array([lengths, amps, alphas]).T)
+        MC.set_detector_function(qbr.int_avg_det)
+    else:
+        s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new(phases,
+                                                    qbc.name,
+                                                    qbt.name,
+                                                    qbr.name,
+                                                    CZ_pulse_name,
+                                                    CZ_pulse_channel,
+                                                    operation_dict,
+                                                    max_flux_length,
+                                                    cal_points=cal_points,
+                                                    reference_measurements=True,
+                                                    upload=upload)
+        s2 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='length',
+                                                upload=upload)
+        s3 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='amplitude',
+                                                upload=upload)
+
+        MC.set_sweep_functions([s1, s2, s3])
+        MC.set_sweep_points(phases)
+        #Here the order of the parameters matters! Paramters must be
+        #set in the same order as their sweepfunctions!
+        MC.set_sweep_points_2D(np.array([lengths, amps]).T)
+        MC.set_detector_function(qbr.int_avg_det)
 
     t0 = time.time()
     if prepare_for_timedomain:
         for qb in [qbc, qbt, qbr]:
-             qb.prepare_for_timedomain()
-    MC.set_sweep_functions([s1,s2,s3])
-    MC.set_sweep_points(phases)
-    #Here the order of the parameters matters! Paramters must be
-    #set in the same order as their sweepfunctions!
-    MC.set_sweep_points_2D(np.array([lengths,amps]).T)
-    MC.set_detector_function(qbr.int_avg_det)
-    MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
+            qb.prepare_for_timedomain()
+    MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name, qbt.name))
 
     t1 = time.time()
     print('Measured Cphases with ',
           len(amps)*len(phases),
-          ' sweeppoints in T=',t1-t0,' s.')
+          ' sweeppoints in T=', t1-t0, ' s.')
 
-    # ma.TwoD_Analysis(close_file=True)
-    flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis_Predictive(
-        label='CPhase_measurement_{}_{}'.format(qbc.name, qbt.name),
-        qb_name=qbc.name, cal_points=cal_points, plot=plot, save_plot=save_plot,
-        reference_measurements=True, only_cos_fits=True, **kw)
-    cphases = flux_pulse_ma.cphases
-    population_losses = flux_pulse_ma.population_losses
-    if output_measured_values:
-        print('fitted phases: ', cphases)
-        print('pop loss: ', population_losses)
-    return cphases, population_losses, flux_pulse_ma
+    if analyze:
+        flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis_Predictive(
+            label='CPhase_measurement_{}_{}'.format(qbc.name, qbt.name),
+            qb_name=qbc.name, cal_points=cal_points, plot=plot,
+            save_plot=save_plot,  reference_measurements=True,
+            only_cos_fits=True, **kw)
+        cphases = flux_pulse_ma.cphases
+        population_losses = flux_pulse_ma.population_losses
+        if output_measured_values:
+            print('fitted phases: ', cphases)
+            print('pop loss: ', population_losses)
+        return cphases, population_losses, flux_pulse_ma
+    else:
+        return
+
+
+def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
+                       CZ_pulse_name=None,
+                       phases=None, MC=None,
+                       UHFQC=None, pulsar=None,
+                       cal_points=False, plot=False,
+                       output_measured_values=False,
+                       analyze=True, upload=True, **kw):
+    '''
+    method to measure the leakage and the phase acquired during a flux pulse
+    conditioned on the state of the control qubit (self).
+    In this measurement, the phase from two Ramsey type measurements
+    on qb_target is measured, once with the control qubit in the excited state
+    and once in the ground state. The conditional phase is calculated as the
+    difference.
+
+
+    Args:
+        qb_target (QuDev_transmon): target qubit / non-fluxed qubit
+        amps (list): list or array of flux pulse amplitudes
+        lengths (list):  list or array of flux pulse lengths (must have same
+                         dimension as amps)
+        phases (array): phases used for the Ramsey type phase sweep
+        spacing (float): spacing between flux pulse and Ramsey pulses in s
+        MC (optional): measurement control
+        cal_points (bool): if True, calibration points are measured
+        plot (bool): if true, the phase fit is shown
+        return_population_loss: if true, the population loss (loss of contrast
+                                when having the control qubit in the excited
+                                state is returned)
+        upload_AWGs (list): list of the AWGs to be uploaded
+        upload_channels (list): list of channels to be uploaded
+        prepare_for_timedomain (bool): if False, the
+                                       self.prepare_for_timedomain()
+                                       is NOT called
+
+    Returns:
+        cphases (numpy array): array of the conditional phases measured at
+                              (amps[i], lengths[i])
+    '''
+    if len(amps) != len(lengths):
+        raise ValueError('amps and lengths must have the same '
+                         'dimension.')
+    if alphas is None:
+        raise ValueError('alphas is None')
+    if len(alphas) != len(amps):
+        raise ValueError('alphas must have the same dimension as '
+                         'amps and lengths.')
+    if MC is None:
+        MC = qbc.MC
+        print("Unspecified MC object. Using {}.MC.".format(
+            qbc.name))
+    if UHFQC is None:
+        UHFQC = qbc.UHFQC
+        print("Unspecified UHFQC instrument. Using {}.UHFQC.".format(
+            qbc.name))
+    if pulsar is None:
+        pulsar = qbc.AWG
+        print("Unspecified pulsar instrument. Using {}.AWG.".format(
+            qbc.name))
+
+    if phases is None:
+        phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
+
+    if cal_points:
+        step = phases[-1] - phases[-2]
+        phases = np.concatenate(
+            [phases, [phases[-1]+step,  phases[-1]+2*step,
+                      phases[-1]+3*step, phases[-1]+4*step]])
+    sweep_points = np.concatenate((phases, phases))
+
+    operation_dict = get_operation_dict([qbc, qbt])
+    if CZ_pulse_name is None:
+        CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
+
+    CZ_pulse_channel = operation_dict[CZ_pulse_name]['channel']
+    max_flux_length = np.max(lengths)
+    s1 = awg_swf.CPhase_NZ_hard_swf(phases,
+                                    qbc.name,
+                                    qbt.name,
+                                    CZ_pulse_name,
+                                    CZ_pulse_channel,
+                                    operation_dict,
+                                    max_flux_length,
+                                    cal_points=cal_points,
+                                    reference_measurements=True,
+                                    upload=upload)
+    s2 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='length',
+                                            upload=upload)
+    s3 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='amplitude',
+                                            upload=upload)
+    s4 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='alpha',
+                                            upload=upload)
+    MC.set_sweep_functions([s1, s2, s3, s4])
+    MC.set_sweep_points(sweep_points)
+    #Here the order of the parameters matters! Paramters must be
+    #set in the same order as their sweepfunctions!
+    MC.set_sweep_points_2D(np.array([lengths, amps, alphas]).T)
+
+    for qb in [qbc, qbt]:
+        qb.prepare_for_timedomain(multiplexed=True)
+    multiplexed_pulse([qbc, qbt], f_LO, upload=True)
+    det_func = get_multiplexed_readout_detector_functions(
+        [qbc, qbt], nr_averages=max(qb.RO_acq_averages() for qb in [qbc, qbt]),
+        UHFQC=UHFQC, pulsar=pulsar)['int_avg_det']
+    MC.set_detector_function(det_func)
+    exp_metadata = {'leakage_qbname': qbc.name,
+                    'cphase_qbname': qbt.name,
+                    'num_cal_points': 4 if cal_points else 0}
+    if kw.pop('predictive', False):
+        label = 'Predictive_cphase_nz_measurement_{}_{}'.format(
+            qbc.name, qbt.name)
+    else:
+        label = 'CPhase_nz_measurement_{}_{}'.format(
+            qbc.name, qbt.name)
+    MC.run_2D(label, exp_metadata=exp_metadata)
+
+    if analyze:
+        flux_pulse_tdma = tda.CPhaseLeakageAnalysis(
+            qb_names=[qbc.name, qbt.name], extract_only=not plot,
+            options_dict={'TwoD': True})
+        cphases = flux_pulse_tdma.proc_data_dict[
+            'analysis_params_dict']['cphase']
+        population_losses = flux_pulse_tdma.proc_data_dict[
+            'analysis_params_dict']['pop_loss']
+        leakage = flux_pulse_tdma.proc_data_dict[
+            'analysis_params_dict']['leakage']
+        if output_measured_values:
+            print('fitted phases: ', cphases)
+            print('pop loss: ', population_losses)
+            print('leakage: ', leakage)
+        return cphases, population_losses, leakage, flux_pulse_tdma
+    else:
+        return
 
 
 def measure_cphase_frequency(qbc, qbt, qbr, frequencies, length, amp,
@@ -2720,7 +2938,7 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases, CZ_pulse_name,
 
     operation_dict = qb.get_operation_dict()
 
-    s1 = awg_swf.CZ_bleed_through_phase_hard_sweep_new(
+    s1 = awg_swf.CZ_bleed_through_phase_hard_sweep(
         qb_name=qb.name,
         CZ_pulse_name=CZ_pulse_name,
         CZ_separation=CZ_separation_times[0],
@@ -2745,7 +2963,7 @@ def measure_CZ_bleed_through(qb, CZ_separation_times, phases, CZ_pulse_name,
             s2 = awg_swf.CZ_bleed_through_nr_cz_gates_soft_sweep(
                 s1, upload=upload)
             MC.set_sweep_function_2D(s2)
-            MC.set_sweep_points_2D(1+np.arange(nr_cz_gates))
+            MC.set_sweep_points_2D(1+np.arange(0, nr_cz_gates, 2))
     MC.set_detector_function(qb.int_avg_det)
     MC.soft_avg(soft_avgs)
 

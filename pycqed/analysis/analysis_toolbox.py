@@ -424,7 +424,8 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
         elif param == 'exp_metadata':
             if 'Experimental Data' not in ma.data_file or \
                'Experimental Metadata' not in ma.data_file['Experimental Data']:
-                warnings.warn('The data file does not experimental metadata')
+                warnings.warn('The data file does not contain '
+                              'experimental metadata')
             else:
                 data[param] = hdf5_data.read_dict_from_hdf5(
                     {}, ma.data_file['Experimental Data']['Experimental Metadata'])
@@ -536,6 +537,7 @@ def append_data_from_ma(ma, param_names, data, data_version=2,
 def get_data_from_timestamp_list(timestamps,
                                  param_names,
                                  TwoD=False,
+                                 TwoD_tuples=False,
                                  max_files=None,
                                  filter_no_analysis=False,
                                  numeric_params=None,
@@ -584,14 +586,18 @@ def get_data_from_timestamp_list(timestamps,
                         do_analysis = True
                     else:
                         do_analysis = False
-
                 if do_analysis:
-                    if TwoD:
+                    if TwoD_tuples:
+                        print('Extracting 2D_tuples')
+                        ana.get_naming_and_values_2D_tuples()
+                    elif TwoD:
                         ana.get_naming_and_values_2D()
+                        print('Extracting 2D')
                     else:
                         ana.get_naming_and_values()
 
-                    if 'datasaving_format' in ana.data_file['Experimental Data'].attrs:
+                    if 'datasaving_format' in ana.data_file[
+                            'Experimental Data'].attrs:
                         datasaving_format = ana.get_key('datasaving_format')
                     else:
                         print(
@@ -1665,23 +1671,23 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     trans_y = data[1] - mean_y
 
     #compute the covariance 2x2 matrix
-    cov_matrix = np.cov(np.array([trans_x,trans_y]))
+    cov_matrix = np.cov(np.array([trans_x, trans_y]))
 
     #find eigenvalues and eigenvectors of the covariance matrix
     [eigvals, eigvecs] = np.linalg.eig(cov_matrix)
 
     #compute the transposed feature vector
-    row_feature_vector = np.array([(eigvecs[0,np.argmin(eigvals)],
-                                    eigvecs[1,np.argmin(eigvals)]),
-                                   (eigvecs[0,np.argmax(eigvals)],
-                                    eigvecs[1,np.argmax(eigvals)])])
+    row_feature_vector = np.array([(eigvecs[0, np.argmin(eigvals)],
+                                    eigvecs[1, np.argmin(eigvals)]),
+                                   (eigvecs[0, np.argmax(eigvals)],
+                                    eigvecs[1, np.argmax(eigvals)])])
     #compute the row_data_trans matrix with (x,y) pairs in each column. Each
     #row is a dimension (row1 = x_data, row2 = y_data)
-    row_data_trans = np.array([trans_x,trans_y])
+    row_data_trans = np.array([trans_x, trans_y])
     #compute final, projected data; only the first row is of interest (it is the
     #principal axis
     final_data = np.dot(row_feature_vector, row_data_trans)
-    normalized_data = final_data[1,:]
+    normalized_data = final_data[1, :]
 
     #normalize data
     # max_min_distance = np.sqrt(max(final_data[1,:])**2 +

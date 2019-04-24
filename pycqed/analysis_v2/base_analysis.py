@@ -286,12 +286,13 @@ class BaseDataAnalysis(object):
         if self.single_timestamp:
             self.timestamps = [self.timestamps[0]]
         TwoD = self.options_dict.get('TwoD', False)
+        TwoD_tuples = self.options_dict.get('TwoD_tuples', False)
         # this should always be extracted as it is used to determine where
         # the file is as required for datasaving
         self.params_dict['folder'] = 'folder'
         self.raw_data_dict = a_tools.get_data_from_timestamp_list(
             self.timestamps, param_names=self.params_dict,
-            ma_type=self.ma_type,
+            ma_type=self.ma_type, TwoD_tuples=TwoD_tuples,
             TwoD=TwoD, numeric_params=self.numeric_params,
             filter_no_analysis=self.filter_no_analysis)
 

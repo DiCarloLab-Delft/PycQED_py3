@@ -338,7 +338,8 @@ class QuDev_transmon(Qubit):
         self.add_operation('flux')
         self.add_pulse_parameter('flux', 'flux_pulse_type', 'pulse_type',
                                  initial_value='CosPulse',
-                                 vals=vals.Enum('CosPulse'))
+                                 vals=vals.Enum('CosPulse', 'NZBufferedCZPulse',
+                                                'BufferedCZPulse'))
         self.add_pulse_parameter('flux', 'flux_pulse_channel', 'channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('flux', 'flux_pulse_amp', 'amplitude',
@@ -1616,7 +1617,7 @@ class QuDev_transmon(Qubit):
             interleaved_gate=interleaved_gate)
 
         RB_sweepfunction_2D = awg_swf.Randomized_Benchmarking_nr_cliffords(
-            RB_sweepfunction=RB_sweepfunction)
+            RB_sweepfunction=RB_sweepfunction, upload=upload)
 
         MC.set_sweep_function(RB_sweepfunction)
         MC.set_sweep_points(sweep_points1D)
@@ -4431,6 +4432,42 @@ class QuDev_transmon(Qubit):
 
         ma.MeasurementAnalysis(TwoD=True)
 
+    def measure_flux_pulse_scope_nzcz_alpha(
+            self, nzcz_alphas, delays, CZ_pulse_name=None,
+            cal_points=True, upload=True, upload_all=True,
+            spacing=30e-9, MC=None):
+
+        if MC is None:
+            MC = self.MC
+
+        self.prepare_for_timedomain()
+
+        if cal_points:
+            step = np.abs(delays[-1] - delays[-2])
+            sweep_points = np.concatenate(
+                [delays, [delays[-1]+step, delays[-1]+2*step,
+                          delays[-1]+3*step, delays[-1]+4*step]])
+        else:
+            sweep_points = delays
+
+        s1 = awg_swf.Fluxpulse_scope_nzcz_alpha_hard_swf(
+            qb_name=self.name, nzcz_alpha=nzcz_alphas[0],
+            CZ_pulse_name=CZ_pulse_name,
+            operation_dict=self.get_operation_dict(),
+            cal_points=cal_points, upload=False,
+            upload_all=upload_all, spacing=spacing)
+        s2 = awg_swf.Fluxpulse_scope_nzcz_alpha_soft_sweep(
+            s1, upload=upload)
+
+        MC.set_sweep_function(s1)
+        MC.set_sweep_points(sweep_points)
+        MC.set_sweep_function_2D(s2)
+        MC.set_sweep_points_2D(nzcz_alphas)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run_2D('Flux_scope_nzcz_alpha' + self.msmt_suffix)
+
+        ma.MeasurementAnalysis(TwoD=True)
+
 
 def add_CZ_pulse(qbc, qbt):
     """
@@ -4455,9 +4492,10 @@ def add_CZ_pulse(qbc, qbt):
                                 initial_value=qbt.name,
                                 vals=vals.Enum(qbt.name))
         qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
-                                initial_value='BufferedCZPulse',
+                                initial_value='NZBufferedCZPulse',
                                 vals=vals.Enum('BufferedSquarePulse',
-                                               'BufferedCZPulse'))
+                                               'BufferedCZPulse',
+                                               'NZBufferedCZPulse'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
         qbc.add_pulse_parameter(op_name, ps_name + '_aux_channels_dict',
@@ -4471,11 +4509,13 @@ def add_CZ_pulse(qbc, qbt):
                                 initial_value=0, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_length', 'pulse_length',
                                 initial_value=0, vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_alpha', 'alpha',
+                                initial_value=1, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_buf_start',
-                                'buffer_length_start', initial_value=40e-9,
+                                'buffer_length_start', initial_value=10e-9,
                                 vals=vals.Numbers(0))
         qbc.add_pulse_parameter(op_name, ps_name + '_buf_end',
-                                'buffer_length_end', initial_value=40e-9,
+                                'buffer_length_end', initial_value=10e-9,
                                 vals=vals.Numbers(0))
         qbc.add_pulse_parameter(op_name, ps_name + '_extra_buffer_aux_pulse',
                                 'extra_buffer_aux_pulse', initial_value=5e-9,
@@ -4488,9 +4528,6 @@ def add_CZ_pulse(qbc, qbt):
         qbc.add_pulse_parameter(op_name, ps_name + '_gaussian_filter_sigma',
                                 'gaussian_filter_sigma', initial_value=2e-9,
                                 vals=vals.Numbers(0))
-
-
-
 
 
 

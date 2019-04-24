@@ -298,11 +298,12 @@ class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
 class two_qubit_randomized_benchmarking_nr_cliffords(swf.Soft_Sweep):
 
     def __init__(self, sweep_control='soft',
-                 two_qubit_RB_sweepfunction=None):
+                 two_qubit_RB_sweepfunction=None, upload=True):
         super().__init__()
 
         self.sweep_control = sweep_control
         self.two_qubit_RB_sweepfunction = two_qubit_RB_sweepfunction
+        self.upload = upload
         self.name = 'Two_Qubit_Randomized_Benchmarking_nr_cliffords'
         self.parameter_name = 'Nr of Cliffords'
         self.unit = '#'
@@ -310,7 +311,7 @@ class two_qubit_randomized_benchmarking_nr_cliffords(swf.Soft_Sweep):
 
     def set_parameter(self, val):
         self.two_qubit_RB_sweepfunction.nr_cliffords_value = val
-        self.two_qubit_RB_sweepfunction.upload = True
+        self.two_qubit_RB_sweepfunction.upload = self.upload
         self.two_qubit_RB_sweepfunction.prepare()
 
 

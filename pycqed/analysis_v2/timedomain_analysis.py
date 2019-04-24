@@ -198,6 +198,10 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             'value_units': 'value_units',
                             'measured_values': 'measured_values',
                             'exp_metadata': 'exp_metadata'}
+
+        if not self.options_dict.get('TwoD', False):
+            if self.options_dict.get('TwoD_tuples', False):
+                self.options_dict['TwoD'] = True
         if self.options_dict.get('TwoD', False):
             self.params_dict['sweep_points_2D'] = 'sweep_points_2D'
             self.params_dict['ylabel'] = 'sweep_name_2D'
@@ -544,8 +548,15 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                          self.raw_data_dict['measurementstring'][0] +
                          '\nRaw data ' + qb_name)
             plot_name = 'raw_plot_' + qb_name
+        # get xunit
+            xunit = self.raw_data_dict['xunit'][0]
+            if hasattr(xunit, '__iter'):
+                xunit = xunit[0]
             for ax_id, ro_channel in enumerate(raw_data_dict):
                 if self.options_dict.get('TwoD', False):
+                    yunit = self.raw_data_dict['yunit'][0]
+                    if hasattr(yunit, '__iter'):
+                        yunit = yunit[0]
                     self.plot_dicts[plot_name + '_' + ro_channel] = {
                         'fig_id': plot_name,
                         'ax_id': ax_id,
@@ -555,9 +566,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             'sweep_points_2D_dict'][qb_name],
                         'zvals': raw_data_dict[ro_channel].T,
                         'xlabel': self.raw_data_dict['xlabel'][0],
-                        'xunit': self.raw_data_dict['xunit'][0][0],
+                        'xunit': xunit,
                         'ylabel': self.raw_data_dict['ylabel'][0],
-                        'yunit': self.raw_data_dict['yunit'][0][0],
+                        'yunit': yunit,
                         'numplotsx': numplotsx,
                         'numplotsy': numplotsy,
                         'plotsize': (plotsize[0]*numplotsx,
@@ -571,7 +582,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         'plotfn': self.plot_line,
                         'xvals': sweep_points,
                         'xlabel': self.raw_data_dict['xlabel'][0],
-                        'xunit': self.raw_data_dict['xunit'][0][0],
+                        'xunit': xunit,
                         'yvals': raw_data_dict[ro_channel],
                         'ylabel': '{} (Vpeak)'.format(ro_channel),
                         'yunit': '',
@@ -638,7 +649,15 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                  self.raw_data_dict['measurementstring'][0])
         if title_suffix is not None:
             title += '\n' + title_suffix
+        # get xunit
+        xunit = self.raw_data_dict['xunit'][0]
+        if hasattr(xunit, '__iter'):
+            xunit = xunit[0]
         if self.options_dict.get('TwoD', False):
+            yunit = self.raw_data_dict['yunit'][0]
+            if hasattr(yunit, '__iter'):
+                yunit = yunit[0]
+
             self.plot_dicts[plot_name] = {
                 'plotfn': self.plot_colorxy,
                 'xvals': xvals,
@@ -646,9 +665,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     'sweep_points_2D_dict'][qb_name],
                 'zvals': yvals,
                 'xlabel': self.raw_data_dict['xlabel'][0],
-                'xunit': self.raw_data_dict['xunit'][0][0],
+                'xunit': xunit,
                 'ylabel': self.raw_data_dict['ylabel'][0],
-                'yunit': self.raw_data_dict['yunit'][0][0],
+                'yunit': yunit,
                 'title': title,
                 'clabel': 'Excited state population'}
         else:
@@ -657,7 +676,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'plotsize': plotsize,
                 'xvals': xvals,
                 'xlabel': self.raw_data_dict['xlabel'][0],
-                'xunit': self.raw_data_dict['xunit'][0][0],
+                'xunit': xunit,
                 'yvals': yvals,
                 'ylabel': 'Excited state population',
                 'yunit': '',
@@ -3503,8 +3522,7 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                 exp_decay_fit_key = self.fit_keys[0] + qbn
                 old_qb_freq = ramsey_dict[qbn][
                     exp_decay_fit_key]['old_qb_freq']
-                textstr = '$f_{qubit \_ old}$ = '+'{:.6f} GHz '.format(
-                        old_qb_freq*1e-9)
+                textstr = ''
                 T2_star_str = ''
                 for i, key in enumerate([k + qbn for k in self.fit_keys]):
 
@@ -3520,8 +3538,10 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                         'legend_bbox_to_anchor': (1, -0.15),
                         'legend_pos': 'upper right'}
 
+                    if i != 0:
+                        textstr += '\n'
                     textstr += \
-                        ('\n$f_{{qubit \_ new \_ {{{key}}} }}$ = '.format(
+                        ('$f_{{qubit \_ new \_ {{{key}}} }}$ = '.format(
                             key=('exp' if i == 0 else 'gauss')) +
                             '{:.6f} GHz '.format(
                             ramsey_dict[qbn][key]['new_qb_freq']*1e-9) +
@@ -3536,6 +3556,8 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                             '$\pm$ {:.2f} $\mu$s'.format(
                             fit_res.params['tau'].stderr*1e6))
 
+                textstr += '\n$f_{qubit \_ old}$ = '+'{:.6f} GHz '.format(
+                    old_qb_freq*1e-9)
                 textstr += ('\n$\Delta f$ = {:.4f} MHz '.format(
                     (ramsey_dict[qbn][exp_decay_fit_key]['new_qb_freq'] -
                     old_qb_freq)*1e-6) + '$\pm$ {:.2E} MHz'.format(
@@ -3987,3 +4009,446 @@ class OverUnderRotationAnalysis(MultiQubit_TimeDomain_Analysis):
                     'colors': 'gray'}
 
 
+# class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
+#
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+#
+#     def process_data(self):
+#         super().process_data()
+#
+#         self.leakage_qbname = self.metadata.get('leakage_qbname',
+#                               self.options_dict.get('leakage_qbname', None))
+#         self.cphase_qbname = self.metadata.get('cphase_qbname',
+#                               self.options_dict.get('cphase_qbname', None))
+#         if self.leakage_qbname is None and self.cphase_qbname is None:
+#             raise ValueError('Please provide either leakage_qbname or '
+#                              'cphase_qbname.')
+#         elif self.leakage_qbname is None:
+#             self.cphase_qbname = [qbn for qbn in self.qb_names if
+#                                   qbn != self.leakage_qbname][0]
+#         elif self.cphase_qbname is None:
+#             self.leakage_qbname = [qbn for qbn in self.qb_names if
+#                                   qbn != self.cphase_qbname][0]
+#
+#     def prepare_fitting(self):
+#         self.fit_dicts = OrderedDict()
+#
+#         all_sweep_points = self.raw_data_dict['sweep_points_dict'][
+#             self.qb_names[0]]['sweep_points']
+#         if self.num_cal_points == 0:
+#             idxend = -1
+#         else:
+#             idxend = -self.num_cal_points
+#
+#         for i, qbn in enumerate([self.cphase_qbname, self.leakage_qbname]):
+#             for label, idx_pair in zip(['e', 'g'],
+#                                        [(0, len(all_sweep_points)//2),
+#                                         (len(all_sweep_points)//2, idxend)]):
+#
+#                 sweep_points = self.raw_data_dict['sweep_points_dict'][qbn][
+#                     'sweep_points'][idx_pair[0]: idx_pair[1]]
+#                 data = self.proc_data_dict['projected_data_dict'][qbn][
+#                        idx_pair[0]: idx_pair[1]]
+#
+#                 key = 'fit_{}_{}'.format(label, qbn)
+#                 if i == 0:
+#                     # fit cphase qb results to a cosine
+#                     model = lmfit.Model(fit_mods.CosFunc)
+#                     guess_pars = fit_mods.Cos_guess(
+#                         model=model,
+#                         t=sweep_points,
+#                         data=data)
+#                     guess_pars['amplitude'].vary = True
+#                     guess_pars['offset'].vary = True
+#                     guess_pars['frequency'].vary = True
+#                     guess_pars['phase'].vary = True
+#
+#                     self.fit_dicts[key] = {
+#                         'fit_fn': fit_mods.CosFunc,
+#                         'fit_xvals': {'t': sweep_points},
+#                         'fit_yvals': {'data': data},
+#                         'guess_pars': guess_pars}
+#                 else:
+#                     # fit leakage qb results to a constant
+#                     model = lmfit.models.ConstantModel()
+#                     guess_pars = model.guess(data=data, x=sweep_points)
+#
+#                     self.fit_dicts[key] = {
+#                         'fit_fn': model.func,
+#                         'fit_xvals': {'x': sweep_points},
+#                         'fit_yvals': {'data': data},
+#                         'guess_pars': guess_pars}
+#
+#     def analyze_fit_results(self):
+#
+#         self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+#         # get cphase and population recovery
+#         cphase_value = (self.fit_dicts['fit_e_{}'.format(
+#             self.cphase_qbname)]['fit_res'].best_values['phase'] -
+#             self.fit_dicts['fit_g_{}'.format(self.cphase_qbname)][
+#             'fit_res'].best_values['phase'])*180/np.pi
+#         cphase_err = np.sqrt(self.fit_dicts['fit_e_{}'.format(
+#             self.cphase_qbname)]['fit_res'].params['phase'].stderr**2 +
+#             self.fit_dicts['fit_g_{}'.format(self.cphase_qbname)][
+#             'fit_res'].params['phase'].stderr**2)*180/np.pi
+#         self.proc_data_dict['analysis_params_dict'][
+#             'cphase'] = {'val': cphase_value, 'stderr': cphase_err}
+#
+#         pop_loss_value = self.fit_dicts['fit_g_{}'.format(
+#                 self.cphase_qbname)]['fit_res'].best_values['amplitude'] - \
+#             self.fit_dicts['fit_e_{}'.format(self.cphase_qbname)][
+#                 'fit_res'].best_values['amplitude']
+#         pop_loss_err = np.sqrt(self.fit_dicts['fit_e_{}'.format(
+#                 self.cphase_qbname)]['fit_res'].params['amplitude'].stderr**2 +
+#             self.fit_dicts['fit_g_{}'.format(self.cphase_qbname)][
+#             'fit_res'].params['amplitude'].stderr**2)
+#         self.proc_data_dict['analysis_params_dict'][
+#             'pop_loss'] = {'val': pop_loss_value, 'stderr': pop_loss_err}
+#
+#         # get leakage
+#         leakage_value = (self.fit_dicts['fit_e_{}'.format(
+#                 self.leakage_qbname)]['fit_res'].best_values['c'] -
+#             self.fit_dicts['fit_g_{}'.format(self.leakage_qbname)][
+#                 'fit_res'].best_values['c'])
+#         leakage_err = np.sqrt(self.fit_dicts['fit_e_{}'.format(
+#                 self.leakage_qbname)]['fit_res'].params['c'].stderr**2 +
+#              self.fit_dicts['fit_g_{}'.format(self.leakage_qbname)][
+#                  'fit_res'].params['c'].stderr**2)
+#         self.proc_data_dict['analysis_params_dict'][
+#             'leakage'] = {'val': leakage_value, 'stderr': leakage_err}
+#
+#     def prepare_plots(self):
+#
+#         super().prepare_plots()
+#
+#         if self.do_fitting:
+#             for i, qbn in enumerate([self.cphase_qbname, self.leakage_qbname]):
+#                 # rename base plot
+#                 if qbn == self.cphase_qbname:
+#                     base_plot_name = 'Cphase_' + qbn
+#                 else:
+#                     base_plot_name = 'Leakage_' + qbn
+#
+#                 self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
+#                     'projected_plot_' + qbn)
+#                 for ref_state_plot_label in ('exc_state_'+qbn,
+#                                              'gnd_state_'+qbn):
+#                     if ref_state_plot_label in self.plot_dicts:
+#                         self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+#                             base_plot_name
+#                     if ref_state_plot_label+'_line' in self.plot_dicts:
+#                         self.plot_dicts[ref_state_plot_label+'_line'][
+#                             'fig_id'] = base_plot_name
+#
+#                 for label in ['e', 'g']:
+#                     legend_label = '{} in $|g\\rangle$'.format(
+#                         self.leakage_qbname) if label == 'g' else \
+#                         '{} in $|e\\rangle$'.format(self.leakage_qbname)
+#
+#                     fit_res = self.fit_dicts['fit_{}_{}'.format(
+#                         label, qbn)]['fit_res']
+#
+#                     if qbn == self.leakage_qbname:
+#                         xvals = fit_res.userkws[
+#                             fit_res.model.independent_vars[0]]
+#                         xfine = np.linspace(min(xvals), max(xvals), 1000)
+#                         yvals = fit_res.model.func(xfine, **fit_res.best_values)
+#                         if not hasattr(yvals, '__iter__'):
+#                             yvals = np.array(len(xfine)*[yvals])
+#
+#                         self.plot_dicts['fit_{}_{}'.format(label, qbn)] = {
+#                             'fig_id': base_plot_name,
+#                             'plotfn': self.plot_line,
+#                             'xvals': xfine,
+#                             'yvals': yvals,
+#                             'marker': '',
+#                             'setlabel': legend_label,
+#                             'do_legend': True,
+#                             'legend_ncol': 2,
+#                             'color': 'r' if label == 'e' else 'C1',
+#                             'legend_bbox_to_anchor': (1, -0.15),
+#                             'legend_pos': 'upper right'}
+#                     else:
+#                         self.plot_dicts['fit_{}_{}'.format(label, qbn)] = {
+#                             'fig_id': base_plot_name,
+#                             'plotfn': self.plot_fit,
+#                             'fit_res': fit_res,
+#                             'setlabel': legend_label,
+#                             'color': 'r' if label == 'e' else 'C1',
+#                             'do_legend': True,
+#                             'legend_ncol': 2,
+#                             'legend_bbox_to_anchor': (1, -0.15),
+#                             'legend_pos': 'upper right'}
+#
+#                 if qbn == self.cphase_qbname:
+#                     textstr = 'Cphase = {:.2f}'.format(
+#                         self.proc_data_dict['analysis_params_dict'][
+#                             'cphase']['val']) + r'$^{\circ}$'
+#                     textstr += '\nPopulation loss = {:.2f}'.format(
+#                         self.proc_data_dict['analysis_params_dict'][
+#                             'pop_loss']['val'])
+#                     self.plot_dicts['text_msg_' + qbn] = {
+#                         'fig_id': base_plot_name,
+#                         'ypos': -0.2,
+#                         'xpos': 0,
+#                         'horizontalalignment': 'left',
+#                         'verticalalignment': 'top',
+#                         'plotfn': self.plot_text,
+#                         'text_string': textstr}
+#                 else:
+#                     textstr = 'Leakage = {:.2f}'.format(
+#                         self.proc_data_dict['analysis_params_dict'][
+#                             'leakage']['val'])
+#                     self.plot_dicts['text_msg_' + qbn] = {
+#                         'fig_id': base_plot_name,
+#                         'ypos': -0.2,
+#                         'xpos': 0,
+#                         'horizontalalignment': 'left',
+#                         'verticalalignment': 'top',
+#                         'plotfn': self.plot_text,
+#                         'text_string': textstr}
+
+
+class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def process_data(self):
+        super().process_data()
+
+        self.leakage_qbname = self.metadata.get('leakage_qbname',
+                                                self.options_dict.get(
+                                                    'leakage_qbname', None))
+        self.cphase_qbname = self.metadata.get('cphase_qbname',
+                                               self.options_dict.get(
+                                                   'cphase_qbname', None))
+        if self.leakage_qbname is None and self.cphase_qbname is None:
+            raise ValueError('Please provide either leakage_qbname or '
+                             'cphase_qbname.')
+        elif self.leakage_qbname is None:
+            self.cphase_qbname = [qbn for qbn in self.qb_names if
+                                  qbn != self.leakage_qbname][0]
+        elif self.cphase_qbname is None:
+            self.leakage_qbname = [qbn for qbn in self.qb_names if
+                                   qbn != self.cphase_qbname][0]
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        labels = ['e', 'g']
+        # TODO: make this work for cal points!
+        for i, qbn in enumerate([self.cphase_qbname, self.leakage_qbname]):
+            for row in range(self.proc_data_dict['projected_data_dict'][
+                                 qbn].shape[0]):
+                phases = np.unique(self.raw_data_dict['sweep_points_dict'][qbn][
+                                   'sweep_points'])
+                data = self.proc_data_dict['projected_data_dict'][qbn][row, :]
+
+                key = 'fit_{}{}_{}'.format(labels[row % 2], row, qbn)
+                if i == 0:
+                    # fit cphase qb results to a cosine
+                    model = lmfit.Model(fit_mods.CosFunc)
+                    guess_pars = fit_mods.Cos_guess(
+                        model=model,
+                        t=phases,
+                        data=data)
+                    guess_pars['amplitude'].vary = True
+                    guess_pars['offset'].vary = True
+                    guess_pars['frequency'].vary = False
+                    guess_pars['phase'].vary = True
+
+                    self.fit_dicts[key] = {
+                        'fit_fn': fit_mods.CosFunc,
+                        'fit_xvals': {'t': phases},
+                        'fit_yvals': {'data': data},
+                        'guess_pars': guess_pars}
+                else:
+                    # fit leakage qb results to a constant
+                    model = lmfit.models.ConstantModel()
+                    guess_pars = model.guess(data=data, x=phases)
+
+                    self.fit_dicts[key] = {
+                        'fit_fn': model.func,
+                        'fit_xvals': {'x': phases},
+                        'fit_yvals': {'data': data},
+                        'guess_pars': guess_pars}
+
+    def analyze_fit_results(self):
+
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+
+        # get cphases population losses
+        keys = [k for k in list(self.fit_dicts.keys()) if
+                self.cphase_qbname in k]
+        fit_res_objs = [self.fit_dicts[k]['fit_res'] for k in keys]
+        # cphases
+        phases = np.array([fr.best_values['phase'] for fr in fit_res_objs])
+        phases_errs = np.array([fr.params['phase'].stderr
+                                for fr in fit_res_objs])
+        phases_errs[phases_errs == None] = 0.0
+
+        cphases = phases[0::2] - phases[1::2]
+        cphases[cphases < 0] += 2*np.pi
+        cphases_stderrs = np.sqrt(np.array(phases_errs[0::2]**2 +
+                                           phases_errs[1::2]**2,
+                                           dtype=np.float64))
+        self.proc_data_dict['analysis_params_dict'][
+            'cphase'] = {'val': cphases, 'stderr': cphases_stderrs}
+
+        # population losses
+        amps = np.array([fr.best_values['amplitude'] for fr in fit_res_objs])
+        amps_errs = np.array([fr.params['amplitude'].stderr
+                                for fr in fit_res_objs])
+        amps_errs[amps_errs == None] = 0.0
+
+        population_loss = np.abs(amps[0::2] - amps[1::2])/amps[1::2]
+        x = amps[0::2] - amps[1::2]
+        x_err = np.array(amps_errs[0::2]**2 + amps_errs[1::2]**2,
+                         dtype=np.float64)
+        y = amps[1::2]
+        y_err = amps_errs[1::2]
+        population_loss_stderrs = np.sqrt(np.array(
+            ((y*x_err)**2 + (x*y_err)**2)/(y**4), dtype=np.float64))
+        self.proc_data_dict['analysis_params_dict'][
+            'pop_loss'] = {'val': population_loss,
+                           'stderr': population_loss_stderrs}
+
+        # get leakage
+        keys = [k for k in list(self.fit_dicts.keys()) if
+                self.leakage_qbname in k]
+        fit_res_objs = [self.fit_dicts[k]['fit_res'] for k in keys]
+
+        lines = np.array([fr.best_values['c'] for fr in fit_res_objs])
+        lines_errs = np.array([fr.params['c'].stderr for fr in fit_res_objs])
+        lines_errs[lines_errs == None] = 0.0
+
+        leakage = np.abs(lines[0::2] - lines[1::2])/lines[1::2]
+        x = lines[0::2] - lines[1::2]
+        x_err = np.array(lines_errs[0::2]**2 + lines_errs[1::2]**2,
+                         dtype=np.float64)
+        y = lines[1::2]
+        y_err = lines_errs[1::2]
+        leakage_errs = np.sqrt(np.array(
+            ((y*x_err)**2 + (x*y_err)**2)/(y**4), dtype=np.float64))
+        self.proc_data_dict['analysis_params_dict'][
+            'leakage'] = {'val': leakage, 'stderr': leakage_errs}
+
+    def prepare_plots(self):
+        # super().prepare_plots()
+        if self.do_fitting:
+            for i, qbn in enumerate([self.cphase_qbname, self.leakage_qbname]):
+                if qbn == self.cphase_qbname:
+                    base_plot_name = 'Cphase_{}'.format(qbn)
+                else:
+                    base_plot_name = 'Leakage_{}'.format(qbn)
+                # TODO: deal with cal points
+                # for ref_state_plot_label in ('exc_state_'+qbn,
+                #                              'gnd_state_'+qbn):
+                #     if ref_state_plot_label in self.plot_dicts:
+                #         self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+                #             base_plot_name
+                #     if ref_state_plot_label+'_line' in self.plot_dicts:
+                #         self.plot_dicts[ref_state_plot_label+'_line'][
+                #             'fig_id'] = base_plot_name
+
+                for idx in range(self.proc_data_dict[
+                                     'projected_data_dict'][qbn].shape[0]):
+                    phases = np.unique(self.raw_data_dict['sweep_points_dict'][
+                                           qbn]['sweep_points'])
+                    data = self.proc_data_dict['projected_data_dict'][
+                               qbn][idx, :]
+                    plotsize = self.get_default_plot_params(set=False)[
+                        'figure.figsize']
+                    plotsize = (plotsize[0], plotsize[0]/1.25)
+                    xunit = self.raw_data_dict['xunit'][0]
+                    if hasattr(xunit, '__iter'):
+                        xunit = xunit[0]
+                    self.plot_dicts['data_{}_{}'.format(idx, qbn)] = {
+                        'plotfn': self.plot_line,
+                        'fig_id': base_plot_name,
+                        'plotsize': plotsize,
+                        'xvals': phases,
+                        'xlabel': self.raw_data_dict['xlabel'][0],
+                        'xunit': xunit,
+                        'yvals': data,
+                        'ylabel': 'Excited state population',
+                        'yunit': '',
+                        'setlabel': 'Data',
+                        'title': self.raw_data_dict['timestamps'][0] + ' ' +
+                                 self.raw_data_dict['measurementstring'][0],
+                        'linestyle': 'none',
+                        'color': 'C0' if idx % 2 == 0 else 'C2',
+                        'do_legend': idx in [0, 1],
+                        'legend_bbox_to_anchor': (1, 0.5),
+                        'legend_pos': 'center left'}
+
+
+                    legend_label = '{} in $|g\\rangle$'.format(
+                        self.leakage_qbname) if idx % 2 != 0 else \
+                        '{} in $|e\\rangle$'.format(self.leakage_qbname)
+                    k = 'fit_{}{}_{}'.format('e' if idx % 2 == 0 else 'g',
+                                             idx, qbn)
+                    fit_res = self.fit_dicts[k]['fit_res']
+
+                    if qbn == self.leakage_qbname:
+                        xvals = fit_res.userkws[
+                            fit_res.model.independent_vars[0]]
+                        xfine = np.linspace(min(xvals), max(xvals), 100)
+                        yvals = fit_res.model.func(xfine, **fit_res.best_values)
+                        if not hasattr(yvals, '__iter__'):
+                            yvals = np.array(len(xfine)*[yvals])
+
+                        self.plot_dicts[k] = {
+                            'fig_id': base_plot_name,
+                            'plotfn': self.plot_line,
+                            'xvals': xfine,
+                            'yvals': yvals,
+                            'marker': '',
+                            'setlabel': legend_label,
+                            'do_legend': idx in [0, 1],
+                            'legend_ncol': 2,
+                            'color': 'C0' if idx % 2 == 0 else 'C2',
+                            'legend_bbox_to_anchor': (1, -0.15),
+                            'legend_pos': 'upper right'}
+                    else:
+                        self.plot_dicts[k] = {
+                            'fig_id': base_plot_name,
+                            'plotfn': self.plot_fit,
+                            'fit_res': fit_res,
+                            'setlabel': legend_label,
+                            'color': 'C0' if idx % 2 == 0 else 'C2',
+                            'do_legend': idx in [0, 1],
+                            'legend_ncol': 2,
+                            'legend_bbox_to_anchor': (1, -0.15),
+                            'legend_pos': 'upper right'}
+
+                if len(self.proc_data_dict['analysis_params_dict'][
+                           'cphase']['val']) == 1:
+                    if qbn == self.cphase_qbname:
+                        textstr = 'Cphase = {:.2f}'.format(
+                            self.proc_data_dict['analysis_params_dict'][
+                                'cphase']['val'][0]) + r'$^{\circ}$'
+                        textstr += '\nPopulation loss = {:.2f}'.format(
+                            self.proc_data_dict['analysis_params_dict'][
+                                'pop_loss']['val'][0])
+                        self.plot_dicts['text_msg_' + qbn] = {
+                            'fig_id': base_plot_name,
+                            'ypos': -0.2,
+                            'xpos': 0,
+                            'horizontalalignment': 'left',
+                            'verticalalignment': 'top',
+                            'plotfn': self.plot_text,
+                            'text_string': textstr}
+                    else:
+                        textstr = 'Leakage = {:.2f}'.format(
+                            self.proc_data_dict['analysis_params_dict'][
+                                'leakage']['val'][0])
+                        self.plot_dicts['text_msg_' + qbn] = {
+                            'fig_id': base_plot_name,
+                            'ypos': -0.2,
+                            'xpos': 0,
+                            'horizontalalignment': 'left',
+                            'verticalalignment': 'top',
+                            'plotfn': self.plot_text,
+                            'text_string': textstr}

@@ -461,6 +461,90 @@ class BufferedCZPulse(Pulse):
         return wave
 
 
+class NZBufferedCZPulse(Pulse):
+    def __init__(self, channel, aux_channels_dict=None,
+                 name='NZ buffered CZ pulse', **kw):
+        super().__init__(name)
+
+        self.channel = channel
+        self.aux_channels_dict = aux_channels_dict
+        self.channels = [self.channel]
+        if self.aux_channels_dict is not None:
+            self.channels += list(self.aux_channels_dict)
+
+        self.amplitude = kw.pop('amplitude', 0) #of first half
+        self.alpha = kw.pop('alpha', 1) #this will be applied to 2nd half
+        self.pulse_length = kw.pop('pulse_length', 0)
+        self.length1 = self.alpha*self.pulse_length/(self.alpha + 1)
+
+        self.buffer_length_start = kw.pop('buffer_length_start', 0)
+        self.buffer_length_end = kw.pop('buffer_length_end', 0)
+        self.extra_buffer_aux_pulse = kw.pop('extra_buffer_aux_pulse', 5e-9)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma', 0)
+        self.length = self.pulse_length + self.buffer_length_start + \
+                      self.buffer_length_end
+
+        # these are here so that we can use the CZ pulse dictionary that is
+        # created by add_CZ_pulse in QuDev_transmon.py
+        self.frequency = kw.pop('frequency', 0)
+        self.phase = kw.pop('phase', 0.)
+
+    def __call__(self, **kw):
+        self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.alpha = kw.pop('alpha', self.alpha)
+        self.pulse_length = kw.pop('pulse_length', self.pulse_length)
+        self.length1 = self.alpha*self.pulse_length/(self.alpha + 1)
+        self.buffer_length_start = kw.pop('buffer_length_start',
+                                          self.buffer_length_start)
+        self.buffer_length_end = kw.pop('buffer_length_end',
+                                        self.buffer_length_end)
+        self.extra_buffer_aux_pulse = kw.pop('extra_buffer_aux_pulse',
+                                             self.extra_buffer_aux_pulse)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma',
+                                            self.gaussian_filter_sigma)
+        self.length = self.pulse_length + self.buffer_length_start + \
+                      self.buffer_length_end
+        self.channels = kw.pop('channels', self.channels)
+        self.channels.append(self.channel)
+        return self
+
+    def chan_wf(self, chan, tvals):
+        amp1 = self.amplitude
+        amp2 = -self.amplitude*self.alpha
+        buffer_start = self.buffer_length_start
+        buffer_end = self.buffer_length_end
+        pulse_length = self.pulse_length
+        l1 = self.length1
+        if chan != self.channel:
+            amp1 = self.aux_channels_dict[chan]
+            amp2 = -amp1*self.alpha
+            buffer_start -= self.extra_buffer_aux_pulse
+            buffer_end -= self.extra_buffer_aux_pulse
+            pulse_length += 2*self.extra_buffer_aux_pulse
+            l1 = self.alpha*pulse_length/(self.alpha + 1)
+
+        if self.gaussian_filter_sigma == 0:
+            wave1 = np.ones_like(tvals)*amp1
+            wave1 *= (tvals >= tvals[0] + buffer_start)
+            wave1 *= (tvals < tvals[0] + buffer_start + l1)
+
+            wave2 = np.ones_like(tvals)*amp2
+            wave2 *= (tvals >= tvals[0] + buffer_start + l1)
+            wave2 *= (tvals < tvals[0] + buffer_start + pulse_length)
+
+            wave = wave1 + wave2
+        else:
+            tstart = tvals[0] + buffer_start
+            tend = tvals[0] + buffer_start + l1
+            tend2 = tvals[0] + buffer_start + pulse_length
+            scaling = 1/np.sqrt(2)/self.gaussian_filter_sigma
+            wave = 0.5*(amp1*sp.special.erf((tvals - tstart)*scaling) -
+                        amp1*sp.special.erf((tvals - tend)*scaling) +
+                        amp2*sp.special.erf((tvals - tend)*scaling) -
+                        amp2*sp.special.erf((tvals - tend2)*scaling))
+        return wave
+
+
 class GaussFilteredCosIQPulse(Pulse):
     def __init__(self, I_channel, Q_channel,
                  name='gauss filtered cos IQ pulse', **kw):

@@ -1188,7 +1188,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                                min=0, max=1,
                                value=guess_pars_dict.get('Amplitude', 0.9))
         RBModel.set_param_hint('p',
-                               value=guess_pars_dict.get('p', 0.99),
+                               value=guess_pars_dict.get('p', 0.95),
                                min=0, max=1)
         RBModel.set_param_hint('offset',
                                value=guess_pars_dict.get('offset', 0),
