@@ -64,9 +64,9 @@ def compile(p):
     """
     with suppress_stdout():
         p.compile()
-    # attribute is added to program to help finding the output files
 
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    # attribute is added to program to help finding the output files
+    p.filename = join(p.output_dir, p.name + '.qisa')  # FIXME: platform dependent (CC-light)
     return p
 
 
@@ -471,6 +471,7 @@ def plot_time_tuples_split(time_tuples, ax=None, time_unit='s',
 # File modifications
 #############################################################################
 
+# FIXME: platform dependent (CC-light)
 def flux_pulse_replacement(qisa_fn: str):
     """
     args:

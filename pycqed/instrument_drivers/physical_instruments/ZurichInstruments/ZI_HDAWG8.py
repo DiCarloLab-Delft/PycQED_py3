@@ -402,7 +402,7 @@ class ZI_HDAWG8(ZI_HDAWG_core):
         self._params_to_skip_update = []
         for ch in range(self._num_channels):
             for cw in range(self._num_codewords):
-                parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
+                parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)  # NB: parameter naming identical to QWG
                 self.add_parameter(
                     parname,
                     label='Waveform channel {} codeword {:03}'.format(

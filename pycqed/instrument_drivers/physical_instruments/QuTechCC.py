@@ -65,3 +65,18 @@ class QuTechCC(SCPIBase):
         return self._ask_int('STATus:QUEStionable:FREQ:ENABle?')
 
 
+    ##########################################################################
+    # 'public' functions for the end user, CC-light 'emulation'
+    # FIXME: these are compatibility hacks to ease integration in the existing CC-light toolchain
+    ##########################################################################
+
+    def eqasm_program(self, file_name: str) -> None:
+        real_file_name = file_name.replace(".qisa", ".vq1asm")  # correct assumption of openql_helpers.py::compile()
+        with open(real_file_name, 'r') as f:
+            prog = f.read()
+        self.sequence_program(prog)
+"""
+TODO:
+    vsm_channel_delay
+    
+"""

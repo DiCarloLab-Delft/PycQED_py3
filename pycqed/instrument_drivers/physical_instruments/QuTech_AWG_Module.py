@@ -306,7 +306,7 @@ class QuTech_AWG_Module(SCPI):
             for cw in range(self.device_descriptor.numCodewords):
                 ch = j+1
 
-                parname = 'wave_ch{}_cw{:03}'.format(ch, cw)
+                parname = 'wave_ch{}_cw{:03}'.format(ch, cw)  # NB: parameter naming identical to ZI-HDAWG
                 self.add_parameter(
                     parname,
                     label='Waveform channel {} codeword {:03}'.format(

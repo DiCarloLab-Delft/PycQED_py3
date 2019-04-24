@@ -180,39 +180,39 @@ class SCPIBase:
     ###
 
     # bits for *ESR and *ESE
-    ESR_OPERATION_COMPLETE = 1
-    ESR_REQUEST_CONTROL = 2
-    ESR_QUERY_ERROR = 4
-    ESR_DEVICE_DEPENDENT_ERROR = 8
-    ESR_EXECUTION_ERROR = 16
-    ESR_COMMAND_ERROR = 32
-    ESR_USER_REQUEST = 64
-    ESR_POWER_ON = 128
+    ESR_OPERATION_COMPLETE      = 0x01
+    ESR_REQUEST_CONTROL         = 0x02
+    ESR_QUERY_ERROR             = 0x04
+    ESR_DEVICE_DEPENDENT_ERROR  = 0x08
+    ESR_EXECUTION_ERROR         = 0x10
+    ESR_COMMAND_ERROR           = 0x20
+    ESR_USER_REQUEST            = 0x40
+    ESR_POWER_ON                = 0x80
 
     # bits for STATus:OPERation
     # FIXME: add the function
-    STAT_OPER_CALIBRATING = 1       # The instrument is currently performing a calibration
-    STAT_OPER_SETTLING = 2          # The instrument is waiting for signals it controls to stabilize enough to begin measurements
-    STAT_OPER_RANGING = 4           # The instrument is currently changing its range
-    STAT_OPER_SWEEPING = 8          # A sweep is in progress
-    STAT_OPER_MEASURING = 16        # The instrument is actively measuring
-    STAT_OPER_WAIT_TRIG = 32        # The instrument is in a “wait for trigger” state of the trigger model
-    STAT_OPER_WAIT_ARM = 64         # The instrument is in a “wait for arm” state of the trigger model
-    STAT_OPER_CORRECTING = 128      # The instrument is currently performing a correction
-    STAT_OPER_INSTR_SUMMARY = 8192  # One of n multiple logical instruments is reporting OPERational status
-    STAT_OPER_PROG_RUNNING = 16384  # A user-defined program is currently in the run state
+    STAT_OPER_CALIBRATING       = 0x0001       # The instrument is currently performing a calibration
+    STAT_OPER_SETTLING          = 0x0002          # The instrument is waiting for signals it controls to stabilize enough to begin measurements
+    STAT_OPER_RANGING           = 0x0004           # The instrument is currently changing its range
+    STAT_OPER_SWEEPING          = 0x0008          # A sweep is in progress
+    STAT_OPER_MEASURING         = 0x0010       # The instrument is actively measuring
+    STAT_OPER_WAIT_TRIG         = 0x0020        # The instrument is in a “wait for trigger” state of the trigger model
+    STAT_OPER_WAIT_ARM          = 0x0040         # The instrument is in a “wait for arm” state of the trigger model
+    STAT_OPER_CORRECTING        = 0x0080      # The instrument is currently performing a correction
+    STAT_OPER_INSTR_SUMMARY     = 0x2000  # One of n multiple logical instruments is reporting OPERational status
+    STAT_OPER_PROG_RUNNING      = 0x4000  # A user-defined program is currently in the run state
 
     # bits for STATus:QUEStionable
     # FIXME: add the function
-    STAT_QUES_VOLTAGE = 1
-    STAT_QUES_CURRENT = 2
-    STAT_QUES_TIME = 4
-    STAT_QUES_POWER = 8
-    STAT_QUES_TEMPERATURE = 16
-    STAT_QUES_FREQUENCY = 32
-    STAT_QUES_PHASE = 64
-    STAT_QUES_MODULATION = 128
-    STAT_QUES_CALIBRATION = 256
-    STAT_QUES_INSTR_SUMMARY = 8192
-    STAT_QUES_COMMAND_WARNING = 16384
+    STAT_QUES_VOLTAGE           = 0x0001
+    STAT_QUES_CURRENT           = 0x0002
+    STAT_QUES_TIME              = 0x0004
+    STAT_QUES_POWER             = 0x0008
+    STAT_QUES_TEMPERATURE       = 0x0010
+    STAT_QUES_FREQUENCY         = 0x0020
+    STAT_QUES_PHASE             = 0x0040
+    STAT_QUES_MODULATION        = 0x0080
+    STAT_QUES_CALIBRATION       = 0x0100
+    STAT_QUES_INSTR_SUMMARY     = 0x2000
+    STAT_QUES_COMMAND_WARNING   = 0x4000
 
