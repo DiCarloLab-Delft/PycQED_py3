@@ -1334,6 +1334,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                     subspace_depolariz_params_dict=depolariz_params_dict, **kw)
 
         print('d in multi-qubit error ', d)
+        self.total_depolariz_param = total_depolariz_param
         self.total_error['val'] = (d-1) * \
                                   (1-total_depolariz_param['val'])/d
         self.total_error['stderr'] = np.abs((d-1) * \

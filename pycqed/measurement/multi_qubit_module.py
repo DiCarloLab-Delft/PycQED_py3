@@ -2693,8 +2693,7 @@ def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
                        CZ_pulse_name=None,
                        phases=None, MC=None,
                        UHFQC=None, pulsar=None,
-                       cal_points=False, plot=False,
-                       output_measured_values=False,
+                       cal_points=True, plot=False,
                        analyze=True, upload=True, **kw):
     '''
     method to measure the leakage and the phase acquired during a flux pulse
@@ -2797,7 +2796,7 @@ def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
     exp_metadata = {'leakage_qbname': qbc.name,
                     'cphase_qbname': qbt.name,
                     'num_cal_points': 4 if cal_points else 0}
-    if kw.pop('predictive', False):
+    if kw.pop('predictive_label', False):
         label = 'Predictive_cphase_nz_measurement_{}_{}'.format(
             qbc.name, qbt.name)
     else:
@@ -2807,18 +2806,14 @@ def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
 
     if analyze:
         flux_pulse_tdma = tda.CPhaseLeakageAnalysis(
-            qb_names=[qbc.name, qbt.name], extract_only=not plot,
-            options_dict={'TwoD': True})
+            qb_names=[qbc.name, qbt.name],
+            options_dict={'TwoD_tuples': True, 'plot_all_traces': plot})
         cphases = flux_pulse_tdma.proc_data_dict[
-            'analysis_params_dict']['cphase']
+            'analysis_params_dict']['cphase']['val']
         population_losses = flux_pulse_tdma.proc_data_dict[
-            'analysis_params_dict']['pop_loss']
+            'analysis_params_dict']['population_loss']['val']
         leakage = flux_pulse_tdma.proc_data_dict[
-            'analysis_params_dict']['leakage']
-        if output_measured_values:
-            print('fitted phases: ', cphases)
-            print('pop loss: ', population_losses)
-            print('leakage: ', leakage)
+            'analysis_params_dict']['leakage']['val']
         return cphases, population_losses, leakage, flux_pulse_tdma
     else:
         return
