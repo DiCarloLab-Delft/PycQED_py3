@@ -27,6 +27,9 @@ class Detector_Function(object):
         self.value_names = ['val A', 'val B']
         self.value_units = ['arb. units', 'arb. units']
 
+        self.prepare_function = None
+        self.prepare_function_kwargs = None
+
     def set_kw(self, **kw):
         '''
         convert keywords to attributes
@@ -34,11 +37,42 @@ class Detector_Function(object):
         for key in list(kw.keys()):
             exec('self.%s = %s' % (key, kw[key]))
 
+
+    def arm(self):
+        """
+        Ensures acquisition instrument is ready to measure on first trigger.
+        """
+        pass 
+
     def get_values(self):
         pass
 
     def prepare(self, **kw):
-        pass
+        if self.prepare_function_kwargs is not None:
+            if self.prepare_function is not None:
+                self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            if self.prepare_function is not None:
+                self.prepare_function()
+
+
+    def set_prepare_function(self, 
+                             prepare_function, 
+                             prepare_function_kwargs:dict=dict()):
+        """
+        Set an optional custom prepare function.
+        
+        prepare_function: function to call during prepare 
+        prepare_function_kwargs: keyword arguments to be passed to the 
+            prepare_function.
+
+        N.B. Note that not all detectors support a prepare function and 
+        the corresponding keywords. 
+        Detectors that do not support this typicaly ignore these attributes. 
+        """
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
+
 
     def finish(self, **kw):
         pass
@@ -77,6 +111,52 @@ class Multi_Detector(Detector_Function):
     def prepare(self, **kw):
         for detector in self.detectors:
             detector.prepare(**kw)
+
+
+    def set_prepare_function(self, 
+                             prepare_function, 
+                             prepare_function_kw:dict=dict(), 
+                             detectors: str='all'):
+        """
+        Set an optional custom prepare function.
+        
+        prepare_function: function to call during prepare 
+        prepare_function_kw: keyword arguments to be passed to the 
+            prepare_function.
+        detectors :  |"all"|"first"|"last"| 
+            sets the prepare function to "all" child detectors, or only 
+            on the "first" or "last" 
+
+        The multi detector passes the arguments to the set_prepare_function 
+        method of all detectors it contains. 
+        """
+        if detectors =="all": 
+            for detector in self.detectors: 
+                detector.set_prepare_function(prepare_function, prepare_function_kw)
+        elif detectors == 'first': 
+            self.detectors[0].set_prepare_function(prepare_function, prepare_function_kw)
+        elif detectors == 'last': 
+            self.detectors[-1].set_prepare_function(prepare_function, prepare_function_kw)
+
+    def set_child_attr(self, attr, value, detectors: str='all'):
+        """
+        Set an attribute of child detectors. 
+
+        attr (str): the attribute to set
+        value   : the value to set the attribute to 
+
+        detectors :  |"all"|"first"|"last"| 
+            sets the attribute on "all" child detectors, or only 
+            on the "first" or "last"  
+        """
+        if detectors =="all": 
+            for detector in self.detectors: 
+                setattr(detector, attr, value)
+        elif detectors == 'first':           
+            setattr(self.detectors[0], attr, value)
+        elif detectors == 'last': 
+            setattr(self.detectors[-1], attr, value)
+
 
     def get_values(self):
         values_list = []

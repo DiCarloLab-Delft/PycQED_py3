@@ -385,7 +385,7 @@ class DeviceCCL(Instrument):
         acq_instruments, ro_ch_idx, value_names = \
             self._get_ro_channels_and_labels(qubits)
         int_log_dets=[]
-        for j, acq_instrument in enumerate(np.unique(acq_instrument)):
+        for j, acq_instrument in enumerate(np.unique(acq_instruments)):
             #selecting the readout channesl for  each acq instrument
             indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
@@ -461,15 +461,14 @@ class DeviceCCL(Instrument):
         input_average_detectors=[]
         int_avg_det_singles=[]
 
-        for acq_instrument in np.unique(acq_instruments):
-            #selecting the readout channesla that are applicable to each acq instrument
-            indexes=[i for i in range(len(acq_instruments)) if acq_instruments[i]==acq_instrument]
-
+        for j, acq_instrument in enumerate(np.unique(acq_instruments)):
+            #selecting the readout channesl for  each acq instrument
+            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
-            if acq_instrument==np.unique(acq_instruments)[0]: #CC should only be controlled by last detector
+            if j == 0: 
                 CC=self.instr_CC.get_instr()
-            else:
-                CC=None
+            else: 
+                CC = None
 
             UHFQC = self.find_instrument(acq_instrument)
             input_average_detectors.append(det.UHFQC_input_average_detector(
@@ -511,8 +510,8 @@ class DeviceCCL(Instrument):
             self._get_ro_channels_and_labels(qubits=qubits)
 
         int_avg_dets=[]
-        
-        for j, acq_instrument in enumerate(np.unique(acq_instrument)):
+
+        for j, acq_instrument in enumerate(np.unique(acq_instruments)):
             #selecting the readout channesl for  each acq instrument
             indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
@@ -888,7 +887,9 @@ class DeviceCCL(Instrument):
 
         d = self.get_int_logging_detector(qubits=[qA],
                                           result_logging_mode='lin_trans')
-        d.nr_shots = 4088  # To ensure proper data binning
+        # d.nr_shots = 4088  # To ensure proper data binning
+        # Because we are using a multi-detector 
+        d.set_child_attr('nr_shots', 4088)
 
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
@@ -973,20 +974,20 @@ class DeviceCCL(Instrument):
             print('mmts_per_round', mmts_per_round)
             nr_shots = 4096*64*mmts_per_round  # To ensure proper data binning
             if mmts_per_round < 4:
-                d.nr_shots = 4096*64*mmts_per_round  # To ensure proper data binning
+                nr_shots = 4096*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 10:
-                d.nr_shots = 64*64*mmts_per_round  # To ensure proper data binning
+                nr_shots = 64*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 20:
-                d.nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
+                nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 40:
-                d.nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
+                nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
             else:
-                d.nr_shots = 8*64*mmts_per_round  # To ensure proper data binning
-            print('detector shots', d.nr_shots)
+                nr_shots = 8*64*mmts_per_round  # To ensure proper data binning
+            d.set_child_attr('nr_shots', nr_shots)
 
         else:
-            d.nr_shots = 4096*8  # To ensure proper data binning
             nr_shots = 4096*8  # To ensure proper data binning
+            d.set_child_attr('nr_shots', nr_shots)
 
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
@@ -1728,12 +1729,16 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        d.prepare_function = oqh.load_range_of_oql_programs
-        d.prepare_function_kwargs = prepare_function_kwargs
+        # Using the first detector of the multi-detector as this is 
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(oqh.load_range_of_oql_programs, 
+                               prepare_function_kwargs, 
+                               detectors='first')
         # d.nr_averages = 128
 
         reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        nr_shots = reps_per_seed*len(sweep_points)
+        d.set_child_attr('nr_shots', nr_shots)
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
@@ -1746,6 +1751,35 @@ class DeviceCCL(Instrument):
                exp_metadata={'bins': sweep_points})
         # N.B. if interleaving cliffords are used, this won't work
         ma2.RandomizedBenchmarking_TwoQubit_Analysis()
+
+    def measure_two_qubit_interleaved_randomized_benchmarking(
+            self, qubits, MC,
+            nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
+                                   15., 20., 25., 30., 50.]), nr_seeds=100,
+            recompile: bool ='as needed',
+            flux_codeword='fl_cw_01'):
+        """
+        Perform two qubit interleaved randomized benchmarking with an 
+        interleaved CZ gate. 
+        """
+
+        # Perform two-qubit RB (no interleaved gate)
+        self.measure_two_qubit_randomized_benchmarking(
+            qubits=qubits, MC=MC, nr_cliffords=nr_cliffords, 
+            interleaving_cliffords=[None], recompile=recompile, 
+            flux_codeword=flux_codeword, nr_seeds=nr_seeds)
+
+        # Perform two-qubit RB with CZ interleaved 
+        self.measure_two_qubit_randomized_benchmarking(
+            qubits=qubits, MC=MC, nr_cliffords=nr_cliffords, 
+            interleaving_cliffords=[-4368], recompile=recompile, 
+            flux_codeword=flux_codeword, nr_seeds=nr_seeds)
+
+        ma2.InterleavedRandomizedBenchmarkingAnalysis(
+            ts_base=None, ts_int=None, 
+            label_base='icl[None]', label_int='icl[-4368]')
+
+
 
     def measure_two_qubit_purity_benchmarking(
             self, qubits, MC,
@@ -1831,12 +1865,16 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        d.prepare_function = oqh.load_range_of_oql_programs
-        d.prepare_function_kwargs = prepare_function_kwargs
+        # Using the first detector of the multi-detector as this is 
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(oqh.load_range_of_oql_programs, 
+                               prepare_function_kwargs, 
+                               detectors='first')
         # d.nr_averages = 128
 
         reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        nr_shots = reps_per_seed*len(sweep_points)
+        d.set_child_attr('nr_shots', nr_shots)
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
@@ -1919,12 +1957,16 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        d.prepare_function = oqh.load_range_of_oql_programs
-        d.prepare_function_kwargs = prepare_function_kwargs
+        # Using the first detector of the multi-detector as this is 
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(oqh.load_range_of_oql_programs, 
+                               prepare_function_kwargs, 
+                               detectors='first')
         # d.nr_averages = 128
 
         reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        nr_shots = reps_per_seed*len(sweep_points)
+        d.set_child_attr('nr_shots', nr_shots)
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
@@ -2023,12 +2065,15 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        d.prepare_function = oqh.load_range_of_oql_programs
-        d.prepare_function_kwargs = prepare_function_kwargs
+        # Using the first detector of the multi-detector as this is 
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(oqh.load_range_of_oql_programs, 
+                               prepare_function_kwargs, 
+                               detectors='first')
         # d.nr_averages = 128
 
         reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        d.set_child_attr('nr_shots', reps_per_seed*len(sweep_points))
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
@@ -2178,56 +2223,6 @@ class DeviceCCL(Instrument):
             if update:
                 self.find_instrument(
                     q_osc).fl_cz_phase_corr_amp(phase_corr_amp)
-            return True
-
-    def calibrate_flux_timing(self, q0: str, q1: str,
-                              times,
-                              waveform='cz_z',
-                              update: bool = True,
-                              prepare_for_timedomain: bool=True, MC=None):
-
-        if prepare_for_timedomain:
-            self.prepare_for_timedomain()
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
-        q0idx = self.find_instrument(q0).cfg_qubit_nr()
-        q1idx = self.find_instrument(q1).cfg_qubit_nr()
-        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-
-        p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                            platf_cfg=self.cfg_openql_platform_fn(),
-                                            CZ_disabled=False, add_cal_points=False,
-                                            angles=[90])
-
-        CC = self.instr_CC.get_instr()
-        CC.eqasm_program(p.filename)
-        CC.start()
-
-        s = swf.FLsweep(fl_lutman, fl_lutman.cz_phase_corr_amp,
-                        waveform)
-
-        d = self.get_correlation_detector(
-            qubits=[q0, q1], single_int_avg=True, seg_per_point=2)
-        d.detector_control = 'hard'
-        # the order of self.qubits is used in the correlation detector
-        # and is required for the analysis
-        ch_idx = self.qubits().index(q0)
-
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(np.repeat(amps, 2))
-        MC.set_detector_function(d)
-        MC.run('{}_CZphase'.format(q0))
-
-        a = ma2.CZ_1QPhaseCal_Analysis(options_dict={'ch_idx': ch_idx})
-
-        phase_corr_amp = a.get_zero_phase_diff_intersect()
-        if phase_corr_amp > np.max(amps) or phase_corr_amp < np.min(amps):
-            print('Calibration failed, intersect outside of initial range')
-            return False
-        else:
-            if update:
-                self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
 
     def create_dep_graph(self):
