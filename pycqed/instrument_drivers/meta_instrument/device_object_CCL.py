@@ -385,14 +385,15 @@ class DeviceCCL(Instrument):
         acq_instruments, ro_ch_idx, value_names = \
             self._get_ro_channels_and_labels(qubits)
         int_log_dets=[]
-        for acq_instrument in np.unique(acq_instruments):
-            #selecting the readout channesla that are applicable to each acq instrument
-            indexes=[i for i in range(len(acq_instruments)) if acq_instruments[i]==acq_instrument]
+        for j, acq_instrument in enumerate(np.unique(acq_instrument)):
+            #selecting the readout channesl for  each acq instrument
+            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
-            if acq_instrument==np.unique(acq_instruments)[0]: #CC should only be controlled by last detector
+            if j == 0: 
                 CC=self.instr_CC.get_instr()
-            else:
-                CC=None
+            else: 
+                CC = None
+
             UHFQC = self.find_instrument(acq_instrument)
             int_log_dets.append(det.UHFQC_integration_logging_det(
                 UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
@@ -484,7 +485,6 @@ class DeviceCCL(Instrument):
                 nr_averages=self.ro_acq_averages(),
                 real_imag=True, single_int_avg=True,
                 integration_length=self.ro_acq_integration_length()))
-        print(len(input_average_detectors))
 
         self.input_average_detector = det.Multi_Detector(detectors=input_average_detectors)
         self.int_avg_det_single = det.Multi_Detector(detectors=int_avg_det_singles)
@@ -511,14 +511,16 @@ class DeviceCCL(Instrument):
             self._get_ro_channels_and_labels(qubits=qubits)
 
         int_avg_dets=[]
-        for acq_instrument in np.unique(acq_instruments):
-            #selecting the readout channesla that are applicable to each acq instrument
-            indexes=[i for i in range(len(acq_instruments)) if acq_instruments[i]==acq_instrument]
+        
+        for j, acq_instrument in enumerate(np.unique(acq_instrument)):
+            #selecting the readout channesl for  each acq instrument
+            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
-            if acq_instrument==np.unique(acq_instruments)[0]: #CC should only be controlled by last detector
+            if j == 0: 
                 CC=self.instr_CC.get_instr()
-            else:
-                CC=None
+            else: 
+                CC = None
+
             int_avg_dets.append(det.UHFQC_integrated_average_detector(
                 channels=ro_ch_idx_instr,
                 UHFQC=self.find_instrument(acq_instrument),
@@ -1662,8 +1664,9 @@ class DeviceCCL(Instrument):
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
-        d = self.get_int_logging_detector(qubits=qubits)
         MC.soft_avg(1)
+        # The detector needs to be defined before setting back parameters
+        d = self.get_int_logging_detector(qubits=qubits)
         # set back the settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
@@ -1956,6 +1959,9 @@ class DeviceCCL(Instrument):
         self.prepare_for_timedomain(qubits=qubits)
 
         MC.soft_avg(1)
+
+        # The detector needs to be defined before setting back parameters
+        d = self.get_int_logging_detector(qubits=qubits)
         # set back the settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
@@ -2009,7 +2015,7 @@ class DeviceCCL(Instrument):
         else:
             sweep_points = np.repeat(nr_cliffords, 2)
 
-        d = self.get_int_logging_detector(qubits=qubits)
+
 
         counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
