@@ -105,6 +105,25 @@ class DeviceCCL(Instrument):
                        ' future will be the CC_Light.'),
             parameter_class=InstrumentRefParameter)
 
+
+        for i in range(3): # S17 has 3 feedlines 
+            self.add_parameter('instr_acq_{}'.format(i),
+                               parameter_class=InstrumentRefParameter)
+        # Two microwave AWGs are used for S17 
+        self.add_parameter('instr_AWG_mw_0',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_AWG_mw_1',
+                           parameter_class=InstrumentRefParameter)
+
+        self.add_parameter('instr_AWG_flux_0',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_AWG_flux_1',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_AWG_flux_2',
+                           parameter_class=InstrumentRefParameter)
+
+
+
         ro_acq_docstr = (
             'Determines what type of integration weights to use: '
             '\n\t SSB: Single sideband demodulation\n\t'
@@ -227,9 +246,14 @@ class DeviceCCL(Instrument):
         """
         Responsible for ensuring timing is configured correctly.
 
-        Takes parameters starting with `tim_` and uses them to set the correct latencies on the DIO ports of the CCL or QCC.
+        Takes parameters starting with `tim_` and uses them to set the correct 
+        latencies on the DIO ports of the CCL or QCC.
 
-        N.B. As latencies here are controlled through the DIO delays it can only be controlled in multiples of 20 ns.
+        N.B. latencies are set in multiples of 20ns in the DIO. 
+        Latencies shorter than 20ns are set as channel delays in the AWGs. 
+        These are set globablly. If individual (per channel) setting of latency
+        is required in the future, we can add this. 
+
         """
         # 2. Setting the latencies
         latencies = OrderedDict([('ro_0', self.tim_ro_latency_0()),
@@ -250,9 +274,8 @@ class DeviceCCL(Instrument):
         for key, val in latencies.items():
             latencies[key] = val - lowest_value
 
-        # FIXME: it is not clear what this snippet does threats one of the
-        # latencies as special. This should probably be removed.
-        # ensuring that RO latency is a multiple of 20 ns
+        # ensuring that RO latency is a multiple of 20 ns as the UHFQC does 
+        # not have a fine timing control. 
         ro_latency_modulo_20 = latencies['ro_0'] % 20e-9
         for key, val in latencies.items():
             latencies[key] = val + (20e-9 - ro_latency_modulo_20) % 20e-9
@@ -265,8 +288,21 @@ class DeviceCCL(Instrument):
         # timing setting are set.
         for lat_key, dio_ch in dio_map.items():
             lat = latencies[lat_key]
-            CC.set('dio{}_out_delay'.format(dio_ch),
-                   int(lat*1e9 // 20))  # Convert to CC dio value
+            lat_coarse = int(lat*1e9 // 20)  # Convert to CC dio value
+            lat_fine = int(lat*1e9 % 20)*1e-9 
+            CC.set('dio{}_out_delay'.format(dio_ch), lat_coarse)  
+
+            # RO devices do not support fine delay setting. 
+            if 'mw' in lat_key or 'flux' in lat_key: 
+                # Check name to prevent crash when instrument not specified
+                AWG_name = self.get('instr_AWG_{}'.format(lat_key))
+                if AWG_name is not None: 
+                    AWG = self.find_instrument(AWG_name)
+                    # All channels are set globally from the device object. 
+                    for i in range(8): # assumes the AWG is an HDAWG 
+                        AWG.set('sigouts_{}_delay'.format(i), lat_fine)       
+
+
 
     def prepare_readout(self, qubits):
         self._prep_ro_setup_qubits(qubits=qubits)
