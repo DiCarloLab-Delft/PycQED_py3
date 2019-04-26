@@ -379,17 +379,17 @@ class DeviceCCL(Instrument):
 
             if self.ro_acq_digitized():
                 # Update the RO theshold
+                if (qb.ro_acq_rotated_SSB_when_optimal() and 
+                        abs(qb.ro_acq_threshold())>32):
+                    threshold = 32
+                    # working around the limitation of threshold in UHFQC 
+                    # which cannot be >abs(32). 
+                    # See also self._prep_ro_integration_weights scaling the weights
+                else: 
+                    threshold = qb.ro_acq_threshold()
                 acq_ch = qb.ro_acq_weight_chI()
-
-                # The threshold that is set in the hardware  needs to be
-                # corrected for the offset as this is only applied in
-                # software.
-                threshold = qb.ro_acq_threshold()
-                offs = qb.instr_acquisition.get_instr().get(
-                    'quex_trans_offset_weightfunction_{}'.format(acq_ch))
-                hw_threshold = threshold + offs
                 qb.instr_acquisition.get_instr().set(
-                    'quex_thres_{}_level'.format(acq_ch), hw_threshold)
+                    'quex_thres_{}_level'.format(acq_ch), threshold)
 
     def get_correlation_detector(self, qubits: list, single_int_avg: bool =False,
                                  seg_per_point: int=1):

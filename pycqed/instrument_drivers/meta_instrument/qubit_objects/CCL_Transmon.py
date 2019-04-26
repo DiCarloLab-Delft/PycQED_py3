@@ -805,7 +805,7 @@ class CCLight_Transmon(Qubit):
             # corrected for the offset as this is only applied in
             # software.
 
-            if self.ro_acq_rotated_SSB_when_optimal():
+            if self.ro_acq_rotated_SSB_when_optimal() and abs(self.ro_acq_threshold())>32:
                 threshold = 32
                 # working around the limitation of threshold in UHFQC 
                 # which cannot be >abs(32). 
