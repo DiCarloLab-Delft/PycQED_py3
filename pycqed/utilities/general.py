@@ -2,6 +2,7 @@ import os
 import sys
 import numpy as np
 import h5py
+import string
 import json
 import datetime
 from pycqed.measurement import hdf5_data as h5d
@@ -561,3 +562,37 @@ def check_keyboard_interrupt():
                     'Human "f" terminated experiment safely.')
     except Exception:
         pass
+
+
+class SafeFormatter(string.Formatter):
+    """
+    A formatter that replaces "missing" values and "bad_fmt" to prevent
+    unexpected Exceptions being raised.
+
+    Based on https://stackoverflow.com/questions/20248355/how-to-get-python-to-gracefully-format-none-and-non-existing-fields
+    """
+
+    def __init__(self, missing='~~', bad_fmt='!!'):
+        self.missing, self.bad_fmt = missing, bad_fmt
+
+    def get_field(self, field_name, args, kwargs):
+        # Handle a key not found
+        try:
+            val = super(SafeFormatter, self).get_field(
+                field_name, args, kwargs)
+            # Python 3, 'super().get_field(field_name, args, kwargs)' works
+        except (KeyError, AttributeError):
+            val = None, field_name
+        return val
+
+    def format_field(self, value, spec):
+        # handle an invalid format
+        if value is None:
+            return self.missing
+        try:
+            return super(SafeFormatter, self).format_field(value, spec)
+        except ValueError:
+            if self.bad_fmt is not None:
+                return self.bad_fmt
+            else:
+                raise
