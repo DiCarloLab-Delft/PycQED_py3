@@ -1380,9 +1380,6 @@ class DeviceCCL(Instrument):
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Time', unit='s')
 
-#        self.instr_CC.get_instr().eqasm_program(p.filename)
-#        self.instr_CC.get_instr().start()
-
         dt = times[1] - times[0]
         times = np.concatenate((times,
                                 [times[-1]+k*dt for k in range(1, 9)]))
@@ -1472,6 +1469,63 @@ class DeviceCCL(Instrument):
                                  always_prepare=True)
         MC.set_detector_function(d)
         MC.run(label)
+
+    def measure_timing_diagram(self, q0, flux_latencies, microwave_latencies,
+                       MC=None,  label='timing_{}_{}',
+                       prepare_for_timedomain: bool=True):
+        """
+        Measure timing diagram. 
+        
+        Args:
+            q0  (str)     :
+                name of the target qubit
+            flux_latencies   (array):
+                array of flux latencies to set (in seconds)
+            microwave_latencies (array): 
+                array of microwave latencies to set (in seconds)
+
+            label (str):
+                used to label the experiment
+
+            prepare_for_timedomain (bool):
+                calls self.prepare_for_timedomain on start
+        """ 
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        fl_lutman.sq_length(10e-9)
+
+
+        CC = self.instr_CC.get_instr()
+
+        # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 80ns 
+        p = sqo.FluxTimingCalibration(X.cfg_qubit_nr(),
+                              times=[40e-9], 
+                              platf_cfg=device.cfg_openql_platform_fn(),
+                              cal_points=False)
+        CC.eqasm_program(p.filename)
+
+        d = device.get_int_avg_det(qubits=['X'], single_int_avg=True)
+        MC.set_detector_function(d)
+
+        s = swf.tim_flux_latency_sweep(device)
+        s2 = swf.tim_mw_latency_sweep(device)
+        MC.set_sweep_functions([s,s2])
+
+        MC.set_sweep_points(flux_latencies)
+        MC.set_sweep_points_2D(microwave_latencies)
+        MC.run_2D(label.format(self.name, q0))
+
+        # This is the analysis that should be run but with custom delays
+        ma2.Timing_Cal_Flux_Fine(ch_idx=0, close_figs=False,
+                               ro_latency=-100e-9,
+                               flux_latency=0,
+                               flux_pulse_duration=10e-9, 
+                               mw_pulse_separation=80e-9)
+
 
     def measure_ramsey_with_flux_pulse(self, q0: str, times,
                                        MC=None,
@@ -2260,6 +2314,9 @@ class DeviceCCL(Instrument):
                 self.find_instrument(
                     q_osc).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
+
+
+
 
     def create_dep_graph(self):
         dags = []
