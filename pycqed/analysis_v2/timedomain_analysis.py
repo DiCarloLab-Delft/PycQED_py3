@@ -4332,8 +4332,8 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             lines_errs = np.array([fr.params['c'].stderr for fr in fit_res_objs])
             lines_errs[lines_errs == None] = 0.0
 
-            leakage = np.abs(lines[0::2] - lines[1::2])/lines[1::2]
-            x = lines[0::2] - lines[1::2]
+            leakage = np.abs(lines[0::2] - lines[1::2])#/np.abs(lines[1::2])
+            x = lines[1::2] - lines[0::2]
             x_err = np.array(lines_errs[0::2]**2 + lines_errs[1::2]**2,
                              dtype=np.float64)
             y = lines[1::2]
@@ -4341,7 +4341,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             leakage_errs = np.sqrt(np.array(
                 ((y*x_err)**2 + (x*y_err)**2)/(y**4), dtype=np.float64))
             self.proc_data_dict['analysis_params_dict'][
-                'leakage'] = {'val': leakage, 'stderr': leakage_errs}
+                'leakage'] = {'val': leakage, 'stderr': x_err}
 
     def prepare_plots(self):
         plotsize = self.get_default_plot_params(set=False)[
@@ -4364,8 +4364,9 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                     if self.num_cal_points > 0:
                         ref_states_plot_dicts = {}
                         for j, cal_pts_idxs in enumerate(self.cal_points[::-1]):
-                            ref_state_plot_name = f'exc_state_{row}_{qbn}' if \
-                                j == 0 else f'gnd_state_{row}_{qbn}'
+                            s = '{}_{}'.format(row, qbn)
+                            ref_state_plot_name = 'exc_state_' + s if \
+                                j == 0 else 'gnd_state_' + s
                             ref_states_plot_dicts[ref_state_plot_name] = {
                                 'fig_id': base_plot_name,
                                 'plotfn': self.plot_line,
@@ -4496,19 +4497,24 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                 'sweep_points_2D_dict'][self.qb_names[0]]]
             swpts2d_lengths = np.array([len(np.unique(arr)) for arr in
                                         unique_swpts2d])
-            swpts2d_idx = np.where(swpts2d_lengths > 1)[0][0]
-            for param_name, results_dict in self.proc_data_dict[
-                    'analysis_params_dict'].items():
-                self.plot_dicts[param_name] = {
-                    'plotfn': self.plot_line,
-                    'xvals': unique_swpts2d[swpts2d_idx],
-                    'xlabel': self.raw_data_dict['parameter_names'][0][
-                        1+swpts2d_idx],
-                    'xunit': self.raw_data_dict['parameter_units'][0][
-                        1+swpts2d_idx],
-                    'yvals': results_dict['val'],
-                    'yerr': results_dict['stderr'],
-                    'ylabel': param_name,
-                    'yunit': 'rad' if param_name == 'cphase' else '%',
-                    'linestyle': 'none',
-                    'do_legend': False}
+            swpts2d_idxs = np.where(swpts2d_lengths > 1)[0]
+            for idx in swpts2d_idxs:
+                for param_name, results_dict in self.proc_data_dict[
+                        'analysis_params_dict'].items():
+                    plot_name = '{}_vs_{}'.format(param_name,
+                              self.raw_data_dict['parameter_names'][0][1+idx])
+                    self.plot_dicts[plot_name] = {
+                        'plotfn': self.plot_line,
+                        'xvals': unique_swpts2d[idx],
+                        'xlabel': self.raw_data_dict['parameter_names'][0][
+                            1+idx],
+                        'xunit': self.raw_data_dict['parameter_units'][0][
+                            1+idx],
+                        'yvals': results_dict['val'],
+                        'yerr': results_dict['stderr'] if
+                            param_name != 'leakage' else None,
+                        'ylabel': param_name,
+                        'yunit': 'rad' if param_name == 'cphase' else '%',
+                        'linestyle': 'none',
+                        'do_legend': False}
+

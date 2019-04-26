@@ -2434,17 +2434,17 @@ def cphase_nz_seq(phases, flux_params, max_flux_length,
         upload_channels, upload_AWGs = get_required_upload_information(
             pulse_list, station)
 
+    unique_phases = np.unique(phases)
     for pipulse in [True, False]:
         if not pipulse:
             X180_control['amplitude'] = 0
-        for i, phase in enumerate(phases):
-            el_iter = i if pipulse else len(phases)+i
-            # print(el_iter)
-            if cal_points and (i == (len(phases)-4)
-                               or i == (len(phases)-3)):
+        for i, phase in enumerate(unique_phases):
+            el_iter = i if pipulse else len(unique_phases)+i
+            if cal_points and (i == (len(unique_phases)-4)
+                               or i == (len(unique_phases)-3)):
                 el = multi_pulse_elt(el_iter, station, [RO_pulse])
-            elif cal_points and (i == (len(phases)-2)
-                                 or i == (len(phases)-1)):
+            elif cal_points and (i == (len(unique_phases)-2)
+                                 or i == (len(unique_phases)-1)):
                 el = multi_pulse_elt(el_iter, station,
                                      [operation_dict['X180 ' + qbc_name],
                                       operation_dict['X180s ' + qbt_name],

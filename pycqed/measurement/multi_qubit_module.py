@@ -2764,7 +2764,7 @@ def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
 
     CZ_pulse_channel = operation_dict[CZ_pulse_name]['channel']
     max_flux_length = np.max(lengths)
-    s1 = awg_swf.CPhase_NZ_hard_swf(phases,
+    s1 = awg_swf.CPhase_NZ_hard_swf(sweep_points,
                                     qbc.name,
                                     qbt.name,
                                     CZ_pulse_name,

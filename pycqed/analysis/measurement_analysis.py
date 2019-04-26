@@ -37,7 +37,6 @@ from scipy.constants import *
 from copy import deepcopy
 from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
-from math import floor
 from pycqed.measurement import optimization as opt
 try:
     from pycqed.analysis import machine_learning_toolbox as mlt
@@ -11008,7 +11007,8 @@ class OptimizationAnalysis_Predictive2D:
         except:
             optimization_method = 'Numerical'
         if self.target_value_names is None:
-            self.target_value_names  =['none_label' for i in range(self.output_dim)]
+            self.target_value_names = ['none_label' for i
+                                       in range(self.output_dim)]
         self.target_value_names.append(r"$||z||_2 [a.u]$")
         pre_proc_dict = self.estimator.pre_proc_dict
         output_scale = pre_proc_dict.get('output',{}).get('scaling',1.)
@@ -11096,8 +11096,8 @@ class OptimizationAnalysis_Predictive2D:
                 ax.legend(loc='upper left',framealpha=0.75,fontsize=fontsize)
                 tot = tot+1
 
-        fig.suptitle(figname,fontsize=16.)
-        self.ma.save_fig(fig,figname=savename,**kw)
+        fig.suptitle(figname, fontsize=16.)
+        self.ma.save_fig(fig, figname=savename, **kw)
 
         base_figname = 'CPhase_interpolated landscapes_'+self.ma.timestamp_string
         f, (ax1,ax2) = plt.subplots(1,2)

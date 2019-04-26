@@ -2702,6 +2702,7 @@ class CPhase_NZ_hard_swf(swf.Hard_Sweep):
         self.first_data_point = True
 
     def prepare(self, flux_params=None, **kw):
+        print('flux params hard swf ', flux_params)
         if flux_params is None:
             return
 
@@ -2726,6 +2727,7 @@ class CPhase_NZ_hard_swf(swf.Hard_Sweep):
 
     def set_parameter(self, flux_val, **kw):
         val_type = kw.pop('val_type', None)
+        print('val_type hard swf ', val_type)
         if val_type is None:
             logging.warning('CPhase hard sweep set_parameter method was called '
                             'without a value type!')
@@ -2831,8 +2833,10 @@ class Flux_pulse_CPhase_hard_swf_frequency(swf.Hard_Sweep):
             logging.error('CPhase hard sweep does not recognize value type handed'
                           'by set_parameter() method!')
         if self.frequency is not None:
-            self.prepare(flux_params=[self.flux_length,self.flux_amplitude,self.frequency])
-            self.frequency=None
+            self.prepare(flux_params=[self.flux_length,
+                                      self.flux_amplitude,
+                                      self.frequency])
+            self.frequency = None
 
 class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
 
@@ -2870,11 +2874,14 @@ class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
         pass
 
     def set_parameter(self, val, **kw):
+        print('sweep_param set_param in soft swf ', self.sweep_param)
         self.hard_sweep.upload = self.upload
         self.hard_sweep.set_parameter(flux_val=val, val_type=self.sweep_param)
 
     def finish(self):
         pass
+
+
 class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
 
     def __init__(self, qb_control, qb_target, hard_sweep,

@@ -311,10 +311,10 @@ def get_param_value_from_file(file_path, instr_name, param_name, h5mode='r+'):
         if param_name in list(instr_settings[instr_name].attrs):
             param_val = float(instr_settings[instr_name].attrs[param_name])
         else:
-            raise ValueError('"{}" does not exist for instrument "."'.format(
+            raise ValueError('"{}" does not exist for instrument "{}"'.format(
                 param_name, instr_name))
     else:
-        raise ValueError('"" does not exist in "Instrument settings."'.format(
+        raise ValueError('"{}" does not exist in "Instrument settings."'.format(
             instr_name))
 
     return param_val
