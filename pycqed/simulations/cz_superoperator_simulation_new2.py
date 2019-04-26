@@ -447,9 +447,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0,alpha_q1=alpha_q1)
-            population_transfer_12_21 = czf.average_population_transfer_subspace_to_subspace(U_superop_average,states_in=[[1,2]],states_out=[[2,1]])
-            population_transfer_12_03 = czf.average_population_transfer_subspace_to_subspace(U_superop_average,states_in=[[1,2]],states_out=[[0,3]])
-            #population_transfer_12_03 = -1        # to use if simulations use two qutrits
 
             if self.noise_parameters_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
                                                                                         # then we optimize the search via higher-order cost function
@@ -461,7 +458,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                              qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], 
                              qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100,
                              qoi['cond_phase02'], qoi['coherent_leakage11']*100, qoi['offset_difference']*100, qoi['missing_fraction']*100, 
-                             population_transfer_12_21*100,population_transfer_12_03*100,
+                             qoi['population_transfer_12_21']*100,qoi['population_transfer_12_03']*100,
                              qoi['phase_diff_12_02'], qoi['phase_diff_21_20'], qoi['cond_phase12'], qoi['cond_phase21'], qoi['cond_phase03'], qoi['cond_phase20']]
             qoi_vec=np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
