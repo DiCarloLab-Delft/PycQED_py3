@@ -991,6 +991,12 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
     phase_diff_12_02 = (phases[6]-phases[4]) % 360
     phase_diff_21_20 = (phases[7]-phases[5]) % 360
 
+    population_transfer_12_21 = average_population_transfer_subspace_to_subspace(U_final,states_in=[[1,2]],states_out=[[2,1]])
+    if n_levels_q0 >= 4:
+        population_transfer_12_03 = average_population_transfer_subspace_to_subspace(U_final,states_in=[[1,2]],states_out=[[0,3]])
+    else:
+        population_transfer_12_03 = 0
+
 
     H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=0)
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
@@ -1025,7 +1031,8 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
             'cond_phase02': cond_phase02, 'coherent_leakage11': coherent_leakage11,
             'offset_difference': offset_difference, 'missing_fraction': missing_fraction,
             'phase_diff_12_02': phase_diff_12_02, 'phase_diff_21_20': phase_diff_21_20,
-            'cond_phase12': cond_phase12, 'cond_phase21': cond_phase21, 'cond_phase03': cond_phase03, 'cond_phase20': cond_phase20}
+            'cond_phase12': cond_phase12, 'cond_phase21': cond_phase21, 'cond_phase03': cond_phase03, 'cond_phase20': cond_phase20,
+            'population_transfer_12_21': population_transfer_12_21, 'population_transfer_12_03': population_transfer_12_03}
 
 
 
