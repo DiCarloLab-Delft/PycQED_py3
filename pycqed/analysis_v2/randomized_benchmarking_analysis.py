@@ -8,6 +8,7 @@ import numpy as np
 import logging
 from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+from pycqed.utilities.general import SafeFormatter, format_value_string
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pl
 from matplotlib.colors import ListedColormap
@@ -1344,13 +1345,3 @@ def unitarity_decay(A, B, u, m):
     return A + B*u**m
 
 
-def format_value_string(par_name: str, lmfit_par, end_char=''):
-    """Format an lmfit par to a  string of value with uncertainty."""
-    val_string = par_name
-    val_string += ': {:.4f}'.format(lmfit_par.value)
-    if lmfit_par.stderr is not None:
-        val_string += r'$\pm$' + '{:.4f}'.format(lmfit_par.stderr)
-    else:
-        val_string += r'$\pm$' + 'NaN'
-    val_string += end_char
-    return val_string

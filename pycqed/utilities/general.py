@@ -596,3 +596,14 @@ class SafeFormatter(string.Formatter):
                 return self.bad_fmt
             else:
                 raise
+
+def format_value_string(par_name: str, lmfit_par, end_char=''):
+    """Format an lmfit par to a  string of value with uncertainty."""
+    val_string = par_name
+    val_string += ': {:.4f}'.format(lmfit_par.value)
+    if lmfit_par.stderr is not None:
+        val_string += r'$\pm$' + '{:.4f}'.format(lmfit_par.stderr)
+    else:
+        val_string += r'$\pm$' + 'NaN'
+    val_string += end_char
+    return val_string

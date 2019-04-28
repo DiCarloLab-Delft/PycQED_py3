@@ -1,4 +1,4 @@
-from pycqed.utilities.general import SafeFormatter
+from pycqed.utilities.general import SafeFormatter, format_value_string
 
 
 base_str = 'my_test_values_{:.2f}_{:.3f}'
