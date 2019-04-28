@@ -23,7 +23,7 @@ from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.utilities.general import int2base
-
+from pycqed.utilities.general import format_value_string
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
@@ -148,7 +148,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                                               **guess0)
                 fitres1 = gauss2D_model_1.fit(data=H1.transpose(),  x=x2d, y=y2d,
                                               **guess1)
-                
+
                 fr0 = fitres0.best_values
                 fr1 = fitres1.best_values
                 x0 = fr0['center_x']
@@ -679,24 +679,29 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                         self.proc_data_dict['F_discr']*100))
                 fit_text += fit_th_msg
                 snr = self.fit_res['shots_all'].params['SNR']
-                fit_text += '\nSNR (fit) = ${:.3f}\\pm{:.3f}$'.format(snr.value, snr.stderr)
+
+                fit_text += format_value_string('\nSNR (fit)', lmfit_par=snr)
 
                 fr = self.fit_res['shots_all']
                 bv = fr.params
                 a_sp = bv['A_spurious']
                 fit_text += '\n\nSpurious Excitations:'
-                fit_text += '\n$p(e|0) = {:.3f}$'.format(a_sp.value)
-                if self.options_dict.get('fixed_p01', True) == True:
-                    fit_text += '$\\pm{:.3f}$'.format(a_sp.stderr)
-                else:
-                    fit_text += ' (fixed)'
+
+                fit_text += format_value_string('\n$p(e|0)$', lmfit_par=a_sp)
+                # fit_text += '\n$p(e|0) = {:.3f}$'.format(a_sp.value)
+                # if self.options_dict.get('fixed_p01', True) == True:
+                #     fit_text += '$\\pm{:.3f}$'.format(a_sp.stderr)
+                # else:
+                #     fit_text += ' (fixed)'
 
                 b_sp = bv['B_spurious']
-                fit_text += ' \n$p(g|\\pi) = {:.3f}$'.format(b_sp.value)
-                if self.options_dict.get('fixed_p10', True) == True:
-                    fit_text += '$\\pm{:.3f}$'.format(b_sp.stderr)
-                else:
-                    fit_text += ' (fixed)'
+                fit_text += format_value_string('\n$p(g|\\pi)$',
+                                                lmfit_par=b_sp)
+                # fit_text += ' \n$p(g|\\pi) = {:.3f}$'.format(b_sp.value)
+                # if self.options_dict.get('fixed_p10', True) == True:
+                #     fit_text += '$\\pm{:.3f}$'.format(b_sp.stderr)
+                # else:
+                #     fit_text += ' (fixed)'
 
             if two_dim_data:
                 offs = self.proc_data_dict['raw_offset']

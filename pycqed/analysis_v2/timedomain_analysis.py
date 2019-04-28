@@ -5,6 +5,7 @@ from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from pycqed.utilities.general import format_value_string
 from copy import deepcopy
 
 class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
@@ -145,11 +146,12 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
         states = ['0', '1', '+']
         for state in states:
             fr = self.fit_res['fit {}'.format(state)]
-            N1 = fr.params['N1'].value, fr.params['N1'].stderr
-            N2 = fr.params['N2'].value, fr.params['N2'].stderr
-            fit_msg += ('Prep |{}> : \n\tN_1 = {:.2g} $\pm$ {:.2g}'
-                    '\n\tN_2 = {:.2g} $\pm$ {:.2g}\n').format(
-                state, N1[0], N1[1], N2[0], N2[1])
+
+            fit_msg += 'Prep |{}> :\n\t'
+            fit_msg += format_value_string('$N_1$',
+                                           fr.params['N1'], end_char='\n\t')
+            fit_msg += format_value_string('$N_2$',
+                                           fr.params['N2'], end_char='\n')
 
         self.proc_data_dict['fit_msg'] = fit_msg
 
@@ -158,7 +160,7 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
         states = ['0', '1', '+']
         for i, state in enumerate(states):
             yvals = self.proc_data_dict['yvals_{}'.format(state)]
-            xvals =  self.proc_data_dict['xvals']
+            xvals = self.proc_data_dict['xvals']
 
             mod = lmfit.Model(fit_mods.idle_error_rate_exp_decay)
             mod.guess = fit_mods.idle_err_rate_guess.__get__(mod, mod.__class__)
@@ -921,7 +923,6 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['phi_1'] = phi1, phi1_stderr
         phi_cond_stderr = (phi0_stderr**2+phi1_stderr**2)**.5
         self.proc_data_dict['phi_cond'] = (phi1 -phi0), phi_cond_stderr
-
 
         osc_amp = np.mean([fr_0['amplitude'], fr_1['amplitude']])
         osc_amp_stderr = np.sqrt(fr_0['amplitude'].stderr**2 +

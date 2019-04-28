@@ -18,6 +18,7 @@ from functools import reduce  # forward compatibility for Python 3
 import operator
 import string
 from contextlib import ContextDecorator
+from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 
 
 try:
@@ -597,13 +598,33 @@ class SafeFormatter(string.Formatter):
             else:
                 raise
 
-def format_value_string(par_name: str, lmfit_par, end_char=''):
-    """Format an lmfit par to a  string of value with uncertainty."""
+
+def format_value_string(par_name: str, lmfit_par, end_char='', unit=None):
+    """
+    Format an lmfit par to a  string of value with uncertainty.
+
+    par_name (str):
+        the name of the parameter to use in the string
+    lmfit_par :
+        an lmfit Parameter object. The value and stderr of this parameter
+        will be used.
+    end_char (str):
+        A character that will be put at the end of the line.
+    unit (str):
+        a unit. If this is an SI unit it will be used in automatically
+        determining a prefix for the unit and rescaling accordingly.
+    """
     val_string = par_name
-    val_string += ': {:.4f}'.format(lmfit_par.value)
+    val_string += ': {:.4f}$\pm${:.4f} {}{}'
+
+    scale_factor, unit = SI_prefix_and_scale_factor(
+            lmfit_par.value, unit)
+    val = lmfit_par.value*scale_factor
     if lmfit_par.stderr is not None:
-        val_string += r'$\pm$' + '{:.4f}'.format(lmfit_par.stderr)
+        stderr = lmfit_par.stderr*scale_factor
     else:
-        val_string += r'$\pm$' + 'NaN'
-    val_string += end_char
+        stderr = None
+    fmt = SafeFormatter(missing='NaN')
+    val_string = fmt.format(val_string, val, stderr,
+                            unit, end_char)
     return val_string
