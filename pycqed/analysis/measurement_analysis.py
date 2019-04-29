@@ -5727,15 +5727,14 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         if ('hanger' in fitting_model) or ('complex' in fitting_model):
             if kw['custom_power_message'] is None:
-                textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
-                    fit_res.params['f0'].value,
-                    fit_res.params['f0'].stderr) + '\n' \
-                                                   '$Qc$ = %.1f $\pm$ (%.1f)' % (
-                    fit_res.params['Qc'].value,
-                    fit_res.params['Qc'].stderr) + '\n' \
-                    '$Qi$ = %.1f $\pm$ (%.1f)' % (
-                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
-                    old_vals
+                textstr = format_value_string(
+                    '$f_{\mathrm{center}}$', fit_res.params['f0'],
+                    end_char='\n', unit=self.sweep_unit[0])
+                textstr += format_value_string(
+                    '$Qc$', fit_res.params['Qc'], end_char='\n')
+                textstr += format_value_string(
+                    '$Qi$', fit_res.params['Qi'], end_char='\n')
+                textstr += old_vals
             else:
                 ###############################################################################
                 # Custom must be a dictionary                                                #
@@ -5754,27 +5753,25 @@ class Homodyne_Analysis(MeasurementAnalysis):
                 phase_vel = 4 * custom_power['res_len'] * \
                     fit_res.params['f0'].value * 1e9
 
-                textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
-                    fit_res.params['f0'].value,
-                    fit_res.params['f0'].stderr) + '\n' \
-                                                   '$Qc$ = %.1f $\pm$ (%.1f)' % (
-                    fit_res.params['Qc'].value,
-                    fit_res.params['Qc'].stderr) + '\n' \
-                    '$Qi$ = %.1f $\pm$ (%.1f)' % (
-                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
-                    old_vals + '\n' \
+                textstr = format_value_string(
+                    '$f_{\mathrm{center}}$', fit_res.params['f0'],
+                    end_char='\n', unit=self.sweep_unit[0])
+                textstr += format_value_string(
+                    '$Qc$', fit_res.params['Qc'], end_char='\n')
+                textstr += format_value_string(
+                    '$Qi$', fit_res.params['Qi'], end_char='\n')
+                textstr += old_vals+'\n'\
                     '$< n_{\mathrm{ph} }>$ = %.1f' % (mean_ph) + '\n' \
-                    '$v_{\mathrm{phase}}$ = %.3e m/s' % (
-                    phase_vel)
+                    '$v_{\mathrm{phase}}$ = %.3e m/s' % (phase_vel)
 
         elif fitting_model == 'lorentzian':
-            textstr = '$f_{{\mathrm{{center}}}}$ = %.5f GHz ' \
-                      '$\pm$ (%.3g) GHz' % (
-                          fit_res.params['f0'].value * scale,
-                          fit_res.params['f0'].stderr * scale) + '\n' \
-                                                                 '$Q$ = %.1f $\pm$ (%.1f)' % (
-                          fit_res.params['Q'].value,
-                          fit_res.params['Q'].stderr) + old_vals
+            textstr = format_value_string(
+                    '$f_{\mathrm{center}}$', fit_res.params['f0'],
+                    end_char='\n', unit=self.sweep_unit[0])
+            textstr += format_value_string(
+                    '$Q$', fit_res.params['Q'], end_char='\n')
+            textstr+=old_vals
+
 
         fig.text(0.5, 0, textstr, transform=ax.transAxes,
                  fontsize=self.font_size,
