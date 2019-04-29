@@ -460,7 +460,7 @@ class CCLight_Transmon(Qubit):
             AWG = lutman.find_instrument(lutman.AWG())
             using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
             if using_QWG:
-                logging.warning('CCL transmon is using QWG. Not implemented.')
+                logging.warning('CCL transmon is using QWG. mw_fine_delay not supported.')
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_I()-1), val)
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_Q()-1), val)
@@ -475,7 +475,7 @@ class CCLight_Transmon(Qubit):
         AWG = lutman.find_instrument(lutman.AWG())
         using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
         if using_QWG:
-            logging.warning('CCL transmon is using QWG. Not implemented.')
+            logging.warning('CCL transmon is using QWG. flux_fine_delay not supported.')
         else:
             AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
             # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
@@ -623,7 +623,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter,
                            vals=vals.Strings())
         self.add_parameter(
-            'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 7),
+            'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 16),
             parameter_class=ManualParameter, initial_value=0,
             docstring='The qubit number is used in the OpenQL compiler. ')
 
@@ -804,12 +804,17 @@ class CCLight_Transmon(Qubit):
             # The threshold that is set in the hardware  needs to be
             # corrected for the offset as this is only applied in
             # software.
-            threshold = self.ro_acq_threshold()
-            offs = self.instr_acquisition.get_instr().get(
-                'quex_trans_offset_weightfunction_{}'.format(acq_ch))
-            hw_threshold = threshold + offs
+
+            if self.ro_acq_rotated_SSB_when_optimal() and abs(self.ro_acq_threshold())>32:
+                threshold = 32
+                # working around the limitation of threshold in UHFQC 
+                # which cannot be >abs(32). 
+                # See also self._prep_ro_integration_weights scaling the weights
+            else: 
+                threshold = self.ro_acq_threshold()
+
             self.instr_acquisition.get_instr().set(
-                'quex_thres_{}_level'.format(acq_ch), hw_threshold)
+                'quex_thres_{}_level'.format(acq_ch), threshold)
 
         else:
             ro_channels = [self.ro_acq_weight_chI(),
@@ -993,12 +998,20 @@ class CCLight_Transmon(Qubit):
                                     ' not setting integration weights')
                 elif self.ro_acq_rotated_SSB_when_optimal():
                     #this allows bypasing the optimal weights for poor SNR qubits
+                    # working around the limitation of threshold in UHFQC 
+                    # which cannot be >abs(32)
+                    if self.ro_acq_digitized() and abs(self.ro_acq_threshold())>32: 
+                        scaling_factor = 32/self.ro_acq_threshold()
+                    else: 
+                        scaling_factor = 1
+
                     UHFQC.prepare_SSB_weight_and_rotation(
                                 IF=self.ro_freq_mod(),
                                 weight_function_I=self.ro_acq_weight_chI(),
                                 weight_function_Q=None,
                                 rotation_angle=self.ro_acq_rotated_SSB_rotation_angle(),
-                                length=self.ro_acq_integration_length_weigth_function())
+                                length=self.ro_acq_integration_length_weigth_function(),
+                                scaling_factor=scaling_factor)
                 else:
                     # When optimal weights are used, only the RO I weight
                     # channel is used

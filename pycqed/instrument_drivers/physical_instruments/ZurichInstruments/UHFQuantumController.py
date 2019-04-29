@@ -19,6 +19,9 @@ Changelog:
     spec_mode_on
     spec_mode_off
 
+20190429 WJV
+- merged branch 'QCC_testing' into 'feature/cc', changes:
+    load_default_settings(): awgs_0_dio_strobe_index changed from 31 (CCL) to 15 (QCC)
 
 Notes:
 - this driver builds on zhinst.ziPython and zhinst.utils directly, whereas the HDAWG driver inserts zishell_NH and
@@ -278,7 +281,7 @@ class UHFQC(Instrument):
 
         # Configure the codeword protocol
         if self._use_dio:
-            self.awgs_0_dio_strobe_index(31)
+            self.awgs_0_dio_strobe_index(15) # FIXME: 15 for QCC, 31 for CCL
             self.awgs_0_dio_strobe_slope(1)  # rising edge
             self.awgs_0_dio_valid_index(16)
             self.awgs_0_dio_valid_polarity(2)  # high polarity
@@ -1064,6 +1067,9 @@ class UHFQC(Instrument):
         # adding the final part of the sequence including a default wave
         sequence = (sequence +
                     '  default:\n' +
+                    # the default wave should never trigger, noneteless if it does trigger 
+                    # it indicates that 1. the correct codeword can not be triggered and 
+                    # 2. that there are triggers bio received. 
                     '   playWave(ones(36), ones(36));\n' +
                     ' }\n' +
                     ' wait(wait_delay);\n' +

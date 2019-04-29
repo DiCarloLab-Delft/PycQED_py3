@@ -35,6 +35,7 @@ class VirtualAWG8(Instrument):
         for i in range(8):
             parnames.append('sigouts_{}_offset'.format(i))
             parnames.append('sigouts_{}_on'.format(i))
+            parnames.append('sigouts_{}_delay'.format(i))
             self.add_parameter(
                 'awgs_{}_outputs_{}_amplitude'.format(i//2, i % 2),
                 initial_value=.5, parameter_class=ManualParameter)

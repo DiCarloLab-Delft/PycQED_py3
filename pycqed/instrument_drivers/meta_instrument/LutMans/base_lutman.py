@@ -23,7 +23,7 @@ class Base_LutMan(Instrument):
         - Methods to upload and regenerate these waveforms.
         - Methods to render waves.
 
-    The Base LutMan does not provide a set of
+    The Base LutMan does not provide a set of FIXME: comment ends
 
 
     """

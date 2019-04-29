@@ -1157,7 +1157,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         Helper method to ensure waveforms have the desired length
         """
-        length_samples = int(self.sampling_rate()*self.cfg_max_wf_length())
+        length_samples = roundup1024(int(self.sampling_rate()*self.cfg_max_wf_length()))
         extra_samples = length_samples - len(waveform)
         if extra_samples >= 0:
             y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
@@ -1332,7 +1332,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             distorted_waveform = k.distort_waveform(
                 waveform,
                 length_samples=int(
-                    self.cfg_max_wf_length()*self.sampling_rate()),
+                    roundup1024(self.cfg_max_wf_length()*self.sampling_rate())),
                 inverse=inverse)
         else:  # old kernel object does not have this method
             if inverse:

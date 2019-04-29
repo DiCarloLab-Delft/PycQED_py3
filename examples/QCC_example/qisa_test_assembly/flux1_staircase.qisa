@@ -16,10 +16,10 @@ SMIS s14, { 14 }
 SMIS s15, { 15 }
 SMIS s16, { 16 }
 
-smit t0, {(11, 8)}
-smit t1, {(13, 10)}
-smit t2, {(9, 12)}
-smit t3, {(11, 14)}
+smit t0, {(10, 8)}
+smit t1, {(11, 9)}
+smit t2, {(15, 12)}
+smit t3, {(10, 13)}
 
 start:
     bs 1    prepz s0 | prepz s2

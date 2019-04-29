@@ -16,6 +16,9 @@ import datetime
 from pycqed.utilities.general import check_keyboard_interrupt
 from importlib import reload
 
+from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
+from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
+
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
@@ -38,6 +41,10 @@ from collections import defaultdict
 
 
 class DeviceCCL(Instrument):
+    """
+    Device object for systems controlled using the
+    CCLight (CCL) or QuMa based CC (QCC).
+    """
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
@@ -98,6 +105,25 @@ class DeviceCCL(Instrument):
                        ' future will be the CC_Light.'),
             parameter_class=InstrumentRefParameter)
 
+
+        for i in range(3): # S17 has 3 feedlines 
+            self.add_parameter('instr_acq_{}'.format(i),
+                               parameter_class=InstrumentRefParameter)
+        # Two microwave AWGs are used for S17 
+        self.add_parameter('instr_AWG_mw_0',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_AWG_mw_1',
+                           parameter_class=InstrumentRefParameter)
+
+        self.add_parameter('instr_AWG_flux_0',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_AWG_flux_1',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_AWG_flux_2',
+                           parameter_class=InstrumentRefParameter)
+
+
+
         ro_acq_docstr = (
             'Determines what type of integration weights to use: '
             '\n\t SSB: Single sideband demodulation\n\t'
@@ -121,7 +147,7 @@ class DeviceCCL(Instrument):
                            vals=vals.Strings())
 
         self.add_parameter('ro_always_all',
-                           label='If true, configures the UHFQC to RO all qubits '
+                           docstring='If true, configures the UHFQC to RO all qubits '
                            'independent of codeword received.',
                            parameter_class=ManualParameter,
                            vals=vals.Bool())
@@ -129,34 +155,79 @@ class DeviceCCL(Instrument):
         # Timing related parameters
         self.add_parameter('tim_ro_latency_0',
                            unit='s',
-                           label='readout latency DIO 1',
+                           label='Readout latency 0',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
         self.add_parameter('tim_ro_latency_1',
                            unit='s',
-                           label='readout latency DIO 2',
+                           label='Readout latency 1',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
-        self.add_parameter('tim_flux_latency',
+        self.add_parameter('tim_ro_latency_2',
                            unit='s',
-                           label='flux latency DIO 3',
+                           label='Readout latency 2',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_flux_latency_0',
+                           unit='s',
+                           label='Flux latency 0',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_flux_latency_1',
+                           unit='s',
+                           label='Flux latency 1',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_flux_latency_2',
+                           unit='s',
+                           label='Flux latency 2',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
         self.add_parameter('tim_mw_latency_0',
                            unit='s',
-                           label='microwave latency DIO 4',
+                           label='Microwave latency 0',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
         self.add_parameter('tim_mw_latency_1',
                            unit='s',
-                           label='microwave latency DIO 5',
+                           label='Microwave latency 1',
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
+
+        self.add_parameter('dio_map',
+                           docstring='Returns the map between DIO'
+                           ' channel number and functionality',
+                           get_cmd=self._get_dio_map)
+
+    def _get_dio_map(self):
+        CC = self.instr_CC.get_instr()
+        if isinstance(CC, CCL):
+            dio_map = {'ro_0': 1,
+                       'ro_1': 2,
+                       'flux_0': 3,
+                       'mw_0': 4,
+                       'mw_1': 5}
+        elif isinstance(CC, QCC):
+            dio_map = {'ro_0': 1,
+                       'ro_1': 2,
+                       'ro_2': 3,
+                       'mw_0': 4,
+                       'mw_1': 5,
+                       'flux_0': 6,
+                       'flux_1': 7,
+                       'flux_2': 8,
+                       }
+        else:
+            return ValueError('CC type not recognized')
+        return dio_map
 
     def _grab_instruments_from_qb(self):
         """
@@ -175,18 +246,25 @@ class DeviceCCL(Instrument):
         """
         Responsible for ensuring timing is configured correctly.
 
-        Takes parameters starting with `tim_` and uses them to set the correct
-        latencies on the DIO ports of the CCL.
+        Takes parameters starting with `tim_` and uses them to set the correct 
+        latencies on the DIO ports of the CCL or QCC.
 
-        N.B. As latencies here are controlled through the DIO delays it can
-        only be controlled in multiples of 20 ns.
+        N.B. latencies are set in multiples of 20ns in the DIO. 
+        Latencies shorter than 20ns are set as channel delays in the AWGs. 
+        These are set globablly. If individual (per channel) setting of latency
+        is required in the future, we can add this. 
+
         """
         # 2. Setting the latencies
-        latencies = OrderedDict([('ro_latency_0', self.tim_ro_latency_0()),
-                                 ('ro_latency_1', self.tim_ro_latency_1()),
-                                 ('flux_latency_0', self.tim_flux_latency()),
-                                 ('mw_latency_0', self.tim_mw_latency_0()),
-                                 ('mw_latency_1', self.tim_mw_latency_1())])
+        latencies = OrderedDict([('ro_0', self.tim_ro_latency_0()),
+                                 ('ro_1', self.tim_ro_latency_1()),
+                                 ('ro_2', self.tim_ro_latency_2()),
+                                 ('mw_0', self.tim_mw_latency_0()),
+                                 ('mw_1', self.tim_mw_latency_1()),
+                                 ('flux_0', self.tim_flux_latency_0()),
+                                 ('flux_1', self.tim_flux_latency_1()),
+                                 ('flux_2', self.tim_flux_latency_2())]
+                                 )
 
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
@@ -196,27 +274,33 @@ class DeviceCCL(Instrument):
         for key, val in latencies.items():
             latencies[key] = val - lowest_value
 
-        # ensuring that RO latency is a multiple of 20 ns
-        ro_latency_modulo_20 = latencies['ro_latency_0'] % 20e-9
+        # ensuring that RO latency is a multiple of 20 ns as the UHFQC does 
+        # not have a fine timing control. 
+        ro_latency_modulo_20 = latencies['ro_0'] % 20e-9
         for key, val in latencies.items():
             latencies[key] = val + (20e-9 - ro_latency_modulo_20) % 20e-9
 
         # Setting the latencies in the CCL
-        CCL = self.instr_CC.get_instr()
-        for i, (key, val) in enumerate(latencies.items()):
-            for qbt in self.qubits():
-                # get qubit objects
-                q = self.find_instrument(qbt)
-                # set delay AWGs and channels
-                if key in ('ro_latency_0'):
-                    pass
-                elif key in ('flux_latency_0'):
-                    q.flux_fine_delay(val % 20e-9)
-                elif key in ('mw_latency_0'):
-                    q.mw_fine_delay(val % 20e-9)
+        CC = self.instr_CC.get_instr()
+        dio_map = self.dio_map()
 
-            CCL.set('dio{}_out_delay'.format(i+1), val //
-                    20e-9)  # Convert to CCL dio value
+        # Iterate over keys in dio_map as this ensures only relevant
+        # timing setting are set.
+        for lat_key, dio_ch in dio_map.items():
+            lat = latencies[lat_key]
+            lat_coarse = int(lat*1e9 // 20)  # Convert to CC dio value
+            lat_fine = int(lat*1e9 % 20)*1e-9 
+            CC.set('dio{}_out_delay'.format(dio_ch), lat_coarse)  
+
+            # RO devices do not support fine delay setting. 
+            if 'mw' in lat_key or 'flux' in lat_key: 
+                # Check name to prevent crash when instrument not specified
+                AWG_name = self.get('instr_AWG_{}'.format(lat_key))
+                if AWG_name is not None: 
+                    AWG = self.find_instrument(AWG_name)
+                    # All channels are set globally from the device object. 
+                    for i in range(8): # assumes the AWG is an HDAWG 
+                        AWG.set('sigouts_{}_delay'.format(i), lat_fine)       
 
 
 
@@ -224,7 +308,7 @@ class DeviceCCL(Instrument):
         self._prep_ro_setup_qubits(qubits=qubits)
         self._prep_ro_sources(qubits=qubits)
         # commented out because it conflicts with setting in the qubit object
-        # self._prep_ro_pulses()
+        self._prep_ro_pulses(qubits=qubits)
         self._prep_ro_integration_weights(qubits=qubits)
         self._prep_ro_instantiate_detectors(qubits=qubits)
 
@@ -283,7 +367,7 @@ class DeviceCCL(Instrument):
             qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
             qb._prep_ro_pulse(upload=False)
         # only call it once with upload after setting all pulses.
-        qb._prep_ro_pulse(upload=True)
+        #qb._prep_ro_pulse(upload=True)
 
     def _prep_ro_integration_weights(self, qubits):
         """
@@ -295,17 +379,17 @@ class DeviceCCL(Instrument):
 
             if self.ro_acq_digitized():
                 # Update the RO theshold
+                if (qb.ro_acq_rotated_SSB_when_optimal() and 
+                        abs(qb.ro_acq_threshold())>32):
+                    threshold = 32
+                    # working around the limitation of threshold in UHFQC 
+                    # which cannot be >abs(32). 
+                    # See also self._prep_ro_integration_weights scaling the weights
+                else: 
+                    threshold = qb.ro_acq_threshold()
                 acq_ch = qb.ro_acq_weight_chI()
-
-                # The threshold that is set in the hardware  needs to be
-                # corrected for the offset as this is only applied in
-                # software.
-                threshold = qb.ro_acq_threshold()
-                offs = qb.instr_acquisition.get_instr().get(
-                    'quex_trans_offset_weightfunction_{}'.format(acq_ch))
-                hw_threshold = threshold + offs
                 qb.instr_acquisition.get_instr().set(
-                    'quex_thres_{}_level'.format(acq_ch), hw_threshold)
+                    'quex_thres_{}_level'.format(acq_ch), threshold)
 
     def get_correlation_detector(self, qubits: list, single_int_avg: bool =False,
                                  seg_per_point: int=1):
@@ -315,36 +399,46 @@ class DeviceCCL(Instrument):
 
         w0 = q0.ro_acq_weight_chI()
         w1 = q1.ro_acq_weight_chI()
-
-        d = det.UHFQC_correlation_detector(
-            UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
-            thresholding=self.ro_acq_digitized(),
-            AWG=self.instr_CC.get_instr(),
-            channels=[w0, w1], correlations=[(w0, w1)],
-            nr_averages=self.ro_acq_averages(),
-            integration_length=q0.ro_acq_integration_length(),
-            single_int_avg=single_int_avg,
-            seg_per_point=seg_per_point)
-        d.value_names = ['{} ch{}'.format(qubits[0], w0),
-                         '{} ch{}'.format(qubits[1], w1),
-                         'Corr ({}, {})'.format(qubits[0], qubits[1])]
+        if q0.instr_acquisition.get_instr()==q1.instr_acquisition.get_instr():
+            d = det.UHFQC_correlation_detector(
+                UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
+                thresholding=self.ro_acq_digitized(),
+                AWG=self.instr_CC.get_instr(),
+                channels=[w0, w1], correlations=[(w0, w1)],
+                nr_averages=self.ro_acq_averages(),
+                integration_length=q0.ro_acq_integration_length(),
+                single_int_avg=single_int_avg,
+                seg_per_point=seg_per_point)
+            d.value_names = ['{} ch{}'.format(qubits[0], w0),
+                             '{} ch{}'.format(qubits[1], w1),
+                             'Corr ({}, {})'.format(qubits[0], qubits[1])]
+        else:
+            d=self.get_int_avg_det(qubits=qubits)
         return d
 
     def get_int_logging_detector(self, qubits,
                                  result_logging_mode='lin_trans'):
-        acq_instrs, ro_ch_idx, value_names = \
+        acq_instruments, ro_ch_idx, value_names = \
             self._get_ro_channels_and_labels(qubits)
+        int_log_dets=[]
+        for j, acq_instrument in enumerate(np.unique(acq_instruments)):
+            #selecting the readout channesl for  each acq instrument
+            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
+            ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
+            if j == 0: 
+                CC=self.instr_CC.get_instr()
+            else: 
+                CC = None
 
-        UHFQC = self.find_instrument(acq_instrs[0])
-        int_log_det = det.UHFQC_integration_logging_det(
-            UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-            channels=ro_ch_idx,
-            result_logging_mode=result_logging_mode,
-            integration_length=self.ro_acq_integration_length())
-
-        int_log_det.value_names = value_names
-
-        return int_log_det
+            UHFQC = self.find_instrument(acq_instrument)
+            int_log_dets.append(det.UHFQC_integration_logging_det(
+                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
+                channels=ro_ch_idx_instr,
+                result_logging_mode=result_logging_mode,
+                integration_length=self.ro_acq_integration_length()))
+        self.int_log_det = det.Multi_Detector(detectors=int_log_dets)
+        self.int_log_det.value_names = value_names
+        return self.int_log_det
 
     def _get_ro_channels_and_labels(self, qubits):
         """
@@ -374,11 +468,11 @@ class DeviceCCL(Instrument):
                                       'w{} {} Q'.format(ch_idx, qb_name)))
 
         # for now, implement only working with one UHFLI
-        acq_instruments = list(set([inst for inst, _, _ in channels_list]))
-        if len(acq_instruments) != 1:
-            raise NotImplementedError("Only one acquisition"
-                                      "instrument supported so far")
-
+        # acq_instruments = list(set([inst for inst, _, _ in channels_list]))
+        # if len(acq_instruments) != 1:
+        #     raise NotImplementedError("Only one acquisition"
+        #                               "instrument supported so far")
+        acq_instruments = [inst for inst, _, _ in channels_list]
         ro_ch_idx = [ch for _, ch, _ in channels_list]
         value_names = [n for _, _, n in channels_list]
 
@@ -399,28 +493,40 @@ class DeviceCCL(Instrument):
                 result_logging_mode = 'digitized'
         else:
             result_logging_mode = 'raw'
+        
+        input_average_detectors=[]
+        int_avg_det_singles=[]
 
-        if 'UHFQC' in acq_instruments[0]:
-            UHFQC = self.find_instrument(acq_instruments[0])
+        for j, acq_instrument in enumerate(np.unique(acq_instruments)):
+            #selecting the readout channesl for  each acq instrument
+            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
+            ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
+            if j == 0: 
+                CC=self.instr_CC.get_instr()
+            else: 
+                CC = None
 
-            self.input_average_detector = det.UHFQC_input_average_detector(
+            UHFQC = self.find_instrument(acq_instrument)
+            input_average_detectors.append(det.UHFQC_input_average_detector(
                 UHFQC=UHFQC,
-                AWG=self.instr_CC.get_instr(),
+                AWG=CC,
                 nr_averages=self.ro_acq_averages(),
-                nr_samples=int(self.ro_acq_integration_length()*1.8e9))
+                nr_samples=int(self.ro_acq_integration_length()*1.8e9)))
 
-            self.int_avg_det = self.get_int_avg_det(qubits=qubits)
-            self.int_avg_det.value_names = value_names
-
-            self.int_avg_det_single = det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-                channels=ro_ch_idx,
+            int_avg_det_singles.append(det.UHFQC_integrated_average_detector(
+                UHFQC=UHFQC, AWG=CC,
+                channels= ro_ch_idx_instr,
                 result_logging_mode=result_logging_mode,
                 nr_averages=self.ro_acq_averages(),
                 real_imag=True, single_int_avg=True,
-                integration_length=self.ro_acq_integration_length())
+                integration_length=self.ro_acq_integration_length()))
 
-            self.int_avg_det_single.value_names = value_names
+        self.input_average_detector = det.Multi_Detector(detectors=input_average_detectors)
+        self.int_avg_det_single = det.Multi_Detector(detectors=int_avg_det_singles)
+        
+        self.int_avg_det = self.get_int_avg_det(qubits=qubits)
+        self.int_avg_det.value_names = value_names
+        self.int_avg_det_single.value_names = value_names
 
     def get_int_avg_det(self, qubits, **kw):
         """
@@ -439,14 +545,25 @@ class DeviceCCL(Instrument):
         acq_instruments, ro_ch_idx, value_names = \
             self._get_ro_channels_and_labels(qubits=qubits)
 
-        int_avg_det = det.UHFQC_integrated_average_detector(
-            channels=ro_ch_idx,
-            UHFQC=self.find_instrument(acq_instruments[0]),
-            AWG=self.instr_CC.get_instr(),
-            result_logging_mode=result_logging_mode,
-            nr_averages=self.ro_acq_averages(),
-            integration_length=self.ro_acq_integration_length(), **kw)
+        int_avg_dets=[]
 
+        for j, acq_instrument in enumerate(np.unique(acq_instruments)):
+            #selecting the readout channesl for  each acq instrument
+            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
+            ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
+            if j == 0: 
+                CC=self.instr_CC.get_instr()
+            else: 
+                CC = None
+
+            int_avg_dets.append(det.UHFQC_integrated_average_detector(
+                channels=ro_ch_idx_instr,
+                UHFQC=self.find_instrument(acq_instrument),
+                AWG=CC,
+                result_logging_mode=result_logging_mode,
+                nr_averages=self.ro_acq_averages(),
+                integration_length=self.ro_acq_integration_length(), **kw))
+        int_avg_det = det.Multi_Detector(detectors=int_avg_dets)
         return int_avg_det
 
     def _prep_ro_sources(self, qubits):
@@ -454,20 +571,19 @@ class DeviceCCL(Instrument):
         turn on and configure the RO LO's of all qubits to be measured.
         """
 
-
         for qb_name in qubits:
             LO = self.find_instrument(qb_name).instr_LO_ro.get_instr()
             LO.frequency.set(self.ro_lo_freq())
             LO.power(self.ro_pow_LO())
             LO.on()
 
-    def _prep_ro_pulses(self):
+    def _prep_ro_pulses(self, qubits):
         """
         configure lutmans to measure the qubits and
         let the lutman configure the readout AWGs.
         """
         # these are the qubits that should be possible to read out
-        ro_qb_list = self.qubits()
+        ro_qb_list = qubits
         if ro_qb_list == []:
             ro_qb_list = self.qubits()
 
@@ -481,7 +597,7 @@ class DeviceCCL(Instrument):
 
             ro_lm = qb.instr_LutMan_RO.get_instr()
             lutmans_to_configure[ro_lm.name] = ro_lm
-            res_nr = qb.cfg_qubit_nr()()
+            res_nr = qb.cfg_qubit_nr()
 
             # extend the list of combinations to be set for the lutman
 
@@ -523,6 +639,7 @@ class DeviceCCL(Instrument):
                       qb.ro_pulse_down_amp1())
             ro_lm.set('M_down_phi1_R{}'.format(res_nr),
                       qb.ro_pulse_down_phi1())
+        print('lm to configure',lutmans_to_configure)
 
         for ro_lm_name, ro_lm in lutmans_to_configure.items():
             if self.ro_always_all():
@@ -572,7 +689,7 @@ class DeviceCCL(Instrument):
             #     'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
             #     qb.mw_vsm_delay())
 
-    def prepare_for_timedomain(self, qubits:list):
+    def prepare_for_timedomain(self, qubits: list):
         """
         Prepare setup for a timedomain experiment:
 
@@ -614,20 +731,20 @@ class DeviceCCL(Instrument):
         """
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        for q in [q0, q1]:
-            # This can be
-            mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
-
-            lm = mw_lutman.LutMap()
-            # we hardcode the X on the ef transition to CW 31 here.
-            lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
-            # load_phase_pulses will also upload other waveforms
-            mw_lutman.load_phase_pulses_to_AWG_lookuptable()
-            mw_lutman.load_waveforms_onto_AWG_lookuptable(
-                regenerate_waveforms=True)
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0, q1])
+            for q in [q0, q1]:
+                # This can be
+                mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+
+                lm = mw_lutman.LutMap()
+                # we hardcode the X on the ef transition to CW 31 here.
+                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+                # load_phase_pulses will also upload other waveforms
+                mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+                mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                    regenerate_waveforms=True)
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -641,7 +758,8 @@ class DeviceCCL(Instrument):
             q2idx = self.find_instrument(q2).cfg_qubit_nr()
 
         # These are hardcoded angles in the mw_lutman for the AWG8
-        angles = np.concatenate([np.arange(0, 101, 20), np.arange(140,341,20)]) #avoid CW15, issue
+        angles = np.concatenate(
+            [np.arange(0, 101, 20), np.arange(140, 341, 20)])  # avoid CW15, issue
         # angles = np.arange(0, 341, 20))
 
         p = mqo.conditional_oscillation_seq(
@@ -659,7 +777,8 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
 
-        MC.set_detector_function(self.get_correlation_detector(qubits=[q0, q1]))
+        MC.set_detector_function(
+            self.get_correlation_detector(qubits=[q0, q1]))
         MC.run('conditional_oscillation_{}_{}_{}{}'.format(q0, q1,
                                                            self.msmt_suffix, label),
                disable_snapshot_metadata=disable_metadata)
@@ -670,9 +789,6 @@ class DeviceCCL(Instrument):
             extract_only=extract_only)
 
         return a
-
-
-
 
     def measure_two_qubit_grovers_repeated(
             self, qubits: list, nr_of_grover_iterations=40,
@@ -712,7 +828,7 @@ class DeviceCCL(Instrument):
                                     label=''):
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0,q1])
+            self.prepare_for_timedomain(qubits=[q0, q1])
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -748,7 +864,7 @@ class DeviceCCL(Instrument):
                                 prepare_for_timedomain: bool=True, MC=None):
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0,q1])
+            self.prepare_for_timedomain(qubits=[q0, q1])
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -787,7 +903,7 @@ class DeviceCCL(Instrument):
         assert qD in self.qubits()
         assert qA in self.qubits()
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[qD,qA])
+            self.prepare_for_timedomain(qubits=[qD, qA])
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -795,22 +911,21 @@ class DeviceCCL(Instrument):
         qAidx = self.find_instrument(qA).cfg_qubit_nr()
 
         p = mqo.single_qubit_parity_check(qDidx, qAidx,
-                                           self.cfg_openql_platform_fn(),
-                                           number_of_repetitions=number_of_repetitions,
-                                           initialization_msmt=initialization_msmt,
-                                           initial_states=initial_states,
-                                           flux_codeword=flux_codeword,
-                                           parity_axis=parity_axis
-                                           )
+                                          self.cfg_openql_platform_fn(),
+                                          number_of_repetitions=number_of_repetitions,
+                                          initialization_msmt=initialization_msmt,
+                                          initial_states=initial_states,
+                                          flux_codeword=flux_codeword,
+                                          parity_axis=parity_axis
+                                          )
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
 
-
-
         d = self.get_int_logging_detector(qubits=[qA],
                                           result_logging_mode='lin_trans')
-        d.nr_shots = 4088  # To ensure proper data binning
-
+        # d.nr_shots = 4088  # To ensure proper data binning
+        # Because we are using a multi-detector 
+        d.set_child_attr('nr_shots', 4088)
 
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
@@ -820,7 +935,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        name='Single_qubit_parity_{}_{}_{}'.format(qD, qA, self.msmt_suffix)
+        name = 'Single_qubit_parity_{}_{}_{}'.format(qD, qA, self.msmt_suffix)
         MC.run(name)
 
         MC.soft_avg(old_soft_avg)
@@ -831,29 +946,30 @@ class DeviceCCL(Instrument):
                 label=name,
                 options_dict={'post_select': initialization_msmt,
                               'nr_samples': 2+2*initialization_msmt,
-                              'post_select_threshold':self.find_instrument(qA).ro_acq_threshold()},
+                              'post_select_threshold': self.find_instrument(qA).ro_acq_threshold()},
                 extract_only=False)
         return a
 
-    def measure_two_qubit_parity(self, qD0: str,qD1: str, qA: str,
-                                    number_of_repetitions: int = 1,
-                                    initialization_msmt: bool=False,
-                                    initial_states=[['0','0'],['0','1'],['1','1',],['1','0']], #nb: this groups even and odd
-                                    # nr_shots: int=4088*4,
-                                    flux_codeword0: str = 'fl_cw_03',
-                                    flux_codeword1: str = 'fl_cw_01',
-                                    analyze: bool=True, close_fig: bool=True,
-                                    prepare_for_timedomain: bool=True, MC=None,
-                                    echo: bool=True,
-                                    post_select_threshold: float=None,
-                                    parity_axes=['ZZ'], tomo=False,
-                                    tomo_after=False,
-                                    ro_time=1000e-9,
-                                    echo_during_ancilla_mmt: bool=True,
-                                    idling_time=780e-9,
-                                    idling_time_echo=480e-9,
-                                    idling_rounds=0
-                                    ):
+    def measure_two_qubit_parity(self, qD0: str, qD1: str, qA: str,
+                                 number_of_repetitions: int = 1,
+                                 initialization_msmt: bool=False,
+                                 initial_states=[['0', '0'], ['0', '1'], ['1', '1', ], [
+                                     '1', '0']],  # nb: this groups even and odd
+                                 # nr_shots: int=4088*4,
+                                 flux_codeword0: str = 'fl_cw_03',
+                                 flux_codeword1: str = 'fl_cw_01',
+                                 analyze: bool=True, close_fig: bool=True,
+                                 prepare_for_timedomain: bool=True, MC=None,
+                                 echo: bool=True,
+                                 post_select_threshold: float=None,
+                                 parity_axes=['ZZ'], tomo=False,
+                                 tomo_after=False,
+                                 ro_time=1000e-9,
+                                 echo_during_ancilla_mmt: bool=True,
+                                 idling_time=780e-9,
+                                 idling_time_echo=480e-9,
+                                 idling_rounds=0
+                                 ):
         assert qD0 in self.qubits()
         assert qD1 in self.qubits()
         assert qA in self.qubits()
@@ -867,61 +983,59 @@ class DeviceCCL(Instrument):
         qAidx = self.find_instrument(qA).cfg_qubit_nr()
 
         p = mqo.two_qubit_parity_check(qD0idx, qD1idx, qAidx,
-                                           self.cfg_openql_platform_fn(),
-                                           number_of_repetitions=number_of_repetitions,
-                                           initialization_msmt=initialization_msmt,
-                                           initial_states=initial_states,
-                                           flux_codeword0=flux_codeword0,
-                                           flux_codeword1=flux_codeword1,
-                                           echo=echo,
-                                           parity_axes=parity_axes,
-                                           tomo=tomo,
-                                           tomo_after=tomo_after,
-                                           ro_time=ro_time,
-                                           echo_during_ancilla_mmt=echo_during_ancilla_mmt,
-                                           idling_time=idling_time,
-                                           idling_time_echo=idling_time_echo,
-                                           idling_rounds=idling_rounds)
+                                       self.cfg_openql_platform_fn(),
+                                       number_of_repetitions=number_of_repetitions,
+                                       initialization_msmt=initialization_msmt,
+                                       initial_states=initial_states,
+                                       flux_codeword0=flux_codeword0,
+                                       flux_codeword1=flux_codeword1,
+                                       echo=echo,
+                                       parity_axes=parity_axes,
+                                       tomo=tomo,
+                                       tomo_after=tomo_after,
+                                       ro_time=ro_time,
+                                       echo_during_ancilla_mmt=echo_during_ancilla_mmt,
+                                       idling_time=idling_time,
+                                       idling_time_echo=idling_time_echo,
+                                       idling_rounds=idling_rounds)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
-
-
 
         d = self.get_int_logging_detector(qubits=[qD1, qD0, qA],
                                           result_logging_mode='lin_trans')
 
         if tomo:
-            mmts_per_round = (number_of_repetitions*len(parity_axes)+1*initialization_msmt+1*tomo_after)
+            mmts_per_round = (
+                number_of_repetitions*len(parity_axes)+1*initialization_msmt+1*tomo_after)
             print('mmts_per_round', mmts_per_round)
             nr_shots = 4096*64*mmts_per_round  # To ensure proper data binning
             if mmts_per_round < 4:
-                d.nr_shots = 4096*64*mmts_per_round  # To ensure proper data binning
+                nr_shots = 4096*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 10:
-                d.nr_shots = 64*64*mmts_per_round  # To ensure proper data binning
+                nr_shots = 64*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 20:
-                d.nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
+                nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
             elif mmts_per_round < 40:
-                d.nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
+                nr_shots = 16*64*mmts_per_round  # To ensure proper data binning
             else:
-                d.nr_shots = 8*64*mmts_per_round  # To ensure proper data binning
-            print('detector shots', d.nr_shots)
-
+                nr_shots = 8*64*mmts_per_round  # To ensure proper data binning
+            d.set_child_attr('nr_shots', nr_shots)
 
         else:
-            d.nr_shots = 4096*8  # To ensure proper data binning
             nr_shots = 4096*8  # To ensure proper data binning
-
+            d.set_child_attr('nr_shots', nr_shots)
 
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
-        self.msmt_suffix='rounds{}'.format(number_of_repetitions)
+        self.msmt_suffix = 'rounds{}'.format(number_of_repetitions)
         MC.soft_avg(1)
         MC.live_plot_enabled(False)
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        name = 'Two_qubit_parity_{}_{}_{}_{}_{}'.format(parity_axes, qD1, qD0, qA, self.msmt_suffix)
+        name = 'Two_qubit_parity_{}_{}_{}_{}_{}'.format(
+            parity_axes, qD1, qD0, qA, self.msmt_suffix)
         MC.run(name)
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
@@ -930,16 +1044,14 @@ class DeviceCCL(Instrument):
                 if not initialization_msmt:
                     a = mra.two_qubit_ssro_fidelity(name)
             a = ma2.Singleshot_Readout_Analysis(
-                    t_start=None, t_stop=None,
-                    label=name,
-                    options_dict={'post_select': initialization_msmt,
-                                  'nr_samples': 2+2*initialization_msmt,
-                                  'post_select_threshold':self.find_instrument(qA).ro_acq_threshold(),
-                                  'preparation_labels':['prep. 00, 11', 'prep. 01, 10']},
-                    extract_only=False)
+                t_start=None, t_stop=None,
+                label=name,
+                options_dict={'post_select': initialization_msmt,
+                              'nr_samples': 2+2*initialization_msmt,
+                              'post_select_threshold': self.find_instrument(qA).ro_acq_threshold(),
+                              'preparation_labels': ['prep. 00, 11', 'prep. 01, 10']},
+                extract_only=False)
             return a
-
-
 
     def measure_residual_ZZ_coupling(self, q0: str, q1: str,
                                      times=np.linspace(0, 10e-6, 26),
@@ -948,12 +1060,11 @@ class DeviceCCL(Instrument):
 
         # FIXME: this is not done yet, needs testing and finishing -Filip July 2018
 
-
         assert q0 in self.qubits()
         assert q1 in self.qubits()
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0,q1])
+            self.prepare_for_timedomain(qubits=[q0, q1])
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1007,7 +1118,7 @@ class DeviceCCL(Instrument):
             # right is LSQ
             d = self.get_int_logging_detector(qubits,
                                               result_logging_mode='lin_trans')
-            d.nr_shots = 4088  # To ensure proper data binning
+            #d.nr_shots = 4088  # To ensure proper data binning
         else:
             d = detector
 
@@ -1070,9 +1181,9 @@ class DeviceCCL(Instrument):
         # Loop over all target and measurement qubits
         target_qubits = [self.find_instrument(q) for q in qubits]
         measured_qubits = [self.find_instrument(q) for q in qubits]
-        if selected_target!=None:
+        if selected_target != None:
             target_qubits = [target_qubits[selected_target]]
-        if selected_measured!=None:
+        if selected_measured != None:
             measured_qubits = [measured_qubits[selected_measured]]
         for target_qubit in target_qubits:
             for measured_qubit in measured_qubits:
@@ -1188,7 +1299,7 @@ class DeviceCCL(Instrument):
             raise ValueError('Waveform shape not understood')
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0,q_spec])
+            self.prepare_for_timedomain(qubits=[q0, q_spec])
 
         awg = fl_lutman.AWG.get_instr()
         using_QWG = (awg.__class__.__name__ == 'QuTech_AWG_Module')
@@ -1220,7 +1331,7 @@ class DeviceCCL(Instrument):
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
-        d = self.get_correlation_detector(qubits=[q0, q_spec],single_int_avg=True,
+        d = self.get_correlation_detector(qubits=[q0, q_spec], single_int_avg=True,
                                           seg_per_point=1)
 
         MC.set_sweep_function(amp_par)
@@ -1260,7 +1371,7 @@ class DeviceCCL(Instrument):
         q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0,q_spec])
+            self.prepare_for_timedomain(qubits=[q0, q_spec])
 
         p = mqo.two_qubit_ramsey(times, q0idx, q_specidx,
                                  platf_cfg=self.cfg_openql_platform_fn(),
@@ -1268,9 +1379,6 @@ class DeviceCCL(Instrument):
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Time', unit='s')
-
-#        self.instr_CC.get_instr().eqasm_program(p.filename)
-#        self.instr_CC.get_instr().start()
 
         dt = times[1] - times[0]
         times = np.concatenate((times,
@@ -1361,6 +1469,63 @@ class DeviceCCL(Instrument):
                                  always_prepare=True)
         MC.set_detector_function(d)
         MC.run(label)
+
+    def measure_timing_diagram(self, q0, flux_latencies, microwave_latencies,
+                       MC=None,  label='timing_{}_{}',
+                       prepare_for_timedomain: bool=True):
+        """
+        Measure timing diagram. 
+        
+        Args:
+            q0  (str)     :
+                name of the target qubit
+            flux_latencies   (array):
+                array of flux latencies to set (in seconds)
+            microwave_latencies (array): 
+                array of microwave latencies to set (in seconds)
+
+            label (str):
+                used to label the experiment
+
+            prepare_for_timedomain (bool):
+                calls self.prepare_for_timedomain on start
+        """ 
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        fl_lutman.sq_length(10e-9)
+
+
+        CC = self.instr_CC.get_instr()
+
+        # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 80ns 
+        p = sqo.FluxTimingCalibration(X.cfg_qubit_nr(),
+                              times=[40e-9], 
+                              platf_cfg=device.cfg_openql_platform_fn(),
+                              cal_points=False)
+        CC.eqasm_program(p.filename)
+
+        d = device.get_int_avg_det(qubits=['X'], single_int_avg=True)
+        MC.set_detector_function(d)
+
+        s = swf.tim_flux_latency_sweep(device)
+        s2 = swf.tim_mw_latency_sweep(device)
+        MC.set_sweep_functions([s,s2])
+
+        MC.set_sweep_points(flux_latencies)
+        MC.set_sweep_points_2D(microwave_latencies)
+        MC.run_2D(label.format(self.name, q0))
+
+        # This is the analysis that should be run but with custom delays
+        ma2.Timing_Cal_Flux_Fine(ch_idx=0, close_figs=False,
+                               ro_latency=-100e-9,
+                               flux_latency=0,
+                               flux_pulse_duration=10e-9, 
+                               mw_pulse_separation=80e-9)
+
 
     def measure_ramsey_with_flux_pulse(self, q0: str, times,
                                        MC=None,
@@ -1455,7 +1620,7 @@ class DeviceCCL(Instrument):
 
         MC.set_sweep_function(flux_pulse_time)
         MC.set_sweep_points(times)
-        d = self.get_int_avg_det(qubits=[q0],values_per_point=2,
+        d = self.get_int_avg_det(qubits=[q0], values_per_point=2,
                                  values_per_point_suffex=[
                                      'final x90', 'final y90'],
                                  single_int_avg=True,
@@ -1543,7 +1708,8 @@ class DeviceCCL(Instrument):
 
         # angles = np.arange(0, 341, 20*1)
         # These are hardcoded angles in the mw_lutman for the AWG8
-        angles = np.concatenate([np.arange(0, 101, 20), np.arange(140,341,20)]) #avoid CW15, issue
+        angles = np.concatenate(
+            [np.arange(0, 101, 20), np.arange(140, 341, 20)])  # avoid CW15, issue
         # angles = np.arange(0, 341, 20))
 
         qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
@@ -1560,7 +1726,8 @@ class DeviceCCL(Instrument):
                              parameter_name='Phase', unit='deg')
         nested_MC.set_sweep_function(s)
         nested_MC.set_sweep_points(angles)
-        nested_MC.set_detector_function(self.get_correlation_detector(qubits=qubits))
+        nested_MC.set_detector_function(
+            self.get_correlation_detector(qubits=qubits))
         nested_MC.run('sliding_CZ_oscillation_{}'.format(counter_par()),
                       disable_snapshot_metadata=True)
 
@@ -1588,8 +1755,9 @@ class DeviceCCL(Instrument):
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
-        d = self.get_int_logging_detector(qubits=qubits)
         MC.soft_avg(1)
+        # The detector needs to be defined before setting back parameters
+        d = self.get_int_logging_detector(qubits=qubits)
         # set back the settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
@@ -1645,20 +1813,22 @@ class DeviceCCL(Instrument):
         else:
             sweep_points = np.repeat(nr_cliffords, 2)
 
-
-
         counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
             'counter_param': counter_param,
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        d.prepare_function = oqh.load_range_of_oql_programs
-        d.prepare_function_kwargs = prepare_function_kwargs
+        # Using the first detector of the multi-detector as this is 
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(oqh.load_range_of_oql_programs, 
+                               prepare_function_kwargs, 
+                               detectors='first')
         # d.nr_averages = 128
 
         reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        nr_shots = reps_per_seed*len(sweep_points)
+        d.set_child_attr('nr_shots', nr_shots)
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
@@ -1671,6 +1841,35 @@ class DeviceCCL(Instrument):
                exp_metadata={'bins': sweep_points})
         # N.B. if interleaving cliffords are used, this won't work
         ma2.RandomizedBenchmarking_TwoQubit_Analysis()
+
+    def measure_two_qubit_interleaved_randomized_benchmarking(
+            self, qubits, MC,
+            nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
+                                   15., 20., 25., 30., 50.]), nr_seeds=100,
+            recompile: bool ='as needed',
+            flux_codeword='fl_cw_01'):
+        """
+        Perform two qubit interleaved randomized benchmarking with an 
+        interleaved CZ gate. 
+        """
+
+        # Perform two-qubit RB (no interleaved gate)
+        self.measure_two_qubit_randomized_benchmarking(
+            qubits=qubits, MC=MC, nr_cliffords=nr_cliffords, 
+            interleaving_cliffords=[None], recompile=recompile, 
+            flux_codeword=flux_codeword, nr_seeds=nr_seeds)
+
+        # Perform two-qubit RB with CZ interleaved 
+        self.measure_two_qubit_randomized_benchmarking(
+            qubits=qubits, MC=MC, nr_cliffords=nr_cliffords, 
+            interleaving_cliffords=[-4368], recompile=recompile, 
+            flux_codeword=flux_codeword, nr_seeds=nr_seeds)
+
+        ma2.InterleavedRandomizedBenchmarkingAnalysis(
+            ts_base=None, ts_int=None, 
+            label_base='icl[None]', label_int='icl[-4368]')
+
+
 
     def measure_two_qubit_purity_benchmarking(
             self, qubits, MC,
@@ -1756,12 +1955,16 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        d.prepare_function = oqh.load_range_of_oql_programs
-        d.prepare_function_kwargs = prepare_function_kwargs
+        # Using the first detector of the multi-detector as this is 
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(oqh.load_range_of_oql_programs, 
+                               prepare_function_kwargs, 
+                               detectors='first')
         # d.nr_averages = 128
 
         reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        nr_shots = reps_per_seed*len(sweep_points)
+        d.set_child_attr('nr_shots', nr_shots)
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
@@ -1838,20 +2041,22 @@ class DeviceCCL(Instrument):
         print('Succesfully generated {} Character benchmarking programs in {:.1f}s'.format(
             nr_seeds, time.time()-t0))
 
-
-
         counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
             'counter_param': counter_param,
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        d.prepare_function = oqh.load_range_of_oql_programs
-        d.prepare_function_kwargs = prepare_function_kwargs
+        # Using the first detector of the multi-detector as this is 
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(oqh.load_range_of_oql_programs, 
+                               prepare_function_kwargs, 
+                               detectors='first')
         # d.nr_averages = 128
 
         reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        nr_shots = reps_per_seed*len(sweep_points)
+        d.set_child_attr('nr_shots', nr_shots)
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
@@ -1864,7 +2069,6 @@ class DeviceCCL(Instrument):
                exp_metadata={'bins': sweep_points})
         # N.B. if measurement was interrupted this wont work
         ma2.CharacterBenchmarking_TwoQubit_Analysis(ch_idxs=ch_idxs)
-
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
             self, qubits, MC,
@@ -1887,6 +2091,9 @@ class DeviceCCL(Instrument):
         self.prepare_for_timedomain(qubits=qubits)
 
         MC.soft_avg(1)
+
+        # The detector needs to be defined before setting back parameters
+        d = self.get_int_logging_detector(qubits=qubits)
         # set back the settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
@@ -1940,7 +2147,7 @@ class DeviceCCL(Instrument):
         else:
             sweep_points = np.repeat(nr_cliffords, 2)
 
-        d = self.get_int_logging_detector(qubits=qubits)
+
 
         counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
@@ -1948,12 +2155,15 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        d.prepare_function = oqh.load_range_of_oql_programs
-        d.prepare_function_kwargs = prepare_function_kwargs
+        # Using the first detector of the multi-detector as this is 
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(oqh.load_range_of_oql_programs, 
+                               prepare_function_kwargs, 
+                               detectors='first')
         # d.nr_averages = 128
 
         reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        d.set_child_attr('nr_shots', reps_per_seed*len(sweep_points))
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
@@ -2059,15 +2269,15 @@ class DeviceCCL(Instrument):
         analysis looks for the intersect.
         """
 
-
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits = [q_osc, q_spec])
+            self.prepare_for_timedomain(qubits=[q_osc, q_spec])
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         q0idx = self.find_instrument(q_osc).cfg_qubit_nr()
         q1idx = self.find_instrument(q_spec).cfg_qubit_nr()
-        fl_lutman_q0 = self.find_instrument(q_osc).instr_LutMan_Flux.get_instr()
+        fl_lutman_q0 = self.find_instrument(
+            q_osc).instr_LutMan_Flux.get_instr()
 
         p = mqo.conditional_oscillation_seq(
             q0idx, q1idx,
@@ -2083,7 +2293,7 @@ class DeviceCCL(Instrument):
                         waveform)
 
         d = self.get_correlation_detector(qubits=[q_osc, q_spec],
-            single_int_avg=True, seg_per_point=2)
+                                          single_int_avg=True, seg_per_point=2)
         d.detector_control = 'hard'
 
         MC.set_sweep_function(s)
@@ -2101,57 +2311,12 @@ class DeviceCCL(Instrument):
             return False
         else:
             if update:
-                self.find_instrument(q_osc).fl_cz_phase_corr_amp(phase_corr_amp)
+                self.find_instrument(
+                    q_osc).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
 
-    def calibrate_flux_timing(self, q0: str, q1: str,
-                              times,
-                              waveform='cz_z',
-                              update: bool = True,
-                              prepare_for_timedomain: bool=True, MC=None):
 
-        if prepare_for_timedomain:
-            self.prepare_for_timedomain()
-        if MC is None:
-            MC = self.instr_MC.get_instr()
 
-        q0idx = self.find_instrument(q0).cfg_qubit_nr()
-        q1idx = self.find_instrument(q1).cfg_qubit_nr()
-        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-
-        p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                            platf_cfg=self.cfg_openql_platform_fn(),
-                                            CZ_disabled=False, add_cal_points=False,
-                                            angles=[90])
-
-        CC = self.instr_CC.get_instr()
-        CC.eqasm_program(p.filename)
-        CC.start()
-
-        s = swf.FLsweep(fl_lutman, fl_lutman.cz_phase_corr_amp,
-                        waveform)
-
-        d = self.get_correlation_detector(qubits=[q0, q1],single_int_avg=True, seg_per_point=2)
-        d.detector_control = 'hard'
-        # the order of self.qubits is used in the correlation detector
-        # and is required for the analysis
-        ch_idx = self.qubits().index(q0)
-
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(np.repeat(amps, 2))
-        MC.set_detector_function(d)
-        MC.run('{}_CZphase'.format(q0))
-
-        a = ma2.CZ_1QPhaseCal_Analysis(options_dict={'ch_idx': ch_idx})
-
-        phase_corr_amp = a.get_zero_phase_diff_intersect()
-        if phase_corr_amp > np.max(amps) or phase_corr_amp < np.min(amps):
-            print('Calibration failed, intersect outside of initial range')
-            return False
-        else:
-            if update:
-                self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
-            return True
 
     def create_dep_graph(self):
         dags = []

@@ -30,7 +30,6 @@ try:
             self.assertEqual(p.name, 'vsm_timing_cal_sequence')
 
         def test_CW_RO_seq(self):
-
             p = sqo.CW_RO_sequence(qubit_idx=0, platf_cfg=config_fn)
             self.assertEqual(p.name, 'CW_RO_sequence')
 
