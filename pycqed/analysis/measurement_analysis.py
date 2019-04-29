@@ -5728,7 +5728,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         if ('hanger' in fitting_model) or ('complex' in fitting_model):
             if kw['custom_power_message'] is None:
                 textstr = format_value_string(
-                    '$f_{\mathrm{center}}$', fit_res.params['f0'],
+                    '$f_{{\mathrm{{center}}}}$', fit_res.params['f0'],
                     end_char='\n', unit=self.sweep_unit[0])
                 textstr += format_value_string(
                     '$Qc$', fit_res.params['Qc'], end_char='\n')
@@ -5754,7 +5754,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                     fit_res.params['f0'].value * 1e9
 
                 textstr = format_value_string(
-                    '$f_{\mathrm{center}}$', fit_res.params['f0'],
+                    '$f_{{\mathrm{{center}}}}$', fit_res.params['f0'],
                     end_char='\n', unit=self.sweep_unit[0])
                 textstr += format_value_string(
                     '$Qc$', fit_res.params['Qc'], end_char='\n')
@@ -5766,7 +5766,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         elif fitting_model == 'lorentzian':
             textstr = format_value_string(
-                    '$f_{\mathrm{center}}$', fit_res.params['f0'],
+                    '$f_{{\mathrm{{center}}}}$', fit_res.params['f0'],
                     end_char='\n', unit=self.sweep_unit[0])
             textstr += format_value_string(
                     '$Q$', fit_res.params['Q'], end_char='\n')
