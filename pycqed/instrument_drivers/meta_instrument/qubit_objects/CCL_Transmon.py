@@ -640,7 +640,7 @@ class CCLight_Transmon(Qubit):
                            initial_value=20e-9,
                            unit='s',
                            parameter_class=ManualParameter,
-                           # this is to effictively hardcode the cycle time
+                           # this is to effectively hardcode the cycle time
                            vals=vals.Enum(20e-9))
         # TODO: add docstring (Oct 2017)
         self.add_parameter('cfg_prepare_ro_awg', vals=vals.Bool(),
