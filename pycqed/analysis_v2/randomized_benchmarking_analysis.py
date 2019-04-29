@@ -202,9 +202,9 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         fr_dec = self.fit_res['leakage_decay'].params
 
         text_msg = 'Summary: \n'
-        text_msg += format_value_string(r'$\epsilon_{\mathrm{simple}}$',
+        text_msg += format_value_string(r'$\epsilon_{{\mathrm{{simple}}}}$',
                                         fr_rb_simple['eps'], '\n')
-        text_msg += format_value_string(r'$\epsilon_{X_1}$',
+        text_msg += format_value_string(r'$\epsilon_{{X_1}}$',
                                         fr_rb['eps'], '\n')
         text_msg += format_value_string(r'$L_1$', fr_dec['L1'], '\n')
         text_msg += format_value_string(r'$L_2$', fr_dec['L2'], '\n')
