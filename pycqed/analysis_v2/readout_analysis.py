@@ -23,6 +23,7 @@ from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.utilities.general import int2base
+from pycqed.utilities.general import format_value_string
 
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
@@ -65,7 +66,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         # Determine the default for auto_rotation_angle
         man_angle = self.options_dict.get('rotation_angle', False) is False
-        self.options_dict['auto_rotation_angle'] = self.options_dict.get('auto_rotation_angle', man_angle)
+        self.options_dict['auto_rotation_angle'] = self.options_dict.get(
+            'auto_rotation_angle', man_angle)
 
         if auto:
             self.run_analysis()
@@ -90,7 +92,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # loop through channels
         shots = np.zeros((2, len(meas_val),), dtype=np.ndarray)
         for j, dat in enumerate(meas_val):
-            assert unit == self.raw_data_dict['value_units'][j], 'The channels have been measured using different units. This is not supported yet.'
+            assert unit == self.raw_data_dict['value_units'][
+                j], 'The channels have been measured using different units. This is not supported yet.'
             sh_0, sh_1 = get_shots_zero_one(
                 dat, post_select=post_select, nr_samples=nr_samples,
                 post_select_threshold=post_select_threshold,
@@ -109,7 +112,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             data_range_y = (np.min([np.min(b) for b in shots[:, 1]]),
                             np.max([np.max(b) for b in shots[:, 1]]))
             data_range_xy = (data_range_x, data_range_y)
-            nr_bins_2D = self.options_dict.get('nr_bins_2D', 6*np.sqrt(nr_bins))
+            nr_bins_2D = self.options_dict.get(
+                'nr_bins_2D', 6*np.sqrt(nr_bins))
             H0, xedges, yedges = np.histogram2d(x=shots[0, 0],
                                                 y=shots[0, 1],
                                                 bins=nr_bins_2D,
@@ -148,7 +152,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                                               **guess0)
                 fitres1 = gauss2D_model_1.fit(data=H1.transpose(),  x=x2d, y=y2d,
                                               **guess1)
-                
+
                 fr0 = fitres0.best_values
                 fr1 = fitres1.best_values
                 x0 = fr0['center_x']
@@ -166,7 +170,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
             if self.verbose:
                 ang_deg = (angle*180/np.pi)
-                print('Mixing I/Q channels with %.3f degrees '%ang_deg +
+                print('Mixing I/Q channels with %.3f degrees ' % ang_deg +
                       #'around point (%.2f, %.2f)%s'%(mid[0], mid[1], unit) +
                       ' to obtain effective voltage.')
 
@@ -176,14 +180,15 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                        [+np.sin(-angle), +np.cos(-angle)]]
             # rotate data accordingly
             eff_sh = np.zeros(len(shots[0]), dtype=np.ndarray)
-            eff_sh[0] = np.dot(rot_mat[0], shots[0])# - mid
-            eff_sh[1] = np.dot(rot_mat[0], shots[1])# - mid
+            eff_sh[0] = np.dot(rot_mat[0], shots[0])  # - mid
+            eff_sh[1] = np.dot(rot_mat[0], shots[1])  # - mid
         else:
             # If we have only one quadrature, use that (doh!)
             eff_sh = shots[:, 0]
 
         self.proc_data_dict['all_channel_int_voltages'] = shots
-        self.proc_data_dict['shots_xlabel'] = 'Effective integrated Voltage'#self.raw_data_dict['value_names'][0]
+        # self.raw_data_dict['value_names'][0]
+        self.proc_data_dict['shots_xlabel'] = 'Effective integrated Voltage'
         self.proc_data_dict['shots_xunit'] = unit
         self.proc_data_dict['eff_int_voltages'] = eff_sh
         self.proc_data_dict['nr_shots'] = [len(eff_sh[0]), len(eff_sh[1])]
@@ -238,7 +243,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['F_assignment_raw'] = F_vs_th[opt_idx]
         self.proc_data_dict['threshold_raw'] = all_x[opt_idx]
 
-
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
 
@@ -278,7 +282,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'guess_pars': cum_params,
         }
 
-
     def analyze_fit_results(self):
         # Create a CDF based on the fit functions of both fits.
         fr = self.fit_res['shots_all']
@@ -287,6 +290,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         bvn = deepcopy(bv)
         bvn['A_amplitude'] = 1
         bvn['B_amplitude'] = 1
+
         def CDF(x):
             return ro_CDF(x=x, **bvn)
 
@@ -357,7 +361,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         # Did we load two voltage components (shall we do 2D plots?)
-        two_dim_data = len(self.proc_data_dict['all_channel_int_voltages'][0]) == 2
+        two_dim_data = len(
+            self.proc_data_dict['all_channel_int_voltages'][0]) == 2
 
         eff_voltage_label = self.proc_data_dict['shots_xlabel']
         eff_voltage_unit = self.proc_data_dict['shots_xunit']
@@ -372,18 +377,17 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         title = ('\n' + self.timestamps[0] + ' - "' +
                  self.raw_data_dict['measurementstring'] + '"')
 
-
-        #### 1D histograms
+        # 1D histograms
         log_hist = self.options_dict.get('log_hist', False)
         bin_x = self.proc_data_dict['bin_edges']
         bin_y = self.proc_data_dict['hist']
         self.plot_dicts['hist_0'] = {
             'title': 'Binned Shot Counts' + title,
-            'ax_id' : '1D_histogram',
+            'ax_id': '1D_histogram',
             'plotfn': self.plot_bar,
             'xvals': bin_x,
             'yvals': bin_y[0],
-            'xwidth' : self.proc_data_dict['binsize'],
+            'xwidth': self.proc_data_dict['binsize'],
             'bar_kws': {'log': log_hist, 'alpha': .4, 'facecolor': 'C0',
                         'edgecolor': 'C0'},
             'setlabel': label_0,
@@ -397,7 +401,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'plotfn': self.plot_bar,
             'xvals': bin_x,
             'yvals': bin_y[1],
-            'xwidth' : self.proc_data_dict['binsize'],
+            'xwidth': self.proc_data_dict['binsize'],
             'bar_kws': {'log': log_hist, 'alpha': .3, 'facecolor': 'C3',
                         'edgecolor': 'C3'},
             'setlabel': label_1,
@@ -410,7 +414,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.plot_dicts['hist_0']['yrange'] = (0.5, 1.5*np.max(bin_y[0]))
             self.plot_dicts['hist_1']['yrange'] = (0.5, 1.5*np.max(bin_y[1]))
 
-        #### CDF
+        # CDF
         cdf_xs = self.proc_data_dict['cumsum_x']
         cdf_ys = self.proc_data_dict['cumsum_y']
         cdf_ys[0] = cdf_ys[0]/np.max(cdf_ys[0])
@@ -448,9 +452,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'do_legend': True,
         }
 
-        ### Vlines for thresholds
+        # Vlines for thresholds
         th_raw = self.proc_data_dict['threshold_raw']
-        threshs = [th_raw,]
+        threshs = [th_raw, ]
         if self.do_fitting:
             threshs.append(self.proc_data_dict['threshold_fit'])
             threshs.append(self.proc_data_dict['threshold_discr'])
@@ -466,7 +470,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'do_legend': True,
             }
 
-        #### 2D Histograms
+        # 2D Histograms
         if two_dim_data:
             iq_centers = None
             if 'IQ_pos' in self.proc_data_dict and self.proc_data_dict['IQ_pos'] is not None:
@@ -530,7 +534,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 dp['ax_id'] = '2D_histogram_1'
                 self.plot_dicts['2D_histogram_1_marker'] = dp
 
-            #### Scatter Shots
+            # Scatter Shots
             volts = self.proc_data_dict['all_channel_int_voltages']
             vxr = [np.min([np.min(a) for a in volts[:][1]]),
                    np.max([np.max(a) for a in volts[:][1]])]
@@ -587,7 +591,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # Adding the fits to the figures    #
         #####################################
         if self.do_fitting:
-            #todo: add seperate fits for residual and main gaussians
+            # todo: add seperate fits for residual and main gaussians
             x = np.linspace(bin_x[0], bin_x[-1], 150)
             para_hist_tmp = self.fit_res['shots_all_hist'].best_values
             para_cdf = self.fit_res['shots_all'].best_values
@@ -679,47 +683,42 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                         self.proc_data_dict['F_discr']*100))
                 fit_text += fit_th_msg
                 snr = self.fit_res['shots_all'].params['SNR']
-                fit_text += '\nSNR (fit) = ${:.3f}\\pm{:.3f}$'.format(snr.value, snr.stderr)
+
+                fit_text += format_value_string('\nSNR (fit)', lmfit_par=snr)
 
                 fr = self.fit_res['shots_all']
                 bv = fr.params
                 a_sp = bv['A_spurious']
                 fit_text += '\n\nSpurious Excitations:'
-                fit_text += '\n$p(e|0) = {:.3f}$'.format(a_sp.value)
-                if self.options_dict.get('fixed_p01', True) == True:
-                    fit_text += '$\\pm{:.3f}$'.format(a_sp.stderr)
-                else:
-                    fit_text += ' (fixed)'
+
+                fit_text += format_value_string('\n$p(e|0)$', lmfit_par=a_sp)
 
                 b_sp = bv['B_spurious']
-                fit_text += ' \n$p(g|\\pi) = {:.3f}$'.format(b_sp.value)
-                if self.options_dict.get('fixed_p10', True) == True:
-                    fit_text += '$\\pm{:.3f}$'.format(b_sp.stderr)
-                else:
-                    fit_text += ' (fixed)'
+                fit_text += format_value_string('\n$p(g|\\pi)$',
+                                                lmfit_par=b_sp)
 
             if two_dim_data:
                 offs = self.proc_data_dict['raw_offset']
-                #fit_text += '\nOffset from raw:\n'
-                #fit_text += '({:.3f},{:.3f}) {},\n'.format(offs[0], offs[1], eff_voltage_unit)
-                fit_text += '\n\nRotated by ${:.1f}^\\circ$'.format((offs[2]*180/np.pi)%180)
+
+                fit_text += '\n\nRotated by ${:.1f}^\\circ$'.format(
+                    (offs[2]*180/np.pi) % 180)
                 auto_rot = self.options_dict.get('auto_rotation_angle', True)
                 fit_text += '(auto)' if auto_rot else '(man.)'
             else:
                 fit_text += '\n\n(Single quadrature data)'
 
-            fit_text += '\n\nTotal shots: %d+%d'%(*self.proc_data_dict['nr_shots'],)
+            fit_text += '\n\nTotal shots: %d+%d' % (*self.proc_data_dict['nr_shots'],)
 
             for ax in ['cdf', '1D_histogram']:
                 self.plot_dicts['text_msg_' + ax] = {
-                        'ax_id': ax,
-                        # 'ypos': 0.15,
-                        'xpos' : 1.05,
-                        'horizontalalignment' : 'left',
-                        'plotfn': self.plot_text,
-                        'box_props': 'fancy',
-                        'text_string': fit_text,
-                    }
+                    'ax_id': ax,
+                    'xpos': 1.05,
+                    'horizontalalignment': 'left',
+                    'plotfn': self.plot_text,
+                    'box_props': 'fancy',
+                    'text_string': fit_text,
+                }
+
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     """
@@ -1062,4 +1061,3 @@ def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
 
     if title is not None:
         ax.set_title(title)
-

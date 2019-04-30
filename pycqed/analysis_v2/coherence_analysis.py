@@ -6,6 +6,7 @@ import datetime
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit, plot_scatter_errorbar
 from pycqed.analysis import measurement_analysis as ma_old
+from pycqed.utilities.general import SafeFormatter, format_value_string
 
 import numpy as np
 import lmfit
@@ -268,7 +269,7 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
     def extract_data(self):
         super().extract_data()
-        
+
         a = ma_old.MeasurementAnalysis(
             timestamp=self.t_start, auto=False, close_file=False)
         a.get_naming_and_values()
@@ -320,7 +321,7 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         text_msg += format_value_string(r'$o$', decay_fit.params['o'], '')
 
         self.proc_data_dict['decay_fit_msg'] = text_msg
-                    
+
 
     def save_fit_results(self):
         # todo: if you want to save some results to a hdf5, do it here
@@ -1043,16 +1044,3 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose: bool = Fa
         lmfit.printfuncs.report_fit(fit_result_gammas.params)
     return fit_result_gammas
 
-
-def format_value_string(par_name: str, lmfit_par, end_char=''):
-    """
-    Formats an lmfit par to a  string of value with uncertainty.
-    """
-    val_string = par_name
-    val_string += ': {:.3g}'.format(lmfit_par.value)
-    if lmfit_par.stderr is not None:
-        val_string += r'$\pm$' + '{:.3g}'.format(lmfit_par.stderr)
-    else:
-        val_string += r'$\pm$' + 'NaN'
-    val_string += end_char
-    return val_string
