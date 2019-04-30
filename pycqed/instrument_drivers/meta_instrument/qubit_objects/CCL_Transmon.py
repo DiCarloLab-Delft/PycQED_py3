@@ -25,8 +25,6 @@ from pycqed.measurement.openql_experiments.openql_helpers import \
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
-import warnings
-
 
 import cma
 from pycqed.measurement.optimization import nelder_mead

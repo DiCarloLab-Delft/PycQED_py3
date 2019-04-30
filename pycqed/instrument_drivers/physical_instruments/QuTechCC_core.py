@@ -41,28 +41,42 @@ class QuTechCC_core(SCPIBase):
 
     # FIXME: add function to get assembly errors
 
+    def set_q1_reg(self, ccio: int, reg: int, val: int) -> None:
+        self._transport.write('QUTech:CCIO{}:Q1REG{} {}'.format(ccio, reg, val))
+
+    def get_q1_reg(self, ccio: int, reg: int) -> int:
+        return self._transport.ask_int('QUTech:CCIO{}:Q1REG{}'.format(ccio, reg))
+
+    def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_39_ps_steps: int) -> None:
+        self._transport.write('QUTech:CCIO#:VSMbit#:DELAYRISE {}'.format(ccio, bit, cnt_in_39_ps_steps))
+
+    def get_vsm_delay_rise(self, ccio: int, bit: int) -> int:
+        return self._transport._ask_int('QUTech:CCIO#:VSMbit#:DELAYRISE'.format(ccio, bit))
+
+    def set_vsm_delay_fall(self, ccio: int, bit: int, cnt_in_39_ps_steps: int) -> None:
+        self._transport.write('QUTech:CCIO#:VSMbit#:DELAYFALL {}'.format(ccio, bit, cnt_in_39_ps_steps))
+
+    def get_vsm_delay_fall(self, ccio: int, bit: int) -> int:
+        return self._transport._ask_int('QUTech:CCIO#:VSMbit#:DELAYFALL'.format(ccio, bit))
+
     def start(self) -> None:
         self._transport.write('awgcontrol:run:immediate')
 
     def stop(self) -> None:
         self._transport.write('awgcontrol:stop:immediate')
 
-
-    def get_status_questionable_frequency_condition(self):
+    ### status functions ###
+    def get_status_questionable_frequency_condition(self) -> int:
         return self._ask_int('STATus:QUEStionable:FREQ:CONDition?')
 
-    def get_status_questionable_frequency_event(self):
+    def get_status_questionable_frequency_event(self) -> int:
         return self._ask_int('STATus:QUEStionable:FREQ:EVENt?')
 
-    def set_status_questionable_frequency_enable(self, val):
+    def set_status_questionable_frequency_enable(self, val) -> None:
         self._transport.write('STATus:QUEStionable:FREQ:ENABle {}'.format(val))
 
-    def get_status_questionable_frequency_enable(self):
+    def get_status_questionable_frequency_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:FREQ:ENABle?')
-
-
-    def set_vsm_delay_rise(self, value):
-        cmd = 'QUTech:CCIO#:VSMbit#:DELAYRISE'
 
 
 

@@ -184,7 +184,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
              ['ry90', 'ry90']]
 
     # this should be implicit
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    # FIXME: remove try-except, when we depend hard on >=openql-0.6
     try:
         p.set_sweep_points(np.arange(len(allXY), dtype=float))
     except TypeError:
