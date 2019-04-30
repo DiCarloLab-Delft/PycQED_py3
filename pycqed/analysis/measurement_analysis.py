@@ -2200,16 +2200,8 @@ class Echo_analysis(TD_Analysis):
                                       unit=self.parameter_units[0],
                                       end_char='\n')
         textstr += format_value_string(
-            '$n$', lmfit_par=self.fit_res.params['tau'])
-        # scale_factor, unit = SI_prefix_and_scale_factor(
-        #     self.fit_res.params['tau'].value, self.parameter_units[0])
-        # textstr = '$T_2$={:.3g}$\pm$({:.3g}) {} '.format(
-        #     self.fit_res.params['tau'].value * scale_factor,
-        #     self.fit_res.params['tau'].stderr * scale_factor,
-        #     unit)
-        # textstr += '\n$n$={:.2g}$\pm$({:.2g})'.format(
-        #     self.fit_res.params['n'].value,
-        #     self.fit_res.params['n'].stderr)
+            '$n$', lmfit_par=self.fit_res.params['n'])
+
         if show_guess:
             self.ax.plot(x_fine, self.fit_res.eval(
                 t=x_fine, **self.fit_res.init_values), label='guess')
