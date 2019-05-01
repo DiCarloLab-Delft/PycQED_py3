@@ -3,7 +3,7 @@ File:               CC_transmon.py
 Author:             Adriaan Rol
 Purpose:            Multiple qubit objects for CC controlled transmons
 Usage:
-Notes:
+Notes:              uses Cbox, not CC as the name suggests
 Bugs:
 '''
 import time

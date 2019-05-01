@@ -140,8 +140,7 @@ class QuTechCC(QuTechCC_core, Instrument):
 
     # helper for parameter 'eqasm_program'
     def _eqasm_program(self, file_name: str) -> None:
-        real_file_name = file_name.replace(".qisa", ".vq1asm")  # correct assumption of openql_helpers.py::compile()
-        with open(real_file_name, 'r') as f:
+        with open(file_name, 'r') as f:
             prog = f.read()
         self.sequence_program(prog)
 
