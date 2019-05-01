@@ -1,4 +1,5 @@
 import re
+import logging
 import numpy as np
 from os.path import join, dirname
 from pycqed.utilities.general import suppress_stdout
@@ -44,6 +45,18 @@ def create_program(pname: str, platf_cfg: str, nregisters: int=0):
     p.output_dir = ql.get_option('output_dir')
     p.nqubits = platf.get_qubit_number()
     p.nregisters = nregisters
+
+    # detect OpenQL backend ('eqasm_compiler') used
+    p.eqasm_compiler = ''
+    with open(platf_cfg) as f:
+        for line in f:
+            if 'eqasm_compiler' in line:
+                m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
+                p.eqasm_compiler = m.group(1)
+                break
+    if p.eqasm_compiler=='':
+        logging.error("'eqasm_compiler' not found in '{}'".format(platf_cfg))
+
     return p
 
 
@@ -65,8 +78,13 @@ def compile(p):
     with suppress_stdout():
         p.compile()
 
+
     # attribute is added to program to help finding the output files
-    p.filename = join(p.output_dir, p.name + '.qisa')  # FIXME: platform dependent (CC-light)
+    if p.eqasm_compiler=='eqasm_backend_cc':
+        ext = '.vq1asm' # CC
+    else:
+        ext = '.qisa' # CC-light, QCC
+    p.filename = join(p.output_dir, p.name + ext)
     return p
 
 
