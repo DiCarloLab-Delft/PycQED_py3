@@ -25,7 +25,8 @@ class QuTechCC(QuTechCC_core, Instrument):
     def __init__(self,
                  name: str,
                  transport: Transport):
-        super().__init__(name, transport) # FIXME: super -> QuTechCC_core
+        super().__init__(name, transport) # calls QuTechCC_core
+        super(Instrument, QuTechCC).__init__(self, name) # calls Instrument
 
         # set constants
         self._num_dio = 9  # the number of DIO connectors used
