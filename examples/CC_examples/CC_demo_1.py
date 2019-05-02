@@ -27,7 +27,7 @@ if 0:
     p = sqo.AllXY(qubit_idx=qubit_idx, double_points=True, platf_cfg=cfg_openql_platform_fn)
     print(p.filename)
 
-if 0:
+if 1:
     # based on CCL_Transmon.py::measure_ramsey()
     # funny default is because there is no real time sideband
     # modulation
@@ -40,7 +40,7 @@ if 0:
     p = sqo.Ramsey(times, qubit_idx=qubit_idx, platf_cfg=cfg_openql_platform_fn)
     print(p.filename)
 
-if 1:
+if 0:
     # based on CCL_Transmon.py::measure_rabi_channel_amp()
     log.debug('compiling Rabi')
     p = sqo.off_on(
