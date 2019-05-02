@@ -365,7 +365,8 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mw_awg_ch', parameter_class=ManualParameter,
-                           initial_value=1)
+                           initial_value=1,
+                           vals=vals.Ints())
         self.add_parameter('mw_gauss_width', unit='s',
                            initial_value=10e-9,
                            parameter_class=ManualParameter)
@@ -834,6 +835,12 @@ class CCLight_Transmon(Qubit):
                 real_imag=True, single_int_avg=True,
                 integration_length=self.ro_acq_integration_length())
 
+            self.UHFQC_spec_det = det.UHFQC_spectroscopy_detector(
+                UHFQC=UHFQC, ro_freq_mod=self.ro_freq_mod(),
+                AWG=self.instr_CC.get_instr(), channels=ro_channels,
+                nr_averages=self.ro_acq_averages(),
+                integration_length=self.ro_acq_integration_length())
+
             self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
                 channels=ro_channels,
@@ -1033,7 +1040,6 @@ class CCLight_Transmon(Qubit):
                             self.ro_acq_weight_chQ()), 1.0)
                         UHFQC.set('quex_rot_{}_imag'.format(
                             self.ro_acq_weight_chQ()), 1.0)
-
 
         else:
             raise NotImplementedError(
@@ -1535,7 +1541,8 @@ class CCLight_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
         # Starting specmode if set in config
         if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+            UHFQC.spec_mode_on(acq_length=self.ro_acq_integration_length(),
+                               IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
@@ -1684,8 +1691,11 @@ class CCLight_Transmon(Qubit):
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
         if 'ivvi' in self.instr_FluxCtrl().lower():
-            IVVI = self.instr_FluxCtrl.get_instr()
-            dac_par = IVVI.parameters['dac{}'.format(self.cfg_dc_flux_ch())]
+            if fluxChan is None:
+                IVVI = self.instr_FluxCtrl.get_instr()
+                dac_par = IVVI.parameters['dac{}'.format(self.cfg_dc_flux_ch())]
+            else:
+                dac_par = IVVI.parameters[fluxChan]
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
@@ -1711,15 +1721,18 @@ class CCLight_Transmon(Qubit):
             ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
-                             analyze=True, close_fig=True, label=''):
+                             analyze=True, close_fig=True, label='',
+                             prepare_for_continuous_wave=True):
         if not pulsed:
             logging.warning('CCL transmon can only perform '
                             'pulsed spectrocsopy')
         UHFQC = self.instr_acquisition.get_instr()
-        self.prepare_for_continuous_wave()
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
-            # Starting specmode if set in config
+
+        # Starting specmode if set in config
         if self.cfg_spec_mode():
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
@@ -1739,8 +1752,12 @@ class CCLight_Transmon(Qubit):
         spec_source.on()
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
-        self.int_avg_det_single._set_real_imag(False)
-        MC.set_detector_function(self.int_avg_det_single)
+        if self.cfg_spec_mode():
+          print('Enter loop')
+          MC.set_detector_function(self.UHFQC_spec_det)
+        else:
+          self.int_avg_det_single._set_real_imag(False)
+          MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='spectroscopy_'+self.msmt_suffix+label)
         # Stopping specmode
         if self.cfg_spec_mode():
@@ -1749,78 +1766,154 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-        # anharmonicity measurement, bus crossing and photon number splitting with the bus
 
-    def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None,
-                              f_12_power=None, MC=None, spec_source_2=None, f_01_span=24e6,
-                              f_12_span = 24e6):
+    def find_bus_frequency(self,freqs,spec_source_bus,bus_power,f01=None,label='',
+                        close_fig=True,analyze=True,MC=None,prepare_for_continuous_wave=True):
         '''
-        note measures anharmonicity of the transmon using three-tone
-        spectroscopy. two usecases:
-        - provide f_02 from high-power spectroscopy of the 02-transition.
-                                    It will calculate the 12 transition from it
-        - provide directly the 1-2 transition
+        Drive the qubit and sit at the spectroscopy peak while the bus is driven with
+        bus_spec_source
+
+        Input parameters:
+        - freqs: list of frequencies of the second drive tone (at bus frequency)
+        - spec_source_bus =: rf source used for the second spectroscopy tone
+        - bus_power: power of the second spectroscopy tone
+        - f_01: frequency of 01 transition (default: self.freq_qubit())
         '''
-        if (f_02 is None) and (f_12 is None):
-            raise ValueError("provide either and estimate of f_02 or f_12")
-        if f_12 == None:
-            f_anharmonicity = (f_01-f_02)*2
-            f_12 = f_01-f_anharmonicity
-        if f_01_power == None:
-            f_01_power = self.spec_pow()
-        if f_12_power == None:
-            f_12_power = f_01_power
-        f_anharmonicity = (f_01-f_12)
-        print('f_anharmonicity estimations', f_anharmonicity)
-        print('f_12 estimations', f_12)
+
+        if f01==None:
+          f01 = self.freq_qubit()
+
+        UHFQC = self.instr_acquisition.get_instr()
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        # Starting specmode if set in config
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+                               ro_amp=self.ro_pulse_amp_CW())
+
+        # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
         CCL.eqasm_program(p.filename)
+        # CCL gets started in the int_avg detector
+
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        spec_source.frequency(f01)
+        # spec_source.power(self.spec_pow())
+        spec_source_bus.on()
+        spec_source_bus.power(bus_power)
+        MC.set_sweep_function(spec_source_bus.frequency)
+        MC.set_sweep_points(freqs)
+        if self.cfg_spec_mode():
+          print('Enter loop')
+          MC.set_detector_function(self.UHFQC_spec_det)
+        else:
+          self.int_avg_det_single._set_real_imag(False)
+          MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Bus_spectroscopy_'+self.msmt_suffix+label)
+        spec_source_bus.off()
+        # Stopping specmode
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_off()
+            self._prep_ro_pulse(upload=True)
+        if analyze:
+            ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+    def bus_frequency_flux_sweep(self,freqs,spec_source_bus,bus_power,dacs,dac_param,f01=None,label='',
+                        close_fig=True,analyze=True,MC=None,
+                        prepare_for_continuous_wave=True):
+        '''
+        Drive the qubit and sit at the spectroscopy peak while the bus is driven with
+        bus_spec_source. At the same time sweep dac channel specified by dac_param over
+        set of values sepcifeid by dacs.
+
+        Practical comments:
+        - sweep flux bias of different (neighbour) qubit than the one measured
+        - set spec_power of the first tone high (say, +15 dB relative to value optimal
+                for sharp spectroscopy). This makes you less sensitive to flux crosstalk.
+
+        Input parameters:
+        - freqs: list of frequencies of the second drive tone (at bus frequency)
+        - spec_source_bus =: rf source used for the second spectroscopy tone
+        - bus_power: power of the second spectroscopy tone
+        - dacs: valuses of current bias to measure
+        - dac_param: parameter corresponding to the sweeped current bias
+        - f_01: frequency of 01 transition (default: self.freq_qubit())
+        '''
+        if f01==None:
+            f01 = self.freq_qubit()
+
+        UHFQC = self.instr_acquisition.get_instr()
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
-        if spec_source_2 is None:
-            spec_source_2 = self.instr_spec_source_2.get_instr()
+        # Starting specmode if set in config
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+                               ro_amp=self.ro_pulse_amp_CW())
+
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        # CCL gets started in the int_avg detector
+
         spec_source = self.instr_spec_source.get_instr()
-        freqs_q1 = np.arange(f_01-f_01_span/2, f_01+f_01_span/2, 0.7e6)
-        freqs_q2 = np.arange(f_12-f_12_span/2, f_12+f_12_span/2, 0.7e6)
-
-        self.prepare_for_continuous_wave()
-        self.int_avg_det_single._set_real_imag(False)
         spec_source.on()
-        spec_source.power(f_01_power)
+        spec_source.frequency(f01)
+        # spec_source.power(self.spec_pow())
+        spec_source_bus.on()
+        spec_source_bus.power(bus_power)
 
-        spec_source_2.on()
-        spec_source_2.power(f_12_power)
-        spec_source_2.frequency(f_12)
-        MC.set_sweep_function(wrap_par_to_swf(
-                              spec_source.frequency, retrieve_value=True))
-        MC.set_sweep_points(freqs_q1)
-        MC.set_sweep_function_2D(wrap_par_to_swf(
-            spec_source_2.frequency, retrieve_value=True))
-        MC.set_sweep_points_2D(freqs_q2)
-        MC.set_detector_function(self.int_avg_det_single)
-        MC.run_2D(name='Two_tone_'+self.msmt_suffix)
-        ma.TwoD_Analysis(auto=True)
-        spec_source.off()
-        spec_source_2.off()
-        ma.Three_Tone_Spectroscopy_Analysis(
-            label='Two_tone',  f01=f_01, f12=f_12)
+        MC.set_sweep_function(spec_source_bus.frequency)
+        MC.set_sweep_points(freqs)
 
-    def measure_anharmonicity_new(self, freqs_01, freqs_12, f_01_power=None,f_12_power=None,
+        MC.set_sweep_function_2D(dac_param)
+        MC.set_sweep_points_2D(dacs)
+
+        if self.cfg_spec_mode():
+            print('Enter loop')
+            MC.set_detector_function(self.UHFQC_spec_det)
+        else:
+            self.int_avg_det_single._set_real_imag(False)
+            MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Bus_flux_sweep_'+self.msmt_suffix+label,mode='2D')
+        spec_source_bus.off()
+
+        # Stopping specmode
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_off()
+            self._prep_ro_pulse(upload=True)
+        if analyze:
+            ma.TwoD_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+
+    def measure_anharmonicity(self, freqs_01, freqs_12, f_01_power=None,
+                              f_12_power=None,
                               MC=None, spec_source_2=None):
-        '''
-        New version where one manually inputs the frequencies to be measured. -Luc
-        '''
-        f_anharmonicity = ((freqs_01[-1]+freqs_01[0])-freqs_12[-1]-freqs_12[0])
+        """
+        Measures anharmonicity of the transmon using three-tone spectroscopy.
+
+        Typically a good guess for the 12 transition frequencies is 
+        f01 + alpha where alpha is the anharmonicity and typically ~ -300 MHz
+        """
+        f_anharmonicity = np.mean(freqs_01) - np.mean(freqs_12)
         if f_01_power == None:
             f_01_power = self.spec_pow()
         if f_12_power == None:
             f_12_power = f_01_power
         print('f_anharmonicity estimation', f_anharmonicity)
-        print('f_12 estimations', .5*freqs_12[-1]+.5*freqs_12[0])
+        print('f_12 estimations', np.mean(freqs_12))
         CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
@@ -1840,7 +1933,7 @@ class CCLight_Transmon(Qubit):
 
         spec_source_2.on()
         spec_source_2.power(f_12_power)
-        spec_source_2.frequency(.5*freqs_12[-1]+.5*freqs_12[0])
+
         MC.set_sweep_function(wrap_par_to_swf(
                               spec_source.frequency, retrieve_value=True))
         MC.set_sweep_points(freqs_01)
@@ -1853,7 +1946,8 @@ class CCLight_Transmon(Qubit):
         spec_source.off()
         spec_source_2.off()
         ma.Three_Tone_Spectroscopy_Analysis(
-            label='Two_tone',  f01=.5*freqs_01[-1]+.5*freqs_01[0], f12=.5*freqs_12[-1]+.5*freqs_12[0])
+            label='Two_tone',  f01=np.mean(freqs_01), f12=np.mean(freqs_12))
+
 
     def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10, 10, 1), MC=None, spec_source_2=None):
 
@@ -2397,6 +2491,7 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
+        ma.Rabi_Analysis(label='rabi_')
         return True
 
     def measure_allxy(self, MC=None,
@@ -2871,6 +2966,7 @@ class CCLight_Transmon(Qubit):
 
         if artificial_detuning is None:
             artificial_detuning = 3/times[-1]
+            artificial_detuning = 5/times[-1]
 
         # append the calibration points, times are for location in plot
         dt = times[1] - times[0]
@@ -3012,7 +3108,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
-                     label: str=''):
+                     label: str='', prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -3046,7 +3142,8 @@ class CCLight_Transmon(Qubit):
             raise ValueError(
                 'timesteps must be multiples of 2 modulation periods')
 
-        self.prepare_for_timedomain()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         p = sqo.echo(times, qubit_idx=self.cfg_qubit_nr(),
@@ -3059,15 +3156,15 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('echo'+label+self.msmt_suffix)
-        # FIXME: echo analysis v2 required that correctly handles 
-        # modulation of recovery pulse. 
-        a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
-        if update:
-            self.T2_echo(a.fit_res.params['tau'].value)
-        return a
+        if analyze:
+            # N.B. v1.5 analysis
+            a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
+            if update:
+                self.T2_echo(a.fit_res.params['tau'].value)
+            return a
 
     def measure_flipping(self, number_of_flips=np.arange(0, 40, 2), equator=True,
-                         MC=None, analyze=True, close_fig=True, update=True,
+                         MC=None, analyze=True, close_fig=True, update=False,
                          ax='x', angle='180'):
 
         if MC is None:
@@ -3099,6 +3196,31 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma2.FlippingAnalysis(
                 options_dict={'scan_label': 'flipping'})
+
+        if update:
+            chisqr_cos = a.fit_res['cos_fit'].chisqr
+            chisqr_line = a.fit_res['line_fit'].chisqr
+
+            scale_factor_cos = a._get_scale_factor_cos()
+            scale_factor_line = a._get_scale_factor_line()
+
+            if chisqr_cos<chisqr_line:
+                scale_factor = scale_factor_cos
+            else:
+                scale_factor = scale_factor_line
+
+            if abs(scale_factor-1)<2e-3:
+                print('Pulse amplitude accurate within 0.2%. Amplitude not updated.')
+                return a
+
+            if self.cfg_with_vsm():
+                amp_old = self.mw_vsm_G_amp()
+                self.mw_vsm_G_amp(scale_factor*amp_old)
+            else:
+                amp_old = self.mw_channel_amp()
+                self.mw_channel_amp(scale_factor*amp_old)
+
+            print('Pulse amplitude changed from {:.3f} to {:.3f}'.format(amp_old,amp_old*amp_old))
         return a
 
     def measure_motzoi(self, motzoi_amps=None,
@@ -3152,14 +3274,16 @@ class CCLight_Transmon(Qubit):
             if self.ro_acq_weight_type() == 'optimal':
                 a = ma2.Intersect_Analysis(
                     options_dict={'ch_idx_A': 0,
-                                  'ch_idx_B': 1})
+                                  'ch_idx_B': 1},
+                                  normalized_probability=True)
             else:
                 # if statement required if 2 channels readout
                 logging.warning(
                     'It is recommended to do this with optimal weights')
                 a = ma2.Intersect_Analysis(
                     options_dict={'ch_idx_A': 0,
-                                  'ch_idx_B': 2})
+                                  'ch_idx_B': 1},
+                                  normalized_probability=False)
             return a
 
     def measure_single_qubit_randomized_benchmarking(
@@ -3740,7 +3864,6 @@ class CCLight_Transmon(Qubit):
                     't_start': start_time, 't_stop': end_time}
         else:
             return {}
-
 
     def calc_current_to_freq(self, curr: float):
         """

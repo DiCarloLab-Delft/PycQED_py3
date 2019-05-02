@@ -833,7 +833,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 (self.nr_segments, nr_runs))
             measured_values2 = np.zeros(
                 (self.nr_segments, nr_runs))
-            if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom', 'PF_no_error'] or 'selected_blossom' in self.PF_tracking:
+            if self.PF_tracking in ['PF_first_all_phi_plus','PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom', 'PF_no_error'] or 'selected_blossom' in self.PF_tracking:
                 # preparing a Pauli record with dimensions according to the parity pattern
                 self.PF_record = np.zeros(
                     (self.nr_measurement_segments, nr_runs, len(self.PF_parity_pattern)))
@@ -871,8 +871,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                         thresholds=[self.q_post_select_threshold],
                         init_measurements=[shots_qA_init],
                         positive_case=True)
-                    #measured_values1[i, :][post_select_indices_0] = np.nan
-                    #measured_values2[i, :][post_select_indices_0] = np.nan
+                    measured_values1[i, :][post_select_indices_0] = np.nan
+                    measured_values2[i, :][post_select_indices_0] = np.nan
 
                 if self.q_post_select:
                     # first digitize the 2D array
@@ -924,12 +924,15 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
 
                     if 'selected_blossom' in self.PF_tracking:
                         #post-selecting outcomes where blossom has not detected a data-qubit error
-                        post_select_indices_0 = np.array(np.where(np.array(self.blossom_record)[i, :, 0] !=0)).flatten()
+                        if self.PF_tracking=='PF_selected_blossom':
+                            post_select_indices_0 = np.array(np.where(np.array(self.blossom_record)[i, :, 1] !=0)).flatten()
+                        else:
+                            post_select_indices_0 = np.array(np.where(np.array(self.blossom_record)[i, :, 0] !=0)).flatten()
                         measured_values1[i, :][post_select_indices_0] = np.nan
                         measured_values2[i, :][post_select_indices_0] = np.nan
 
                     # 4. make a Pauli record in case the pauli frame of tomography is to be updated
-                    if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom', 'PF_no_error'] or 'selected_blossom' in self.PF_tracking:
+                    if self.PF_tracking in ['PF_first_all_phi_plus','PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus', 'PF_reset_all_blossom', 'PF_no_error'] or 'selected_blossom' in self.PF_tracking:
                         for j in range(len(self.PF_parity_pattern)):
                             parity_outcomes = ancilla_outcomes_derivative[j::len(
                                 self.PF_parity_pattern)]
@@ -941,6 +944,12 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                     added_nr = 0
                                 self.PF_record[i, :, j] = np.sum(
                                     parity_outcomes, axis=0)+added_nr% 2
+                            elif self.PF_tracking=='PF_first_all_phi_plus':
+                                if len(parity_outcomes)==1:
+                                    self.PF_record[i, :, j] = parity_outcomes
+                                else:
+                                    self.PF_record[i, :, j] = parity_outcomes[0]
+
                             elif self.PF_tracking=='PF_reset':
                                 if self.q_post_selection_states[j]==1:
                                     self.PF_record[i, :, j] = parity_outcomes[-1]+1%2
@@ -1021,8 +1030,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         avg_h12 = (avg_h12)/scale_h12
         # applying pauli frame update here
         # first suptracting offsets and rescaling all individual shots
-        if self.PF_tracking in ['PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus','PF_reset_all_blossom', 'PF_no_error'] or 'selected_blossom' in self.PF_tracking:
-            print('applying PF updates')
+        if self.PF_tracking in ['PF_first_all_phi_plus','PF_tracking', 'PF_reset', 'PF_reset_all_phi_plus','PF_reset_all_blossom', 'PF_no_error'] or 'selected_blossom' in self.PF_tracking:
             # first subtracting offsets
             measured_values1 -= mean_h1
             measured_values2 -= mean_h2
@@ -1229,6 +1237,9 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                          'operators_mle_ZZ': self.operators_mle[5],
                          'operators_mle_XX': self.operators_mle[10],
                          'operators_mle_YY': self.operators_mle[15],
+                         'operators_ZZ': self.operators[5],
+                         'operators_XX': self.operators[10],
+                         'operators_YY': self.operators[15],
                          'angle_LSQ': np.rad2deg(self.fit_res.best_values['angle_LSQ']),
                          'angle_MSQ': np.rad2deg(self.fit_res.best_values['angle_MSQ']),
                          'LSQ_name': self.q0_label,
@@ -1381,6 +1392,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         qtp.matrix_histogram_complex(self.rho_2, xlabels=['00', '01', '10', '11'],
                                      ylabels=['00', '01', '10', '11'],
                                      fig=fig3,
+                                     # limits=[0,0.5],
                                      ax=fig3.add_subplot(122, projection='3d'))
         if 'no_error' in self.PF_tracking:
             figname = 'MLE-Tomography_decoding_{}_states_{}_indices_{}_Exp_{}.{}'.format(self.PF_tracking,

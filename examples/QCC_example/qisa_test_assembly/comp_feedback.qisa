@@ -1,0 +1,52 @@
+# UHFQC-0: 0 2 3 5 6
+# UHFQC-1: 1 4
+
+SMIS s0, { 0, 10 }
+SMIS s1, { 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16 }
+SMIS s2, { 0 }
+SMIS s8, {3, 5, 6}
+SMIS s9, {3, 5, 6}
+SMIS s10, {1, 4}
+SMIS s11, { 0 }
+SMIS s12, { 1 }
+SMIS s13, { 4 }
+SMIS s14, { 5 }
+SMIS s15, { 6 }
+SMIS s16, { 7 }
+SMIS s17, { 8 }
+SMIS s18, { 9 }
+SMIS s19, { 10 }
+SMIS s20, { 11 }
+SMIS s21, { 12 }
+SMIS s22, { 13 }
+SMIS s23, { 14 }
+SMIS s24, { 15 }
+SMIS s25, { 16 }
+
+ldi r0, 0
+Loop:
+    qwait 50
+    cw_01 s0 | MeasZ s1    # 2 qubit operation
+    qwait 100
+    bs 1 MeasZ s2
+    qwait 100
+    fmr r1, q2
+    cmp r1, r0
+    nop
+    br eq, Loop
+
+    # This should never be executed
+    qwait 50
+    bs 1 MeasZ s8
+    qwait 50
+    bs 1 MeasZ s9
+    qwait 50
+    bs 1 MeasZ s9
+    qwait 50
+    bs 1 MeasZ s10
+    qwait 50
+    bs 1 MeasZ s10
+
+    br always, Loop
+    nop
+    nop

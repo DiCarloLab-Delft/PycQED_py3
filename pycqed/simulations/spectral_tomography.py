@@ -129,7 +129,7 @@ def f_to_parallelize_new(arglist):
 
     elif adaptive_pars['mode']=='spectral_tomo_nonmarkovian':
         MC.set_sweep_functions([noise_parameters_CZ.repetitions])
-        MC.set_sweep_points(np.arange(1, adaptive_pars['n_points'], 2))
+        MC.set_sweep_points(np.arange(0, adaptive_pars['n_points'], 1))
         if noise_parameters_CZ.cluster():
             dat = MC.run('1D sim_spectral_tomo_nonmarkovian double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
                 fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
@@ -142,6 +142,25 @@ def f_to_parallelize_new(arglist):
                 mode='1D',exp_metadata=exp_metadata)
             else:
                 dat = MC.run('1D sim_spectral_tomo_nonmarkovian', 
+                exp_metadata=exp_metadata, 
+                mode='1D')
+
+
+    elif adaptive_pars['mode']=='time_series':
+        MC.set_sweep_functions([noise_parameters_CZ.detuning])    # random sweep function never used in this file. Put it just because I need to put one
+        MC.set_sweep_points(np.array([-1]))
+        if noise_parameters_CZ.cluster():
+            dat = MC.run('1D time_series_cluster double sided {} - length {:.0f} - sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D',exp_metadata=exp_metadata)
+
+        else:
+            if adaptive_pars['long_name']:
+                dat = MC.run('1D time_series double sided {} - length {:.0f} - sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='1D',exp_metadata=exp_metadata)
+            else:
+                dat = MC.run('1D time_series', 
                 exp_metadata=exp_metadata, 
                 mode='1D')
 
@@ -412,6 +431,47 @@ def extract_T_matrix(PTM):
     return PTM
 
 
+def time_series(U_final_vec_timeseries,S,weights,repetitions,samplingpoints_gaussian_q0,axis_overrotation):
+
+    trace_PTM_vec=[]
+    trace_GTM_vec=[]
+
+
+    for n_rep in range(repetitions):
+        print(n_rep)
+        
+        U_final_vec=np.copy(U_final_vec_timeseries)
+
+        for i in range(len(U_final_vec)):
+            if U_final_vec[i].type == 'oper':
+                U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
+                
+                over_rot=czf.qubit_to_2qutrit_unitary(czf.bloch_sphere_rotation(samplingpoints_gaussian_q0[i], 
+                                                            axis_overrotation),'right')
+                U_final_vec[i]=qtp.to_super(over_rot)*U_final_vec[i]
+
+                U_final_vec[i] = U_final_vec[i] ** n_rep
+            U_final_vec[i] = U_final_vec[i] * weights[i]
+        U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting average propagator
+        #print(czf.verify_CPTP(U_superop_average))
+
+        U_superop_average=czf.correct_phases(U_superop_average)
+        U_superop_average=transform_basis(U_superop_average,S.dag())
+
+        GTM=get_PTM_or_GTM(U_superop_average,'GTM')
+        PTM=get_PTM_or_GTM(U_superop_average,'PTM')
+        T_GTM=extract_T_matrix(GTM)
+        T_PTM=extract_T_matrix(PTM)
+
+        trace_PTM=np.trace(T_PTM)
+        trace_GTM=np.trace(T_GTM)
+
+        trace_GTM_vec.append(trace_GTM)
+        trace_PTM_vec.append(trace_PTM)
+
+    return trace_GTM_vec, trace_PTM_vec
+
+
 
 
 
@@ -435,9 +495,26 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         Returns: quantities of interest
         """
         super().__init__()
+
+
+        # load instruments and parameters
+        self.fluxlutman = fluxlutman
+        self.noise_parameters_CZ = noise_parameters_CZ
+
+        self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
+                                                                # as a function of time (=t)
+        self.noise_parameters_CZ.T1_q1(self.noise_parameters_CZ.T1_q0())
+
+
+
+        ### define value names and units
+        # std simulations of CZ
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
                             'cond_phase02', 'coherent_leakage11', 'offset_difference', 'missing_fraction']
+        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%']
+        
+        # eigenvalues of 1 single CZ in the case of time_series, otherwise of n repetitions if spectral_tomo_nonmarkovian
         for i in range(1,81):
             self.value_names.append('eig_real_GTM_'+str(i))
         for i in range(1,81):
@@ -446,10 +523,27 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             self.value_names.append('eig_real_PTM_'+str(i))
         for i in range(1,16):
             self.value_names.append('eig_imag_PTM_'+str(i))
-        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%']
+        
         for i in range(0,95*2):
-            self.value_units.append('a.u.')
+        	self.value_units.append('a.u.')
+            
 
+        # add traces
+        if not self.noise_parameters_CZ.time_series():
+            self.value_names.append('trace_PTM')
+            self.value_names.append('trace_GTM')
+            for i in [0,1]:
+            	self.value_units.append('a.u.')
+        else:
+            for i in range(noise_parameters_CZ.repetitions()):
+                self.value_names.append('trace_GTM_'+str(i))
+                self.value_units.append('a.u.')
+            for i in range(noise_parameters_CZ.repetitions()):
+                self.value_names.append('trace_PTM_'+str(i))
+                self.value_units.append('a.u.')
+
+
+        # filter
         self.qois = qois
         if self.qois != 'all': 
             self.qoi_mask = [self.value_names.index(q) for q in qois]
@@ -457,12 +551,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             self.value_units = list(np.array(self.value_units)[self.qoi_mask])
 
 
-        self.fluxlutman = fluxlutman
-        self.noise_parameters_CZ = noise_parameters_CZ
-        self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
-                                                                # as a function of time (=t)
-
-        self.noise_parameters_CZ.T1_q1(self.noise_parameters_CZ.T1_q0())
+        
 
 
     def acquire_data_point(self, **kw):
@@ -508,6 +597,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 for j_q1 in range(len(samplingpoints_gaussian_q1)): 
                     fluxbias_q1 = samplingpoints_gaussian_q1[j_q1]                 # q1 spectator qubit
 
+                    if self.noise_parameters_CZ.overrotation_sims():
+                        fluxbias_q0=0
+                        fluxbias_q1=0
+
                     input_point = {'fluxbias_q0': fluxbias_q0,                  
                                    'fluxbias_q1': fluxbias_q1,
                                    'fluxlutman': self.fluxlutman,
@@ -522,10 +615,17 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
             U_final_vec = []
             t_final_vec = []
-            for input_arglist in input_to_parallelize:
-                result_list = compute_propagator(input_arglist)
-                U_final_vec.append(result_list[0])
-                t_final_vec.append(result_list[1])
+            if self.noise_parameters_CZ.overrotation_sims():
+                result_list = compute_propagator(input_to_parallelize[0])
+                for i in range(len(input_to_parallelize)):
+                    U_final_vec.append(result_list[0])
+                    t_final_vec.append(result_list[1])
+            else:
+                for input_arglist in input_to_parallelize:
+                    result_list = compute_propagator(input_arglist)
+                    U_final_vec.append(result_list[0])
+                    t_final_vec.append(result_list[1])
+            U_final_vec_timeseries = np.copy(U_final_vec)
 
 
             t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
@@ -539,7 +639,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             for i in range(len(U_final_vec)):
                 if U_final_vec[i].type == 'oper':
                     U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
-                U_final_vec[i] = U_final_vec[i] ** self.noise_parameters_CZ.repetitions()
+                if not self.noise_parameters_CZ.time_series():
+                    U_final_vec[i] = U_final_vec[i] ** self.noise_parameters_CZ.repetitions()
                 U_final_vec[i] = U_final_vec[i] * weights[i]
             U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting average propagator
             #print(czf.verify_CPTP(U_superop_average))
@@ -575,12 +676,22 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 S = qtp.tensor(qtp.qeye(3),qtp.qeye(3))
             U_superop_average=transform_basis(U_superop_average,S.dag())
 
+            
             GTM=get_PTM_or_GTM(U_superop_average,'GTM')
             PTM=get_PTM_or_GTM(U_superop_average,'PTM')
             T_GTM=extract_T_matrix(GTM)
             T_PTM=extract_T_matrix(PTM)
             eig_T_GTM=np.linalg.eigvals(T_GTM)
             eig_T_PTM=np.linalg.eigvals(T_PTM)
+
+
+            if not self.noise_parameters_CZ.time_series():
+                trace_PTM=np.trace(T_PTM)
+                trace_GTM=np.trace(T_GTM)
+            else:
+                trace_GTM_vec, trace_PTM_vec = time_series(U_final_vec_timeseries,S,weights,
+                                self.noise_parameters_CZ.repetitions(),samplingpoints_gaussian_q0,
+                                self.noise_parameters_CZ.axis_overrotation())
 
 
         qoi_plot = np.array(qoi_plot)
@@ -604,9 +715,20 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             return_values.append(np.real(eig))
         for eig in eig_T_PTM:
             return_values.append(np.real(-1j*eig))
+
+        
+        if not self.noise_parameters_CZ.time_series():
+            return_values.append(np.real(trace_PTM))
+            return_values.append(np.real(trace_GTM))
+        else:
+            for x in trace_GTM_vec:
+                return_values.append(np.real(x))
+            for x in trace_PTM_vec:
+                return_values.append(np.real(x))
+
+
         if self.qois != 'all': 
             return np.array(return_values)[self.qoi_mask]
-            
         else: 
             return return_values 
 
