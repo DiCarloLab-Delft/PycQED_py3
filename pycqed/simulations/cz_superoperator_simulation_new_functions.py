@@ -966,7 +966,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
     return U_final
     
 
-def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, alpha_q0, alpha_q1):
+def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, noise_parameters_CZ):
     """
     Calculates the quantities of interest from the propagator (either unitary or superoperator)
 
@@ -978,7 +978,6 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
     U_final = U
 
     phases = phases_from_superoperator(U_final)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
-    phi_cond = phases[-1]
     L1 = leakage_from_superoperator(U_final)
     population_02_state = calc_population_02_state(U_final)
     L2 = seepage_from_superoperator(U_final)
@@ -988,9 +987,6 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
     #print('avgatefid_compsubspace',avgatefid_compsubspace)
     offset_difference, missing_fraction = offset_difference_and_missing_fraction(U_final)
 
-    phase_diff_12_02 = (phases[6]-phases[4]) % 360
-    phase_diff_21_20 = (phases[7]-phases[5]) % 360
-
     population_transfer_12_21 = average_population_transfer_subspace_to_subspace(U_final,states_in=[[1,2]],states_out=[[2,1]])
     if n_levels_q0 >= 4:
         population_transfer_12_03 = average_population_transfer_subspace_to_subspace(U_final,states_in=[[1,2]],states_out=[[0,3]])
@@ -998,15 +994,25 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
         population_transfer_12_03 = 0
 
 
-    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=0)
+    H_0 = calc_hamiltonian(0,fluxlutman,noise_parameters_CZ)
+    if noise_parameters_CZ.dressed_compsub():
+        S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[n_levels_q1, n_levels_q0], [n_levels_q1, n_levels_q0]])
+    else:
+        S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S  
+    H_0_diag = S.dag()*H_0*S
+    H_rotatingframe = H_0_diag
+    #coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=0)  # old wrong way
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
     avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_new,L1)
     # NOTE: a single qubit phase off by 30 degrees costs 5.5% fidelity
+    # We now correct only for the phase of qubit left (q1), in the rotating frame
+    avgatefid_compsubspace_pc_onlystaticqubit = pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U_final_new,L1,phases)
 
     phases = phases_from_superoperator(U_final_new)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
     phase_q0 = (phases[1]-phases[0]) % 360
     phase_q1 = (phases[2]-phases[0]) % 360
+    phi_cond = phases[-1]
     cond_phase02 = (phases[4]-2*phase_q0+phases[0]) % 360
     cond_phase12 = (phases[6]-2*phase_q0-phase_q1+phases[0]) % 360
     cond_phase21 = (phases[7]-phase_q0-2*phase_q1+phases[0]) % 360
@@ -1015,13 +1021,10 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, w_q0, w_q1, al
     else:
         cond_phase03 = 0
     cond_phase20 = (phases[5]-2*phase_q1+phases[0]) % 360
-
     #print(cond_phase20+cond_phase02+phases[-1])
 
-    
-
-    # We now correct only for the phase of qubit left (q1), in the rotating frame
-    avgatefid_compsubspace_pc_onlystaticqubit = pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U_final_new,L1,phases)
+    phase_diff_12_02 = (phases[6]-phases[4]-phase_q1) % 360
+    phase_diff_21_20 = (phases[7]-phases[5]-phase_q0) % 360
     
 
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid,
@@ -1370,7 +1373,7 @@ def conditional_frequency(amp,fluxlutman,noise_parameters_CZ):
     return cond_frequency
 
 
-def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q1,alpha_q0):
+def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,fluxlutman,noise_parameters_CZ):
     '''
     Function used to study the effect of constant flux offsets on the quantities of interest.
     The input should be a series of propagators computed for different flux offsets,
@@ -1390,7 +1393,7 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q
     for i in range(len(U_final_vec)):
         if U_final_vec[i].type == 'oper':
             U_final_vec[i] = qtp.to_super(U_final_vec[i])
-        qoi_temp = simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i],t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+        qoi_temp = simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i],t_final=t_final,fluxlutman=fluxlutman,noise_parameters_CZ=noise_parameters_CZ)
         if i==mid_index:
             print('qoi_temp =',qoi_temp)
         leakage_vec.append(qoi_temp['L1'])
@@ -1434,7 +1437,7 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q
 
 
 
-def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
+def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,noise_parameters_CZ):
     '''
     Function used to study how the leakage accumulation differs from the case in which we use directly the gate that comes out of the simulations
     and the case in which we artificially dephase the leakage subspace wrt the computational subspace.
@@ -1482,8 +1485,8 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0):
     for n in range(1,number_CZ_repetitions,step_repetitions):        # we consider only odd n so that in theory it should be always a CZ
         U_superop_n=U_superop_average**n
         U_superop_dephased_n = U_superop_dephased**n
-        qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
-        qoi_dephased=simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+        qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,fluxlutman=fluxlutman,noise_parameters_CZ=noise_parameters_CZ)
+        qoi_dephased=simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,fluxlutman=fluxlutman,noise_parameters_CZ=noise_parameters_CZ)
         leakage_vec.append(qoi['L1'])
         infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
         leakage_dephased_vec.append(qoi_dephased['L1'])

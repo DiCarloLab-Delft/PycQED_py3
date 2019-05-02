@@ -431,11 +431,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
-            w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
+            #w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
+            																										 # not used anymore
 
 
             ## Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
-            #czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q1,alpha_q0)
+            #czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,self.fluxlutman,self.noise_parameters_CZ)
 
 
             for i in range(len(U_final_vec)):
@@ -446,7 +447,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             #print(czf.verify_CPTP(U_superop_average))
 
 
-            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0,alpha_q1=alpha_q1)
+            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, noise_parameters_CZ=self.noise_parameters_CZ)
 
             if self.noise_parameters_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
                                                                                         # then we optimize the search via higher-order cost function
@@ -465,7 +466,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             ## To study the effect of the coherence of leakage on repeated CZs (simpler than simulating a full RB experiment):
-            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0)
+            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,self.fluxlutman,self.noise_parameters_CZ)
 
 
             #czf.plot_spectrum(self.fluxlutman,self.noise_parameters_CZ)
