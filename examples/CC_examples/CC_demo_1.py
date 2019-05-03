@@ -2,6 +2,7 @@
 
 import os
 import logging
+import sys
 import numpy as np
 
 from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
@@ -10,6 +11,10 @@ from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 
+# parameter handling
+sel = 0
+if len(sys.argv)>1:
+    sel = int(sys.argv[1])
 
 # constants
 ip = '192.168.0.241'
@@ -21,13 +26,13 @@ cfg_openql_platform_fn = os.path.join(curdir, 'demo1_cfg.json')
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-if 0:
+if sel==0:  # ALLXY
     # based on CCL_Transmon.py::measure_allxy()
     log.debug('compiling allxy')
     p = sqo.AllXY(qubit_idx=qubit_idx, double_points=True, platf_cfg=cfg_openql_platform_fn)
     print(p.filename)
 
-if 1:
+if sel==1:  # Ramsey
     # based on CCL_Transmon.py::measure_ramsey()
     # funny default is because there is no real time sideband
     # modulation
@@ -40,7 +45,7 @@ if 1:
     p = sqo.Ramsey(times, qubit_idx=qubit_idx, platf_cfg=cfg_openql_platform_fn)
     print(p.filename)
 
-if 0:
+if sel==2:  # Rabi
     # based on CCL_Transmon.py::measure_rabi_channel_amp()
     log.debug('compiling Rabi')
     p = sqo.off_on(
