@@ -55,7 +55,7 @@ class UHFQCPulsar:
 
         self.add_parameter('{}_id'.format(name),
                            get_cmd=(lambda _=id: _))
-        self.add_parameter('{}_element_start_granularity'.format(awg.name),
+        self.add_parameter('{}_element_start_granularity'.format(name),
                            get_cmd=lambda: None)
         self.add_parameter('{}_awg'.format(name),
                            get_cmd=lambda _=obj.name: _)
@@ -101,6 +101,12 @@ class UHFQCPulsar:
         self.add_parameter('{}_compensation_pulse_scale'.format(name),
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(0., 1.), initial_value=0.5)
+        self.add_parameter('{}_compensation_pulse_delay'.format(name), 
+                           initial_value=0, unit='s',
+                           parameter_class=ManualParameter)
+        self.add_parameter('{}_compensation_pulse_min_length'.format(name), 
+                           initial_value=0, unit='s',
+                           parameter_class=ManualParameter)
 
     def _program_awg(self, obj, sequence):
         if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
@@ -359,6 +365,10 @@ class HDAWG8Pulsar:
                            label='{} active'.format(awg.name),
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
+        self.add_parameter('{}_compensation_pulse_min_length'.format(name), 
+                           initial_value=0, unit='s',
+                           parameter_class=ManualParameter)
+
         for ch_nr in range(8):
             id = 'ch{}'.format(ch_nr + 1)
             name = channel_name_map.get(id, awg.name + '_' + id)
@@ -398,6 +408,9 @@ class HDAWG8Pulsar:
         self.add_parameter('{}_compensation_pulse_scale'.format(name),
                             parameter_class=ManualParameter,
                             vals=vals.Numbers(0., 1.), initial_value=0.5)
+        self.add_parameter('{}_compensation_pulse_delay'.format(name), 
+                           initial_value=0, unit='s',
+                           parameter_class=ManualParameter)
     
     def _hdawg_create_marker_channel_parameters(self, id, name, awg):
         self.add_parameter('{}_id'.format(name), get_cmd=lambda _=id: _)
@@ -987,11 +1000,7 @@ class AWG5014Pulsar:
         hardware_offsets = False
         for grp in grps:
             cname = self._id_channel(grp, obj.name)
-            try:
-                options = self.get('{}_options'.format(cname))
-            except:
-                    options = {}
-            offset_mode = options.get('offset_mode', 'software')
+            offset_mode = self.get('{}_offset_mode'.format(cname))
             if offset_mode == 'hardware':
                 hardware_offsets = True
         if hardware_offsets:
@@ -1212,6 +1221,10 @@ class AWG5014Pulsar:
                            label='{} active'.format(awg.name), 
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
+        self.add_parameter('{}_compensation_pulse_min_length'.format(awg.name), 
+                           initial_value=0, unit='s',
+                           parameter_class=ManualParameter)
+
         for ch_nr in range(4):
             id = 'ch{}'.format(ch_nr + 1)
             name = channel_name_map.get(id, awg.name + '_' + id)
@@ -1261,6 +1274,9 @@ class AWG5014Pulsar:
         self.add_parameter('{}_compensation_pulse_scale'.format(name),
                             parameter_class=ManualParameter,
                             vals=vals.Numbers(0., 1.), initial_value=0.5)
+        self.add_parameter('{}_compensation_pulse_delay'.format(name), 
+                           initial_value=0, unit='s',
+                           parameter_class=ManualParameter)
     
     def _awg5014_create_marker_channel_parameters(self, id, name, awg):
         self.add_parameter('{}_id'.format(name), get_cmd=lambda _=id: _)

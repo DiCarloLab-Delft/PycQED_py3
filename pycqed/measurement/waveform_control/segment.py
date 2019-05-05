@@ -166,22 +166,28 @@ class Segment:
         t_end = -float('inf')
 
         pulse_area = {}
-        compensation_chan = []
+        compensation_chan = set()
 
         for c in self.pulsar.channels:
             if self.pulsar.get('{}_type'.format(c)) != 'analog':
                 continue
             if self.pulsar.get('{}_charge_buildup_compensation'.format(c)):
-                compensation_chan.append(c)
+                compensation_chan.add(c)
 
         # * generate the pulse_area dictionarry containing for each channel
         #   that has to be compensated the sum of all pulse areas on that
         #   channel + the name of the last element
         # * and find the end time of the last pulse of the segment
         for element in self.elements:
+            
+            # finds the channels of AWGs with that element
+            awg_channels = set()
+            for awg in self.element_start_end[element]:
+                chan = set(self.pulsar.find_awg_channels(awg))
+                awg_channels = awg_channels.union(chan)
 
-            tvals = self.tvals(compensation_chan, element)
-
+            tvals = self.tvals(compensation_chan & awg_channels, element)
+      
             for pulse in self.elements[element]:
                 t_end = max(t_end, pulse.algorithm_time() + pulse.length)
 
@@ -208,8 +214,13 @@ class Segment:
                         ]
 
         # Add all compensation pulses to the last element after the last pulse
-        # of the segment
+        # of the segment and for each element with a compensation pulse save 
+        # the pusle with the greates length to determine the new length of the
+        # element
         i = 1
+        comp_i = 1
+        comp_dict = {}
+        longest_pulse = {}
         for c in pulse_area:
             comp_delay = self.pulsar.get(
                 '{}_compensation_pulse_delay'.format(c))
@@ -232,6 +243,19 @@ class Segment:
                     amp = -amp
 
             last_element = pulse_area[c][1]
+            # for RO elements create a seperate element for compensation pulses
+            if last_element in self.acquisition_elements:
+                RO_awg = self.pulsar.get('{}_awg'.format(c))
+                if RO_awg not in comp_dict:
+                    last_element = 'compensation_el{}_{}'.format(comp_i,self.name)
+                    comp_dict[RO_awg] = last_element
+                    self.elements[last_element] = []
+                    self.element_start_end[last_element] = {RO_awg: [t_end,0]}
+                    self.elements_on_awg[RO_awg].append(last_element)
+                    comp_i += 1
+                else:
+                    last_element = comp_dict[RO_awg]
+
             kw = {
                 'amplitude': amp,
                 'buffer_length_start': comp_delay,
@@ -244,12 +268,20 @@ class Segment:
 
             pulse.algorithm_time(t_end)
 
-            # Add compensation pulse length to element_start_end of the
-            # respective element
-            self.element_start_end[last_element][awg][1] += self.time2sample(
-                length, awg=awg)
-
+            # Save the length of the longer pulse in longest_pulse dictionary
+            total_length = 2*comp_delay + length
+            longest_pulse[(last_element,awg)] = \
+                    max(longest_pulse.get((last_element,awg),0), total_length)
+            
             self.elements[last_element].append(pulse)
+        
+        for (el,awg) in longest_pulse:
+            length_comp = longest_pulse[(el,awg)]
+            el_start = self.get_element_start(el,awg)
+            new_end = t_end + length_comp
+            new_samples = self.time2sample(new_end-el_start, awg=awg)
+            self.element_start_end[el][awg][1] = new_samples
+
 
     def gen_refpoint_dict(self):
         """
@@ -694,7 +726,6 @@ class Segment:
             for (i, element) in enumerate(self.elements_on_awg[awg]):
                 awg_wfs[awg][(i, element)] = {}
                 tvals = self.tvals(channel_list, element)
-                print(tvals.keys(),awg)
                 wfs = {}
 
                 element_start_time = self.get_element_start(element, awg)
@@ -729,7 +760,7 @@ class Segment:
                     for channel in pulse_channels:
                         chan_tvals[channel] = tvals[channel].copy(
                         )[pulse_start:pulse_end]
-
+                    
                     pulse_wfs = pulse.get_wfs(chan_tvals)
 
                     for channel in pulse_channels:
