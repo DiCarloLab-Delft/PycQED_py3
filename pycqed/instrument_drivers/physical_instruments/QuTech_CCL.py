@@ -63,6 +63,7 @@ class CCL(SCPI):
     exceptionLevel = logging.CRITICAL
 
     def __init__(self, name, address, port, log_level=False, **kwargs):
+        print("Hello")
         self.model = name
         self._dummy_instr = False
         self.driver_version = "0.2.1"
@@ -95,15 +96,7 @@ class CCL(SCPI):
         curdir = os.path.dirname(__file__)
         print(f"Assembler version {self.QISA.getVersion()}")
         if self.QISA.getVersion() == '4.0.0':
-
-            """
-            Assembler now aditionally requires quantum layout information file
-            """
-            configureinput = os.path.join(curdir, '_CCL', 'quantum_layout_information_7.txt')
-            if not os.path.isfile(configureinput):
-                raise RuntimeError('The QISA Assembler supporting CC-Light and QCC now expects a quantum_layout_information file in the Pycqed physical instruments directory.')
-
-            self.QISA.read(configureinput)
+            raise RuntimeError('Cannot init CC-Light driver; proper assembler for CCL (v2.0) is missing from the environment.')
 
         self.QISA.enableScannerTracing(False)
         self.QISA.enableParserTracing(False)
