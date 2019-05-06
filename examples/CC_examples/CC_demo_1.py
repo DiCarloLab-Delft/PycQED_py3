@@ -62,6 +62,11 @@ if 1:
     cc.clear_status()
     cc.set_status_questionable_frequency_enable(0x7FFF)
 
+    if 1:
+        cc.debug_marker_out(0, cc.UHFQA_TRIG) # UHF-QA trigger
+        cc.debug_marker_out(8, cc.HDAWG_TRIG) # HDAWG trigger
+
+
     log.debug('uploading {}'.format(p.filename))
     if 0:
         cc.eqasm_program = p.filename

@@ -48,16 +48,25 @@ class QuTechCC_core(SCPIBase):
         return self._transport.ask_int('QUTech:CCIO{}:Q1REG{}'.format(ccio, reg))
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_39_ps_steps: int) -> None:
-        self._transport.write('QUTech:CCIO#:VSMbit#:DELAYRISE {}'.format(ccio, bit, cnt_in_39_ps_steps))
+        self._transport.write('QUTech:CCIO{}:VSMbit{}:RISEDELAY {}'.format(ccio, bit, cnt_in_39_ps_steps))
 
     def get_vsm_delay_rise(self, ccio: int, bit: int) -> int:
-        return self._transport._ask_int('QUTech:CCIO#:VSMbit#:DELAYRISE'.format(ccio, bit))
+        return self._transport._ask_int('QUTech:CCIO#:VSMbit#:RISEDELAY?'.format(ccio, bit))
 
     def set_vsm_delay_fall(self, ccio: int, bit: int, cnt_in_39_ps_steps: int) -> None:
-        self._transport.write('QUTech:CCIO#:VSMbit#:DELAYFALL {}'.format(ccio, bit, cnt_in_39_ps_steps))
+        self._transport.write('QUTech:CCIO{}:VSMbit{}:FALLDELAY {}'.format(ccio, bit, cnt_in_39_ps_steps))
 
     def get_vsm_delay_fall(self, ccio: int, bit: int) -> int:
-        return self._transport._ask_int('QUTech:CCIO#:VSMbit#:DELAYFALL'.format(ccio, bit))
+        return self._transport._ask_int('QUTech:CCIO{}:VSMbit{}:FALLDELAY?'.format(ccio, bit))
+
+    def debug_marker_off(self, ccio: int) -> None:
+        self._transport.write('QUTech:DEBUG:CCIO#:MARKER:OFF'.format(ccio))
+
+    def debug_marker_in(self, ccio: int, bit: int) -> None:
+        self._transport.write('QUTech:DEBUG:CCIO#:MARKER:IN {}'.format(ccio))
+
+    def debug_marker_out(self, ccio: int, bit: int) -> None:
+        self._transport.write('QUTech:DEBUG:CCIO#:MARKER:OUT {}'.format(ccio))
 
     def start(self) -> None:
         self._transport.write('awgcontrol:run:immediate')
@@ -78,5 +87,11 @@ class QuTechCC_core(SCPIBase):
     def get_status_questionable_frequency_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:FREQ:ENABle?')
 
+    # DIO/marker bit definitions: output
+    UHFQA_TOGGLE_DS = 31
+    UHFQA_TRIG = 16
 
+    HDAWG_TOGGLE_DS = 30
+    HDAWG_TRIG = 31
 
+    # DIO/marker bit definitions: input
