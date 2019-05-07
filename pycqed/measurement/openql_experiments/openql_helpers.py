@@ -54,8 +54,8 @@ def create_program(pname: str, platf_cfg: str, nregisters: int=0):
                 m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
                 p.eqasm_compiler = m.group(1)
                 break
-    if p.eqasm_compiler=='':
-        logging.error("'eqasm_compiler' not found in '{}'".format(platf_cfg))
+    if p.eqasm_compiler == '':
+        logging.error("key 'eqasm_compiler' not found in file '{}'".format(platf_cfg))
 
     return p
 
@@ -75,15 +75,15 @@ def compile(p):
     """
     Wrapper around OpenQL Program.compile() method.
     """
-    with suppress_stdout():
+    with suppress_stdout(): # FIXME: we would like to see warnings
         p.compile()
 
-
-    # attribute is added to program to help finding the output files
+    # determine extension of generated file
     if p.eqasm_compiler=='eqasm_backend_cc':
         ext = '.vq1asm' # CC
     else:
         ext = '.qisa' # CC-light, QCC
+    # attribute is added to program to help finding the output files
     p.filename = join(p.output_dir, p.name + ext)
     return p
 

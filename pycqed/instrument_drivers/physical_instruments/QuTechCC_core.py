@@ -60,13 +60,13 @@ class QuTechCC_core(SCPIBase):
         return self._transport._ask_int('QUTech:CCIO{}:VSMbit{}:FALLDELAY?'.format(ccio, bit))
 
     def debug_marker_off(self, ccio: int) -> None:
-        self._transport.write('QUTech:DEBUG:CCIO#:MARKER:OFF'.format(ccio))
+        self._transport.write('QUTech:DEBUG:CCIO{}:MARKER:OFF'.format(ccio))
 
     def debug_marker_in(self, ccio: int, bit: int) -> None:
-        self._transport.write('QUTech:DEBUG:CCIO#:MARKER:IN {}'.format(ccio))
+        self._transport.write('QUTech:DEBUG:CCIO{}:MARKER:IN {}'.format(ccio, bit))
 
     def debug_marker_out(self, ccio: int, bit: int) -> None:
-        self._transport.write('QUTech:DEBUG:CCIO#:MARKER:OUT {}'.format(ccio))
+        self._transport.write('QUTech:DEBUG:CCIO{}:MARKER:OUT {}'.format(ccio, bit))
 
     def start(self) -> None:
         self._transport.write('awgcontrol:run:immediate')
