@@ -63,7 +63,6 @@ class CCL(SCPI):
     exceptionLevel = logging.CRITICAL
 
     def __init__(self, name, address, port, log_level=False, **kwargs):
-        print("Hello")
         self.model = name
         self._dummy_instr = False
         self.driver_version = "0.2.1"
