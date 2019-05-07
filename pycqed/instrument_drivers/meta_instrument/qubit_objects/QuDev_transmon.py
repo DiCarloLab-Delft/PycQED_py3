@@ -33,6 +33,10 @@ except ModuleNotFoundError:
     logging.warning('"readout_mode_simulations_for_CLEAR_pulse" not imported.')
 
 class QuDev_transmon(Qubit):
+    """
+    This is the Transmon Class used by the QuDev Group.
+    It is a child class of the :Qubit: class.
+    """
     def __init__(self, name, MC,
                  heterodyne=None,  # metainstrument for cw spectroscopy
                  cw_source=None,  # MWG for driving the qubit continuously
@@ -1049,7 +1053,7 @@ class QuDev_transmon(Qubit):
         self.prepare_for_timedomain()
 
         if label is None:
-            label = 'T1_2nd'+self.msmt_suffix
+            label = 'T1_2nd' + self.msmt_suffix
 
         if MC is None:
             MC = self.MC
@@ -1640,52 +1644,48 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name, TwoD=True)
         return MC
 
-    def measure_transients(self, MC=None, cases=('off', 'on'), upload=True,
+    def measure_transients(self, MC=None, cases=('g', 'e'), upload=True,
                            analyze=True, **kw):
         """
         If the resulting transients will be used to caclulate the optimal
         weight functions, then it is important that the UHFQC iavg_delay and
         wint_delay are calibrated such that the weights and traces are
         aligned: iavg_delay = 2*wint_delay.
+
         """
+        assert not ('on' in cases or 'off' in cases), \
+            "Naming cases 'on' and 'off' is now deprecated to ensure clear " \
+            "denomination for 3 level readout. Please adapt your code:\n " \
+            "'off' --> 'g'\n'on' --> 'e'\n'f' for 3d level detection "
         if MC is None:
             MC = self.MC
-
         name_extra = kw.get('name_extra', None)
-
-        self.prepare_for_timedomain()
         npoints = self.inp_avg_det.nr_samples
-        if 'off' in cases:
-            MC.set_sweep_function(awg_swf.OffOn(
+
+        # initialize instruments
+        self.prepare_for_timedomain()
+
+        for level in cases:
+            if level not in ['g', 'e', 'f']:
+                raise ValueError("Unrecognized case: {}. It should be 'g', 'e' "
+                                 "or 'f'.".format(level))
+            base_name = 'timetrace_{}'.format(level)
+            name = base_name + "_" + name_extra if name_extra is not None else base_name
+
+            # set sweep function and run measurement
+            MC.set_sweep_function(awg_swf.SingleLevel(
                 pulse_pars=self.get_drive_pars(),
+                pulse_pars_2nd=self.get_ef_drive_pars(),
                 RO_pars=self.get_RO_pars(),
-                pulse_comb='OffOff',
+                level=level,
                 upload=upload))
-            MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
-                                            endpoint=False))
+            MC.set_sweep_points(np.linspace(0, npoints / 1.8e9, npoints, endpoint=False))
             MC.set_detector_function(self.inp_avg_det)
-            if name_extra is not None:
-                MC.run(name='timetrace_off_' + name_extra + self.msmt_suffix)
-            else:
-                MC.run(name='timetrace_off' + self.msmt_suffix)
+            MC.run(name=name + self.msmt_suffix)
+
             if analyze:
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
-        if 'on' in cases:
-            MC.set_sweep_function(awg_swf.OffOn(
-                pulse_pars=self.get_drive_pars(),
-                RO_pars=self.get_RO_pars(),
-                pulse_comb='OnOn',
-                upload=upload))
-            MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
-                                            endpoint=False))
-            MC.set_detector_function(self.inp_avg_det)
-            if name_extra is not None:
-                MC.run(name='timetrace_on_' + name_extra + self.msmt_suffix)
-            else:
-                MC.run(name='timetrace_on' + self.msmt_suffix)
-            if analyze:
-                ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
     def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
                                     prep_pulses=None, comm_freq=225e6,
@@ -2486,7 +2486,7 @@ class QuDev_transmon(Qubit):
         prev_shots = self.RO_acq_shots()
         self.RO_acq_shots(2*(self.RO_acq_shots()//2))
         self.prepare_for_timedomain()
-        MC.set_sweep_function(awg_swf.OffOn(
+        MC.set_sweep_function(awg_swf.SingleLevel(
             pulse_pars=self.get_drive_pars(),
             RO_pars=self.get_RO_pars(),
             upload=upload,
@@ -3884,9 +3884,9 @@ class QuDev_transmon(Qubit):
             heterodyne.nr_averages(self.RO_acq_averages())
 
             for mode in ('on', 'off'):
-                sq.OffOn_seq(pulse_pars=self.get_drive_pars(),
-                             RO_pars=self.get_RO_pars(),
-                             pulse_comb='O{0}O{0}'.format(mode[1:]))
+                sq.single_level_seq(pulse_pars=self.get_drive_pars(),
+                                    RO_pars=self.get_RO_pars(),
+                                    level='O{0}O{0}'.format(mode[1:]))
                 MC.set_sweep_function(heterodyne.frequency)
                 MC.set_sweep_points(freqs)
                 demod_mode = 'single' if self.heterodyne.single_sideband_demod() \

@@ -129,7 +129,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
     def prepare(self, **kw):
         if not self.optimized_weights:
             self.soft_rotate = True
-            self.MC.set_sweep_function(awg_swf.OffOn(
+            self.MC.set_sweep_function(awg_swf.SingleLevel(
                                        pulse_pars=self.pulse_pars,
                                        RO_pars=self.RO_pars,
                                        upload=self.upload))
@@ -213,10 +213,10 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                     self.CBox.demodulation_mode('double')
                 self.nr_samples = 512
                 self.CBox.nr_samples.set(self.nr_samples)
-                SWF = awg_swf.OffOn(
+                SWF = awg_swf.SingleLevel(
                     pulse_pars=self.pulse_pars,
                     RO_pars=self.RO_pars,
-                    pulse_comb='OffOff',
+                    level='g',
                     nr_samples=self.nr_samples)
                 SWF.prepare()
                 self.CBox.acquisition_mode('idle')
@@ -227,10 +227,10 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 transient0_I = inp_avg_res[0]
                 transient0_Q = inp_avg_res[1]
 
-                SWF = awg_swf.OffOn(
+                SWF = awg_swf.SingleLevel(
                     pulse_pars=self.pulse_pars,
                     RO_pars=self.RO_pars,
-                    pulse_comb='OnOn',
+                    level='e',
                     nr_samples=self.nr_samples)
                 SWF.prepare()
                 self.CBox.acquisition_mode('idle')
@@ -262,7 +262,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 else:
                     self.CBox.sig1_integration_weights.set(
                         np.multiply(optimized_weights_Q, 0))  # disabling the Q quadrature
-                self.MC.set_sweep_function(awg_swf.OffOn(
+                self.MC.set_sweep_function(awg_swf.SingleLevel(
                                            pulse_pars=self.pulse_pars,
                                            RO_pars=self.RO_pars))
                 self.MC.set_sweep_points(np.arange(self.nr_shots))
@@ -284,10 +284,10 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 self.UHFQC.acquisition_initialize(channels=self.channels, mode='iavg')
 
                 #prepare sweep
-                SWF = awg_swf.OffOn(
+                SWF = awg_swf.SingleLevel(
                     pulse_pars=self.pulse_pars,
                     RO_pars=self.RO_pars,
-                    pulse_comb='OffOff',
+                    level='g',
                     nr_samples=self.nr_samples)
                 SWF.prepare()
 
@@ -307,10 +307,10 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 transient0_Q = data[1]
 
                 self.AWG.stop()
-                SWF = awg_swf.OffOn(
+                SWF = awg_swf.SingleLevel(
                     pulse_pars=self.pulse_pars,
                     RO_pars=self.RO_pars,
-                    pulse_comb='OnOn',
+                    level='e',
                     nr_samples=self.nr_samples)
                 SWF.prepare()
 
@@ -395,7 +395,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(
                     self.weight_function_Q))
 
-                self.MC.set_sweep_function(awg_swf.OffOn(
+                self.MC.set_sweep_function(awg_swf.SingleLevel(
                                            pulse_pars=self.pulse_pars,
                                            RO_pars=self.RO_pars))
                 self.MC.set_sweep_points(np.arange(self.nr_shots))

@@ -1005,24 +1005,26 @@ class AllXY(swf.Hard_Sweep):
                           double_points=self.double_points)
 
 
-class OffOn(swf.Hard_Sweep):
+class SingleLevel(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, RO_pars, upload=True,
-                 pulse_comb='OffOn', nr_samples=2, preselection=False):
+    def __init__(self, pulse_pars, RO_pars, pulse_pars_2nd=None, upload=True,
+                 level='e', nr_samples=2, preselection=False):
         super().__init__()
         self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
         self.RO_pars = RO_pars
         self.upload = upload
         self.parameter_name = 'sample'
         self.unit = '#'
-        self.name = pulse_comb
+        self.name = level
         self.preselection = preselection
         self.sweep_points = np.arange(nr_samples)
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.OffOn_seq(pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-                          pulse_comb=self.name, preselection=self.preselection)
+            sqs.single_level_seq(pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+                                 pulse_pars_2nd=pulse_pars_2nd,
+                                 level=self.name, preselection=self.preselection)
 
 
 class Butterfly(swf.Hard_Sweep):

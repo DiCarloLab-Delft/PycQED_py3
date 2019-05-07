@@ -272,8 +272,9 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses_unmodified = get_pulse_dict_from_pars(pulse_pars)
+    # FIXME: Nathan 2019.05.07: I believe next line is useless since deepcopy is already done
+    # in get_pulse_dict_from_pars()
     pulses = deepcopy(pulses_unmodified)
-
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         if cal_points and no_cal_points==4 and \
                 (i == (len(amps)-4) or i == (len(amps)-3)):
@@ -885,8 +886,8 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         return seq_name
 
 
-def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
-              upload=True, return_seq=False,  preselection=False):
+def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False, level='e',
+                     upload=True, return_seq=False, preselection=False):
     '''
     OffOn sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -897,21 +898,25 @@ def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
                              to allow initialization by post-selection
         Post-measurement delay:  should be sufficiently long to avoid
                              photon-induced gate errors when post-selecting.
-        pulse_comb:          OffOn/OnOn/OffOff cobmination of pulses to play
+        level:               specifies for which level a pulse should be generated (g,e,f)
         preselection:        adds an extra readout pulse before other pulses.
     '''
-    seq_name = 'OffOn_sequence'
+    seq_name = 'gef_levels_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
-    # Create a dict with the parameters for all the pulses
-    pulses = get_pulse_dict_from_pars(pulse_pars)
-
-    if pulse_comb == 'OffOn':
-        pulse_combinations = ['I', 'X180']
-    elif pulse_comb == 'OnOn':
-        pulse_combinations = ['X180', 'X180']
-    elif pulse_comb == 'OffOff':
-        pulse_combinations = ['I', 'I']
+    # Create dicts with the parameters for all the pulses
+    pulse_1st = get_pulse_dict_from_pars(pulse_pars)
+    if level == 'g':
+        pulse_combination = [pulse_1st['I']]
+    elif level == 'e':
+        pulse_combination = [pulse_1st['X180']]
+    elif level == 'f':
+        assert pulse_pars_2nd is not None, \
+            "pulse_pars_2nd is a required parameter for f-level pulse."
+        pulse_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
+        pulse_combination = [pulse_1st['X180'], pulse_2nd['X180']]
+    else:
+        raise ValueError("Unrecognized Level: {}. Should be g, e or f.")
 
     spacer = {'pulse_type': 'SquarePulse',
               'channel': RO_pars['acq_marker_channel'],
@@ -920,12 +925,17 @@ def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
                             pulse_pars['nr_sigma']*pulse_pars['sigma']),
               'pulse_delay': 0}
 
-    for i, pulse_comb in enumerate(pulse_combinations):
-        if preselection:
-            pulse_list = [RO_pars, spacer, pulses[pulse_comb], RO_pars]
-        else:
-            pulse_list = [pulses[pulse_comb], RO_pars]
-        el = multi_pulse_elt(i, station, pulse_list)
+    # if preselection, add readout between each pulse
+    if preselection:
+        for i, pulse in enumerate(pulse_combination):
+            pulse_list = [RO_pars, spacer, pulse, RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+    # otherwise use the pulse combination as is and add readout pulse at the end
+    else:
+        pulse_list = pulse_combination + [RO_pars]
+        el = multi_pulse_elt(0, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
