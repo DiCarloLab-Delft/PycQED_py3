@@ -9,13 +9,13 @@ try:
     from openql import openql as ql
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
+        def setUp(self):
+            rootDir = os.path.dirname(os.path.realpath(__file__))
+            curdir = os.path.dirname(__file__)
+            self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
 
-        rootDir = os.path.dirname(os.path.realpath(__file__))
-        curdir = os.path.dirname(__file__)
-        config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
-
-        output_dir = os.path.join(curdir, 'test_output')
-        ql.set_option('output_dir', output_dir)
+            output_dir = os.path.join(curdir, 'test_output')
+            ql.set_option('output_dir', output_dir)
 
         def test_CW_tone(self):
             p = sqo.CW_tone(qubit_idx=1,

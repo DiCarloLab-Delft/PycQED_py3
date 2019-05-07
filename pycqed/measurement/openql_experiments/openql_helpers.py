@@ -75,7 +75,11 @@ def compile(p):
     """
     Wrapper around OpenQL Program.compile() method.
     """
-    with suppress_stdout(): # FIXME: we would like to see warnings
+    if 0:  # FIXME: allow choice
+        with suppress_stdout():
+            p.compile()
+    else:  # show warnings
+        ql.set_option('log_level', 'LOG_WARNING')
         p.compile()
 
     # determine extension of generated file

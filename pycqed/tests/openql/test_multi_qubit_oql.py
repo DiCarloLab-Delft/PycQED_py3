@@ -9,12 +9,12 @@ try:
     from openql import openql as ql
 
     class Test_multi_qubit_oql(unittest.TestCase):
-        rootDir = os.path.dirname(os.path.realpath(__file__))
-        curdir = os.path.dirname(__file__)
-        config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
-
-        output_dir = os.path.join(curdir, 'test_output')
-        ql.set_option('output_dir', output_dir)
+        def setUp(self):
+            rootDir = os.path.dirname(os.path.realpath(__file__))
+            curdir = os.path.dirname(__file__)
+            self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
+            output_dir = os.path.join(curdir, 'test_output')
+            ql.set_option('output_dir', output_dir)
 
         def test_single_flux_pulse_seq(self):
             # N.B. edge 0,2 is still illegal...
