@@ -77,14 +77,14 @@ class ZI_HDAWG8(ZI_base_instrument):
         self.connect_message(begin_time=t0)
 
     def set_default_values(self):
-        self.triggers_out_0_source(4)
-        self.triggers_out_1_source(6)
-        self.triggers_out_2_source(4)
-        self.triggers_out_3_source(6)
-        self.triggers_out_4_source(4)
-        self.triggers_out_5_source(6)
-        self.triggers_out_6_source(4)
-        self.triggers_out_7_source(6)
+        self._dev.seti('triggers/out/0/source', 4)
+        self._dev.seti('triggers/out/1/source', 6)
+        self._dev.seti('triggers/out/2/source', 4)
+        self._dev.seti('triggers/out/3/source', 6)
+        self._dev.seti('triggers/out/4/source', 4)
+        self._dev.seti('triggers/out/5/source', 6)
+        self._dev.seti('triggers/out/6/source', 4)
+        self._dev.seti('triggers/out/7/source', 6)
 
     def _add_extra_parameters(self):
         self.add_parameter(

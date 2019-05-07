@@ -911,7 +911,7 @@ class AWG5014Pulsar:
         #self.last_grps = grps
 
         # create a packed waveform for each element for each channel group
-        # in the sequence0
+        # in the sequence
         packed_waveforms = {}
         for segment in sequence.segments:
             el_wfs = seg_wfs[segment]
@@ -952,16 +952,18 @@ class AWG5014Pulsar:
 
         wfname_l = []
 
-        for grp in grps:
-            grp_wfnames = []
-            for (
-                    element,
-                    segment,
-            ) in sequence.awg_sequence[obj.name]:
-                wfname = element + '_' + grp
-                grp_wfnames.append(wfname)
-            wfname_l.append(grp_wfnames)
-
+        for grp in ['ch1','ch2','ch3','ch4']:
+            if grp in grps:
+                grp_wfnames = []
+                for (
+                        element,
+                        segment,
+                ) in sequence.awg_sequence[obj.name]:
+                    wfname = element + '_' + grp
+                    grp_wfnames.append(wfname)
+                wfname_l.append(grp_wfnames)
+            else:
+                wfname_l.append([None]*len(sequence.segments.keys()))
         no_of_elements = len(sequence.awg_sequence[obj.name])
 
         nrep_l = [1] * no_of_elements
@@ -974,6 +976,9 @@ class AWG5014Pulsar:
             ch: obj.get('{}_offset'.format(ch))
             for ch in ['ch1', 'ch2', 'ch3', 'ch4']
         }
+
+        print(packed_waveforms)
+        print(wfname_l)
 
         if len(wfname_l) > 0:
             filename = sequence.name + '_FILE.AWG'
@@ -1395,6 +1400,8 @@ class AWG5014Pulsar:
 
         for grp in grps:
             self.AWG_obj(awg=awg).set('{}_state'.format(grp), 1)
+            log.info('Channel {} turned on {}'.format(grp, awg))
+        
 
     def _awg5014_chan_cfg(self, awg):
         channel_cfg = {}

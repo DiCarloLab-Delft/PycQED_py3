@@ -9,6 +9,8 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
 from qcodes.instrument.parameter import ManualParameter
+import ctypes
+from ctypes.wintypes import MAX_PATH
 
 
 class UHFQC(Instrument):

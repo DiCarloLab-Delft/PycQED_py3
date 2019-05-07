@@ -421,7 +421,7 @@ class Segment:
                 for trigger_awg in trigger_awgs:
                     # if there is no element on that AWG create a new element
                     if self.elements_on_awg.get(trigger_awg, None) == None:
-                        trigger_elements[trigger_awg] = 'trigger_element'
+                        trigger_elements[trigger_awg] = 'trigger_element_{}'.format(self.name)
                     # else find the element that is closest to the
                     # trigger pulse
                     else:
