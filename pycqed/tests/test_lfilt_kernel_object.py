@@ -19,16 +19,15 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
         self.k0.filter_model_01({'model': 'exponential',
                                  'params': {'amp': 4.2035373039155806, 'tau': 5.9134605614601521e-06}})
 
-
     def test_print_overview(self):
         # only test that it doesn't raise errors
         self.k0.print_overview()
 
     def test_distort_waveform(self):
-        my_sqaure = np.ones(20)
-        self.k0.distort_waveform(my_sqaure)
+        my_square = np.ones(20)
+        self.k0.distort_waveform(my_square)
 
-        self.k0.distort_waveform(my_sqaure, length_samples=1000)
+        self.k0.distort_waveform(my_square, length_samples=1000)
 
     def test_get_first_empty_kernel(self):
         first_empty = self.k0.get_first_empty_filter()
@@ -46,6 +45,33 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
         self.k0.reset_kernels()
         read_back = self.k0.filter_model_00()
         self.assertEqual({}, read_back)
+
+
+    def test_setting_realtime_filter(self):
+        self.k0.reset_kernels()
+        self.k0.cfg_gain_correction(1)
+
+        tau = 4.071755778296734e-05
+        self.k0.filter_model_00(
+            {'model': 'exponential',
+             'real-time': True,
+             'params': {'tau': tau, 'amp': 0.1}})
+        my_square = np.ones(20)
+        distorted_square = self.k0.distort_waveform(my_square)
+        assert (my_square == distorted_square[:20]).all()
+
+        self.k0.cfg_awg_channel(1)
+        amp = self.AWG.sigouts_0_precompensation_exponentials_0_amplitude()
+        assert amp == 0.1
+        set_tau = self.AWG.sigouts_0_precompensation_exponentials_0_timeconstant()
+        assert set_tau == tau
+
+        # Add tests for enabling realtime fiters
+
+
+
+
+
 
     @classmethod
     def tearDownClass(self):

@@ -1,6 +1,7 @@
 """
 This file contains an instrument for correcting distortions
-using linear filtering (scipy.signal.lfilter).
+using linear filtering (scipy.signal.lfilter) and/or setting
+the real-time distortion corrections in the HDAWG instrument.
 
 It is based on the kernel_object.DistortionsKernel
 """
