@@ -996,7 +996,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
 
 
     H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=fluxlutman.q_freq_10(), 
-    													alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=noise_parameters_CZ.alpha_q1(), J=0)  # old wrong way
+                                                        alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=noise_parameters_CZ.alpha_q1(), J=0)  # old wrong way
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
     avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_new,L1)
@@ -1365,6 +1365,21 @@ def conditional_frequency(amp,fluxlutman,noise_parameters_CZ):
     cond_frequency = eigs[4]-eigs[1]-eigs[2]+eigs[0]
     cond_frequency = cond_frequency/(2*np.pi)
     return cond_frequency
+
+
+def steady_state_populations(gamma12,gamma21,gamma23=0,gamma32=0.00001):
+    normalization = gamma12*gamma32+gamma21*gamma32+gamma12*gamma23
+    p_1_star = (gamma21*gamma32) / normalization
+    p_2_star = (gamma12*gamma32) / normalization
+    p_3_star = (gamma12*gamma23) / normalization
+    return p_1_star, p_2_star, p_3_star
+def calc_rates(L_1,L_12to03,t_cycle,T_1):
+    gamma12 = L_1
+    gamma21 = 2*L_1 + (1-np.exp(-t_cycle/(T_1/2)))
+    gamma23 = L_12to03/2
+    gamma21 = L_12to03/2 + (1-np.exp(-t_cycle/(T_1/3)))
+    return gamma12,gamma21,gamma23,gamma32
+
 
 
 def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,fluxlutman,noise_parameters_CZ):
