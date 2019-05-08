@@ -978,6 +978,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
     U_final = U
 
     phases = phases_from_superoperator(U_final)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
+    phi_cond = phases[-1]
     L1 = leakage_from_superoperator(U_final)
     population_02_state = calc_population_02_state(U_final)
     L2 = seepage_from_superoperator(U_final)
@@ -994,14 +995,8 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
         population_transfer_12_03 = 0
 
 
-    H_0 = calc_hamiltonian(0,fluxlutman,noise_parameters_CZ)
-    if noise_parameters_CZ.dressed_compsub():
-        S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[n_levels_q1, n_levels_q0], [n_levels_q1, n_levels_q0]])
-    else:
-        S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S  
-    H_0_diag = S.dag()*H_0*S
-    H_rotatingframe = H_0_diag
-    #coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=0)  # old wrong way
+    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=fluxlutman.q_freq_10(), 
+    													alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=noise_parameters_CZ.alpha_q1(), J=0)  # old wrong way
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
     avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_new,L1)
@@ -1012,7 +1007,6 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
     phases = phases_from_superoperator(U_final_new)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
     phase_q0 = (phases[1]-phases[0]) % 360
     phase_q1 = (phases[2]-phases[0]) % 360
-    phi_cond = phases[-1]
     cond_phase02 = (phases[4]-2*phase_q0+phases[0]) % 360
     cond_phase12 = (phases[6]-2*phase_q0-phase_q1+phases[0]) % 360
     cond_phase21 = (phases[7]-phase_q0-2*phase_q1+phases[0]) % 360
