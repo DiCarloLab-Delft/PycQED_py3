@@ -768,6 +768,8 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
     for day in reversed(list(range(days_delta + 1))):
         date = datetime_start + datetime.timedelta(days=day)
         datemark = timestamp_from_datetime(date)[:8]
+        #TODO:Sometimes, when choosing multiples days, there is a day with no measurmeents
+
         all_measdirs = [d for d in os.listdir(os.path.join(folder, datemark))]
         # Remove all hidden folders to prevent errors
         all_measdirs = [d for d in all_measdirs if not d.startswith('.')]

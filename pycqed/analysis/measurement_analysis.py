@@ -7959,6 +7959,12 @@ class DoubleFrequency(TD_Analysis):
             np.arange(1, len(sweep_values) / 2, 1),
             abs(np.fft.fft(zero_mean_values))[1:len(zero_mean_values) // 2],
             window_len=1, perc=95)
+        if (len(fourier_max_pos)==0):
+            print('No strong peak found, trying again')
+            fourier_max_pos = a_tools.peak_finder_v2(
+                np.arange(1, len(sweep_values) / 2, 1),
+                abs(np.fft.fft(zero_mean_values))[1:len(zero_mean_values) // 2],
+                window_len=1, perc=75)
         if len(fourier_max_pos) == 1: #One peak found
             fmin = 1./sweep_values[-1]*\
                 (fourier_max_pos[0] - 10)
@@ -7971,6 +7977,8 @@ class DoubleFrequency(TD_Analysis):
             fmax = 1./sweep_values[-1]*\
                 (np.max(fourier_max_pos) + 10)
         #Do a ZoomFFT
+        if (fmin<0):
+            fmin = 0
         [chirp_x, chirp_y] = a_tools.zoom_fft(sweep_values,zero_mean_values,
                                               fmin,fmax)
         fourier_max_pos = a_tools.peak_finder_v2(
@@ -7987,7 +7995,8 @@ class DoubleFrequency(TD_Analysis):
             fourier_max_pos = fourier_max_pos[0:2]
 
         freq_guess = chirp_x[fourier_max_pos]
-        n_shift =6
+        n_shift =min(6,len(chirp_y)-1-max(fourier_max_pos))
+
         Ratio = chirp_y[fourier_max_pos]/chirp_y[fourier_max_pos+n_shift]
         Omega_freq = 2*np.pi*dt*freq_guess
         dOmega_freq = 2*np.pi*dt*(chirp_x[fourier_max_pos + n_shift]-chirp_x[fourier_max_pos])
@@ -8094,6 +8103,7 @@ class DoubleFrequency(TD_Analysis):
                     format=plot_format)
             except:
                 fail_counter = True
+                print('Could not save to '+str(self.savename))
         if fail_counter:
             logging.warning('Figure "%s" has not been saved.' % self.savename)
         if close_fig:
@@ -8187,6 +8197,7 @@ class SWAPN_cost(object):
                 figname = (figname + '.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
                 self.folder, figname))
+
             if fig_tight:
                 try:
                     fig.tight_layout()

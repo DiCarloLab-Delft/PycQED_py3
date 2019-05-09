@@ -217,6 +217,7 @@ class complex_spectroscopy(Spectroscopy):
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
+        print(self.raw_data_dict['measured_values'])
         self.raw_data_dict['real'] = [
             self.raw_data_dict['measured_values'][0][2]]
         self.raw_data_dict['imag'] = [
@@ -333,17 +334,30 @@ class VNA_analysis(complex_spectroscopy):
 
         Qc = 1/np.real(1/(Qe.value*np.exp(1j*theta.value)))
         Qi = 1/(1/Q.value - 1/Qc)
+        #TODO: what should we do when the fit does not give the std_err?
+        if ((freq.stderr==None)):
+            msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.value/1e6)
+            msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.value/1e3)
+            msg += '\n'
+            msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+            msg += '\n'
+            msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+            msg += '\n'
+            msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
 
-        msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.stderr/1e6)
-        msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.stderr/1e3)
-        msg += '\n'
-        msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
-        msg += '\n'
-        msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
-        msg += '\n'
-        msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
+            self.proc_data_dict['complex_fit_msg'] = msg
+            # print('Fitting went wrong')
+        else:
+            msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.stderr/1e6)
+            msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.stderr/1e3)
+            msg += '\n'
+            msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+            msg += '\n'
+            msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+            msg += '\n'
+            msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
 
-        self.proc_data_dict['complex_fit_msg'] = msg
+            self.proc_data_dict['complex_fit_msg'] = msg
 
 
 
