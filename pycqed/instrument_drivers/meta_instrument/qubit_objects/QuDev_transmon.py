@@ -1,14 +1,12 @@
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
-from copy import deepcopy
 import qcodes as qc
 
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 
 from pycqed.measurement import detector_functions as det
-from pycqed.measurement import composite_detector_functions as cdet
 from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf2
@@ -26,6 +24,8 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
 from pycqed.measurement import optimization as opti
 from pycqed.measurement import mc_parameter_wrapper
 import pycqed.analysis_v2.spectroscopy_analysis as sa
+from pycqed.utilities import math
+
 try:
     import pycqed.simulations.readout_mode_simulations_for_CLEAR_pulse \
         as sim_CLEAR
@@ -149,6 +149,11 @@ class QuDev_transmon(Qubit):
         self.add_parameter('RO_acq_integration_length', initial_value=2.2e-6,
                            vals=vals.Numbers(min_value=10e-9, max_value=2.2e-6),
                            parameter_class=ManualParameter)
+        # FIXME: Nathan 2019.05.08: Name of following parameter is confusing
+        #  w.r.t 'ro_acq_weight_func_I' and now that we enable double weighted
+        #  integration even more. IMO Should be refactored to something like
+        #  'RO_acq_weight_channel_I' (althought that doesn't solve the double
+        #  integration confusion.
         self.add_parameter('RO_acq_weight_function_I', initial_value=0,
                            vals=vals.Enum(0, 1, 2, 3, 4, 5, 6, 7, 8),
                            parameter_class=ManualParameter)
@@ -160,18 +165,28 @@ class QuDev_transmon(Qubit):
                                      'in single shot experiments.',
                            vals=vals.Ints(0, 1048576),
                            parameter_class=ManualParameter)
-
         self.add_parameter('RO_IQ_angle', initial_value=0,
                            docstring='The phase of the integration weights when'
                                      'using SSB, DSB or square_rot integration '
                                      'weights', label='RO IQ angle', unit='rad',
                            parameter_class=ManualParameter)
-
         self.add_parameter('ro_acq_weight_func_I', vals=vals.Arrays(),
                            label='Optimized weights for I channel',
                            parameter_class=ManualParameter)
         self.add_parameter('ro_acq_weight_func_Q', vals=vals.Arrays(),
                            label='Optimized weights for Q channel',
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_weight_2nd_integr_I', vals=vals.Arrays(),
+                           label='Optimized weights for second integration '
+                                 'channel I',
+                           docstring=("Used for double weighted integration "
+                                      "during qutrit readout"),
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_weight_2nd_integr_Q', vals=vals.Arrays(),
+                           label='Optimized weights for second integration '
+                                 'channel Q',
+                           docstring=("Used for double weighted integration "
+                                      "during qutrit readout"),
                            parameter_class=ManualParameter)
         self.add_parameter('ro_acq_input_average_length', unit='s',
                            initial_value=2.275e-6, docstring='The measurement '
@@ -181,6 +196,7 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('ro_acq_weight_type', initial_value='SSB',
                            vals=vals.Enum('SSB', 'DSB', 'optimal',
+                                          'optimal_qutrit',
                                           'square_rot', 'manual'),
                            docstring=(
                                'Determines what type of integration weights to '
@@ -631,6 +647,31 @@ class QuDev_transmon(Qubit):
                                self.RO_acq_weight_function_I()), 1.0)
                 self.UHFQC.set('quex_rot_{}_imag'.format(
                                self.RO_acq_weight_function_I()), -1.0)
+        elif type == 'optimal_qutrit':
+            for w_f in [self.ro_acq_weight_func_I, self.ro_acq_weight_func_Q,
+                        self.ro_acq_weight_2nd_integr_I,
+                        self.ro_acq_weight_2nd_integr_Q]:
+                if w_f() is None:
+                    logging.warning('The optimal weights {} are None. '
+                                    '\nNot setting integration weights.'
+                                    .format(w_f.name))
+                    return
+            # if all weights are not None, set first integration weights (real and
+            # imag) on channel I amd second integration weights on channel Q.
+            self.UHFQC.set('quex_wint_weights_{}_real'.format(
+                self.RO_acq_weight_function_I()),
+                self.ro_acq_weight_func_I().copy())
+            self.UHFQC.set('quex_wint_weights_{}_imag'.format(
+                self.RO_acq_weight_function_I()),
+                self.ro_acq_weight_func_Q().copy())
+            self.UHFQC.set('quex_wint_weights_{}_real'.format(
+                self.RO_acq_weight_function_Q()),
+                self.ro_acq_weight_2nd_integr_I().copy())
+            self.UHFQC.set('quex_wint_weights_{}_imag'.format(
+                self.RO_acq_weight_function_Q()),
+                self.ro_acq_weight_2nd_integr_Q().copy())
+
+
         else:
             tbase = np.arange(0, 4096 / 1.8e9, 1 / 1.8e9)
             theta = self.RO_IQ_angle()
@@ -1644,7 +1685,7 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name, TwoD=True)
         return MC
 
-    def measure_transients(self, MC=None, cases=('g', 'e'), upload=True,
+    def measure_transients(self, MC=None, levels=('g', 'e'), upload=True,
                            analyze=True, **kw):
         """
         If the resulting transients will be used to caclulate the optimal
@@ -1653,8 +1694,8 @@ class QuDev_transmon(Qubit):
         aligned: iavg_delay = 2*wint_delay.
 
         """
-        assert not ('on' in cases or 'off' in cases), \
-            "Naming cases 'on' and 'off' is now deprecated to ensure clear " \
+        assert not ('on' in levels or 'off' in levels), \
+            "Naming levels 'on' and 'off' is now deprecated to ensure clear " \
             "denomination for 3 level readout. Please adapt your code:\n " \
             "'off' --> 'g'\n'on' --> 'e'\n'f' for 3d level detection "
         if MC is None:
@@ -1665,7 +1706,7 @@ class QuDev_transmon(Qubit):
         # initialize instruments
         self.prepare_for_timedomain()
 
-        for level in cases:
+        for level in levels:
             if level not in ['g', 'e', 'f']:
                 raise ValueError("Unrecognized case: {}. It should be 'g', 'e' "
                                  "or 'f'.".format(level))
@@ -2292,60 +2333,79 @@ class QuDev_transmon(Qubit):
         MC.run('ro_uc_spectrum' + self.msmt_suffix)
         ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
 
-    def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
+    def find_optimized_weights(self, MC=None, update=True, measure=True,
+                               qutrit=False, **kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
         # I agree (Christian, 07.11.2018 -- around 1 year later)
+
+        levels = ('g', 'e', 'f') if qutrit else ('g', 'e')
         if measure:
-            self.measure_transients(MC, analyze=True, **kw)
+            self.measure_transients(MC, analyze=True, levels=levels, **kw)
 
-        name_extra = kw.get('name_extra', None)
-
-        if name_extra is not None:
-            MAon = ma.MeasurementAnalysis(label='timetrace_on_' + name_extra
-                                                + '_' +self.name)
-            MAoff = ma.MeasurementAnalysis(label='timetrace_off_' + name_extra
-                                                 + '_' +self.name)
-        else:
-            MAon = ma.MeasurementAnalysis(label='timetrace_on_'+self.name)
-            MAoff = ma.MeasurementAnalysis(label='timetrace_off_'+self.name)
-        don = MAon.measured_values[0] + 1j * MAon.measured_values[1]
-        doff = MAoff.measured_values[0] + 1j * MAoff.measured_values[1]
+        # create label, measurement analysis and data for each level
+        labels = {l: 'timetrace_{}_'.format(l) + kw.get('name_extra', "")
+                     + "_{}".format(self.name) for l in levels}
+        m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
+        iq_traces = {l: m_a[l].measured_values[0]
+                        + 1j * m_a[l].measured_values[1] for l in levels}
         if update:
-            wre = np.real(don - doff)
-            wim = np.imag(don - doff)
-            k = max(np.max(np.abs(wre)), np.max(np.abs(wim)))
-            wre /= k
-            wim /= k
-            self.ro_acq_weight_func_I(wre)
-            self.ro_acq_weight_func_Q(wim)
+            # FIXME: could merge qutrit and non qutrit although normalization is not
+            #  the same but would be a good thing to do. First test if qutrit works
+            #  well. idem in plot
+            if qutrit:
+                logging.info("Starting Qutrit weight optimization")
+                basis = [iq_traces[l] - iq_traces['g'] for l in levels[1:]]
+                ortho_basis = math.gram_schmidt(np.array(basis).transpose())
+                ortho_basis = ortho_basis.transpose() # obtain basis vect as rows
+                self.ro_acq_weight_func_I(ortho_basis[0].real)
+                self.ro_acq_weight_func_Q(ortho_basis[0].imag)
+                self.ro_acq_weight_2nd_integr_I(ortho_basis[1].real)
+                self.ro_acq_weight_2nd_integr_Q(ortho_basis[1].imag)
+            else:
+                wre = np.real(iq_traces['e'] - iq_traces['g'])
+                wim = np.imag(iq_traces['e'] - iq_traces['g'])
+                k = max(np.max(np.abs(wre)), np.max(np.abs(wim)))
+                wre /= k
+                wim /= k
+                self.ro_acq_weight_func_I(wre)
+                self.ro_acq_weight_func_Q(wim)
         if kw.get('plot', True):
-            npoints = len(MAon.sweep_points)
+            # TODO: Nathan: plot amplitude instead of I, Q ?
+            npoints = len(m_a['g'].sweep_points)
+            plot_ylabels = dict(g='d.c. voltage,\nNo pulse (V)',
+                                e='d.c. voltage,\nPi_ge pulse (V)',
+                                f='d.c. voltage,\nPi_gf pulse (V)')
             tbase = np.linspace(0, npoints/1.8e9, npoints, endpoint=False)
             modulation = np.exp(2j * np.pi * self.f_RO_mod() * tbase)
-            plt.subplot(311)
-            plt.title('optimized weights ' + self.name + '\n' +
-                      MAon.timestamp_string + '\n' + MAoff.timestamp_string)
-            plt.plot(tbase / 1e-9, np.real(don * modulation), '-', label='I')
-            plt.plot(tbase / 1e-9, np.imag(don * modulation), '-', label='Q')
-            plt.ylabel('d.c. voltage,\npi pulse (V)')
-            plt.xlim(0, kw.get('tmax', 300))
-            plt.legend(loc='upper right')
-            plt.subplot(312)
-            plt.plot(tbase / 1e-9, np.real(doff * modulation), '-', label='I')
-            plt.plot(tbase / 1e-9, np.imag(doff * modulation), '-', label='Q')
-            plt.ylabel('d.c. voltage,\nno pi pulse (V)')
-            plt.xlim(0, kw.get('tmax', 300))
-            plt.legend(loc='upper right')
-            plt.subplot(313)
-            plt.plot(tbase / 1e-9, np.real((don - doff) * modulation), '-',
-                     label='I')
-            plt.plot(tbase / 1e-9, np.imag((don - doff) * modulation), '-',
-                     label='Q')
-            plt.ylabel('d.c. voltage\ndifference (V)')
-            plt.xlim(0, kw.get('tmax', 300))
-            plt.legend(loc='upper right')
-            plt.xlabel('Time (ns)')
-            MAoff.save_fig(plt.gcf(), 'timetraces', xlabel='time',
+            fig, ax = plt.subplots(len(levels) + 1)
+            plt.title('optimized weights ' + self.name +
+                      "".join('\n' + m_a[l].timestamp_string for  l in levels))
+            for i, l in enumerate(levels):
+                ax[i].plot(tbase / 1e-9, np.real(iq_traces[l] * modulation), '-',
+                         label='I_' + l)
+                ax[i].plot(tbase / 1e-9, np.imag(iq_traces[l] * modulation), '-',
+                         label='Q_' + l)
+                ax[i].set_ylabel(plot_ylabels[l])
+                ax[i].set_xlim(0, kw.get('tmax', 300))
+                ax[i].legend(loc='upper right')
+            if qutrit:
+                for i, vect in enumerate(ortho_basis):
+                    ax[-1].plot(tbase / 1e-9, np.real(vect * modulation), '-',
+                                label='I_' + str(i))
+                    ax[-1].plot(tbase / 1e-9, np.imag(vect * modulation), '-',
+                                label='Q_' + str(i))
+            else:
+                ax[-1].plot(tbase / 1e-9,
+                            np.real((iq_traces['e'] - iq_traces['g']) * modulation), '-',
+                            label='I')
+                ax[-1].plot(tbase / 1e-9,
+                            np.imag((iq_traces['e'] - iq_traces['g']) * modulation), '-',
+                            label='Q')
+            ax[-1].ylabel('d.c. voltage\ndifference (V)')
+            ax[-1].set_xlim(0, kw.get('tmax', 300))
+            ax[-1].legend(loc='upper right')
+            ax[-1].set_xlabel('Time (ns)')
+            m_a['g'].save_fig(plt.gcf(), 'timetraces', xlabel='time',
                            ylabel='voltage')
             plt.close()
 

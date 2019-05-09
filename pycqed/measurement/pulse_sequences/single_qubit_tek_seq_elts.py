@@ -894,6 +894,8 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False, le
     Input pars:
         pulse_pars:          dict containing the pulse parameters
         RO_pars:             dict containing the RO parameters
+        pulse_pars_2nd:      dict containing the pulse parameters of ef transition.
+                             Required if level is 'f'.
         Initialize:          adds an exta measurement before state preparation
                              to allow initialization by post-selection
         Post-measurement delay:  should be sufficiently long to avoid
@@ -901,7 +903,7 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False, le
         level:               specifies for which level a pulse should be generated (g,e,f)
         preselection:        adds an extra readout pulse before other pulses.
     '''
-    seq_name = 'gef_levels_sequence'
+    seq_name = 'single_level_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
     # Create dicts with the parameters for all the pulses
@@ -916,7 +918,11 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False, le
         pulse_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
         pulse_combination = [pulse_1st['X180'], pulse_2nd['X180']]
     else:
-        raise ValueError("Unrecognized Level: {}. Should be g, e or f.")
+        raise ValueError("Unrecognized Level: {}. Should be g, e or f.\n"
+                         "Note: Naming levels 'on' and 'off' is now deprecated "
+                         "to ensure clear denomination for 3 level readout. "
+                         "Please adapt your code:\n 'off' --> 'g'\n'on' --> 'e'"
+                         "\n'f' for f-level .")
 
     spacer = {'pulse_type': 'SquarePulse',
               'channel': RO_pars['acq_marker_channel'],
