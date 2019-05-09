@@ -217,7 +217,6 @@ class complex_spectroscopy(Spectroscopy):
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
-        print(self.raw_data_dict['measured_values'])
         self.raw_data_dict['real'] = [
             self.raw_data_dict['measured_values'][0][2]]
         self.raw_data_dict['imag'] = [
