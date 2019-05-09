@@ -170,7 +170,10 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
 
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
-        J * (-1)*(a.dag()*b+a*b.dag()) #(a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
+        J * (-1)*(a.dag()*b+a*b.dag()) \
+        # + J * (basis_state(0,1,to_vector=False)*basis_state(1,0,to_vector=False).dag() + \
+        #        basis_state(1,0,to_vector=False)*basis_state(0,1,to_vector=False).dag())
+        #(a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
     H = H * (2*np.pi)
     return H
 
@@ -1463,12 +1466,14 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,noise_paramet
     popul_in_21from12=[]
     popul_test=[]
     popul_in_10from01=[]
+    popul_in_12from12=[]
 
     popul_in_20_dephased=[]
     popul_in_02_dephased=[]
     popul_in_21from12_dephased=[]
     popul_test_dephased=[]
     popul_in_10from01_dephased=[]
+    popul_in_12from12_dephased=[]
 
     if n_levels_q0 >= 4:
         popul_in_03from12=[]
@@ -1489,8 +1494,8 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,noise_paramet
 
     U_superop_dephased = qtp.Qobj(U_temp,type='super',dims=dimensions)
 
-    number_CZ_repetitions=500
-    step_repetitions=2
+    number_CZ_repetitions=60
+    step_repetitions=1
     for n in range(1,number_CZ_repetitions,step_repetitions):        # we consider only odd n so that in theory it should be always a CZ
         U_superop_n=U_superop_average**n
         U_superop_dephased_n = U_superop_dephased**n
@@ -1506,12 +1511,14 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,noise_paramet
         popul_in_21from12.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out=[[2,1]]))
         popul_test.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out='all'))
         popul_in_10from01.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[0,1]],states_out=[[1,0]]))
+        popul_in_12from12.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out=[[1,2]]))
 
         popul_in_20_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,1]],states_out=[[2,0]]))
         popul_in_02_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,1]],states_out=[[0,2]]))
         popul_in_21from12_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out=[[2,1]]))
         popul_test_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out='all'))
         popul_in_10from01_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[0,1]],states_out=[[1,0]]))
+        popul_in_12from12_dephased.append(average_population_transfer_subspace_to_subspace(U_superop_dephased_n,states_in=[[1,2]],states_out=[[1,2]]))
 
         if n_levels_q0 >= 4:
             popul_in_03from12.append(average_population_transfer_subspace_to_subspace(U_superop_n,states_in=[[1,2]],states_out=[[0,3]]))
@@ -1561,6 +1568,18 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,noise_paramet
                   title='Repeated $CZ$ gates',
                   xlabel='Number of CZ gates',ylabel='Av. Population out (%)',
                   legend_labels=['01 to 10','01 to 10, dephased case'])
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
+                  y_plot_vec=[np.array(popul_in_12from12)*100,np.array(popul_in_21from12)*100,np.array(popul_in_03from12)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Population (%)',
+                  legend_labels=['12','21', '03'])
+
+    plot(x_plot_vec=[np.arange(1,number_CZ_repetitions,step_repetitions)],
+                  y_plot_vec=[np.array(popul_in_12from12_dephased)*100,np.array(popul_in_21from12_dephased)*100,np.array(popul_in_03from12_dephased)*100],
+                  title='Repeated $CZ$ gates',
+                  xlabel='Number of CZ gates',ylabel='Population (%)',
+                  legend_labels=['12','21', '03'])
 
 
     print('leakage_vec',leakage_vec)
