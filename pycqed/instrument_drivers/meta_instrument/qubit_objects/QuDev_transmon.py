@@ -3855,14 +3855,26 @@ class QuDev_transmon(Qubit):
 
         return EC, EJ
 
-    def find_readout_frequency(self, freqs=None, update=False, MC=None, **kw):
+    def find_readout_frequency(self, freqs=None, update=False, MC=None,
+                               for_3_levels_ro=False, **kw):
         """
-        You need a working pi-pulse for this to work. Also, if your
+        Find readout frequency at which contrast between the states of the
+        qubit is the highest.
+        You need a working pi-pulse for this to work, as well as a pi_ef
+        pulse if you intend to use `for_3_level_ro`. Also, if your
         readout pulse length is much longer than the T1, the results will not
         be nice as the excited state spectrum will be mixed with the ground
         state spectrum.
-        """
 
+        Args:
+            freqs: frequencies to sweep
+            for_3_levels_ro (bool): find optimal frequency for 3-level readout.
+                                    Default is False.
+            **kw:
+
+        Returns:
+
+        """
         # FIXME: Make proper analysis class for this (Ants, 04.12.2017)
         if not update:
             logging.info("Does not automatically update the RO resonator "
@@ -3883,18 +3895,37 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        self.measure_dispersive_shift(freqs, MC=MC, analyze=False, **kw)
-        MAon = ma.MeasurementAnalysis(label='on-spec' + self.msmt_suffix)
-        MAoff = ma.MeasurementAnalysis(label='off-spec' + self.msmt_suffix)
-        cdaton = MAon.measured_values[0] * \
-                 np.exp(1j * np.pi * MAon.measured_values[1] / 180)
-        cdatoff = MAoff.measured_values[0] * \
-                  np.exp(1j * np.pi * MAoff.measured_values[1] / 180)
-        fmax = freqs[np.argmax(np.abs(cdaton - cdatoff))]
+        levels = ('g', 'e', 'f') if for_3_levels_ro else ('g', 'e')
+
+        self.measure_dispersive_shift(freqs, MC=MC, analyze=False,
+                                      levels=levels[1:], **kw)
+        labels = {l: '{}-spec' + self.msmt_suffix for l in levels}
+        m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
+        trace = {l: m_a[l].measured_values[0] *
+                    np.exp(1j * np.pi * m_a[l].measured_values[1] / 180.)
+                 for l in levels}
+        # FIXME: make something that doesn't require a conditional branching
+        if for_3_levels_ro:
+            total_dist = np.abs(trace['e'] - trace['g']) + \
+                         np.abs(trace['f'] - trace['g']) + \
+                         np.abs(trace['f'] - trace['e'])
+            fmax = freqs[np.argmax(total_dist)]
+            # FIXME: just as debug plotting for now
+            plt.plot(freqs, np.abs(trace['e'] - trace['g']), label='eg diff')
+            plt.plot(freqs, np.abs(trace['f'] - trace['g']), label='fg diff')
+            plt.plot(freqs, np.abs(trace['e'] - trace['f']), label='ef diff')
+            plt.plot(freqs, total_dist, label='total diff')
+            plt.legend()
+            plt.show()
+        else:
+            fmax = freqs[np.argmax(np.abs(trace['e'] - trace['g']))]
+
+        logging.info("Optimal RO frequency to distinguish states {}: {} Hz"
+                     .format(levels, fmax))
 
         if kw.get('analyze', True):
-            SA = sa.ResonatorSpectroscopy(t_start=[MAoff.timestamp_string,
-                                                   MAon.timestamp_string],
+            SA = sa.ResonatorSpectroscopy(t_start=[m_a['g'].timestamp_string,
+                                                   m_a['e'].timestamp_string],
                                           options_dict=dict(simultan=True,
                                                             fit_options = dict(
                                                             model='hanger_with_pf'),
@@ -3925,40 +3956,56 @@ class QuDev_transmon(Qubit):
                         max_amp_diff=max_diff) * self.RO_amp
 
 
-    def measure_dispersive_shift(self, freqs, MC=None, analyze=True, **kw):
-            # FIXME: Remove dependancy on heterodyne!
-            if np.any(freqs < 500e6):
-                logging.warning(('Some of the values in the freqs array might be '
-                                 'too small. The units should be Hz.'))
-            if MC is None:
-                MC = self.MC
+    def measure_dispersive_shift(self, freqs, MC=None, analyze=True,
+                                 levels=('e',), **kw):
+        """
+        Measure the dispersive shift for the given levels.
+        Args:
+            freqs:
+            MC:             Measurement Control object
+            analyze (bool): perform an analysis
+            levels (tuple): specifies the level for which the dispersive shift
+                            should be measured. Default is ('e'). Supports also
+                            ('f') and ('e', 'f').
+            **kw:
 
-            heterodyne = self.heterodyne
-            heterodyne.f_RO_mod(self.f_RO_mod())
-            heterodyne.RO_length(self.RO_pulse_length())
-            heterodyne.mod_amp(self.RO_amp())
-            self.prepare_for_pulsed_spec()
-            self.drive_LO.pulsemod_state('off')
-            self.drive_LO.power(self.drive_LO_pow())
-            self.UHFQC.quex_wint_length(int(self.RO_acq_integration_length()*1.8e9))
-            heterodyne.nr_averages(self.RO_acq_averages())
+        """
+        # FIXME: Remove dependancy on heterodyne!
+        if np.any(freqs < 500e6):
+            logging.warning(('Some of the values in the freqs array might be '
+                             'too small. The units should be Hz.'))
+        if MC is None:
+            MC = self.MC
+        assert isinstance(levels, tuple), \
+            "levels should be a tuple, not {}".format(type(levels))
 
-            for mode in ('on', 'off'):
-                sq.single_level_seq(pulse_pars=self.get_drive_pars(),
-                                    RO_pars=self.get_RO_pars(),
-                                    level='O{0}O{0}'.format(mode[1:]))
-                MC.set_sweep_function(heterodyne.frequency)
-                MC.set_sweep_points(freqs)
-                demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
-                    else 'double'
-                MC.set_detector_function(det.Heterodyne_probe(
-                    self.heterodyne,
-                    trigger_separation=self.heterodyne.trigger_separation(),
-                    demod_mode=demod_mode))
-                self.AWG.start()
-                MC.run(name='{}-spec{}'.format(mode, self.msmt_suffix))
-                if analyze:
-                    ma.MeasurementAnalysis(qb_name=self.name, **kw)
+        heterodyne = self.heterodyne
+        heterodyne.f_RO_mod(self.f_RO_mod())
+        heterodyne.RO_length(self.RO_pulse_length())
+        heterodyne.mod_amp(self.RO_amp())
+        self.prepare_for_pulsed_spec()
+        self.drive_LO.pulsemod_state('off')
+        self.drive_LO.power(self.drive_LO_pow())
+        self.UHFQC.quex_wint_length(int(self.RO_acq_integration_length()*1.8e9))
+        heterodyne.nr_averages(self.RO_acq_averages())
+
+        for level in ('g') + levels:
+            sq.single_level_seq(pulse_pars=self.get_drive_pars(),
+                                RO_pars=self.get_RO_pars(),
+                                pulse_pars_2nd=self.get_ef_drive_pars(),
+                                level=level)
+            MC.set_sweep_function(heterodyne.frequency)
+            MC.set_sweep_points(freqs)
+            demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
+                else 'double'
+            MC.set_detector_function(det.Heterodyne_probe(
+                self.heterodyne,
+                trigger_separation=self.heterodyne.trigger_separation(),
+                demod_mode=demod_mode))
+            self.AWG.start()
+            MC.run(name='{}-spec{}'.format(level, self.msmt_suffix))
+            if analyze:
+                ma.MeasurementAnalysis(qb_name=self.name, **kw)
 
     def get_spec_pars(self):
         return self.get_operation_dict()['Spec ' + self.name]
