@@ -46,6 +46,33 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
         read_back = self.k0.filter_model_00()
         self.assertEqual({}, read_back)
 
+    def test_reset_kernel_resets_hardware(self):
+
+        self.k0.filter_model_00(
+            {'model': 'exponential',
+             'real-time': True,
+             'params': {'tau': 1e-6, 'amp': 0.1}})
+        self.k0.filter_model_01(
+            {'model': 'FIR',
+             'real-time': True,
+             'params': {'weights': np.linspace(.2, 0, 40)}})
+
+        my_square = np.ones(20)
+        distorted_square = self.k0.distort_waveform(my_square)
+
+        exp_amp = self.AWG.sigouts_0_precompensation_exponentials_0_amplitude()
+        fir_coeffs = self.AWG.sigouts_0_precompensation_fir_coefficients()
+        assert exp_amp != 0
+        assert (fir_coeffs == np.linspace(.2, 0, 40)).all()
+        self.k0.set_realtime_distortions_zero()
+
+        exp_amp = self.AWG.sigouts_0_precompensation_exponentials_0_amplitude()
+        fir_coeffs = self.AWG.sigouts_0_precompensation_fir_coefficients()
+        assert exp_amp == 0
+        imp_resp = np.zeros(40)
+        imp_resp[0] = 1
+        assert (fir_coeffs == imp_resp).all()
+
 
     def test_setting_realtime_filter(self):
         self.k0.reset_kernels()
