@@ -732,11 +732,19 @@ class MeasurementAnalysis(object):
                 ax.hlines(np.mean(y[cal_one_points]),
                           min(x), max(x),
                           linestyles='--', color='C7')
+                l = 'f' if kw.get("for_ef", False) else 'e'
                 ax.text(np.mean(x[cal_one_points]),
-                        np.mean(y[cal_one_points])-0.05, r'$|e\rangle$',
+                        np.mean(y[cal_one_points])-0.05,
+                        r'$|{}\rangle$'.format(l),
                         fontsize=font_size, verticalalignment='top',
                         horizontalalignment='center', color='k')
                 NoCalPoints += len(cal_one_points)
+
+            # FIXME: issue when 6 cal points are used, because method above recovers
+            #  only 4 although 6 were used. the first two cal points are then
+            #  interpreted as data. therefore, for now I allow a dirty override
+            #  of the parameter by parent function. Should be fixed more thoroughly !!
+            NoCalPoints = kw.get("no_cal_points", NoCalPoints)
 
             line = ax.plot(x[:-NoCalPoints], y[:-NoCalPoints],
                            marker, markersize=self.marker_size,
@@ -1706,7 +1714,9 @@ class TD_Analysis(MeasurementAnalysis):
                 marker='o-',
                 save=False,
                 plot_title=plot_title,
-                add_half_line=add_half_line)
+                add_half_line=add_half_line,
+                no_cal_points=self.NoCalPoints,
+                for_ef=self.for_ef)
             if save_fig:
                 if not close_main_fig:
                     # Hacked in here, good idea to only show the main fig but
