@@ -920,7 +920,7 @@ class AWG5014Pulsar:
                 maxlen = -float('inf')
                 for wf in cid_wfs.values():
                     maxlen = max(maxlen, len(wf))
-                for grp in grps:
+                for grp in ['ch1','ch2','ch3', 'ch4']:
                     grp_wfs = {}
                     # arrange waveforms from input data and pad with zeros for
                     # equal length
@@ -952,7 +952,7 @@ class AWG5014Pulsar:
 
         wfname_l = []
 
-        for grp in grps:
+        for grp in ['ch1','ch2','ch3', 'ch4']:
             grp_wfnames = []
             try:
                 for (
