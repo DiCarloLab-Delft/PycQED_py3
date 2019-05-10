@@ -1428,6 +1428,13 @@ class AWG5014Pulsar:
                 channel_cfg['MARKER{}_HIGH_{}'.format(cid[-1], cid[2])] = \
                     off + amp
             channel_cfg['CHANNEL_STATE_' + cid[2]] = 0
+
+        for channel in self.channels:
+            if self.get('{}_AWG'.format(channel)) != AWG:
+                continue
+            if self.get('{}_active'.format(channel)):
+                cid = self.get('{}_id'.format(channel))
+                channel_cfg['CHANNEL_STATE_' + cid[2]] = 1
         return channel_cfg
 
 
