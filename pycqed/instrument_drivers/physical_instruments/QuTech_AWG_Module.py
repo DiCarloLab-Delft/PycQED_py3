@@ -284,22 +284,6 @@ class QuTech_AWG_Module(SCPI):
                                      'first `get` parameter\n'
                                      'Calibration duration = time * 20')
 
-        self.add_function('_dio_calibrate_ref_clock',
-                          call_cmd='DIO:CALibrate:REFclock',
-                          docstring='Calibrate only the DIO reference clock.\n')
-
-        self.add_function('_dio_ref_clock_shift',
-                          call_cmd='DIO:SHIFtrefclock',
-                          docstring='Shift the DIO reference clock\n')
-
-        self.add_parameter('_dio_ref_clock_signal',
-                           get_cmd='DIO:REF:SIGNal',
-                           docstring='Get the DIO reference clock data')
-
-        self.add_parameter('_dio_ref_clock_bitdiffs',
-                           get_cmd='DIO:REF:BITDiff',
-                           docstring='Get the DIO reference clock bitDiffs')
-
         self.add_parameter('_dio_bit_diff_table',
                            get_cmd=self._get_bit_diff_table,
                            docstring='Get the DIO bit diff table of the last calibration')
