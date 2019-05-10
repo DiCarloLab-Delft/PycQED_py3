@@ -31,10 +31,6 @@ class Segment:
         for pulse_pars in pulse_pars_list:
             self.add(pulse_pars)
 
-        if pulse_pars_list != []:
-            self.resolve_timing()
-            self.gen_trigger_el()
-
     def add(self, pulse_pars):
 
         pars_copy = deepcopy(pulse_pars)
@@ -179,7 +175,6 @@ class Segment:
         #   channel + the name of the last element
         # * and find the end time of the last pulse of the segment
         for element in self.elements:
-            
             # finds the channels of AWGs with that element
             awg_channels = set()
             for awg in self.element_start_end[element]:
@@ -196,7 +191,6 @@ class Segment:
                     element_start_time = self.get_element_start(element, awg)
                     if c not in compensation_chan:
                         continue
-
                     pulse_start = self.time2sample(
                         pulse.element_time(element_start_time), channel=c)
                     pulse_end = self.time2sample(
@@ -227,21 +221,19 @@ class Segment:
             amp = self.pulsar.get('{}_amp'.format(c))
             amp *= self.pulsar.get('{}_compensation_pulse_scale'.format(c))
 
-            if pulse_area[c][0] < 0:
-                amp = -amp
-
             # If pulse lenght was smaller than min_length, the amplitude will
             # be reduced
-            length = pulse_area[c][0] / amp
+            length = abs(pulse_area[c][0] / amp)
             awg = self.pulsar.get('{}_awg'.format(c))
             min_length = self.pulsar.get(
                 '{}_compensation_pulse_min_length'.format(awg))
             if length < min_length:
                 length = min_length
-                amp = pulse_area[c][0] / length
-                if pulse_area[c][0] < 0:
-                    amp = -amp
+                amp = abs(pulse_area[c][0] / length)
 
+            if pulse_area[c][0] > 0:
+                amp = -amp
+                
             last_element = pulse_area[c][1]
             # for RO elements create a seperate element for compensation pulses
             if last_element in self.acquisition_elements:
@@ -589,6 +581,13 @@ class Segment:
 
         if start_gran != None:
             t_start_awg = int(t_start / start_gran) * start_gran
+            # add the number of samples the element gets larger when changing
+            # t_start
+            add = self.time2sample(t_start - t_start_awg, awg=awg)
+            if add % gran != 0:
+                add += gran - add % gran
+            samples += add
+
         else:
             t_start_awg = t_start
 
