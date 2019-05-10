@@ -926,7 +926,7 @@ class QuDev_transmon(Qubit):
 
     def measure_rabi_2nd_exc(self, amps=None, n=1, MC=None, analyze=True,
                              label=None, last_ge_pulse=True,
-                             close_fig=True, cal_points=True, no_cal_points=4,
+                             close_fig=True, cal_points=True, no_cal_points=6,
                              upload=True, exp_metadata=None):
 
         if amps is None:
@@ -941,6 +941,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         if cal_points:
+            print("cal points {}".format(no_cal_points))
             step = np.abs(amps[-1]-amps[-2])
             if no_cal_points == 6:
                 sweep_points = np.concatenate(
@@ -3022,6 +3023,7 @@ class QuDev_transmon(Qubit):
                               no_cal_points=no_cal_points,
                               upload=upload)
         else:
+            print("cal points {}".format(no_cal_points))
             self.measure_rabi_2nd_exc(amps=rabi_amps, n=n, MC=MC,
                                       close_fig=close_fig, label=label,
                                       cal_points=cal_points,
