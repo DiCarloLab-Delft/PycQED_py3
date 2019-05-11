@@ -43,6 +43,36 @@ class Detector_Function(object):
     def finish(self, **kw):
         pass
 
+class Mock_Detector(Detector_Function):
+    def __init__(self, value_names=['val'], value_units=['arb. units'],
+                 detector_control='soft',
+                 mock_values=np.zeros([20, 1]),
+                 **kw):
+        self.name = self.__class__.__name__
+        self.set_kw()
+        self.value_names = value_names
+        self.value_units = value_units
+        self.detector_control=detector_control
+        self.mock_values = mock_values
+        self._iteration = 0
+
+    def acquire_data_point(self, **kw):
+        '''
+        Returns something random for testing
+        '''
+        idx = self._iteration % (np.shape(self.mock_values)[0])
+        self._iteration += 1
+        return self.mock_values[idx]
+
+    def get_values(self):
+        return self.mock_values
+
+    def prepare(self, **kw):
+        pass
+
+    def finish(self, **kw):
+        pass
+
 
 class Multi_Detector(Detector_Function):
     """
