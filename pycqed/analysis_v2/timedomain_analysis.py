@@ -996,17 +996,21 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                                  else np.nan))
         qoi['phi_0'] = phi0
         qoi['phi_1'] = phi1
-        qoi['phi_cond'] = (phi0-phi1)%360
+        qoi['phi_cond'] = (phi0-phi1) % 360
 
         qoi['osc_amp_0'] = ufloat(fr_0.params['amplitude'].value,
                                   fr_0.params['amplitude'].stderr if
                                   fr_0.params['amplitude'].stderr is not None
                                   else np.nan)
+        qoi['osc_amp_1'] = ufloat(fr_1.params['amplitude'].value,
+                                  fr_1.params['amplitude'].stderr if
+                                  fr_1.params['amplitude'].stderr is not None
+                                  else np.nan)
 
-        osc_amp = np.mean([fr_0.params['amplitude'],
-                          fr_1.params['amplitude']])
-        osc_amp_stderr = np.sqrt(fr_0.params['amplitude'].stderr**2 +
-                                 fr_1.params['amplitude']**2)/2
+        qoi['osc_offs_0'] = ufloat(fr_0.params['offset'].value,
+                                   fr_0.params['offset'].stderr if
+                                   fr_0.params['offset'].stderr is not None
+                                   else np.nan)
 
         qoi['osc_offs_1'] = ufloat(fr_1.params['offset'].value,
                                    fr_1.params['offset'].stderr if
