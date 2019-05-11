@@ -1904,7 +1904,7 @@ class CCLight_Transmon(Qubit):
         """
         Measures anharmonicity of the transmon using three-tone spectroscopy.
 
-        Typically a good guess for the 12 transition frequencies is 
+        Typically a good guess for the 12 transition frequencies is
         f01 + alpha where alpha is the anharmonicity and typically ~ -300 MHz
         """
         f_anharmonicity = np.mean(freqs_01) - np.mean(freqs_12)
@@ -2412,6 +2412,9 @@ class CCLight_Transmon(Qubit):
     def measure_rabi(self, MC=None, amps=None,
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
+        """
+        Perform a Rabi experiment.
+        """
         if self.cfg_with_vsm():
             self.measure_rabi_vsm(MC, amps,
                                   analyze, close_fig, real_imag,
