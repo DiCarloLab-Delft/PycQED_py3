@@ -23,7 +23,7 @@ RUN pip install --upgrade --no-cache-dir pip && \
         "matplotlib<2.3" \
         # required by qcodes-0.1.11
         "numpy<1.14" \
-        plotly \
+        "plotly<3.8" \
         PyQt5 \
         scipy \
         pandas && \

@@ -7,6 +7,7 @@ from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from pycqed.utilities.general import format_value_string
 from copy import deepcopy
 from pycqed.analysis.tools.data_manipulation import \
     populations_using_rate_equations
@@ -150,11 +151,12 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
         states = ['0', '1', '+']
         for state in states:
             fr = self.fit_res['fit {}'.format(state)]
-            N1 = fr.params['N1'].value, fr.params['N1'].stderr
-            N2 = fr.params['N2'].value, fr.params['N2'].stderr
-            fit_msg += ('Prep |{}> : \n\tN_1 = {:.2g} $\pm$ {:.2g}'
-                        '\n\tN_2 = {:.2g} $\pm$ {:.2g}\n').format(
-                state, N1[0], N1[1], N2[0], N2[1])
+
+            fit_msg += 'Prep |{}> :\n\t'
+            fit_msg += format_value_string('$N_1$',
+                                           fr.params['N1'], end_char='\n\t')
+            fit_msg += format_value_string('$N_2$',
+                                           fr.params['N2'], end_char='\n')
 
         self.proc_data_dict['fit_msg'] = fit_msg
 
@@ -1001,15 +1003,9 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                                   fr_0.params['amplitude'].stderr is not None 
                                   else np.nan)
 
-        qoi['osc_amp_1'] = ufloat(fr_1.params['amplitude'].value,
-                                  fr_1.params['amplitude'].stderr if 
-                                  fr_1.params['amplitude'].stderr is not None 
-                                  else np.nan)
-
-        qoi['osc_offs_0'] = ufloat(fr_0.params['offset'].value,
-                                   fr_0.params['offset'].stderr if 
-                                   fr_0.params['offset'].stderr is not None 
-                                   else np.nan)
+        osc_amp = np.mean([fr_0['amplitude'], fr_1['amplitude']])
+        osc_amp_stderr = np.sqrt(fr_0['amplitude'].stderr**2 +
+                                 fr_1['amplitude']**2)/2
 
         qoi['osc_offs_1'] = ufloat(fr_1.params['offset'].value,
                                    fr_1.params['offset'].stderr if 
