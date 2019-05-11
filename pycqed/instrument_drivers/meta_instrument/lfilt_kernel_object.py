@@ -54,8 +54,6 @@ class LinDistortionKernel(Instrument):
         for filt_id in range(self._num_models):
             self.set('filter_model_{:02}'.format(filt_id), {})
 
-
-
     def get_first_empty_filter(self):
         """
         Resets all kernels to an empty dict so no distortion is applied.
@@ -76,7 +74,8 @@ class LinDistortionKernel(Instrument):
             AWG = self.instr_AWG.get_instr()
         except Exception as e:
             logging.warning(e)
-            logging.warning('Could not set realtime distortions to 0, AWG not found')
+            logging.warning(
+                'Could not set realtime distortions to 0, AWG not found')
             return
 
         # set exp_filters to 0
@@ -102,16 +101,22 @@ class LinDistortionKernel(Instrument):
                          inverse: bool=False):
         """
         Distorts a waveform using the models specified in the Kernel Object.
+
         Args:
             waveform (array)    : waveform to be distorted
             lenght_samples (int): number of samples after which to cut of wf
             inverse (bool)      : if True apply the inverse of the waveform.
 
-        Returns:
+        Return:
             y_sig (array)       : waveform with distortion filters applied
 
-        N.B. the bounce correction does not have an inverse implemented
+        N.B. The bounce correction does not have an inverse implemented
             (June 2018) MAR
+        N.B.2 The real-time FIR also does not have an inverse implemented.
+            (May 2019) MAR
+        N.B.3 the real-time distortions are reset and set on the HDAWG every
+            time a waveform is distorted. This is a suboptimal workflow.
+
         """
         if length_samples is not None:
             extra_samples = length_samples - len(waveform)
@@ -211,7 +216,8 @@ class LinDistortionKernel(Instrument):
                         if not inverse:
                             y_sig = signal.lfilter(fir_filter_coeffs, 1, y_sig)
                         elif inverse:
-                            y_sig = signal.lfilter(np.ones(1), fir_filter_coeffs, y_sig)
+                            y_sig = signal.lfilter(
+                                np.ones(1), fir_filter_coeffs, y_sig)
 
                 else:
                     raise KeyError('Model {} not recognized'.format(model))

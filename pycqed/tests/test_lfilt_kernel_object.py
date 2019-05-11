@@ -3,6 +3,7 @@ import numpy as np
 import pycqed.instrument_drivers.meta_instrument.lfilt_kernel_object as lko
 import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 
+
 class Test_LinDistortionKernelObject(unittest.TestCase):
 
     @classmethod
@@ -58,10 +59,11 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
              'params': {'weights': np.linspace(.2, 0, 40)}})
 
         my_square = np.ones(20)
-        distorted_square = self.k0.distort_waveform(my_square)
+        self.k0.distort_waveform(my_square)
 
         exp_amp = self.AWG.sigouts_0_precompensation_exponentials_0_amplitude()
         fir_coeffs = self.AWG.sigouts_0_precompensation_fir_coefficients()
+        # First test that some hardware settings were set
         assert exp_amp != 0
         assert (fir_coeffs == np.linspace(.2, 0, 40)).all()
         self.k0.set_realtime_distortions_zero()
@@ -73,8 +75,7 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
         imp_resp[0] = 1
         assert (fir_coeffs == imp_resp).all()
 
-
-    def test_setting_realtime_filter(self):
+    def test_setting_realtime_filter_exponential(self):
         self.k0.reset_kernels()
         self.k0.cfg_gain_correction(1)
 
@@ -93,16 +94,26 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
         set_tau = self.AWG.sigouts_0_precompensation_exponentials_0_timeconstant()
         assert set_tau == tau
 
+    def test_setting_realtime_filter_FIR(self):
+        self.k0.reset_kernels()
+        self.k0.cfg_gain_correction(1)
+
+        self.k0.filter_model_01(
+            {'model': 'FIR',
+             'real-time': True,
+             'params': {'weights': np.linspace(.2, 0, 40)}})
+        my_square = np.ones(20)
+        distorted_square = self.k0.distort_waveform(my_square)
+        assert (my_square == distorted_square[:20]).all()
+
+        self.k0.cfg_awg_channel(1)
+        coeffs = self.AWG.sigouts_0_precompensation_fir_coefficients()
+        assert (coeffs == np.linspace(.2, 0, 40)).all()
+        assert self.AWG.sigouts_0_precompensation_fir_enable() == 1
+
         # Add tests for enabling realtime fiters
-
-
-
-
-
 
     @classmethod
     def tearDownClass(self):
         self.k0.close()
         self.AWG.close()
-
-
