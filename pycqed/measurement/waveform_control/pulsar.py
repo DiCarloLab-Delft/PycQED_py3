@@ -915,7 +915,7 @@ class AWG5014Pulsar:
         packed_waveforms = {}
         for segment in sequence.segments:
             el_wfs = seg_wfs[segment]
-
+    
             for (_, el), cid_wfs in sorted(el_wfs.items()):
                 maxlen = -float('inf')
                 for wf in cid_wfs.values():
@@ -932,12 +932,12 @@ class AWG5014Pulsar:
                             constant_values=0)
 
                         if grp_wfs[cid][0] != 0.:
-                            log.warning('Element {} starts with non zero entry on \
-                                        {}.'.format(el, obj.name))
+                            log.warning('Element {} starts with non zero ' 
+                                'entry on {}.'.format(el, obj.name))
                     wfname = el + '_' + grp
 
                     packed_waveforms[wfname] = obj.pack_waveform(
-                        grp_wfs[grp], grp_wfs[grp + '_m1'], grp_wfs[grp + '_m2'])
+                        grp_wfs[grp], grp_wfs[grp + 'm1'], grp_wfs[grp + 'm2'])
 
         log.info("Programming {} sequence '{}' ({} element(s)) \t".format(
             obj.name, sequence.name, len(sequence.segments)))
@@ -1374,14 +1374,14 @@ class AWG5014Pulsar:
         """
         Returns all id-s corresponding to a single channel group.
         For example `Pulsar._awg5014_group_ids('ch2')` returns `['ch2',
-        'ch2_marker1', 'ch2_marker2']`.
+        'ch2m1', 'ch2m2']`.
 
         Args:
             cid: An id of one of the AWG5014 channels.
 
         Returns: A list of id-s corresponding to the same group as `cid`.
         """
-        return [cid[:3], cid[:3] + '_m1', cid[:3] + '_m2']
+        return [cid[:3], cid[:3] + 'm1', cid[:3] + 'm2']
 
     def _awg5014_activate_channels(self, grps, awg):
         """
@@ -1430,9 +1430,9 @@ class AWG5014Pulsar:
             channel_cfg['CHANNEL_STATE_' + cid[2]] = 0
 
         for channel in self.channels:
-            if self.get('{}_AWG'.format(channel)) != AWG:
+            if self.get('{}_awg'.format(channel)) != awg:
                 continue
-            if self.get('{}_active'.format(channel)):
+            if self.get('{}_active'.format(awg)):
                 cid = self.get('{}_id'.format(channel))
                 channel_cfg['CHANNEL_STATE_' + cid[2]] = 1
         return channel_cfg

@@ -182,7 +182,7 @@ class Segment:
                 awg_channels = awg_channels.union(chan)
 
             tvals = self.tvals(compensation_chan & awg_channels, element)
-      
+
             for pulse in self.elements[element]:
                 t_end = max(t_end, pulse.algorithm_time() + pulse.length)
 
@@ -208,7 +208,7 @@ class Segment:
                         ]
 
         # Add all compensation pulses to the last element after the last pulse
-        # of the segment and for each element with a compensation pulse save 
+        # of the segment and for each element with a compensation pulse save
         # the pusle with the greates length to determine the new length of the
         # element
         i = 1
@@ -233,16 +233,17 @@ class Segment:
 
             if pulse_area[c][0] > 0:
                 amp = -amp
-                
+
             last_element = pulse_area[c][1]
             # for RO elements create a seperate element for compensation pulses
             if last_element in self.acquisition_elements:
                 RO_awg = self.pulsar.get('{}_awg'.format(c))
                 if RO_awg not in comp_dict:
-                    last_element = 'compensation_el{}_{}'.format(comp_i,self.name)
+                    last_element = 'compensation_el{}_{}'.format(
+                        comp_i, self.name)
                     comp_dict[RO_awg] = last_element
                     self.elements[last_element] = []
-                    self.element_start_end[last_element] = {RO_awg: [t_end,0]}
+                    self.element_start_end[last_element] = {RO_awg: [t_end, 0]}
                     self.elements_on_awg[RO_awg].append(last_element)
                     comp_i += 1
                 else:
@@ -261,19 +262,18 @@ class Segment:
             pulse.algorithm_time(t_end)
 
             # Save the length of the longer pulse in longest_pulse dictionary
-            total_length = 2*comp_delay + length
+            total_length = 2 * comp_delay + length
             longest_pulse[(last_element,awg)] = \
                     max(longest_pulse.get((last_element,awg),0), total_length)
-            
-            self.elements[last_element].append(pulse)
-        
-        for (el,awg) in longest_pulse:
-            length_comp = longest_pulse[(el,awg)]
-            el_start = self.get_element_start(el,awg)
-            new_end = t_end + length_comp
-            new_samples = self.time2sample(new_end-el_start, awg=awg)
-            self.element_start_end[el][awg][1] = new_samples
 
+            self.elements[last_element].append(pulse)
+
+        for (el, awg) in longest_pulse:
+            length_comp = longest_pulse[(el, awg)]
+            el_start = self.get_element_start(el, awg)
+            new_end = t_end + length_comp
+            new_samples = self.time2sample(new_end - el_start, awg=awg)
+            self.element_start_end[el][awg][1] = new_samples
 
     def gen_refpoint_dict(self):
         """
@@ -389,6 +389,7 @@ class Segment:
         # these AWGs and so on.
         awg_hierarchy = self.find_awg_hierarchy()
 
+        i = 1
         for awg in awg_hierarchy:
             if awg not in self.elements_on_awg:
                 continue
@@ -413,7 +414,9 @@ class Segment:
                 for trigger_awg in trigger_awgs:
                     # if there is no element on that AWG create a new element
                     if self.elements_on_awg.get(trigger_awg, None) == None:
-                        trigger_elements[trigger_awg] = 'trigger_element_{}'.format(self.name)
+                        trigger_elements[
+                            trigger_awg] = 'trigger_element_{}'.format(
+                                self.name)
                     # else find the element that is closest to the
                     # trigger pulse
                     else:
@@ -429,7 +432,9 @@ class Segment:
                     trig_pulse = bpl.SquarePulse(
                         trigger_elements[trigger_awg],
                         channel=channel,
+                        name='trigger_pulse_{}'.format(i),
                         **self.trigger_pars)
+                    i += 1
 
                     trig_pulse.algorithm_time(trigger_pulse_time)
 
@@ -759,7 +764,7 @@ class Segment:
                     for channel in pulse_channels:
                         chan_tvals[channel] = tvals[channel].copy(
                         )[pulse_start:pulse_end]
-                    
+
                     pulse_wfs = pulse.get_wfs(chan_tvals)
 
                     for channel in pulse_channels:
@@ -807,7 +812,7 @@ class Segment:
                                                       iir_filters[1], wf)
                         wfs[codeword][c] = wf
 
-                        # truncate all values that are out of bounds and 
+                        # truncate all values that are out of bounds and
                         # normalize the waveforms
                         amp = self.pulsar.get('{}_amp'.format(c))
                         if self.pulsar.get('{}_type'.format(c)) == 'analog':
@@ -825,7 +830,7 @@ class Segment:
                                 amp,
                                 out=wfs[codeword][c])
                             # normalize wfs
-                            wfs[codeword][c] = wfs[codeword][c]/amp
+                            wfs[codeword][c] = wfs[codeword][c] / amp
                         # marker channels have to be 1 or 0
                         elif self.pulsar.get('{}_type'.format(c)) == 'marker':
                             wfs[codeword][c][wfs[codeword][c] > 0] = 1
