@@ -48,9 +48,18 @@ class VirtualAWG8(Instrument):
                                initial_value=0.8,
                                parameter_class=ManualParameter)
             # Adding precompensation pars
+            self.add_parameter('sigouts_{}_precompensation_enable'.format(i),
+                               parameter_class=ManualParameter)
+            self.add_parameter(
+                'sigouts_{}_precompensation_fir_enable'.format(i),
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'sigouts_{}_precompensation_fir_coefficients'.format(i),
+                parameter_class=ManualParameter)
+
             for j in range(8):
                 self.add_parameter('sigouts_{}_precompensation_exponentials'
-                                   '_{}_timecofnstant'.format(i, j),
+                                   '_{}_timeconstant'.format(i, j),
                                    parameter_class=ManualParameter)
                 self.add_parameter('sigouts_{}_precompensation_exponentials'
                                    '_{}_amplitude'.format(i, j),
