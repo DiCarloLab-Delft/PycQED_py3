@@ -986,30 +986,35 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         fr_1 = self.fit_res['cos_fit_on']
 
         phi0 = ufloat(np.rad2deg(fr_0.params['phase'].value),
-                      np.rad2deg(fr_0.params['phase'].stderr if 
-                                 fr_0.params['phase'].stderr is not None 
+                      np.rad2deg(fr_0.params['phase'].stderr if
+                                 fr_0.params['phase'].stderr is not None
                                  else np.nan))
 
         phi1 = ufloat(np.rad2deg(fr_1.params['phase'].value),
-                      np.rad2deg(fr_1.params['phase'].stderr if 
-                                 fr_1.params['phase'].stderr is not None 
+                      np.rad2deg(fr_1.params['phase'].stderr if
+                                 fr_1.params['phase'].stderr is not None
                                  else np.nan))
         qoi['phi_0'] = phi0
         qoi['phi_1'] = phi1
-        qoi['phi_cond'] = (phi0-phi1)%360
+        qoi['phi_cond'] = (phi0-phi1) % 360
 
         qoi['osc_amp_0'] = ufloat(fr_0.params['amplitude'].value,
-                                  fr_0.params['amplitude'].stderr if 
-                                  fr_0.params['amplitude'].stderr is not None 
+                                  fr_0.params['amplitude'].stderr if
+                                  fr_0.params['amplitude'].stderr is not None
+                                  else np.nan)
+        qoi['osc_amp_1'] = ufloat(fr_1.params['amplitude'].value,
+                                  fr_1.params['amplitude'].stderr if
+                                  fr_1.params['amplitude'].stderr is not None
                                   else np.nan)
 
-        osc_amp = np.mean([fr_0['amplitude'], fr_1['amplitude']])
-        osc_amp_stderr = np.sqrt(fr_0['amplitude'].stderr**2 +
-                                 fr_1['amplitude']**2)/2
+        qoi['osc_offs_0'] = ufloat(fr_0.params['offset'].value,
+                                   fr_0.params['offset'].stderr if
+                                   fr_0.params['offset'].stderr is not None
+                                   else np.nan)
 
         qoi['osc_offs_1'] = ufloat(fr_1.params['offset'].value,
-                                   fr_1.params['offset'].stderr if 
-                                   fr_1.params['offset'].stderr is not None 
+                                   fr_1.params['offset'].stderr if
+                                   fr_1.params['offset'].stderr is not None
                                    else np.nan)
 
         qoi['offs_diff'] = qoi['osc_offs_1'] - qoi['osc_offs_0']

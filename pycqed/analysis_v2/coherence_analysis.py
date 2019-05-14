@@ -580,21 +580,6 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         if auto:
             self.run_analysis()
 
-    def extract_data(self):
-        super().extract_data()
-
-        a = ma_old.MeasurementAnalysis(
-            timestamp=self.t_start, auto=False, close_file=False)
-        a.get_naming_and_values()
-
-        ch_amp = a.data_file[self.ch_amp_key].attrs['value']
-        if self.ch_range_key is None:
-            ch_range = 2  # corresponds to a scale factor of 1
-        else:
-            ch_range = a.data_file[self.ch_range_key].attrs['value']
-        waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
-        amp = ch_amp*ch_range/2*waveform_amp
-        self.proc_data_dict['sq_amp'] = amp
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
@@ -639,10 +624,6 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
         self.proc_data_dict['decay_fit_msg'] = text_msg
 
-
-    def save_fit_results(self):
-        # todo: if you want to save some results to a hdf5, do it here
-        pass
 
     def prepare_plots(self):
         self.plot_dicts['main'] = {
@@ -1294,7 +1275,7 @@ class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
              frequency_key=frequency_key,
              fit_qubit_Q_factor=False)
 
-    
+
 
 
 
@@ -1323,9 +1304,9 @@ class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
 #                       'plot_times':'sweep_points',
 # #                       'temperatures':'LaDucati.temperatures', # Does not exist any more
 #                       'field':'Magnet.field'}
-        
+
 #         if numeric_params is None:
-#             numeric_params = ['tau','tau_err','dac','frequency', 
+#             numeric_params = ['tau','tau_err','dac','frequency',
 #             'plot_data','plot_times','Attenuation','field']
 
 #         if t_stop is not None:
@@ -1481,7 +1462,7 @@ class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
 
 
     # Define a function that generates the filter mask
-    # Filters could e.g. be given as a 
+    # Filters could e.g. be given as a
 
 
 
