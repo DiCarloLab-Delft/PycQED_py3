@@ -3093,16 +3093,14 @@ class QuDev_transmon(Qubit):
         #get pi and pi/2 amplitudes from the analysis results
         if analyze:
             if for_ef:
-                rabi_ana = ma.Rabi_Analysis(label=label, qb_name=self.name,
-                                         NoCalPoints=no_cal_points,
-                                         close_fig=close_fig, for_ef=for_ef,
-                                         last_ge_pulse=last_ge_pulse, **kw)
-
-                rabi_amps = rabi_ana.rabi_amplitudes   #This is a dict with keywords
-                                                    #'piPulse',  'piPulse_std',
-                                                    #'piHalfPulse', 'piHalfPulse_std
-
-                amp180 = rabi_amps['piPulse']
+                #TODO: change hardcoding here
+                rabi_ana = \
+                    tda.RabiAnalysis(qb_names=[self.name],
+                                     options_dict=dict(num_cal_points=6,
+                                                       cal_zero_points=[-4, -3],
+                                                       cal_one_points=[-2, -1]))
+                amp180 = rabi_ana.proc_data_dict['analysis_params_dict'][
+                    self.name]['piPulse']
             else:
                 rabi_ana = tda.RabiAnalysis(qb_names=[self.name])
                 amp180 = rabi_ana.proc_data_dict['analysis_params_dict'][
