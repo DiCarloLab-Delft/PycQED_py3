@@ -1023,7 +1023,7 @@ class SingleLevel(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs.single_level_seq(pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-                                 pulse_pars_2nd=pulse_pars_2nd,
+                                 pulse_pars_2nd=self.pulse_pars_2nd,
                                  level=self.name, preselection=self.preselection)
 
 
