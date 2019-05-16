@@ -4343,6 +4343,8 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             self.proc_data_dict['analysis_params_dict'][
                 'leakage'] = {'val': leakage, 'stderr': x_err}
 
+        self.save_processed_data(key='analysis_params_dict')
+
     def prepare_plots(self):
         plotsize = self.get_default_plot_params(set=False)[
             'figure.figsize']
@@ -4466,25 +4468,25 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                                 self.proc_data_dict['analysis_params_dict'][
                                     'cphase']['val'][0]*180/np.pi) + \
                                       r'$^{\circ}$'
-                            textstr += '\nPopulation loss = {:.2f}'.format(
+                            textstr += '\nPopulation loss = {:.3f}'.format(
                                 self.proc_data_dict['analysis_params_dict'][
                                     'population_loss']['val'][0])
                             self.plot_dicts['text_msg_' + qbn] = {
                                 'fig_id': base_plot_name,
                                 'ypos': -0.2,
-                                'xpos': 0,
+                                'xpos': -0.05,
                                 'horizontalalignment': 'left',
                                 'verticalalignment': 'top',
                                 'plotfn': self.plot_text,
                                 'text_string': textstr}
                         else:
-                            textstr = 'Leakage = {:.2f}'.format(
+                            textstr = 'Leakage = {:.3f}'.format(
                                 self.proc_data_dict['analysis_params_dict'][
                                     'leakage']['val'][0])
                             self.plot_dicts['text_msg_' + qbn] = {
                                 'fig_id': base_plot_name,
                                 'ypos': -0.2,
-                                'xpos': 0,
+                                'xpos': -0.05,
                                 'horizontalalignment': 'left',
                                 'verticalalignment': 'top',
                                 'plotfn': self.plot_text,
@@ -4510,11 +4512,19 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                             1+idx],
                         'xunit': self.raw_data_dict['parameter_units'][0][
                             1+idx],
-                        'yvals': results_dict['val'],
+                        'yvals': results_dict['val']-np.pi if param_name=='cphase' else results_dict['val'],
                         'yerr': results_dict['stderr'] if
                             param_name != 'leakage' else None,
-                        'ylabel': param_name,
-                        'yunit': 'rad' if param_name == 'cphase' else '%',
+                        'ylabel': param_name+'-$\\pi$' if param_name=='cphase' else param_name,
+                        'yunit': 'rad' if param_name == 'cphase' else '',
                         'linestyle': 'none',
                         'do_legend': False}
+                    if param_name == 'cphase':
+                            self.plot_dicts[plot_name+'_hline'] = {
+                                'fig_id': plot_name,
+                                'plotfn': self.plot_hlines,
+                                'y': 0,
+                                'xmin': np.min(unique_swpts2d[idx]),
+                                'xmax': np.max(unique_swpts2d[idx]),
+                                'colors': 'gray'}
 

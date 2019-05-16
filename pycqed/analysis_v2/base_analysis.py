@@ -608,6 +608,9 @@ class BaseDataAnalysis(object):
                     # If the processed data group already exists.
                     proc_data_group = analysis_group['Processed data']
 
+                if key in proc_data_group.keys():
+                    del proc_data_group[key]
+
                 d = {key: self.proc_data_dict[key]}
                 write_dict_to_hdf5(d, entry_point=proc_data_group, 
                                    overwrite=overwrite)
