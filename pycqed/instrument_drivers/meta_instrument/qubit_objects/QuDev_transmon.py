@@ -379,8 +379,10 @@ class QuDev_transmon(Qubit):
         return {'driver': str(self.__class__), 'name': self.name}
 
     def update_detector_functions(self):
-
-        if self.RO_acq_weight_function_Q() is None or \
+        if self.ro_acq_weight_type() == "optimal_qutrit":
+            channels = [self.RO_acq_weight_function_I(),
+                        self.RO_acq_weight_function_Q()]
+        elif self.RO_acq_weight_function_Q() is None or \
            self.ro_acq_weight_type() not in ['SSB', 'DSB']:
             channels = [self.RO_acq_weight_function_I()]
         else:
@@ -671,6 +673,14 @@ class QuDev_transmon(Qubit):
                 self.RO_acq_weight_function_Q()),
                 self.ro_acq_weight_2nd_integr_Q().copy())
 
+            self.UHFQC.set('quex_rot_{}_real'.format(
+                self.RO_acq_weight_function_I()), 1.0)
+            self.UHFQC.set('quex_rot_{}_imag'.format(
+                self.RO_acq_weight_function_I()), -1.0)
+            self.UHFQC.set('quex_rot_{}_real'.format(
+                self.RO_acq_weight_function_Q()), 1.0)
+            self.UHFQC.set('quex_rot_{}_imag'.format(
+                self.RO_acq_weight_function_Q()), -1.0)
 
         else:
             tbase = np.arange(0, 4096 / 1.8e9, 1 / 1.8e9)
@@ -1001,7 +1011,6 @@ class QuDev_transmon(Qubit):
                     [amps, [amps[-1]+step, amps[-1]+2*step]])
             else:
                 sweep_points = amps
-
         MC.set_sweep_function(awg_swf.Rabi_2nd_exc(
                         pulse_pars=self.get_drive_pars(),
                         pulse_pars_2nd=self.get_ef_drive_pars(),
@@ -2343,8 +2352,12 @@ class QuDev_transmon(Qubit):
             self.measure_transients(MC, analyze=True, levels=levels, **kw)
 
         # create label, measurement analysis and data for each level
-        labels = {l: 'timetrace_{}_'.format(l) + kw.get('name_extra', "")
-                     + "_{}".format(self.name) for l in levels}
+        if kw.get("name_extra", False):
+            labels = {l: 'timetrace_{}_'.format(l) + kw.get('name_extra')
+                         + "_{}".format(self.name) for l in levels}
+        else:
+            labels = {l: 'timetrace_{}'.format(l)
+                         + "_{}".format(self.name) for l in levels}
         m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
         iq_traces = {l: m_a[l].measured_values[0]
                         + 1j * m_a[l].measured_values[1] for l in levels}
@@ -2377,7 +2390,7 @@ class QuDev_transmon(Qubit):
                                 f='d.c. voltage,\nPi_gf pulse (V)')
             tbase = np.linspace(0, npoints/1.8e9, npoints, endpoint=False)
             modulation = np.exp(2j * np.pi * self.f_RO_mod() * tbase)
-            fig, ax = plt.subplots(len(levels) + 1)
+            fig, ax = plt.subplots(len(levels) + 1, figsize=(20,20))
             plt.title('optimized weights ' + self.name +
                       "".join('\n' + m_a[l].timestamp_string for  l in levels))
             for i, l in enumerate(levels):
@@ -2401,12 +2414,13 @@ class QuDev_transmon(Qubit):
                 ax[-1].plot(tbase / 1e-9,
                             np.imag((iq_traces['e'] - iq_traces['g']) * modulation), '-',
                             label='Q')
-            ax[-1].ylabel('d.c. voltage\ndifference (V)')
+            ax[-1].set_ylabel('d.c. voltage\ndifference (V)')
             ax[-1].set_xlim(0, kw.get('tmax', 300))
             ax[-1].legend(loc='upper right')
             ax[-1].set_xlabel('Time (ns)')
             m_a['g'].save_fig(plt.gcf(), 'timetraces', xlabel='time',
                            ylabel='voltage')
+            plt.tight_layout()
             plt.close()
 
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
@@ -3497,7 +3511,7 @@ class QuDev_transmon(Qubit):
                     no_cal_points=no_cal_points, label=label)
 
         if analyze:
-            if multiple_detunings or for_ef:
+            if multiple_detunings:
                 ramsey_ana = ma.Ramsey_Analysis(
                     auto=True,
                     label=label,
@@ -3507,9 +3521,26 @@ class QuDev_transmon(Qubit):
                     last_ge_pulse=last_ge_pulse,
                     artificial_detuning=artificial_detuning, **kw)
 
-                #get new freq and T2* from analysis results
-                new_qubit_freq = ramsey_ana.qubit_frequency    #value
-                T2_star = ramsey_ana.T2_star['T2_star']        #dict
+                # get new freq and T2* from analysis results
+                new_qubit_freq = ramsey_ana.qubit_frequency  # value
+                T2_star = ramsey_ana.T2_star['T2_star']  # dict
+
+            if for_ef:
+                # TODO: change hardcoding here of calpoints
+                ramsey_ana = tda.RamseyAnalysis(qb_names=[self.name],
+                                                options_dict=
+                                                dict(fit_gaussian_decay=kw.get('fit_gaussian_decay', True),
+                                                num_cal_points=6,
+                                                cal_zero_points=[-4, -3],
+                                                cal_one_points=[-2, -1],
+                                                for_ef=True))
+                new_qubit_freq = ramsey_ana.proc_data_dict[
+                    'analysis_params_dict'][self.name]['exp_decay_' + self.name][
+                    'new_qb_freq']
+                T2_star = ramsey_ana.proc_data_dict[
+                    'analysis_params_dict'][self.name]['exp_decay_' + self.name][
+                    'T2_star']
+
             else:
                 ramsey_ana = tda.RamseyAnalysis(
                     qb_names=[self.name],
@@ -3776,12 +3807,21 @@ class QuDev_transmon(Qubit):
         # Returns the optimal qscale parameter
         if kw.pop('analyze', True):
             if for_ef:
-                qscale_ana = ma.QScale_Analysis(auto=True, qb_name=self.name,
-                                             label=label,
-                                             NoCalPoints=no_cal_points,
-                                             for_ef=for_ef,
-                                             last_ge_pulse=last_ge_pulse, **kw)
-                qscale = qscale_ana.optimal_qscale['qscale']
+                # TODO remove hard coded cal points
+                # qscale_ana = ma.QScale_Analysis(auto=True, qb_name=self.name,
+                #                              label=label,
+                #                              NoCalPoints=no_cal_points,
+                #                              for_ef=for_ef,
+                #                              last_ge_pulse=last_ge_pulse, **kw)
+                # qscale = qscale_ana.optimal_qscale['qscale']
+                qscale_ana = tda.QScaleAnalysis(qb_names=[self.name],
+                                                options_dict=
+                                                dict(num_cal_points=6,
+                                                     cal_zero_points=[-4, -3],
+                                                     cal_one_points=[-2, -1],
+                                                     for_ef=True))
+                qscale = qscale_ana.proc_data_dict['analysis_params_dict'][
+                    self.name]['qscale']
             else:
                 qscale_ana = tda.QScaleAnalysis(qb_names=[self.name])
                 qscale = qscale_ana.proc_data_dict['analysis_params_dict'][
@@ -3895,9 +3935,9 @@ class QuDev_transmon(Qubit):
 
         levels = ('g', 'e', 'f') if for_3_levels_ro else ('g', 'e')
 
-        self.measure_dispersive_shift(freqs, MC=MC, analyze=False,
-                                      levels=levels[1:], **kw)
-        labels = {l: '{}-spec' + self.msmt_suffix for l in levels}
+        #self.measure_dispersive_shift(freqs, MC=MC, analyze=False,
+        #                              levels=levels[1:], **kw)
+        labels = {l: '{}-spec'.format(l) + self.msmt_suffix for l in levels}
         m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
         trace = {l: m_a[l].measured_values[0] *
                     np.exp(1j * np.pi * m_a[l].measured_values[1] / 180.)
@@ -3909,10 +3949,19 @@ class QuDev_transmon(Qubit):
                          np.abs(trace['f'] - trace['e'])
             fmax = freqs[np.argmax(total_dist)]
             # FIXME: just as debug plotting for now
-            plt.plot(freqs, np.abs(trace['e'] - trace['g']), label='eg diff')
-            plt.plot(freqs, np.abs(trace['f'] - trace['g']), label='fg diff')
-            plt.plot(freqs, np.abs(trace['e'] - trace['f']), label='ef diff')
-            plt.plot(freqs, total_dist, label='total diff')
+            fig, ax = plt.subplots(2, figsize = (10,10))
+            ax[0].plot(freqs, np.abs(trace['g']), label='g')
+            ax[0].plot(freqs, np.abs(trace['e']), label='e')
+            ax[0].plot(freqs, np.abs(trace['f']), label='f')
+            ax[0].set_ylabel('Amplitude')
+            ax[0].legend()
+            ax[1].plot(freqs, np.abs(trace['e'] - trace['g']), label='eg')
+            ax[1].plot(freqs, np.abs(trace['f'] - trace['g']), label='fg')
+            ax[1].plot(freqs, np.abs(trace['e'] - trace['f']), label='ef')
+            ax[1].plot(freqs, total_dist, label='total distance')
+            ax[1].set_xlabel("Freq. [Hz]")
+            ax[1].set_ylabel('Distance in IQ plane')
+            ax[0].set_title("RO_freq used: {} Hz\nOptimal Freq: {} Hz".format(self.f_RO(), fmax))
             plt.legend()
             plt.show()
         else:
@@ -3925,6 +3974,14 @@ class QuDev_transmon(Qubit):
             SA = sa.ResonatorSpectroscopy(t_start=[m_a['g'].timestamp_string,
                                                    m_a['e'].timestamp_string],
                                           options_dict=dict(simultan=True,
+                                                            fit_options = dict(
+                                                            model='hanger_with_pf'),
+                                                            scan_label=''),
+                                          do_fitting=True)
+            # FIXME Nathan: remove 3 level dependency
+            if for_3_levels_ro:
+                SA2 = sa.ResonatorSpectroscopy(t_start= m_a['f'].timestamp_string,
+                                          options_dict=dict(simultan=False,
                                                             fit_options = dict(
                                                             model='hanger_with_pf'),
                                                             scan_label=''),
@@ -3987,7 +4044,7 @@ class QuDev_transmon(Qubit):
         self.UHFQC.quex_wint_length(int(self.RO_acq_integration_length()*1.8e9))
         heterodyne.nr_averages(self.RO_acq_averages())
 
-        for level in ('g') + levels:
+        for level in ('g',) + levels:
             sq.single_level_seq(pulse_pars=self.get_drive_pars(),
                                 RO_pars=self.get_RO_pars(),
                                 pulse_pars_2nd=self.get_ef_drive_pars(),
