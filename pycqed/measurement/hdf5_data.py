@@ -174,7 +174,7 @@ def write_dict_to_hdf5(data_dict: dict, entry_point, overwrite=False):
                     del entry_point[key]
                     entry_point.create_group(key)
                 else:
-                    raise
+                    raise 
             write_dict_to_hdf5(data_dict=item,
                                entry_point=entry_point[key],
                                overwrite=overwrite)

@@ -732,6 +732,7 @@ class MeasurementAnalysis(object):
                 ax.hlines(np.mean(y[cal_one_points]),
                           min(x), max(x),
                           linestyles='--', color='C7')
+
                 l = 'f' if kw.get("for_ef", False) else 'e'
                 ax.text(np.mean(x[cal_one_points]),
                         np.mean(y[cal_one_points])-0.05,
@@ -740,6 +741,16 @@ class MeasurementAnalysis(object):
                         horizontalalignment='center', color='k')
                 NoCalPoints += len(cal_one_points)
 
+                # hacky way to get the e level drawn on figure
+                # even if not given when doing 3-level readout with 6 calibration points
+                if l == 'f' and kw.get("no_cal_points", NoCalPoints) == 6:
+                    cal_points_e = np.array(cal_one_points, dtype=np.int) - 2
+                    ax.plot(x[cal_points_e], y[cal_points_e], '.k')
+                    ax.text(np.mean(x[cal_points_e]),
+                            np.mean(y[cal_points_e]) - 0.05,
+                            r'$|e\rangle$',
+                            fontsize=font_size, verticalalignment='top',
+                            horizontalalignment='center', color='k')
             # FIXME: issue when 6 cal points are used, because method above recovers
             #  only 4 although 6 were used. the first two cal points are then
             #  interpreted as data. therefore, for now I allow a dirty override
