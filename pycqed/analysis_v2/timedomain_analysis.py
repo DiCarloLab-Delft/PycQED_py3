@@ -3486,9 +3486,14 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                     OrderedDict()
                 fit_res = self.fit_dicts[key]['fit_res']
 
-                old_qb_freq = a_tools.get_param_value_from_file(
-                    file_path=self.raw_data_dict['folder'][0],
-                    instr_name=qbn, param_name='f_qubit')
+                if self.options_dict.get('for_ef', False):
+                    old_qb_freq = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='f_ef_qubit')
+                else:
+                    old_qb_freq = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='f_qubit')
                 self.proc_data_dict['analysis_params_dict'][qbn][key][
                     'old_qb_freq'] = old_qb_freq
                 self.proc_data_dict['analysis_params_dict'][qbn][key][
@@ -3767,7 +3772,9 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
 
                     old_qscale_val = a_tools.get_param_value_from_file(
                         file_path=self.raw_data_dict['folder'][0],
-                        instr_name=qbn, param_name='motzoi')
+                        instr_name=qbn,
+                        param_name='motzoi{}'.format("_ef" if self.options_dict.get("for_ef", False)
+                                                     else ""))
                     textstr = 'Qscale = {:.4f} $\pm$ {:.4f}'.format(
                         self.proc_data_dict['analysis_params_dict'][qbn][
                             'qscale'],
