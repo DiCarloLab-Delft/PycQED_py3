@@ -4530,6 +4530,77 @@ def add_CZ_pulse(qbc, qbt):
                                 vals=vals.Numbers(0))
 
 
+def add_CZ_MG_pulse(qbc, qbt):
+    """
+    Args:
+        qbc: Control qubit. A QudevTransmon object corresponding to the qubit
+             that we apply the flux pulse on.
+        qbt: Target qubit. A QudevTransmon object corresponding to the qubit
+             we induce the conditional phase on.
+    """
+
+    # add flux pulse parameters
+    op_name = 'CZ ' + qbt.name
+    ps_name = 'CZ_' + qbt.name
+
+    if np.any([op_name == i for i in qbc.get_operation_dict().keys()]):
+        # do not try to add it again if operation already exists
+        raise ValueError('Operation {} already exists.'.format(op_name))
+    else:
+        qbc.add_operation(op_name)
+
+        qbc.add_pulse_parameter(op_name, ps_name + '_target',  'qb_target',
+                                initial_value=qbt.name,
+                                vals=vals.Enum(qbt.name))
+        qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
+                                initial_value='NZMartinisGellarPulse',
+                                vals=vals.Enum('NZMartinisGellarPulse'))
+        qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
+                                initial_value='', vals=vals.Strings())
+        qbc.add_pulse_parameter(op_name, ps_name + '_aux_channels_dict',
+                                'aux_channels_dict',
+                                initial_value={}, vals=vals.Dict())
+        qbc.add_pulse_parameter(op_name, ps_name + '_theta_f', 'theta_f',
+                                initial_value=0, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_lambda_2', 'lambda_2',
+                                initial_value=0, vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_qbc_freq', 'qbc_freq',
+                                initial_value=qbc.f_qubit(),
+                                vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_qbt_freq', 'qbt_freq',
+                                initial_value=qbt.f_qubit(),
+                                vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_length', 'pulse_length',
+                                initial_value=0, vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_alpha', 'alpha',
+                                initial_value=1, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_buf_start',
+                                'buffer_length_start', initial_value=10e-9,
+                                vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_buf_end',
+                                'buffer_length_end', initial_value=10e-9,
+                                vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_extra_buffer_aux_pulse',
+                                'extra_buffer_aux_pulse', initial_value=5e-9,
+                                vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_anharmonicity_qbc',
+                                'anharmonicity',
+                                initial_value=0, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_J_qbc', 'J',
+                                initial_value=0, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_dynamic_phases',
+                                'basis_rotation', initial_value={},
+                                vals=vals.Dict())
+        qbc.add_pulse_parameter(op_name, ps_name + '_dphi_dV_qbc', 'dphi_dV',
+                                initial_value=0, vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_loop_asym_qbc', 'loop_asym',
+                                initial_value=0, vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_wave_generation_func',
+                                'wave_generation_func', initial_value=None,
+                                vals=vals.Callable())
+        qbc.add_pulse_parameter(op_name, ps_name + '_delay', 'pulse_delay',
+                                initial_value=0, vals=vals.Numbers())
+
 
 
 

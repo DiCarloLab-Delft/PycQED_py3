@@ -2475,37 +2475,38 @@ def measure_fgge_frequency_sweep(qbc, qbt, qbm, fgge_pulse_name,
     ma.MeasurementAnalysis()
 
 
-def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
-                    frequencies=None, alphas=None,
-                    cal_points=True, upload=True,
+def measure_chevron(qbc, qbt, qbr, sweep_params_dict, cal_points=True,
                     verbose=False, return_seq=False,
                     MC=None, soft_averages=1):
 
     if MC is None:
         MC = qbc.MC
+    if 'hard_sweep_points' not in sweep_params_dict:
+        raise ValueError('"hard_sweep_points" not in sweep_params_dict.')
+    if 'soft_sweep_points' not in sweep_params_dict:
+        raise ValueError('"soft_sweep_points" not in sweep_params_dict.')
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
     CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
 
-    if frequencies is None:
-        frequencies = [operation_dict[CZ_pulse_name].get('frequency', 0)]
-    if alphas is None:
-        alphas = [operation_dict[CZ_pulse_name].get('alpha', 1)]
-
     for qb in [qbc, qbt, qbr]:
         qb.prepare_for_timedomain()
 
+    hard_swpts = sweep_params_dict['hard_sweep_points']['values']
     if cal_points:
-        step = np.abs(lengths[-1]-lengths[-2])
+        step = np.abs(hard_swpts[-1]-hard_swpts[-2])
         sweep_points = np.concatenate(
-            [lengths, [lengths[-1]+step,  lengths[-1]+2*step,
-                           lengths[-1]+3*step, lengths[-1]+4*step]])
+            [hard_swpts, [hard_swpts[-1]+step,  hard_swpts[-1]+2*step,
+                       hard_swpts[-1]+3*step, hard_swpts[-1]+4*step]])
+    else:
+        sweep_points = hard_swpts
 
+    soft_sweep_dict = {}
+    for param_name, param_dict in sweep_params_dict['soft_sweep_points'].items():
+        soft_sweep_dict[param_name] = param_dict['values'][0]
     sf1 = awg_swf.Chevron_length_swf_new(
-                lengths=sweep_points,
-                flux_pulse_amp=amplitudes[0],
-                frequency=frequencies[0],
-                alpha=alphas[0],
+                sweep_params_dict['hard_sweep_points'],
+                soft_sweep_dict,
                 qbc_name=qbc.name,
                 qbt_name=qbt.name,
                 qbr_name=qbr.name,
@@ -2518,34 +2519,15 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
     MC.set_sweep_function(sf1)
     MC.set_sweep_points(sweep_points)
 
-    if len(amplitudes) > 1:
-        sf2 = awg_swf.Chevron_ampl_swf_new(hard_sweep=sf1)
-        sweep_points_2D = amplitudes
-        exp_metadata = {'CZ_frequency': frequencies[0]}
-        if operation_dict[CZ_pulse_name]['pulse_type'] == 'NZBufferedCZPulse':
-            exp_metadata['alpha'] = alphas[0]
-    elif len(frequencies) > 1:
-        sf2 = awg_swf.Chevron_freq_swf_new(hard_sweep=sf1)
-        sweep_points_2D = frequencies
-        exp_metadata = {'CZ_amplitude': amplitudes[0]}
-        if operation_dict[CZ_pulse_name]['pulse_type'] == 'NZBufferedCZPulse':
-            exp_metadata['alpha'] = alphas[0]
-    elif len(alphas) > 1:
-        sf2 = awg_swf.Chevron_alpha_swf_new(hard_sweep=sf1)
-        sweep_points_2D = alphas
-        exp_metadata = {'CZ_amplitude': amplitudes[0],
-                        'CZ_frequency': frequencies[0]}
-    else:
-        raise ValueError('At least amplitudes or frequencies or alphas '
-                         'must have len > 1')
 
-
+    sf2 = awg_swf.Chevron_general_soft_swf(
+        hard_sweep=sf1,
+        parameter_name=sweep_params_dict['soft_sweep_points']['parameter_name'],
+        unit=sweep_params_dict['soft_sweep_points']['unit'])
     MC.set_sweep_function_2D(sf2)
-    MC.set_sweep_points_2D(sweep_points_2D)
+    MC.set_sweep_points_2D(sweep_params_dict['soft_sweep_points']['values'])
     MC.set_detector_function(qbr.int_avg_det)
-    MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name),
-              exp_metadata=exp_metadata)
-    # ma.MeasurementAnalysis(TwoD=True)
+    MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name))
     tda.MultiQubit_TimeDomain_Analysis(qb_names=[qbr.name],
                                        options_dict={'TwoD': True})
 
@@ -2689,7 +2671,7 @@ def measure_cphase(qbc, qbt, qbr, lengths, amps, alphas=None,
         return
 
 
-def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
+def measure_cphase_nz(qbc, qbt, soft_sweep_params_dict, f_LO,
                        CZ_pulse_name=None,
                        phases=None, MC=None,
                        UHFQC=None, pulsar=None,
@@ -2727,14 +2709,15 @@ def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
         cphases (numpy array): array of the conditional phases measured at
                               (amps[i], lengths[i])
     '''
-    if len(amps) != len(lengths):
-        raise ValueError('amps and lengths must have the same '
-                         'dimension.')
-    if alphas is None:
-        raise ValueError('alphas is None')
-    if len(alphas) != len(amps):
-        raise ValueError('alphas must have the same dimension as '
-                         'amps and lengths.')
+    # if len(amps) != len(lengths):
+    #     raise ValueError('amps and lengths must have the same '
+    #                      'dimension.')
+    # if alphas is None:
+    #     raise ValueError('alphas is None')
+    # if len(alphas) != len(amps):
+    #     raise ValueError('alphas must have the same dimension as '
+    #                      'amps and lengths.')
+
     if MC is None:
         MC = qbc.MC
         print("Unspecified MC object. Using {}.MC.".format(
@@ -2750,7 +2733,6 @@ def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
 
     if phases is None:
         phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
-
     if cal_points:
         step = phases[-1] - phases[-2]
         phases = np.concatenate(
@@ -2761,9 +2743,13 @@ def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
     operation_dict = get_operation_dict([qbc, qbt])
     if CZ_pulse_name is None:
         CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
-
     CZ_pulse_channel = operation_dict[CZ_pulse_name]['channel']
-    max_flux_length = np.max(lengths)
+
+    # set sweep functions
+    if 'pulse_length' in soft_sweep_params_dict:
+        max_flux_length = np.max(soft_sweep_params_dict['pulse_length'])
+    else:
+        max_flux_length = None
     s1 = awg_swf.CPhase_NZ_hard_swf(sweep_points,
                                     qbc.name,
                                     qbt.name,
@@ -2774,17 +2760,19 @@ def measure_cphase_nz(qbc, qbt, lengths, amps, alphas, f_LO,
                                     cal_points=cal_points,
                                     reference_measurements=True,
                                     upload=upload)
-    s2 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='length',
-                                            upload=upload)
-    s3 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='amplitude',
-                                            upload=upload)
-    s4 = awg_swf.Flux_pulse_CPhase_soft_swf(s1, sweep_param='alpha',
-                                            upload=upload)
-    MC.set_sweep_functions([s1, s2, s3, s4])
+    soft_swf_list = []
+    soft_swpts_list = []
+    for sweep_param, param_dict in soft_sweep_params_dict.items():
+        s_soft = awg_swf.Flux_pulse_CPhase_soft_swf(
+            s1, sweep_param=sweep_param, unit=param_dict['unit'], upload=upload)
+        soft_swf_list += [s_soft]
+        soft_swpts_list += [param_dict['values']]
+
+    MC.set_sweep_functions(soft_swf_list)
     MC.set_sweep_points(sweep_points)
     #Here the order of the parameters matters! Paramters must be
     #set in the same order as their sweepfunctions!
-    MC.set_sweep_points_2D(np.array([lengths, amps, alphas]).T)
+    MC.set_sweep_points_2D(np.array(soft_swpts_list).T)
 
     for qb in [qbc, qbt]:
         qb.prepare_for_timedomain(multiplexed=True)

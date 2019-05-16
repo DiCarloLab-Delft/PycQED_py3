@@ -2172,7 +2172,7 @@ class Chevron_length_hard_swf(swf.Hard_Sweep):
 
 class Chevron_length_swf_new(swf.Hard_Sweep):
 
-    def __init__(self, lengths, flux_pulse_amp, frequency, alpha,
+    def __init__(self, hard_sweep_dict, soft_sweep_dict,
                  qbc_name, qbt_name, qbr_name,
                  CZ_pulse_name, operation_dict, readout_qbt=None,
                  verbose=False, cal_points=False,
@@ -2184,10 +2184,8 @@ class Chevron_length_swf_new(swf.Hard_Sweep):
         'fsqs.Chevron_length_seq(...)'''
 
         super().__init__()
-        self.lengths = lengths
-        self.flux_pulse_amp = flux_pulse_amp
-        self.frequency = frequency
-        self.alpha = alpha
+        self.hard_sweep_dict = hard_sweep_dict
+        self.soft_sweep_dict = soft_sweep_dict
         self.qbc_name = qbc_name
         self.qbt_name = qbt_name
         self.qbr_name = qbr_name
@@ -2206,10 +2204,8 @@ class Chevron_length_swf_new(swf.Hard_Sweep):
     def prepare(self, upload_all=True, **kw):
         if self.upload:
             fsqs.Chevron_length_seq_new(
-                lengths=self.lengths,
-                flux_pulse_amp=self.flux_pulse_amp,
-                frequency=self.frequency,
-                alpha=self.alpha,
+                hard_sweep_dict=self.hard_sweep_dict,
+                soft_sweep_dict=self.soft_sweep_dict,
                 qbc_name=self.qbc_name,
                 qbt_name=self.qbt_name,
                 qbr_name=self.qbr_name,
@@ -2268,7 +2264,7 @@ class Chevron_frequency_hard_swf(swf.Hard_Sweep):
 
 class Chevron_ampl_swf_new(swf.Soft_Sweep):
 
-    def __init__(self, hard_sweep):
+    def __init__(self, hard_sweep, parameter_name='', unit=''):
         '''
         Sweep function class (soft sweep) for 2D Chevron experiment where
         the amplitude of the fluxpulse is swept. Used in combination with
@@ -2281,8 +2277,8 @@ class Chevron_ampl_swf_new(swf.Soft_Sweep):
         '''
         super().__init__()
         self.name = 'Chevron flux pulse amplitude sweep'
-        self.parameter_name = 'Fluxpulse amplitude'
-        self.unit = 'V'
+        self.parameter_name = parameter_name
+        self.unit = unit
         self.hard_sweep = hard_sweep
         self.is_first_sweeppoint = True
 
@@ -2290,7 +2286,34 @@ class Chevron_ampl_swf_new(swf.Soft_Sweep):
         pass
 
     def set_parameter(self, val, **kw):
-        self.hard_sweep.flux_pulse_amp = val
+        first_key = list(self.hard_sweep.soft_sweep_dict)[0]
+        # TODO: do this properly!
+        self.hard_sweep.soft_sweep_dict[first_key] = val
+        self.hard_sweep.upload = True
+        self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
+        self.is_first_sweeppoint = False
+
+    def finish(self):
+        pass
+
+
+class Chevron_general_soft_swf(swf.Soft_Sweep):
+
+    def __init__(self, hard_sweep, parameter_name='', unit=''):
+        super().__init__()
+        self.name = 'Chevron flux pulse {} sweep'.format(parameter_name)
+        self.parameter_name = parameter_name
+        self.unit = unit
+        self.hard_sweep = hard_sweep
+        self.is_first_sweeppoint = True
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        first_key = list(self.hard_sweep.soft_sweep_dict)[0]
+        # TODO: do this properly!
+        self.hard_sweep.soft_sweep_dict[first_key] = val
         self.hard_sweep.upload = True
         self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
         self.is_first_sweeppoint = False
@@ -2695,22 +2718,21 @@ class CPhase_NZ_hard_swf(swf.Hard_Sweep):
         self.parameter_name = 'phase'
         self.unit = 'rad'
         self.max_flux_length = max_flux_length
-        self.flux_length = None
-        self.flux_amplitude = None
-        self.flux_alpha = None
+        self.flux_params_dict = None
         self.values_complete = False
         self.first_data_point = True
 
-    def prepare(self, flux_params=None, **kw):
-        print('flux params hard swf ', flux_params)
-        if flux_params is None:
+    def prepare(self, flux_params_dict_soft_swf=None, **kw):
+        print('flux params dict soft swf in hard swf ',
+              flux_params_dict_soft_swf)
+        if flux_params_dict_soft_swf is None:
             return
 
         if self.upload:
             print('Uploaded CPhase Sequence')
             fsqs.cphase_nz_seq(
                 phases=self.phases,
-                flux_params=flux_params,
+                flux_params_dict=flux_params_dict_soft_swf,
                 max_flux_length=self.max_flux_length,
                 qbc_name=self.qbc_name,
                 qbt_name=self.qbt_name,
@@ -2718,7 +2740,6 @@ class CPhase_NZ_hard_swf(swf.Hard_Sweep):
                 CZ_pulse_name=self.CZ_pulse_name,
                 CZ_pulse_channel=self.CZ_pulse_channel,
                 cal_points=self.cal_points,
-                reference_measurements=self.reference_measurements,
                 upload=self.upload,
                 return_seq=True,
                 first_data_point=self.first_data_point
@@ -2732,22 +2753,12 @@ class CPhase_NZ_hard_swf(swf.Hard_Sweep):
             logging.warning('CPhase hard sweep set_parameter method was called '
                             'without a value type!')
             return
-        elif val_type == 'length':
-            self.flux_length = flux_val
-        elif val_type == 'amplitude':
-            self.flux_amplitude = flux_val
-        elif val_type == 'alpha':
-            self.flux_alpha = flux_val
         else:
-            logging.error('CPhase hard sweep does not recognize value type '
-                          'handed by set_parameter() method!')
-        if self.flux_length is not None and self.flux_amplitude is not None \
-                and self.flux_alpha is not None:
-            self.prepare(flux_params=[self.flux_length, self.flux_amplitude,
-                                      self.flux_alpha])
-            self.flux_length = None
-            self.flux_amplitude = None
-            self.flux_alpha = None
+            self.flux_params_dict_soft_swf = {val_type: flux_val}
+
+        if self.flux_params_dict is not None:
+            self.prepare(flux_params_dict_soft_swf=self.flux_params_dict)
+            self.flux_params_dict = None
 
 
 class Flux_pulse_CPhase_hard_swf_frequency(swf.Hard_Sweep):
@@ -2840,7 +2851,7 @@ class Flux_pulse_CPhase_hard_swf_frequency(swf.Hard_Sweep):
 
 class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
 
-    def __init__(self, hard_sweep, sweep_param='length', upload=True):
+    def __init__(self, hard_sweep, sweep_param, unit='', upload=True):
         '''
             Flexible soft sweep function class for 2D CPhase
             experiments that can either sweep the amplitude or
@@ -2852,21 +2863,11 @@ class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
             hard_sweep: 1D hard sweep
         '''
         super().__init__()
+        self.sweep_param = sweep_param
         self.name = 'flux_pulse_CPhase_measurement_{}_2D_sweep'.format(
             sweep_param)
-        self.sweep_param = sweep_param
-        if sweep_param == 'length':
-            self.unit = 's'
-            self.parameter_name = 'flux_length'
-        elif sweep_param == 'amplitude':
-            self.unit = 'V'
-            self.parameter_name = 'flux_amp'
-        elif sweep_param == 'frequency':
-            self.unit = 'Hz'
-            self.parameter_name = 'frequency'
-        elif sweep_param == 'alpha':
-            self.unit = ''
-            self.parameter_name = 'alpha'
+        self.unit = unit
+        self.parameter_name = sweep_param
         self.hard_sweep = hard_sweep
         self.upload = upload
 
