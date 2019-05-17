@@ -1199,7 +1199,7 @@ class CCLight_Transmon(Qubit):
                           all_modules=all_modules)
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
         try:
-            if self.cfg_with_vsm():
+            if self.cfg_with_vsm(): 
                 self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
             else:
                 self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
