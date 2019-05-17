@@ -1770,7 +1770,7 @@ class CCLight_Transmon(Qubit):
     def find_bus_frequency(self,freqs,spec_source_bus,bus_power,f01=None,label='',
                         close_fig=True,analyze=True,MC=None,prepare_for_continuous_wave=True):
         '''
-        Drive the qubit and sit at the spectroscopy peak while the bus is driven with 
+        Drive the qubit and sit at the spectroscopy peak while the bus is driven with
         bus_spec_source
 
         Input parameters:
@@ -1829,10 +1829,10 @@ class CCLight_Transmon(Qubit):
                         close_fig=True,analyze=True,MC=None,
                         prepare_for_continuous_wave=True):
         '''
-        Drive the qubit and sit at the spectroscopy peak while the bus is driven with 
+        Drive the qubit and sit at the spectroscopy peak while the bus is driven with
         bus_spec_source. At the same time sweep dac channel specified by dac_param over
         set of values sepcifeid by dacs.
-        
+
         Practical comments:
         - sweep flux bias of different (neighbour) qubit than the one measured
         - set spec_power of the first tone high (say, +15 dB relative to value optimal
@@ -1898,29 +1898,22 @@ class CCLight_Transmon(Qubit):
             ma.TwoD_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
 
-    # anharmonicity measurement, bus crossing and photon number splitting with the bus
-    def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None,
-                              f_12_power=None, MC=None, spec_source_2=None, f_01_span=24e6,
-                              f_12_span = 24e6):
-        '''
-        note measures anharmonicity of the transmon using three-tone
-        spectroscopy. two usecases:
-        - provide f_02 from high-power spectroscopy of the 02-transition.
-                                    It will calculate the 12 transition from it
-        - provide directly the 1-2 transition
-        '''
-        if (f_02 is None) and (f_12 is None):
-            raise ValueError("provide either and estimate of f_02 or f_12")
-        if f_12 == None:
-            f_anharmonicity = (f_01-f_02)*2
-            f_12 = f_01-f_anharmonicity
+    def measure_anharmonicity(self, freqs_01, freqs_12, f_01_power=None,
+                              f_12_power=None,
+                              MC=None, spec_source_2=None):
+        """
+        Measures anharmonicity of the transmon using three-tone spectroscopy.
+
+        Typically a good guess for the 12 transition frequencies is 
+        f01 + alpha where alpha is the anharmonicity and typically ~ -300 MHz
+        """
+        f_anharmonicity = np.mean(freqs_01) - np.mean(freqs_12)
         if f_01_power == None:
             f_01_power = self.spec_pow()
         if f_12_power == None:
             f_12_power = f_01_power
-        f_anharmonicity = (f_01-f_12)
-        print('f_anharmonicity estimations', f_anharmonicity)
-        print('f_12 estimations', f_12)
+        print('f_anharmonicity estimation', f_anharmonicity)
+        print('f_12 estimations', np.mean(freqs_12))
         CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
@@ -1932,8 +1925,6 @@ class CCLight_Transmon(Qubit):
         if spec_source_2 is None:
             spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source = self.instr_spec_source.get_instr()
-        freqs_q1 = np.arange(f_01-f_01_span/2, f_01+f_01_span/2, 0.7e6)
-        freqs_q2 = np.arange(f_12-f_12_span/2, f_12+f_12_span/2, 0.7e6)
 
         self.prepare_for_continuous_wave()
         self.int_avg_det_single._set_real_imag(False)
@@ -1942,20 +1933,21 @@ class CCLight_Transmon(Qubit):
 
         spec_source_2.on()
         spec_source_2.power(f_12_power)
-        spec_source_2.frequency(f_12)
+
         MC.set_sweep_function(wrap_par_to_swf(
                               spec_source.frequency, retrieve_value=True))
-        MC.set_sweep_points(freqs_q1)
+        MC.set_sweep_points(freqs_01)
         MC.set_sweep_function_2D(wrap_par_to_swf(
             spec_source_2.frequency, retrieve_value=True))
-        MC.set_sweep_points_2D(freqs_q2)
+        MC.set_sweep_points_2D(freqs_12)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run_2D(name='Two_tone_'+self.msmt_suffix)
         ma.TwoD_Analysis(auto=True)
         spec_source.off()
         spec_source_2.off()
         ma.Three_Tone_Spectroscopy_Analysis(
-            label='Two_tone',  f01=f_01, f12=f_12)
+            label='Two_tone',  f01=np.mean(freqs_01), f12=np.mean(freqs_12))
+
 
     def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10, 10, 1), MC=None, spec_source_2=None):
 
@@ -3164,13 +3156,12 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('echo'+label+self.msmt_suffix)
-        # FIXME: echo analysis v2 required that correctly handles 
-        # modulation of recovery pulse. 
         if analyze:
+            # N.B. v1.5 analysis
             a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
-        if update:
-            self.T2_echo(a.fit_res.params['tau'].value)
-        return a
+            if update:
+                self.T2_echo(a.fit_res.params['tau'].value)
+            return a
 
     def measure_flipping(self, number_of_flips=np.arange(0, 40, 2), equator=True,
                          MC=None, analyze=True, close_fig=True, update=False,
@@ -3209,7 +3200,7 @@ class CCLight_Transmon(Qubit):
         if update:
             chisqr_cos = a.fit_res['cos_fit'].chisqr
             chisqr_line = a.fit_res['line_fit'].chisqr
-            
+
             scale_factor_cos = a._get_scale_factor_cos()
             scale_factor_line = a._get_scale_factor_line()
 
@@ -3220,7 +3211,7 @@ class CCLight_Transmon(Qubit):
 
             if abs(scale_factor-1)<2e-3:
                 print('Pulse amplitude accurate within 0.2%. Amplitude not updated.')
-                return a    
+                return a
 
             if self.cfg_with_vsm():
                 amp_old = self.mw_vsm_G_amp()

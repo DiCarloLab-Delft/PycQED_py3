@@ -8,6 +8,8 @@ import datetime
 from collections import OrderedDict
 from copy import deepcopy
 import pycqed.analysis_v2.base_analysis as ba
+from pycqed.analysis import measurement_analysis as ma_old
+from pycqed.utilities.general import SafeFormatter, format_value_string
 from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit,\
     plot_scatter_errorbar, set_xlabel, set_ylabel
 
@@ -598,6 +600,7 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         if auto:
             self.run_analysis()
 
+
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
         xs = self.raw_data_dict['measured_values'][0][self.ch_idxs[0]]
@@ -640,6 +643,7 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         text_msg += format_lmfit_par(r'$o$', decay_fit.params['o'], '')
 
         self.proc_data_dict['decay_fit_msg'] = text_msg
+
 
     def prepare_plots(self):
         self.plot_dicts['main'] = {

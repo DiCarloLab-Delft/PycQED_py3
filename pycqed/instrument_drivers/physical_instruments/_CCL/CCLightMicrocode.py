@@ -208,31 +208,30 @@ class CCLightMicrocode():
         mc_config.readline()
 
         for line in mc_config:
+            # throw away empty lines
+            if not line.rstrip():
+                continue
+
             # remove the ':' character
             line = line.translate({ord(":"): None})
+
             # get each number in the line
             line_number, condition, op_type_left, cw_left,\
                 op_type_right, cw_right = line.split()
 
             line_number = int(line_number)
-            # print("line_number: ", line_number, " ", end= "")
             condition = int(condition)
-            # print("condition: ", condition, " ", end= "")
             op_type_left = int(op_type_left)
-            # print("op_type_left: ", op_type_left, " ", end= "")
             cw_left = int(cw_left)
-            # print("cw_left: ", cw_left, " ", end= "")
             op_type_right = int(op_type_right)
-            # print("op_type_right: ", op_type_right, " ", end= "")
             cw_right = int(cw_right)
-            # print("cw_right: ", cw_right, " ", end= "")
+
             if line_number > 256:
                 raise ValueError("line number ({}) in the file "
                                  "exceeds the maximum value (256).")
 
             self.microcode[line_number] = self.gen_control_store_line(
                 condition, op_type_left, cw_left, op_type_right, cw_right)
-            # print(self.microcode[line_number])
 
     def write_to_bin(self, filename=None):
         bin_data = bytearray()
