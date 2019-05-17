@@ -302,6 +302,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  plot_versus_frequency=True,
                  frequency_key='Instrument settings.Q.freq_qubit',
                  fit_qubit_Q_factor=False,
+                 mean_and_std=False
                  ):
         '''
         Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
@@ -364,6 +365,8 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             self.params_dict['qfreq'] = frequency_key
 
         self.numeric_params = []
+
+        self.mean_and_std = mean_and_std
 
         if auto:
             self.run_analysis()
@@ -449,6 +452,23 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             self._prepare_plot(ax_id='time_stability', xvals=self.raw_data_dict['datetime'],
                                yvals=self.raw_data_dict['tau'], yerr=self.raw_data_dict['tau_stderr'],
                                xlabel='Time in Delft', xunit=None)
+            if self.mean_and_std:
+                if 'T1' in self.labels[0]:
+                    measured_param = '$T_1$'
+                elif 'Ramsey' in self.labels[0]:
+                    measured_param = '$T_2^*$'
+                elif 'echo' in self.labels[0]:
+                    measured_param = '$T_2^{echo}$'
+                else:
+                    measured_param = 'Coherence'
+                t_msg = measured_param+' = {:.1f}$\pm${:.1f} $\mu$s'.format(np.mean(self.raw_data_dict['tau'])*1e6,
+                                                   np.std(self.raw_data_dict['tau'])*1e6)
+                self.plot_dicts['mean_and_std'] = {
+                'plotfn': self.plot_text,
+                'text_string': t_msg,
+                'xpos': 0.05, 'ypos': 0.05, 'ax_id': 'time_stability',
+                'horizontalalignment': 'left', 'verticalalignment': 'bottom'}
+
             if self.plot_versus_frequency and self.fit_qubit_Q_factor:
                 plot_dict = {
                     'xlabel': 'Qubit Frequency', 'xunit': 'Hz',
@@ -1271,7 +1291,7 @@ class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
              frequency_key=frequency_key,
              fit_qubit_Q_factor=False)
 
-    
+
 
 
 
@@ -1300,9 +1320,9 @@ class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
 #                       'plot_times':'sweep_points',
 # #                       'temperatures':'LaDucati.temperatures', # Does not exist any more
 #                       'field':'Magnet.field'}
-        
+
 #         if numeric_params is None:
-#             numeric_params = ['tau','tau_err','dac','frequency', 
+#             numeric_params = ['tau','tau_err','dac','frequency',
 #             'plot_data','plot_times','Attenuation','field']
 
 #         if t_stop is not None:
@@ -1458,7 +1478,7 @@ class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
 
 
     # Define a function that generates the filter mask
-    # Filters could e.g. be given as a 
+    # Filters could e.g. be given as a
 
 
 
