@@ -127,7 +127,10 @@ class Test_Mock_CCL(unittest.TestCase):
     #     assert 3 ==4.2
 
         #assert self.CCL_qubit.mw_amp180 == self.CCL_qubit.mock_mw_amp180()
+    def test_ramsey(self):
+        self.CCL_qubit.mock_T2_star(23e-6)
 
+        self.CCL_qubit.measure_ramsey()
     @classmethod
     def tearDownClass(self):
         for inststr in list(self.CCL_qubit._all_instruments):

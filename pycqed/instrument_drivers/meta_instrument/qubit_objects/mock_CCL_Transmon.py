@@ -26,10 +26,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             - describe "hidden" parameters to mock real experiments.
         """
 
-        self.add_parameter(
-            'mock_freq_qubit', label='qubit frequency', unit='Hz',
-            docstring='A fixed value, can be made fancier by making it depend on Flux through E_c, E_j and flux',
-            parameter_class=ManualParameter)
+        self.add_parameter('mock_freq_qubit', label='qubit frequency', unit='Hz',
+                           docstring='A fixed value, can be made fancier by making it depend on Flux through E_c, E_j and flux',
+                           parameter_class=ManualParameter, initial_value=4.8e9)
 
         self.add_parameter('mock_freq_res', label='qubit frequency', unit='Hz',
                            parameter_class=ManualParameter)
@@ -37,11 +36,46 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude', unit='V',
                            initial_value=0.5, parameter_class=ManualParameter)
 
+        self.add_parameter('mock_T2_star', label='Ramsey T2', unit='s',
+                           initial_value=23e-6, parameter_class=ManualParameter)
+
+    def measure_spectroscopy(self, freqs, pulsed=True, MC=None, analyze=True,
+                             close_fig=True, label='',
+                             prepare_for_continuous_wave=True):
+        '''
+        Can be made fancier by implementing different types of spectroscopy 
+        (e.g. pulsed/CW) and by imp using cfg_spec_mode.
+
+        Uses a Lorentzian as a result for now
+        '''
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        s = swf.None_Sweep()
+        h = 20e-3  # Lorentian baseline [V]
+        A = h*3/4   # Height of peak [V]
+        w = 10e6    # Full width half maximum of peak
+        mocked_values = h + A*(w/2.0)**2 / ((w/2.0)**2 +
+                                            ((freqs - self.mock_freq_qubit()))**2)
+
+        mocked_values += np.random.normal(0, 1e-3, np.size(mocked_values))
+
+        d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
+                              detector_control='soft', mock_values=mocked_values)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(freqs)
+
+        MC.set_detector_function(d)
+        MC.run('mock_spectroscopy_')
+
+        # a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+        # return a.fit_params['f0']
+
     def measure_rabi(self, MC=None, amps=None,
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
         """
-        Measurement is the same with and without vsm; therefore there is only 
+        Measurement is the same with and without vsm; therefore there is only
         one measurement method rather than two. In the calibrate_mw_pulse_amp_coarse,
         the required parameter is updated.
         """
@@ -63,38 +97,87 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_detector_function(d)
         MC.run('mock_rabi_')
         a = ma.Rabi_Analysis(label='rabi_')
+
         return a.rabi_amplitudes['piPulse']
 
-###############################################################################
-# AutoDepGraph
-###############################################################################
+    def measure_ramsey(self, times=None, MC=None,
+                       artificial_detuning: float = None,
+                       freq_qubit: float = None, label: str = '',
+                       prepare_for_timedomain=True, analyze=True,
+                       close_fig=True, update=True, detector=False, double_fit=False):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if times is None:
+            stepsize = (self.mock_T2_star()*4/61)//(abs(self.cfg_cycle_time())) \
+                * abs(self.cfg_cycle_time())
+            times = np.arange(0, self.mock_T2_star()*4, stepsize)
+
+        if artificial_detuning is None:
+            artificial_detuning = 5/times[-1]
+
+        # Calibration points:
+        dt = times[1] - times[0]
+        times = np.concatenate([times,
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                 times[-1]+3*dt,
+                                 times[-1]+4*dt)])
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        if freq_qubit is None:
+            freq_qubit = self.freq_qubit()
+
+        # self.instr_Lo_mw.get_instr().set('frequency', freq_qubit -
+            # self.mw_freq_mod.get() + artificial_detuning)
+
+        s = swf.None_Sweep()
+        phase = np.random.uniform(0, 2*np.pi, 1)
+        oscillation_offset = 0
+        exponential_offset = 0.5
+        frequency = self.mock_freq_qubit() - freq_qubit + artificial_detuning
+        # Mock values without calibration points
+        mocked_values = 0.5 * np.exp(-(times[0:-4] / self.mock_T2_star())) * (np.cos(
+            2 * np.pi * frequency * times[0:-4] + phase) + oscillation_offset) + exponential_offset
+        mocked_values = np.concatenate([mocked_values, (0, 0, 1, 1)])  # Calibration points
+        # Add noise:
+        mocked_values += np.random.normal(0, 0.1, np.size(mocked_values))
+        d = det.Mock_Detector(value_names=['F|1>'], value_units=['-'],
+                              detector_control='soft', mock_values=mocked_values)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(d)
+        MC.run('mock_ramsey_')
+
+        if analyze:
+            a = ma.Ramsey_Analysis(auto=True, closefig=True,
+                                   freq_qubit=freq_qubit,
+                                   artificial_detuning=artificial_detuning)
+            self.T2_star(a.T2_star['T2_star'])
+            res = {'T2star': a.T2_star['T2_star'],
+                   'frequency': a.qubit_frequency}
+            return res
+    ###############################################################################
+    # AutoDepGraph
+    ###############################################################################
 
     def dep_graph(self):
         cal_True_delayed = 'autodepgraph.node_functions.calibration_functions.test_calibration_True_delayed'
         self.dag = AutoDepGraph_DAG(name=self.name+' DAG')
-        self.dag.add_node('VNA Analysis', calibrate_function=cal_True_delayed)
 
         self.dag.add_node('VNA Wide Search',
                           calibrate_function=cal_True_delayed)
         self.dag.add_node('VNA Zoom on resonators',
                           calibrate_function=cal_True_delayed)
-        self.dag.add_node('Test Resonator Power Sweep',
+        self.dag.add_node('VNA Resonators Power Sweep',
                           calibrate_function=cal_True_delayed)
-        self.dag.add_node('Qubit Resonators Power Sweep',
-                          calibrate_function=cal_True_delayed)
-        self.dag.add_node('Qubit Resonators Flux Sweep: All Qubits, All Flux Lines',
-                          calibrate_function=cal_True_delayed)
-        self.dag.add_node('Qubit Resonators Flux Sweep: Dedicated Lines',
+        self.dag.add_node('VNA Resonators Flux Sweep',
                           calibrate_function=cal_True_delayed)
 
-        self.dag.add_node(' Resonator Frequency Coarse',
-                          calibrate_function=cal_True_delayed)
         # Resonators
-        self.dag.add_node(self.name + ' Resonator Frequency Fine',
-                          calibrate_function=cal_True_delayed)
-        self.dag.add_node(self.name + ' Resonator Power Scan',
-                          calibrate_function=cal_True_delayed)
-        self.dag.add_node(self.name + ' Resonator Flux Sweep',
+        self.dag.add_node(self.name + ' Resonator Frequency',
                           calibrate_function=cal_True_delayed)
 
         # Calibration of instruments and ro
@@ -148,24 +231,29 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.dag.add_node(self.name + ' T2_Star')
         self.dag.add_node(self.name + ' T2_Star(time)')
         self.dag.add_node(self.name + ' T2_Star(frequency)')
+        #######################################################################
+        # EDGES
+        #######################################################################
 
+        # VNA
+        self.dag.add_edge('VNA Zoom on resonators', 'VNA Wide Search')
+        self.dag.add_edge('VNA Resonators Power Sweep',
+                          'VNA Zoom on resonators')
+        self.dag.add_edge('VNA Resonators Flux Sweep',
+                          'VNA Zoom on resonators')
+        self.dag.add_edge('VNA Resonators Flux Sweep',
+                          'VNA Resonators Power Sweep')
         # Resonators
-        self.dag.add_edge(self.name + ' Resonator Frequency Fine',
-                          ' Resonator Frequency Coarse')
-        self.dag.add_edge(self.name + ' Resonator Power Scan',
-                          self.name + ' Resonator Frequency Fine')
-        self.dag.add_edge(self.name + ' Resonator Flux Sweep',
-                          self.name + ' Resonator Power Scan')
-        self.dag.add_edge(self.name + ' Resonator Flux Sweep',
-                          self.name + ' Resonator Frequency Fine')
+        self.dag.add_edge(
+            self.name + ' Resonator Frequency', 'VNA Resonators Power Sweep')
+        self.dag.add_edge(
+            self.name + ' Resonator Frequency', 'VNA Resonators Flux Sweep')
 
         # Qubit Calibrations
         self.dag.add_edge(self.name + ' Frequency Coarse',
-                          self.name + ' Resonator Power Scan')
-        self.dag.add_edge(self.name + ' Frequency Coarse',
-                          self.name + ' Resonator Flux Sweep')
+                          self.name + ' Resonator Frequency')
         # self.dag.add_edge(self.name + ' Frequency Coarse',
-                          # self.name + ' Calibrations')
+        # self.name + ' Calibrations')
 
         # Calibrations
         self.dag.add_edge(self.name + ' Calibrations',
