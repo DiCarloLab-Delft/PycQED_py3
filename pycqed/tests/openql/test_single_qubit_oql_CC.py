@@ -10,13 +10,12 @@
 import os
 import pytest
 from openql import openql as ql
-from test_single_qubit_oql import Test_single_qubit_seqs_CCL
+import test_single_qubit_oql as parent  # rename to stop pytest from running tests directly
 
 
-# FIXME: we just hijack the parent class to run the same tests
-class Test_single_qubit_seqs_CC(Test_single_qubit_seqs_CCL):
+# NB: we just hijack the parent class to run the same tests
+class Test_single_qubit_seqs_CC(parent.Test_single_qubit_seqs_CCL):
     def setUp(self):
-        rootDir = os.path.dirname(os.path.realpath(__file__))
         curdir = os.path.dirname(__file__)
         self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
         output_dir = os.path.join(curdir, 'test_output_cc')
