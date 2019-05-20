@@ -213,6 +213,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.single_timestamp = single_timestamp
         self.numeric_params = []
 
+
         if auto:
             self.run_analysis()
 

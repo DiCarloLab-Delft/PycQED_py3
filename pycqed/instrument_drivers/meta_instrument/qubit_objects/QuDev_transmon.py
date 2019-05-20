@@ -6,6 +6,7 @@ import qcodes as qc
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 
+from pycqed.analysis_v2.readout_analysis import Singleshot_Readout_Analysis_Qutrit
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import awg_sweep_functions as awg_swf
@@ -2426,7 +2427,7 @@ class QuDev_transmon(Qubit):
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
                            no_fits=False, upload=True, preselection_pulse=True,
                            thresholded=False, RO_comm=3/225e6, RO_slack=150e-9,
-                           RO_shots=50000):
+                           RO_shots=50000, qutrit=False):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -2453,6 +2454,7 @@ class QuDev_transmon(Qubit):
                      fidelity. Default `False`.
             preselection_pulse: Whether to do an additional readout pulse
                                 before state preparation. Default `True`.
+            qutrit: SSRO for 3 levels readout
         Returns:
             If `no_fits` is `False` returns assigment fidelity, discrimination
             fidelity and SNR = 2 |mu00 - mu11| / (sigma00 + sigma11). Else
@@ -2480,12 +2482,6 @@ class QuDev_transmon(Qubit):
         RO_spacing += RO_slack # for slack
         RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
 
-        MC.set_sweep_function(awg_swf2.n_qubit_off_on(
-            pulse_pars_list=[self.get_drive_pars()],
-            RO_pars=self.get_RO_pars(),
-            upload=upload,
-            preselection=preselection_pulse,
-            RO_spacing=RO_spacing))
         spoints = np.arange(self.RO_acq_shots())
         if preselection_pulse:
             spoints //= 2
@@ -2504,35 +2500,73 @@ class QuDev_transmon(Qubit):
             MC.set_sweep_points_2D(np.arange(nreps))
             mode = '2D'
 
-        MC.run(name=label+self.msmt_suffix, mode=mode)
+        if qutrit:
+            # TODO Nathan: could try and merge this with following to avoid logical
+            #  branching but would require to create a n_qubit_3_levels readout
+            #  sweepfunction.
+            levels = ('g', 'e', 'f')
+            assert thresholded is False, \
+                "Thresholding cannot work for 3-Level SSRO. Please set thresholded to " \
+                "False."
+            for level in levels:
+                MC.set_sweep_function(awg_swf.SingleLevel(
+                    pulse_pars=self.get_drive_pars(),
+                    pulse_pars_2nd=self.get_ef_drive_pars(),
+                    RO_pars=self.get_RO_pars(),
+                    level=level,
+                    upload=upload,
+                    preselection=preselection_pulse))
+                MC.run(name=label + '_{}'.format(level) + self.msmt_suffix,
+                       mode=mode)
+                pass
+        else:
+            MC.set_sweep_function(awg_swf2.n_qubit_off_on(
+                pulse_pars_list=[self.get_drive_pars()],
+                RO_pars=self.get_RO_pars(),
+                upload=upload,
+                preselection=preselection_pulse,
+                RO_spacing=RO_spacing))
 
-        MC.soft_avg(prev_avg)
-        self.RO_acq_shots(prev_shots)
+            MC.run(name=label+self.msmt_suffix, mode=mode)
+
+        # MC.soft_avg(prev_avg)
+        # self.RO_acq_shots(prev_shots)
 
         if analyze:
-            rotate = self.ro_acq_weight_type() in {'SSB', 'DSB'}
-            if thresholded:
-                channels = self.dig_log_det.value_names
+            if qutrit:
+                # TODO Nathan: could try and merge this with no qutrit to avoid logical
+                #  branching
+                options = dict(classif_method='gmm')
+                labels = ['SSRO_fidelity_{}'.format(l) for l in levels]
+                ssqtro = Singleshot_Readout_Analysis_Qutrit(label=labels,
+                                                            options_dict=options)
+                return ssqtro.proc_data_dict['fidelity_mtx'],  \
+                       ssqtro.proc_data_dict.get('classifier_params', None)
+
             else:
-                channels = self.int_log_det.value_names
-            if preselection_pulse:
-                nr_samples = 4
-                sample_0 = 0
-                sample_1 = 2
-            else:
-                nr_samples = 2
-                sample_0 = 0
-                sample_1 = 1
-            ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name,
-                                   rotate=rotate, no_fits=no_fits,
-                                   channels=channels, nr_samples=nr_samples,
-                                   sample_0=sample_0, sample_1=sample_1,
-                                   preselection=preselection_pulse)
-            if not no_fits:
-                return ana.F_a, ana.F_d, ana.SNR
-            else:
-                return ana.F_a
+                rotate = self.ro_acq_weight_type() in {'SSB', 'DSB'}
+                if thresholded:
+                    channels = self.dig_log_det.value_names
+                else:
+                    channels = self.int_log_det.value_names
+                if preselection_pulse:
+                    nr_samples = 4
+                    sample_0 = 0
+                    sample_1 = 2
+                else:
+                    nr_samples = 2
+                    sample_0 = 0
+                    sample_1 = 1
+                ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
+                                       qb_name=self.name,
+                                       rotate=rotate, no_fits=no_fits,
+                                       channels=channels, nr_samples=nr_samples,
+                                       sample_0=sample_0, sample_1=sample_1,
+                                       preselection=preselection_pulse)
+                if not no_fits:
+                    return ana.F_a, ana.F_d, ana.SNR
+                else:
+                    return ana.F_a
 
     def find_readout_angle(self, MC=None, upload=True, close_fig=True, update=True, nreps=10):
         """
