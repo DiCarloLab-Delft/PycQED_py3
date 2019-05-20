@@ -23,10 +23,9 @@ class Segment:
         self.elements = odict()
         self.element_start_end = {}
         self.elements_on_awg = {}
-        self.trigger_pars = {'length': 20e-9, 'amplitude': 1}
+        self.trigger_pars = {'length': 50e-9, 'amplitude': 0.5}
         self._pulse_names = set()
         self.acquisition_elements = set()
-        self.codeword_elements = set()
 
         for pulse_pars in pulse_pars_list:
             self.add(pulse_pars)
@@ -59,7 +58,6 @@ class Segment:
 
         # check whether pulse is acquistion. If so, add the element to
         # self.acquisition_elements
-
         if new_pulse.flags.get('RO', False):
             self.acquisition_elements.add(new_pulse.pulse_obj.element_name)
 
@@ -583,6 +581,9 @@ class Segment:
         # start granularity
         start_gran = self.pulsar.get(
             '{}_element_start_granularity'.format(awg))
+        
+        # element start granularity is not working at the moment!
+        start_gran = None
 
         if start_gran != None:
             t_start_awg = int(t_start / start_gran) * start_gran
@@ -739,10 +740,6 @@ class Segment:
                     if pulse_channels == set():
                         continue
 
-                    # adds the element to codeword_elements set
-                    if pulse.codeword != 'no_codeword':
-                        self.codeword_elements.add(element)
-
                     # fills wfs with zeros for used channels
                     if pulse.codeword not in wfs:
                         wfs[pulse.codeword] = {}
@@ -812,6 +809,8 @@ class Segment:
                                                       iir_filters[1], wf)
                         wfs[codeword][c] = wf
 
+                for codeword in wfs:
+                    for c in wfs[codeword]:
                         # truncate all values that are out of bounds and
                         # normalize the waveforms
                         amp = self.pulsar.get('{}_amp'.format(c))

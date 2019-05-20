@@ -331,7 +331,7 @@ class UHFQC(Instrument):
     def _write_csv_waveform(self, wf_name: str, waveform):
         filename = os.path.join(
             self.lab_one_webserver_path, 'awg', 'waves',
-            self._devname+'_'+wf_name+'.csv')
+            self._device+'_'+wf_name+'.csv')
         # with open(filename, 'w') as f:
         np.savetxt(filename, waveform, delimiter=",")
 
@@ -387,12 +387,12 @@ class UHFQC(Instrument):
         if not success:
             # Printing is disabled because we put the waveform in the program
             # this should be changed when .csv waveforms are supported for UHFQC
-            # print("Compilation failed, printing program:")
-            # for i, line in enumerate(program_string.splitlines()):
-            #     print(i+1, '\t', line)
-            # print('\n')
-            #raise ziShellCompilationError(comp_msg)
-            #print("Possible error:", comp)
+            print("Compilation failed, printing program:")
+            for i, line in enumerate(program_string.splitlines()):
+                print(i+1, '\t', line)
+            print('\n')
+            raise ziShellCompilationError(comp_msg)
+            print("Possible error:", comp)
             pass
         # If succesful the comipilation success message is printed
         t1 = time.time()

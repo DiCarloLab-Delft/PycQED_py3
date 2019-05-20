@@ -371,7 +371,11 @@ class ZI_HDAWG8(ZI_base_instrument):
         filename = os.path.join(self.lab_one_webserver_path, 'awg', 'waves',
                                 self._devname + '_' + wf_name + '.csv')
         # with open(filename, 'w') as f:
-        np.savetxt(filename, waveform, delimiter=",")
+        if isinstance(waveform[0], np.int32):
+            # marker channel waveforms have to be stored as int
+            np.savetxt(filename, waveform, delimiter=",", fmt='%1u')
+        else:
+            np.savetxt(filename, waveform, delimiter=",")
 
     def _read_csv_waveform(self, wf_name: str):
         filename = os.path.join(self.lab_one_webserver_path, 'awg', 'waves',

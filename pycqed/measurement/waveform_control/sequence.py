@@ -46,5 +46,3 @@ class Sequence:
                     self.awg_sequence[awg].append([element, segment])
                     if element in seg.acquisition_elements:
                         self.awg_sequence[awg][-1].append('RO')
-                    if element in seg.codeword_elements:
-                        self.awg_sequence[awg][-1].append('codeword')

@@ -5,9 +5,10 @@ from ..waveform_control import element
 from ..waveform_control.element import calculate_time_correction
 from ..waveform_control import pulse
 from ..waveform_control import sequence as sequence
+from ..waveform_control import segment as segment
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
-from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
+# from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
 # import pycqed.measurement.pulse_sequences.calibration_elements as cal_elts
 
 from importlib import reload
@@ -54,21 +55,20 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
     nr_of_pulse_reps = int((200e-6-10e-6)//period)
 
     seq_name = 'Pulsed_spec'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
 
     pulse_dict = {'spec_pulse': spec_pars, 'RO': RO_pars}
     pulse_list = [pulse_dict['spec_pulse'], pulse_dict['RO']]*nr_of_pulse_reps
     for i in range(1):
-        el = multi_pulse_elt(
-            i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=False)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq
 
@@ -84,8 +84,8 @@ def Pulsed_spec_ro_markers_seq(spec_pars, RO_pars,
     '''
 
     seq_name = 'Pulsed_spec'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
 
     # Nr of pulse reps is set to ensure max nr of pulses and end 10us before
     # next trigger comes in. Assumes 200us trigger period, also works for
@@ -95,15 +95,15 @@ def Pulsed_spec_ro_markers_seq(spec_pars, RO_pars,
     nr_of_pulse_reps = int((200e-6-10e-6)//period)
     pulse_list = [spec_pars, RO_pars]*nr_of_pulse_reps
 
-    el = multi_pulse_elt(0, station, pulse_list)
-    el_list.append(el)
-    seq.append_element(el, trigger_wait=True)
+    seg = segment.Segment('segment_0', station.pulsar, pulse_list)
+    seg_list.append(seg)
+    seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=False)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq
 
@@ -113,8 +113,8 @@ def Resonator_spec_seq(RO_channel='AWG1_ch3_m2', marker_length=5e-9,
                        upload=True, return_seq=False):
 
     seq_name = 'Resonator_spec_seq'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
 
     RO_trig = {
         'pulse_type': 'SquarePulse',
@@ -137,15 +137,15 @@ def Resonator_spec_seq(RO_channel='AWG1_ch3_m2', marker_length=5e-9,
     number_of_pulses = int(200*1e-6/marker_interval)
     pulse_list += [RO_trig]*(number_of_pulses-1)
 
-    el = multi_pulse_elt(0, station, pulse_list)
-    el_list.append(el)
-    seq.append_element(el, trigger_wait=True)
+    seg = segment.Segment('segment_0', station, pulse_list)
+    seg_list.append(seg)
+    seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=False)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq
 
@@ -172,19 +172,18 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
     nr_of_pulse_reps = int((200e-6-10e-6)//period)
 
     seq_name = 'photon_number_spliting'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
 
     pulse_dict = {'disp': disp_pars, 'spec_pulse': spec_pars, 'RO': RO_pars}
     pulse_list = [pulse_dict['disp'], pulse_dict[
         'spec_pulse'], pulse_dict['RO']]*nr_of_pulse_reps
     for i in range(2):
-        el = multi_pulse_elt(
-            i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=False)
+        station.pulsar.program_awgs(seq)
     return seq
 
 
@@ -244,7 +243,8 @@ def mixer_skewness_cal_sqs(pulseIch,
             format(len(new_elt[0].pulses), n)
         # print(new_elt)
         if seq is None:
-            seq = sequence.Sequence('Sideband_modulation_seq')
+            seq_name = 'Sideband_modulation_seq'
+            seq = sequence.Sequence(seq_name, station.pulsar)
             seq.append_element(*new_elt, trigger_wait=True)
         else:
             seq.append_element(*new_elt, trigger_wait=True)
@@ -269,21 +269,21 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
         upload:          whether to upload sequence to instrument or not
     '''
     seq_name = 'Rabi_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulses_unmodified = get_pulse_dict_from_pars(pulse_pars)
     pulses = deepcopy(pulses_unmodified)
 
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         if cal_points and no_cal_points==4 and \
                 (i == (len(amps)-4) or i == (len(amps)-3)):
-            el = multi_pulse_elt(i, station,[pulses_unmodified['I'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar,[pulses_unmodified['I'], RO_pars])
         elif cal_points and no_cal_points==4 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-            el = multi_pulse_elt(i, station, [pulses_unmodified['X180'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses_unmodified['X180'], RO_pars])
         elif cal_points and no_cal_points==2 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-            el = multi_pulse_elt(i, station,[pulses_unmodified['I'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar,[pulses_unmodified['I'], RO_pars])
         else:
             pulses['X180']['amplitude'] = amp
             pulse_list = n*[pulses['X180']]+[RO_pars]
@@ -292,16 +292,16 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
             pulse_list[0] = deepcopy(pulse_list[0])
             pulse_list[0]['pulse_delay'] += post_msmt_delay
 
-            el = multi_pulse_elt(i, station, pulse_list)
+            seg = segment.Segment('segment_{}'.format(i), station, pulse_list)
 
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg_list.append(seg)
+        seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq
 
@@ -317,29 +317,29 @@ def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
         post_msmt_delay: extra wait time for resetless compatibility
     '''
     seq_name = 'Flipping_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     RO_pulse_delay = RO_pars['pulse_delay']
     for i in range(n+4):  # seq has to have at least 2 elts
 
         if (i == (n+1) or i == (n)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif(i == (n+3) or i == (n+2)):
             RO_pars['pulse_delay'] = RO_pulse_delay
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
             pulse_list = [pulses['X90']]+(2*i+1)*[pulses['X180']]+[RO_pars]
             # # copy first element and set extra wait
             # pulse_list[0] = deepcopy(pulse_list[0])
             # pulse_list[0]['pulse_delay'] += post_msmt_delay
-            el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq
 
@@ -356,8 +356,8 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         post_msmt_delay: extra wait time for resetless compatibility
     '''
     seq_name = 'Rabi_amp90_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, scale in enumerate(scales):  # seq has to have at least 2 elts
         pulses['X90']['amplitude'] = pulses['X180']['amplitude'] * scale
@@ -366,13 +366,13 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         # copy first element and set extra wait
         pulse_list[0] = deepcopy(pulse_list[0])
         pulse_list[0]['pulse_delay'] += post_msmt_delay
-        el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -393,8 +393,8 @@ def T1_seq(times,
         logging.warning('The values in the times array might be too large.'
                         'The units should be seconds.')
     seq_name = 'T1_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     RO_pulse_delay = RO_pars['pulse_delay']
     RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -404,20 +404,20 @@ def T1_seq(times,
         #RO_pars['refpoint'] = 'start'  # time defined between start of ops
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
             RO_pars['pulse_delay'] = RO_pulse_delay
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
             RO_pars['pulse_delay'] = RO_pulse_delay
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
+        seg_list.append(seg)
+        seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -442,8 +442,8 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                         'The units should be seconds.')
 
     seq_name = 'Ramsey_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     # First extract values from input, later overwrite when generating
     # waveforms
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -461,9 +461,9 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
             pulse_pars_x2['phase'] = Dphase
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
             X90_separation = tau - DRAG_length
             if cpmg_scheme:
@@ -515,15 +515,15 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                         1, nr_echo_pulses)
                     pulse_dict_list += [pulse_pars_x2, RO_pars]
 
-            el = multi_pulse_elt(i, station, pulse_dict_list)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_dict_list)
 
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -548,8 +548,8 @@ def Ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
                         'The units should be seconds.')
 
     seq_name = 'Ramsey_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     # First extract values from input, later overwrite when generating
     # waveforms
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -583,9 +583,9 @@ def Ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
             pulse_pars_x2['phase'] = Dphase
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
             X90_separation = tau - DRAG_length
             if X90_separation > 0:
@@ -608,15 +608,15 @@ def Ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
                 pulse_pars_x2['pulse_delay'] = tau
                 pulse_dict_list = [pulses['X90'], pulse_pars_x2, RO_pars]
 
-            el = multi_pulse_elt(i, station, pulse_dict_list)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_dict_list)
 
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -641,8 +641,8 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
                         'The units should be seconds.')
 
     seq_name = 'Ramsey_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     # First extract values from input, later overwrite when generating
     # waveforms
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -664,20 +664,20 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
             pulse_pars_x2['phase'] = Dphase
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
-            el = multi_pulse_elt(i, station,
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar,
                                  [pulses['X90'], pulse_pars_x2, RO_pars])
 
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -702,8 +702,8 @@ def Ramsey_seq_VZ(times, pulse_pars, RO_pars,
                         'The units should be seconds.')
 
     seq_name = 'Ramsey_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     # First extract values from input, later overwrite when generating
     # waveforms
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -720,22 +720,22 @@ def Ramsey_seq_VZ(times, pulse_pars, RO_pars,
         Z_gate = Z(Dphase, pulse_pars)
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
             pulse_list = [pulses['X90'], Z_gate, pulse_pars_x2, RO_pars]
-            el = multi_pulse_elt(i, station, pulse_list)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
 
             #a = [j['phase'] for j in pulse_list]
 
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -758,9 +758,9 @@ def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
         cal_points:          whether to use calibration points or not
     '''
     seq_name = 'Ramsey_sequence_multiple_detunings'
-    seq = sequence.Sequence(seq_name)
+    seq = sequence.Sequence(seq_name, station.pulsar)
     station.pulsar.update_channel_settings()
-    el_list = []
+    seg_list = []
     # First extract values from input, later overwrite when generating
     # waveforms
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -776,20 +776,20 @@ def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
             pulse_pars_x2['phase'] = Dphase
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
-            el = multi_pulse_elt(i, station,
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar,
                                  [pulses['X90'], pulse_pars_x2, RO_pars])
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg_list.append(seg)
+        seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -809,8 +809,8 @@ def Echo_seq(times, pulse_pars, RO_pars,
         cal_points:     whether to use calibration points or not
     '''
     seq_name = 'Echo_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
     center_X180 = deepcopy(pulses['X180'])
@@ -824,19 +824,19 @@ def Echo_seq(times, pulse_pars, RO_pars,
         if artificial_detuning is not None:
             final_X90['phase'] = (tau-times[0]) * artificial_detuning * 360
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
-            el = multi_pulse_elt(i, station,
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar,
                                  [pulses['X90'], center_X180,
                                   final_X90, RO_pars])
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -852,8 +852,8 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
 
     '''
     seq_name = 'AllXY_seq'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
@@ -873,14 +873,14 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         pulse_list = [pulses[pulse_comb[0]],
                       pulses[pulse_comb[1]],
                       RO_pars]
-        el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -901,8 +901,8 @@ def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
         preselection:        adds an extra readout pulse before other pulses.
     '''
     seq_name = 'OffOn_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
@@ -925,13 +925,13 @@ def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
             pulse_list = [RO_pars, spacer, pulses[pulse_comb], RO_pars]
         else:
             pulse_list = [pulses[pulse_comb], RO_pars]
-        el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -948,8 +948,8 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
     gate errors when post-selecting.
     '''
     seq_name = 'Butterfly_seq'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
@@ -980,12 +980,12 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
             pulse_sub_list[0] = start_pulse
             pulse_list += pulse_sub_list
 
-        el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     return seq_name
 
 
@@ -1032,8 +1032,8 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     '''
     if seq_name is None:
         seq_name = 'RandomizedBenchmarking_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     net_cliffords = [0, 3]  # Exists purely for the double curves mode
     i = 0
@@ -1045,11 +1045,11 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
 
             if cal_points and (j == (len(nr_cliffords)-4) or
                                j == (len(nr_cliffords)-3)):
-                el = multi_pulse_elt(i, station,
+                 seg = segment.Segment('segment_{}'.format(i), station.pulsar,
                                      [pulses['I'], RO_pars])
             elif cal_points and (j == (len(nr_cliffords)-2) or
                                  j == (len(nr_cliffords)-1)):
-                el = multi_pulse_elt(i, station,
+                 seg = segment.Segment('segment_{}'.format(i), station.pulsar,
                                      [pulses['X180'], RO_pars])
             else:
                 cl_seq = rb.randomized_benchmarking_sequence(
@@ -1060,21 +1060,21 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                 # copy first element and set extra wait
                 pulse_list[0] = deepcopy(pulse_list[0])
                 pulse_list[0]['pulse_delay'] += post_msmt_delay
-                el = multi_pulse_elt(i, station, pulse_list)
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
+                seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+            seg_list.append(seg)
+            seq.add(seg)
 
             # If the element is too long, add in an extra wait elt
             # to skip a trigger
             if resetless and n_cl*pulse_pars['pulse_delay']*1.875 > 50e-6:
-                el = multi_pulse_elt(i, station, [pulses['I']])
-                el_list.append(el)
-                seq.append_element(el, trigger_wait=True)
+                seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I']])
+                seg_list.append(seg)
+                seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-        return seq, el_list
+        station.pulsar.program_awgs(seq)
+        return seq, seg_list
     else:
-        return seq, el_list
+        return seq, seg_list
 
 def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                                             nr_cliffords_value, #scalar
@@ -1090,8 +1090,8 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
 
     if seq_name is None:
         seq_name = 'RandomizedBenchmarking_sequence_one_length'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
     if upload_all:
@@ -1107,11 +1107,11 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
     for i in nr_seeds:
         if cal_points and (i == (len(nr_seeds)-4) or
                                    i == (len(nr_seeds)-3)):
-            el = multi_pulse_elt(i, station,
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar,
                                  [pulses['I'], RO_pars])
         elif cal_points and (i == (len(nr_seeds)-2) or
                                      i == (len(nr_seeds)-1)):
-            el = multi_pulse_elt(i, station,
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar,
                                  [pulses['X180'], RO_pars])
         else:
             cl_seq = rb.randomized_benchmarking_sequence(
@@ -1127,25 +1127,22 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                 gate_decomp=gate_decomposition)
             pulse_list = [pulses[x] for x in pulse_keys]
             pulse_list += [RO_pars]
-            el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
 
         # If the element is too long, add in an extra wait elt
         # to skip a trigger
         if resetless and nr_cliffords_value*pulse_pars[
             'pulse_delay']*1.875 > 50e-6:
-            el = multi_pulse_elt(i, station, [pulses['I']])
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I']])
+            seg_list.append(seg)
+            seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list,
-                                    AWGs=upload_AWGs,
-                                    channels='all',
-                                    verbose=verbose)
-        return seq, el_list
+        station.pulsar.program_awgs(seq)
+        return seq, seg_list
     else:
-        return seq, el_list
+        return seq, seg_list
 
 
 def Freq_XY(freqs, pulse_pars, RO_pars,
@@ -1166,8 +1163,8 @@ def Freq_XY(freqs, pulse_pars, RO_pars,
                              calibration points
     '''
     seq_name = 'MotzoiXY'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, ff in enumerate(freqs):
@@ -1176,22 +1173,22 @@ def Freq_XY(freqs, pulse_pars, RO_pars,
             pulses[p_name]['mod_frequency'] = ff
         if cal_points and (i == (len(freqs)-4) or
                            i == (len(freqs)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(freqs)-2) or
                              i == (len(freqs)-1)):
             # pick motzoi for calpoint in the middle of the range
             pulses['X180']['mod_frequency'] = np.mean(freqs)
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
             pulse_list = [pulses[x] for x in pulse_keys]
             pulse_list += [RO_pars]
-            el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
 
-    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -1214,8 +1211,8 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
                              calibration points
     '''
     seq_name = 'MotzoiXY'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, motzoi in enumerate(motzois):
@@ -1224,23 +1221,23 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
             pulses[p_name]['motzoi'] = motzoi
         if cal_points and (i == (len(motzois)-4) or
                            i == (len(motzois)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(motzois)-2) or
                              i == (len(motzois)-1)):
             # pick motzoi for calpoint in the middle of the range
             pulses['X180']['motzoi'] = np.mean(motzois)
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
             pulse_list = [pulses[x] for x in pulse_keys]
             pulse_list += [RO_pars]
-            el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -1264,8 +1261,8 @@ def QScale(qscales, pulse_pars, RO_pars,
                              calibration points
     '''
     seq_name = 'QScale'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulse_combinations=[['X90','X180'],['X90','Y180'],['X90','mY180']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, motzoi in enumerate(qscales):
@@ -1274,23 +1271,23 @@ def QScale(qscales, pulse_pars, RO_pars,
             pulses[p_name]['motzoi'] = motzoi
         if cal_points and (i == (len(qscales)-4) or
                                    i == (len(qscales)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(qscales)-2) or
                                      i == (len(qscales)-1)):
             # pick motzoi for calpoint in the middle of the range
             pulses['X180']['motzoi'] = np.mean(qscales)
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
             pulse_list = [pulses[x] for x in pulse_keys]
             pulse_list += [RO_pars]
-            el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
@@ -1312,17 +1309,17 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         post_msmt_delay: extra wait time for resetless compatibility
     '''
     seq_name = 'Rising_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulse_pars = {'pulse_type': 'RisingPulse'}
     pulse_list = [pulse_pars]
-    el = multi_pulse_elt(0, station, pulse_list)
-    el_list.append(el)
-    seq.append_element(el, trigger_wait=True)
+    seg = segment.Segment('segment_0', station.pulsar, pulse_list)
+    seg_list.append(seg)
+    seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq
 
@@ -1331,8 +1328,8 @@ def custom_seq(seq_func, sweep_points, pulse_pars, RO_pars,
                upload=True, return_seq=False, cal_points=True):
 
     seq_name = 'Custom_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
     for i, sp in enumerate(sweep_points):
@@ -1342,19 +1339,19 @@ def custom_seq(seq_func, sweep_points, pulse_pars, RO_pars,
 
         if cal_points and (i == (len(sweep_points)-4) or
                                    i == (len(sweep_points)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(sweep_points)-2) or
                                      i == (len(sweep_points)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, [pulses['X180'], RO_pars])
         else:
-            el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=False)
+        station.pulsar.program_awgs(seq)
 
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq
 
@@ -1446,7 +1443,7 @@ def multi_elem_segment_timing_seq(phases, qbn, op_dict, ramsey_time,
     )
 
     ## Create elements
-    el_list = []
+    seg_list = []
 
     idle_pulse = deepcopy(op_dict['I ' + qbn])
     idle_pulse['nr_sigma'] = 1
@@ -1454,7 +1451,7 @@ def multi_elem_segment_timing_seq(phases, qbn, op_dict, ramsey_time,
     start_elem = multi_pulse_elt(0, station,
                                  [idle_pulse, op_dict['X90 ' + qbn]], name='s',
                                  trigger=True)
-    el_list.append(start_elem)
+    seg_list.append(start_elem)
 
     wait_pulse = deepcopy(op_dict['I ' + qbn])
     wait_pulse['nr_sigma'] = 1
@@ -1514,7 +1511,7 @@ def multi_elem_segment_timing_seq(phases, qbn, op_dict, ramsey_time,
 
     ## Create sequence
     seq_name = 'Multi_elem_segment_timing_seq'
-    seq = sequence.Sequence(seq_name)
+    seq = sequence.Sequence(seq_name, station.pulsar)
     seq.codewords[0] = 'w'
     seq.codewords[1] = 'w'
     for i, phase in enumerate(phases):
@@ -1540,9 +1537,9 @@ def multi_elem_segment_timing_seq(phases, qbn, op_dict, ramsey_time,
             seq.append('e{}'.format(i), 'e{}'.format(i), trigger_wait=False)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq
 
@@ -1570,8 +1567,8 @@ def Z(theta=0, pulse_pars=None):
 def over_under_rotation_seq(qb_name, nr_pi_pulses_array, operation_dict,
                             pi_pulse_amp=None, cal_points=True, upload=True):
     seq_name = 'Over-under rotation sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     X90 = deepcopy(operation_dict['X90 ' + qb_name])
     X180 = deepcopy(operation_dict['X180 ' + qb_name])
     if pi_pulse_amp is not None:
@@ -1581,22 +1578,22 @@ def over_under_rotation_seq(qb_name, nr_pi_pulses_array, operation_dict,
     for i, N in enumerate(nr_pi_pulses_array):
         if cal_points and (i == (len(nr_pi_pulses_array)-4) or
                                    i == (len(nr_pi_pulses_array)-3)):
-            el = multi_pulse_elt(i, station,
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar,
                                  [operation_dict['I ' + qb_name],
                                   operation_dict['RO ' + qb_name]])
         elif cal_points and (i == (len(nr_pi_pulses_array)-2) or
                                      i == (len(nr_pi_pulses_array)-1)):
-            el = multi_pulse_elt(i, station,
+             seg = segment.Segment('segment_{}'.format(i), station.pulsar,
                                  [operation_dict['X180 ' + qb_name],
                                   operation_dict['RO ' + qb_name]])
         else:
             pulse_list = [X90]
             pulse_list += N*[X180]
             pulse_list += [operation_dict['RO ' + qb_name]]
-            el = multi_pulse_elt(i, station, pulse_list)
+            seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
 
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, AWGs='all', channels='all')
+        station.pulsar.program_awgs(seq)
     return

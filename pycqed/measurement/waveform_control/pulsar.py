@@ -45,68 +45,106 @@ class UHFQCPulsar:
     """
     _supportedAWGtypes = (UHFQC,)
 
-    def _create_parameters(self, name, id, obj, options):
+    def _create_awg_parameters(self, awg, channel_name_map):
+        if not isinstance(awg, UHFQCPulsar._supportedAWGtypes):
+            return super()._create_awg_parameters(awg, channel_name_map)
+        
+        name = awg.name
 
-        if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
-            return super()._create_parameters(name, id, obj)
-
-        if id not in {'ch1', 'ch2'}:
-            raise KeyError('Invalid UHFQC channel id: {}'.format(id))
-
-        self.add_parameter('{}_id'.format(name),
-                           get_cmd=(lambda _=id: _))
-        self.add_parameter('{}_element_start_granularity'.format(name),
-                           get_cmd=lambda: None)
-        self.add_parameter('{}_awg'.format(name),
-                           get_cmd=lambda _=obj.name: _)
-        self.add_parameter('{}_options'.format(name),
-                           get_cmd=lambda _=options.copy(): _)
-        self.add_parameter('{}_type'.format(name),
-                           get_cmd=lambda: 'analog')
-        self.add_parameter('{}_granularity'.format(name),
-                           get_cmd=lambda: 8)
-        self.add_parameter('{}_min_length'.format(name),
-                           get_cmd=lambda: 8 / 1.8e9)
-        self.add_parameter('{}_inter_element_deadtime'.format(name),
-                           get_cmd=lambda: 8 / 1.8e9)
-        self.add_parameter('{}_precompile'.format(name),
-                           get_cmd=lambda: False)
-        self.add_parameter('{}_delay'.format(name), initial_value=0,
-                           label='{} delay'.format(name), unit='s',
-                           parameter_class=ManualParameter,
-                           docstring="Global delay applied to this channel. "
-                                     "Positive values move pulses on this "
-                                     "channel forward in time")
-        self.add_parameter('{}_offset'.format(name), initial_value=0,
-                           label='{} offset'.format(name), unit='V',
+        self.add_parameter('{}_granularity'.format(awg.name),
+                           get_cmd=lambda: 16)
+        self.add_parameter('{}_element_start_granularity'.format(awg.name),
+                           get_cmd=lambda: 8/(1.8e9))
+        self.add_parameter('{}_min_length'.format(awg.name),
+                           get_cmd=lambda: 16 /(1.8e9))
+        self.add_parameter('{}_inter_element_deadtime'.format(awg.name),
+                           # get_cmd=lambda: 80 / 2.4e9)
+                           get_cmd=lambda: 8 / (1.8e9))
+                           # get_cmd=lambda: 0 / 2.4e9)
+        self.add_parameter('{}_precompile'.format(awg.name), 
+                           initial_value=False, vals=vals.Bool(),
+                           label='{} precompile segments'.format(awg.name),
                            parameter_class=ManualParameter)
-        self.add_parameter('{}_amp'.format(name), initial_value=1,
-                           label='{} amplitude'.format(name), unit='V',
+        self.add_parameter('{}_delay'.format(awg.name), 
+                           initial_value=0, label='{} delay'.format(name), 
+                           unit='s', parameter_class=ManualParameter,
+                           docstring='Global delay applied to this '
+                                     'channel. Positive values move pulses'
+                                     ' on this channel forward in time')
+        self.add_parameter('{}_trigger_channels'.format(awg.name), 
+                           initial_value=None, 
+                           label='{} trigger channel'.format(awg.name), 
                            parameter_class=ManualParameter)
-        self.add_parameter('{}_active'.format(name), initial_value=True,
-                           label='{} active'.format(name), vals=vals.Bool(),
-                           parameter_class=ManualParameter)
-        self.add_parameter('{}_distortion'.format(name),
-                           label='{} distortion mode'.format(name),
-                           initial_value='off',
-                           vals=vals.Enum('off', 'precalculate'),
-                           parameter_class=ManualParameter)
-        self.add_parameter('{}_distortion_dict'.format(name),
-                           label='{} distortion dictionary'.format(name),
-                           vals=vals.Dict(),
-                           parameter_class=ManualParameter)
-        self.add_parameter('{}_charge_buildup_compensation'.format(name),
-                           parameter_class=ManualParameter,
-                           vals=vals.Bool(), initial_value=False)
-        self.add_parameter('{}_compensation_pulse_scale'.format(name),
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(0., 1.), initial_value=0.5)
-        self.add_parameter('{}_compensation_pulse_delay'.format(name), 
-                           initial_value=0, unit='s',
+        self.add_parameter('{}_active'.format(awg.name), initial_value=True,
+                           label='{} active'.format(awg.name),
+                           vals=vals.Bool(),
                            parameter_class=ManualParameter)
         self.add_parameter('{}_compensation_pulse_min_length'.format(name), 
                            initial_value=0, unit='s',
                            parameter_class=ManualParameter)
+
+        for ch_nr in range(2):
+            id = 'ch{}'.format(ch_nr + 1)
+            name = channel_name_map.get(id, awg.name + '_' + id)
+            self._uhfqc_create_channel_parameters(id, name, awg)
+            self.channels.add(name)
+    
+    def _uhfqc_create_channel_parameters(self, id, name, awg):
+        self.add_parameter('{}_id'.format(name), get_cmd=lambda _=id: _)
+        self.add_parameter('{}_awg'.format(name), get_cmd=lambda _=awg.name: _)
+        self.add_parameter('{}_type'.format(name), get_cmd=lambda: 'analog')
+        self.add_parameter('{}_amp'.format(name),
+                            label='{} amplitude'.format(name), unit='V',
+                            set_cmd=self._uhfqc_setter(awg, id, 'amp'),
+                            get_cmd=self._uhfqc_getter(awg, id, 'amp'),
+                            vals=vals.Numbers(0.075, 1.5),
+                            initial_value=0.75)
+        self.add_parameter('{}_distortion'.format(name),
+                            label='{} distortion mode'.format(name),
+                            initial_value='off',
+                            vals=vals.Enum('off', 'precalculate'),
+                            parameter_class=ManualParameter)
+        self.add_parameter('{}_distortion_dict'.format(name),
+                            label='{} distortion dictionary'.format(name),
+                            vals=vals.Dict(),
+                            parameter_class=ManualParameter)
+        self.add_parameter('{}_charge_buildup_compensation'.format(name),
+                            parameter_class=ManualParameter,
+                            vals=vals.Bool(), initial_value=False)
+        self.add_parameter('{}_compensation_pulse_scale'.format(name),
+                            parameter_class=ManualParameter,
+                            vals=vals.Numbers(0., 1.), initial_value=0.5)
+        self.add_parameter('{}_compensation_pulse_delay'.format(name), 
+                           initial_value=0, unit='s',
+                           parameter_class=ManualParameter)
+
+    @staticmethod
+    def _uhfqc_setter(obj, id, par):
+        if par == 'offset':
+            def s(val):
+                obj.set('sigouts_{}_offset'.format(int(id[2])-1), val)
+        elif par == 'amp':
+            def s(val):
+                obj.set('sigouts_{}_range'.format(int(id[2])-1), val)
+        else:
+            raise NotImplementedError('Unknown parameter {}'.format(par))
+        return s
+
+    def _uhfqc_getter(self, obj, id, par):
+        if par == 'offset':
+            def g():
+                return obj.get('sigouts_{}_offset'.format(int(id[2])-1))
+        elif par == 'amp':
+            def g():
+                if self._awgs_prequeried_state:
+                    return obj.parameters['sigouts_{}_range' \
+                        .format(int(id[2])-1)].get_latest()/2
+                else:
+                    return obj.get('sigouts_{}_range' \
+                        .format(int(id[2])-1))/2
+        else:
+            raise NotImplementedError('Unknown parameter {}'.format(par))
+        return g 
 
     def _program_awg(self, obj, sequence):
         if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
@@ -164,9 +202,11 @@ class UHFQCPulsar:
                             'Pulsar: Trigger wait set for element {} with a non-zero first '
                             'point'.format(el))
                             
-        if not (ch_has_waveforms['ch1'] or ch_has_waveforms['ch1']):
+        if not (ch_has_waveforms['ch1'] or ch_has_waveforms['ch2']):
             ### Turn off all channels and return ###
             return
+
+        self.awgs_with_waveforms(obj.name)
         
         for el_info in sequence.awg_sequence[obj.name]:
                 # Expected element names
@@ -175,16 +215,17 @@ class UHFQCPulsar:
                 name_ch2 = el + '_ch2'
 
                 # if channel name not in waveform_data None has to be
-                # passed to _hdawg_element_seqc()
-                if name_ch1 not in waveform_data:
-                    name_ch1 = None
-                else:
-                    name_ch1 = wf_name(el, 'ch1', '', obj._devname, False)
-
-                if name_ch2 not in waveform_data:
-                    name_ch2 = None
-                else:
-                    name_ch2 = wf_name(el, 'ch2', '', obj._devname, False)
+                # passed to _UHFQC_element_seqc()
+                name_ch1 = wf_name(el, obj._device, 'ch1') if name_ch1 in waveform_data else None
+                name_ch2 = wf_name(el, obj._device, 'ch2') if name_ch2 in waveform_data else None
+                try: 
+                    name_ch1 = '"' + name_ch1 + '"' 
+                except:
+                    pass
+                try:
+                    name_ch2 = '"' + name_ch2 + '"'
+                except:
+                    pass 
 
                 if name_ch1 is not None or name_ch2 is not None:
                     main_loop += self._UHFQC_element_seqc(name_ch1, name_ch2, 'RO' in el_info)
@@ -199,7 +240,7 @@ class UHFQCPulsar:
 
         # here we want to use a timeout value longer than the obj.timeout()
         # as programming the AWGs takes more time than normal communications
-        obj.awg_string(awg_str)
+        obj.awg_string(awg_str, timeout=600)
 
         
     
@@ -319,7 +360,7 @@ class UHFQCPulsar:
         readout_str += '\t\tsetTrigger(WINT_EN);\n' if readout else ''
         return wait_wave_str + trigger_str + play_str + readout_str
 
-    def _clock(self, obj):
+    def _clock(self, obj, cid=None):
         if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
             return super()._clock(obj)
         return obj.clock_freq()
@@ -342,10 +383,10 @@ class HDAWG8Pulsar:
         self.add_parameter('{}_element_start_granularity'.format(awg.name),
                            get_cmd=lambda: 8/(2.4e9))
         self.add_parameter('{}_min_length'.format(awg.name),
-                           get_cmd=lambda: 16 / 2.4e9)
+                           get_cmd=lambda: 16 /(2.4e9))
         self.add_parameter('{}_inter_element_deadtime'.format(awg.name),
                            # get_cmd=lambda: 80 / 2.4e9)
-                           get_cmd=lambda: 8 / 2.4e9)
+                           get_cmd=lambda: 8 / (2.4e9))
                            # get_cmd=lambda: 0 / 2.4e9)
         self.add_parameter('{}_precompile'.format(awg.name), 
                            initial_value=False, vals=vals.Bool(),
@@ -478,7 +519,7 @@ class HDAWG8Pulsar:
         obj._delete_csv_files()
         log.info('Previous AWG8 csv files have been deleted.')
 
-        ch_has_waveforms = {'ch{}'.format(i+1): False for i in range(8)}
+        ch_has_waveforms = {'ch{}{}'.format(i+1,j): False for i in range(8) for j in ['','m']}
 
         for awg_nr in [0, 1, 2, 3]:
             ch1id = 'ch{}'.format(awg_nr * 2 + 1)
@@ -495,6 +536,10 @@ class HDAWG8Pulsar:
             waveform_data = {}  
             waveform_table = ""
 
+            # codeword_el contains elements that are triggered 
+            # by codewords. Used later when compiling the 
+            # instructions for the HDAWG.
+            codeword_el = set()
             for segment in sequence.segments:
                 wfs = sequence.segments[segment].waveforms(awgs=[obj.name])
                 if obj.name not in wfs:
@@ -517,13 +562,13 @@ class HDAWG8Pulsar:
                         for cid in [ch1id, ch1mid, ch2id, ch2mid]:
                             if cid not in wfs[(i, el)][cw]:
                                 continue
-                            # set ch_has_waveforms True for this channel (only
-                            # for non marker channels)
-                            if cid != ch1mid and cid != ch2mid:
-                                ch_has_waveforms[cid] = True
+                            ch_has_waveforms[cid] = True
                             wfname = str(el) + '_' + cid
                             cid_wf = wfs[(i, el)][cw][cid]
-                            waveform_data[wfname] = cid_wf
+                            waveform_data[wfname] = np.array(cid_wf)
+                            # for marker channels save the array as integers 1 and 0
+                            if cid == ch1mid or cid == ch2mid: 
+                                waveform_data[wfname] = (waveform_data[wfname]+0.5).astype(int)
                             if len(cid_wf) > 0 and cid_wf[0] != 0.:
                                 log.warning(
                                     'Pulsar: Trigger wait set for element {} with a non-zero first '
@@ -533,10 +578,13 @@ class HDAWG8Pulsar:
                         # generate codeword table
                         if cw == 'no_codeword':
                             continue
-                        wfname1 = wf_name(el, ch1id, ch1mid, obj._devname, 
-                            ch1mid in cw_wfs) if ch1id in cw_wfs else None
-                        wfname2 = wf_name(el, ch2id, ch2mid, obj._devname, 
-                            ch2mid in cw_wfs) if ch2id in cw_wfs else None
+                        codeword_el.add(el)
+                        chid = ch1id if ch1id in cw_wfs else None
+                        chmid = ch1mid if ch1mid in cw_wfs else None
+                        (header,wfname1) = _hdawg_wave_name(el, obj._devname, header=header,chid=chid, chmid = chmid)
+                        chid = ch2id if ch2id in cw_wfs else None
+                        chmid = ch2mid if ch2mid in cw_wfs else None
+                        (header,wfname2) = _hdawg_wave_name(el, obj._devname, header=header, chid = chid, chmid = chmid)
                         command = {
                             (True, True): 'setWaveDIO({0}, {1}, {2});\n',
                             (True, False): 'setWaveDIO({0}, 1, {1});\n',
@@ -545,19 +593,20 @@ class HDAWG8Pulsar:
                         }[(wfname1 is not None, wfname2 is not None)]
                         waveform_table += command.format(cw, wfname1, wfname2)
 
-            if not (ch_has_waveforms[ch1id] or ch_has_waveforms[ch2id]):
+            if not (ch_has_waveforms[ch1id] or ch_has_waveforms[ch2id] or \
+                    ch_has_waveforms[ch1mid] or ch_has_waveforms[ch2mid]):
                 continue
 
             main_loop = "while(1) {\n"
             footer = "}\nwait(1000);\n"
 
             for el_info in sequence.awg_sequence[obj.name]:
-                if 'codeword' in el_info:
+                el = el_info[0]
+                if el in codeword_el:
                     main_loop += self._hdawg_element_seqc(None, None)
                     continue
                 
                 # Expected element names
-                el = el_info[0]
                 name_ch1 = str(el) + '_' + ch1id
                 name_ch1m = str(el) + '_' + ch1mid
                 name_ch2 = str(el) + '_' + ch2id
@@ -565,19 +614,13 @@ class HDAWG8Pulsar:
 
                 # if channel name not in waveform_data None has to be
                 # passed to _hdawg_element_seqc()
-                if name_ch1 not in waveform_data:
-                    name_ch1 = None
-                else:
-                    marker_ch = name_ch1m in waveform_data
-                    name_ch1 = wf_name(el, ch1id, ch1mid, obj._devname,
-                                    marker_ch)
+                chid = ch1id if name_ch1 in waveform_data else None
+                chmid = ch1mid if name_ch1m in waveform_data else None
+                (header,name_ch1) = _hdawg_wave_name(el, obj._devname, header=header,chid=chid, chmid = chmid)
                                     
-                if name_ch2 not in waveform_data:
-                    name_ch2 = None
-                else:
-                    marker_ch = name_ch2m in waveform_data
-                    name_ch2 = wf_name(el, ch2id, ch2mid, obj._devname,
-                                    marker_ch)
+                chid = ch2id if name_ch2 in waveform_data else None
+                chmid = ch2mid if name_ch2m in waveform_data else None
+                (header,name_ch2) = _hdawg_wave_name(el, obj._devname, header=header,chid=chid, chmid = chmid)
 
                 if name_ch1 is not None or name_ch2 is not None:
                     main_loop += self._hdawg_element_seqc(name_ch1, name_ch2)
@@ -588,7 +631,7 @@ class HDAWG8Pulsar:
             for wfname, data in waveform_data.items():
                 log.warning(wfname)
                 log.warning(simplify_name(wfname))
-                obj._write_csv_waveform(simplify_name(wfname), np.array(data))
+                obj._write_csv_waveform(simplify_name(wfname), data)
 
             log.info("Programming {} vawg{} sequence '{}'".format(
                 obj.name, awg_nr, sequence.name))
@@ -607,6 +650,8 @@ class HDAWG8Pulsar:
             if ch_has_waveforms[ch]:
                 obj.set('sigouts_{}_on'.format(int(ch[2])-1), 1)
                 one_channel_has_wfs = True
+                print(obj.name)
+                print(ch)
             else: 
                 obj.set('sigouts_{}_on'.format(int(ch[2])-1), 0)
 
@@ -1438,7 +1483,7 @@ class AWG5014Pulsar:
         return channel_cfg
 
 
-class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, Instrument):
+class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
     """
     A meta-instrument responsible for all communication with the AWGs.
     Contains information about all the available awg-channels in the setup.
@@ -1813,13 +1858,14 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, Instrument):
                   Default is `True`.
         """
         fail = None
-        try:
-            super()._program_awg(obj, sequence)
-        except AttributeError as e:
-            fail = e
-        if fail is not None:
-            raise TypeError('Unsupported AWG instrument: {} of type {}. '
-                            .format(obj.name, type(obj)) + str(fail))
+        # try:
+        #     super()._program_awg(obj, sequence)
+        # except AttributeError as e:
+        #     fail = e
+        # if fail is not None:
+        #     raise TypeError('Unsupported AWG instrument: {} of type {}. '
+        #                     .format(obj.name, type(obj)) + str(fail))
+        super()._program_awg(obj, sequence)
 
     def _start_awg(self, awg):
         obj = self.AWG_obj(awg=awg)
@@ -1908,22 +1954,50 @@ def simplify_name(s):
     
     return ''.join(s)
 
-def wf_name(el, chid, chmid, devname, marker_ch):
-        """
-        Input:
-            * el: element name
-            * chid: channel id
-            * chimd: marker channel id
-            * devname: AWG device name
-            * marker_ch: boolean wich is True if there are waveforms on the 
-                        marker channel
-        Returns: the waveform name for codewords in the format used for HDAWG8
-        """
-        wfname = el + '_' + chid
-        wfname = '"{}_{}"'.format(devname, wfname)
-        wfname = simplify_name(wfname)
-        if marker_ch:
-            wfnamem = el + '_' + chmid
-            wfnamem = simplify_name('"{}_{}"'.format(devname, wfnamem))
-            wfname = wfname + " + " + wfnamem
-        return wfname
+def wf_name(el, devname, chid):
+    """
+    Input:
+        * el: element name
+        * chid: channel id (marker or analog)
+        * devname: AWG device name
+    Returns: the waveform name for codewords in the format used for HDAWG8
+    """
+    
+    wfname = el + '_' + chid
+    wfname = '{}_{}'.format(devname, wfname)
+    wfname = simplify_name(wfname)
+    
+    wfname = wfname
+    return wfname
+
+def _hdawg_wave_name(el, devname, header=None, chid = None, chmid = None):
+    """
+    Returns the waveform name and header in the right format for HDAWG8.
+        * el: element name
+        * devname: device name of HDAWG
+        * header: header string
+        * chid: channel id
+        * chmid: marker channel id
+    """
+    # case 1: marker and analog channel programmed
+    if chid is not None and chmid is not None:
+        chname = wf_name(el, devname, chid)
+        chmname = wf_name(el, devname, chmid)
+        name_ch = chname + '_' + chmname
+        if header is not None:
+            header += 'wave {0} = "{0}"; \n'.format(chname)
+            header += 'wave {0} = "{0}"; \n'.format(chmname)
+            header += 'wave {} = {} + {};\n'.format(name_ch, chname, chmname)
+    # case 2: neither marker nor analog is programmed
+    elif chid is None and chmid is None:
+        name_ch = None
+    # case 3: either marker or analog is programmed
+    else:
+        if chmid is not None:
+            chid = chmid
+        name_ch = '"' + wf_name(el, devname, chid) + '"'
+    
+    if header is None:
+        return name_ch
+    else:
+        return (header, name_ch)
