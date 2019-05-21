@@ -165,35 +165,7 @@ class QuTech_AWG_Module(SCPI):
                                 'from the connected master IORearDIO board\n'
                                     '\t\tDisables SE and DIFF inputs\n' )
 
-        self.add_function('dio_calibrate',
-                            call_cmd='DIO:CALibrate:ALL',
-                            docstring='Calibrate the DIO input signals.\n' \
-                                'Will analyze the input signals for each DIO '\
-                                'inputs (used to transfer codeword bits), secondly, '\
-                                'the most preferable index is set and stored.\n\n' \
 
-                                'Each signal is sampled and divided into sections. '\
-                                'These sections are analyzed to find a stable '\
-                                'stable signal. These stable sections '\
-                                'are addressed by there index.\n\n' \
-
-                                'Note 1: Expects a DIO calibration signal on the inputs:\n' \
-                                '\tAn all codewords bits high followed by an all codeword ' \
-                                'bits low in a continues repetition. This results in a ' \
-                                'square wave of 25 MHz on the DIO inputs of the ' \
-                                'DIO connection. Individual DIO inputs where no ' \
-                                'signal is detected will not be calibrated, See ' \
-                                'paramater dio_calibrated_inputs\n\n' \
-
-                                'Note 2: The best index is stored in non-volatile ' \
-                                'memory and loaded at startup.\n\n' \
-
-                                'Note 3: The QWG will continuously validate if ' \
-                                'the active index is still stable.\n\n' \
-
-                                'If no suitable indexes are found the list '\
-                                'is empty and an error is pushed onto the error stack\n'
-                            )
 
         self.add_parameter('dio_is_calibrated',
                             unit='',
@@ -271,18 +243,18 @@ class QuTech_AWG_Module(SCPI):
                            )
 
         # TODO [versloot] : remove
-        self.add_parameter('_dio_calibrate_input',
-                           unit='S',
-                           label='Only calibrate DIO input with a specified time',
-                           set_cmd='DIO:CALibrate:INPut {}',
-                           vals=vals.Numbers(1e-6),
-                           docstring='Calibrate only the DIO input signals.\n'
-                                     'Parameter:'
-                                     '\tMeasurement time between bitDiffs in seconds, resolution of 1e-6 s\n'
-                                     'Note that when select a measurement time longer than 25e-2 S the scpi connection '
-                                     'will timeout, the calibration is than still running. This will happen on the '
-                                     'first `get` parameter\n'
-                                     'Calibration duration = time * 20')
+        # self.add_parameter('_dio_calibrate_input',
+        #                    unit='S',
+        #                    label='Only calibrate DIO input with a specified time',
+        #                    set_cmd='DIO:CALibrate:INPut {}',
+        #                    vals=vals.Numbers(1e-6),
+        #                    docstring='Calibrate only the DIO input signals.\n'
+        #                              'Parameter:'
+        #                              '\tMeasurement time between bitDiffs in seconds, resolution of 1e-6 s\n'
+        #                              'Note that when select a measurement time longer than 25e-2 S the scpi connection '
+        #                              'will timeout, the calibration is than still running. This will happen on the '
+        #                              'first `get` parameter\n'
+        #                              'Calibration duration = time * 20')
 
         self.add_parameter('_dio_bit_diff_table',
                            get_cmd=self._get_bit_diff_table,
@@ -409,10 +381,10 @@ class QuTech_AWG_Module(SCPI):
             self.add_parameter('ch{}_bit_map'.format(ch),
                                unit='',
                                label='Channel {}, set bit map for this channel'.format(ch),
-                               get_cmd=self._gen_ch_get_func(
-                                   self._get_bit_map, ch),
+                               get_cmd=f"DAC{ch}:BITmap?",
                                set_cmd=self._gen_ch_set_func(
                                    self._set_bit_map, ch),
+                               get_parser=self._int_to_array,
                                docstring='Codeword bit map for a channel\n')
 
             # Trigger parameters
@@ -652,8 +624,7 @@ class QuTech_AWG_Module(SCPI):
         return json.loads(result)
 
     def _int_to_array(self, msg):
-        msg = msg.replace('\"', '') # SCPI/visa adds additional quotes
-        if not msg:
+        if msg == "\"\"":
             return []
         return msg.split(',')
 
@@ -689,13 +660,36 @@ class QuTech_AWG_Module(SCPI):
             array_raw = ',' + ','.join(str(x) for x in bit_map)
         self.write(f"DAC{ch}:BITmap {len(bit_map)}{array_raw}")
 
-    def _get_bit_map(self, ch: type = int):
-        result = self.ask(f"DAC{ch}:BITmap?")
-        if result == "\"\"":
-                result = []
-        else:
-            result = result.split(",")
-        return result
+    def dio_calibrate(self, target_index: int = ''):
+        """
+        Calibrate the DIO input signals.\n
+
+        Will analyze the input signals for each DIO
+        inputs (used to transfer codeword bits), secondly,
+        the most preferable index is set and stored.\n\n'
+
+        Each signal is sampled and divided into sections.
+        These sections are analyzed to find a stable
+        stable signal. These stable sections
+        are addressed by there index.\n\n
+
+        Note 1: Expects a DIO calibration signal on the inputs:\n
+        \tAn all codewords bits high followed by an all codeword
+        bits low in a continues repetition. This results in a
+        square wave of 25 MHz on the DIO inputs of the
+        DIO connection. Individual DIO inputs where no
+        signal is detected will not be calibrated, See
+        paramater dio_calibrated_inputs\n\n
+
+        Note 2: The best index is stored in non-volatile
+        memory and loaded at startup.\n\n
+        Note 3: The QWG will continuously validate if
+        the active index is still stable.\n\n
+        If no suitable indexes are found the list
+        is empty and an error is pushed onto the error stack\n
+        """
+
+        self.write(f'DIO:CALibrate:ALL {target_index}')
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
@@ -865,6 +859,29 @@ class QuTech_AWG_Module(SCPI):
     # TODO [versloot]: remove
     def _get_bit_diff_table(self):
         return self.ask("DIO:BDT").replace("\"", '').replace(",", "\n")
+
+    def _dio_calibrate_input(self, meas_time: float, nr_itr: int, target_index: int = ""):
+        """
+        Calibrate only the DIO input signals.\n
+        Parameters:
+        \t meas_time: Measurement time between bitDiffs in seconds, resolution of 1e-6 s
+        Note that when select a measurement time longer than 25e-2 S the scpi connection
+        will timeout, the calibration is than still running. This will happen on the
+        first `get` parameter\n
+        \tnr_itr: Number  DIO signal data (bitDiffs) gathering iterations\n
+        \ttarget_index: DIO index which determines on which side of the edge to select the active index from\n
+        Calibration duration = meas_time * nr_itr * 20 * 1.1 (10% to compensate for log printing time)\n
+        """
+        if meas_time < 1e-6:
+            raise ValueError(f"Cannot calibration inputs: meas time is too low; min 1e-6, actual: {meas_time}")
+
+        if nr_itr < 1:
+            raise ValueError(f"Cannot calibration inputs: nr_itr needs to be positive; actual: {nr_itr}")
+
+        if target_index is not "":
+            target_index = f",{target_index}"
+
+        self.write(f'DIO:CALibrate:INPut {meas_time},{nr_itr}{target_index}')
 
     ##########################################################################
     # Generic (i.e. at least AWG520 and AWG5014) Tektronix AWG functions
