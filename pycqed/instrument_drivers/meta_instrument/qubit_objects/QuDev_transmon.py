@@ -2529,8 +2529,8 @@ class QuDev_transmon(Qubit):
 
             MC.run(name=label+self.msmt_suffix, mode=mode)
 
-        # MC.soft_avg(prev_avg)
-        # self.RO_acq_shots(prev_shots)
+        MC.soft_avg(prev_avg)
+        self.RO_acq_shots(prev_shots)
 
         if analyze:
             if qutrit:

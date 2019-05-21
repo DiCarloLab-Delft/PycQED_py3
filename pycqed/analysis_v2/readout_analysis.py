@@ -834,6 +834,10 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         Returns:
 
         """
+        assert len(X.shape) == 2, \
+            "Classification data should be a 2D array. " \
+            "If using only one channel, please make array of shape (n, 1) " \
+            "instead of (n,)"
         if method == 'ncc':
             pred_states = []
             for pt in X:
@@ -847,17 +851,36 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         elif method == 'gmm':
             # FIXME Nathan: here since completely unsupervised should add a function
             #  that guesses which level is which label assuming good readout (>50%)
-            cov = kw.pop("covariance_type", "tied")
+            cov_type = kw.pop("covariance_type", "tied")
             # full allows full covariance matrix for each level. Other options
             # see GM documentation
-            gm = GM(n_components=len(self.levels), covariance_type=cov,
+            gm = GM(n_components=len(self.levels), covariance_type=cov_type,
                     random_state=0, means_init=[mu for _, mu in self.proc_data_dict[
                     'mu'].items()])
             gm.fit(X)
             pred_states = np.argmax(gm.predict_proba(X), axis=1)
             params = dict()
+            if cov_type == "tied":
+                # in case all components share the same cov mtx return a list
+                # of identical cov matrices
+                covs = [gm.covariances_ for _ in range(gm.n_components)]
+            elif cov_type == "full":
+                # already of the right shape (n_comp, n_features, n_features)
+                covs = gm.covariances_
+            elif cov_type == "spherical":
+                # return list of sigma_i^2 * I instead of list of sigma_i^2
+                covs = [np.diag([gm.covariances_[i]
+                                 for _ in range(X.shape[1])])
+                        for i in range(gm.n_components)]
+            elif cov_type == "diag":
+                # make covariance matrices from diagonals
+                covs = [np.diag(gm.covariances_[i])
+                            for i in range(gm.n_components)]
+            else:
+                raise ValueError("covariance type: {} is not supported"
+                                 .format(cov_type))
             params['means'] = gm.means_
-            params['covariances'] = gm.covariances_
+            params['covariances'] = covs
             params['weights'] = gm.weights_
             return pred_states, params
         else:
