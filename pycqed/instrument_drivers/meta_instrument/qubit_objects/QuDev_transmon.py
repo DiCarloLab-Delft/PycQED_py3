@@ -2482,10 +2482,7 @@ class QuDev_transmon(Qubit):
         RO_spacing += RO_slack # for slack
         RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
 
-        spoints = np.arange(self.RO_acq_shots())
-        if preselection_pulse:
-            spoints //= 2
-        MC.set_sweep_points(np.arange(self.RO_acq_shots()))
+
         if thresholded:
             MC.set_detector_function(self.dig_log_det)
         else:
@@ -2516,6 +2513,10 @@ class QuDev_transmon(Qubit):
                     level=level,
                     upload=upload,
                     preselection=preselection_pulse))
+                spoints = np.arange(self.RO_acq_shots())
+                if preselection_pulse:
+                    spoints //= 2
+                MC.set_sweep_points(np.arange(self.RO_acq_shots()))
                 MC.run(name=label + '_{}'.format(level) + self.msmt_suffix,
                        mode=mode)
                 pass
@@ -2526,7 +2527,10 @@ class QuDev_transmon(Qubit):
                 upload=upload,
                 preselection=preselection_pulse,
                 RO_spacing=RO_spacing))
-
+            spoints = np.arange(self.RO_acq_shots())
+            if preselection_pulse:
+                spoints //= 2
+            MC.set_sweep_points(np.arange(self.RO_acq_shots()))
             MC.run(name=label+self.msmt_suffix, mode=mode)
 
         MC.soft_avg(prev_avg)
@@ -3983,7 +3987,7 @@ class QuDev_transmon(Qubit):
                          np.abs(trace['f'] - trace['e'])
             fmax = freqs[np.argmax(total_dist)]
             # FIXME: just as debug plotting for now
-            fig, ax = plt.subplots(2, figsize = (10,10))
+            fig, ax = plt.subplots(2)
             ax[0].plot(freqs, np.abs(trace['g']), label='g')
             ax[0].plot(freqs, np.abs(trace['e']), label='e')
             ax[0].plot(freqs, np.abs(trace['f']), label='f')
@@ -3999,6 +4003,8 @@ class QuDev_transmon(Qubit):
                 self.f_RO(),
                                                                           fmax))
             plt.legend()
+
+            m_a['g'].save_fig(fig, 'IQplane_distance')
             plt.show()
         else:
             fmax = freqs[np.argmax(np.abs(trace['e'] - trace['g']))]
@@ -4010,18 +4016,18 @@ class QuDev_transmon(Qubit):
             SA = sa.ResonatorSpectroscopy(t_start=[m_a['g'].timestamp_string,
                                                    m_a['e'].timestamp_string],
                                           options_dict=dict(simultan=True,
-                                                            fit_options = dict(
+                                                            fit_options=dict(
                                                             model='hanger_with_pf'),
                                                             scan_label=''),
                                           do_fitting=True)
-            # FIXME Nathan: remove 3 level dependency
-            if qutrit:
-                SA2 = sa.ResonatorSpectroscopy(t_start= m_a['f'].timestamp_string,
-                                          options_dict=dict(simultan=False,
-                                                            fit_options = dict(
-                                                            model='hanger_with_pf'),
-                                                            scan_label=''),
-                                          do_fitting=True)
+            # FIXME Nathan: remove 3 level dependency; fix this analysis:
+            # if qutrit:
+            #     SA2 = sa.ResonatorSpectroscopy(t_start=m_a['f'].timestamp_string,
+            #                               options_dict=dict(simultan=False,
+            #                                                 fit_options = dict(
+            #                                                 model='hanger_with_pf'),
+            #                                                 scan_label=''),
+            #                               do_fitting=True)
 
             if update:
                 # FIXME Nathan: update parameters accordingly
@@ -4728,14 +4734,3 @@ def add_CZ_pulse(qbc, qbt):
         qbc.add_pulse_parameter(op_name, ps_name + '_gaussian_filter_sigma',
                                 'gaussian_filter_sigma', initial_value=2e-9,
                                 vals=vals.Numbers(0))
-
-
-
-
-
-
-
-
-
-
-
