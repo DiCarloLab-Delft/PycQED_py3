@@ -1855,7 +1855,7 @@ def parity_correction_seq(
             .format(total_mod_phase/elements_length/360))
 
     # tomography elements
-    if parity_op in ['XX', ['XX,ZZ', 'ZZ,XX'][nr_parity_measurements%2]]:
+    if parity_op in ['XX', ['XX,ZZ', 'ZZ,XX'][nr_parity_measurements % 2]]:
         pretomo = pretomo_after_x
     else:
         pretomo = pretomo_after_z

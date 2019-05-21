@@ -2009,7 +2009,7 @@ class Load_Sequence_Tek(swf.Hard_Sweep):
 
 class Dynamic_phase(swf.Hard_Sweep):
 
-    def __init__(self, qb_name, CZ_pulse_name, flux_pulse_amp,
+    def __init__(self, qb_name, CZ_pulse_name,
                  operation_dict,
                  upload=True, cal_points=True):
         '''
@@ -2026,7 +2026,6 @@ class Dynamic_phase(swf.Hard_Sweep):
         # self.thetas = thetas
         self.qb_name = qb_name
         self.CZ_pulse_name = CZ_pulse_name
-        self.flux_pulse_amp = flux_pulse_amp
         self.operation_dict = operation_dict
         self.upload = upload
         self.cal_points = cal_points
@@ -2040,7 +2039,6 @@ class Dynamic_phase(swf.Hard_Sweep):
             fsqs.dynamic_phase_meas_seq(thetas=self.sweep_points,
                                         qb_name=self.qb_name,
                                         CZ_pulse_name=self.CZ_pulse_name,
-                                        flux_pulse_amp=self.flux_pulse_amp,
                                         operation_dict=self.operation_dict,
                                         cal_points=self.cal_points)
 
@@ -2700,39 +2698,41 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
 class CPhase_NZ_hard_swf(swf.Hard_Sweep):
 
     def __init__(self, phases, qbc_name, qbt_name, CZ_pulse_name,
-                 CZ_pulse_channel, operation_dict,
-                 max_flux_length, cal_points=False,
-                 upload=True, reference_measurements=False):
+                 CZ_pulse_channel, operation_dict, num_soft_sweepparams,
+                 max_flux_length, cal_points=False, first_data_point=True,
+                 num_cal_points=4, upload=True, reference_measurements=False):
 
         super().__init__()
         self.phases = phases
         self.qbc_name = qbc_name
         self.qbt_name = qbt_name
         self.operation_dict = operation_dict
+        self.num_soft_sweepparams = num_soft_sweepparams
         self.CZ_pulse_name = CZ_pulse_name
         self.CZ_pulse_channel = CZ_pulse_channel
         self.upload = upload
         self.cal_points = cal_points
+        self.num_cal_points = num_cal_points
         self.reference_measurements = reference_measurements
         self.name = 'flux_pulse_CPhase_measurement_phase_sweep'
         self.parameter_name = 'phase'
         self.unit = 'rad'
         self.max_flux_length = max_flux_length
-        self.flux_params_dict = None
+        self.flux_params_dict = {}
         self.values_complete = False
-        self.first_data_point = True
+        self.first_data_point = first_data_point
 
-    def prepare(self, flux_params_dict_soft_swf=None, **kw):
-        print('flux params dict soft swf in hard swf ',
-              flux_params_dict_soft_swf)
-        if flux_params_dict_soft_swf is None:
+    def prepare(self, flux_params_dict={}, **kw):
+        print('flux params dict in hard swf ',
+              flux_params_dict)
+        if flux_params_dict == {}:
             return
-
+        print(self.upload)
         if self.upload:
-            print('Uploaded CPhase Sequence')
+            print('Uploading CPhase Sequence...')
             fsqs.cphase_nz_seq(
                 phases=self.phases,
-                flux_params_dict=flux_params_dict_soft_swf,
+                flux_params_dict=flux_params_dict,
                 max_flux_length=self.max_flux_length,
                 qbc_name=self.qbc_name,
                 qbt_name=self.qbt_name,
@@ -2740,6 +2740,7 @@ class CPhase_NZ_hard_swf(swf.Hard_Sweep):
                 CZ_pulse_name=self.CZ_pulse_name,
                 CZ_pulse_channel=self.CZ_pulse_channel,
                 cal_points=self.cal_points,
+                num_cal_points=self.num_cal_points,
                 upload=self.upload,
                 return_seq=True,
                 first_data_point=self.first_data_point
@@ -2754,11 +2755,11 @@ class CPhase_NZ_hard_swf(swf.Hard_Sweep):
                             'without a value type!')
             return
         else:
-            self.flux_params_dict_soft_swf = {val_type: flux_val}
+            self.flux_params_dict.update({val_type: flux_val})
 
-        if self.flux_params_dict is not None:
-            self.prepare(flux_params_dict_soft_swf=self.flux_params_dict)
-            self.flux_params_dict = None
+        if len(self.flux_params_dict) == self.num_soft_sweepparams:
+            self.prepare(flux_params_dict=self.flux_params_dict)
+            self.flux_params_dict = {}
 
 
 class Flux_pulse_CPhase_hard_swf_frequency(swf.Hard_Sweep):

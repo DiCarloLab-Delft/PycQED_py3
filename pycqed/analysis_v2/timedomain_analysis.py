@@ -296,6 +296,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         self.num_cal_points = self.options_dict.get(
             'num_cal_points', self.metadata.get('num_cal_points', None))
+        print(self.num_cal_points)
         if self.num_cal_points is None:
             print('Assuming two cal states, |g> and |e>, and using '
                   'sweep_points[-4:-2] as |g> cal points, and '
@@ -303,32 +304,28 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             self.num_cal_points = 4
             cal_zero_points = [-4, -3]
             cal_one_points = [-2, -1]
-            zero_coord = None
-            one_coord = None
+            self.cal_point_indices = [cal_zero_points, cal_one_points]
         elif self.num_cal_points == 0:
             cal_zero_points = None
             cal_one_points = None
-            zero_coord = None
-            one_coord = None
+            self.cal_point_indices = [cal_zero_points, cal_one_points]
         else:
             cal_zero_points = self.options_dict.get(
                 'cal_zero_points', self.metadata.get('cal_zero_points', None))
             cal_one_points = self.options_dict.get(
                 'cal_one_points', self.metadata.get('cal_one_points', None))
-            zero_coord = self.options_dict.get('zero_coord', None)
-            one_coord = self.options_dict.get('one_coord', None)
-            if np.all([i is None for i in [cal_zero_points, cal_one_points,
-                                          zero_coord, one_coord]]):
-                print('Assuming two cal states, |g> and |e>, and using '
-                      'sweep_points[{}:{}] for |g> and sweep points[{}::] '
-                      'for |e>.'.format(-self.num_cal_points,
-                                        -self.num_cal_points//2,
-                                        -self.num_cal_points//2))
-                assert (self.num_cal_points % 2 == 0)
-                cal_zero_points = list(range(-self.num_cal_points,
-                                             -self.num_cal_points//2))
-                cal_one_points = list(range(-self.num_cal_points//2, 0))
-        self.cal_points = [cal_zero_points, cal_one_points]
+            if np.all([i is None for i in [cal_zero_points, cal_one_points]]):
+                self.num_cal_states = self.options_dict.get(
+                        'num_cal_states', self.metadata.get(
+                        'num_cal_states', 2))
+
+                assert (self.num_cal_points % self.num_cal_states == 0)
+                print('Using {} cal states and {} cal points'.format(
+                    self.num_cal_states, self.num_cal_points))
+                k = int(self.num_cal_points/self.num_cal_states)
+                indices = list(range(-self.num_cal_points, 0))
+                self.cal_point_indices = [indices[i:i + k] for i in
+                                   range(0, len(indices), k)]
 
         if self.options_dict.get('TwoD', False):
             if 'sweep_points_2D_dict' in self.metadata:
@@ -343,15 +340,11 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                      qbn in self.qb_names}
             self.proc_data_dict['projected_data_dict'] = \
                 self.rotate_data_TwoD(meas_results_per_qb_per_ROch,
-                                      self.channel_map,
-                                      cal_zero_points, cal_one_points,
-                                      zero_coord, one_coord)
+                                      self.channel_map, self.cal_point_indices)
         else:
             self.proc_data_dict['projected_data_dict'] = \
                 self.rotate_data(meas_results_per_qb_per_ROch,
-                                 self.channel_map,
-                                 cal_zero_points, cal_one_points,
-                                 zero_coord, one_coord)
+                                 self.channel_map, self.cal_point_indices)
             
         for qbn in self.qb_names:
             if self.num_cal_points > 0:
@@ -373,8 +366,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
     @staticmethod
     def rotate_data(meas_results_per_qb_per_ROch, channel_map,
-                    cal_zero_points=None, cal_one_points=None,
-                    zero_coord=None, one_coord=None):
+                    cal_point_indices):
 
         rotated_data_dict = OrderedDict()
         for qb_name, meas_res_dict in meas_results_per_qb_per_ROch.items():
@@ -383,17 +375,15 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 rotated_data_dict[qb_name] = \
                     a_tools.normalize_data_v3(
                         data=meas_res_dict[list(meas_res_dict)[0]],
-                        cal_zero_points=cal_zero_points,
-                        cal_one_points=cal_one_points)
+                        cal_zero_points=cal_point_indices[0],
+                        cal_one_points=cal_point_indices[1])
             elif list(meas_res_dict) == channel_map[qb_name]:
                 # two RO channels per qubit
                 rotated_data_dict[qb_name], _, _ = \
                     a_tools.rotate_and_normalize_data(
                         data=np.array([v for v in meas_res_dict.values()]),
-                        zero_coord=zero_coord,
-                        one_coord=one_coord,
-                        cal_zero_points=cal_zero_points,
-                        cal_one_points=cal_one_points)
+                        cal_zero_points=cal_point_indices[0],
+                        cal_one_points=cal_point_indices[1])
             else:
                 # multiple readouts per qubit per channel
                 rotated_data_dict[qb_name] = {}
@@ -409,8 +399,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         rotated_data_dict[qb_name][ro_suf] = \
                             a_tools.normalize_data_v3(
                                 data=meas_res_dict[list(meas_res_dict)[i]],
-                                cal_zero_points=cal_zero_points,
-                                cal_one_points=cal_one_points)
+                                cal_zero_points=cal_point_indices[0],
+                                cal_one_points=cal_point_indices[1])
                     else:
                         # two RO ch per qubit
                         keys = [k for k in meas_res_dict if ro_suf in k]
@@ -422,17 +412,14 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         _, _ = \
                             a_tools.rotate_and_normalize_data(
                                 data=data_array,
-                                zero_coord=zero_coord,
-                                one_coord=one_coord,
-                                cal_zero_points=cal_zero_points,
-                                cal_one_points=cal_one_points)
+                                cal_zero_points=cal_point_indices[0],
+                                cal_one_points=cal_point_indices[1])
 
         return rotated_data_dict
 
     @staticmethod
     def rotate_data_TwoD(meas_results_per_qb_per_ROch, channel_map,
-                         cal_zero_points=None, cal_one_points=None,
-                         zero_coord=None, one_coord=None):
+                         cal_point_indices):
 
         rotated_data_dict = deepcopy(channel_map)
         for qb_name, meas_res_dict in meas_results_per_qb_per_ROch.items():
@@ -445,8 +432,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     rotated_data_dict[qb_name][col] = \
                         a_tools.normalize_data_v3(
                             data=raw_data_arr[:, col],
-                            cal_zero_points=cal_zero_points,
-                            cal_one_points=cal_one_points)
+                            cal_zero_points=cal_point_indices[0],
+                            cal_one_points=cal_point_indices[1])
             elif list(meas_res_dict) == channel_map[qb_name]:
                 # two RO channels per qubit
                 raw_data_arr = meas_res_dict[list(meas_res_dict)[0]]
@@ -458,10 +445,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     rotated_data_dict[qb_name][col], _, _ = \
                         a_tools.rotate_and_normalize_data(
                             data=data_array,
-                            zero_coord=zero_coord,
-                            one_coord=one_coord,
-                            cal_zero_points=cal_zero_points,
-                            cal_one_points=cal_one_points)
+                            cal_zero_points=cal_point_indices[0],
+                            cal_one_points=cal_point_indices[1])
             else:
                 # multiple readouts per qubit per channel
                 rotated_data_dict[qb_name] = {}
@@ -482,8 +467,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                 ro_suf][col] = \
                                 a_tools.normalize_data_v3(
                                     data=raw_data_arr[:, col],
-                                    cal_zero_points=cal_zero_points,
-                                    cal_one_points=cal_one_points)
+                                    cal_zero_points=cal_point_indices[0],
+                                    cal_one_points=cal_point_indices[1])
                     else:
                         # two RO ch per qubit
                         raw_data_arr = meas_res_dict[list(meas_res_dict)[i]]
@@ -496,10 +481,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             rotated_data_dict[qb_name][ro_suf][col], _, _ = \
                                 a_tools.rotate_and_normalize_data(
                                     data=data_array,
-                                    zero_coord=zero_coord,
-                                    one_coord=one_coord,
-                                    cal_zero_points=cal_zero_points,
-                                    cal_one_points=cal_one_points)
+                                    cal_zero_points=cal_point_indices[0],
+                                    cal_one_points=cal_point_indices[1])
 
         return rotated_data_dict
 
@@ -609,13 +592,13 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         plotsize = self.get_default_plot_params(set=False)['figure.figsize']
         plotsize = (plotsize[0], plotsize[0]/1.25)
         if plot_cal_points and self.num_cal_points != 0:
-            assert (len(ref_state_plot_labels) == len(self.cal_points))
+            assert (len(ref_state_plot_labels) == len(self.cal_point_indices))
             yvals = data[:-self.num_cal_points]
             xvals = self.raw_data_dict['sweep_points_dict'][qb_name][
                 'msmt_sweep_points']
 
             # plot cal points
-            for i, cal_pts_idxs in enumerate(self.cal_points[::-1]):
+            for i, cal_pts_idxs in enumerate(self.cal_point_indices[::-1]):
                 self.plot_dicts[ref_state_plot_labels[i]] = {
                     'fig_id': plot_name,
                     'plotfn': self.plot_line,
@@ -2744,7 +2727,7 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                     sweep_points = sweep_points_dict['msmt_sweep_points']
 
                     # plot cal points
-                    for i, cal_pts_idxs in enumerate(self.cal_points[::-1]):
+                    for i, cal_pts_idxs in enumerate(self.cal_point_indices[::-1]):
                         key = 'exc_state_' + meas_qbn if i == 0 else \
                             'gnd_state_' + meas_qbn
                         self.plot_dicts[key] = {
@@ -3788,8 +3771,8 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
             if self.num_cal_points != 0:
                 ref_state_plot_labels = ('exc_state_' + qbn,
                                          'gnd_state_' + qbn)
-                assert (len(ref_state_plot_labels) == len(self.cal_points))
-                for i, cal_pts_idxs in enumerate(self.cal_points[::-1]):
+                assert (len(ref_state_plot_labels) == len(self.cal_point_indices))
+                for i, cal_pts_idxs in enumerate(self.cal_point_indices[::-1]):
                     self.plot_dicts[ref_state_plot_labels[i]] = {
                         'fig_id': base_plot_name,
                         'plotfn': self.plot_line,
@@ -4365,7 +4348,8 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                     # plot cal points
                     if self.num_cal_points > 0:
                         ref_states_plot_dicts = {}
-                        for j, cal_pts_idxs in enumerate(self.cal_points[::-1]):
+                        for j, cal_pts_idxs in enumerate(
+                                self.cal_point_indices[::-1]):
                             s = '{}_{}'.format(row, qbn)
                             ref_state_plot_name = 'exc_state_' + s if \
                                 j == 0 else 'gnd_state_' + s
@@ -4512,10 +4496,12 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                             1+idx],
                         'xunit': self.raw_data_dict['parameter_units'][0][
                             1+idx],
-                        'yvals': results_dict['val']-np.pi if param_name=='cphase' else results_dict['val'],
+                        'yvals': results_dict['val']-np.pi if \
+                                param_name=='cphase' else results_dict['val'],
                         'yerr': results_dict['stderr'] if
                             param_name != 'leakage' else None,
-                        'ylabel': param_name+'-$\\pi$' if param_name=='cphase' else param_name,
+                        'ylabel': param_name+'-$\\pi$' if \
+                            param_name=='cphase' else param_name,
                         'yunit': 'rad' if param_name == 'cphase' else '',
                         'linestyle': 'none',
                         'do_legend': False}

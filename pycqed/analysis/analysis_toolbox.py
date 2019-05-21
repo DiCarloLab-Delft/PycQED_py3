@@ -1552,7 +1552,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                               zero_coord=None, one_coord=None, **kw):
     '''
     Rotates and normalizes data with respect to some reference coordinates.
-    there are two ways to specify the reference coordinates.
+    There are two ways to specify the reference coordinates.
         1. Explicitly defining the coordinates
         2. Specifying which elements of the input data correspond to zero
             and one
@@ -1566,14 +1566,13 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                                  correspond to one
     '''
     # Extract zero and one coordinates
-
     if np.all([cal_zero_points==None, cal_one_points==None,
                zero_coord==None, one_coord==None]):
         # no cal points were used
         normalized_data = rotate_and_normalize_data_no_cal_points(data=data,
                                                                   **kw)
     elif np.all([cal_one_points==None, one_coord==None]) and \
-        (not np.all([cal_zero_points==None, zero_coord==None])):
+            (not np.all([cal_zero_points==None, zero_coord==None])):
         # only 2 cal points used; both are I pulses
         I_zero = np.mean(data[0][cal_zero_points])
         Q_zero = np.mean(data[1][cal_zero_points])
@@ -1654,6 +1653,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
     return [normalized_data, zero_coord, one_coord]
 
+
 def rotate_and_normalize_data_no_cal_points(data, **kw):
 
     """
@@ -1697,6 +1697,7 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     # normalized_data = (normalized_data-min(normalized_data))/max_min_difference
 
     return normalized_data
+
 
 def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
                       cal_one_points=np.arange(-2, 0, 1), **kw):
