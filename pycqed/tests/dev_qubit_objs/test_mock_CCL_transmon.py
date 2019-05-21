@@ -110,6 +110,15 @@ class Test_Mock_CCL(unittest.TestCase):
     ###########################################################
     # Test MW pulse calibration
     ###########################################################
+    def test_find_frequency(self):
+        self.CCL_qubit.mock_freq_res(7.48920e9)
+        self.CCL_qubit.freq_res(7.4e9)
+        threshold = 0.01e9
+
+        self.CCL_qubit.find_frequency()
+
+        assert np.abs(self.CCL_qubit.mock_freq_res() -
+                      self.CCL_qubit.freq_res()) <= threshold
 
     def test_calibrate_mw_pulse_amplitude_coarse(self):
         self.CCL_qubit.mock_mw_amp180(.345)
@@ -131,6 +140,7 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.mock_T2_star(23e-6)
 
         self.CCL_qubit.measure_ramsey()
+
     @classmethod
     def tearDownClass(self):
         for inststr in list(self.CCL_qubit._all_instruments):
