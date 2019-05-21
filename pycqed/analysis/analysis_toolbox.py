@@ -15,6 +15,7 @@ from pycqed.utilities.get_default_datadir import get_default_datadir
 from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
+from scipy.optimize import Bounds, LinearConstraint, minimize
 from scipy.signal import argrelextrema
 # to allow backwards compatibility with old a_tools code
 from .tools.file_handling import *
@@ -1724,9 +1725,34 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
     return normalized_data
 
+def predict_gm_proba_from_cal_points(X, cal_points):
+    """
+    For each point of the data array X, predicts the probability of being
+    in the states of each cal_point respectively,
+    in the limit of narrow gaussians.
+    Args:
+        X: Data (n, n_channels)
+        cal_points: list of n_states cal_points (where each cal_point is
+            of size (n_channels,))
+    """
+    def find_prob(p, s, mu):
+        approx = 0
+        for mu_i, p_i in zip(mu, p):
+            approx += mu_i*p_i
+        diff = np.abs(s - approx)
+        return np.sum(diff)
+    probas = []
+    initial_guess = np.array([0.34,0.33,0.33])
+    proba_bounds = Bounds([0.,0.,0.], [1.,1.,1.])
+    proba_sum_constr = LinearConstraint([1.,1.,1.], [1.],[1.])
+    for pt in X:
+        opt_results = minimize(find_prob, initial_guess,
+                               args=[pt, cal_points], method='SLSQP',
+                               bounds=proba_bounds, constraints=proba_sum_constr)
+        probas.append(opt_results.x)
+    return np.array(probas)
 
-
-def predict_gm_proba(X, means, covariances, levels, weights=None):
+def predict_gm_proba_from_clf(X, means, covariances, levels, weights=None):
     """
     Predict gaussian mixture posterior probabilities for different levels of a qudit.
     Args:

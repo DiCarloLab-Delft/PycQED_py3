@@ -933,11 +933,15 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False, le
 
     # if preselection, add readout between each pulse
     if preselection:
-        for i, pulse in enumerate(pulse_combination):
-            pulse_list = [RO_pars, spacer, pulse, RO_pars]
-            el = multi_pulse_elt(i, station, pulse_list)
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
+        pulse_list = [RO_pars, spacer] + pulse_combination + [RO_pars]
+        el = multi_pulse_elt(0, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+        # for i, pulse in enumerate(pulse_combination):
+        #     pulse_list = [RO_pars, spacer, pulse, RO_pars]
+        #     el = multi_pulse_elt(i, station, pulse_list)
+        #     el_list.append(el)
+        #     seq.append_element(el, trigger_wait=True)
     # otherwise use the pulse combination as is and add readout pulse at the end
     else:
         pulse_list = pulse_combination + [RO_pars]
