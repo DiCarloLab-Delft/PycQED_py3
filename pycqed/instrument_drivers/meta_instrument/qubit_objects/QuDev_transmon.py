@@ -3928,7 +3928,7 @@ class QuDev_transmon(Qubit):
         return EC, EJ
 
     def find_readout_frequency(self, freqs=None, update=False, MC=None,
-                               for_3_levels_ro=False, **kw):
+                               qutrit=False, **kw):
         """
         Find readout frequency at which contrast between the states of the
         qubit is the highest.
@@ -3940,7 +3940,7 @@ class QuDev_transmon(Qubit):
 
         Args:
             freqs: frequencies to sweep
-            for_3_levels_ro (bool): find optimal frequency for 3-level readout.
+            qutrit (bool): find optimal frequency for 3-level readout.
                                     Default is False.
             **kw:
 
@@ -3967,17 +3967,17 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        levels = ('g', 'e', 'f') if for_3_levels_ro else ('g', 'e')
+        levels = ('g', 'e', 'f') if qutrit else ('g', 'e')
 
-        #self.measure_dispersive_shift(freqs, MC=MC, analyze=False,
-        #                              levels=levels[1:], **kw)
+        self.measure_dispersive_shift(freqs, MC=MC, analyze=False,
+                                     levels=levels[1:], **kw)
         labels = {l: '{}-spec'.format(l) + self.msmt_suffix for l in levels}
         m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
         trace = {l: m_a[l].measured_values[0] *
                     np.exp(1j * np.pi * m_a[l].measured_values[1] / 180.)
                  for l in levels}
         # FIXME: make something that doesn't require a conditional branching
-        if for_3_levels_ro:
+        if qutrit:
             total_dist = np.abs(trace['e'] - trace['g']) + \
                          np.abs(trace['f'] - trace['g']) + \
                          np.abs(trace['f'] - trace['e'])
@@ -3995,7 +3995,9 @@ class QuDev_transmon(Qubit):
             ax[1].plot(freqs, total_dist, label='total distance')
             ax[1].set_xlabel("Freq. [Hz]")
             ax[1].set_ylabel('Distance in IQ plane')
-            ax[0].set_title("RO_freq used: {} Hz\nOptimal Freq: {} Hz".format(self.f_RO(), fmax))
+            ax[0].set_title("Current RO_freq: {} Hz\nOptimal Freq: {} Hz".format(
+                self.f_RO(),
+                                                                          fmax))
             plt.legend()
             plt.show()
         else:
@@ -4013,15 +4015,17 @@ class QuDev_transmon(Qubit):
                                                             scan_label=''),
                                           do_fitting=True)
             # FIXME Nathan: remove 3 level dependency
-            if for_3_levels_ro:
+            if qutrit:
                 SA2 = sa.ResonatorSpectroscopy(t_start= m_a['f'].timestamp_string,
                                           options_dict=dict(simultan=False,
                                                             fit_options = dict(
                                                             model='hanger_with_pf'),
                                                             scan_label=''),
                                           do_fitting=True)
+
             if update:
-                self.f_RO(SA.f_RO)
+                # FIXME Nathan: update parameters accordingly
+                self.f_RO(SA.f_RO if not qutrit else fmax)
                 self.chi(SA.chi)
                 self.f_RO_resonator(SA.f_RO_res)
                 self.f_RO_purcell(SA.f_PF)
