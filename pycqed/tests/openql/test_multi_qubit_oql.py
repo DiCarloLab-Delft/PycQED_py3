@@ -10,7 +10,6 @@ try:
 
     class Test_multi_qubit_oql(unittest.TestCase):
         def setUp(self):
-            rootDir = os.path.dirname(os.path.realpath(__file__))
             curdir = os.path.dirname(__file__)
             self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
             output_dir = os.path.join(curdir, 'test_output')
