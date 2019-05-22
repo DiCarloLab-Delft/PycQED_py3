@@ -306,7 +306,8 @@ def Rabi_seq_old(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_point
         return seq
 
 
-def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1, post_msmt_delay=0, no_cal_points=2,
+def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1,
+             post_msmt_delay=0, no_cal_points=2,
              cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
@@ -320,9 +321,18 @@ def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1, post_msmt_delay
         cal_points:      whether to use calibration points or not
         upload:          whether to upload sequence to instrument or not
     '''
+
+    RO_pars["channel"] = "UHFQC_ch1"
+    RO_pars["buffer_length_start"] = 0
+    RO_pars["buffer_length_end"] = 200e-9
+    RO_pars["pulse_length"] = 200e-9
+    RO_pars["frequency"] = RO_pars['mod_frequency']
+    RO_pars["element_name"] = "RO_element"
+
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name, station.pulsar)
     seg_list = []
+    pulse_list_with_ar = []
     pulses_unmodified = get_pulse_dict_from_pars(pulse_pars)
     pulses = deepcopy(pulses_unmodified)
 
@@ -340,24 +350,31 @@ def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1, post_msmt_delay
             pulses['X180']['amplitude'] = amp
             pulse_list = n*[pulses['X180']]+[RO_pars]
 
-            # copy first element and set extra wait
-            pulse_list[0] = deepcopy(pulse_list[0])
-            pulse_list[0]['pulse_delay'] += post_msmt_delay
+            # # copy first element and set extra wait
+            # pulse_list[0] = deepcopy(pulse_list[0])
+            # pulse_list[0]['pulse_delay'] += post_msmt_delay
 
         if active_reset:
-            ar_pars_list = [deepcopy(pulses_unmodified['I']), deepcopy(pulses_unmodified['X180'])]
+            ar_pars_list = [deepcopy(pulses_unmodified['I']),
+                            deepcopy(pulses_unmodified['X180'])]
             
-            for i in range(2):
+            for j in range(2):
                 # map I to 0 and X180 to 1
-                ar_pars_list[i]['codeword'] = i
-                ar_pars_list[i]['element_name'] = 'reset_element'
+                ar_pars_list[j]['codeword'] = j
+                ar_pars_list[j]['element_name'] = 'reset_element'
                 # set dealy for reset pulses
-                ar_pars_list[i]['pulse_delay'] = 1e-8
-            
-            pulse_list += ar_pars_list
+                ar_pars_list[j]['pulse_delay'] = 0
+            pulse_list_with_ar += deepcopy(pulse_list) + ar_pars_list
+        else:
+            pulse_list[0]['reference_pulse'] = 'segment_start'
+            seg = segment.Segment('segment_{}'.format(i),
+                                  station.pulsar, pulse_list)
+            seg_list.append(seg)
+            seq.add(seg)
 
-        seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)
-
+    if active_reset:
+        pulse_list_with_ar[0]['reference_pulse'] = 'segment_start'
+        seg = segment.Segment('segment', station.pulsar, pulse_list_with_ar)
         seg_list.append(seg)
         seq.add(seg)
 

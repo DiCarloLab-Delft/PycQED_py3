@@ -650,8 +650,6 @@ class HDAWG8Pulsar:
             if ch_has_waveforms[ch]:
                 obj.set('sigouts_{}_on'.format(int(ch[2])-1), 1)
                 one_channel_has_wfs = True
-                print(obj.name)
-                print(ch)
             else: 
                 obj.set('sigouts_{}_on'.format(int(ch[2])-1), 0)
 

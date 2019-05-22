@@ -23,7 +23,7 @@ class Segment:
         self.elements = odict()
         self.element_start_end = {}
         self.elements_on_awg = {}
-        self.trigger_pars = {'length': 50e-9, 'amplitude': 0.5}
+        self.trigger_pars = {'pulse_length': 50e-9, 'amplitude': 0.5, 'buffer_length_start': 25e-9}
         self._pulse_names = set()
         self.acquisition_elements = set()
 
@@ -398,7 +398,8 @@ class Segment:
                 if self.pulsar.get('{}_trigger_channels'.format(awg)) == None:
                     continue
 
-                trigger_pulse_time = el_start - self.pulsar.get(awg + '_delay')
+                trigger_pulse_time = el_start - self.pulsar.get(awg + '_delay')\
+                                    - self.trigger_pars['buffer_length_start']
 
                 # Find the trigger_AWGs that trigger the AWG
                 trigger_awgs = set()
@@ -427,7 +428,7 @@ class Segment:
                         '{}_trigger_channels'.format(awg)):
 
                     trigger_awg = self.pulsar.get('{}_awg'.format(channel))
-                    trig_pulse = bpl.SquarePulse(
+                    trig_pulse = pl.BufferedSquarePulse(
                         trigger_elements[trigger_awg],
                         channel=channel,
                         name='trigger_pulse_{}'.format(i),

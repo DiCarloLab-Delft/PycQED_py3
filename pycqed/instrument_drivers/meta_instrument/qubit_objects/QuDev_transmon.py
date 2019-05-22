@@ -268,6 +268,8 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('RO', 'RO_pulse_phase', 'phase',
                                  initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('RO', 'do_RO', 'RO',
+                                 initial_value=True, vals=vals.Bool())
         self.add_pulse_parameter('RO', 'ro_pulse_basis_rotation',
                                  'basis_rotation', initial_value={},
                                  docstring='Dynamic phase acquired by other '
@@ -805,7 +807,7 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name)
 
 
-    def measure_rabi(self, amps=None, MC=None, analyze=True,
+    def measure_rabi(self, amps=None, MC=None, analyze=True, active_reset=False,
              close_fig=True, cal_points=True, no_cal_points=2,
              upload=True, label=None,  n=1, exp_metadata=None):
 
@@ -862,6 +864,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(awg_swf.Rabi(pulse_pars=self.get_drive_pars(),
                                            RO_pars=self.get_RO_pars(), n=n,
                                            cal_points=cal_points,
+                                           active_reset=active_reset,
                                            no_cal_points=no_cal_points,
                                            upload=upload))
         MC.set_sweep_points(sweep_points)
