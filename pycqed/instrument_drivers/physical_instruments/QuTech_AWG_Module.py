@@ -195,7 +195,6 @@ class QuTech_AWG_Module(SCPI):
                             unit='',
                             label='DIO suitable indexes',
                             get_cmd='DIO:INDexes?',
-                            # TODO [versloot]: use scpi actual array and update _int_to_array
                             get_parser=self._int_to_array,
                             docstring='Get DIO all suitable indexes\n' \
                                     '\t- The array is ordered by most preferable index first\n'
@@ -207,17 +206,6 @@ class QuTech_AWG_Module(SCPI):
                             get_cmd='DIO:INPutscalibrated?',
                             get_parser=int,
                             docstring='Get all DIO inputs channels which are calibrated\n'
-                           )
-
-        self.add_parameter('dio_signal',
-                            unit='',
-                            label='DIO signal detect status',
-                            get_cmd='DIO:SIGNal?',
-                            val_mapping={True: '1', False: '0'},
-                            docstring='Get the DIO signal detect status of SE/DIFF/Master input.\n' \
-                                'Result:\n' \
-                                '\tTrue: Signal detected\n'\
-                                '\tFalse: No signal detected'
                            )
 
         self.add_parameter('dio_lvds',
@@ -241,20 +229,6 @@ class QuTech_AWG_Module(SCPI):
                                      '\tTrue:  To master interboard connection detected\n'
                                      '\tFalse: No interboard connection detected'
                            )
-
-        # TODO [versloot] : remove
-        # self.add_parameter('_dio_calibrate_input',
-        #                    unit='S',
-        #                    label='Only calibrate DIO input with a specified time',
-        #                    set_cmd='DIO:CALibrate:INPut {}',
-        #                    vals=vals.Numbers(1e-6),
-        #                    docstring='Calibrate only the DIO input signals.\n'
-        #                              'Parameter:'
-        #                              '\tMeasurement time between bitDiffs in seconds, resolution of 1e-6 s\n'
-        #                              'Note that when select a measurement time longer than 25e-2 S the scpi connection '
-        #                              'will timeout, the calibration is than still running. This will happen on the '
-        #                              'first `get` parameter\n'
-        #                              'Calibration duration = time * 20')
 
         self.add_parameter('_dio_bit_diff_table',
                            get_cmd=self._get_bit_diff_table,
@@ -856,15 +830,14 @@ class QuTech_AWG_Module(SCPI):
         self.newWaveformReal(name, waveLen)
         self.sendWaveformDataReal(name, waveform)
 
-    # TODO [versloot]: remove
     def _get_bit_diff_table(self):
         return self.ask("DIO:BDT").replace("\"", '').replace(",", "\n")
 
-    def _dio_calibrate_input(self, meas_time: float, nr_itr: int, target_index: int = ""):
+    def _dio_calibrate_param(self, meas_time: float, nr_itr: int, target_index: int = ""):
         """
-        Calibrate only the DIO input signals.\n
+        Calibrate the DIO input signals with extra arguments.\n
         Parameters:
-        \t meas_time: Measurement time between bitDiffs in seconds, resolution of 1e-6 s
+        \t meas_time: Measurement time between indexes in seconds, resolution of 1e-6 s
         Note that when select a measurement time longer than 25e-2 S the scpi connection
         will timeout, the calibration is than still running. This will happen on the
         first `get` parameter\n
