@@ -68,14 +68,14 @@ class QuTech_AWG_Module(SCPI):
 
         cw_protocol_mt = {
             # Name          Ch1,    Ch2,    Ch3,    Ch4
-            'Flux':         [0x03,  0x0C,   0x30,   0x0],
-            'Microwave':    [0x5F,  0x5F,   0x5F,   0x5F],
+            'FLUX':         [0x5F,  0x5F,   0x5F,   0x5F],
+            'MICROWAVE':    [0x5F,  0x5F,   0x5F,   0x5F]
         }
 
         cw_protocol_dio = {
             # Name          Ch1,   Ch2,  Ch3,  Ch4
-            'Flux':         [0x03, 0x0C, 0x30, 0xC0],
-            'Microwave':    [0x3FF, 0x3FF, 0x3FF, 0x3FF]
+            'FLUX':         [0x07, 0x38, 0x1C0, 0xE00],
+            'MICROWAVE':    [0x3FF, 0x3FF, 0x3FF, 0x3FF]
         }
 
         if self.device_descriptor.numCodewordsBits <= 7:
@@ -229,10 +229,6 @@ class QuTech_AWG_Module(SCPI):
                                      '\tTrue:  To master interboard connection detected\n'
                                      '\tFalse: No interboard connection detected'
                            )
-
-        self.add_parameter('_dio_bit_diff_table',
-                           get_cmd=self._get_bit_diff_table,
-                           docstring='Get the DIO bit diff table of the last calibration')
 
         # Channel parameters #
         for ch in range(1, self.device_descriptor.numChannels+1):
@@ -551,15 +547,15 @@ class QuTech_AWG_Module(SCPI):
             self.set("ch{}_bit_select".format(ch+1), bitSelect)
 
     def _getCodewordProtocol(self):
-        channels_bit_sels = [];
-        result = "Custom" # Default, if no protocol matches
+        channels_bit_sels = []
+        result = "Custom"  # Default, if no protocol matches
         for ch in range(1, self.device_descriptor.numChannels + 1):
             channels_bit_sels.append(self.get("ch{}_bit_select".format(ch)))
 
         for prtc_name, prtc_bitSels in self.codeword_protocols.items():
             if channels_bit_sels == prtc_bitSels:
-                result = prtc_name;
-                break;
+                result = prtc_name
+                break
 
         return result
 
@@ -663,7 +659,7 @@ class QuTech_AWG_Module(SCPI):
         is empty and an error is pushed onto the error stack\n
         """
 
-        self.write(f'DIO:CALibrate:ALL {target_index}')
+        self.write(f'DIO:CALibrate {target_index}')
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
@@ -830,18 +826,22 @@ class QuTech_AWG_Module(SCPI):
         self.newWaveformReal(name, waveLen)
         self.sendWaveformDataReal(name, waveform)
 
-    def _get_bit_diff_table(self):
+    def _dio_bit_diff_table(self):
+        """
+        FOR DEVELOPMENT ONLY: Get the bit diff table of the last calibration
+        :return: String of the bitDiff table
+        """
         return self.ask("DIO:BDT").replace("\"", '').replace(",", "\n")
 
     def _dio_calibrate_param(self, meas_time: float, nr_itr: int, target_index: int = ""):
         """
-        Calibrate the DIO input signals with extra arguments.\n
+        FOR DEVELOPMENT ONLY: Calibrate the DIO input signals with extra arguments.\n
         Parameters:
         \t meas_time: Measurement time between indexes in seconds, resolution of 1e-6 s
-        Note that when select a measurement time longer than 25e-2 S the scpi connection
-        will timeout, the calibration is than still running. This will happen on the
-        first `get` parameter\n
-        \tnr_itr: Number  DIO signal data (bitDiffs) gathering iterations\n
+        \tNote that when select a measurement time longer than 25e-2 S the scpi connection
+        will timeout, but the calibration is than still running. The timeout will happen on the
+        first `get` parameter after this call\n
+        \tnr_itr: Number of DIO signal data (bitDiffs) gathering iterations\n
         \ttarget_index: DIO index which determines on which side of the edge to select the active index from\n
         Calibration duration = meas_time * nr_itr * 20 * 1.1 (10% to compensate for log printing time)\n
         """
@@ -854,7 +854,20 @@ class QuTech_AWG_Module(SCPI):
         if target_index is not "":
             target_index = f",{target_index}"
 
-        self.write(f'DIO:CALibrate:INPut {meas_time},{nr_itr}{target_index}')
+        self.write(f'DIO:CALibrate:PARam {meas_time},{nr_itr}{target_index}')
+
+    def _dio_set_signals(self, signals: List):
+        """
+        FOR DEVELOPMENT ONLY: Set DIO simulation signals. Only works if kernal module and application are build with the
+        'OPT_DBG_SIM_DIO' define enabled
+        :param signals: list of unsigned int, the signal on a input (note: not the bitDiffs, the system will calculate
+        the bitDiffs). Need to contain 16 elements. Example: signal[0]=0xFFF00 where LSB is the oldest in time
+        :return: None
+        """
+
+        if not len(signals) == 16:
+            raise ValueError(f"Invalid number of DIO signals; expected 16, actual: {len(signals)}")
+        self.write("DIO:DBG:SIG {}".format(','.join(map(str, signals))))
 
     ##########################################################################
     # Generic (i.e. at least AWG520 and AWG5014) Tektronix AWG functions
