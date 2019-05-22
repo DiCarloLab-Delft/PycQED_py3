@@ -438,7 +438,7 @@ class QuTech_AWG_Module(SCPI):
                            label='Codeword protocol',
                            get_cmd=self._getCodewordProtocol,
                            set_cmd=self._setCodewordProtocol,
-                           vals=vals.Enum('Microwave', 'Flux'),
+                           vals=vals.Enum('MICROWAVE', 'FLUX'),
                            docstring='Reads the current system status. E.q. channel ' \
                              +'status: on or off, overflow, underdrive.\n' \
                              +'Return:\n     JSON object with system status')
