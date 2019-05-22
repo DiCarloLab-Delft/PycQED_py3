@@ -58,7 +58,7 @@ class Segment:
 
         # check whether pulse is acquistion. If so, add the element to
         # self.acquisition_elements
-        if new_pulse.flags.get('RO', False):
+        if new_pulse.RO:
             self.acquisition_elements.add(new_pulse.pulse_obj.element_name)
 
         self.unresolved_pulses.append(new_pulse)
@@ -551,12 +551,11 @@ class Segment:
                 else:
                     qubit_phases[qubit] = pulse.basis_rotation[qubit]
 
-            if 'basis' in pulse.flags:
+            if pulse.basis is not None:
                 try:
-                    pulse.pulse_obj.phase -= qubit_phases[pulse.flags.get(
-                        'basis')]
+                    pulse.pulse_obj.phase -= qubit_phases[pulse.basis]
                 except KeyError:
-                    qubit_phases[pulse.flags.get('basis')] = 0
+                    qubit_phases[pulse.basis] = 0
 
     def element_start_length(self, element, awg):
         if element not in self.element_start_end:
@@ -581,7 +580,7 @@ class Segment:
         # start granularity
         start_gran = self.pulsar.get(
             '{}_element_start_granularity'.format(awg))
-        
+
         # element start granularity is not working at the moment!
         start_gran = None
 
@@ -915,7 +914,8 @@ class UnresolvedPulse:
 
         self.delay = pulse_pars['pulse_delay']
         self.original_phase = pulse_pars.get('phase', 0)
-        self.flags = pulse_pars.get('flags', {})
+        self.RO = pulse_pars.get('RO', False)
+        self.basis = pulse_pars.get('basis', None)
         self.basis_rotation = pulse_pars.pop('basis_rotation', {})
 
         try:

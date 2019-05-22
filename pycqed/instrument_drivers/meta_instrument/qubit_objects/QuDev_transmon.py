@@ -253,7 +253,7 @@ class QuDev_transmon(Qubit):
         self.add_operation('RO')
         self.add_pulse_parameter('RO', 'RO_pulse_type', 'pulse_type',
                                  vals=vals.Strings(),
-                                 initial_value='SquarePulse')
+                                 initial_value='CosPulse')
         self.add_pulse_parameter('RO', 'RO_I_channel', 'I_channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'RO_Q_channel', 'Q_channel',
