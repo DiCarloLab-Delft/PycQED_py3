@@ -197,7 +197,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}".format(i+j/2), p)
+            k = oqh.create_kernel("AllXY_{}".format(i+j//2), p)
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
@@ -335,6 +335,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     p = oqh.create_program("echo", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
+
         k = oqh.create_kernel("echo_{}".format(i), p)
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
@@ -343,7 +344,14 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.gate('rx180', [qubit_idx])
         k.gate("wait", [qubit_idx], wait_nanoseconds)
-        k.gate('rx90', [qubit_idx])
+        #k.gate('rx90', [qubit_idx])
+        angle = (i*40)%360
+        cw_idx = angle//20 + 9
+        if angle == 0:
+            k.gate('rx90', [qubit_idx])
+        else:
+            k.gate('cw_{:02}'.format(cw_idx), [qubit_idx])
+
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -542,12 +550,12 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
+        #k.gate('i', [qubit_idx])
         k.gate('rx180', [qubit_idx])
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
+        #k.gate('i', [qubit_idx])
         if net_gate == 'pi':
             k.gate('rxm90', [qubit_idx])
         elif net_gate == 'i':
@@ -556,6 +564,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
             raise ValueError('net_gate ({})should be "i" or "pi"'.format(
                 net_gate))
         if feedback:
+            k.gate("wait", [qubit_idx], 20)
             k.gate('C1rx180', [qubit_idx])
     elif sequence_type == 'pi':
         if net_gate == 'pi':
@@ -566,6 +575,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
             raise ValueError('net_gate ({})should be "i" or "pi"'.format(
                 net_gate))
         if feedback:
+            k.gate("wait", [qubit_idx], 20)
             k.gate('C1rx180', [qubit_idx])
     else:
         raise ValueError('sequence_type ({})should be "echo" or "pi"'.format(
@@ -701,7 +711,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         times = times[:-4]
     for t in times:
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi-flux-pi', p)
+        k = oqh.create_kernel('pi_flux_pi', p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         k.gate('fl_cw_02', [2, 0])
@@ -844,7 +854,7 @@ def ef_rabi_seq(q0: int,
         # cw_idx corresponds to special hardcoded pulses in the lutman
         cw_idx = i + 9
 
-        k = oqh.create_kernel("ef_A{}".format(amp), p)
+        k = oqh.create_kernel("ef_A{}".format(int(abs(1000*amp))), p)
         k.prepz(q0)
         k.gate('rx180', [q0])
         k.gate('cw_{:02}'.format(cw_idx), [q0])

@@ -139,7 +139,7 @@ class dummy_UHFQC(Instrument):
         print('Initialized dummy UHFQC', self.name,
               'in %.2fs' % (t1-t0))
 
-    def load_default_settings(self):
+    def load_default_settings(self, upload_sequence=True):
         # standard configurations adapted from Haendbaek's notebook
         # Run this block to do some standard configuration
 
@@ -153,7 +153,8 @@ class dummy_UHFQC(Instrument):
 
         # Load an AWG program (from Zurich
         # Instruments/LabOne/WebServer/awg/src)
-        self.awg_sequence_acquisition()
+        if upload_sequence:
+            self.awg_sequence_acquisition()
 
         # Turn on both outputs
         self.sigouts_0_on(1)

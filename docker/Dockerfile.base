@@ -10,6 +10,7 @@ RUN apt-get update && \
         cmake \
         gcc \
         g++ \
+        libxkbcommon-x11-0 \
         make \
         swig \
         xvfb && \
@@ -22,7 +23,7 @@ RUN pip install --upgrade --no-cache-dir pip && \
         "matplotlib<2.3" \
         # required by qcodes-0.1.11
         "numpy<1.14" \
-        plotly \
+        "plotly<3.8" \
         PyQt5 \
         scipy \
         pandas && \
@@ -41,7 +42,7 @@ RUN pip install --upgrade --no-cache-dir pip && \
         networkx \
         spirack \
         pyzmq \
-        pygsti \
+        "pygsti<0.9.6" \
         pyqtgraph \
         pyserial \
         pytest \

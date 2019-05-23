@@ -2,9 +2,11 @@ import os
 import sys
 import numpy as np
 import h5py
+import string
 import json
 import datetime
-from pycqed.measurement import hdf5_data as h5d
+# from pycqed.measurement import hdf5_data as h5d
+from pycqed.measurement.hdf5_data import read_dict_from_hdf5, RepresentsInt
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
 import pycqed as pq
@@ -17,6 +19,7 @@ from functools import reduce  # forward compatibility for Python 3
 import operator
 import string
 from contextlib import ContextDecorator
+from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 
 
 try:
@@ -248,7 +251,7 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
 
             f = h5py.File(filepath, 'r')
             snapshot = {}
-            h5d.read_dict_from_hdf5(snapshot, h5_group=f['Snapshot'])
+            read_dict_from_hdf5(snapshot, h5_group=f['Snapshot'])
 
             if load_from_instr is None:
                 ins_group = snapshot['instruments'][instrument_name]
@@ -561,3 +564,68 @@ def check_keyboard_interrupt():
                     'Human "f" terminated experiment safely.')
     except Exception:
         pass
+
+
+class SafeFormatter(string.Formatter):
+    """
+    A formatter that replaces "missing" values and "bad_fmt" to prevent
+    unexpected Exceptions being raised.
+
+    Based on https://stackoverflow.com/questions/20248355/how-to-get-python-to-gracefully-format-none-and-non-existing-fields
+    """
+
+    def __init__(self, missing='~~', bad_fmt='!!'):
+        self.missing, self.bad_fmt = missing, bad_fmt
+
+    def get_field(self, field_name, args, kwargs):
+        # Handle a key not found
+        try:
+            val = super(SafeFormatter, self).get_field(
+                field_name, args, kwargs)
+            # Python 3, 'super().get_field(field_name, args, kwargs)' works
+        except (KeyError, AttributeError):
+            val = None, field_name
+        return val
+
+    def format_field(self, value, spec):
+        # handle an invalid format
+        if value is None:
+            return self.missing
+        try:
+            return super(SafeFormatter, self).format_field(value, spec)
+        except ValueError:
+            if self.bad_fmt is not None:
+                return self.bad_fmt
+            else:
+                raise
+
+
+def format_value_string(par_name: str, lmfit_par, end_char='', unit=None):
+    """
+    Format an lmfit par to a  string of value with uncertainty.
+
+    par_name (str):
+        the name of the parameter to use in the string
+    lmfit_par :
+        an lmfit Parameter object. The value and stderr of this parameter
+        will be used.
+    end_char (str):
+        A character that will be put at the end of the line.
+    unit (str):
+        a unit. If this is an SI unit it will be used in automatically
+        determining a prefix for the unit and rescaling accordingly.
+    """
+    val_string = par_name
+    val_string += ': {:.4f}$\pm${:.4f} {}{}'
+
+    scale_factor, unit = SI_prefix_and_scale_factor(
+            lmfit_par.value, unit)
+    val = lmfit_par.value*scale_factor
+    if lmfit_par.stderr is not None:
+        stderr = lmfit_par.stderr*scale_factor
+    else:
+        stderr = None
+    fmt = SafeFormatter(missing='NaN')
+    val_string = fmt.format(val_string, val, stderr,
+                            unit, end_char)
+    return val_string

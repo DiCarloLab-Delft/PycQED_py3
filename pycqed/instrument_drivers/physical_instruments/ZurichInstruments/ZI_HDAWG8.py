@@ -528,8 +528,8 @@ class ZI_HDAWG8(ZI_base_instrument):
                             'wave_ch{}_cw{:03}'.format(ch, cw0))))
                     # if no wfs are triggered play only zeros
                     else:
-                        wf0_cmd = 'zeros({})'.format(42)
-                        wf1_cmd = 'zeros({})'.format(42)
+                        wf0_cmd = 'zeros({})'.format(928) # this length is to account for #109
+                        wf1_cmd = 'zeros({})'.format(928) # this length is to account for #109
 
                     waveform_table += 'setWaveDIO({}, {}, {});\n'.format(
                         cw, wf0_cmd, wf1_cmd)

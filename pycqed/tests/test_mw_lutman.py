@@ -5,7 +5,7 @@ import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import \
-    get_redundant_codewords
+    get_redundant_codewords, get_wf_idx_from_name
 
 
 class Test_MW_LutMan(unittest.TestCase):
@@ -35,7 +35,7 @@ class Test_MW_LutMan(unittest.TestCase):
         self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
         self.QWG_MW_LutMan = mwl.QWG_MW_LutMan('QWG_MW_LutMan')
 
-    def test__program_hash_differs_AWG8_lutman(self):
+    def test_program_hash_differs_AWG8_lutman(self):
 
         # set to a random value to ensure different
         self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
@@ -46,7 +46,7 @@ class Test_MW_LutMan(unittest.TestCase):
         hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
         self.assertFalse(hash_differs)
 
-    def test__program_hash_differs_AWG8_VSM_lutman(self):
+    def test_program_hash_differs_AWG8_VSM_lutman(self):
 
         # set to a random value to ensure different
         self.AWG8_VSM_MW_LutMan._awgs_mwG_sequencer_program_expected_hash(
@@ -58,7 +58,7 @@ class Test_MW_LutMan(unittest.TestCase):
         hash_differs = self.AWG8_VSM_MW_LutMan._program_hash_differs()
         self.assertFalse(hash_differs)
 
-    def test__program_hash_updated_when_loading_program(self):
+    def test_program_hash_updated_when_loading_program(self):
         self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
         hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
         self.assertTrue(hash_differs)
@@ -88,27 +88,51 @@ class Test_MW_LutMan(unittest.TestCase):
         uploaded_wf = self.AWG.get('wave_ch1_cw008')
         np.testing.assert_array_almost_equal(expected_wf_spec, uploaded_wf)
 
+    def test_generating_standard_pulses(self):
+        """Test if standard waveforms are correctly generated."""
+
+        self.AWG8_MW_LutMan.LutMap(mwl.default_mw_lutmap)
+        print(self.AWG8_MW_LutMan.LutMap())
+        self.AWG8_MW_LutMan.generate_standard_waveforms()
+
+        # remove this line later
+        self.AWG8_MW_LutMan.set_default_lutmap()
+
+        expected_wf = wf.mod_gauss(
+            amp=self.AWG8_MW_LutMan.mw_amp180(),
+            sigma_length=self.AWG8_MW_LutMan.mw_gauss_width(),
+            f_modulation=self.AWG8_MW_LutMan.mw_modulation(),
+            sampling_rate=self.AWG8_MW_LutMan.sampling_rate(),
+            phase=0,
+            motzoi=self.AWG8_MW_LutMan.mw_motzoi())[0]
+        # expected on cw 1 based on LutMap
+        generated_wf = self.AWG8_MW_LutMan._wave_dict[1]
+        np.testing.assert_array_almost_equal(expected_wf, generated_wf[0])
+
+        generated_wf = self.AWG8_MW_LutMan._wave_dict[8]
+        expected_wf_spec = wf.block_pulse(
+            length=self.AWG8_MW_LutMan.spec_length(),
+            amp=self.AWG8_MW_LutMan.spec_amp(),
+            sampling_rate=self.AWG8_MW_LutMan.sampling_rate(),
+            delay=0, phase=0)[0]
+        np.testing.assert_array_almost_equal(expected_wf_spec, generated_wf[0])
+
+    def test_codeword_idx_to_parnames(self):
+
+        parnames = self.AWG8_MW_LutMan.codeword_idx_to_parnames(3)
+        expected_parnames = ['wave_ch1_cw003', 'wave_ch2_cw003']
+        self.assertEqual(parnames, expected_parnames)
+
+        parnames = self.AWG8_VSM_MW_LutMan.codeword_idx_to_parnames(3)
+        expected_parnames = ['wave_ch1_cw003', 'wave_ch2_cw003',
+                             'wave_ch3_cw003', 'wave_ch4_cw003']
+        self.assertEqual(parnames, expected_parnames)
+
     def test_lut_mapping_AWG8(self):
         self.AWG8_MW_LutMan.set_default_lutmap()
         expected_dict = {
-            'rY90': ('wave_ch1_cw004',
-                     'wave_ch2_cw004'),
-            'I': ('wave_ch1_cw000',
-                  'wave_ch2_cw000'),
-            'rY180': ('wave_ch1_cw002',
-                      'wave_ch2_cw002'),
-            'rX180': ('wave_ch1_cw001',
-                      'wave_ch2_cw001'),
-            'rPhi90': ('wave_ch1_cw007',
-                       'wave_ch2_cw007'),
-            'rX90': ('wave_ch1_cw003',
-                     'wave_ch2_cw003'),
-            'rYm90': ('wave_ch1_cw006',
-                      'wave_ch2_cw006'),
-            'rXm90': ('wave_ch1_cw005',
-                      'wave_ch2_cw005'),
-            'spec': ('wave_ch1_cw008',
-                     'wave_ch2_cw008')}
+            0: {"name": "I",        "theta": 0, "phi": 0, "type": "ge"},
+            1: {"name": "rX180",    "theta": 180, "phi": 0, "type": "ge"}, }
         # Does not check the full lutmap
         dict_contained_in(expected_dict, self.AWG8_MW_LutMan.LutMap())
 
@@ -129,42 +153,8 @@ class Test_MW_LutMan(unittest.TestCase):
     def test_lut_mapping_AWG8_VSM(self):
         self.AWG8_VSM_MW_LutMan.set_default_lutmap()
         expected_dict = {
-            'rY90': ('wave_ch1_cw004',
-                     'wave_ch2_cw004',
-                     'wave_ch3_cw004',
-                     'wave_ch4_cw004'),
-            'I': ('wave_ch1_cw000',
-                  'wave_ch2_cw000',
-                  'wave_ch3_cw000',
-                  'wave_ch4_cw000'),
-            'rY180': ('wave_ch1_cw002',
-                      'wave_ch2_cw002',
-                      'wave_ch3_cw002',
-                      'wave_ch4_cw002'),
-            'rX180': ('wave_ch1_cw001',
-                      'wave_ch2_cw001',
-                      'wave_ch3_cw001',
-                      'wave_ch4_cw001'),
-            'rPhi90': ('wave_ch1_cw007',
-                       'wave_ch2_cw007',
-                       'wave_ch3_cw007',
-                       'wave_ch4_cw007'),
-            'rX90': ('wave_ch1_cw003',
-                     'wave_ch2_cw003',
-                     'wave_ch3_cw003',
-                     'wave_ch4_cw003'),
-            'rYm90': ('wave_ch1_cw006',
-                      'wave_ch2_cw006',
-                      'wave_ch3_cw006',
-                      'wave_ch4_cw006'),
-            'rXm90': ('wave_ch1_cw005',
-                      'wave_ch2_cw005',
-                      'wave_ch3_cw005',
-                      'wave_ch4_cw005'),
-            'spec': ('wave_ch1_cw008',
-                     'wave_ch2_cw008',
-                     'wave_ch3_cw008',
-                     'wave_ch4_cw008')}
+            0: {"name": "I",        "theta": 0, "phi": 0, "type": "ge"},
+            1: {"name": "rX180",    "theta": 180, "phi": 0, "type": "ge"}, }
         # Does not check the full lutmap
         dict_contained_in(expected_dict, self.AWG8_VSM_MW_LutMan.LutMap())
 
@@ -184,6 +174,42 @@ class Test_MW_LutMan(unittest.TestCase):
         for i in range(4):
             uploaded_wf = self.AWG.get('wave_ch{}_cw001'.format(i+1))
             np.testing.assert_array_almost_equal(expected_wfs[i], uploaded_wf)
+
+    def test_load_ef_rabi_pulses_to_AWG_lookuptable_correct_pars(self):
+        self.AWG8_VSM_MW_LutMan.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        ef_pulse_pars = self.AWG8_VSM_MW_LutMan.LutMap()[9]
+        self.assertEqual(ef_pulse_pars['type'], 'raw-drag')
+        exp_amp = self.AWG8_VSM_MW_LutMan.mw_ef_amp180()
+        self.assertEqual(ef_pulse_pars['drag_pars']['amp'], exp_amp)
+
+        amps = [.1, .2, .5]
+        self.AWG8_VSM_MW_LutMan.load_ef_rabi_pulses_to_AWG_lookuptable(
+            amps=amps)
+        for i, exp_amp in enumerate(amps):
+            ef_pulse_pars = self.AWG8_VSM_MW_LutMan.LutMap()[i+9]
+            self.assertEqual(ef_pulse_pars['type'], 'raw-drag')
+            self.assertEqual(ef_pulse_pars['drag_pars']['amp'], exp_amp)
+
+    def test_load_ef_rabi_pulses_to_AWG_lookuptable_correct_waveform(self):
+        self.AWG8_VSM_MW_LutMan.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        expected_wf = wf.mod_gauss(
+            amp=self.AWG8_MW_LutMan.mw_ef_amp180(),
+            sigma_length=self.AWG8_MW_LutMan.mw_gauss_width(),
+            f_modulation=self.AWG8_MW_LutMan.mw_ef_modulation(),
+            sampling_rate=self.AWG8_MW_LutMan.sampling_rate(), phase=0,
+            motzoi=self.AWG8_MW_LutMan.mw_motzoi())[0]
+
+        uploaded_wf = self.AWG.get('wave_ch1_cw009')
+        np.testing.assert_array_almost_equal(expected_wf, uploaded_wf)
+
+    def test_render_wave(self):
+        self.AWG8_VSM_MW_LutMan.render_wave('rX180', show=False)
+
+    def test_render_wave_PSD(self):
+        self.AWG8_VSM_MW_LutMan.render_wave_PSD('rX180', show=False)
+
 
     @classmethod
     def tearDownClass(self):
@@ -209,6 +235,32 @@ class Test_LutMan_Utils(unittest.TestCase):
             print(bin(cw))
             self.assertEqual((cw & (256-16)) >> 4, target_cw)
         self.assertEqual(len(red_cws_B), 2**4)
+
+    def test_valid_mw_lutmap(self):
+
+        valid_mw_lutmap = {
+            0: {"name": "I",        "theta": 0, "phi": 0, "type": "ge"},
+            1: {"name": "rX180",    "theta": 180, "phi": 0, "type": "ge"}, }
+        self.assertTrue(mwl.mw_lutmap_is_valid(valid_mw_lutmap))
+
+        invalid_mw_lutmap = {
+            "0": {"name": "I",        "theta": 0, "phi": 0, "type": "ge"}, }
+        with self.assertRaises(TypeError):
+            mwl.mw_lutmap_is_valid(invalid_mw_lutmap)
+
+    def test_theta_to_amp(self):
+        ref_amp180 = 1.5
+        thetas = [0, 180, 270, -90, -180]
+        expected_amps = [0, 1.5, -.75, -.75, 1.5]
+        for theta, exp_amp in zip(thetas, expected_amps):
+            self.assertEqual(
+                mwl.theta_to_amp(theta, ref_amp180), exp_amp)
+
+    def test_get_wf_idx_from_name(self):
+        idx = get_wf_idx_from_name('rX12', mwl.default_mw_lutmap)
+        self.assertEqual(idx, 9)
+
+
 
 
 def dict_contained_in(subset, superset):

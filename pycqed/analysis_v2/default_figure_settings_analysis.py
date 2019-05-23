@@ -15,7 +15,7 @@ def apply_default_figure_settings():
 #         'weight'    : 'normal'
 #        }
 
-    my_mathtext = dict(fontset='dejavusans')
+    my_mathtext = dict(fontset='stixsans')
     matplotlib.rc('mathtext', **my_mathtext)
 
     my_axes = {'formatter.useoffset': False}

@@ -77,7 +77,7 @@ def martinis_flux_pulse(length: float,
             'Martinis flux wave form has been clipped to [{}, 180 deg]'
             .format(np.rad2deg(theta_i)))
 
-    # 3. Transform from proper time τ to real time t using interpolation
+    # 3. Transform from proper time τ to real time t using interpolation, eqs. 17-20
     t = np.array([np.trapz(np.sin(theta_wave_clipped)[:i+1],
                            dx=1/(fine_sampling_factor*sampling_rate))
                   for i in range(len(theta_wave_clipped))])

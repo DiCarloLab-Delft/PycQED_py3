@@ -6,7 +6,6 @@ from pycqed.utilities.general import setInDict
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
-from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
 
 
@@ -88,13 +87,30 @@ class Elapsed_Time_Sweep(Soft_Sweep):
         return elapsed_time
 
 class Heterodyne_Frequency_Sweep(Soft_Sweep):
+    """
+    Performs a joint sweep of two microwave sources for the purpose of
+    varying a heterodyne frequency.
+    """
 
-    def __init__(self, RO_pulse_type,
-                 LO_source, IF,
+    def __init__(self, RO_pulse_type:str,
+                 LO_source, IF:float,
                  RF_source=None,
-                 sweep_control='soft',
+                 sweep_control:str='soft',
                  sweep_points=None,
                  **kw):
+        """
+        RO_pulse_type (str) : determines wether to only set the LO source
+            (in case of a modulated RF pulse) or set both the LO and RF source
+            to the required frequency. Can be:
+                "gated"             Will set both the LO and RF source
+                "pulse_modulated"   Will only set the LO source
+                "CW"                Will set both the LO and RF source
+        LO_source (instr) : instance of the LO instrument
+        IF (float)        : intermodulation frequency in Hz
+        RF_source (instr) : instance of the RF instrument, can be None
+            if the pulse type is "pulse_modulated"
+        """
+
         super(Heterodyne_Frequency_Sweep, self).__init__()
         self.sweep_control = sweep_control
         self.name = 'Heterodyne frequency'
@@ -104,13 +120,15 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
         self.sweep_points = sweep_points
         self.LO_source = LO_source
         self.IF = IF
-        if 'gated' in self.RO_pulse_type.lower():
+        if (('gated' in self.RO_pulse_type.lower()) or
+            ('cw' in self.RO_pulse_type.lower())):
             self.RF_source = RF_source
 
     def set_parameter(self, val):
         # RF = LO + IF
         self.LO_source.frequency(val-self.IF)
-        if 'gated' in self.RO_pulse_type.lower():
+        if (('gated' in self.RO_pulse_type.lower()) or
+            ('cw' in self.RO_pulse_type.lower())):
             self.RF_source.frequency(val)
 
 
@@ -236,7 +254,8 @@ class QX_RB_Sweep(Soft_Sweep):
             self.__qxc.create_circuit(c[0], c[1])
 
     def set_parameter(self, val):
-        assert(self.__cnt < self.num_circuits)
+        if not (self.__cnt < self.num_circuits):
+            raise AssertionError()
         self.__cnt = self.__cnt+1
 
 
@@ -278,7 +297,7 @@ class AWG_amp(Soft_Sweep):
     def prepare(self):
         pass
 
-    def set_parameter(self, val, **kw):
+    def set_parameter(self, val):
         self.AWG.stop()
         if type(self.channel) == int:
             exec('self.AWG.ch{}_amp({})'.format(self.channel, val))
@@ -469,7 +488,7 @@ class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
                  upload: bool=True, verbosity_level: int=1,
                  disable_compile_and_upload: bool = False,
                  identical_pulses: bool=True):
-        super(QASM_Sweep_v2, self).__init__()
+        super(QWG_flux_QASM_Sweep, self).__init__()
         self.name = 'QWG_flux_QASM_Sweep'
 
         self.qasm_fn = qasm_fn
@@ -692,7 +711,7 @@ class ZNB_VNA_sweep(Hard_Sweep):
         self.VNA.trigger_source('immediate')
         # trigger signal is generated with the command:
         # VNA.start_sweep_all()
-
+        self.VNA.rf_on()
         if self.segment_list == None:
             self.VNA.sweep_type('linear')  # set a linear sweep
             if self.start_freq != None and self.stop_freq != None:
@@ -719,6 +738,8 @@ class ZNB_VNA_sweep(Hard_Sweep):
         # get the list of frequency used in the span from the VNA
         self.sweep_points = self.VNA.get_stimulus()
 
+    def finish(self, **kw):
+        self.VNA.rf_off()
 
 class QWG_lutman_par(Soft_Sweep):
 
@@ -1084,6 +1105,7 @@ class multi_sweep_function(Soft_Sweep):
         for sweep_function in self.sweep_functions:
             sweep_function.set_parameter(val)
 
+
 class two_par_joint_sweep(Soft_Sweep):
     """
     Allows jointly sweeping two parameters while preserving their
@@ -1091,7 +1113,7 @@ class two_par_joint_sweep(Soft_Sweep):
     Allows par_A and par_B to be arrays of parameters
     """
     def __init__(self, par_A, par_B, preserve_ratio: bool=True,
-                 retrieve_value=False, **kw):
+                 retrieve_value=False, instr=None, **kw):
         self.set_kw()
         self.unit = par_A.unit
         self.sweep_control = 'soft'
@@ -1100,6 +1122,7 @@ class two_par_joint_sweep(Soft_Sweep):
         self.name = par_A.name
         self.parameter_name = par_A.name
         self.retrieve_value = retrieve_value
+        self.instr=instr
         if preserve_ratio:
             try:
                 self.par_ratio = self.par_B.get()/self.par_A.get()
@@ -1113,7 +1136,8 @@ class two_par_joint_sweep(Soft_Sweep):
         self.par_A.set(val)
         self.par_B.set(val*self.par_ratio)
         if self.retrieve_value:
-            self.par_A()  # only get first one to prevent overhead
+            if self.instr:
+                self.instr.operationComplete()  # only get first one to prevent overhead
 
 
 class FLsweep(Soft_Sweep):
@@ -1151,7 +1175,7 @@ class FLsweep_QWG(Soft_Sweep):
         self.realtime_loading = realtime_loading
         self.other_waveform = other_waveform
 
-    def prepare(self):
+    def prepare(self, **kw):
         awg = self.lm.AWG.get_instr()
         awg.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
@@ -1176,7 +1200,7 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.qubit = qubit
         self.freqs = freqs
         self.par = par
-        self.nested_MC = nested_MC        
+        self.nested_MC = nested_MC
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name

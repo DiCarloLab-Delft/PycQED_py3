@@ -15,13 +15,16 @@ from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
 from scipy.signal import argrelextrema
+from scipy import optimize
 # to allow backwards compatibility with old a_tools code
-from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
 from matplotlib import cm
 from pycqed.analysis import composite_analysis as RA
+
+import qutip as qp
+import qutip.metrics as qpmetrics
 
 from matplotlib.colors import LogNorm
 
@@ -120,7 +123,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     is newer than the date given by the timestamp newer_than is returned
 
     If no fitting data is found, an exception is raised.
-    Except when you specifically ask not to to
+    Except when you specifically ask not to do
     this in: raise_exc = False, then a 'False' is returned.
     return_all = True: returns all the folders that satisfy
         the requirements (Cristian)
@@ -450,11 +453,48 @@ def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
 
 
 def append_data_from_ma(ma, param_names, data, data_version=2,
-                        numeric_params=None):
-    new_data = get_data_from_ma(ma, param_names, data_version=data_version,
+                        numeric_params=None, filter_dict=None):
+    """
+    Extract data from an analysis object and appends it to lists in a dict.
+
+    params
+    ------
+    ma:
+        analysis class to be used to extract the data?
+    param_names:
+        parameters to extract.
+    data: (dictionary)
+        dictionary containing lists of data.
+    numeric_params
+        this parameter is ignored (TODO remove this)
+    filter_dict:
+        dictionary to use to filter, keys correpond to parameter names,
+        values correspond to desired values of these params. If a Value is not
+        equal to the filter param, no data from that dataset is loaded at all.
+
+    Returns
+    -------
+    nothing, the data object is modified inside the function scope.
+
+    """
+    if filter_dict is not None:
+        param_names_filter = list(param_names)+list(filter_dict.keys())
+    else:
+        param_names_filter = param_names
+
+    new_data = get_data_from_ma(ma, param_names_filter, data_version=data_version,
                                 numeric_params=numeric_params)
-    for param in param_names:
-        data[param].append(new_data[param])
+
+    if filter_dict is not None:
+        for k,v in filter_dict.items():
+            if new_data[k] != str(v):
+                break
+        else:
+            for param in param_names:
+                data[param].append(new_data[param])
+    else:
+        for param in param_names:
+            data[param].append(new_data[param])
 
 
 def get_data_from_timestamp_list(timestamps,
@@ -463,6 +503,7 @@ def get_data_from_timestamp_list(timestamps,
                                  max_files=None,
                                  filter_no_analysis=False,
                                  numeric_params=None,
+                                 filter_dict=None,
                                  ma_type='MeasurementAnalysis'):
     # dirty import inside this function to prevent circular import
     # FIXME: this function is at the base of the analysis v2 but relies
@@ -529,7 +570,7 @@ def get_data_from_timestamp_list(timestamps,
                                                     data_version=1)
                         else:
                             append_data_from_ma(ana, param_names.values(), data,
-                                                data_version=1)
+                                                data_version=1, filter_dict=filter_dict)
 
                     elif datasaving_format == 'Version 2':
                         if single_timestamp:
@@ -537,7 +578,8 @@ def get_data_from_timestamp_list(timestamps,
                                                     data_version=2)
                         else:
                             append_data_from_ma(
-                                ana, param_names.values(), data, data_version=2)
+                                ana, param_names.values(), data, data_version=2,
+                                                    filter_dict=filter_dict)
 
                 else:
                     remove_timestamps.append(timestamp)
@@ -728,6 +770,9 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
 
         if exact_label_match:
             all_measdirs = [x for x in all_measdirs if label in x]
+            #BUG: does not compare the exact string, just a substring
+            #So 'q5_spectroscopy_f02' will be included in a search for
+            #'q5_spectroscopy'
         else:
             for each_label in label:
                 all_measdirs = [x for x in all_measdirs if each_label in x]
@@ -748,6 +793,8 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         all_timestamps += timestamps
     # Ensures the order of the timestamps is ascending
     all_timestamps.sort()
+    if len(all_timestamps) == 0:
+        raise ValueError('No matching timestamps found')
     return all_timestamps
 
 
@@ -1630,7 +1677,10 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
     return normalized_data
 
 
-def datetime_from_timestamp(timestamp):
+def datetime_from_timestamp(timestamp: str):
+    """
+    Converst a timestamp instring in a datetime object.
+    """
     try:
         if len(timestamp) == 14:
             return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
@@ -1990,7 +2040,7 @@ def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
         return transitions[:no_transitions]
 
 
-def calculate_transmon_and_resonator_transitions(EC, EJ, f_r, g_01,
+def calculate_transmon_and_resonator_transitions_old(EC, EJ, f_r, g_01,
                                                  dim=None, ng=0, f_01=None,
                                                  f_12=None,
                                                  g_12_approximation=1):
@@ -2031,6 +2081,191 @@ def calculate_transmon_and_resonator_transitions(EC, EJ, f_r, g_01,
 
     return f_01_d, f_12_d, f_r_d, f_01_res_shifted, f_r_qubit_shifted
 
+def calculate_transmon_and_resonator_transitions(Ec, Ej, f_bus, gs, ng=0):
+    """
+    Calculate dressed qubit and bus frequencies based on several physical parameters
+    Input:
+    - Ec: transmon charging energy
+    - Ej: transmon josephson energy
+    - f_bus: the bare bus frequency (float or list of floats)
+    - g: qubit-bus coupling (float or list of floats)
+    Output:
+    - f01_dressed: 01 transition of a dressed qubit
+    - f12_dressed: 12 transition of a dressed qubit
+    - f_bus_transitions: dressed bus transition with qubit in a ground state
+    - photon_splittings: a qubit photon splitting (difference between f01_dressed with
+        and without a photon in this resonator).
+    - f_bus_shifted_transitions: dressed bus transition with qubit in an excited state
+
+    Replacement for the previous calculate_transmon_and_resonator_transitions function,
+    which was assuming only one bus. That one is temporarily kept as
+    'calculate_transmon_and_resonator_transitions_old'. It is verified to produce
+    the same result to 6 decimal places.
+    """
+    if isinstance(f_bus, float) or isinstance(f_bus, int):
+        f_bus = [f_bus]
+    if isinstance(gs, float) or isinstance(gs, int):
+        gs = [gs]
+    
+    # max photons
+    max_ph = 2
+    
+    # number of buses
+    n_bus = len(f_bus)
+
+    # qubit operators
+    (f01, f12), injs = calculate_transmon_transitions(Ec, Ej, asym=0,
+                                                        reduced_flux=0,
+                                                        no_transitions=2,
+                                                        ng=ng, dim=10,
+                                                        return_injs=True)
+    H_q = qp.Qobj(np.diag((0, f01, f01+f12)))
+    H_q = qp.tensor(H_q, *[qp.qeye(max_ph+1)]*n_bus)
+    a_q = qp.Qobj(np.diag((1,np.abs(injs[2, 1]/injs[1, 0])),k=1))
+    a_q = qp.tensor(a_q, *[qp.qeye(max_ph+1)]*n_bus)
+
+
+    # bus operators
+    n_r_list = []
+    a_r_list = []
+
+    a_r_generating_list = [qp.destroy(max_ph+1)] + [qp.qeye(max_ph+1)]*(n_bus-1)
+    for fb, g in zip(f_bus, gs):
+        a_r = qp.tensor(qp.qeye(3), *a_r_generating_list)
+        a_r_list.append(a_r)
+        n_r_list.append(a_r.dag() * a_r)
+        a_r_generating_list = a_r_generating_list[-1:]+a_r_generating_list[:-1]
+
+    # full hamiltonian
+    H = deepcopy(H_q)
+    for fb, g, a_r, n_r in zip(f_bus, gs, a_r_list, n_r_list):
+        H += fb*n_r
+        H += g*(a_q*a_r.dag() + a_q.dag()*a_r)
+
+    # eigenenergies and eigenstates
+    ees, ess = H.eigenstates()
+
+    # define bare qubit states
+    qubit_g = qp.tensor(qp.fock(3,0),*[qp.fock(max_ph+1,0)]*n_bus)
+    qubit_e = qp.tensor(qp.fock(3,1),*[qp.fock(max_ph+1,0)]*n_bus)
+    qubit_f = qp.tensor(qp.fock(3,2),*[qp.fock(max_ph+1,0)]*n_bus)
+
+    # define bare bus states
+    bus_e_list = []
+    bus_e_qubit_e_list = []
+    bus_e_generating_list = [qp.fock(max_ph+1,1)] + [qp.fock(max_ph+1,0)]*(n_bus-1)
+    for fb, g in zip(f_bus, gs):
+        bus_e = qp.tensor(qp.fock(3,0), *bus_e_generating_list)
+        bus_e_list.append(bus_e)
+        bus_e_qubit_e = qp.tensor(qp.fock(3,1), *bus_e_generating_list)
+        bus_e_qubit_e_list.append(bus_e_qubit_e)
+        bus_e_generating_list = bus_e_generating_list[-1:]+bus_e_generating_list[:-1]
+
+    # find states with the largest overlap to specific state
+    def largest_overlap_index(state, ess, ees):
+        max_fid = 0
+        best_index = 0
+        for i,es in enumerate(ess):
+            fid = qpmetrics.fidelity(state,es)**2
+            if fid>max_fid:
+                max_fid = fid
+                best_index = i
+            if max_fid>0.5:
+                break
+        return i, max_fid, ees[i]
+
+    # find states with the largest overlap to specific state
+    def largest_overlap_energy(state, ess, ees):
+        return largest_overlap_index(state, ess, ees)[2]
+
+    # ground state energy
+    E_g = largest_overlap_energy(qubit_g, ess, ees)
+    # excited state energy
+    E_e = largest_overlap_energy(qubit_e, ess, ees)
+    # second_excited state energy
+    E_f = largest_overlap_energy(qubit_f, ess, ees)
+
+    # transitions of dressed states
+    f01_dressed = E_e - E_g
+    f12_dressed = E_f - E_e
+
+    # bus transition with qubit in ground state
+    f_bus_transitions = []
+    # bus transition with qubit in excited state
+    f_bus_shifted_transitions = []
+    # qubit 01 transition with a photon in a bus
+    f01_dressed_shifted = []
+
+    # dressed bus transitions
+    for bus_qubit_g, bus_qubit_e in zip(bus_e_list, bus_e_qubit_e_list):
+        E_b_g = largest_overlap_energy(bus_qubit_g, ess, ees)
+        E_b_e = largest_overlap_energy(bus_qubit_e, ess, ees)
+
+        f_bus_transitions.append(E_b_g-E_g)
+        f_bus_shifted_transitions.append(E_b_e-E_e)
+        f01_dressed_shifted.append(E_b_e - E_b_g)
+    
+    if n_bus == 1:
+        f_bus_transitions = f_bus_transitions[0]
+        f_bus_shifted_transitions = f_bus_shifted_transitions[0]
+        f01_dressed_shifted = f01_dressed_shifted[0]
+    
+    return f01_dressed, f12_dressed, f_bus_transitions, f01_dressed_shifted, f_bus_shifted_transitions
+
+def fit_Ec_Ej_fbus_g(f01, f12, fbus, f01_shifted):
+    '''
+    Use the qubit anharmonicity and photon splitting to calculate
+    Ec, Ej, resonator frequency, and coupling to resonator
+    
+    Input:
+    - f01: qubit frequency
+    - f12: e-f transition frequency
+    - fbus: resonator frequency (bus of RO resonator; dressed i.e. as measured)
+    - f01_shifted: qubit frequency in presence of a single photon in the resonator
+    
+    Output:
+    tuple containing:
+    - Ec: charging energy
+    - Ej: josephson energy
+    - fbus: bare resonator frequency (bus of RO resonator)
+    - g: coupling between qubit and resonator
+    '''
+    
+    # pack measured values into an array
+    measured = np.array([f01, f12, fbus, f01_shifted])
+    
+    # guess initial parameters
+    
+    # Ec is smaller that f01-f12 because of a bus so let's use
+    # f01_shifted-f12 as a guess
+    Ec_guess = f01_shifted - f12
+    # and let's use large Ej/Ec limit for Ej guess
+    Ej_guess = (f01 + Ec_guess) ** 2 / (8 * Ec_guess)
+    # detuning is roughly (fbus-f01) so I use it to guess g and fbus
+    # in a dispersive regime
+    g_guess = np.sqrt(np.abs(fbus-f01) * np.abs(f01-f01_shifted) * 2)
+    fbus_guess = fbus+g_guess**2/(fbus-f01)
+
+    # pack all quesses into an array
+    guesses = np.array([Ec_guess, Ej_guess, fbus_guess, g_guess])
+    
+    # define a penalty function to minimize
+    def penalty_function(params):
+        # calculate frequencies based on parameters
+        calc = np.array(calculate_transmon_and_resonator_transitions(*params))
+        # remove last element which is the bus frequency for qubit in 1 state
+        calc = calc[:-1]
+
+        # calculate difference between calculated and measured frequencies
+        errors = calc - measured
+        return errors**2
+    
+    # optimize
+    out = optimize.leastsq(penalty_function,guesses, full_output=1)
+    
+#     print('Measured frequencies: '+str(measured))
+#     print('Frequencies after fitting: '+str(np.around(calculate_transmon_and_resonator_transitions(*out[0]), decimals=4)[:-1]))
+    return tuple(out[0])
 
 def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
                                          dim=None, ng=0, f_01=None, f_12=None,
@@ -2097,12 +2332,11 @@ def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
     return f_q_01, f_r1, f_r2, f_q_12, f_disp_r1, f_disp_r2, f_nrsplt_r1, f_nrsplt_r2
 
 
-def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR,
-                                             g_RR_PF, g_trm_bus,
-                                             dim=None, ng=0, f_01=None,
-                                             f_12=None):
+
+def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR, g_RR_PF, g_trm_bus,
+                                   dim=None, ng=0):
     """
-    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    Calculates transmon and resonator energy levels and resonator from the full Hamiltonian.
     """
 
     # calculate the bare transmon transitions, hardcoded to three levels only
@@ -2180,6 +2414,299 @@ def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR,
 
     return f_q_01, f_r1, f_r2, f_q_12, f_disp_r1, f_disp_r2, f_nrsplt_r1, f_nrsplt_r2
 
+def calculate_tr_bus_tr_bus_tr_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3 ,f_bus1, f_bus2, g1, g2, g3, g4,
+                                   dim=None, ng=0):
+    '''
+    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    '''
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01_1, f_12_1], injs = calculate_transmon_transitions(EC1, EJ1, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_2, f_12_2], injs = calculate_transmon_transitions(EC2, EJ2, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_3, f_12_3], injs = calculate_transmon_transitions(EC3, EJ3, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    # try:
+    #E0000 = 0
+    g1 = np.abs(g1)
+    g2 = np.abs(g2)
+    g3 = np.abs(g3)
+    g4 = np.abs(g4)
+    H1 = np.array([[f_01_1,     0,      0,     g1,  0],
+                   [0,     f_01_2,      0,     g2,  g3],
+                   [0,          0, f_01_3,      0,  g4],
+                   [g1,        g2,      0, f_bus1,  0],
+                   [0,         g3,     g4,      0,  f_bus2]])
+
+    E10000, E01000, E00100, E00010, E00001 = np.linalg.eigvalsh(H1)
+    return E10000, E01000, E00100, E00010, E00001
+
+def calculate_tr_bus_square(EC1, EC2, EC3, EC4, EJ1, EJ2, EJ3 ,EJ4, f_bus1_2,
+                            f_bus2_3,f_bus3_4, f_bus4_1, g1_2, g2_3, g3_4, g4_1,
+                            dim=None, ng=0):
+    '''
+    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    '''
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01_1, f_12_1], injs = calculate_transmon_transitions(EC1, EJ1, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_2, f_12_2], injs = calculate_transmon_transitions(EC2, EJ2, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_3, f_12_3], injs = calculate_transmon_transitions(EC3, EJ3, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_4, f_12_4], injs = calculate_transmon_transitions(EC4, EJ4, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    # try:
+    #E0000 = 0
+    H1 = np.array([[f_01_1,     0,     0,     0,    g1_2,       0,       0,    g4_1],
+                   [     0,f_01_2,     0,     0,    g1_2,    g2_3,       0,       0],
+                   [     0,     0,f_01_3,     0,       0,    g2_3,    g3_4,       0],
+                   [     0,     0,     0,f_01_4,       0,       0,    g3_4,   g4_1],
+                   [  g1_2,  g1_2,     0,     0,f_bus1_2,       0,       0,       0],
+                   [     0,  g2_3,  g2_3,     0,       0,f_bus2_3,       0,       0],
+                   [     0,     0,  g3_4,  g3_4,       0,       0,f_bus3_4,       0],
+                   [  g4_1,     0,     0,  g4_1,       0,       0,       0,f_bus4_1]])
+
+    E10000000, E01000000, E00100000, E00010000, E00001000, E00000100, E00000010, E0000001 = np.linalg.eigvalsh(H1)
+    return E10000000, E01000000, E00100000, E00010000, E00001000, E00000100, E00000010, E0000001
+
+def calculate_tr_tr_tr_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3, g1_2, g2_3,
+                                   dim=None, ng=0):
+    '''
+    Calculates transmon energy levels for three coupled transmons in the 1-excitation manifolc.
+    '''
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01_1, f_12_1], injs1 = calculate_transmon_transitions(EC1, EJ1, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_2, f_12_2], injs2 = calculate_transmon_transitions(EC2, EJ2, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_3, f_12_3], injs3 = calculate_transmon_transitions(EC3, EJ3, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    # try:
+    #E0000 = 0
+    g1_2 = np.abs(g1_2)
+    g2_3 = np.abs(g2_3)
+    H1 = np.array([[f_01_1,     g1_2,      0],
+                   [g1_2,     f_01_2,      g2_3],
+                   [0,          g2_3, f_01_3]])
+
+    E1, E2, E3 = np.linalg.eigvalsh(H1)
+
+    g1_2_2first = g1_2*injs1[1,2]/injs1[0,1]
+    g1_2_2sec = g1_2*injs2[1,2]/injs2[0,1]
+    g2_3_2first = g2_3*injs2[1,2]/injs2[0,1]
+    g2_3_2sec = g2_3*injs3[1,2]/injs3[0,1]
+
+    H2 = np.array([[f_01_1+f_12_1,g1_2_2first  ,0            ,0            ,0            ,0            ],
+                   [g1_2_2first  ,f_01_1+f_01_2,g1_2_2sec    ,g2_3         ,0            ,0            ],
+                   [0            ,g1_2_2sec    ,f_01_2+f_12_2,0            ,g2_3_2first  ,0            ],
+                   [0            ,g2_3         ,0            ,f_01_1+f_01_3,g1_2         ,0            ],
+                   [0            ,0            ,g2_3_2first  ,g1_2         ,f_01_2+f_01_3,g2_3_2sec    ],
+                   [0            ,0            ,0            ,0            ,g2_3_2sec    ,f_01_3+f_12_3]])
+    E4, E5, E6, E7, E8, E9 = np.linalg.eigvalsh(H2)
+
+    return E1, E2, E3, E4, E5, E6, E7, E8, E9
+
+def calculate_tr_tr_tr_bus_transitions(EC1, EC2,EC3, EJ1, EJ2, EJ3, fbus, g1_2, g2_3, g1_bus, g3_bus,
+                                   dim=None, ng=0):
+    '''
+    Calculates transmon energy levels for three coupled transmons in the 1-excitation manifolc.
+    '''
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01_1, f_12_1], injs1 = calculate_transmon_transitions(EC1, EJ1, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_2, f_12_2], injs2 = calculate_transmon_transitions(EC2, EJ2, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_3, f_12_3], injs3 = calculate_transmon_transitions(EC3, EJ3, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    # try:
+    #E0000 = 0
+    g1_2 = np.abs(g1_2)
+    g2_3 = np.abs(g2_3)
+    H1 = np.array([[f_01_1,     g1_2,     0,g1_bus],
+                   [g1_2,     f_01_2,  g2_3,     0],
+                   [0,          g2_3,f_01_3,g3_bus],
+                   [g1_bus,        0,g3_bus,  fbus]])
+
+    E1, E2, E3, E4= np.linalg.eigvalsh(H1)
+
+    g1_2_2first = g1_2*injs1[1,2]/injs1[0,1]
+    g1_2_2sec = g1_2*injs2[1,2]/injs2[0,1]
+    g2_3_2first = g2_3*injs2[1,2]/injs2[0,1]
+    g2_3_2sec = g2_3*injs3[1,2]/injs3[0,1]
+
+    g1_bus_2first = g1_bus*injs1[1,2]/injs1[0,1]
+    g1_bus_2sec = g1_bus*np.sqrt(2)
+    g3_bus_2first = g3_bus*injs3[1,2]/injs3[0,1]
+    g3_bus_2sec = g3_bus*np.sqrt(2)
+
+    H2 = np.array([[f_01_1+f_12_1,g1_2_2first  ,0            ,0            ,0            ,0            ,g1_bus_2first,0           ,0            ,0          ],
+                   [g1_2_2first  ,f_01_1+f_01_2,g1_2_2sec    ,g2_3         ,0            ,0            ,0            ,g1_bus      ,0            ,0          ],
+                   [0            ,g1_2_2sec    ,f_01_2+f_12_2,0            ,g2_3_2first  ,0            ,0            ,0           ,0            ,0          ],
+                   [0            ,g2_3         ,0            ,f_01_1+f_01_3,g1_2         ,0            ,g3_bus       ,0           ,g1_bus       ,0          ],
+                   [0            ,0            ,g2_3_2first  ,g1_2         ,f_01_2+f_01_3,g2_3_2sec    ,0            ,g3_bus      ,0            ,0          ],
+                   [0            ,0            ,0            ,0            ,g2_3_2sec    ,f_01_3+f_12_3,0            ,0           ,g3_bus_2first,0          ],
+                   [g1_bus_2first,0            ,0            ,g3_bus       ,0            ,0            ,fbus+f_01_1  ,g1_2        ,0            ,g1_bus_2sec],
+                   [0            ,g1_bus       ,0            ,0            ,g3_bus       ,0            ,g1_2         ,fbus+f_01_2 ,g2_3         ,0          ],
+                   [0            ,0            ,0            ,g1_bus       ,0            ,g3_bus_2first,0            ,g2_3        ,fbus+f_01_3  ,g3_bus_2sec],
+                   [0            ,0            ,0            ,0            ,0            ,0            ,g1_bus_2sec  ,0           ,g3_bus_2sec  ,fbus*2     ]])
+    E5, E6, E7, E8, E9, E10, E11, E12, E13, E14 = np.linalg.eigvalsh(H2)
+
+    return E1, E2, E3, E4, E5, E6, E7, E8, E9, E10, E11, E12, E13, E14
+
+def calculate_tr_bus_tr_bus_transitions(EC1, EC3, EJ1, EJ3, fbus2, fbus4, g1_2, g2_3, g3_4, g4_1,
+                                   dim=None, ng=0):
+    '''
+    Calculates transmon energy levels for three coupled transmons in the 1-excitation manifolc.
+    '''
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01_1, f_12_1], injs1 = calculate_transmon_transitions(EC1, EJ1, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_3, f_12_3], injs3 = calculate_transmon_transitions(EC3, EJ3, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    # try:
+    #E0000 = 0
+    H1 = np.array([[f_01_1,g1_2  ,0     ,g4_1 ],
+                   [g1_2  ,fbus2,g2_3  ,0    ],
+                   [0     ,g2_3  ,f_01_3,g3_4 ],
+                   [g4_1  ,0     ,g3_4  ,fbus4]])
+
+    E1, E2, E3, E4= np.linalg.eigvalsh(H1)
+
+    g1_2_2first = g1_2*injs1[1,2]/injs1[0,1]
+    g1_2_2sec   = g1_2*np.sqrt(2)
+
+    g2_3_2first = g2_3*np.sqrt(2)
+    g2_3_2sec   = g2_3*injs3[1,2]/injs3[0,1]
+
+    g3_4_2first = g3_4*injs3[1,2]/injs3[0,1]
+    g3_4_2sec   = g3_4*np.sqrt(2)
+
+    g4_1_2first = g4_1*np.sqrt(2)
+    g4_1_2sec   = g4_1*injs1[1,2]/injs1[0,1]
+
+    f_01_2 = fbus2
+    f_12_2 = fbus2
+    f_01_4 = fbus4
+    f_12_4 = fbus4
+
+
+    H2 = np.array([[f_01_1+f_12_1,g1_2_2first  ,0            ,0            ,0            ,0            ,g4_1_2first  ,0            ,0            ,0            ],
+                   [g1_2_2first  ,f_01_1+f_01_2,g1_2_2sec    ,g2_3         ,0            ,0            ,0            ,g4_1         ,0            ,0            ],
+                   [0            ,g1_2_2sec    ,f_01_2+f_12_2,0            ,g2_3_2first  ,0            ,0            ,0            ,0            ,0            ],
+                   [0            ,g2_3         ,0            ,f_01_1+f_01_3,g1_2         ,0            ,g3_4         ,0            ,g4_1         ,0            ],
+                   [0            ,0            ,g2_3_2first  ,g1_2         ,f_01_2+f_01_3,g2_3_2sec    ,0            ,g3_4         ,0            ,0            ],
+                   [0            ,0            ,0            ,0            ,g2_3_2sec    ,f_01_3+f_12_3,0            ,0            ,g3_4_2first  ,0            ],
+                   [g4_1_2first  ,0            ,0            ,g3_4         ,0            ,0            ,f_01_4+f_01_1,g1_2         ,0            ,g4_1_2sec    ],
+                   [0            ,g4_1         ,0            ,0            ,g3_4         ,0            ,g1_2         ,f_01_4+f_01_2,g2_3         ,0            ],
+                   [0            ,0            ,0            ,g4_1         ,0            ,g3_4_2first  ,0            ,g2_3         ,f_01_4+f_01_3,g3_4_2sec    ],
+                   [0            ,0            ,0            ,0            ,0            ,0            ,g4_1_2sec    ,0            ,g3_4_2sec    ,f_01_4+f_01_2]])
+    E5, E6, E7, E8, E9, E10, E11, E12, E13, E14 = np.linalg.eigvalsh(H2)
+
+    return E1, E2, E3, E4, E5, E6, E7, E8, E9, E10, E11, E12, E13, E14
+
+def calculate_tr_bus_tr(EC1, EC2, EJ1, EJ2,f_bus, g1, g2, dim=None, ng=0):
+    '''
+    Calculates energy levels for a transmon-resonator-transmon system from the full transmon qubit Hamiltonian.
+    '''
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01_1, f_12_1], injs1 = calculate_transmon_transitions(EC1, EJ1, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_2, f_12_2], injs2 = calculate_transmon_transitions(EC2, EJ2, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    # try:
+    #E0000 = 0
+    g1 = np.abs(g1)
+    g2 = np.abs(g2)
+    H1 = np.array([[f_01_1,     0,      g1],
+                   [0,     f_01_2,      g2],
+                   [g1,        g2,      f_bus]])
+
+    E100, E010, E001 = np.linalg.eigvalsh(H1)
+    g2_trm_r1 = abs(g1*injs1[1,2]/injs1[0,1])
+    g2_r_trm1 = abs(g1*np.sqrt(2))
+    g2_trm_r2 = abs(g2*injs2[1,2]/injs2[0,1])
+    g2_r_trm2 = abs(g2*np.sqrt(2))
+    H2 = np.zeros([6,6])
+    H2[0, 0] = f_01_1+f_12_1
+    H2[0, 3] = H2[3, 0] = g2_trm_r1
+    H2[1, 1] = f_01_1+f_01_2
+    H2[1, 3] = H2[3, 1] = g2
+    H2[1, 4] = H2[4, 1] = g1
+    H2[2, 2] = f_01_2+f_12_2
+    H2[2, 4] = H2[4, 2] = g2_trm_r2
+    H2[3, 3] = f_01_1+f_bus
+    H2[3, 5] = H2[5, 3] = g2_r_trm1
+    H2[4, 4] = f_01_2+f_bus
+    H2[4, 5] = H2[5, 4] = g2_r_trm2
+    H2[5, 5] = f_bus+f_bus
+    E200, E110, E020, E101, E011, E002 = np.linalg.eigvalsh(H2)
+    ZZ1 = E110 - E010
+    ZZ2 = E110 - E100
+    return E100, E010, E001, E200, E110, E020, E101, E011, E002
+
+def calculate_tr_tr(EC1, EC2, EJ1, EJ2, g1, dim=None, ng=0):
+    '''
+    Calculates energy levels for two directly coupled transmons from the full transmon qubit Hamiltonian.
+    '''
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01_1, f_12_1], injs1 = calculate_transmon_transitions(EC1, EJ1, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+    [f_01_2, f_12_2], injs2 = calculate_transmon_transitions(EC2, EJ2, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    # try:
+    #E0000 = 0
+    g1 = np.abs(g1)
+    H1 = np.array([[f_01_1,     g1],
+                   [g1,        f_01_2]])
+
+    E10, E01 = np.linalg.eigvalsh(H1)
+    g2_trm_r1 = abs(g1*injs1[1,2]/injs1[0,1])
+    g2_trm_r2 = abs(g1*injs2[1,2]/injs2[0,1])
+    H2 = np.zeros([3,3])
+    H2[0, 0] = f_01_1+f_12_1
+    H2[0, 1] = H2[1, 0] = g2_trm_r1
+    H2[1, 1] = f_01_1+f_01_2
+    H2[1, 2] = H2[2, 1] = g2_trm_r2
+    H2[2, 2] = f_01_2+f_12_2
+    E20, E11, E02 = np.linalg.eigvalsh(H2)
+    ZZ1 = E11 - E01
+    ZZ2 = E11 - E10
+    return E10, E01, E20, E11, E02
+
 
 def fit_EC_EJ_g_f_res_ng(flux_01, f_01, flux_12, f_12, flux_r, f_r, ng=0,
                          asym=0):
@@ -2188,7 +2715,6 @@ def fit_EC_EJ_g_f_res_ng(flux_01, f_01, flux_12, f_12, flux_r, f_r, ng=0,
     as a function of thier respective flux settings by numerical optimization.
     for initial guess it takes the maximum of the inputs
     """
-    from scipy import optimize
     # initial guesses
     g_01_ss_guess = 300e6
     EC_guess = np.max(f_01) - np.max(f_12)
@@ -2254,7 +2780,6 @@ def fit_EC_EJ(f01, f12):
     """
     Calculates EC and EJ from f01 and f12 by numerical optimization.
     """
-    from scipy import optimize
     # initial guesses
     EC0 = f01 - f12
     EJ0 = (f01 + EC0) ** 2 / (8 * EC0)
@@ -2285,6 +2810,40 @@ def solve_quadratic_equation(a, b, c, verbose=False):
         if verbose:
             print("This equation has two solutions: ", x1, " or", x2)
         return [x1, x2]
+
+
+def calculate_f_qubit_from_power_scan(f_bare,f_shifted,g_coupling=65e6):
+    '''
+    Inputs are in Hz
+    f_bare: the resonator frequency without a coupled qubit
+    f_shifted: the reso freq shifted due to coupling of a qwubit
+    g_coupling: the coupling strengs
+    Output:
+    f_q: in Hz
+    '''
+    w_r = f_bare * 2* np.pi
+    w_shift = f_shifted * 2*np.pi
+    g = 2*np.pi * g_coupling
+    shift =(w_shift - w_r)/g**2
+    #f_shift > 0 when f_qubit<f_res
+    if (shift>0):
+        w_q = -1/(shift) + np.sqrt(1/(shift**2)+w_r**2)
+        #For the RWA approximation
+        # w_q_RWA = -1/shift + w_r
+    else:
+        w_q = 1/shift + np.sqrt(1/(shift**2)+w_r**2)
+
+        # w_q_RWA = 1/shift + w_r
+    return w_q/(2.*np.pi)
+
+def calculate_g_coupling_from_frequency_shift(f_bare,f_shifted,f_qubit):
+    w_r = 2*np.pi * f_bare
+    w_shift = 2*np.pi * f_shifted
+    w_q = 2*np.pi*f_qubit
+    shift = w_shift-w_r
+    rhs = 1./(w_q-w_r) + 1./(w_q+w_r)
+    # rhs_RWA = 1./(w_q-w_r)
+    return np.sqrt(np.abs(shift/rhs))/(2*np.pi)
 
 
 # def find_min(x, y, min_target=None, return_fit=False, perc=30):

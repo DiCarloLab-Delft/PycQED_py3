@@ -236,6 +236,17 @@ def CosFunc(t, amplitude, frequency, phase, offset):
     '''
     return amplitude * np.cos(2 * np.pi * frequency * t + phase) + offset
 
+def CosFunc2(t, amplitude, frequency, phase, offset):
+    '''
+    parameters:
+        t, time in s
+        amplitude a.u.
+        frequency in Hz (f, not omega!)
+        phase in rad
+        offset a.u.
+    '''
+    return amplitude * np.cos(2 * np.pi * frequency * (t + phase)) + offset
+
 
 def ExpDecayFunc(t, tau, amplitude, offset, n):
     return amplitude * np.exp(-(t / tau) ** n) + offset
@@ -335,8 +346,10 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
         phi_0:  phase to account for propagation delay from sample
         slope:  slope of signal around the resonance
 
+
     The complex hanger function that has a list of parameters as input
     is now called hanger_func_complex_SI_pars
+
 
     '''
     slope_corr = (1+slope*(f-f0)/f0)
@@ -349,6 +362,7 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
 
 def hanger_func_complex_SI_pars(f,pars):
     '''
+
     This function is used in the minimization fitting which requires parameters.
     It calls the function hanger_func_complex_SI, see there for details.
     '''
@@ -548,6 +562,47 @@ def avoided_crossing_direct_coupling(flux, f_center1, f_center2,
     result = np.where(flux_state, frequencies[:, 0], frequencies[:, 1])
     return result
 
+def avoided_crossing_freq_shift(flux, a, b, g):
+    """
+    Calculates the frequency shift due to an avoided crossing for the following model:
+        [delta_f,  g ]
+        [g,        0 ]
+
+    delta_f = a*flux + b 
+    
+    Parameters 
+    ----------
+    flux : array like
+        flux bias values 
+    a, b : float
+        parameters used to calculate frequency distance (delta) away from 
+        avoided crossing according to 
+            delta_f = a*flux+b 
+    
+    g: float
+        Coupling strength strength, beware to relabel your variable if using this
+        model to fit J1 or J2.
+    
+    Returns
+    ------- 
+    frequency_shift : (float) 
+    
+    
+    Note: this model is useful for fitting the frequency shift due to an interaction 
+    in a chevron experiment (after fourier transforming the data). 
+    """
+    
+    frequencies = np.zeros([len(flux), 2])
+    for kk, fl_i in enumerate(flux):
+        f_1 = a*fl_i  +  b
+        f_2 = 0
+        matrix = [[f_1, g],
+                  [g, f_2]]
+        frequencies[kk, :] = np.linalg.eigvalsh(matrix)[:2]
+    result = frequencies[:, 1]- frequencies[:, 0]
+    return result
+
+
 
 ######################
 # Residual functions #
@@ -587,7 +642,10 @@ def exp_dec_guess(model, data, t, vary_n=False):
 
     model.set_param_hint('amplitude', value=amp_guess)
     model.set_param_hint('tau', value=tau_guess)
-    model.set_param_hint('n', value=1, vary=vary_n)
+    if vary_n:
+        model.set_param_hint('n', value=1.1, vary=vary_n, min=1)
+    else:
+        model.set_param_hint('n', value=1, vary=vary_n)
     model.set_param_hint('offset', value=offs_guess)
 
     params = model.make_params()
@@ -1108,6 +1166,8 @@ def sum_int(x,y):
 # A valid reason to define it here would beexp_dec_guess if you want to add a guess function
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
+CosModel2 = lmfit.Model(CosFunc2)
+
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)

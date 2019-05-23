@@ -11,7 +11,6 @@ class Test_VNA_complex_reso_Analysis(unittest.TestCase):
     @classmethod
     def tearDownClass(self):
         plt.close('all')
-
     @classmethod
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')

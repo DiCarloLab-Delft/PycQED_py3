@@ -323,9 +323,9 @@ class ZNB_VNA_detector(Hard_Detector):
         super(ZNB_VNA_detector, self).__init__()
         self.VNA = VNA
         self.value_names = ['ampl', 'phase',
-                            'real', 'imag', ]
+                            'real', 'imag', 'ampl_dB']
         self.value_units = ['', 'radians',
-                            '', '']
+                            '', '', 'dB']
 
     def get_values(self):
         '''
@@ -343,10 +343,10 @@ class ZNB_VNA_detector(Hard_Detector):
 
         complex_data = np.add(real_data, 1j*imag_data)
         ampl_linear = np.abs(complex_data)
-        # ampl_dB = 20*np.log10(ampl_linear)
+        ampl_dB = 20*np.log10(ampl_linear)
         phase_radians = np.arctan2(imag_data, real_data)
 
-        return ampl_linear, phase_radians, real_data, imag_data
+        return ampl_linear, phase_radians, real_data, imag_data, ampl_dB
 
 
 # Detectors for QuTech Control box modes
@@ -1005,7 +1005,7 @@ class Heterodyne_probe(Soft_Detector):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
-        self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
+        self.value_names = ['S21', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
         self.value_units = ['V', 'deg']
         self.first = True
         self.last_frequency = 0.
@@ -1059,7 +1059,7 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
-        self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
+        self.value_names = ['S21', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
         self.value_units = ['mV', 'deg']  # , 'a.u.', 'a.u.']
         self.first = True
         self.last_frequency = 0.
@@ -1450,6 +1450,7 @@ class UHFQC_input_average_detector(Hard_Detector):
             self.AWG.stop()
 
 
+
 class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
     '''
     Detector used for acquiring averaged input traces withe the UHFQC.
@@ -1480,6 +1481,27 @@ class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
             ret_data = np.array([amp, phase])
 
         return ret_data
+
+
+class UHFQC_spectroscopy_detector(Soft_Detector):
+    '''
+    Detector used for the spectroscopy mode
+    '''
+    def __init__(self, UHFQC, ro_freq_mod,
+                 AWG=None, channels=(0, 1),
+                 nr_averages=1024, integration_length=4096, **kw):
+        super().__init__()
+        #UHFQC=UHFQC, AWG=AWG, channels=channels,
+                         # nr_averages=nr_averages, nr_samples=nr_samples, **kw
+        self.UHFQC = UHFQC
+        self.ro_freq_mod = ro_freq_mod
+
+    def acquire_data_point(self):
+        RESULT_LENGTH = 1600
+        vals = self.UHFQC.acquisition(samples=RESULT_LENGTH, acquisition_time=0.010, timeout=10)
+        a = max(np.abs(fft.fft(vals[0][1:int(len(RESULT_LENGTH)/2)])))
+        b = max(np.abs(fft.fft(vals[1][1:int(len(RESULT_LENGTH)/2)])))
+        return a+b
 
 
 class UHFQC_integrated_average_detector(Hard_Detector):
@@ -2583,3 +2605,33 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
+class Function_Detector_list(Soft_Detector):
+    """
+    Defines a detector function that wraps around an user-defined function.
+    Inputs are:
+        sweep_function, function that is going to be wrapped around
+        result_keys, keys of the dictionary returned by the function
+        value_names, names of the elements returned by the function
+        value_units, units of the elements returned by the function
+        msmt_kw, kw arguments for the function
+    The input function sweep_function must return a dictionary.
+    The contents(keys) of this dictionary are going to be the measured
+    values to be plotted and stored by PycQED
+    """
+
+    def __init__(self, sweep_function, result_keys, value_names=None,
+                 value_unit=None, msmt_kw=None, **kw):
+        super(Function_Detector_list, self).__init__()
+        self.sweep_function = sweep_function
+        self.result_keys = result_keys
+        self.value_names = value_names
+        self.value_units = value_unit
+        self.msmt_kw = msmt_kw or {}
+        if self.value_names is None:
+            self.value_names = result_keys
+        if self.value_units is None:
+            self.value_units = [""] * len(result_keys)
+
+    def acquire_data_point(self, **kw):
+        return self.sweep_function(**self.msmt_kw)
