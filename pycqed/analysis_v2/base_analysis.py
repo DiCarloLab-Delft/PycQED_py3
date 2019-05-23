@@ -1582,6 +1582,7 @@ class BaseDataAnalysis(object):
         tick_length = kwargs.pop('tick_length', 5)
         tick_width = kwargs.pop('tick_width', 1)
         tick_color = kwargs.get('tick_color', 'k')
+        ticks_direction = kwargs.get('ticks_direction', 'out')
         axes_labelcolor = kwargs.get('axes_labelcolor', 'k')
 
         fig_size_dim = 10
@@ -1602,8 +1603,8 @@ class BaseDataAnalysis(object):
                   'axes.linewidth': axes_line_width,
                   'lines.markersize': marker_size,
                   'lines.linewidth': line_width,
-                  'xtick.direction': 'in',
-                  'ytick.direction': 'in',
+                  'xtick.direction': ticks_direction,
+                  'ytick.direction': ticks_direction,
                   'xtick.labelsize': font_size,
                   'ytick.labelsize': font_size,
                   'xtick.color': tick_color,
