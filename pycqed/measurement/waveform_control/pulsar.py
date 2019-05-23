@@ -526,19 +526,19 @@ class HDAWG8Pulsar:
                     if name_ch1 is not None:
                         name_ch1 = '"{}_{}"'.format(obj._devname,
                                                     simplify_name(name_ch1))
-                        if name_ch1m is not None:
-                            name_ch1 += ' + "{}_{}"'.format(obj._devname,
-                                                      simplify_name(name_ch1m))
+                    if name_ch1m is not None:
+                        name_ch1m = '"{}_{}"'.format(obj._devname,
+                                                    simplify_name(name_ch1m))
                     if name_ch2 is not None:
                         name_ch2 = '"{}_{}"'.format(obj._devname,
                                                     simplify_name(name_ch2))
-                        if name_ch2m is not None:
-                            name_ch2 += ' + "{}_{}"'.format(obj._devname,
-                                                      simplify_name(name_ch2m))
+                    if name_ch2m is not None:
+                        name_ch2m = '"{}_{}"'.format(obj._devname,
+                                                    simplify_name(name_ch2m))
                     if name_ch1 is not None or name_ch2 is not None:
                         main_loop += self._HDAWG8_element_seqc(
                             el['repetitions'], el['trigger_wait'],
-                            name_ch1, name_ch2)
+                            name_ch1, name_ch2, name_ch1m, name_ch2m)
             awg_str = header + waveform_table + main_loop + footer
 
             # write the waveforms to csv files
@@ -577,7 +577,8 @@ class HDAWG8Pulsar:
             return super()._clock(obj, cid)
         return obj.clock_freq((int(cid[2])-1)//2)
 
-    def _HDAWG8_element_seqc(self, reps, wait, name1, name2):
+    def _HDAWG8_element_seqc(self, reps, wait, name1, name2,
+                             name1m=None, name2m=None):
         """
         Generates a part of the sequence code responsible for playing back a
         single element
@@ -587,24 +588,73 @@ class HDAWG8Pulsar:
             wait: boolean flag, whether to wait for trigger
             name1: name of the wave to be played on channel 1
             name2: name of the wave to be played on channel 2
+            name1m: name of the wave to be played on channel 1 marker
+            name2m: name of the wave to be played on channel 2 marker
         Returns:
             string for playing back an element
         """
         repeat_open_str = 'repeat ({}) {{\n'.format(
             reps) if reps != 1 else ''
         trigger_str = 'waitDigTrigger(1);\n'
-        if name1 is None and name2 is None:
+        if name1 is None and name2 is None and name1m is None and name2m is None:
             prefetch_str = ''
             play_str = 'playWaveDIO();\n'
-        elif name1 is None:
-            prefetch_str = 'prefetch({});\n'.format(name2)
-            play_str = 'playWave(2, {});\n'.format(name2)
-        elif name2 is None:
-            prefetch_str = 'prefetch({});\n'.format(name1)
-            play_str = 'playWave(1, {});\n'.format(name1)
+        elif name1 is None and name1m is None:
+            if name2 is not None and name2m is not None:
+                n2s = name2.strip('"')
+                n2ms = name2m.strip('"')
+                prefetch_str = 'wave {} = {};\n'.format(n2s, name2)
+                prefetch_str += 'wave {} = {};\n'.format(n2ms, name2m)
+                prefetch_str += 'wave {} = {} + {};\n'.format(n2s + n2ms, n2s, n2ms)
+                prefetch_str += 'prefetch({});\n'.format(n2s + n2ms)
+                play_str = 'playWave(2, {});\n'.format(n2s + n2ms)
+            elif name2 is not None:
+                prefetch_str = 'prefetch({});\n'.format(name2)
+                play_str = 'playWave(2, {});\n'.format(name2)
+            else:        
+                prefetch_str = 'prefetch({});\n'.format(name2m)
+                play_str = 'playWave(2, {});\n'.format(name2m)
+        elif name2 is None and name2m is None:
+            if name1 is not None and name1m is not None:
+                n1s = name1.strip('"')
+                n1ms = name1m.strip('"')
+                prefetch_str = 'wave {} = {};\n'.format(n1s, name1)
+                prefetch_str += 'wave {} = {};\n'.format(n1ms, name1m)
+                prefetch_str += 'wave {} = {} + {};\n'.format(n1s + n1ms, n1s, n1ms)
+                prefetch_str += 'prefetch({});\n'.format(n1s + n1ms)
+                play_str = 'playWave(1, {});\n'.format(n1s + n1ms)
+            elif name1 is not None:
+                prefetch_str = 'prefetch({});\n'.format(name1)
+                play_str = 'playWave(1, {});\n'.format(name1)
+            else:        
+                prefetch_str = 'prefetch({});\n'.format(name1m)
+                play_str = 'playWave(1, {});\n'.format(name1m)
         else:
-            prefetch_str = 'prefetch({}, {});\n'.format(name1, name2)
-            play_str = 'playWave({}, {});\n'.format(name1, name2)
+            prefetch_str = ''
+            if name1 is not None and name1m is not None:
+                n1s = name1.strip('"')
+                n1ms = name1m.strip('"')
+                n1c = n1s + n1ms
+                prefetch_str += 'wave {} = {};\n'.format(n1s, name1)
+                prefetch_str += 'wave {} = {};\n'.format(n1ms, name1m)
+                prefetch_str += 'wave {} = {} + {};\n'.format(n1c, n1s, n1ms)
+            elif name1 is not None:
+                n1c = name1
+            else:  
+                n1c = name1m
+            if name2 is not None and name2m is not None:
+                n2s = name2.strip('"')
+                n2ms = name2m.strip('"')
+                n2c = n2s + n2ms
+                prefetch_str += 'wave {} = {};\n'.format(n2s, name2)
+                prefetch_str += 'wave {} = {};\n'.format(n2ms, name2m)
+                prefetch_str += 'wave {} = {} + {};\n'.format(n2c, n2s, n2ms)
+            elif name2 is not None:
+                n2c = name2
+            else:  
+                n2c = name2m
+            prefetch_str += 'prefetch({}, {});\n'.format(n1c, n2c)
+            play_str = 'playWave({}, {});\n'.format(n1c, n2c)
         repeat_close_str = '}\n' if reps != 1 else ''
         return repeat_open_str + prefetch_str+ trigger_str + \
                play_str + repeat_close_str

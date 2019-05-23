@@ -3864,40 +3864,41 @@ class QuDev_transmon(Qubit):
                         max_amp_diff=max_diff) * self.RO_amp
 
 
-    def measure_dispersive_shift(self, freqs, MC=None, analyze=True, **kw):
-            # FIXME: Remove dependancy on heterodyne!
-            if np.any(freqs < 500e6):
-                logging.warning(('Some of the values in the freqs array might be '
-                                 'too small. The units should be Hz.'))
-            if MC is None:
-                MC = self.MC
+    def measure_dispersive_shift(self, freqs, MC=None, analyze=True, close_fig=True, upload=True):
+        """ Varies the frequency of the microwave source to the resonator and
+        measures the transmittance """
 
-            heterodyne = self.heterodyne
-            heterodyne.f_RO_mod(self.f_RO_mod())
-            heterodyne.RO_length(self.RO_pulse_length())
-            heterodyne.mod_amp(self.RO_amp())
-            self.prepare_for_pulsed_spec()
-            self.drive_LO.pulsemod_state('off')
-            self.drive_LO.power(self.drive_LO_pow())
-            self.UHFQC.quex_wint_length(int(self.RO_acq_integration_length()*1.8e9))
-            heterodyne.nr_averages(self.RO_acq_averages())
+        if freqs is None:
+            raise ValueError("Unspecified frequencies for measure_resonator_"
+                            "spectroscopy")
+        if np.any(freqs < 500e6):
+            logging.warning(('Some of the values in the freqs array might be '
+                            'too small. The units should be Hz.'))
 
-            for mode in ('on', 'off'):
-                sq.OffOn_seq(pulse_pars=self.get_drive_pars(),
-                             RO_pars=self.get_RO_pars(),
-                             pulse_comb='O{0}O{0}'.format(mode[1:]))
-                MC.set_sweep_function(heterodyne.frequency)
-                MC.set_sweep_points(freqs)
-                demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
-                    else 'double'
-                MC.set_detector_function(det.Heterodyne_probe(
-                    self.heterodyne,
-                    trigger_separation=self.heterodyne.trigger_separation(),
-                    demod_mode=demod_mode))
-                self.AWG.start()
-                MC.run(name='{}-spec{}'.format(mode, self.msmt_suffix))
-                if analyze:
-                    ma.MeasurementAnalysis(qb_name=self.name, **kw)
+        if MC is None:
+            MC = self.MC
+
+        self.prepare_for_continuous_wave()
+
+        for pulse_comb, label in [('OffOff', 'off-spec'), ('OnOn', 'on-spec')]:
+            if upload:
+                sq.OffOn_seq(pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+                            pulse_comb=pulse_comb, preselection=False)
+            MC.set_sweep_function(awg_swf.Resonator_spectroscopy(
+                RO_MWG=self.readout_UC_LO,
+                RO_IF=self.f_RO_mod(),
+                RO_channel=self.RO_acq_marker_channel(),
+                upload=False))
+            MC.set_sweep_points(freqs)
+            MC.set_detector_function(self.int_avg_det_spec)
+
+            self.AWG.start()
+            MC.run(name=label + self.msmt_suffix)
+            self.AWG.stop()
+
+            if analyze:
+                ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                    qb_name=self.name)
 
     def get_spec_pars(self):
         return self.get_operation_dict()['Spec ' + self.name]

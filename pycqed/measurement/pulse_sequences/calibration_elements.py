@@ -64,7 +64,7 @@ def cos_seq(amplitude, frequency, channels, phases,
 
 def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel=None,
                                RO_pars = None,
-                               pulse_I_channel=None, pulse_Q_channel=None,
+                               pulse_I_channel='AWG_ch1', pulse_Q_channel='AWG_ch2',
                                f_pulse_mod=0, phi_skew=0, alpha=1, upload=True):
     if trigger_channel is not None:
         RO_trigger = {'pulse_type': 'SquarePulse',

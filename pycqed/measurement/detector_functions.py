@@ -1631,15 +1631,22 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[1] = 'Phase'
             self.value_units[1] = 'deg'
 
+    def _get_readout(self):
+        return sum([(1 << c) for c in self.channels])
+
     def get_values(self):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        
+        # resets UHFQC internal readout counters
+        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout', self._get_readout())
+        
         self.UHFQC.acquisition_arm()
-        while not self.UHFQC.awgs_0_enable():
-            time.sleep(0.05)
+
+        time.sleep(0.05)
+
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()

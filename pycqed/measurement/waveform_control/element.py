@@ -425,8 +425,7 @@ class Element:
             if self.pulsar.get('{}_type'.format(wf)) == 'analog':
                 wfs[wf] = wfs[wf] / amp
             if self.pulsar.get('{}_type'.format(wf)) == 'marker':
-                wfs[wf][wfs[wf] > 0] = 1
-                wfs[wf][wfs[wf] <= 0] = 0
+                wfs[wf] = (wfs[wf] > 0).astype(np.int)
         return tvals, wfs
 
     # testing and inspection

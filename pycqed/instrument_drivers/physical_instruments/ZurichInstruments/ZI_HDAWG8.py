@@ -346,8 +346,8 @@ class ZI_HDAWG8(ZI_base_instrument):
         filename = os.path.join(
             self.lab_one_webserver_path, 'awg', 'waves',
             self._devname+'_'+wf_name+'.csv')
-        # with open(filename, 'w') as f:
-        np.savetxt(filename, waveform, delimiter=",")
+        fmt = '%.18e' if waveform.dtype == np.float else '%d'
+        np.savetxt(filename, waveform, delimiter=",", fmt=fmt)
 
     def _read_csv_waveform(self, wf_name: str):
         filename = os.path.join(
