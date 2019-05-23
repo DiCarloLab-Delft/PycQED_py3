@@ -58,9 +58,12 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 14
 
-        self._nr_codeword_bits_cmd = "SYSTem:CODEwordsbits?";
-        self.device_descriptor.numCodewordsBits = int(self.ask(self._nr_codeword_bits_cmd))
-        self.device_descriptor.numCodewords = pow(2, self.device_descriptor.numCodewordsBits)
+        self._nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
+        self.device_descriptor.numMaxCwBits = int(self.ask(self._nr_cw_bits_cmd))
+
+        self._nr_cw_inp_cmd = "SYSTem:CODEwords:SELect?"
+        self.device_descriptor.numSelectCwInputs = int(self.ask(self._nr_cw_inp_cmd))
+        self.device_descriptor.numCodewords = pow(2, self.device_descriptor.numSelectCwInputs)
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
@@ -78,7 +81,7 @@ class QuTech_AWG_Module(SCPI):
             'MICROWAVE':    [0x3FF, 0x3FF, 0x3FF, 0x3FF]
         }
 
-        if self.device_descriptor.numCodewordsBits <= 7:
+        if self.device_descriptor.numMaxCwBits <= 7:
             self.codeword_protocols = cw_protocol_mt
         else:
             self.codeword_protocols = cw_protocol_dio
@@ -88,7 +91,6 @@ class QuTech_AWG_Module(SCPI):
 
         self.add_parameters()
         self.connect_message()
-
 
     def add_parameters(self):
         #######################################################################
@@ -144,68 +146,64 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=float)
 
         self.add_parameter('run_mode',
-                            get_cmd='AWGC:RMO?',
-                            set_cmd='AWGC:RMO ' + '{}',
-                            vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'))
+                           get_cmd='AWGC:RMO?',
+                           set_cmd='AWGC:RMO ' + '{}',
+                           vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'))
         # NB: setting mode "CON" (valid SCPI abbreviation) reads back as "CONt"
 
         self.add_parameter('dio_mode',
-                            unit='',
-                            label='DIO input operation mode',
-                            get_cmd='DIO:MODE?',
-                            set_cmd='DIO:MODE ' + '{}',
-                            vals=vals.Enum('MASTER', 'SLAVE'),
-                            val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
-                            docstring='Get or set the DIO input operation mode\n' \
-                                'Paramaters:\n' \
-                                '\tmaster: Use DIO codeword (lower 14 bits) input '\
-                                'from its own IORearDIO board\n' \
-                                    '\t\tEnables SE and DIFF inputs\n' \
-                                '\tslave; Use DIO codeword (upper 14 bits) input '\
-                                'from the connected master IORearDIO board\n'
-                                    '\t\tDisables SE and DIFF inputs\n' )
-
-
+                           unit='',
+                           label='DIO input operation mode',
+                           get_cmd='DIO:MODE?',
+                           set_cmd='DIO:MODE ' + '{}',
+                           vals=vals.Enum('MASTER', 'SLAVE'),
+                           val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
+                           docstring='Get or set the DIO input operation mode\n' \
+                               'Paramaters:\n' \
+                               '\tMASTER: Use DIO codeword (lower 14 bits) input '\
+                               'from its own IORearDIO board' \
+                                   '\t\tEnables single-ended and differential inputs\n' \
+                               '\tSLAVE; Use DIO codeword (upper 14 bits) input '\
+                               'from the connected master IORearDIO board\n'
+                                   '\t\tDisables SE and DIFF inputs\n' )
 
         self.add_parameter('dio_is_calibrated',
-                            unit='',
-                            label='DIO calibration status',
-                            get_cmd='DIO:CALibrate?',
-                            val_mapping={True: '1', False: '0'},
-                            docstring='Get DIO calibration status\n' \
-                                'Note: will also return false on no signal.\n\n' \
-                                'Result:\n' \
-                                '\tTrue: DIO is calibrated\n'\
-                                '\tFalse: DIO is not calibrated'
-                            )
+                           unit='',
+                           label='DIO calibration status',
+                           get_cmd='DIO:CALibrate?',
+                           val_mapping={True: '1', False: '0'},
+                           docstring="""Get DIO calibration status\n 
+                                        Result:\n
+                                       \tTrue: DIO is calibrated\n
+                                       \tFalse: DIO is not calibrated"""
+                           )
 
         self.add_parameter('dio_active_index',
-                            unit='',
-                            label='DIO calibration index',
-                            get_cmd='DIO:INDexes:ACTive?',
-                            set_cmd='DIO:INDexes:ACTive {}',
-                            get_parser=np.uint32,
-                            vals=vals.Ints(0, 20),
-                            docstring='Get and set DIO calibration index\n' \
-                                'Index will also be stored in non-volatile memory\n' \
-                                'See dio_calibrate() paramater\n'
+                           unit='',
+                           label='DIO calibration index',
+                           get_cmd='DIO:INDexes:ACTive?',
+                           set_cmd='DIO:INDexes:ACTive {}',
+                           get_parser=np.uint32,
+                           vals=vals.Ints(0, 20),
+                           docstring='Get and set DIO calibration index\n' \
+                               'See dio_calibrate() paramater\n'
                            )
 
         self.add_parameter('dio_suitable_indexes',
-                            unit='',
-                            label='DIO suitable indexes',
-                            get_cmd='DIO:INDexes?',
-                            get_parser=self._int_to_array,
-                            docstring='Get DIO all suitable indexes\n' \
-                                    '\t- The array is ordered by most preferable index first\n'
+                           unit='',
+                           label='DIO suitable indexes',
+                           get_cmd='DIO:INDexes?',
+                           get_parser=self._int_to_array,
+                           docstring='Get DIO all suitable indexes\n' \
+                                   '\t- The array is ordered by most preferable index first\n'
                            )
 
         self.add_parameter('dio_calibrated_inputs',
-                            unit='',
-                            label='DIO calibrated inputs',
-                            get_cmd='DIO:INPutscalibrated?',
-                            get_parser=int,
-                            docstring='Get all DIO inputs channels which are calibrated\n'
+                           unit='',
+                           label='DIO calibrated inputs',
+                           get_cmd='DIO:INPutscalibrated?',
+                           get_parser=int,
+                           docstring='Get all DIO inputs which are calibrated\n'
                            )
 
         self.add_parameter('dio_lvds',
@@ -375,7 +373,6 @@ class QuTech_AWG_Module(SCPI):
                                                      # usefull when other logic is needed
                                docstring=doc_trgs_log_inp)
 
-
         # Single parameters
         self.add_parameter('status_frontIO_temperature',
                            unit='C',
@@ -428,7 +425,7 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameter('get_max_codeword_bits',
                            unit='',
                            label=('Max codeword bits'),
-                           get_cmd=self._nr_codeword_bits_cmd,
+                           get_cmd=self._nr_cw_bits_cmd,
                            vals=vals.Strings(),
                            get_parser=int,
                            docstring='Reads the maximal number of codeword bits for all channels')
@@ -563,11 +560,11 @@ class QuTech_AWG_Module(SCPI):
         '''
         Will raise an warning if on a channel underflow is detected
         '''
-        msg = [];
+        msg = []
         for channel in status["channels"]:
             if((channel["on"] == True) and (channel["underdrive"] == True)):
                 msg.append("Possible wave underdrive detected on channel: {}".format(channel["id"]))
-        return msg;
+        return msg
 
     def getErrors(self):
         '''
@@ -577,7 +574,7 @@ class QuTech_AWG_Module(SCPI):
         errNr = self.getSystemErrorCount()
 
         if errNr > 0:
-            errMgs = [];
+            errMgs = []
             for i in range(errNr):
                 errMgs.append(self.getError())
             raise RuntimeError(', '.join(errMgs))
@@ -593,16 +590,22 @@ class QuTech_AWG_Module(SCPI):
         result = result.replace('\"\"', '\"') # SCPI/visa adds additional quotes
         return json.loads(result)
 
-    def _int_to_array(self, msg):
+    @staticmethod
+    def _int_to_array(msg):
+        """
+        Converst a scpi array of ints into a python int array
+        :param msg: scpi result
+        :return: array of ints
+        """
         if msg == "\"\"":
             return []
         return msg.split(',')
 
     def _set_bit_select(self, ch: int, selection: int):
         bit_map = []
-        if selection.bit_length() > self.device_descriptor.numCodewordsBits:
+        if selection.bit_length() > self.device_descriptor.numMaxCwBits:
             raise ValueError(f'Cannot set bit select; highest set bit is to high; '
-                             f'max: {self.device_descriptor.numCodewordsBits}, actual: {selection.bit_length()}')
+                             f'max: {self.device_descriptor.numMaxCwBits}, actual: {selection.bit_length()}')
 
         for cw_bit_input in range(0, selection.bit_length()):
             if (1 << cw_bit_input) & selection:
@@ -615,15 +618,21 @@ class QuTech_AWG_Module(SCPI):
         return result.split(",")
 
     def _set_bit_map(self, ch: int, bit_map: List[int]):
-        if len(bit_map) > 10:
+        """
+        Helper function to set a bitMap
+        :param ch:  int, channel of the bitmap
+        :param bit_map:  array of ints, element determines the codeword input
+        :return: none
+        """
+        if len(bit_map) > self.device_descriptor.numSelectCwInputs:
             raise ValueError(f'Cannot set bit map; Number of codeword bits inputs are too high; '
-                             f'max: 10, actual: {len(bit_map)}')
-        invalid_inputs = list(x for x in bit_map if x > (self.device_descriptor.numCodewordsBits - 1))
+                             f'max: {self.device_descriptor.numSelectCwInputs}, actual: {len(bit_map)}')
+        invalid_inputs = list(x for x in bit_map if x > (self.device_descriptor.numMaxCwBits - 1))
         if invalid_inputs:
             err_msg = ', '.join("input {} at index {}".format(cw_bit_input, bit_map.index(cw_bit_input) + 1)
                                 for index, cw_bit_input in enumerate(invalid_inputs))
             raise ValueError(f'Cannot set bit map; invalid codeword bit input(s); '
-                             f'max: {self.device_descriptor.numCodewordsBits - 1}, actual: {err_msg}')
+                             f'max: {self.device_descriptor.numMaxCwBits - 1}, actual: {err_msg}')
 
         array_raw = ''
         if bit_map:
@@ -636,29 +645,34 @@ class QuTech_AWG_Module(SCPI):
 
         Will analyze the input signals for each DIO
         inputs (used to transfer codeword bits), secondly,
-        the most preferable index is set and stored.\n\n'
+        the most preferable index (active index) is set.\n\n'
 
         Each signal is sampled and divided into sections.
         These sections are analyzed to find a stable
         stable signal. These stable sections
         are addressed by there index.\n\n
 
+        After calibration the suitable indexes list (see dio_suitable_indexes()) contains all indexes which are stable.
+
+        Parameters:
+        :param target_index: unsigned int, optional: When provided the calibration will select an active index based
+        on the target index. Used to determine the new index before or after the edge. This parameter is commonly used
+        to calibrate a DIO slave where the target index is the active index after calibration of the DIO master
+
         Note 1: Expects a DIO calibration signal on the inputs:\n
         \tAn all codewords bits high followed by an all codeword
         bits low in a continues repetition. This results in a
         square wave of 25 MHz on the DIO inputs of the
         DIO connection. Individual DIO inputs where no
-        signal is detected will not be calibrated, See
-        paramater dio_calibrated_inputs\n\n
+        signal is detected will not be calibrated (See
+         dio_calibrated_inputs())\n\n
 
-        Note 2: The best index is stored in non-volatile
-        memory and loaded at startup.\n\n
-        Note 3: The QWG will continuously validate if
+        Note 2: The QWG will continuously validate if
         the active index is still stable.\n\n
-        If no suitable indexes are found the list
+
+        Note 3: If no suitable indexes are found
         is empty and an error is pushed onto the error stack\n
         """
-
         self.write(f'DIO:CALibrate {target_index}')
 
     ##########################################################################
@@ -858,7 +872,7 @@ class QuTech_AWG_Module(SCPI):
 
     def _dio_set_signals(self, signals: List):
         """
-        FOR DEVELOPMENT ONLY: Set DIO simulation signals. Only works if kernal module and application are build with the
+        FOR DEVELOPMENT ONLY: Set DIO simulation signals. Only works if kernel module and application are build with the
         'OPT_DBG_SIM_DIO' define enabled
         :param signals: list of unsigned int, the signal on a input (note: not the bitDiffs, the system will calculate
         the bitDiffs). Need to contain 16 elements. Example: signal[0]=0xFFF00 where LSB is the oldest in time
