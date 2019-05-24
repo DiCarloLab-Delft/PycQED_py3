@@ -46,7 +46,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         self.add_parameter('mock_res_power_shift', label='resonator power shift',
                            unit='Hz', parameter_class=ManualParameter,
-                           initial_value=1.3e6)
+                           initial_value=2.6e6)
 
         self.add_parameter('mock_residual_flux_current', label='magnitude of sweetspot current',
                            unit='A', parameter_class=ManualParameter,
@@ -60,6 +60,32 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         self.add_parameter('mock_T2_star', label='Ramsey T2', unit='s',
                            initial_value=1e-6, parameter_class=ManualParameter)
+
+    def find_resonator_power(self, freqs=None, powers=None):
+        if freqs is None:
+            freq_center = self.freq_res()
+            freq_range = 10e6
+            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+                0.1e6)
+
+        if powers is None:
+            powers = np.arange(-40, 0, 4)
+
+        self.measure_resonator_power(freqs=freqs, powers=powers)
+
+        return True
+
+    def find_resonator_sweetspot(self, freqs=None, dac_values=None):
+        if freqs is None:
+            freq_center = self.freq_res()
+            freq_range = 10e6
+            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+                0.5e6)
+
+        if dac_values is None:
+            dac_values = np.arange(-1e-3, -1e3, )
+
+        return True
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None, analyze=True,
                              close_fig=True, label='',
@@ -91,7 +117,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.run('mock_spectroscopy_'+self.msmt_suffix)
 
         a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-        return a.fit_params['f0']
+        return True  # a.fit_params['f0']
 
     def measure_resonator_power(self, freqs, powers, MC=None,
                                 analyze: bool = True, close_fig: bool = True,
@@ -164,10 +190,11 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         MC.set_detector_function(d)
         MC.run('Resonator_power_scan'+self.msmt_suffix, mode='2D')
- 
+
         if analyze:
             ma.TwoD_Analysis(label='Resonator_power_scan',
                              close_fig=close_fig, normalize=True)
+
     def measure_heterodyne_spectroscopy(self, freqs, MC=None, analyze=True, close_fig=True):
         '''
         For finding resonator frequencies. Uses a lorentzian fit for now, might
@@ -200,24 +227,54 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_detector_function(d)
         MC.run('Resonator_scan'+self.msmt_suffix)
 
-    # def measure_resonator_power(self, freqs, powers, MC=None,
-    #                             analyze: bool = True, close_fig: bool = True):
-    #     '''
-    #     Measure resonator frequency as function of power
-    #     '''
-    #     if MC is None:
-    #         MC = self.instr_MC.get_instr()
-    #     s = swf.None_Sweep
+    def measure_resonator_frequency_dac_scan(self, freqs, dac_values, pulsed=True,
+                                             MC=None, analyze=True, fluxChan=None,
+                                             close_fig=True,
+                                             nested_resonator_calibration=False,
+                                             resonator_freqs=None):
+        '''
+        Measures resonator frequency versus flux. Simple model which just shifts
+        the lorentzian peak with a simple cosine by 2 MHz.
+        '''
 
-    #     MC.set_sweep_function(s)
-    #     MC.set_sweep_points(freqs)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        s1 = swf.None_Sweep(name='Heterodyne Frequency', parameter_name='Frequency',
+                            unit='Hz')
+        s2 = swf.None_Sweep(name='Flux', parameter_name='FBL',
+                            unit='A')
 
-    def measure_qubit_frequency_dac_scan(self, freqs, dac_values, pulsed=True,
-                                         MC=None, analyze=True, fluxChan=None, close_fig=True, nested_resonator_calibration=False,
-                                         resonator_freqs=None):
-        s = swf.None_Sweep()
+        freq_res = self.mock_freq_res()
+        Iref = self.mock_residual_flux_current()
+        I0 = 10e-3
+        df = 2e6
 
-        freq_qubit = self.mock_freq_qubit()
+        mocked_values = []
+        for dac_value in dac_values:
+            h = 10e-3  # Lorentian baseline [V]
+            A = 9e-3   # Height of peak [V]
+            w = 0.5e6    # Full width half maximum of peak
+            f0 = freq_res - df*(np.sin(1/2*np.pi*(dac_value-Iref)/I0))**2
+            new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
+                                             ((freqs - f0))**2)
+            new_values += np.random.normal(0, 0.1e-3, np.size(new_values))
+
+            mocked_values = np.concatenate([mocked_values, new_values])
+
+        d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
+                              detector_control='soft', mock_values=mocked_values)
+
+        MC.set_sweep_function(s1)
+        MC.set_sweep_function_2D(s2)
+
+        MC.set_sweep_points(freqs)
+        MC.set_sweep_points_2D(dac_values)
+
+        MC.set_detector_function(d)
+        MC.run('Resonator_dac_scan'+self.msmt_suffix, mode='2D')
+
+        if analyze:
+            ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
 
     def measure_rabi(self, MC=None, amps=None,
                      analyze=True, close_fig=True, real_imag=True,
@@ -372,11 +429,11 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Resonators
         self.dag.add_node(self.name + ' Resonator Frequency',
-                          calibrate_function=cal_True_delayed)
+                          calibrate_function=self.name + '.find_resonator_frequency')
         self.dag.add_node(self.name + ' Resonator Power Scan',
-                          calibrate_function=cal_True_delayed)
+                          calibrate_function=self.name + '.find_resonator_power')
         self.dag.add_node(self.name + ' Resonator Sweetspot',
-                          calibrate_function=cal_True_delayed)
+                          calibrate_function=self.name + '.find_resonator_sweetspot')
 
         # Calibration of instruments and ro
         self.dag.add_node(self.name + ' Calibrations',
@@ -458,8 +515,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # Qubit Calibrations
         self.dag.add_edge(self.name + ' Frequency Coarse',
                           self.name + ' Resonator Frequency')
-        self.dag.add_edge(self.name + ' Frequency Coarse',
-                          self.name + ' Calibrations')
+        # self.dag.add_edge(self.name + ' Frequency Coarse',
+        #                   self.name + ' Calibrations')
 
         # Calibrations
         self.dag.add_edge(self.name + ' Calibrations',
