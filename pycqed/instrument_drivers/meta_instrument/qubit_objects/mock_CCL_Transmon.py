@@ -26,16 +26,31 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             - describe "hidden" parameters to mock real experiments.
         """
 
+        self.add_parameter('mock_Ec', label='charging energy', unit='Hz',
+                           parameter_class=ManualParameter, initial_value=266.3e6)
+
+        self.add_parameter('mock_Ej', label='josephson energy', unit='Hz',
+                           parameter_class=ManualParameter, initial_value=17.76e9)
+
         self.add_parameter('mock_freq_qubit', label='qubit frequency', unit='Hz',
                            docstring='A fixed value, can be made fancier by making it depend on Flux through E_c, E_j and flux',
-                           parameter_class=ManualParameter, initial_value=4.83498762145e9)
+                           parameter_class=ManualParameter,
+                           initial_value=np.sqrt(8*self.mock_Ec()*self.mock_Ej())-self.mock_Ec())
 
         self.add_parameter('mock_freq_res', label='resonator frequency', unit='Hz',
                            parameter_class=ManualParameter, initial_value=7.487628e9)
 
-        self.add_parameter('mock_ro_pulse_amp', label='Readout pulse amplitude',
+        self.add_parameter('mock_ro_pulse_amp_CW', label='Readout pulse amplitude',
                            unit='Hz', parameter_class=ManualParameter,
                            initial_value=0.048739)
+
+        self.add_parameter('mock_res_power_shift', label='resonator power shift',
+                           unit='Hz', parameter_class=ManualParameter,
+                           initial_value=1.3e6)
+
+        self.add_parameter('mock_residual_flux_current', label='magnitude of sweetspot current',
+                           unit='A', parameter_class=ManualParameter,
+                           initial_value=0.5e-3)
 
         self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude', unit='V',
                            initial_value=0.5, parameter_class=ManualParameter)
@@ -73,20 +88,102 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_points(freqs)
 
         MC.set_detector_function(d)
-        MC.run('mock_spectroscopy_')
+        MC.run('mock_spectroscopy_'+self.msmt_suffix)
 
-        # a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-        # return a.fit_params['f0']
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+        return a.fit_params['f0']
 
+    def measure_resonator_power(self, freqs, powers, MC=None,
+                                analyze: bool = True, close_fig: bool = True,
+                                fluxChan=None):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        s1 = swf.None_Sweep(name='Heterodyne Frequency', parameter_name='Frequency',
+                            unit='Hz')
+        s2 = swf.None_Sweep(name='Readout Power', parameter_name='Power',
+                            unit='dBm')
+
+        res_power = 20*np.log10(self.mock_ro_pulse_amp_CW())
+        pow_shift = 20
+        mocked_values = []
+        h = 10e-3
+        for power in powers:
+            if power <= res_power:
+                # Good signal
+                pulse_amp = 10**(-power/20)
+                A = 9e-3
+                w = 0.5e6
+                f0 = self.mock_freq_res()
+                new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
+                                                 ((freqs - f0))**2)
+            elif (power > res_power) and (power < res_power + pow_shift):
+                # no signal at all -> width increases, peak decreases
+                pulse_amp = 10**(-power/20)
+
+                # A = 9e-3-8.99e-3*1/2*(1+np.sin(np.pi*(power - res_power)/pow_shift))
+                A0 = 9e-3
+                n = 6
+                b = A0/10
+                a = (A0-b)/(-1/2*pow_shift)**n
+                A = a*(power - (res_power+1/2*pow_shift))**n + b
+
+                w = 0.5e6
+                w = 0.5e6 + 0.5e6*np.sin(np.pi*(power - res_power)/pow_shift)
+
+                b = res_power + self.mock_freq_res()*(pow_shift/self.mock_res_power_shift())
+                f0 = (b - power)/pow_shift*self.mock_res_power_shift()
+
+                new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
+                                                 ((freqs - f0))**2)
+
+                for i, value in enumerate(new_values):
+                    d = np.abs(value - A0)
+
+                    value += np.random.normal(0, d/5, 1)
+                    new_values[i] = value
+                # new_values += np.random.normal(0, 1e-3, np.size(new_values))
+            else:
+                # High power regime
+                A = 9e-3
+                w = 0.5e6
+                f0 = self.mock_freq_res() - self.mock_res_power_shift()
+                new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
+                                                 ((freqs - f0))**2)
+            mocked_values = np.concatenate([mocked_values, new_values])
+
+        mocked_values += np.random.normal(0, 1e-4, np.size(mocked_values))
+        d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
+                              detector_control='soft', mock_values=mocked_values)
+
+        MC.set_sweep_function(s1)
+        MC.set_sweep_function_2D(s2)
+
+        MC.set_sweep_points(freqs)
+        MC.set_sweep_points_2D(powers)
+
+        MC.set_detector_function(d)
+        MC.run('Resonator_power_scan'+self.msmt_suffix, mode='2D')
+ 
+        if analyze:
+            ma.TwoD_Analysis(label='Resonator_power_scan',
+                             close_fig=close_fig, normalize=True)
     def measure_heterodyne_spectroscopy(self, freqs, MC=None, analyze=True, close_fig=True):
         '''
         For finding resonator frequencies. Uses a lorentzian fit for now, might
         be extended in the future
+
+        Dependent on readout power
         '''
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         s = swf.None_Sweep()
+
+        if self.ro_pulse_amp_CW() > self.mock_ro_pulse_amp_CW():
+            # High power regime, shift by some value
+            shift = self.mock_res_power_shift()
+            self.mock_freq_res(self.mock_freq_res()-shift)
 
         h = 10e-3  # Lorentian baseline [V]
         A = 9e-3   # Height of peak [V]
@@ -101,7 +198,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_function(s)
         MC.set_sweep_points(freqs)
         MC.set_detector_function(d)
-        MC.run('mock_Resonator_scan')
+        MC.run('Resonator_scan'+self.msmt_suffix)
 
     # def measure_resonator_power(self, freqs, powers, MC=None,
     #                             analyze: bool = True, close_fig: bool = True):
@@ -114,6 +211,13 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
     #     MC.set_sweep_function(s)
     #     MC.set_sweep_points(freqs)
+
+    def measure_qubit_frequency_dac_scan(self, freqs, dac_values, pulsed=True,
+                                         MC=None, analyze=True, fluxChan=None, close_fig=True, nested_resonator_calibration=False,
+                                         resonator_freqs=None):
+        s = swf.None_Sweep()
+
+        freq_qubit = self.mock_freq_qubit()
 
     def measure_rabi(self, MC=None, amps=None,
                      analyze=True, close_fig=True, real_imag=True,
@@ -208,6 +312,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
     def measure_T1(self, times=None, MC=None, analyze=True, close_fig=True,
                    update=True, prepare_for_timedomain=True):
+        '''
+        Very simple version that just returns a exponential decay based on mock_T1.
+        Might be improved by making it depend on how close your pulse amp is.
+        '''
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -350,8 +458,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # Qubit Calibrations
         self.dag.add_edge(self.name + ' Frequency Coarse',
                           self.name + ' Resonator Frequency')
-        # self.dag.add_edge(self.name + ' Frequency Coarse',
-        # self.name + ' Calibrations')
+        self.dag.add_edge(self.name + ' Frequency Coarse',
+                          self.name + ' Calibrations')
 
         # Calibrations
         self.dag.add_edge(self.name + ' Calibrations',
