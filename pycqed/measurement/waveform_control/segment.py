@@ -23,7 +23,11 @@ class Segment:
         self.elements = odict()
         self.element_start_end = {}
         self.elements_on_awg = {}
-        self.trigger_pars = {'pulse_length': 50e-9, 'amplitude': 0.5, 'buffer_length_start': 25e-9}
+        self.trigger_pars = {'pulse_length': 50e-9, 
+                             'amplitude': 0.5, 
+                             'buffer_length_start': 25e-9}
+        self.trigger_pars['length'] = self.trigger_pars['pulse_length'] + \
+                                      self.trigger_pars['buffer_length_start']
         self._pulse_names = set()
         self.acquisition_elements = set()
 
@@ -43,7 +47,13 @@ class Segment:
         self._pulse_names.add(pars_copy['name'])
 
         # Makes sure that element name is unique within sequence of segments
-        if pars_copy.get('element_name', None) == None:
+        # and that RO pulses have their own elements
+        if pars_copy.get('operation_type', None) == 'RO':
+            i = len(self.acquisition_elements) + 1
+            pars_copy['element_name'] = 'RO_element_{}_{}'.format(i,self.name)
+            # add element to set of acquisition elements
+            self.acquisition_elements.add(pars_copy['element_name'])
+        elif pars_copy.get('element_name', None) == None:
             pars_copy['element_name'] = 'default_{}'.format(self.name)
         else:
             pars_copy['element_name'] += '_' + self.name
@@ -53,13 +63,13 @@ class Segment:
         if new_pulse.ref_pulse == 'previous_pulse':
             if self.previous_pulse != None:
                 new_pulse.ref_pulse = self.previous_pulse.pulse_obj.name
+            # if the frist pulse added to the segment has no ref_pulse
+            # it is reference to segment_start by default
+            elif self.previous_pulse == None and \
+                 len(self.unresolved_pulses) == 0:
+                new_pulse.ref_pulse = 'segment_start'
             else:
                 raise ValueError('No previous pulse has been added!')
-
-        # check whether pulse is acquistion. If so, add the element to
-        # self.acquisition_elements
-        if new_pulse.RO:
-            self.acquisition_elements.add(new_pulse.pulse_obj.element_name)
 
         self.unresolved_pulses.append(new_pulse)
 
@@ -503,8 +513,7 @@ class Segment:
 
     def test_overlap(self):
         """
-        Tests for all AWGs if any of their elements overlap. sort=True 
-        indicates that element dictionary will be time sorted prior to testing.
+        Tests for all AWGs if any of their elements overlap.
         """
 
         for awg in self.elements_on_awg:
@@ -518,8 +527,21 @@ class Segment:
 
             for i in range(len(el_list) - 1):
                 prev_el = el_list[i][2]
+                el_prev_start = self.get_element_start(prev_el, awg)
                 el_prev_end = self.get_element_end(prev_el, awg)
+                el_length = el_prev_end - el_prev_start
+
+                # If element length is shorter than min length, 0s will be 
+                # appended by pulsar. Test for elements with at least
+                # min_el_len if they overlap.
+                min_el_len = self.pulsar.get('{}_min_length'.format(awg))
+                if el_length < min_el_len:
+                    el_prev_end = el_prev_start + min_el_len
+                
                 el_new_start = el_list[i + 1][0]
+                
+
+
                 if el_prev_end > el_new_start:
                     raise ValueError('{} and {} overlap on {}'.format(
                         prev_el, el_list[i + 1][2], awg))
@@ -761,8 +783,11 @@ class Segment:
                     for channel in pulse_channels:
                         chan_tvals[channel] = tvals[channel].copy(
                         )[pulse_start:pulse_end]
-
-                    pulse_wfs = pulse.get_wfs(chan_tvals)
+                    
+                    if pulse.element_name in self.acquisition_elements:
+                        pulse_wfs = pulse.get_wfs(chan_tvals, RO=True)
+                    else:
+                        pulse_wfs = pulse.get_wfs(chan_tvals)
 
                     for channel in pulse_channels:
                         wfs[pulse.codeword][channel][
@@ -891,13 +916,13 @@ class Segment:
 class UnresolvedPulse:
     """
     pulse_pars: dictionary containing pulse parameters
-    reference_pulse: 'segment_start', 'previous_pulse', pulse.name
+    ref_pulse: 'segment_start', 'previous_pulse', pulse.name
     ref_point: 'start', 'end', 'middle', reference point of the reference pulse
     ref_point_new: 'start', 'end', 'middle', reference point of the new pulse
     """
 
     def __init__(self, pulse_pars):
-        self.ref_pulse = pulse_pars.get('reference_pulse', 'previous_pulse')
+        self.ref_pulse = pulse_pars.get('ref_pulse', 'previous_pulse')
 
         if pulse_pars.get('ref_point', 'end') == 'end':
             self.ref_point = 1
@@ -915,8 +940,8 @@ class UnresolvedPulse:
 
         self.delay = pulse_pars['pulse_delay']
         self.original_phase = pulse_pars.get('phase', 0)
-        self.RO = pulse_pars.get('RO', False)
         self.basis = pulse_pars.get('basis', None)
+        self.operation_type = pulse_pars.get('operation_type', None)
         self.basis_rotation = pulse_pars.pop('basis_rotation', {})
 
         try:

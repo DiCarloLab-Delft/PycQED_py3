@@ -322,13 +322,6 @@ def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1,
         upload:          whether to upload sequence to instrument or not
     '''
 
-    RO_pars["channel"] = "UHFQC_ch1"
-    RO_pars["buffer_length_start"] = 0
-    RO_pars["buffer_length_end"] = 200e-9
-    RO_pars["pulse_length"] = 200e-9
-    RO_pars["frequency"] = RO_pars['mod_frequency']
-    RO_pars["element_name"] = "RO_element"
-
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name, station.pulsar)
     seg_list = []
@@ -353,27 +346,40 @@ def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1,
             # # copy first element and set extra wait
             # pulse_list[0] = deepcopy(pulse_list[0])
             # pulse_list[0]['pulse_delay'] += post_msmt_delay
+        
+        
 
         if active_reset:
+            # make sure drive pulses ar put into distinct elements
+            for pulse in pulse_list:
+                pulse['element_name'] = 'drive_element_{}'.format(i)
+                pulse['pulse_delay'] = 50e-9
+            
             ar_pars_list = [deepcopy(pulses_unmodified['I']),
+                            # deepcopy(pulses_unmodified['I'])]
                             deepcopy(pulses_unmodified['X180'])]
+
+            ar_pars_list[0]['pulse_delay'] = 69*(16/1.2e9)
+            # want both I and X180 to happen at the same time
+            ar_pars_list[1]['ref_point'] = 'start'
+            ar_pars_list[1]['pulse_delay'] = 0
             
             for j in range(2):
                 # map I to 0 and X180 to 1
                 ar_pars_list[j]['codeword'] = j
-                ar_pars_list[j]['element_name'] = 'reset_element'
+                ar_pars_list[j]['element_name'] = 'reset_element_{}'.format(i)
                 # set dealy for reset pulses
-                ar_pars_list[j]['pulse_delay'] = 0
             pulse_list_with_ar += deepcopy(pulse_list) + ar_pars_list
         else:
-            pulse_list[0]['reference_pulse'] = 'segment_start'
+            for pulse in pulse_list:
+                pulse['element_name'] = 'drive_element'
+
             seg = segment.Segment('segment_{}'.format(i),
                                   station.pulsar, pulse_list)
             seg_list.append(seg)
             seq.add(seg)
 
     if active_reset:
-        pulse_list_with_ar[0]['reference_pulse'] = 'segment_start'
         seg = segment.Segment('segment', station.pulsar, pulse_list_with_ar)
         seg_list.append(seg)
         seq.add(seg)
@@ -993,16 +999,11 @@ def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
     elif pulse_comb == 'OffOff':
         pulse_combinations = ['I', 'I']
 
-    spacer = {'pulse_type': 'SquarePulse',
-              'channel': RO_pars['acq_marker_channel'],
-              'amplitude': 0.0,
-              'length': max(0, 300e-9 - pulse_pars['pulse_delay'] -
-                            pulse_pars['nr_sigma']*pulse_pars['sigma']),
-              'pulse_delay': 0}
-
     for i, pulse_comb in enumerate(pulse_combinations):
         if preselection:
-            pulse_list = [RO_pars, spacer, pulses[pulse_comb], RO_pars]
+            pulse = deepcopy(pulses[pulse_comb])
+            pulse['pulse_delay'] = 300e-9
+            pulse_list = [RO_pars, pulse, RO_pars]
         else:
             pulse_list = [pulses[pulse_comb], RO_pars]
         seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulse_list)

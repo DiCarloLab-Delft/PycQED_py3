@@ -14,6 +14,7 @@ from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     get_pulse_dict_from_pars
 from pycqed.measurement.gate_set_tomography.gate_set_tomography import \
     create_experiment_list_pyGSTi_qudev as get_exp_list
+import pycqed.measurement.waveform_control.segment as segment
 
 station = None
 kernel_dir = 'kernels/'
@@ -963,30 +964,22 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
                    RO_spacing=200e-9):
     n = len(pulse_pars_list)
     seq_name = '{}_qubit_OffOn_sequence'.format(n)
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
 
     # Create a dict with the parameters for all the pulses
     pulse_dict = {'RO': RO_pars, 'RO presel': deepcopy(RO_pars)}
-    pulse_dict['RO presel']['refpoint'] = 'start'
+    pulse_dict['RO presel']['ref_point'] = 'start'
     pulse_dict['RO presel']['pulse_delay'] = -RO_spacing
     for i, pulse_pars in enumerate(pulse_pars_list):
         pars = pulse_pars.copy()
+        if i == 0 and parallel_pulses:
+            pars['ref_pulse'] = 'segment_start'
         if i != 0 and parallel_pulses:
-            pars['refpoint'] = 'simultaneous'
+            pars['ref_point'] = 'start'
         pulses = add_suffix_to_dict_keys(
             get_pulse_dict_from_pars(pars), ' {}'.format(i))
         pulse_dict.update(pulses)
-
-    # spacer to shift the reference point from the end of preselection RO
-    # to end of the second RO
-    spacerpulse = {'pulse_type': 'SquarePulse',
-                    'channel': RO_pars['acq_marker_channel'],
-                    'amplitude': 0.0,
-                    'length': RO_spacing,
-                    'refpoint': 'simultaneous',
-                    'pulse_delay': 0}
-    pulse_dict.update({'spacer': spacerpulse})
 
     # Create a list of required pulses
     pulse_combinations = []
@@ -997,7 +990,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
             pulse_comb[i] = pulse + ' {}'.format(i)
         pulse_comb[-1] = 'RO'
         if preselection:
-            pulse_comb = pulse_comb + ['RO presel', 'spacer']
+            pulse_comb = pulse_comb + ['RO presel']
         pulse_combinations.append(pulse_comb)
     print('reloaded')
     for i, pulse_comb in enumerate(pulse_combinations):
@@ -1005,13 +998,13 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         for j, p in enumerate(pulse_comb):
             pulses += [pulse_dict[p]]
 
-        el = multi_pulse_elt(i, station, pulses)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        seg = segment.Segment('segment_{}'.format(i), station.pulsar, pulses)
+        seg_list.append(seg)
+        seq.add(seg)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 

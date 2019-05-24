@@ -487,6 +487,27 @@ def get_multiplexed_readout_pulse_dictionary(qubits):
             'basis_rotation': basis_rotation,
             'target_qubit': ','.join([qb.name for qb in qubits])}
 
+def get_multiplexed_readout_pulse_dictionary_pulsar(qubits):
+    """Takes the readout pulse parameters from the first qubit in `qubits`"""
+    maxlen = 0
+    basis_rotation = {}
+    for qb in qubits:
+        if qb.RO_pulse_length() > maxlen:
+            maxlen = qb.RO_pulse_length()
+        for qbn, rot in qb.ro_pulse_basis_rotation().items():
+            basis_rotation[qbn] = basis_rotation.get(qbn, 0) + rot
+
+    return {'RO_pulse_marker_channel': qubits[0].RO_acq_marker_channel(),
+            'acq_marker_channel': qubits[0].RO_acq_marker_channel(),
+            'acq_marker_delay': qubits[0].RO_acq_marker_delay(),
+            'amplitude': 0.0,
+            'length': maxlen,
+            'operation_type': 'RO',
+            'phase': 0,
+            'pulse_delay': qubits[0].RO_pulse_delay(),
+            'pulse_type': 'Multiplexed_UHFQC_pulse',
+            'basis_rotation': basis_rotation,
+            'target_qubit': ','.join([qb.name for qb in qubits])}
 
 def get_operation_dict(qubits):
     operation_dict = {'RO mux':
@@ -678,8 +699,11 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
     exp_metadata = {'reset_cycle_time': reset_cycle_time,
                     'nr_resets': nr_resets,
                     'shots': shots}
+    # FIX MULTIPLEXED READOUT!!!!!
+    # operation_dict = {
+    #     'RO': get_multiplexed_readout_pulse_dictionary(qubits)}
     operation_dict = {
-        'RO': get_multiplexed_readout_pulse_dictionary(qubits)}
+        'RO': qubits[0].get_RO_pars()}
     qb_names = []
     for qb in qubits:
         qb_names.append(qb.name)

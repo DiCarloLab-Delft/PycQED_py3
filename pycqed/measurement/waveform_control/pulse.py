@@ -55,7 +55,7 @@ class Pulse:
     def __call__(self):
         return self
 
-    def get_wfs(self, tvals):
+    def get_wfs(self, tvals, **kw):
         """
         The time values in tvals can always be given as one array of time
         values, or as a separate array for each channel of the pulse.
@@ -65,10 +65,10 @@ class Pulse:
             if type(tvals) == dict:
                 if c not in tvals:
                     continue
-                wfs[c] = self.chan_wf(c, tvals[c])
+                wfs[c] = self.chan_wf(c, tvals[c],**kw)
             else:
                 if hasattr(self, 'chan_wf'):
-                    wfs[c] = self.chan_wf(c, tvals)
+                    wfs[c] = self.chan_wf(c, tvals, **kw)
                 elif hasattr(self, 'wf'):
                     wfs = self.wf(tvals)
                 else:
@@ -192,7 +192,7 @@ class CosPulse(Pulse):
                                         self.phase / 360.))
 
 def apply_modulation(I_env, Q_env, tvals, mod_frequency,
-                     phase=0, phi_skew=0, alpha=1):
+                     phase=0, phi_skew=0, alpha=1, RO=False):
     '''
     Applies single sideband modulation, requires timevals to make sure the
     phases are correct.
@@ -220,20 +220,23 @@ def apply_modulation(I_env, Q_env, tvals, mod_frequency,
     M*mod = [cos(x)-tan(phi-skew)sin(x)      sin(x)+tan(phi-skew)cos(x) ]
             [-sin(x)sec(phi-skew)/alpha  cos(x)sec(phi-skew)/alpha]
     '''
-
+    if RO:
+        tvals_wave = tvals - tvals[0]
+    else:
+        tvals_wave = tvals
     tan_phi_skew = np.tan(2 * np.pi * phi_skew / 360)
     sec_phi_alpha = 1 / (np.cos(2 * np.pi * phi_skew / 360) * alpha)
 
-    I_mod = (I_env * (np.cos(2 * np.pi * (mod_frequency * tvals +
+    I_mod = (I_env * (np.cos(2 * np.pi * (mod_frequency * tvals_wave +
                                           phase / 360)) - tan_phi_skew *
-                      np.sin(2 * np.pi * (mod_frequency * tvals +
+                      np.sin(2 * np.pi * (mod_frequency * tvals_wave +
                                           phase / 360))) +
-             Q_env * (np.sin(2 * np.pi * (mod_frequency * tvals +
+             Q_env * (np.sin(2 * np.pi * (mod_frequency * tvals_wave +
                                           phase / 360)) + tan_phi_skew *
-                      np.cos(2 * np.pi * (mod_frequency * tvals + phase / 360))))
+                      np.cos(2 * np.pi * (mod_frequency * tvals_wave + phase / 360))))
 
     Q_mod = (-1 * I_env * sec_phi_alpha * np.sin(2 * np.pi * (mod_frequency *
-                                                              tvals + phase / 360.)) +
+                                                              tvals_wave + phase / 360.)) +
              + Q_env * sec_phi_alpha * np.cos(2 * np.pi * (
-                 mod_frequency * tvals + phase / 360.)))
+                 mod_frequency * tvals_wave + phase / 360.)))
     return [I_mod, Q_mod]

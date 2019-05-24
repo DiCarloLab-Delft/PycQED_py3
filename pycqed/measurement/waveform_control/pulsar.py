@@ -522,6 +522,7 @@ class HDAWG8Pulsar:
         ch_has_waveforms = {'ch{}{}'.format(i+1,j): False for i in range(8) for j in ['','m']}
 
         for awg_nr in [0, 1, 2, 3]:
+            added_cw = set()
             ch1id = 'ch{}'.format(awg_nr * 2 + 1)
             ch1mid = 'ch{}m'.format(awg_nr * 2 + 1)
             ch2id = 'ch{}'.format(awg_nr * 2 + 2)
@@ -563,7 +564,11 @@ class HDAWG8Pulsar:
                             if cid not in wfs[(i, el)][cw]:
                                 continue
                             ch_has_waveforms[cid] = True
-                            wfname = str(el) + '_' + cid
+                            if cw != 'no_codeword':
+                                wfname = str(el) + '_cw' + str(cw) + '_' + cid
+                            else:
+                                wfname = str(el) + '_' + cid
+                            
                             cid_wf = wfs[(i, el)][cw][cid]
                             waveform_data[wfname] = np.array(cid_wf)
                             # for marker channels save the array as integers 1 and 0
@@ -579,12 +584,19 @@ class HDAWG8Pulsar:
                         if cw == 'no_codeword':
                             continue
                         codeword_el.add(el)
+                        
+                        # Change this if one can reuse waveforms
+                        if cw in added_cw:
+                            continue
+                        
+                        added_cw.add(cw)
+                        el_name = el + '_cw' + str(cw) 
                         chid = ch1id if ch1id in cw_wfs else None
                         chmid = ch1mid if ch1mid in cw_wfs else None
-                        (header,wfname1) = _hdawg_wave_name(el, obj._devname, header=header,chid=chid, chmid = chmid)
+                        (header,wfname1) = _hdawg_wave_name(el_name, obj._devname, header=header,chid=chid, chmid = chmid)
                         chid = ch2id if ch2id in cw_wfs else None
                         chmid = ch2mid if ch2mid in cw_wfs else None
-                        (header,wfname2) = _hdawg_wave_name(el, obj._devname, header=header, chid = chid, chmid = chmid)
+                        (header,wfname2) = _hdawg_wave_name(el_name, obj._devname, header=header, chid = chid, chmid = chmid)
                         command = {
                             (True, True): 'setWaveDIO({0}, {1}, {2});\n',
                             (True, False): 'setWaveDIO({0}, 1, {1});\n',
@@ -629,8 +641,6 @@ class HDAWG8Pulsar:
 
             # write waveforms to csv file
             for wfname, data in waveform_data.items():
-                log.warning(wfname)
-                log.warning(simplify_name(wfname))
                 obj._write_csv_waveform(simplify_name(wfname), data)
 
             log.info("Programming {} vawg{} sequence '{}'".format(
@@ -646,12 +656,15 @@ class HDAWG8Pulsar:
         # Turn on/off channels with/without waveforms and add AWG to set 
         # awgs_with_waveforms if there is one channel with waveforms
         one_channel_has_wfs = False
+        # turn off all channels
+        for ch in range(8):
+            obj.set('sigouts_{}_on'.format(ch), 0)
+        
+        # now turn on only the ones that have waveforms
         for ch in ch_has_waveforms:
             if ch_has_waveforms[ch]:
                 obj.set('sigouts_{}_on'.format(int(ch[2])-1), 1)
                 one_channel_has_wfs = True
-            else: 
-                obj.set('sigouts_{}_on'.format(int(ch[2])-1), 0)
 
         if one_channel_has_wfs:
             self.awgs_with_waveforms(obj.name)
@@ -963,6 +976,9 @@ class AWG5014Pulsar:
                 maxlen = -float('inf')
                 for wf in cid_wfs.values():
                     maxlen = max(maxlen, len(wf))
+                # min element length is 256 for AWG5014
+                if maxlen < 256:
+                    maxlen = 256
                 for grp in ['ch1','ch2','ch3', 'ch4']:
                     grp_wfs = {}
                     # arrange waveforms from input data and pad with zeros for
@@ -1244,7 +1260,7 @@ class AWG5014Pulsar:
         self.add_parameter('{}_element_start_granularity'.format(awg.name),
                            get_cmd=lambda: 4/(1.2e9))
         self.add_parameter('{}_min_length'.format(awg.name),
-                           get_cmd=lambda: 210e-9) # Can not be triggered faster
+                           get_cmd=lambda: 256/1.2e9) # Can not be triggered faster
                                                    # than 210 ns.
         self.add_parameter('{}_inter_element_deadtime'.format(awg.name),
                            get_cmd=lambda: 0)

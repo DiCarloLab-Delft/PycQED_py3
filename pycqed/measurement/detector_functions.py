@@ -1438,7 +1438,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
         self.UHFQC.awgs_0_userregs_0(
-            int(self.nr_averages))  # 0 for rl, 1 for iavg
+            int(self.nr_averages)) 
         self.nr_sweep_points = self.nr_samples
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='iavg')
 
@@ -1717,7 +1717,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                 self.prepare_function()
 
         self.UHFQC.awgs_0_userregs_0(
-            int(self.nr_averages*self.nr_sweep_points))
+            # int(self.nr_averages*self.nr_sweep_points))
+            int(self.nr_averages))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
         # The AWG program uses userregs/0 to define the number of iterations in
         # the loop
@@ -1861,7 +1862,7 @@ class UHFQC_SSRO_detector(Hard_Detector):
             self.nr_sweep_points = len(sweep_points)
 
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(int(self.nr_shots*self.nr_sweep_points))
+        self.UHFQC.awgs_0_userregs_0(int(self.nr_shots))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
         # The AWG program uses userregs/0 to define the number of iterations in
         # the loop

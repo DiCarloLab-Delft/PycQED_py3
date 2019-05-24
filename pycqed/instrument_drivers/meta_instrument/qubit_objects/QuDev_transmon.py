@@ -253,14 +253,14 @@ class QuDev_transmon(Qubit):
         self.add_operation('RO')
         self.add_pulse_parameter('RO', 'RO_pulse_type', 'pulse_type',
                                  vals=vals.Strings(),
-                                 initial_value='CosPulse')
+                                 initial_value='GaussFilteredCosIQPulse')
         self.add_pulse_parameter('RO', 'RO_I_channel', 'I_channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'RO_Q_channel', 'Q_channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'RO_amp', 'amplitude',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('RO', 'RO_pulse_length', 'length',
+        self.add_pulse_parameter('RO', 'RO_pulse_length', 'pulse_length',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('RO', 'RO_pulse_delay', 'pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
@@ -268,8 +268,8 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('RO', 'RO_pulse_phase', 'phase',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('RO', 'do_RO', 'RO',
-                                 initial_value=True, vals=vals.Bool())
+        self.add_pulse_parameter('RO', 'RO_gaussian_filter_sigma', 'gaussian_filter_sigma',
+                                 initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('RO', 'ro_pulse_basis_rotation',
                                  'basis_rotation', initial_value={},
                                  docstring='Dynamic phase acquired by other '
@@ -486,9 +486,9 @@ class QuDev_transmon(Qubit):
         self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
         self.readout_UC_LO.on()
 
-        self.UHFQC.set('sigouts_{}_offset'.format(self.RO_I_channel()), 
+        self.UHFQC.set('sigouts_{}_offset'.format(0), 
                        self.RO_I_offset())
-        self.UHFQC.set('sigouts_{}_offset'.format(self.RO_Q_channel()), 
+        self.UHFQC.set('sigouts_{}_offset'.format(1), 
                        self.RO_Q_offset())
 
         self.update_detector_functions()
@@ -1687,8 +1687,7 @@ class QuDev_transmon(Qubit):
         if freqs is None:
             freqs = self.f_qubit() + np.linspace(-50e6, 50e6, 201)
         if RO_separation is None:
-            RO_separation = np.abs(self.RO_acq_marker_delay())
-            RO_separation += 2 * self.RO_pulse_length()
+            RO_separation = 2 * self.RO_pulse_length()
             RO_separation += np.max(delays)
             RO_separation += 200e-9  # for slack
 
@@ -2850,7 +2849,7 @@ class QuDev_transmon(Qubit):
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         update=False, MC=None, close_fig=True, cal_points=True,
                         no_cal_points=None, upload=True, last_ge_pulse=True,
-                        analyze=True, **kw):
+                        analyze=True, active_reset=False, **kw):
 
         """
             Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
@@ -2978,6 +2977,7 @@ class QuDev_transmon(Qubit):
                               label=label,
                               cal_points=cal_points,
                               no_cal_points=no_cal_points,
+                              active_reset=active_reset,
                               upload=upload)
         else:
             print("cal points {}".format(no_cal_points))
