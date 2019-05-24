@@ -774,8 +774,6 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         """
         Create the histograms based on the raw data
         """
-
-
         ######################################################
         #  Separating data into shots for each level         #
         ######################################################
@@ -789,7 +787,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         # loop through levels
         for l, l_data in meas_val.items():
             if self.pre_selection:
-                intermediate_ro[l], data[l] = self._filter(l_data, l)
+                intermediate_ro[l], data[l] = self._filter(l_data)
                 print(intermediate_ro[l].shape,
                       data[l].shape)
             else:
@@ -798,9 +796,13 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
             # make 2D array in case only one channel (1D array)
             if len(data[l].shape) == 1:
                 data[l] = np.array([data[l]])
-        self.proc_data_dict['mu'] = deepcopy(mu)
+        self.proc_data_dict['analysis_params'] = OrderedDict()
+        self.proc_data_dict['analysis_params']['mu'] = deepcopy(mu)
         self.proc_data_dict['data'] = deepcopy(data)
         X = np.vstack([data[l].transpose() for l in self.levels])
+        assert np.ndim(X) == 2, "Data must be a two D array. " \
+                                "Received shape {}, ndim {}"\
+                                .format(X.shape, np.ndim(X))
         prep_states = np.hstack(
             [np.ones_like(data[l][0]) * i for i, l in enumerate(self.levels)])
         pred_states, clf_params = \
@@ -809,8 +811,9 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                                                         'ncc'),
                            **self.options_dict.get("classif_kw", dict()))
         fm = self.fidelity_matrix(prep_states, pred_states)
-        self.proc_data_dict['fidelity_mtx'] = fm
-        self.proc_data_dict['classifier_params'] = clf_params
+
+        self.proc_data_dict['analysis_params']['fidelity_mtx'] = fm
+        self.proc_data_dict['analysis_params']['classifier_params'] = clf_params
 
         if self.pre_selection:
             prep_states = []
@@ -818,31 +821,29 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
             #re do with classification first of preselection and masking
             pred_presel = dict()
             for i, l in enumerate(self.levels):
-                print(i)
                 data[l] = data[l].transpose()
                 pred_presel[l] = self.clf_.predict(intermediate_ro[l].transpose())
                 data_masked = data[l][pred_presel[l] == 0.]
                 X.append(data_masked)
                 prep_states.append(np.ones((data_masked.shape[0]))*i)
 
+
             pred_states = self.clf_.predict(np.vstack(X))
             prep_states = np.hstack(prep_states)
             print(prep_states.shape, pred_states.shape)
 
             fm = self.fidelity_matrix(prep_states, pred_states)
-            self.proc_data_dict['fidelity_mtx_masked'] = fm
+            self.proc_data_dict['analysis_params']['fidelity_mtx_masked'] = fm
 
-    def _filter(self, data, level):
+    def _filter(self, data):
         """
         Filters data of level and returns intermediate ro and data separately
         """
         nr_samples = self.options_dict.get('nr_samples', 2)
         sample_0 = self.options_dict.get('sample_0', 0)
         sample_1 = self.options_dict.get('sample_1', 1)
-        print("before", data.shape)
         intermediate_ro, data = data.transpose()[sample_0::nr_samples], \
                                 data.transpose()[sample_1::nr_samples]
-        print("after", data.shape)
         return intermediate_ro.transpose(), data.transpose()
 
     def _classify(self, X, prep_state, method, **kw):
@@ -861,15 +862,30 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
             "If using only one channel, please make array of shape (n, 1) " \
             "instead of (n,)"
         if method == 'ncc':
-            pred_states = []
-            for pt in X:
-                dist = []
-                for l in self.levels:
-                    dist.append(np.linalg.norm(pt - self.proc_data_dict['mu'][l]))
-                dist = np.asarray(dist)
-                pred_states.append(np.argmin(dist))
-            pred_states = np.array(pred_states)
-            self.clf_ = None
+            class NCC:
+                def __init__(self, cluster_centers):
+                    """
+                    cluster_centers is a dict of cluster centers
+                    (name as key, n dimensional array as value)
+
+                    """
+                    self.cluster_centers = cluster_centers
+                    print(cluster_centers)
+                def predict(self, X):
+                    pred_states = []
+                    for pt in X:
+                        dist = []
+                        for _, cluster_center in self.cluster_centers.items():
+                            dist.append(np.linalg.norm(pt - cluster_center))
+                        dist = np.asarray(dist)
+                        pred_states.append(np.argmin(dist))
+                    pred_states = np.array(pred_states)
+                    return pred_states
+                def predict_proba(self, X):
+                    raise NotImplementedError("Not implemented for NCC")
+            ncc = NCC(self.proc_data_dict['analysis_params']['mu'])
+            pred_states = ncc.predict(X)
+            self.clf_ = ncc
             return pred_states, dict()
         elif method == 'gmm':
             cov_type = kw.pop("covariance_type", "tied")
@@ -878,7 +894,8 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
             gm = GM(n_components=len(self.levels), covariance_type=cov_type,
                     random_state=0,
                     means_init=[mu for _, mu in
-                                self.proc_data_dict['mu'].items()])
+                                self.proc_data_dict['analysis_params']
+                                    ['mu'].items()])
             gm.fit(X)
             pred_states = np.argmax(gm.predict_proba(X), axis=1)
             params = dict()
@@ -902,7 +919,8 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                 raise ValueError("covariance type: {} is not supported"
                                  .format(cov_type))
             params['means_'] = gm.means_
-            params['covariances_'] = covs
+            params['covariances_'] = gm.covariances_ #covs
+            params['covariance_type'] = gm.covariance_type
             params['weights_'] = gm.weights_
             params['precisions_cholesky_'] = gm.precisions_cholesky_
             self.clf_ = gm
@@ -927,7 +945,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
     @staticmethod
     def plot_fidelity_matrix(fm, target_names,
                              title="Fidelity matrix", append_shots_info=True,
-                             cmap=None, normalize=True):
+                             cmap=None, normalize=True, show=False):
         fidelity_avg = np.trace(fm) / float(np.sum(fm))
         if append_shots_info:
             title += '\nTotal # shots:{}'.format(np.sum(fm))
@@ -960,8 +978,6 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
             ax.set_yticks(tick_marks)
             ax.set_yticklabels(target_names)
 
-
-
         thresh = fm.max() / 1.5 if normalize else fm.max() / 2
         for i, j in itertools.product(range(fm.shape[0]), range(fm.shape[1])):
             if normalize:
@@ -974,35 +990,39 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                          color="white" if fm[i, j] > thresh else "black")
         plt.tight_layout()
         ax.set_ylabel('Prepared State')
-        ax.set_xlabel('Predicted State\n$\mathcal{{F}}_{{avg}}$={:0.2f} %'.format(
-            fidelity_avg * 100))
-        plt.show()
+        ax.set_xlabel('Predicted State\n$\mathcal{{F}}_{{avg}}$={:0.2f} %'
+                      .format(fidelity_avg * 100))
+        if show:
+            plt.show()
         return fig
 
     def prepare_plots(self):
 
+        show = self.options_dict.get("show", False)
         if self.options_dict.get('raw_data_plot', True):
             fig, ax = plt.subplots(1)
             for l, l_data in self.proc_data_dict['data'].items():
                 plt.scatter(l_data[0], l_data[1], label=l, marker='.')
                 plt.xlabel("weighted integration GE")
                 plt.ylabel("weighted integration perp(GE)")
-            for _ , mu in self.proc_data_dict['mu'].items():
+            for _ , mu in self.proc_data_dict['analysis_params']['mu'].items():
                 plt.scatter(mu[0], mu[1], color='r', s=80)
             plt.legend()
-            plt.show()
+            if show:
+                plt.show()
             self.figs['IntegratedIQ_raw'] = fig
             title = self.raw_data_dict['timestamps'][0] + "\nFidelity Matrix"
-            fig = self.plot_fidelity_matrix(self.proc_data_dict['fidelity_mtx'],
-                                            self.levels,
-                                            title=title)
+            fig = self.plot_fidelity_matrix(
+                self.proc_data_dict['analysis_params']['fidelity_mtx'],
+                self.levels, title=title, show=show)
             self.figs['fidelity_matrix'] = fig
             if self.pre_selection:
                 title = self.raw_data_dict['timestamps'][0] + \
                         "\nFidelity Matrix Masked"
                 fig = self.plot_fidelity_matrix(
-                    self.proc_data_dict['fidelity_mtx_masked'],self.levels,
-                    title=title)
+                    self.proc_data_dict['analysis_params']['fidelity_mtx_masked'],
+                    self.levels,
+                    title=title, show=show)
                 self.figs['fidelity_matrix_masked'] = fig
 
 
