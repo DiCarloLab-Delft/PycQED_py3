@@ -26,7 +26,6 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
-
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         if cal_points and no_cal_points == 6 and  \
                 (i == (len(amps)-6) or i == (len(amps)-5)):
@@ -61,9 +60,10 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         #                                                        i == (len(times)-1)):
         #     el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         else:
-            pulses_2nd['X180']['amplitude'] = amp
+            pulses_2nd_temp = deepcopy(pulses_2nd)
+            pulses_2nd_temp['X180']['amplitude'] = amp
 
-            pulse_list = [pulses['X180']]+n*[pulses_2nd['X180']]
+            pulse_list = [pulses['X180']]+n*[pulses_2nd_temp['X180']]
 
             if last_ge_pulse:
                 pulse_list += [pulses['X180']]
@@ -283,7 +283,6 @@ def QScale_2nd_exc_seq(qscales, pulse_pars,  pulse_pars_2nd, RO_pars,
     '''
     seq_name = 'QScale_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_combinations=[['X90','X180'],['X90','Y180'],['X90','mY180']]
     pulses = get_pulse_dict_from_pars(pulse_pars)

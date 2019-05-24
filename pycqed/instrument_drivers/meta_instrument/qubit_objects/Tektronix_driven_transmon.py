@@ -790,20 +790,20 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         if MC is None:
             MC = self.MC.get_instr()
 
-        self.MC.get_instr().set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
-                                                             RO_pars=self.RO_pars,
-                                                             pulse_comb='OffOff',
-                                                             nr_samples=nr_samples))
+        self.MC.get_instr().set_sweep_function(awg_swf.SingleLevel(pulse_pars=self.pulse_pars,
+                                                                   RO_pars=self.RO_pars,
+                                                                   level='g',
+                                                                   nr_samples=nr_samples))
         self.MC.get_instr().set_sweep_points(np.arange(nr_samples))
         self.input_average_detector.nr_samples = nr_samples
         self.MC.get_instr().set_detector_function(self.input_average_detector)
         self.MC.get_instr().run(
             'Measure_transients_{}_0'.format(self.msmt_suffix))
         a0 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
-        self.MC.get_instr().set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
-                                                             RO_pars=self.RO_pars,
-                                                             pulse_comb='OnOn',
-                                                             nr_samples=nr_samples))
+        self.MC.get_instr().set_sweep_function(awg_swf.SingleLevel(pulse_pars=self.pulse_pars,
+                                                                   RO_pars=self.RO_pars,
+                                                                   level='e',
+                                                                   nr_samples=nr_samples))
         # self.MC.get_instr().set_sweep_points(np.arange(nr_samples))
         self.input_average_detector.nr_samples = nr_samples
         self.MC.get_instr().set_detector_function(self.input_average_detector)

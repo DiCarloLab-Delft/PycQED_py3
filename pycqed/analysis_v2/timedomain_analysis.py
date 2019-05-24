@@ -213,6 +213,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.single_timestamp = single_timestamp
         self.numeric_params = []
 
+
         if auto:
             self.run_analysis()
 
@@ -297,6 +298,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.num_cal_points = self.options_dict.get(
             'num_cal_points', self.metadata.get('num_cal_points', None))
         print(self.num_cal_points)
+
         if self.num_cal_points is None:
             print('Assuming two cal states, |g> and |e>, and using '
                   'sweep_points[-4:-2] as |g> cal points, and '
@@ -326,6 +328,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 indices = list(range(-self.num_cal_points, 0))
                 self.cal_point_indices = [indices[i:i + k] for i in
                                    range(0, len(indices), k)]
+            else:
+                self.cal_point_indices = [cal_zero_points, cal_one_points]
 
         if self.options_dict.get('TwoD', False):
             if 'sweep_points_2D_dict' in self.metadata:
@@ -539,12 +543,12 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             plot_name = 'raw_plot_' + qb_name
         # get xunit
             xunit = self.raw_data_dict['xunit'][0]
-            if hasattr(xunit, '__iter'):
+            if hasattr(xunit, '__iter__'):
                 xunit = xunit[0]
             for ax_id, ro_channel in enumerate(raw_data_dict):
                 if self.options_dict.get('TwoD', False):
                     yunit = self.raw_data_dict['yunit'][0]
-                    if hasattr(yunit, '__iter'):
+                    if hasattr(yunit, '__iter__'):
                         yunit = yunit[0]
                     self.plot_dicts[plot_name + '_' + ro_channel] = {
                         'fig_id': plot_name,
@@ -636,11 +640,11 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             title += '\n' + title_suffix
         # get xunit
         xunit = self.raw_data_dict['xunit'][0]
-        if hasattr(xunit, '__iter'):
+        if hasattr(xunit, '__iter__'):
             xunit = xunit[0]
         if self.options_dict.get('TwoD', False):
             yunit = self.raw_data_dict['yunit'][0]
-            if hasattr(yunit, '__iter'):
+            if hasattr(yunit, '__iter__'):
                 yunit = yunit[0]
 
             self.plot_dicts[plot_name] = {
@@ -3437,7 +3441,8 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                 guess_pars['tau'].vary = True
                 guess_pars['phase'].vary = True
                 guess_pars['n'].vary = False
-                guess_pars['oscillation_offset'].vary = False
+                guess_pars['oscillation_offset'].vary = \
+                    self.options_dict.get('for_ef', False)
                 # guess_pars['exponential_offset'].value = 0.5
                 guess_pars['exponential_offset'].vary = True
                 self.fit_dicts[key] = {
@@ -3469,9 +3474,14 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                     OrderedDict()
                 fit_res = self.fit_dicts[key]['fit_res']
 
-                old_qb_freq = a_tools.get_param_value_from_file(
-                    file_path=self.raw_data_dict['folder'][0],
-                    instr_name=qbn, param_name='f_qubit')
+                if self.options_dict.get('for_ef', False):
+                    old_qb_freq = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='f_ef_qubit')
+                else:
+                    old_qb_freq = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='f_qubit')
                 self.proc_data_dict['analysis_params_dict'][qbn][key][
                     'old_qb_freq'] = old_qb_freq
                 self.proc_data_dict['analysis_params_dict'][qbn][key][
@@ -3504,17 +3514,25 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                     if ref_state_plot_label+'_line' in self.plot_dicts:
                         self.plot_dicts[ref_state_plot_label+'_line'][
                             'fig_id'] = base_plot_name
+
                 exp_decay_fit_key = self.fit_keys[0] + qbn
                 old_qb_freq = ramsey_dict[qbn][
                     exp_decay_fit_key]['old_qb_freq']
                 textstr = ''
                 T2_star_str = ''
+
+                xunit = self.raw_data_dict['xunit'][0]
+                if hasattr(xunit, '__iter__'):
+                    xunit = xunit[0]
+
                 for i, key in enumerate([k + qbn for k in self.fit_keys]):
 
                     fit_res = self.fit_dicts[key]['fit_res']
                     self.plot_dicts['fit_' + key] = {
                         'fig_id': base_plot_name,
                         'plotfn': self.plot_fit,
+                        'xlabel': self.raw_data_dict['xlabel'][0],
+                        'xunit': xunit,
                         'fit_res': fit_res,
                         'setlabel': 'exp decay fit' if i == 0 else
                             'gauss decay fit',
@@ -3750,7 +3768,9 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
 
                     old_qscale_val = a_tools.get_param_value_from_file(
                         file_path=self.raw_data_dict['folder'][0],
-                        instr_name=qbn, param_name='motzoi')
+                        instr_name=qbn,
+                        param_name='motzoi{}'.format("_ef" if self.options_dict.get("for_ef", False)
+                                                     else ""))
                     textstr = 'Qscale = {:.4f} $\pm$ {:.4f}'.format(
                         self.proc_data_dict['analysis_params_dict'][qbn][
                             'qscale'],

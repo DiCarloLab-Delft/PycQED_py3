@@ -11,11 +11,15 @@ import itertools
 from copy import deepcopy
 
 import matplotlib.pyplot as plt
+import matplotlib.colors as mc
 import lmfit
 import logging
 import itertools
 from collections import OrderedDict
 import numpy as np
+from sklearn.mixture import GaussianMixture as GM
+from sklearn.metrics import confusion_matrix
+
 import pycqed.analysis.fitting_models as fit_mods
 from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, \
     gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
@@ -243,7 +247,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['F_assignment_raw'] = F_vs_th[opt_idx]
         self.proc_data_dict['threshold_raw'] = all_x[opt_idx]
 
-
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
 
@@ -282,7 +285,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'fit_yvals': {'data': cdf_ys},
             'guess_pars': cum_params,
         }
-
 
     def analyze_fit_results(self):
         # Create a CDF based on the fit functions of both fits.
@@ -726,6 +728,224 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                         'text_string': fit_text,
                     }
 
+class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
+    def __init__(self, t_start: str or list = None, t_stop: str = None,
+                 label: str or list = '', do_fitting: bool = True,
+                 data_file_path: str = None, levels = ('g', 'e', 'f'),
+                 options_dict: dict = None, auto=True, **kw):
+        '''
+        options dict options:
+            'nr_bins' : number of bins to use for the histograms
+            'post_select' :
+            'post_select_threshold' :
+            'nr_samples' : amount of different samples (e.g. ground and excited = 2)
+            'sample_0' : index of first sample (ground-state)
+            'sample_1' : index of second sample (first excited-state)
+            'max_datapoints' : maximum amount of datapoints for culumative fit
+            'log_hist' : use log scale for the y-axis of the 1D histograms
+            'verbose' : see BaseDataAnalysis
+            'presentation_mode' : see BaseDataAnalysis
+            'classif_method': how to classify the data.
+                options: 'ncc' : default. Nearest Cluster Center
+                options: 'gmm': gaussian mixture model.
+            'classif_kw': kw to pass to the classifier
+            see BaseDataAnalysis for more.
+        '''
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label, do_fitting=do_fitting,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         **kw)
+        self.params_dict = {
+            'measurementstring': 'measurementstring',
+            'measured_values': 'measured_values',
+            'value_names': 'value_names',
+            'value_units': 'value_units'}
+        self.numeric_params = []
+        self.levels = levels
+        # empty dict for analysis results
+        self.proc_data_dict = OrderedDict()
+        if auto:
+            self.run_analysis()
+
+
+    def process_data(self):
+        """
+        Create the histograms based on the raw data
+        """
+        post_select = self.options_dict.get('post_select', False)
+        post_select_threshold = \
+            self.options_dict.get('post_select_threshold', 0)
+        nr_samples = self.options_dict.get('nr_samples', 2)
+        sample_0 = self.options_dict.get('sample_0', 0)
+        sample_1 = self.options_dict.get('sample_1', 1)
+        nr_bins = self.options_dict.get('nr_bins', 100)
+
+        ######################################################
+        #  Separating data into shots for each level         #
+        ######################################################
+        # measured values is a list of arrays with measured
+        # values for each level in self.levels
+        meas_val = {l: self.raw_data_dict['measured_values'][i]
+                    for i,l in enumerate(self.levels)}
+        unit = self.raw_data_dict['value_units'][0]
+        intermediate_ro = dict()    # store intermediate ro (preselection)
+        data = dict()               # store final data
+        mu = dict()                 # store mean of measurements
+        # loop through levels
+        for l, l_data in meas_val.items():
+            if post_select:
+                raise NotImplementedError("Not yet implemented.")
+                intermediate_ro[l], data[l] = self._filter(l_data, l)
+            else:
+                data[l] = l_data
+            mu[l] = np.mean(data[l], axis=-1)
+            # make 2D array in case only one channel (1D array)
+            if len(data[l].shape) == 1:
+                data[l] = np.array([data[l]])
+        self.proc_data_dict['mu'] = deepcopy(mu)
+        self.proc_data_dict['data'] = deepcopy(data)
+        X = np.vstack([data[l].transpose() for l in self.levels])
+        prep_states = np.hstack(
+            [np.ones_like(data[l][0]) * i for i, l in enumerate(self.levels)])
+        pred_states, clf_params = \
+            self._classify(X, prep_states,
+                           method=self.options_dict.get('classif_method',
+                                                        'ncc'),
+                           **self.options_dict.get("classif_kw", dict()))
+        fm = self.fidelity_matrix(prep_states, pred_states)
+        self.proc_data_dict['fidelity_mtx'] = fm
+        self.proc_data_dict['classifier_params'] = clf_params
+
+
+    def _filter(self, data, level):
+        """
+        Filters data of level and returns intermediate ro and data separately
+        """
+
+    def _classify(self, X, prep_state, method, **kw):
+        """
+
+        Args:
+            X: measured data to classify
+            prep_state: prepared states (true values)
+            type: classification method
+
+        Returns:
+
+        """
+        assert len(X.shape) == 2, \
+            "Classification data should be a 2D array. " \
+            "If using only one channel, please make array of shape (n, 1) " \
+            "instead of (n,)"
+        if method == 'ncc':
+            pred_states = []
+            for pt in X:
+                dist = []
+                for l in self.levels:
+                    dist.append(np.linalg.norm(pt - self.proc_data_dict['mu'][l]))
+                dist = np.asarray(dist)
+                pred_states.append(np.argmin(dist))
+            pred_states = np.array(pred_states)
+            return pred_states, dict()
+        elif method == 'gmm':
+            # FIXME Nathan: here since completely unsupervised should add a function
+            #  that guesses which level is which label assuming good readout (>50%)
+            cov_type = kw.pop("covariance_type", "tied")
+            # full allows full covariance matrix for each level. Other options
+            # see GM documentation
+            gm = GM(n_components=len(self.levels), covariance_type=cov_type,
+                    random_state=0, means_init=[mu for _, mu in self.proc_data_dict[
+                    'mu'].items()])
+            gm.fit(X)
+            pred_states = np.argmax(gm.predict_proba(X), axis=1)
+            params = dict()
+            if cov_type == "tied":
+                # in case all components share the same cov mtx return a list
+                # of identical cov matrices
+                covs = [gm.covariances_ for _ in range(gm.n_components)]
+            elif cov_type == "full":
+                # already of the right shape (n_comp, n_features, n_features)
+                covs = gm.covariances_
+            elif cov_type == "spherical":
+                # return list of sigma_i^2 * I instead of list of sigma_i^2
+                covs = [np.diag([gm.covariances_[i]
+                                 for _ in range(X.shape[1])])
+                        for i in range(gm.n_components)]
+            elif cov_type == "diag":
+                # make covariance matrices from diagonals
+                covs = [np.diag(gm.covariances_[i])
+                            for i in range(gm.n_components)]
+            else:
+                raise ValueError("covariance type: {} is not supported"
+                                 .format(cov_type))
+            params['means'] = gm.means_
+            params['covariances'] = covs
+            params['weights'] = gm.weights_
+            return pred_states, params
+        else:
+            # TODO Nathan: implement other classif method if needed
+            #  could also just write an instance for general callable classifier
+            #  which implements the scikit learn fit/predict API
+            raise NotImplementedError("Other classification methods:"
+                                      " svc_rbf, svc_linear "
+                                      "remain to be implemented.")
+
+    @staticmethod
+    def fidelity_matrix(prep_states, pred_states,
+                        levels=('g', 'e', 'f'), plot=True):
+        fm = confusion_matrix(prep_states, pred_states)
+        if plot:
+            Singleshot_Readout_Analysis_Qutrit.plot_fidelity_matrix(fm,
+                                                                    levels)
+
+    @staticmethod
+    def plot_fidelity_matrix(fm, target_names, title='Fidelity matrix',
+                             cmap=None, normalize=True):
+        fidelity_avg = np.trace(fm) / float(np.sum(fm))
+        if cmap is None:
+            cmap = plt.get_cmap('Reds')
+        plt.figure(figsize=(8, 6))
+        plt.imshow(fm, interpolation='nearest', cmap=cmap, norm=mc.LogNorm())
+        plt.title(title)
+        plt.colorbar()
+
+        if target_names is not None:
+            tick_marks = np.arange(len(target_names))
+            plt.xticks(tick_marks, target_names, rotation=45)
+            plt.yticks(tick_marks, target_names)
+
+        if normalize:
+            fm = fm.astype('float') / fm.sum(axis=1)[:, np.newaxis]
+
+        thresh = fm.max() / 1.5 if normalize else fm.max() / 2
+        for i, j in itertools.product(range(fm.shape[0]), range(fm.shape[1])):
+            if normalize:
+                plt.text(j, i, "{:0.4f}".format(fm[i, j]),
+                         horizontalalignment="center",
+                         color="white" if fm[i, j] > thresh else "black")
+            else:
+                plt.text(j, i, "{:,}".format(fm[i, j]),
+                         horizontalalignment="center",
+                         color="white" if fm[i, j] > thresh else "black")
+        plt.tight_layout()
+        plt.ylabel('Prepared State')
+        plt.xlabel('Predicted State\n$\mathcal{{F}}_{{avg}}$={:0.2f} %'.format(
+            fidelity_avg * 100))
+        plt.show()
+
+    def prepare_plots(self):
+        if self.options_dict.get('raw_data_plot', True):
+            fig, ax = plt.subplots(1, figsize=(8, 8))
+            for l, l_data in self.proc_data_dict['data'].items():
+                plt.scatter(l_data[0], l_data[1], label=l, marker='.')
+                plt.xlabel("weighted integration GE")
+                plt.ylabel("weighted integration perp(GE)")
+            for _ , mu in self.proc_data_dict['mu'].items():
+                plt.scatter(mu[0], mu[1], color='r', s=80)
+            plt.legend()
+            plt.show()
+
 class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
     """
     Extracts table of counts from multiplexed single shot readout experiment.
@@ -1094,6 +1314,7 @@ def get_shots_zero_one(data, post_select: bool=False,
         shots_0, shots_1 = a_tools.zigzag(
             data, sample_0, sample_1, nr_samples)
     else:
+        # FIXME nathan 2019.05.17: This is useless?
         presel_0, presel_1 = a_tools.zigzag(
             data, sample_0, sample_1, nr_samples)
 

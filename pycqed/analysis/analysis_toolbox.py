@@ -26,6 +26,7 @@ from pycqed.analysis import composite_analysis as RA
 from pycqed.measurement import hdf5_data
 
 from matplotlib.colors import LogNorm
+from scipy.stats import multivariate_normal
 
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
@@ -141,6 +142,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
 
     measdirs = []
     i = len(daydirs)-1
+
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
         # this makes sure that (most) non day dirs do not get searched
@@ -788,6 +790,8 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                             label=None, exact_label_match=False, folder=None):
     if folder is None:
         folder = datadir
+    if not isinstance(label, list):
+        label = [label]
 
     datetime_start = datetime_from_timestamp(timestamp_start)
 
@@ -1721,6 +1725,33 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
     return normalized_data
 
+
+
+def predict_gm_proba(X, means, covariances, levels, weights=None):
+    """
+    Predict gaussian mixture posterior probabilities for different levels of a qudit.
+    Args:
+        X: Data (n, n_features)
+        means: array of means of each component of the GM
+        covariances: covariance matrices of each component of the GM (list of)
+        levels: levels of the qudit (essentially equal to range(n_components))
+        weights: array of priors of being in each level.
+            Defaults to uniform prior ( n_components,)
+
+    Returns: (n, n_components) array of posterior probability of being in each level
+
+    """
+    if weights is None:
+        weights = np.ones((len(levels)))*1./len(levels)
+    gaussian = dict()
+    for i, l in enumerate(levels):
+        gaussian[l] = multivariate_normal(mean=means[i], cov=covariances[i])
+    proba = np.zeros((X.shape[0], len(levels)))
+    for i, l in enumerate(levels):
+        proba[:,i] = gaussian[l].pdf(X)*weights[i] / \
+                     np.sum([gaussian[l].pdf(X)*weights[i]
+                             for i, l in enumerate(levels)], axis=0)
+    return proba
 
 def datetime_from_timestamp(timestamp):
     try:

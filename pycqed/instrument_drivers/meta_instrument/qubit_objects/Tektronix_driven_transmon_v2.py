@@ -580,17 +580,17 @@ class Tektronix_driven_transmon_v2(Transmon):
         if MC is None:
             MC = self.MC
 
-        self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
-                                                 RO_pars=self.RO_pars,
-                                                 pulse_comb='OffOff',
-                                                 nr_samples=nr_samples))
+        self.MC.set_sweep_function(awg_swf.SingleLevel(pulse_pars=self.pulse_pars,
+                                                       RO_pars=self.RO_pars,
+                                                       level='g',
+                                                       nr_samples=nr_samples))
         self.MC.set_detector_function(self.input_average_detector)
         self.MC.run('Measure_transients_{}_0'.format(self.msmt_suffix))
         a0 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
-        self.MC.set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
-                                                 RO_pars=self.RO_pars,
-                                                 pulse_comb='OnOn',
-                                                 nr_samples=nr_samples))
+        self.MC.set_sweep_function(awg_swf.SingleLevel(pulse_pars=self.pulse_pars,
+                                                       RO_pars=self.RO_pars,
+                                                       level='e',
+                                                       nr_samples=nr_samples))
         self.MC.set_detector_function(self.input_average_detector)
         self.MC.run('Measure_transients_{}_1'.format(self.msmt_suffix))
         a1 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
