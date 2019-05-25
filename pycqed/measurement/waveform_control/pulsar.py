@@ -197,10 +197,12 @@ class UHFQCPulsar:
                     wfname = str(el) + '_' + cid
                     cid_wf = channel_wfs[cid]
                     waveform_data[wfname] = cid_wf
-                    if len(cid_wf) > 0 and cid_wf[0] != 0.:
-                        log.warning(
-                            'Pulsar: Trigger wait set for element {} with a non-zero first '
-                            'point'.format(el))
+                    # No problems ocurred with ZI
+                    # if len(cid_wf) > 0 and cid_wf[0] != 0.:
+                    #     log.warning(
+                    #         'Pulsar: Trigger wait set for element {}' 
+                    #         'with a non-zero first '
+                    #         'point'.format(el))
                             
         if not (ch_has_waveforms['ch1'] or ch_has_waveforms['ch2']):
             ### Turn off all channels and return ###
@@ -571,13 +573,17 @@ class HDAWG8Pulsar:
                             
                             cid_wf = wfs[(i, el)][cw][cid]
                             waveform_data[wfname] = np.array(cid_wf)
-                            # for marker channels save the array as integers 1 and 0
+                            # for marker channels save the array as 
+                            # integers 1 and 0
                             if cid == ch1mid or cid == ch2mid: 
-                                waveform_data[wfname] = (waveform_data[wfname]+0.5).astype(int)
-                            if len(cid_wf) > 0 and cid_wf[0] != 0.:
-                                log.warning(
-                                    'Pulsar: Trigger wait set for element {} with a non-zero first '
-                                    'point'.format(el))
+                                waveform_data[wfname] = \
+                                    (waveform_data[wfname]+0.5).astype(int)
+                            # No problems occured with ZI
+                            # if len(cid_wf) > 0 and cid_wf[0] != 0.:
+                            #     log.warning(
+                            #         'Pulsar: Trigger wait set for element '
+                            #         '{} with a non-zero first '
+                            #         'point'.format(el))
                              
 
                         # generate codeword table
@@ -628,11 +634,15 @@ class HDAWG8Pulsar:
                 # passed to _hdawg_element_seqc()
                 chid = ch1id if name_ch1 in waveform_data else None
                 chmid = ch1mid if name_ch1m in waveform_data else None
-                (header,name_ch1) = _hdawg_wave_name(el, obj._devname, header=header,chid=chid, chmid = chmid)
+                (header,name_ch1) = _hdawg_wave_name(el, obj._devname, 
+                                                     header=header,chid=chid, 
+                                                     chmid = chmid)
                                     
                 chid = ch2id if name_ch2 in waveform_data else None
                 chmid = ch2mid if name_ch2m in waveform_data else None
-                (header,name_ch2) = _hdawg_wave_name(el, obj._devname, header=header,chid=chid, chmid = chmid)
+                (header,name_ch2) = _hdawg_wave_name(el, obj._devname, 
+                                                     header=header,chid=chid, 
+                                                     chmid = chmid)
 
                 if name_ch1 is not None or name_ch2 is not None:
                     main_loop += self._hdawg_element_seqc(name_ch1, name_ch2)
@@ -646,8 +656,9 @@ class HDAWG8Pulsar:
             log.info("Programming {} vawg{} sequence '{}'".format(
                 obj.name, awg_nr, sequence.name))
 
-            # here we want to use a timeout value longer than the obj.timeout()
-            # as programming the AWGs takes more time than normal communications
+            # here we want to use a timeout value longer than the 
+            # obj.timeout() as programming the AWGs takes more time 
+            # than normal communications
             obj.configure_awg_from_string(awg_nr, awg_str, timeout=600)
 
             obj.set('awgs_{}_dio_valid_polarity'.format(awg_nr),
