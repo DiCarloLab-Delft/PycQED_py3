@@ -37,9 +37,10 @@ class Pulse:
     See the examples for more information.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, element_name):
         self.length = None
         self.name = name
+        self.element_name = element_name
         self.channels = []
         self.start_offset = 0
         # the time within (or outside) the pulse that is the 'logical' start
@@ -54,7 +55,7 @@ class Pulse:
     def __call__(self):
         return self
 
-    def get_wfs(self, tvals):
+    def get_wfs(self, tvals, **kw):
         """
         The time values in tvals can always be given as one array of time
         values, or as a separate array for each channel of the pulse.
@@ -62,24 +63,52 @@ class Pulse:
         wfs = {}
         for c in self.channels:
             if type(tvals) == dict:
-                wfs[c] = self.chan_wf(c, tvals[c])
+                if c not in tvals:
+                    continue
+                wfs[c] = self.chan_wf(c, tvals[c],**kw)
             else:
                 if hasattr(self, 'chan_wf'):
-                    wfs[c] = self.chan_wf(c, tvals)
+                    wfs[c] = self.chan_wf(c, tvals, **kw)
                 elif hasattr(self, 'wf'):
                     wfs = self.wf(tvals)
                 else:
                     raise Exception('Could not find a waveform-generator function!')
 
         return wfs
+    
+    def pulse_area(self, c, tvals):
+        """
+        Returns the area of a pulse on the channel c in the time interval 
+        tvals.
+        """
+        if isinstance(tvals, dict):
+            wfs = self.chan_wf(c, tvals[c])
+            dt = tvals[c][1] - tvals[c][0]
+        else:
+            if hasattr(self, 'chan_wf'):
+                wfs = self.chan_wf(c, tvals)
+            elif hasattr(self, 'wf'):
+                wfs = self.wf(tvals)
+            else:
+                raise Exception('Could not find a waveform-generator function!')
+            dt = tvals[1] - tvals[0]
+        
+        return sum(wfs)*dt
 
-    def t0(self):
+    def algorithm_time(self, val=None):
         """
-        returns start time of the pulse. This is typically
-        set by the sequence element at the time the pulse is added to the
-        element.
+        Getter/Setter for the start time of the pulse.
         """
-        return self._t0
+        if val is None:
+            return self._t0
+        else:
+            self._t0 = val
+
+    def element_time(self, element_start_time):
+        """
+        Returns the pulse time in the element frame.
+        """
+        return self.algorithm_time() - element_start_time
 
     def effective_start(self):
         return self._t0 + self.start_offset
@@ -96,12 +125,20 @@ class Pulse:
     def effective_length(self):
         return self.length - self.start_offset - self.stop_offset
 
+# Z virtual pulse
+class Z_Pulse(Pulse):
+
+    def __init__(self, element_name, name='Z pulse', **kw):
+        super().__init__(name, element_name)
+        self.length = 0
+        self.codeword = kw.pop('codeword', 'no_codeword')
+
 
 # Some simple pulse definitions.
 class SquarePulse(Pulse):
 
-    def __init__(self, channel=None, channels=None, name='square pulse', **kw):
-        Pulse.__init__(self, name)
+    def __init__(self, element_name, channel=None, channels=None, name='square pulse', **kw):
+        super().__init__(name, element_name)
         if channel is None and channels is None:
             raise ValueError('Must specify either channel or channels')
         elif channels is None:
@@ -112,6 +149,7 @@ class SquarePulse(Pulse):
             self.channels = channels
         self.amplitude = kw.pop('amplitude', 0)
         self.length = kw.pop('length', 0)
+        self.codeword = kw.pop('codeword', 'no_codeword')
 
     def __call__(self, **kw):
         self.amplitude = kw.pop('amplitude', self.amplitude)
@@ -123,12 +161,13 @@ class SquarePulse(Pulse):
 
     def chan_wf(self, chan, tvals):
         return np.ones(len(tvals)) * self.amplitude
+        
 
 
 class CosPulse(Pulse):
 
-    def __init__(self, channel, name='cos pulse', **kw):
-        Pulse.__init__(self, name)
+    def __init__(self, channel, element_name, name='cos pulse', **kw):
+        super().__init__(name, element_name)
 
         self.channel = channel  # this is just for convenience, internally
         self.channels.append(channel)
@@ -137,6 +176,7 @@ class CosPulse(Pulse):
         self.amplitude = kw.pop('amplitude', 0.)
         self.length = kw.pop('length', 0.)
         self.phase = kw.pop('phase', 0.)
+        self.codeword = kw.pop('codeword', 'no_codeword')
 
     def __call__(self, **kw):
         self.frequency = kw.pop('frequency', self.frequency)
@@ -151,186 +191,8 @@ class CosPulse(Pulse):
                                        (self.frequency * tvals +
                                         self.phase / 360.))
 
-class CosPulse_gauss_rise(Pulse):
-
-    def __init__(self, channel, name='cos pulse', **kw):
-        Pulse.__init__(self, name)
-
-        self.channel = channel  # this is just for convenience, internally
-        self.channels.append(channel)
-        # this is the part the sequencer element wants to communicate with
-        self.frequency = kw.pop('frequency', 1e6)
-        self.amplitude = kw.pop('amplitude', 0.)
-        self.length = kw.pop('length', 0.)
-        self.phase = kw.pop('phase', 0.)
-        self.tau = kw.pop('tau', 1e-9)
-
-    def __call__(self, **kw):
-        self.frequency = kw.pop('frequency', self.frequency)
-        self.amplitude = kw.pop('amplitude', self.amplitude)
-        self.length = kw.pop('length', self.length)
-        self.phase = kw.pop('phase', self.phase)
-
-        return self
-
-    def chan_wf(self, chan, tvals):
-        tau = self.tau
-        amp_rel = 0*tvals
-        t0 = tvals[0]
-        for i, t in enumerate(tvals):
-            if (t-t0) < 10*tau:
-                amp_rel[i] = 0.5 + 0.5 * scipy.special.erf(((t-t0)-5*tau)/tau)
-            else:
-                amp_rel[i] = 1
-
-        return self.amplitude * amp_rel * np.cos(2 * np.pi *
-                                       (self.frequency * tvals +
-                                        self.phase / 360.))
-
-class CosPulse_gauss_fall(Pulse):
-
-    def __init__(self, channel, name='cos pulse', **kw):
-        Pulse.__init__(self, name)
-
-        self.channel = channel  # this is just for convenience, internally
-        self.channels.append(channel)
-        # this is the part the sequencer element wants to communicate with
-        self.frequency = kw.pop('frequency', 1e6)
-        self.amplitude = kw.pop('amplitude', 0.)
-        self.length = kw.pop('length', 0.)
-        self.phase = kw.pop('phase', 0.)
-        self.tau = kw.pop('tau', 1-9)
-
-    def __call__(self, **kw):
-        self.frequency = kw.pop('frequency', self.frequency)
-        self.amplitude = kw.pop('amplitude', self.amplitude)
-        self.length = kw.pop('length', self.length)
-        self.phase = kw.pop('phase', self.phase)
-
-        return self
-
-    def chan_wf(self, chan, tvals):
-        tau = self.tau
-        amp_rel = 0*tvals
-        tend = tvals[-1]
-        for i, t in enumerate(tvals):
-            if (tend-t) < 10*tau:
-                amp_rel[i] = 0.5 + 0.5 * scipy.special.erf(((tend-t)-5*tau)/tau)
-            else:
-                amp_rel[i] = 1
-
-        return self.amplitude * amp_rel * np.cos(2 * np.pi *
-                                                 (self.frequency * tvals +
-                                                  self.phase / 360.))
-
-
-class LinearPulse(Pulse):
-
-    def __init__(self, channel=None, channels=None, name='linear pulse', **kw):
-        """ Pulse that performs linear interpolation between two setpoints """
-        Pulse.__init__(self, name)
-        if channel is None and channels is None:
-            raise ValueError('Must specify either channel or channels')
-        elif channels is None:
-            self.channel = channel  # this is just for convenience, internally
-            # this is the part the sequencer element wants to communicate with
-            self.channels.append(channel)
-        else:
-            self.channels = channels
-
-        self.start_value = kw.pop('start_value', 0)
-        self.end_value = kw.pop('end_value', 0)
-        self.length = kw.pop('length', 0)
-
-    def __call__(self, **kw):
-        self.start_value = kw.pop('start_value', self.start_value)
-        self.end_value = kw.pop('end_value', self.end_value)
-        self.length = kw.pop('length', self.length)
-        channel = kw.pop('channel', None)
-        if channel is not None:
-            self.channel = channel
-            self.channels = [self.channel]
-        self.channels = kw.pop('channels', self.channels)
-        return self
-
-    def chan_wf(self, chan, tvals):
-        return np.linspace(self.start_value, self.end_value, len(tvals))
-
-
-class clock_train(Pulse):
-
-    def __init__(self, channel, name='clock train', **kw):
-        Pulse.__init__(self, name)
-
-        self.channel = channel
-        self.channels.append(channel)
-
-        self.amplitude = kw.pop('amplitude', 0.1)
-        self.cycles = kw.pop('cycles', 100)
-        self.nr_up_points = kw.pop('nr_up_points', 2)
-        self.nr_down_points = kw.pop('nr_down_points', 2)
-
-    def __call__(self, **kw):
-        self.amplitude = kw.pop('amplitude', self.amplitude)
-        self.cycles = kw.pop('cycles', self.cycles)
-        self.nr_up_points = kw.pop('nr_up_points', self.nr_up_points)
-        self.nr_down_points = kw.pop('nr_down_points', self.nr_down_points)
-        self.length = self.cycles * (self.nr_up_points + self.nr_down_points) * 1e-9
-        return self
-
-    def chan_wf(self, chan, tvals):
-        unit_cell = []
-        for i in np.arange(self.nr_up_points):
-            unit_cell.append(self.amplitude)
-        for i in np.arange(self.nr_down_points):
-            unit_cell.append(0)
-        wf = unit_cell * self.cycles
-
-        return wf
-
-
-class marker_train(Pulse):
-
-    def __init__(self, channel, name='marker train', **kw):
-        Pulse.__init__(self, name)
-        self.channel = channel
-        self.channels.append(channel)
-
-        self.amplitude = kw.pop('amplitude', 1)
-        self.nr_markers = kw.pop('nr_markers', 100)
-        self.marker_length = kw.pop('marker_length', 15e-9)
-        self.marker_separation = kw.pop('marker_separation', 100e-9)
-
-    def __call__(self, **kw):
-        self.channel = kw.pop('channel', self.channel)
-        self.amplitude = kw.pop('amplitude', self.amplitude)
-        self.nr_markers = kw.pop('nr_markers', self.nr_markers)
-        self.marker_length = kw.pop('marker_length', self.marker_length)
-        self.marker_separation = kw.pop('marker_separation',
-                                        self.marker_separation)
-
-        self.channels = []
-        self.channels.append(self.channel)
-        self.length = self.nr_markers * self.marker_separation
-        return self
-
-    def chan_wf(self, chan, tvals):
-        # Using lists because that is default, I expect arrays also work
-        # but have not tested that. MAR 15-2-2016
-        unit_cell = list(np.ones(round(self.marker_length * 1e9)))
-        unit_cell.extend(list(np.zeros(
-            round((self.marker_separation - self.marker_length) * 1e9))))
-        wf = unit_cell * self.nr_markers
-        # Added this check because I had issues with this before it can occur
-        # when e.g. giving separations that are not in sub ns resolution
-        if(len(wf) != round(self.length * 1e9)):
-            raise ValueError('Waveform length is not equal to expected length')
-
-        return wf
-
-
 def apply_modulation(I_env, Q_env, tvals, mod_frequency,
-                     phase=0, phi_skew=0, alpha=1):
+                     phase=0, phi_skew=0, alpha=1, RO=False):
     '''
     Applies single sideband modulation, requires timevals to make sure the
     phases are correct.
@@ -358,20 +220,23 @@ def apply_modulation(I_env, Q_env, tvals, mod_frequency,
     M*mod = [cos(x)-tan(phi-skew)sin(x)      sin(x)+tan(phi-skew)cos(x) ]
             [-sin(x)sec(phi-skew)/alpha  cos(x)sec(phi-skew)/alpha]
     '''
-
+    if RO:
+        tvals_wave = tvals - tvals[0]
+    else:
+        tvals_wave = tvals
     tan_phi_skew = np.tan(2 * np.pi * phi_skew / 360)
     sec_phi_alpha = 1 / (np.cos(2 * np.pi * phi_skew / 360) * alpha)
 
-    I_mod = (I_env * (np.cos(2 * np.pi * (mod_frequency * tvals +
+    I_mod = (I_env * (np.cos(2 * np.pi * (mod_frequency * tvals_wave +
                                           phase / 360)) - tan_phi_skew *
-                      np.sin(2 * np.pi * (mod_frequency * tvals +
+                      np.sin(2 * np.pi * (mod_frequency * tvals_wave +
                                           phase / 360))) +
-             Q_env * (np.sin(2 * np.pi * (mod_frequency * tvals +
+             Q_env * (np.sin(2 * np.pi * (mod_frequency * tvals_wave +
                                           phase / 360)) + tan_phi_skew *
-                      np.cos(2 * np.pi * (mod_frequency * tvals + phase / 360))))
+                      np.cos(2 * np.pi * (mod_frequency * tvals_wave + phase / 360))))
 
     Q_mod = (-1 * I_env * sec_phi_alpha * np.sin(2 * np.pi * (mod_frequency *
-                                                              tvals + phase / 360.)) +
+                                                              tvals_wave + phase / 360.)) +
              + Q_env * sec_phi_alpha * np.cos(2 * np.pi * (
-                 mod_frequency * tvals + phase / 360.)))
+                 mod_frequency * tvals_wave + phase / 360.)))
     return [I_mod, Q_mod]

@@ -253,29 +253,22 @@ class QuDev_transmon(Qubit):
         self.add_operation('RO')
         self.add_pulse_parameter('RO', 'RO_pulse_type', 'pulse_type',
                                  vals=vals.Strings(),
-                                 initial_value='MW_IQmod_pulse_UHFQC')
+                                 initial_value='GaussFilteredCosIQPulse')
         self.add_pulse_parameter('RO', 'RO_I_channel', 'I_channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'RO_Q_channel', 'Q_channel',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('RO', 'RO_pulse_marker_channel',
-                                 'RO_pulse_marker_channel',
-                                 initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'RO_amp', 'amplitude',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('RO', 'RO_pulse_length', 'length',
+        self.add_pulse_parameter('RO', 'RO_pulse_length', 'pulse_length',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('RO', 'RO_pulse_delay', 'pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('RO', 'f_RO_mod', 'mod_frequency',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('RO', 'RO_acq_marker_delay',
-                                 'acq_marker_delay',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('RO', 'RO_acq_marker_channel',
-                                 'acq_marker_channel',
-                                 initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'RO_pulse_phase', 'phase',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('RO', 'RO_gaussian_filter_sigma', 'gaussian_filter_sigma',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('RO', 'ro_pulse_basis_rotation',
                                  'basis_rotation', initial_value={},
@@ -489,51 +482,14 @@ class QuDev_transmon(Qubit):
         self.readout_DC_LO.pulsemod_state('Off')
         self.readout_DC_LO.frequency(f_RO - self.f_RO_mod())
         self.readout_DC_LO.on()
-        # readout pulse
-        if not multiplexed:
-            if self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
-                eval('self.UHFQC.sigouts_{}_offset({})'.format(
-                    self.RO_I_channel(), self.RO_I_offset()))
-                eval('self.UHFQC.sigouts_{}_offset({})'.format(
-                    self.RO_Q_channel(), self.RO_Q_offset()))
-                if self.ro_pulse_shape() == 'square':
-                    self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
-                        f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                        RO_pulse_length=self.RO_pulse_length(),
-                        alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
-                elif self.ro_pulse_shape() == 'gaussian_filtered':
-                    self.UHFQC.awg_sequence_acquisition_and_pulse_SSB_gaussian_filtered(
-                        f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                        RO_pulse_length=self.RO_pulse_length(),
-                        filter_sigma=self.ro_pulse_filter_sigma(),
-                        nr_sigma=self.ro_pulse_nr_sigma(),
-                        alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
-                elif self.ro_pulse_shape() == 'CLEAR':
-                    self.UHFQC.awg_sequence_acquisition_and_pulse_SSB_gauss_CLEAR_pulse(
-                        delta_amp_segments=self.ro_CLEAR_delta_amp_segment(),
-                        length_segments=self.ro_CLEAR_segment_length(),
-                        f_RO_mod=self.f_RO_mod(), amp_base=self.RO_amp(),
-                        length_total=self.RO_pulse_length(),
-                        sigma=self.ro_pulse_filter_sigma(),
-                        nr_sigma=self.ro_pulse_nr_sigma(),
-                        phase=self.ro_phi_skew())
-                else:
-                    raise ValueError('Invalid ro pulse shape.')
-                self.readout_UC_LO.pulsemod_state('Off')
-                self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
-                self.readout_UC_LO.on()
-            elif self.RO_pulse_type() == 'Gated_MW_RO_pulse':
-                self.readout_RF.pulsemod_state('On')
-                self.readout_RF.frequency(f_RO)
-                self.readout_RF.power(self.RO_pulse_power())
-                self.readout_RF.on()
-                self.UHFQC.awg_sequence_acquisition()
-        else:
-            # setting up the UHFQC awg sequence must be done externally by a
-            # readout manager
-            self.readout_UC_LO.pulsemod_state('Off')
-            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
-            self.readout_UC_LO.on()
+        self.readout_UC_LO.pulsemod_state('Off')
+        self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
+        self.readout_UC_LO.on()
+
+        self.UHFQC.set('sigouts_{}_offset'.format(0), 
+                       self.RO_I_offset())
+        self.UHFQC.set('sigouts_{}_offset'.format(1), 
+                       self.RO_Q_offset())
 
         self.update_detector_functions()
         self.set_readout_weights()
@@ -851,7 +807,7 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name)
 
 
-    def measure_rabi(self, amps=None, MC=None, analyze=True,
+    def measure_rabi(self, amps=None, MC=None, analyze=True, active_reset=False,
              close_fig=True, cal_points=True, no_cal_points=2,
              upload=True, label=None,  n=1, exp_metadata=None):
 
@@ -908,6 +864,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(awg_swf.Rabi(pulse_pars=self.get_drive_pars(),
                                            RO_pars=self.get_RO_pars(), n=n,
                                            cal_points=cal_points,
+                                           active_reset=active_reset,
                                            no_cal_points=no_cal_points,
                                            upload=upload))
         MC.set_sweep_points(sweep_points)
@@ -926,7 +883,7 @@ class QuDev_transmon(Qubit):
 
     def measure_rabi_2nd_exc(self, amps=None, n=1, MC=None, analyze=True,
                              label=None, last_ge_pulse=True,
-                             close_fig=True, cal_points=True, no_cal_points=4,
+                             close_fig=True, cal_points=True, no_cal_points=6,
                              upload=True, exp_metadata=None):
 
         if amps is None:
@@ -941,6 +898,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         if cal_points:
+            print("cal points {}".format(no_cal_points))
             step = np.abs(amps[-1]-amps[-2])
             if no_cal_points == 6:
                 sweep_points = np.concatenate(
@@ -1729,8 +1687,7 @@ class QuDev_transmon(Qubit):
         if freqs is None:
             freqs = self.f_qubit() + np.linspace(-50e6, 50e6, 201)
         if RO_separation is None:
-            RO_separation = np.abs(self.RO_acq_marker_delay())
-            RO_separation += 2 * self.RO_pulse_length()
+            RO_separation = 2 * self.RO_pulse_length()
             RO_separation += np.max(delays)
             RO_separation += 200e-9  # for slack
 
@@ -2892,7 +2849,7 @@ class QuDev_transmon(Qubit):
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         update=False, MC=None, close_fig=True, cal_points=True,
                         no_cal_points=None, upload=True, last_ge_pulse=True,
-                        analyze=True, **kw):
+                        analyze=True, active_reset=False, **kw):
 
         """
             Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
@@ -3020,8 +2977,10 @@ class QuDev_transmon(Qubit):
                               label=label,
                               cal_points=cal_points,
                               no_cal_points=no_cal_points,
+                              active_reset=active_reset,
                               upload=upload)
         else:
+            print("cal points {}".format(no_cal_points))
             self.measure_rabi_2nd_exc(amps=rabi_amps, n=n, MC=MC,
                                       close_fig=close_fig, label=label,
                                       cal_points=cal_points,
@@ -3869,8 +3828,7 @@ class QuDev_transmon(Qubit):
         measures the transmittance """
 
         if freqs is None:
-            raise ValueError("Unspecified frequencies for measure_resonator_"
-                            "spectroscopy")
+            raise ValueError("Unspecified frequencies for measure_dispersive_shift")
         if np.any(freqs < 500e6):
             logging.warning(('Some of the values in the freqs array might be '
                             'too small. The units should be Hz.'))

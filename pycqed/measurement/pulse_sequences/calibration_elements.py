@@ -1,6 +1,7 @@
 from copy import deepcopy
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
-from pycqed.measurement.waveform_control import sequence
+from pycqed.measurement.waveform_control import sequence as sequence
+from pycqed.measurement.waveform_control import segment as segment
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     get_pulse_dict_from_pars
 
@@ -165,47 +166,47 @@ def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
     if comm_freq: RO_separation -= RO_separation % (-1/comm_freq)
 
     seq_name = 'readout_pulse_scope_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq = sequence.Sequence(seq_name, station.pulsar)
+    seg_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     min_delay = min(delays)
     readout_x1 = deepcopy(RO_pars)
-    readout_x1['refpoint'] = 'end'
+    readout_x1['ref_point'] = 'end'
     readout_x2 = deepcopy(RO_pars)
     readout_x2['pulse_delay'] = RO_separation
-    readout_x2['refpoint'] = 'start'
+    readout_x2['ref_point'] = 'start'
     probe_pulse = deepcopy(pulses['X180'])
     prep_pulses = [deepcopy(pulses[pulse_name]) for pulse_name in prep_pulses]
     for pulse in prep_pulses:
         pulse['pulse_delay'] = -2*np.abs(min_delay)
     for i, tau in enumerate(delays):
         if i in cal_points[0] or i - len(delays) in cal_points[0]:
-            el = multi_pulse_elt(2 * i, station, [pulses['I'], RO_pars])
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
-            el = multi_pulse_elt(2 * i + 1, station, [pulses['I'], RO_pars])
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
+            seg = segment.Segment('segment_{}'.format(2*i), station.pulsar, [pulses['I'], RO_pars])
+            seg_list.append(seg)
+            seq.add(seg)
+            seg = segment.Segment('segment_{}'.format(2*i+1), station.pulsar, [pulses['I'], RO_pars])
+            seg_list.append(seg)
+            seq.add(seg)
         elif i in cal_points[1] or i - len(delays) in cal_points[1]:
-            el = multi_pulse_elt(2 * i, station, [pulses['X180'], RO_pars])
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
-            el = multi_pulse_elt(2 * i + 1, station, [pulses['X180'], RO_pars])
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
+            seg = segment.Segment('segment_{}'.format(2*i), station.pulsar, [pulses['X180'], RO_pars])
+            seg_list.append(seg)
+            seq.add(seg)
+            seg = segment.Segment('segment_{}'.format(2*i+1), station.pulsar, [pulses['X180'], RO_pars])
+            seg_list.append(seg)
+            seq.add(seg)
         else:
 
             probe_pulse['pulse_delay'] = tau - min_delay
             readout_x1['pulse_delay'] = -tau
-            el = multi_pulse_elt(2 * i, station, prep_pulses +
+            seg = segment.Segment('segment_{}'.format(2*i), station.pulsar, prep_pulses +
                                  [probe_pulse, readout_x1, readout_x2])
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
+            seg_list.append(seg)
+            seq.add(seg)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq)
     if return_seq:
-        return seq, el_list
+        return seq, seg_list
     else:
         return seq_name
 
