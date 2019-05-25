@@ -281,6 +281,7 @@ class GaussFilteredCosIQPulse(Pulse):
         self.pulse_length = kw.pop('pulse_length', 0)
         self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma', 0)
         self.nr_sigma = kw.pop('nr_sigma', 5)
+        self.phase_lock = kw.pop('phase_lock', False)
         self.length = self.pulse_length + \
                       self.gaussian_filter_sigma*self.nr_sigma
         self.codeword = kw.pop('codeword', 'no_codeword')
@@ -311,7 +312,6 @@ class GaussFilteredCosIQPulse(Pulse):
             wave = 0.5 * (sp.special.erf(
                 (tvals - tstart) * scaling) - sp.special.erf(
                     (tvals - tend) * scaling)) * self.amplitude
-        RO = kw.pop('RO', False)
         I_mod, Q_mod = apply_modulation(
             wave,
             np.zeros_like(wave),
@@ -320,7 +320,7 @@ class GaussFilteredCosIQPulse(Pulse):
             phase=self.phase,
             phi_skew=self.phi_skew,
             alpha=self.alpha,
-            RO=RO)
+            phase_lock=self.phase_lock)
         if chan == self.I_channel:
             return I_mod
         if chan == self.Q_channel:

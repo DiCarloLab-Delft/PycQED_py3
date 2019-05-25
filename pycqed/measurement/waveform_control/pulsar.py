@@ -99,6 +99,12 @@ class UHFQCPulsar:
                             get_cmd=self._uhfqc_getter(awg, id, 'amp'),
                             vals=vals.Numbers(0.075, 1.5),
                             initial_value=0.75)
+        self.add_parameter('{}_offset'.format(name),
+                            label='{} offset'.format(name), unit='V',
+                            set_cmd=self._uhfqc_setter(awg, id, 'offset'),
+                            get_cmd=self._uhfqc_getter(awg, id, 'offset'),
+                            vals=vals.Numbers(-1.5, 1.5),
+                            initial_value=0)
         self.add_parameter('{}_distortion'.format(name),
                             label='{} distortion mode'.format(name),
                             initial_value='off',
@@ -829,19 +835,19 @@ class HDAWG8Pulsar:
                     if name_ch1 is not None:
                         name_ch1 = '"{}_{}"'.format(obj._devname,
                                                     simplify_name(name_ch1))
-                    if name_ch1m is not None:
-                        name_ch1m = '"{}_{}"'.format(obj._devname,
-                                                    simplify_name(name_ch1m))
+                        if name_ch1m is not None:
+                            name_ch1 += ' + "{}_{}"'.format(obj._devname,
+                                                      simplify_name(name_ch1m))
                     if name_ch2 is not None:
                         name_ch2 = '"{}_{}"'.format(obj._devname,
                                                     simplify_name(name_ch2))
-                    if name_ch2m is not None:
-                        name_ch2m = '"{}_{}"'.format(obj._devname,
-                                                    simplify_name(name_ch2m))
+                        if name_ch2m is not None:
+                            name_ch2 += ' + "{}_{}"'.format(obj._devname,
+                                                      simplify_name(name_ch2m))
                     if name_ch1 is not None or name_ch2 is not None:
                         main_loop += self._hdawg_element_seqc(
                             el['repetitions'], el['trigger_wait'],
-                            name_ch1, name_ch2, name_ch1m, name_ch2m)
+                            name_ch1, name_ch2)
             awg_str = header + waveform_table + main_loop + footer
 
             # write the waveforms to csv files
@@ -888,71 +894,22 @@ class HDAWG8Pulsar:
         Args:
             name1: name of the wave to be played on channel 1
             name2: name of the wave to be played on channel 2
-            name1m: name of the wave to be played on channel 1 marker
-            name2m: name of the wave to be played on channel 2 marker
         Returns:
             string for playing back an element
         """
         trigger_str = 'waitDigTrigger(1);\n'
-        if name1 is None and name2 is None and name1m is None and name2m is None:
+        if name1 is None and name2 is None:
             prefetch_str = ''
             play_str = 'playWaveDIO();\n'
-        elif name1 is None and name1m is None:
-            if name2 is not None and name2m is not None:
-                n2s = name2.strip('"')
-                n2ms = name2m.strip('"')
-                prefetch_str = 'wave {} = {};\n'.format(n2s, name2)
-                prefetch_str += 'wave {} = {};\n'.format(n2ms, name2m)
-                prefetch_str += 'wave {} = {} + {};\n'.format(n2s + n2ms, n2s, n2ms)
-                prefetch_str += 'prefetch({});\n'.format(n2s + n2ms)
-                play_str = 'playWave(2, {});\n'.format(n2s + n2ms)
-            elif name2 is not None:
-                prefetch_str = 'prefetch({});\n'.format(name2)
-                play_str = 'playWave(2, {});\n'.format(name2)
-            else:        
-                prefetch_str = 'prefetch({});\n'.format(name2m)
-                play_str = 'playWave(2, {});\n'.format(name2m)
-        elif name2 is None and name2m is None:
-            if name1 is not None and name1m is not None:
-                n1s = name1.strip('"')
-                n1ms = name1m.strip('"')
-                prefetch_str = 'wave {} = {};\n'.format(n1s, name1)
-                prefetch_str += 'wave {} = {};\n'.format(n1ms, name1m)
-                prefetch_str += 'wave {} = {} + {};\n'.format(n1s + n1ms, n1s, n1ms)
-                prefetch_str += 'prefetch({});\n'.format(n1s + n1ms)
-                play_str = 'playWave(1, {});\n'.format(n1s + n1ms)
-            elif name1 is not None:
-                prefetch_str = 'prefetch({});\n'.format(name1)
-                play_str = 'playWave(1, {});\n'.format(name1)
-            else:        
-                prefetch_str = 'prefetch({});\n'.format(name1m)
-                play_str = 'playWave(1, {});\n'.format(name1m)
+        elif name1 is None:
+            prefetch_str = 'prefetch(zeros(1) + marker(1, 0), {});\n'.format(name2)
+            play_str = 'playWave(zeros(1) + marker(1, 0), {});\n'.format(name2)
+        elif name2 is None:
+            prefetch_str = 'prefetch({});\n'.format(name1)
+            play_str = 'playWave(1, {});\n'.format(name1)
         else:
-            prefetch_str = ''
-            if name1 is not None and name1m is not None:
-                n1s = name1.strip('"')
-                n1ms = name1m.strip('"')
-                n1c = n1s + n1ms
-                prefetch_str += 'wave {} = {};\n'.format(n1s, name1)
-                prefetch_str += 'wave {} = {};\n'.format(n1ms, name1m)
-                prefetch_str += 'wave {} = {} + {};\n'.format(n1c, n1s, n1ms)
-            elif name1 is not None:
-                n1c = name1
-            else:  
-                n1c = name1m
-            if name2 is not None and name2m is not None:
-                n2s = name2.strip('"')
-                n2ms = name2m.strip('"')
-                n2c = n2s + n2ms
-                prefetch_str += 'wave {} = {};\n'.format(n2s, name2)
-                prefetch_str += 'wave {} = {};\n'.format(n2ms, name2m)
-                prefetch_str += 'wave {} = {} + {};\n'.format(n2c, n2s, n2ms)
-            elif name2 is not None:
-                n2c = name2
-            else:  
-                n2c = name2m
-            prefetch_str += 'prefetch({}, {});\n'.format(n1c, n2c)
-            play_str = 'playWave({}, {});\n'.format(n1c, n2c)
+            prefetch_str = 'prefetch({}, {});\n'.format(name1, name2)
+            play_str = 'playWave({}, {});\n'.format(name1, name2)
         return prefetch_str+ trigger_str + play_str
 
     def _hdawg_active_awgs(self, obj):

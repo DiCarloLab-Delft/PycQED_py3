@@ -13,8 +13,8 @@ class Sequence:
     AWGs sequentially.
     """
 
-    def __init__(self, name, pulsar):
-        self.pulsar = pulsar
+    def __init__(self, name):
+        self.pulsar = ps.Pulsar.get_instance()
         self.name = name
         self.segments = odict()
         self.awg_sequence = {}

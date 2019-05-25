@@ -249,7 +249,8 @@ class MeasurementControl(Instrument):
         return
 
     def measure_soft_static(self):
-        for self.soft_iteration in range(self.soft_avg()):
+        for j in range(self.soft_avg()):
+            self.soft_iteration = j
             for i, sweep_point in enumerate(self.sweep_points):
                 self.measurement_function(sweep_point)
 
@@ -404,7 +405,7 @@ class MeasurementControl(Instrument):
                     # intended. This does require custom support from
                     # a sweep function.
                     x[-i] = set_val
-
+        
         # used for next iteration
         self.last_sweep_pts = x
         datasetshape = self.dset.shape

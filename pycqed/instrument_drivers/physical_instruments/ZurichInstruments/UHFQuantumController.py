@@ -75,15 +75,15 @@ class UHFQC(Instrument):
 
         init = True
         try:
-            f = open(self._s_file_name).read()
-            s_node_pars = json.loads(f)
+            with open(self._s_file_name) as f:
+                s_node_pars = json.loads(f.read())
         except:
             print("parameter file for gettable parameters {} not found".format(
                 self._s_file_name))
             init = False
         try:
-            f = open(self._d_file_name).read()
-            d_node_pars = json.loads(f)
+            with open(self._d_file_name) as f:
+                d_node_pars = json.loads(f.read())
         except:
             print("parameter file for settable parameters {} not found".format(
                 self._d_file_name))

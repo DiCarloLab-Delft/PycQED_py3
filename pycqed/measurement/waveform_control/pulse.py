@@ -192,7 +192,7 @@ class CosPulse(Pulse):
                                         self.phase / 360.))
 
 def apply_modulation(I_env, Q_env, tvals, mod_frequency,
-                     phase=0, phi_skew=0, alpha=1, RO=False):
+                     phase=0, phi_skew=0, alpha=1, phase_lock=False):
     '''
     Applies single sideband modulation, requires timevals to make sure the
     phases are correct.
@@ -220,7 +220,7 @@ def apply_modulation(I_env, Q_env, tvals, mod_frequency,
     M*mod = [cos(x)-tan(phi-skew)sin(x)      sin(x)+tan(phi-skew)cos(x) ]
             [-sin(x)sec(phi-skew)/alpha  cos(x)sec(phi-skew)/alpha]
     '''
-    if RO:
+    if phase_lock:
         tvals_wave = tvals - tvals[0]
     else:
         tvals_wave = tvals

@@ -15,7 +15,7 @@ class Segment:
     as well as an instance of class Pulse.
     """
 
-    def __init__(self, name, pulsar, pulse_pars_list=[]):
+    def __init__(self, name, pulse_pars_list=[]):
         self.name = name
         self.pulsar = ps.Pulsar.get_instance()
         self.unresolved_pulses = []
