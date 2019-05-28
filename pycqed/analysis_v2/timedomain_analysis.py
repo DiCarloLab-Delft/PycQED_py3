@@ -258,8 +258,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 {qbn: {'sweep_points': self.raw_data_dict['sweep_points'][0]}
                  for qbn in self.qb_names}
 
-        ch_map_lists = {k: v for k, v in self.channel_map.items()
-                        if isinstance(v, list)}
+        # ch_map_lists = {k: v for k, v in self.channel_map.items()
+        #                 if isinstance(v, list)}
         # if np.any([len(v) > 2 for v in ch_map_lists.values()]):
         #     raise ValueError('{} have more than 2 RO channels. There is no '
         #                      'support for this case.'.format(
@@ -291,13 +291,14 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             else:
                 raise TypeError('The RO channels for {} must either be a list '
                                 'or a string.'.format(qb_name))
+
         self.proc_data_dict['meas_results_per_qb_per_ROch'] = \
             meas_results_per_qb_per_ROch
-
         self.for_ef = self.options_dict.get('for_ef',
                                             self.metadata.get('for_ef', False))
         self.num_cal_points = self.options_dict.get(
             'num_cal_points', self.metadata.get('num_cal_points', None))
+
         if self.options_dict.get('rotate_data', True):
             self.cal_states_analysis()
         else:
@@ -343,70 +344,92 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                      qbn in self.qb_names}
 
     def cal_states_analysis(self):
-        if self.num_cal_points is None:
+        self.cal_states_dict = self.options_dict.get(
+            'cal_states_dict', self.metadata.get('cal_states_dict', None))
+        print(self.cal_states_dict)
+        if self.cal_states_dict is None:
             print('Assuming two cal states, |g> and |e>, and using '
                   'sweep_points[-4:-2] as |g> cal points, and '
                   'sweep_points[-2::] as |e> cal points.')
+            self.cal_states_dict = {r'$|g\rangle$':
+                                        {'data_indices': [-4, -3],
+                                         'rotation': 0},
+                                    r'$|e\rangle$':
+                                        {'data_indices': [-2, -1],
+                                         'rotation': 1}}
             self.num_cal_points = 4
-            cal_zero_points = [-4, -3]
-            cal_one_points = [-2, -1]
-            self.cal_point_indices = [cal_zero_points, cal_one_points]
-        elif self.num_cal_points == 0:
-            cal_zero_points = None
-            cal_one_points = None
-            self.cal_point_indices = [cal_zero_points, cal_one_points]
+        elif len(self.cal_states_dict) == 0:
+            self.num_cal_points = 0
         else:
-            cal_zero_points = self.options_dict.get(
-                'cal_zero_points', self.metadata.get('cal_zero_points', None))
-            cal_one_points = self.options_dict.get(
-                'cal_one_points', self.metadata.get('cal_one_points', None))
-            if np.all([i is None for i in [cal_zero_points, cal_one_points]]):
-                self.num_cal_states = self.options_dict.get(
-                        'num_cal_states', self.metadata.get(
-                        'num_cal_states', 2))
+            self.num_cal_points = \
+                len(self.cal_states_dict) * len(self.cal_states_dict[
+                    list(self.cal_states_dict)[0]]['data_indices'])
+        print(self.num_cal_points)
 
-                assert (self.num_cal_points % self.num_cal_states == 0)
-                print('Using {} cal states and {} cal points'.format(
-                    self.num_cal_states, self.num_cal_points))
-                k = int(self.num_cal_points/self.num_cal_states)
-                indices = list(range(-self.num_cal_points, 0))
-                self.cal_point_indices = [indices[i:i + k] for i in
-                                   range(0, len(indices), k)]
-            else:
-                self.cal_point_indices = [cal_zero_points, cal_one_points]
+        # order cal_states_dict
+        self.ordered_cal_states_dict = OrderedDict()
+        cal_states_dict_for_rotation = OrderedDict()
+        for i in range(len(self.cal_states_dict)):
+            cal_state = {k: d['data_indices'] for k, d in
+                         self.cal_states_dict.items() if d['rotation'] == i}
+            self.ordered_cal_states_dict.update(cal_state)
+            cal_states_dict_for_rotation.update(cal_state)
+        self.ordered_cal_states_dict.update(
+            {k: d['data_indices'] for k, d in self.cal_states_dict.items() if
+             k not in cal_states_dict_for_rotation})
+        print(self.ordered_cal_states_dict)
+        print(cal_states_dict_for_rotation)
 
         if self.options_dict.get('TwoD', False):
             self.proc_data_dict['projected_data_dict'] = \
                 self.rotate_data_TwoD(
                     self.proc_data_dict['meas_results_per_qb_per_ROch'],
-                    self.channel_map,
-                    self.cal_point_indices)
+                    self.channel_map, cal_states_dict_for_rotation)
         else:
             self.proc_data_dict['projected_data_dict'] = \
                 self.rotate_data(
                     self.proc_data_dict['meas_results_per_qb_per_ROch'],
-                    self.channel_map, self.cal_point_indices)
+                    self.channel_map, cal_states_dict_for_rotation)
 
     @staticmethod
-    def rotate_data(meas_results_per_qb_per_ROch, channel_map,
-                    cal_point_indices):
+    def rotate_data(meas_results_per_qb_per_ROch, channel_map, cal_states_dict):
 
+        # ONLY WORKS FOR 2 CAL STATES
+        cal_zero_points = list(cal_states_dict.values())[0]
+        cal_one_points = list(cal_states_dict.values())[1]
         rotated_data_dict = OrderedDict()
         for qb_name, meas_res_dict in meas_results_per_qb_per_ROch.items():
+        #     data = np.stack(list(meas_res_dict.values()), axis=1)
+        #
+        #     cal_points = np.zeros((len(cal_states_dict),
+        #                            len(meas_res_dict)))
+        #     for i, cal_state in enumerate(cal_states_dict):
+        #         cal_points[i] = [np.mean(dat[cal_states_dict[cal_state]])
+        #                          for dat in meas_res_dict.values()]
+        #     print(cal_points)
+        #     rotated_data = a_tools.predict_gm_proba_from_cal_points(
+        #         data, cal_points)
+        #     print(rotated_data.shape)
+        #     rotated_data_dict[qb_name] = rotated_data[:, 2]
+        #         # {list(cal_states_dict)[i]: rotated_data[:, i] for i in
+        #         #  range(len(cal_states_dict))}
+        #
+        # return rotated_data_dict
+
             if len(meas_res_dict) == 1:
                 # one RO channel per qubit
                 rotated_data_dict[qb_name] = \
                     a_tools.normalize_data_v3(
                         data=meas_res_dict[list(meas_res_dict)[0]],
-                        cal_zero_points=cal_point_indices[0],
-                        cal_one_points=cal_point_indices[1])
+                        cal_zero_points=cal_zero_points,
+                        cal_one_points=cal_one_points)
             elif list(meas_res_dict) == channel_map[qb_name]:
                 # two RO channels per qubit
                 rotated_data_dict[qb_name], _, _ = \
                     a_tools.rotate_and_normalize_data(
                         data=np.array([v for v in meas_res_dict.values()]),
-                        cal_zero_points=cal_point_indices[0],
-                        cal_one_points=cal_point_indices[1])
+                        cal_zero_points=cal_zero_points,
+                        cal_one_points=cal_one_points)
             else:
                 # multiple readouts per qubit per channel
                 rotated_data_dict[qb_name] = {}
@@ -422,8 +445,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         rotated_data_dict[qb_name][ro_suf] = \
                             a_tools.normalize_data_v3(
                                 data=meas_res_dict[list(meas_res_dict)[i]],
-                                cal_zero_points=cal_point_indices[0],
-                                cal_one_points=cal_point_indices[1])
+                                cal_zero_points=cal_zero_points,
+                                cal_one_points=cal_one_points)
                     else:
                         # two RO ch per qubit
                         keys = [k for k in meas_res_dict if ro_suf in k]
@@ -435,15 +458,17 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         _, _ = \
                             a_tools.rotate_and_normalize_data(
                                 data=data_array,
-                                cal_zero_points=cal_point_indices[0],
-                                cal_one_points=cal_point_indices[1])
+                                cal_zero_points=cal_zero_points,
+                                cal_one_points=cal_one_points)
 
         return rotated_data_dict
 
     @staticmethod
     def rotate_data_TwoD(meas_results_per_qb_per_ROch, channel_map,
-                         cal_point_indices):
+                         cal_states_dict):
 
+        cal_zero_points = list(cal_states_dict.values())[0]
+        cal_one_points = list(cal_states_dict.values())[1]
         rotated_data_dict = deepcopy(channel_map)
         for qb_name, meas_res_dict in meas_results_per_qb_per_ROch.items():
             if len(meas_res_dict) == 1:
@@ -455,8 +480,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     rotated_data_dict[qb_name][col] = \
                         a_tools.normalize_data_v3(
                             data=raw_data_arr[:, col],
-                            cal_zero_points=cal_point_indices[0],
-                            cal_one_points=cal_point_indices[1])
+                            cal_zero_points=cal_zero_points,
+                            cal_one_points=cal_one_points)
             elif list(meas_res_dict) == channel_map[qb_name]:
                 # two RO channels per qubit
                 raw_data_arr = meas_res_dict[list(meas_res_dict)[0]]
@@ -468,8 +493,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     rotated_data_dict[qb_name][col], _, _ = \
                         a_tools.rotate_and_normalize_data(
                             data=data_array,
-                            cal_zero_points=cal_point_indices[0],
-                            cal_one_points=cal_point_indices[1])
+                            cal_zero_points=cal_zero_points,
+                            cal_one_points=cal_one_points)
             else:
                 # multiple readouts per qubit per channel
                 rotated_data_dict[qb_name] = {}
@@ -490,8 +515,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                 ro_suf][col] = \
                                 a_tools.normalize_data_v3(
                                     data=raw_data_arr[:, col],
-                                    cal_zero_points=cal_point_indices[0],
-                                    cal_one_points=cal_point_indices[1])
+                                    cal_zero_points=cal_zero_points,
+                                    cal_one_points=cal_one_points)
                     else:
                         # two RO ch per qubit
                         raw_data_arr = meas_res_dict[list(meas_res_dict)[i]]
@@ -504,10 +529,21 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             rotated_data_dict[qb_name][ro_suf][col], _, _ = \
                                 a_tools.rotate_and_normalize_data(
                                     data=data_array,
-                                    cal_zero_points=cal_point_indices[0],
-                                    cal_one_points=cal_point_indices[1])
+                                    cal_zero_points=cal_zero_points,
+                                    cal_one_points=cal_one_points)
 
         return rotated_data_dict
+
+    @staticmethod
+    def get_cal_state_color(cal_state_label):
+        if cal_state_label == 'g' or cal_state_label == r'$|g\rangle$':
+            return 'k'
+        elif cal_state_label == 'e' or cal_state_label == r'$|e\rangle$':
+            return 'gray'
+        elif cal_state_label == 'f' or cal_state_label == r'$|f\rangle$':
+            return 'C8'
+        else:
+            return 'C4'
 
     def prepare_plots(self):
         if self.options_dict.get('plot_proj_data', True):
@@ -520,10 +556,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             plot_name, data, qb_name=qb_name,
                             title_suffix=qb_name+ro_suffix,
                             plot_cal_points=(
-                                not self.options_dict.get('TwoD', False)),
-                            ref_state_plot_labels=(
-                                'exc_state_' + qb_name + ro_suffix,
-                                'gnd_state_' + qb_name + ro_suffix))
+                                not self.options_dict.get('TwoD', False)))
 
                 else:
                     plot_name = 'projected_plot_' + qb_name
@@ -531,10 +564,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         plot_name, corr_data, qb_name=qb_name,
                         title_suffix=qb_name,
                         plot_cal_points=(
-                            not self.options_dict.get('TwoD', False)),
-                        ref_state_plot_labels=(
-                            'exc_state_' + qb_name,
-                            'gnd_state_' + qb_name))
+                            not self.options_dict.get('TwoD', False)))
 
         if self.options_dict.get('plot_raw_data', True):
             self.prepare_raw_data_plots()
@@ -560,7 +590,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                          self.raw_data_dict['measurementstring'][0] +
                          '\nRaw data ' + qb_name)
             plot_name = 'raw_plot_' + qb_name
-        # get xunit
+            # get xunit
             xunit = self.raw_data_dict['xunit'][0]
             if hasattr(xunit, '__iter__'):
                 xunit = xunit[0]
@@ -609,35 +639,36 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
     def prepare_projected_data_plot(
             self, plot_name, data, qb_name,
-            title_suffix=None, plot_cal_points=True,
-            ref_state_plot_labels=('exc_state', 'gnd_state')):
+            title_suffix=None, plot_cal_points=True):
 
         plotsize = self.get_default_plot_params(set=False)['figure.figsize']
         plotsize = (plotsize[0], plotsize[0]/1.25)
         if plot_cal_points and self.num_cal_points != 0:
-            assert (len(ref_state_plot_labels) == len(self.cal_point_indices))
             yvals = data[:-self.num_cal_points]
             xvals = self.raw_data_dict['sweep_points_dict'][qb_name][
                 'msmt_sweep_points']
 
             # plot cal points
-            for i, cal_pts_idxs in enumerate(self.cal_point_indices[::-1]):
-                self.plot_dicts[ref_state_plot_labels[i]] = {
+            for i, cal_pts_idxs in enumerate(
+                    self.ordered_cal_states_dict.values()):
+                plot_dict_name = list(self.ordered_cal_states_dict)[i] + \
+                                 '_' + title_suffix
+                self.plot_dicts[plot_dict_name] = {
                     'fig_id': plot_name,
                     'plotfn': self.plot_line,
                     'plotsize': plotsize,
                     'xvals': self.raw_data_dict['sweep_points_dict'][qb_name][
                         'cal_points_sweep_points'][cal_pts_idxs],
                     'yvals': data[cal_pts_idxs],
-                    'setlabel': r'$|e\rangle$' if i == 0
-                        else r'$|g\rangle$',
+                    'setlabel': list(self.ordered_cal_states_dict)[i],
                     'do_legend': True,
                     'legend_bbox_to_anchor': (1, 0.5),
                     'legend_pos': 'center left',
                     'linestyle': 'none',
-                    'line_kws': {'color': 'gray' if i == 0 else 'k'}}
+                    'line_kws': {'color': self.get_cal_state_color(
+                        list(self.ordered_cal_states_dict)[i])}}
 
-                self.plot_dicts[ref_state_plot_labels[i]+'_line'] = {
+                self.plot_dicts[plot_dict_name+'_line'] = {
                     'fig_id': plot_name,
                     'plotsize': plotsize,
                     'plotfn': self.plot_hlines,
@@ -2750,9 +2781,9 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                     sweep_points = sweep_points_dict['msmt_sweep_points']
 
                     # plot cal points
-                    for i, cal_pts_idxs in enumerate(self.cal_point_indices[::-1]):
-                        key = 'exc_state_' + meas_qbn if i == 0 else \
-                            'gnd_state_' + meas_qbn
+                    for i, cal_pts_idxs in enumerate(
+                            self.ordered_cal_states_dict.values()):
+                        key = list(self.ordered_cal_states_dict)[i] + meas_qbn
                         self.plot_dicts[key] = {
                             'fig_id': 'dyn_phase_plot_' + meas_qbn,
                             'plotfn': self.plot_line,
@@ -2768,13 +2799,13 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                                 self.proc_data_dict['projected_data_dict'][meas_qbn][
                                     '_measure'][cal_pts_idxs]],
                                              axis=0),
-                            'setlabel': r'$|e\rangle$' if i == 0 \
-                                else r'$|g\rangle$',
+                            'setlabel': list(self.ordered_cal_states_dict)[i],
                             'do_legend': True,
                             'legend_bbox_to_anchor': (1, 0.5),
                             'legend_pos': 'center left',
                             'linestyle': 'none',
-                            'line_kws': {'color': 'gray' if i == 0 else 'k'}}
+                            'line_kws': {'color': self.get_cal_state_color(
+                                list(self.ordered_cal_states_dict)[i])}}
 
                 else:
                     yvals = [self.proc_data_dict['projected_data_dict'][meas_qbn][
@@ -3084,6 +3115,12 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    # def process_data(self):
+    #     super().process_data()
+    #     for qbn in self.qb_names:
+    #         if len(self.proc_data_dict['projected_data_dict'][qbn]) == 2:
+
+
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
         for qbn in self.qb_names:
@@ -3236,13 +3273,13 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                 base_plot_name = 'Rabi_' + qbn
                 self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
                     'projected_plot_' + qbn)
-                for ref_state_plot_label in ('exc_state_'+qbn,
-                                             'gnd_state_'+qbn):
-                    if ref_state_plot_label in self.plot_dicts:
-                        self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+                for ref_state_plot_label in self.ordered_cal_states_dict:
+                    ref_plot_name = ref_state_plot_label + '_' + qbn
+                    if ref_plot_name in self.plot_dicts:
+                        self.plot_dicts[ref_plot_name]['fig_id'] = \
                             base_plot_name
-                    if ref_state_plot_label+'_line' in self.plot_dicts:
-                        self.plot_dicts[ref_state_plot_label+'_line'][
+                    if ref_plot_name + '_line' in self.plot_dicts:
+                        self.plot_dicts[ref_plot_name + '_line'][
                             'fig_id'] = base_plot_name
 
                 fit_res = self.fit_dicts['cos_fit_' + qbn]['fit_res']
@@ -3393,13 +3430,13 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
                 base_plot_name = 'T1_' + qbn
                 self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
                     'projected_plot_' + qbn)
-                for ref_state_plot_label in ('exc_state_'+qbn,
-                                             'gnd_state_'+qbn):
-                    if ref_state_plot_label in self.plot_dicts:
-                        self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+                for ref_state_plot_label in self.ordered_cal_states_dict:
+                    ref_plot_name = ref_state_plot_label + '_' + qbn
+                    if ref_plot_name in self.plot_dicts:
+                        self.plot_dicts[ref_plot_name]['fig_id'] = \
                             base_plot_name
-                    if ref_state_plot_label+'_line' in self.plot_dicts:
-                        self.plot_dicts[ref_state_plot_label+'_line'][
+                    if ref_plot_name + '_line' in self.plot_dicts:
+                        self.plot_dicts[ref_plot_name + '_line'][
                             'fig_id'] = base_plot_name
 
                 self.plot_dicts['fit_' + qbn] = {
@@ -3525,13 +3562,13 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                 base_plot_name = 'Ramsey_' + qbn
                 self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
                     'projected_plot_' + qbn)
-                for ref_state_plot_label in ('exc_state_'+qbn,
-                                             'gnd_state_'+qbn):
-                    if ref_state_plot_label in self.plot_dicts:
-                        self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+                for ref_state_plot_label in self.ordered_cal_states_dict:
+                    ref_plot_name = ref_state_plot_label + '_' + qbn
+                    if ref_plot_name in self.plot_dicts:
+                        self.plot_dicts[ref_plot_name]['fig_id'] = \
                             base_plot_name
-                    if ref_state_plot_label+'_line' in self.plot_dicts:
-                        self.plot_dicts[ref_state_plot_label+'_line'][
+                    if ref_plot_name + '_line' in self.plot_dicts:
+                        self.plot_dicts[ref_plot_name + '_line'][
                             'fig_id'] = base_plot_name
 
                 exp_decay_fit_key = self.fit_keys[0] + qbn
@@ -3724,14 +3761,13 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                       '_xy': r'$X_{\pi/2}Y_{\pi}$',
                       '_xmy': r'$X_{\pi/2}Y_{-\pi}$'}
         for qbn in self.qb_names:
-            ref_state_plot_labels = ['exc_state_' + qbn,
-                                     'gnd_state_' + qbn]
             self.plot_dicts.pop('projected_plot_' + qbn)
-            for ref_state_plot_label in ref_state_plot_labels:
-                if ref_state_plot_label in self.plot_dicts:
-                    self.plot_dicts.pop(ref_state_plot_label)
-                if (ref_state_plot_label + '_line') in self.plot_dicts:
-                    self.plot_dicts.pop(ref_state_plot_label + '_line')
+            for ref_state_plot_label in self.ordered_cal_states_dict:
+                ref_plot_name = ref_state_plot_label + '_' + qbn
+                if ref_plot_name in self.plot_dicts:
+                    self.plot_dicts.pop(ref_plot_name)
+                if ref_plot_name + '_line' in self.plot_dicts:
+                    self.plot_dicts.pop(ref_plot_name + '_line')
 
             base_plot_name = 'Qscale_' + qbn
             for msmt_label in ['_xx', '_xy', '_xmy']:
@@ -3808,11 +3844,11 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
 
             # plot cal points
             if self.num_cal_points != 0:
-                ref_state_plot_labels = ('exc_state_' + qbn,
-                                         'gnd_state_' + qbn)
-                assert (len(ref_state_plot_labels) == len(self.cal_point_indices))
-                for i, cal_pts_idxs in enumerate(self.cal_point_indices[::-1]):
-                    self.plot_dicts[ref_state_plot_labels[i]] = {
+                for i, cal_pts_idxs in enumerate(
+                        self.ordered_cal_states_dict.values()):
+                    plot_dict_name = list(self.ordered_cal_states_dict)[i] + \
+                                     '_' + qbn
+                    self.plot_dicts[plot_dict_name] = {
                         'fig_id': base_plot_name,
                         'plotfn': self.plot_line,
                         'xvals': np.mean([
@@ -3823,15 +3859,15 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                             axis=0),
                         'yvals': self.proc_data_dict[
                             'projected_data_dict'][qbn][cal_pts_idxs],
-                        'setlabel': r'$|e\rangle$' if i == 0
-                        else r'$|g\rangle$',
+                        'setlabel': list(self.ordered_cal_states_dict)[i],
                         'do_legend': True,
                         'legend_bbox_to_anchor': (1, 0.5),
                         'legend_pos': 'center left',
                         'linestyle': 'none',
-                        'line_kws': {'color': 'gray' if i == 0 else 'k'}}
+                        'line_kws': {'color': self.get_cal_state_color(
+                            list(self.ordered_cal_states_dict)[i])}}
 
-                    self.plot_dicts[ref_state_plot_labels[i]+'_line'] = {
+                    self.plot_dicts[plot_dict_name + '_line'] = {
                         'fig_id': base_plot_name,
                         'plotfn': self.plot_hlines,
                         'y': np.mean(
@@ -3978,13 +4014,13 @@ class OverUnderRotationAnalysis(MultiQubit_TimeDomain_Analysis):
                     base_plot_name = 'UnderRotation_' + qbn
                 self.plot_dicts[base_plot_name] = self.plot_dicts.pop(
                     'projected_plot_' + qbn)
-                for ref_state_plot_label in ('exc_state_'+qbn,
-                                             'gnd_state_'+qbn):
-                    if ref_state_plot_label in self.plot_dicts:
-                        self.plot_dicts[ref_state_plot_label]['fig_id'] = \
+                for ref_state_plot_label in self.ordered_cal_states_dict:
+                    ref_plot_name = ref_state_plot_label + '_' + qbn
+                    if ref_plot_name in self.plot_dicts:
+                        self.plot_dicts[ref_plot_name]['fig_id'] = \
                             base_plot_name
-                    if ref_state_plot_label+'_line' in self.plot_dicts:
-                        self.plot_dicts[ref_state_plot_label+'_line'][
+                    if ref_plot_name + '_line' in self.plot_dicts:
+                        self.plot_dicts[ref_plot_name + '_line'][
                             'fig_id'] = base_plot_name
 
                 self.plot_dicts['fit_' + qbn] = {
@@ -4387,11 +4423,11 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                     # plot cal points
                     if self.num_cal_points > 0:
                         ref_states_plot_dicts = {}
-                        for j, cal_pts_idxs in enumerate(
-                                self.cal_point_indices[::-1]):
+                        for i, cal_pts_idxs in enumerate(
+                                self.ordered_cal_states_dict.values()):
                             s = '{}_{}'.format(row, qbn)
-                            ref_state_plot_name = 'exc_state_' + s if \
-                                j == 0 else 'gnd_state_' + s
+                            ref_state_plot_name = list(
+                                self.ordered_cal_states_dict)[i] + '_' + s
                             ref_states_plot_dicts[ref_state_plot_name] = {
                                 'fig_id': base_plot_name,
                                 'plotfn': self.plot_line,
@@ -4406,8 +4442,8 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                                 'legend_bbox_to_anchor': (1, 0.5),
                                 'legend_pos': 'center left',
                                 'linestyle': 'none',
-                                'line_kws': {'color': 'gray' if j == 0
-                                             else 'k'}}
+                                'line_kws': {'color': self.get_cal_state_color(
+                                    list(self.ordered_cal_states_dict)[i])}}
                         phases = phases[:-self.num_cal_points]
                         data = data[:-self.num_cal_points]
 
@@ -4545,11 +4581,11 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                         'linestyle': 'none',
                         'do_legend': False}
                     if param_name == 'cphase':
-                            self.plot_dicts[plot_name+'_hline'] = {
-                                'fig_id': plot_name,
-                                'plotfn': self.plot_hlines,
-                                'y': 0,
-                                'xmin': np.min(unique_swpts2d[idx]),
-                                'xmax': np.max(unique_swpts2d[idx]),
-                                'colors': 'gray'}
+                        self.plot_dicts[plot_name+'_hline'] = {
+                            'fig_id': plot_name,
+                            'plotfn': self.plot_hlines,
+                            'y': 0,
+                            'xmin': np.min(unique_swpts2d[idx]),
+                            'xmax': np.max(unique_swpts2d[idx]),
+                            'colors': 'gray'}
 

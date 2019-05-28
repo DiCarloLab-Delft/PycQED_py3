@@ -390,7 +390,7 @@ class BaseDataAnalysis(object):
                      tag_tstamp: bool = True, dpi: int = 300,
                      fmt: str = 'png', key_list: list = 'auto',
                      close_figs: bool = True):
-        print(dpi)
+
         if savedir is None:
             savedir = self.raw_data_dict.get('folder', '')
             if isinstance(savedir, list):

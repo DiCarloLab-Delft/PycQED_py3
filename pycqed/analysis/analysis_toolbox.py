@@ -1736,7 +1736,7 @@ def predict_gm_proba_from_cal_points(X, cal_points):
     Args:
         X: Data (n, n_channels)
         cal_points: list of n_states cal_points (where each cal_point is
-            of size (n_channels,))
+            of size (n_cal_states, n_channels))
     """
     def find_prob(p, s, mu):
         approx = 0
@@ -1745,13 +1745,19 @@ def predict_gm_proba_from_cal_points(X, cal_points):
         diff = np.abs(s - approx)
         return np.sum(diff)
     probas = []
-    initial_guess = np.array([0.34,0.33,0.33])
-    proba_bounds = Bounds([0.,0.,0.], [1.,1.,1.])
-    proba_sum_constr = LinearConstraint([1.,1.,1.], [1.],[1.])
+    initial_guess = np.ones(cal_points.shape[0])/cal_points.shape[0]
+    # g_prob = 0.01
+    # initial_guess = (g_prob, (1-g_prob)/2, (1-g_prob)/2)
+    print(initial_guess)
+    proba_bounds = Bounds(np.zeros(cal_points.shape[0]),
+                          np.ones(cal_points.shape[0]))
+    proba_sum_constr = LinearConstraint(np.ones(cal_points.shape[0]),
+                                        [1.], [1.])
     for pt in X:
         opt_results = minimize(find_prob, initial_guess,
-                               args=[pt, cal_points], method='SLSQP',
-                               bounds=proba_bounds, constraints=proba_sum_constr)
+                               args=(pt, cal_points), method='SLSQP',
+                               bounds=proba_bounds,
+                               constraints=proba_sum_constr)
         probas.append(opt_results.x)
     return np.array(probas)
 
