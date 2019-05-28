@@ -1735,7 +1735,7 @@ def predict_gm_proba_from_cal_points(X, cal_points):
     Args:
         X: Data (n, n_channels)
         cal_points: array of calpoints where each row is a different state and
-        columns are number of channels
+        columns are number of channels (n_cal_points, n_channels)
     """
     def find_prob(p, s, mu):
         approx = 0
@@ -1744,10 +1744,10 @@ def predict_gm_proba_from_cal_points(X, cal_points):
         diff = np.abs(s - approx)
         return np.sum(diff)
     probas = []
-    initial_guess = np.ones(cal_points.shape[1])/cal_points.shape[1]
-    proba_bounds = Bounds(np.zeros(cal_points.shape[1]),
-                          np.ones(cal_points.shape[1]))
-    proba_sum_constr = LinearConstraint(np.ones(cal_points.shape[1]),
+    initial_guess = np.ones(cal_points.shape[0])/cal_points.shape[0]
+    proba_bounds = Bounds(np.zeros(cal_points.shape[0]),
+                          np.ones(cal_points.shape[0]))
+    proba_sum_constr = LinearConstraint(np.ones(cal_points.shape[0]),
                                         [1.], [1.])
     for pt in X:
         opt_results = minimize(find_prob, initial_guess,
@@ -1759,8 +1759,8 @@ def predict_gm_proba_from_cal_points(X, cal_points):
 
 def predict_gm_proba_from_clf(X, clf_params):
     """
-    Predict gaussian mixture posterior probabilities for different levels of a
-    qudit.
+    Predict gaussian mixture posterior probabilities for single shots
+    of different levels of a qudit.
     Args:
         X: Data (n_datapoints, n_channels)
         clf_params: dictionary with parameters for Gaussian Mixture classifier
