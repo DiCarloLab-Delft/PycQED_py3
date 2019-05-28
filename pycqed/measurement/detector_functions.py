@@ -1650,6 +1650,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
         # the self.channels should be the same as data_raw.keys().
         # this is to be tested (MAR 26-9-2017)
+
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
         # Corrects offsets after crosstalk suppression matrix in UFHQC
@@ -2148,30 +2149,6 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.prepare_function = prepare_function
         self.prepare_function_kwargs = prepare_function_kwargs
 
-    def get_values(self):
-        if self.always_prepare:
-            self.prepare()
-        if self.AWG is not None:
-            self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
-
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
-
-        data_raw = self.UHFQC.acquisition_poll(
-            samples=self.nr_shots, arm=False, acquisition_time=0.01)
-        data = np.array([data_raw[key]
-                         for key in sorted(data_raw.keys())])*self.scaling_factor
-
-        # Corrects offsets after crosstalk suppression matrix in UFHQC
-        if self.result_logging_mode == 'lin_trans':
-            for i, channel in enumerate(self.channels):
-                data[i] = data[i]-self.UHFQC.get(
-                    'quex_trans_offset_weightfunction_{}'.format(channel))
-        return data
-
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
@@ -2198,6 +2175,209 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
         self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+
+    def get_values(self):
+        if self.always_prepare:
+            self.prepare()
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+
+        data_raw = self.UHFQC.acquisition_poll(
+            samples=self.nr_shots, arm=False, acquisition_time=0.01)
+        data = np.array([data_raw[key]
+                         for key in sorted(data_raw.keys())])*self.scaling_factor
+
+        # Corrects offsets after crosstalk suppression matrix in UFHQC
+        if self.result_logging_mode == 'lin_trans':
+            for i, channel in enumerate(self.channels):
+                data[i] = data[i]-self.UHFQC.get(
+                    'quex_trans_offset_weightfunction_{}'.format(channel))
+        return data
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+
+class UHFQC_integration_logging_classifier_det(Hard_Detector):
+
+    '''
+    Detector used for integrated average results with the UHFQC
+
+    '''
+
+    def __init__(self, UHFQC, AWG=None,
+                 integration_length: float=1e-6,
+                 nr_shots: int=4094,
+                 channels: list=(0, 1),
+                 result_logging_mode: str='raw',
+                 always_prepare: bool=False,
+                 prepare_function=None,
+                 prepare_function_kwargs: dict=None,
+                 get_values_function_kwargs: dict=None,
+                 **kw):
+        """
+        Args:
+        UHFQC (instrument) : data acquisition device
+        AWG   (instrument) : device responsible for starting and stopping
+                             the experiment, can also be a central controller.
+        integration_length (float): integration length in seconds
+        nr_shots (int)     : nr of shots (max is 4095)
+        channels (list)    : index (channel) of UHFQC weight functions to use
+
+        result_logging_mode (str):  options are
+            - raw        -> returns raw data in V
+            - lin_trans  -> applies the linear transformation matrix and
+                            subtracts the offsets defined in the UFHQC.
+                            This is typically used for crosstalk suppression
+                            and normalization. Requires optimal weights.
+            - digitized  -> returns fraction of shots based on the threshold
+                            defined in the UFHQC. Requires optimal weights.
+        always_prepare (bool) : when True the acquire/get_values method will
+            first call the prepare statement. This is particularly important
+            when it is both a single_int_avg detector and acquires multiple
+            segments per point.
+        """
+        super().__init__()
+
+        self.UHFQC = UHFQC
+        self.name = '{}_UHFQC_integration_logging_det'.format(
+            result_logging_mode)
+        self.channels = channels
+        self.state_labels = ['pg', 'pe', 'pf']
+
+        channel_strings = [str(ch) for ch in self.channels]
+        self.channel_str_pairs = [''.join(channel_strings[2*j: 2*j+2]) for
+                                  j in range(len(self.channels)//2)]
+        self.value_names = ['']*(len(
+            self.state_labels)*len(self.channel_str_pairs))
+        idx = 0
+        for ch_pair in self.channel_str_pairs:
+            for state in self.state_labels:
+                self.value_names[idx] = '{} w{}'.format(
+                    state, ch_pair)
+                idx += 1
+
+        if result_logging_mode == 'raw':
+            self.value_units = ['']*(len(
+                self.state_labels)*len(self.channel_str_pairs))
+            self.scaling_factor = 1  # /(1.8e9*integration_length)
+        else:
+            self.value_units = ['']*(len(
+                self.state_labels)*len(self.channel_str_pairs))
+            self.scaling_factor = 1
+
+        self.AWG = AWG
+        self.integration_length = integration_length
+        self.nr_shots = nr_shots
+
+        # 0/1/2 crosstalk supressed /digitized/raw
+        res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
+        # mode 3 is statistics logging, this is implemented in a
+        # different detector
+        self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
+        self.result_logging_mode = result_logging_mode
+
+        self.always_prepare = always_prepare
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
+        self.get_values_function_kwargs = get_values_function_kwargs
+
+    def prepare(self, sweep_points):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+        if self.prepare_function_kwargs is not None:
+            if self.prepare_function is not None:
+                self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            if self.prepare_function is not None:
+                self.prepare_function()
+
+        self.nr_sweep_points = len(sweep_points)
+        # The averaging-count is used to specify how many times the AWG program
+        # should run
+        print(int(self.nr_shots*self.nr_sweep_points))
+        self.UHFQC.awgs_0_single(1)
+        self.UHFQC.awgs_0_userregs_0(int(self.nr_shots*self.nr_sweep_points))
+        # The AWG program uses userregs/0 to define the number of iterations
+        # in the loop
+        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
+
+
+        self.UHFQC.quex_rl_length(self.nr_shots*self.nr_sweep_points)
+        self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
+        self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
+
+        self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
+        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+
+    def get_values(self):
+        if self.always_prepare:
+            self.prepare()
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+
+        data_raw = self.UHFQC.acquisition_poll(
+            samples=self.nr_shots*self.nr_sweep_points,
+            arm=False, acquisition_time=0.01)
+
+        print(data_raw)
+        print()
+        data = np.array([data_raw[key]
+                         for key in sorted(data_raw.keys())])*self.scaling_factor
+        print(data.shape, data)
+
+        # Corrects offsets after crosstalk suppression matrix in UFHQC
+        if self.result_logging_mode == 'lin_trans':
+            for i, channel in enumerate(self.channels):
+                data[i] = data[i]-self.UHFQC.get(
+                    'quex_trans_offset_weightfunction_{}'.format(channel))
+
+        # classify data into qutrit states
+        # TODO: make this work for qubits as well!
+        classifier_params_list = self.get_values_function_kwargs.get(
+                    'classifier_params', None)
+        if not isinstance(classifier_params_list, list):
+            classifier_params_list = [classifier_params_list]
+
+        nr_states = len(self.state_labels)
+        classified_data = np.zeros(
+            (nr_states*len(self.channel_str_pairs),self.nr_sweep_points))
+        if self.get_values_function_kwargs.get('classify', False):
+            for i in range(len(self.channel_str_pairs)):
+                classified_data[nr_states*i: nr_states*i+nr_states, :] = \
+                    self.clasify_shots(data[2*i:2*i+2, :],
+                                       classifier_params_list[i],
+                                       self.get_values_function_kwargs.get(
+                                           'average', False))
+        print(classified_data.shape, classified_data)
+        return classified_data
+
+    def clasify_shots(self, data, classifier_params_dict, average=False):
+        if classifier_params_dict is None:
+            raise ValueError('Please specify the classifier parameters dict.')
+
+        classified_data = a_tools.predict_gm_proba_from_clf(
+            data.T, classifier_params_dict)
+
+        if average:
+            classified_data = np.mean(np.reshape(
+                classified_data, (self.nr_shots, self.nr_sweep_points,
+                                  classified_data.shape[1])), axis=0)
+        return classified_data.T
 
     def finish(self):
         if self.AWG is not None:

@@ -2540,7 +2540,8 @@ class QuDev_transmon(Qubit):
             if qutrit:
                 # TODO Nathan: could try and merge this with no qutrit to avoid logical
                 #  branching
-                options = dict(classif_method='gmm')
+                options = dict(classif_method='gmm',
+                               pre_selection=preselection_pulse)
                 labels = ['SSRO_fidelity_{}'.format(l) for l in levels]
                 ssqtro = Singleshot_Readout_Analysis_Qutrit(label=labels,
                                                             options_dict=options)

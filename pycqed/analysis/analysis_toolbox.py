@@ -11,10 +11,13 @@ from collections import OrderedDict as od
 from matplotlib import pyplot as plt
 from matplotlib import colors
 import pandas as pd
+from sklearn.mixture import GaussianMixture as GM
+
 from pycqed.utilities.get_default_datadir import get_default_datadir
 from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
+from scipy.optimize import Bounds, LinearConstraint, minimize
 from scipy.signal import argrelextrema
 # to allow backwards compatibility with old a_tools code
 from .tools.file_handling import *
@@ -348,7 +351,7 @@ def get_qb_channel_map_from_file(qb_names, file_path,
             if ro_acq_weight_type in ['optimal', 'square_rot']:
                 channel_map[qbn] = [ro_type + str(
                     instr_settings[qbn].attrs['RO_acq_weight_function_I'])]
-            elif ro_acq_weight_type in ['SSB', 'DSB']:
+            elif ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
                 channel_map[qbn] = [
                     ro_type +
                     str(instr_settings[qbn].attrs['RO_acq_weight_function_I']),
@@ -1725,33 +1728,64 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
     return normalized_data
 
-
-
-def predict_gm_proba(X, means, covariances, levels, weights=None):
+def predict_gm_proba_from_cal_points(X, cal_points):
     """
-    Predict gaussian mixture posterior probabilities for different levels of a qudit.
+    For each point of the data array X, predicts the probability of being
+    in the states of each cal_point respectively,
+    in the limit of narrow gaussians.
     Args:
-        X: Data (n, n_features)
-        means: array of means of each component of the GM
-        covariances: covariance matrices of each component of the GM (list of)
-        levels: levels of the qudit (essentially equal to range(n_components))
-        weights: array of priors of being in each level.
-            Defaults to uniform prior ( n_components,)
+        X: Data (n, n_channels)
+        cal_points: list of n_states cal_points (where each cal_point is
+            of size (n_channels,))
+    """
+    def find_prob(p, s, mu):
+        approx = 0
+        for mu_i, p_i in zip(mu, p):
+            approx += mu_i*p_i
+        diff = np.abs(s - approx)
+        return np.sum(diff)
+    probas = []
+    initial_guess = np.array([0.34,0.33,0.33])
+    proba_bounds = Bounds([0.,0.,0.], [1.,1.,1.])
+    proba_sum_constr = LinearConstraint([1.,1.,1.], [1.],[1.])
+    for pt in X:
+        opt_results = minimize(find_prob, initial_guess,
+                               args=[pt, cal_points], method='SLSQP',
+                               bounds=proba_bounds, constraints=proba_sum_constr)
+        probas.append(opt_results.x)
+    return np.array(probas)
 
-    Returns: (n, n_components) array of posterior probability of being in each level
+def predict_gm_proba_from_clf(X, clf_params):
+    """
+    Predict gaussian mixture posterior probabilities for different levels of a
+    qudit.
+    Args:
+        X: Data (n_datapoints, n_channels)
+        clf_params: dictionary with parameters for Gaussian Mixture classifier
+            means_: array of means of each component of the GM
+            covariances_: covariance matrix
+            covariance_type: type of covariance matrix
+            weights_: array of priors of being in each level. (n_levels,)
+            precisions_cholesky_: array of precision_cholesky
+
+            For more info see about parameters see :
+            https://scikit-learn.org/stable/modules/generated/sklearn.mixture.
+            GaussianMixture.html
+    Returns: (n_datapoints, n_levels) array of posterior probability of being in
+        each level
 
     """
-    if weights is None:
-        weights = np.ones((len(levels)))*1./len(levels)
-    gaussian = dict()
-    for i, l in enumerate(levels):
-        gaussian[l] = multivariate_normal(mean=means[i], cov=covariances[i])
-    proba = np.zeros((X.shape[0], len(levels)))
-    for i, l in enumerate(levels):
-        proba[:,i] = gaussian[l].pdf(X)*weights[i] / \
-                     np.sum([gaussian[l].pdf(X)*weights[i]
-                             for i, l in enumerate(levels)], axis=0)
-    return proba
+    reqs_params = ['means_', 'covariances_', 'covariance_type',
+                   'weights_', 'precisions_cholesky_']
+    clf_params = clf_params.copy()
+    for r in reqs_params:
+        assert r in clf_params, "Required Classifier parameter {} " \
+                                "not given.".format(r)
+    gm = GM(covariance_type=clf_params.pop('covariance_type'))
+    for param_name, param_value in clf_params.items():
+        setattr(gm, param_name, param_value)
+    probas = gm.predict_proba(X)
+    return probas
 
 def datetime_from_timestamp(timestamp):
     try:

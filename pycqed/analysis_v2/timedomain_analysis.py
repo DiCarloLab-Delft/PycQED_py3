@@ -213,7 +213,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.single_timestamp = single_timestamp
         self.numeric_params = []
 
-
         if auto:
             self.run_analysis()
 
@@ -261,10 +260,10 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         ch_map_lists = {k: v for k, v in self.channel_map.items()
                         if isinstance(v, list)}
-        if np.any([len(v) > 2 for v in ch_map_lists.values()]):
-            raise ValueError('{} have more than 2 RO channels. There is no '
-                             'support for this case.'.format(
-                ','.join([k for k, v in ch_map_lists.items() if len(v) > 2])))
+        # if np.any([len(v) > 2 for v in ch_map_lists.values()]):
+        #     raise ValueError('{} have more than 2 RO channels. There is no '
+        #                      'support for this case.'.format(
+        #         ','.join([k for k, v in ch_map_lists.items() if len(v) > 2])))
 
         measured_RO_channels = list(self.raw_data_dict[
                                         'measured_values_ord_dict'])
@@ -290,15 +289,60 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             self.raw_data_dict[
                                 'measured_values_ord_dict'][meas_RO][0]
             else:
-                raise TypeError('The RO channels for {} must either a list '
+                raise TypeError('The RO channels for {} must either be a list '
                                 'or a string.'.format(qb_name))
         self.proc_data_dict['meas_results_per_qb_per_ROch'] = \
             meas_results_per_qb_per_ROch
 
+        self.for_ef = self.options_dict.get('for_ef',
+                                            self.metadata.get('for_ef', False))
         self.num_cal_points = self.options_dict.get(
             'num_cal_points', self.metadata.get('num_cal_points', None))
-        print(self.num_cal_points)
+        if self.options_dict.get('rotate_data', True):
+            self.cal_states_analysis()
+        else:
+            self.proc_data_dict['projected_data_dict'] = OrderedDict()
+            for qbn in self.qb_names:
+                qb_data = self.proc_data_dict['meas_results_per_qb_per_ROch'][
+                        qbn]
+                if self.for_ef:
+                    key = [k for k in qb_data if 'pf' in k][0]
+                else:
+                    key = [k for k in qb_data if 'pe' in k][0]
+                self.proc_data_dict['projected_data_dict'][qbn] = \
+                    qb_data[key]
 
+        for qbn in self.qb_names:
+            if self.num_cal_points > 0:
+                self.raw_data_dict['sweep_points_dict'][qbn][
+                    'msmt_sweep_points'] = \
+                    self.raw_data_dict['sweep_points_dict'][qbn][
+                    'sweep_points'][:-self.num_cal_points]
+                self.raw_data_dict['sweep_points_dict'][qbn][
+                    'cal_points_sweep_points'] = \
+                    self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'][-self.num_cal_points::]
+            else:
+                self.raw_data_dict['sweep_points_dict'][qbn][
+                    'msmt_sweep_points'] = \
+                    self.raw_data_dict['sweep_points'][0]
+                self.raw_data_dict['sweep_points_dict'][qbn][
+                    'cal_points_sweep_points'] = \
+                    self.raw_data_dict['sweep_points'][0]
+
+        if self.options_dict.get('TwoD', False):
+            if 'sweep_points_2D_dict' in self.metadata:
+                # assumed to be of the form {qbn1: swpts_array1,
+                # qbn2: swpts_array2}
+                self.raw_data_dict['sweep_points_2D_dict'] = \
+                    {qbn: self.metadata['sweep_points_2D_dict'][qbn] for
+                     qbn in self.qb_names}
+            else:
+                self.raw_data_dict['sweep_points_2D_dict'] = \
+                    {qbn: self.raw_data_dict['sweep_points_2D'][0] for
+                     qbn in self.qb_names}
+
+    def cal_states_analysis(self):
         if self.num_cal_points is None:
             print('Assuming two cal states, |g> and |e>, and using '
                   'sweep_points[-4:-2] as |g> cal points, and '
@@ -332,41 +376,16 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 self.cal_point_indices = [cal_zero_points, cal_one_points]
 
         if self.options_dict.get('TwoD', False):
-            if 'sweep_points_2D_dict' in self.metadata:
-                # assumed to be of the form {qbn1: swpts_array1,
-                # qbn2: swpts_array2}
-                self.raw_data_dict['sweep_points_2D_dict'] = \
-                    {qbn: self.metadata['sweep_points_2D_dict'][qbn] for
-                     qbn in self.qb_names}
-            else:
-                self.raw_data_dict['sweep_points_2D_dict'] = \
-                    {qbn: self.raw_data_dict['sweep_points_2D'][0] for
-                     qbn in self.qb_names}
             self.proc_data_dict['projected_data_dict'] = \
-                self.rotate_data_TwoD(meas_results_per_qb_per_ROch,
-                                      self.channel_map, self.cal_point_indices)
+                self.rotate_data_TwoD(
+                    self.proc_data_dict['meas_results_per_qb_per_ROch'],
+                    self.channel_map,
+                    self.cal_point_indices)
         else:
             self.proc_data_dict['projected_data_dict'] = \
-                self.rotate_data(meas_results_per_qb_per_ROch,
-                                 self.channel_map, self.cal_point_indices)
-            
-        for qbn in self.qb_names:
-            if self.num_cal_points > 0:
-                self.raw_data_dict['sweep_points_dict'][qbn][
-                    'msmt_sweep_points'] = \
-                    self.raw_data_dict['sweep_points_dict'][qbn][
-                    'sweep_points'][:-self.num_cal_points]
-                self.raw_data_dict['sweep_points_dict'][qbn][
-                    'cal_points_sweep_points'] = \
-                    self.raw_data_dict['sweep_points_dict'][qbn][
-                        'sweep_points'][-self.num_cal_points::]
-            else:
-                self.raw_data_dict['sweep_points_dict'][qbn][
-                    'msmt_sweep_points'] = \
-                    self.raw_data_dict['sweep_points'][0]
-                self.raw_data_dict['sweep_points_dict'][qbn][
-                    'cal_points_sweep_points'] = \
-                    self.raw_data_dict['sweep_points'][0]
+                self.rotate_data(
+                    self.proc_data_dict['meas_results_per_qb_per_ROch'],
+                    self.channel_map, self.cal_point_indices)
 
     @staticmethod
     def rotate_data(meas_results_per_qb_per_ROch, channel_map,

@@ -29,10 +29,12 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         if cal_points and no_cal_points == 6 and  \
                 (i == (len(amps)-6) or i == (len(amps)-5)):
-                    el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+                    el = multi_pulse_elt(i, station, [pulses['I'],
+                                                      pulses_2nd['I'], RO_pars])
         elif cal_points and no_cal_points == 6 and \
                 (i == (len(amps)-4) or i == (len(amps)-3)):
-                    el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+                    el = multi_pulse_elt(i, station, [pulses['X180'],
+                                                      pulses_2nd['I'], RO_pars])
         elif cal_points and no_cal_points == 6 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
                     el = multi_pulse_elt(i, station, [pulses['X180'],
@@ -40,30 +42,25 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
                                                       RO_pars])
         elif cal_points and no_cal_points == 4 and \
                 (i == (len(amps)-4) or i == (len(amps)-3)):
-                    el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+                    el = multi_pulse_elt(i, station, [pulses['I'],
+                                                      pulses_2nd['I'], RO_pars])
         elif cal_points and no_cal_points == 4 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-                    el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+                    el = multi_pulse_elt(i, station, [pulses['X180'],
+                                                      pulses_2nd['I'], RO_pars])
         elif cal_points and no_cal_points == 2 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-                    el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
-        # if cal_points and (last_ge_pulse==False) and (i == (len(times)-4) or
-        #                                                       i == (len(times)-3)):
-        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        # elif cal_points and (last_ge_pulse==False) and (i == (len(times)-2) or
-        #                                                     i == (len(times)-1)):
-        #     el = multi_pulse_elt(i, station, [pulses_2nd['X180'], RO_pars])
-        # if cal_points and (last_ge_pulse==True) and (i == (len(times)-4) or
-        #                                                      i == (len(times)-3)):
-        #     el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        # elif cal_points and (last_ge_pulse==True) and (i == (len(times)-2) or
-        #                                                        i == (len(times)-1)):
-        #     el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+                    el = multi_pulse_elt(i, station, [pulses['I'],
+                                                      pulses_2nd['I'], RO_pars])
         else:
             pulses_2nd_temp = deepcopy(pulses_2nd)
             pulses_2nd_temp['X180']['amplitude'] = amp
-
             pulse_list = [pulses['X180']]+n*[pulses_2nd_temp['X180']]
+
+            # # ge rabi
+            # pulses_temp = deepcopy(pulses)
+            # pulses_temp['X180']['amplitude'] = amp
+            # pulse_list = [pulses_temp['X180']]
 
             if last_ge_pulse:
                 pulse_list += [pulses['X180']]
@@ -367,7 +364,6 @@ def T1_2nd_exc_seq(times,
                         'The units should be seconds.')
     seq_name = 'T1_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
