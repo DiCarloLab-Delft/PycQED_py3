@@ -812,8 +812,10 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                            **self.options_dict.get("classif_kw", dict()))
         fm = self.fidelity_matrix(prep_states, pred_states)
 
-        self.proc_data_dict['analysis_params']['fidelity_mtx'] = fm
-        self.proc_data_dict['analysis_params']['classifier_params'] = clf_params
+        self.proc_data_dict['analysis_params']['state_prob_mtx'] = fm
+        self.proc_data_dict['analysis_params']['n_shots'] = X.shape[0]
+        self.proc_data_dict['analysis_params'] \
+                           ['classifier_params'] = clf_params
 
         if self.pre_selection:
             prep_states = []
@@ -822,18 +824,21 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
             pred_presel = dict()
             for i, l in enumerate(self.levels):
                 data[l] = data[l].transpose()
-                pred_presel[l] = self.clf_.predict(intermediate_ro[l].transpose())
+                pred_presel[l] = self.clf_.predict(intermediate_ro[l]
+                                                   .transpose())
                 data_masked = data[l][pred_presel[l] == 0.]
                 X.append(data_masked)
                 prep_states.append(np.ones((data_masked.shape[0]))*i)
 
-
-            pred_states = self.clf_.predict(np.vstack(X))
+            X = np.vstack(X)
+            pred_states = self.clf_.predict(X)
             prep_states = np.hstack(prep_states)
-            print(prep_states.shape, pred_states.shape)
 
             fm = self.fidelity_matrix(prep_states, pred_states)
-            self.proc_data_dict['analysis_params']['fidelity_mtx_masked'] = fm
+            self.proc_data_dict['analysis_params']\
+                               ['state_prob_mtx_masked'] = fm
+            self.proc_data_dict['analysis_params']['n_shots_masked'] = \
+                X.shape[0]
 
     def _filter(self, data):
         """
@@ -934,20 +939,23 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                                       "remain to be implemented.")
 
     @staticmethod
-    def fidelity_matrix(prep_states, pred_states,
-                        levels=('g', 'e', 'f'), plot=False):
+    def fidelity_matrix(prep_states, pred_states, levels=('g', 'e', 'f'),
+                        plot=False, normalize=True):
         fm = confusion_matrix(prep_states, pred_states)
         if plot:
             Singleshot_Readout_Analysis_Qutrit.plot_fidelity_matrix(fm,
                                                                     levels)
+        if normalize:
+            fm = fm.astype('float') / fm.sum(axis=1)[:, np.newaxis]
         return fm
 
     @staticmethod
     def plot_fidelity_matrix(fm, target_names,
-                             title="Fidelity matrix", append_shots_info=True,
+                             title="State Assignment Probability Matrix",
+                             auto_shot_info=True,
                              cmap=None, normalize=True, show=False):
         fidelity_avg = np.trace(fm) / float(np.sum(fm))
-        if append_shots_info:
+        if auto_shot_info:
             title += '\nTotal # shots:{}'.format(np.sum(fm))
         if cmap is None:
             cmap = plt.get_cmap('Reds')
@@ -966,8 +974,8 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         if normalize:
             fm = fm.astype('float') / fm.sum(axis=1)[:, np.newaxis]
 
-        im = ax.imshow(fm, interpolation='nearest', cmap=cmap, norm=mc.LogNorm(),
-                       vmin=5e-3, vmax=1.)
+        im = ax.imshow(fm, interpolation='nearest', cmap=cmap,
+                       norm=mc.LogNorm(), vmin=5e-3, vmax=1.)
         ax.set_title(title)
         fig.colorbar(im)
 
@@ -1011,19 +1019,24 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
             if show:
                 plt.show()
             self.figs['IntegratedIQ_raw'] = fig
-            title = self.raw_data_dict['timestamps'][0] + "\nFidelity Matrix"
+            title = self.raw_data_dict['timestamps'][0] + "\nState Assignment" \
+                " Probability Matrix" + '\nTotal # shots:{}'\
+                .format(self.proc_data_dict['analysis_params']['n_shots'])
+
             fig = self.plot_fidelity_matrix(
-                self.proc_data_dict['analysis_params']['fidelity_mtx'],
-                self.levels, title=title, show=show)
-            self.figs['fidelity_matrix'] = fig
+                self.proc_data_dict['analysis_params']['state_prob_mtx'],
+                self.levels, title=title, show=show, auto_shot_info=False)
+            self.figs['state_prob_matrix'] = fig
             if self.pre_selection:
                 title = self.raw_data_dict['timestamps'][0] + \
-                        "\nFidelity Matrix Masked"
+                    "\nState Assignment Probability Matrix Masked" \
+                    '\nTotal # shots:{}'.format(
+                     self.proc_data_dict['analysis_params']['n_shots_masked'])
                 fig = self.plot_fidelity_matrix(
-                    self.proc_data_dict['analysis_params']['fidelity_mtx_masked'],
-                    self.levels,
-                    title=title, show=show)
-                self.figs['fidelity_matrix_masked'] = fig
+                    self.proc_data_dict['analysis_params'] \
+                                       ['state_prob_mtx_masked'],
+                    self.levels, title=title, show=show, auto_shot_info=False)
+                self.figs['state_prob_matrix_masked'] = fig
 
 
 class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):

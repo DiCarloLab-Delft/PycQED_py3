@@ -2519,7 +2519,7 @@ class QuDev_transmon(Qubit):
                 MC.set_sweep_points(np.arange(self.RO_acq_shots()))
                 MC.run(name=label + '_{}'.format(level) + self.msmt_suffix,
                        mode=mode)
-                pass
+
         else:
             MC.set_sweep_function(awg_swf2.n_qubit_off_on(
                 pulse_pars_list=[self.get_drive_pars()],
@@ -2538,13 +2538,14 @@ class QuDev_transmon(Qubit):
 
         if analyze:
             if qutrit:
-                # TODO Nathan: could try and merge this with no qutrit to avoid logical
-                #  branching
+                # TODO Nathan: could try and merge this with no qutrit to
+                #  avoid logical branching
                 options = dict(classif_method='gmm',
                                pre_selection=preselection_pulse)
                 labels = ['SSRO_fidelity_{}'.format(l) for l in levels]
-                ssqtro = Singleshot_Readout_Analysis_Qutrit(label=labels,
-                                                            options_dict=options)
+                ssqtro = \
+                    Singleshot_Readout_Analysis_Qutrit(label=labels,
+                                                       options_dict=options)
                 return ssqtro.proc_data_dict['fidelity_mtx'],  \
                        ssqtro.proc_data_dict.get('classifier_params', None)
 
