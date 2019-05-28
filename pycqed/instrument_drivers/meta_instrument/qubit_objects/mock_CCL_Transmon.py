@@ -35,7 +35,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_freq_qubit', label='qubit frequency', unit='Hz',
                            docstring='A fixed value, can be made fancier by making it depend on Flux through E_c, E_j and flux',
                            parameter_class=ManualParameter,
-                           initial_value=np.sqrt(8*self.mock_Ec()*self.mock_Ej())-self.mock_Ec())
+                           initial_value=4.824567e9)
 
         self.add_parameter('mock_freq_res', label='resonator frequency', unit='Hz',
                            parameter_class=ManualParameter, initial_value=7.487628e9)
@@ -60,6 +60,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         self.add_parameter('mock_T2_star', label='Ramsey T2', unit='s',
                            initial_value=1e-6, parameter_class=ManualParameter)
+
+        self.add_parameter('mock_anharmonicity', label='anharmonicity', unit='Hz',
+                           initial_value=274e6, parameter_class=ManualParameter)
+
+        self.add_parameter('mock_12_spec_amp', label='amplitude for 12 transition',
+                           unit='-', initial_value=0.5, parameter_class=ManualParameter)
 
     def find_resonator_power(self, freqs=None, powers=None):
         if freqs is None:
@@ -86,12 +92,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         '''
         if freqs is None:
             freq_center = self.freq_res()
-            freq_range = 10e6
+            freq_range = 20e6
             freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
                               0.5e6)
 
         if dac_values is None:
-            dac_values = np.arange(-1e-3, -1e3, 101)
+            dac_values = np.linspace(-10e-3, 10e-3, 101)
 
         if fluxChan is None:
             fluxChan = 'FBL_1'
@@ -109,17 +115,27 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         (e.g. pulsed/CW) and by imp using cfg_spec_mode.
 
         Uses a Lorentzian as a result for now
+
+        TODO: Make depend on ro power
         '''
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         s = swf.None_Sweep(name='Homodyne Frequency', parameter_name='Frequency',
                            unit='Hz')
-        h = 10e-3  # Lorentian baseline [V]
-        A = 9e-3   # Height of peak [V]
+        h = self.ro_pulse_amp_CW()*450e-3  # Lorentian baseline [V]
+        A = 0.6*h   # Height of peak [V]
         w = 4e6    # Full width half maximum of peak
-        mocked_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
-                                            ((freqs - self.mock_freq_qubit()))**2)
+        f0 = self.mock_freq_qubit()
+        if self.spec_amp() > self.mock_12_spec_amp():  # 1-2 transition
+            A12 = 0.4*h
+            w12 = 1e6
+            f12 = self.mock_freq_qubit()-self.mock_anharmonicity()
+            mocked_values = h + A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2) + \
+                                A12*(w12/2.0)**2 / ((w12/2.0)**2 + ((freqs - f12))**2)
+        else:
+            mocked_values = h + A*(w/2.0)**2 / ((w/2.0)**2 +
+                                                ((freqs - f0))**2)
 
         mocked_values += np.random.normal(0, 1e-3, np.size(mocked_values))
 
@@ -201,8 +217,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.run('Resonator_power_scan'+self.msmt_suffix, mode='2D')
 
         if analyze:
-            ma.TwoD_Analysis(label='Resonator_power_scan',
-                             close_fig=close_fig, normalize=True)
+            # ma.TwoD_Analysis(label='Resonator_power_scan',
+            #                  close_fig=close_fig, normalize=True)
+            a = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan', 
+                close_figig=True)
+            print(a)
+            return a
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None, analyze=True,
                                         close_fig=True):
@@ -231,7 +251,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             # Good signal
             f0 = self.mock_freq_res()
             mocked_values = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
-            
+
         elif (power > res_power) and (power < res_power + pow_shift):
             # no signal at all -> width increases, peak decreases
             A0 = A
@@ -268,6 +288,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_detector_function(d)
         MC.run('Resonator_scan'+self.msmt_suffix)
 
+        if analyze:
+            ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
+
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, pulsed=True,
                                              MC=None, analyze=True, fluxChan=None,
                                              close_fig=True,
@@ -292,8 +315,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         mocked_values = []
         for dac_value in dac_values:
-            h = 10e-3  # Lorentian baseline [V]
-            A = 9e-3   # Height of peak [V]
+            h = self.ro_pulse_amp_CW()*450e-3  # Lorentian baseline [V]
+            A = 0.9*h   # Height of peak [V]
             w = 0.5e6    # Full width half maximum of peak
             f0 = freq_res - df*(np.sin(1/2*np.pi*(dac_value-Iref)/I0))**2
             new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
@@ -315,7 +338,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.run('Resonator_dac_scan'+self.msmt_suffix, mode='2D')
 
         if analyze:
-            ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
+            ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig,
+                             normalize=False)
             import pycqed.analysis_v2.dac_scan_analysis as dsa
             dsa.Susceptibility_to_Flux_Bias(label='Resonator_dac_scan')
 
@@ -411,7 +435,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             self.T2_star(a.T2_star['T2_star'])
             res = {'T2star': a.T2_star['T2_star'],
                    'frequency': a.qubit_frequency}
-            return True  # res
+            return res
 
     def measure_T1(self, times=None, MC=None, analyze=True, close_fig=True,
                    update=True, prepare_for_timedomain=True):
