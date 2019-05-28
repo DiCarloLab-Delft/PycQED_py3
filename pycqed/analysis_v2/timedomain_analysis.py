@@ -296,12 +296,16 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             meas_results_per_qb_per_ROch
         self.for_ef = self.options_dict.get('for_ef',
                                             self.metadata.get('for_ef', False))
-        self.num_cal_points = self.options_dict.get(
-            'num_cal_points', self.metadata.get('num_cal_points', None))
+        self.cal_states_dict = self.options_dict.get(
+            'cal_states_dict', self.metadata.get('cal_states_dict', None))
+        print(self.cal_states_dict)
 
-        if self.options_dict.get('rotate_data', True):
+        if self.options_dict.get('rotate_data', self.metadata.get(
+                'rotate_data', True)):
             self.cal_states_analysis()
         else:
+            if self.cal_states_dict is not None:
+                self.unwrap_cal_states_dict()
             self.proc_data_dict['projected_data_dict'] = OrderedDict()
             for qbn in self.qb_names:
                 qb_data = self.proc_data_dict['meas_results_per_qb_per_ROch'][
@@ -310,8 +314,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     key = [k for k in qb_data if 'pf' in k][0]
                 else:
                     key = [k for k in qb_data if 'pe' in k][0]
-                self.proc_data_dict['projected_data_dict'][qbn] = \
-                    qb_data[key]
+                self.proc_data_dict['projected_data_dict'][qbn] = qb_data[key]
 
         for qbn in self.qb_names:
             if self.num_cal_points > 0:
@@ -343,10 +346,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     {qbn: self.raw_data_dict['sweep_points_2D'][0] for
                      qbn in self.qb_names}
 
-    def cal_states_analysis(self):
-        self.cal_states_dict = self.options_dict.get(
-            'cal_states_dict', self.metadata.get('cal_states_dict', None))
-        print(self.cal_states_dict)
+    def unwrap_cal_states_dict(self):
+        # TODO: remove this method, it should not be needed in the future
         if self.cal_states_dict is None:
             print('Assuming two cal states, |g> and |e>, and using '
                   'sweep_points[-4:-2] as |g> cal points, and '
@@ -368,28 +369,30 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         # order cal_states_dict
         self.ordered_cal_states_dict = OrderedDict()
-        cal_states_dict_for_rotation = OrderedDict()
+        self.cal_states_dict_for_rotation = OrderedDict()
         for i in range(len(self.cal_states_dict)):
             cal_state = {k: d['data_indices'] for k, d in
                          self.cal_states_dict.items() if d['rotation'] == i}
             self.ordered_cal_states_dict.update(cal_state)
-            cal_states_dict_for_rotation.update(cal_state)
+            self.cal_states_dict_for_rotation.update(cal_state)
         self.ordered_cal_states_dict.update(
             {k: d['data_indices'] for k, d in self.cal_states_dict.items() if
-             k not in cal_states_dict_for_rotation})
+             k not in self.cal_states_dict_for_rotation})
         print(self.ordered_cal_states_dict)
-        print(cal_states_dict_for_rotation)
+        print(self.cal_states_dict_for_rotation)
 
+    def cal_states_analysis(self):
+        self.unwrap_cal_states_dict()
         if self.options_dict.get('TwoD', False):
             self.proc_data_dict['projected_data_dict'] = \
                 self.rotate_data_TwoD(
                     self.proc_data_dict['meas_results_per_qb_per_ROch'],
-                    self.channel_map, cal_states_dict_for_rotation)
+                    self.channel_map, self.cal_states_dict_for_rotation)
         else:
             self.proc_data_dict['projected_data_dict'] = \
                 self.rotate_data(
                     self.proc_data_dict['meas_results_per_qb_per_ROch'],
-                    self.channel_map, cal_states_dict_for_rotation)
+                    self.channel_map, self.cal_states_dict_for_rotation)
 
     @staticmethod
     def rotate_data(meas_results_per_qb_per_ROch, channel_map, cal_states_dict):
@@ -460,7 +463,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                 data=data_array,
                                 cal_zero_points=cal_zero_points,
                                 cal_one_points=cal_one_points)
-
         return rotated_data_dict
 
     @staticmethod
@@ -531,7 +533,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                     data=data_array,
                                     cal_zero_points=cal_zero_points,
                                     cal_one_points=cal_one_points)
-
         return rotated_data_dict
 
     @staticmethod

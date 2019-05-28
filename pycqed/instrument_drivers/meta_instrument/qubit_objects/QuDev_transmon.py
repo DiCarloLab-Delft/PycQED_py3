@@ -2510,6 +2510,7 @@ class QuDev_transmon(Qubit):
                     pulse_pars=self.get_drive_pars(),
                     pulse_pars_2nd=self.get_ef_drive_pars(),
                     RO_pars=self.get_RO_pars(),
+                    RO_spacing=RO_spacing,
                     level=level,
                     upload=upload,
                     preselection=preselection_pulse))
@@ -2546,8 +2547,10 @@ class QuDev_transmon(Qubit):
                 ssqtro = \
                     Singleshot_Readout_Analysis_Qutrit(label=labels,
                                                        options_dict=options)
-                return ssqtro.proc_data_dict['fidelity_mtx'],  \
-                       ssqtro.proc_data_dict.get('classifier_params', None)
+                return ssqtro.proc_data_dict[
+                           'analysis_params']['state_prob_mtx'],  \
+                       ssqtro.proc_data_dict[
+                           'analysis_params'].get('classifier_params', None)
 
             else:
                 rotate = self.ro_acq_weight_type() in {'SSB', 'DSB'}
@@ -3148,11 +3151,20 @@ class QuDev_transmon(Qubit):
         if analyze:
             if for_ef:
                 #TODO: change hardcoding here
+                cal_states_dict = {'$|g\\rangle$':
+                                       {'data_indices': [-6, -5],
+                                        'rotation': None},
+                                   '$|e\\rangle$':
+                                       {'data_indices': [-4, -3],
+                                        'rotation': 0},
+                                   '$|f\\rangle$':
+                                       {'data_indices': [-2, -1],
+                                        'rotation': 1}}
                 rabi_ana = \
                     tda.RabiAnalysis(qb_names=[self.name],
-                                     options_dict=dict(num_cal_points=6,
-                                                       cal_zero_points=[-4, -3],
-                                                       cal_one_points=[-2, -1]))
+                                     options_dict=dict(
+                                         cal_states_dict=cal_states_dict,
+                                         for_ef=True))
                 amp180 = rabi_ana.proc_data_dict['analysis_params_dict'][
                     self.name]['piPulse']
             else:
@@ -3286,17 +3298,25 @@ class QuDev_transmon(Qubit):
         #Extract T1 and T1_stddev from ma.T1_Analysis
         if kw.pop('analyze', True):
             if for_ef:
-                T1_ana = ma.T1_Analysis(label=label, qb_name=self.name,
-                                         NoCalPoints=no_cal_points,
-                                         for_ef=for_ef,
-                                         last_ge_pulse=last_ge_pulse, **kw)
-                T1 = T1_ana.T1_dict['T1']
+                cal_states_dict = {'$|g\\rangle$':
+                                       {'data_indices': [-6, -5],
+                                        'rotation': None},
+                                   '$|e\\rangle$':
+                                       {'data_indices': [-4, -3],
+                                        'rotation': 0},
+                                   '$|f\\rangle$':
+                                       {'data_indices': [-2, -1],
+                                        'rotation': 1}}
+                T1_ana = tda.T1Analysis(
+                    qb_names=['qb1'], options_dict=dict(
+                        cal_states_dict=cal_states_dict,
+                        for_ef=True))
             else:
                 T1_ana = tda.T1Analysis(qb_names=[self.name])
-                T1 = T1_ana.proc_data_dict['analysis_params_dict'][
-                    self.name]['T1']
 
             if update:
+                T1 = T1_ana.proc_data_dict['analysis_params_dict'][
+                    self.name]['T1']
                 if for_ef:
                     self.T1_ef(T1)
                 else:
@@ -3567,13 +3587,19 @@ class QuDev_transmon(Qubit):
 
             if for_ef:
                 # TODO: change hardcoding here of calpoints
-                ramsey_ana = tda.RamseyAnalysis(qb_names=[self.name],
-                                                options_dict=
-                                                dict(fit_gaussian_decay=kw.get('fit_gaussian_decay', True),
-                                                num_cal_points=6,
-                                                cal_zero_points=[-4, -3],
-                                                cal_one_points=[-2, -1],
-                                                for_ef=True))
+                cal_states_dict = {'$|g\\rangle$':
+                                       {'data_indices': [-6, -5],
+                                        'rotation': None},
+                                   '$|e\\rangle$':
+                                       {'data_indices': [-4, -3],
+                                        'rotation': 0},
+                                   '$|f\\rangle$':
+                                       {'data_indices': [-2, -1],
+                                        'rotation': 1}}
+                ramsey_ana = tda.RamseyAnalysis(
+                    qb_names=[self.name], options_dict=dict(
+                        fit_gaussian_decay=kw.get('fit_gaussian_decay', True),
+                        cal_states_dict=cal_states_dict, for_ef=True))
                 new_qubit_freq = ramsey_ana.proc_data_dict[
                     'analysis_params_dict'][self.name]['exp_decay_' + self.name][
                     'new_qb_freq']
@@ -3818,7 +3844,10 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         if label is None:
-            label = 'QScale' + self.msmt_suffix
+            if for_ef:
+                label = 'QScale_2nd' + self.msmt_suffix
+            else:
+                label = 'QScale' + self.msmt_suffix
 
         if qscales is None:
             logging.warning("find_qscale does not know over which "
@@ -3848,18 +3877,18 @@ class QuDev_transmon(Qubit):
         if kw.pop('analyze', True):
             if for_ef:
                 # TODO remove hard coded cal points
-                # qscale_ana = ma.QScale_Analysis(auto=True, qb_name=self.name,
-                #                              label=label,
-                #                              NoCalPoints=no_cal_points,
-                #                              for_ef=for_ef,
-                #                              last_ge_pulse=last_ge_pulse, **kw)
-                # qscale = qscale_ana.optimal_qscale['qscale']
-                qscale_ana = tda.QScaleAnalysis(qb_names=[self.name],
-                                                options_dict=
-                                                dict(num_cal_points=6,
-                                                     cal_zero_points=[-4, -3],
-                                                     cal_one_points=[-2, -1],
-                                                     for_ef=True))
+                cal_states_dict = {'$|g\\rangle$':
+                                       {'data_indices': [-6, -5],
+                                        'rotation': None},
+                                   '$|e\\rangle$':
+                                       {'data_indices': [-4, -3],
+                                        'rotation': 0},
+                                   '$|f\\rangle$':
+                                       {'data_indices': [-2, -1],
+                                        'rotation': 1}}
+                qscale_ana = tda.QScaleAnalysis(
+                    qb_names=[self.name], options_dict=dict(
+                        cal_states_dict=cal_states_dict, for_ef=True))
                 qscale = qscale_ana.proc_data_dict['analysis_params_dict'][
                     self.name]['qscale']
             else:

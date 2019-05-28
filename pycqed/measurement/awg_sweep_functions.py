@@ -1008,11 +1008,12 @@ class AllXY(swf.Hard_Sweep):
 class SingleLevel(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, RO_pars, pulse_pars_2nd=None, upload=True,
-                 level='e', nr_samples=2, preselection=False):
+                 RO_spacing=300e-9, level='e', nr_samples=2, preselection=False):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.pulse_pars_2nd = pulse_pars_2nd
         self.RO_pars = RO_pars
+        self.RO_spacing = RO_spacing
         self.upload = upload
         self.parameter_name = 'sample'
         self.unit = '#'
@@ -1024,6 +1025,7 @@ class SingleLevel(swf.Hard_Sweep):
         if self.upload:
             sqs.single_level_seq(pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
                                  pulse_pars_2nd=self.pulse_pars_2nd,
+                                 RO_spacing=self.RO_spacing,
                                  level=self.name, preselection=self.preselection)
 
 

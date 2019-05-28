@@ -2348,6 +2348,8 @@ class UHFQC_integration_logging_classifier_det(Hard_Detector):
 
         # classify data into qutrit states
         # TODO: make this work for qubits as well!
+        state_prob_mtx = self.get_values_function_kwargs.get(
+                    'state_prob_mtx', None)
         classifier_params_list = self.get_values_function_kwargs.get(
                     'classifier_params', None)
         if not isinstance(classifier_params_list, list):
@@ -2359,14 +2361,16 @@ class UHFQC_integration_logging_classifier_det(Hard_Detector):
         if self.get_values_function_kwargs.get('classify', False):
             for i in range(len(self.channel_str_pairs)):
                 classified_data[nr_states*i: nr_states*i+nr_states, :] = \
-                    self.clasify_shots(data[2*i:2*i+2, :],
-                                       classifier_params_list[i],
-                                       self.get_values_function_kwargs.get(
+                    self.classify_shots(data[2 * i:2 * i + 2, :],
+                                        classifier_params_list[i],
+                                        state_prob_mtx,
+                                        self.get_values_function_kwargs.get(
                                            'average', False))
         print(classified_data.shape, classified_data)
         return classified_data
 
-    def clasify_shots(self, data, classifier_params_dict, average=False):
+    def classify_shots(self, data, classifier_params_dict,
+                       state_prob_mtx=None, average=False):
         if classifier_params_dict is None:
             raise ValueError('Please specify the classifier parameters dict.')
 
@@ -2377,7 +2381,12 @@ class UHFQC_integration_logging_classifier_det(Hard_Detector):
             classified_data = np.mean(np.reshape(
                 classified_data, (self.nr_shots, self.nr_sweep_points,
                                   classified_data.shape[1])), axis=0)
-        return classified_data.T
+        if state_prob_mtx is not None:
+            classified_data = np.linalg.inv(state_prob_mtx) @ classified_data.T
+        else:
+            classified_data = classified_data.T
+
+        return classified_data
 
     def finish(self):
         if self.AWG is not None:

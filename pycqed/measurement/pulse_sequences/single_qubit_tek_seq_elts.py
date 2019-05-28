@@ -886,7 +886,8 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         return seq_name
 
 
-def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False, level='e',
+def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False,
+                     level='e', RO_spacing=300e-9,
                      upload=True, return_seq=False, preselection=False):
     '''
     OffOn sequence for a single qubit using the tektronix.
@@ -927,8 +928,7 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False, le
     spacer = {'pulse_type': 'SquarePulse',
               'channel': RO_pars['acq_marker_channel'],
               'amplitude': 0.0,
-              'length': max(0, 300e-9 - pulse_pars['pulse_delay'] -
-                            pulse_pars['nr_sigma']*pulse_pars['sigma']),
+              'length': RO_spacing,
               'pulse_delay': 0}
 
     # if preselection, add readout between each pulse
