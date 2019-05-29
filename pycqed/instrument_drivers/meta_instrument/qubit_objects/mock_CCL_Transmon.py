@@ -1,9 +1,10 @@
 from .CCL_Transmon import CCLight_Transmon
-
+import time
 import numpy as np
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object import Qubit
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
@@ -67,6 +68,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_12_spec_amp', label='amplitude for 12 transition',
                            unit='-', initial_value=0.5, parameter_class=ManualParameter)
 
+        self.add_parameter('mock_current', label='current through FBL', unit='A',
+                           initial_value=0, parameter_class=ManualParameter)
+
+        self.add_parameter('mock_spec_baseline', label='resonator dip signal',
+                           unit='V', parameter_class=ManualParameter)
+
     def find_resonator_power(self, freqs=None, powers=None):
         if freqs is None:
             freq_center = self.freq_res()
@@ -107,6 +114,102 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         return True
 
+    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True):
+        if freqs is None:
+            freq_center = self.freq_qubit()
+            freq_range = 100e6
+            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+                              0.5e6)
+
+        if dac_values is None:
+            dac_values = np.linspace(-1.5e-3, 1.5e-3, 21)
+
+        t_start = time.time()
+        t_start = time.strftime('%Y%m%d_%H%M%S')
+
+        for dac_value in dac_values:
+            self.mock_current(dac_value)
+            self.find_frequency(freqs=freqs)
+
+        t_end = time.time()
+        t_end = time.strftime('%Y%m%d_%H%M%S')
+
+        a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
+                              label='spectroscopy__' + self.name)
+        pc = a.fit_res['fit_polycoeffs'].value
+        self.flux_polycoeffs(pc)
+        sweetspot_current = -pc[1]/(2*pc[0])
+
+        if update:
+            self.mock_current(sweetspot_current)
+            return True
+
+    def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
+                                    update=True):
+        '''
+        Finds an estimate of the anharmonicity by doing a spectroscopy around 
+        150 MHz below the qubit frequency.
+
+        TODO: if spec_pow is too low/high, it should adjust it to approx the 
+              ideal spec_pow + 25 dBm
+        '''
+
+        if anharmonicity is None:
+            # Standard estimate, negative by convention
+            anharmonicity = self.anharmonicity()
+
+        f12_estimate = self.freq_qubit()*2 + anharmonicity
+
+        if freqs is None:
+            freq_center = f12_estimate/2
+            freq_range = 100e6
+            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+                              0.5e6)
+
+        self.spec_pow(self.spec_pow()+25)
+        self.measure_spectroscopy(freqs=freqs, pulsed=False, analyze=False)
+
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix)
+        f02 = 2*a.params['f0'].value*1e9
+        if update:
+            self.anharmonicity(f02-2*self.freq_qubit())
+            return True
+
+    def find_spec_pow(self, freqs=None, powers=None, update=True):
+        '''
+        Should find the optimal spectroscopy power where the A/w ratio is 
+        at a maximum
+        '''
+
+        if freqs is None:
+            freq_center = self.freq_qubit()
+            freq_range = 100e6
+            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+                              0.5e6)
+        if powers is None:
+            powers = [-30, -20, -10]
+
+        w = np.zeros(np.size(powers))
+        A = np.zeros(np.size(powers))
+
+        for i, power in enumerate(powers):
+            self.spec_pow(power)
+            self.measure_spectroscopy(freqs=freqs, analyze=False)
+
+            a = ma.Homodyne_Analysis(label=self.msmt_suffix,
+                                     fitting_model='lorentzian')
+            w[i] = a.params['kappa'].value
+            A[i] = a.params['A'].value
+
+        Awratio = np.divide(A, w)
+
+        best_spec_pow = -26  # Should be some analysis and iterative method to 
+                             # find the optimum
+
+        if update:
+            self.spec_pow(best_spec_pow)
+            return True
+
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None, analyze=True,
                              close_fig=True, label='',
                              prepare_for_continuous_wave=True):
@@ -124,15 +227,22 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         s = swf.None_Sweep(name='Homodyne Frequency', parameter_name='Frequency',
                            unit='Hz')
         h = self.ro_pulse_amp_CW()*450e-3  # Lorentian baseline [V]
-        A = 0.6*h   # Height of peak [V]
+        current = self.mock_current()
+        Iref = self.mock_residual_flux_current()
+        I0 = 10e-3
+
+        # Height of peak [V]
+        A = 0.6*h*np.sqrt(np.abs(np.cos(2*np.pi*current-Iref)/I0))
         w = 4e6    # Full width half maximum of peak
-        f0 = self.mock_freq_qubit()
+
+        df = 400e6
+        f0 = self.mock_freq_qubit() - df*(np.sin(1/2*np.pi*(current-Iref)/I0))**2
         if self.spec_amp() > self.mock_12_spec_amp():  # 1-2 transition
-            A12 = 0.4*h
+            A12 = A*0.5
             w12 = 1e6
-            f12 = self.mock_freq_qubit()-self.mock_anharmonicity()
+            f02over2 = self.mock_freq_qubit()-self.mock_anharmonicity()/2
             mocked_values = h + A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2) + \
-                                A12*(w12/2.0)**2 / ((w12/2.0)**2 + ((freqs - f12))**2)
+                A12*(w12/2.0)**2 / ((w12/2.0)**2 + ((freqs - f02over2))**2)
         else:
             mocked_values = h + A*(w/2.0)**2 / ((w/2.0)**2 +
                                                 ((freqs - f0))**2)
@@ -147,8 +257,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_detector_function(d)
         MC.run('mock_spectroscopy_'+self.msmt_suffix)
 
-        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-        # return a.fit_res['f0']
+        if analyze:
+            a = ma.Homodyne_Analysis(
+                label=self.msmt_suffix, close_fig=close_fig)
+            return a.params['f0'].value
 
     def measure_resonator_power(self, freqs, powers, MC=None,
                                 analyze: bool = True, close_fig: bool = True,
@@ -219,8 +331,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         if analyze:
             # ma.TwoD_Analysis(label='Resonator_power_scan',
             #                  close_fig=close_fig, normalize=True)
-            a = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan', 
-                close_figig=True)
+            a = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
+                                                close_figig=True)
             print(a)
             return a
 
@@ -522,16 +634,16 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # Qubits calibration
         self.dag.add_node(self.name + ' Frequency Coarse',
                           calibrate_function=self.name + '.find_frequency')
+        self.dag.add_node(self.name + ' Spectroscopy Power',
+                          calibrate_function=self.name + '.find_spec_pow')
         self.dag.add_node(self.name + ' Sweetspot',
                           calibrate_function=cal_True_delayed)
         self.dag.add_node(self.name + ' Rabi',
                           calibrate_function=cal_True_delayed)
         self.dag.add_node(self.name + ' Frequency Fine',
                           calibrate_function=self.name + '.calibrate_frequency_ramsey')
-        self.dag.add_node(self.name + ' RO power',
-                          calibrate_function=cal_True_delayed)
         self.dag.add_node(self.name + ' f_12 estimate',
-                          calibrate_function=cal_True_delayed)
+                          calibrate_function=self.name + '.find_anharmonicity_estimate')
         self.dag.add_node(self.name + ' DAC Arc Polynomial',
                           calibrate_function=cal_True_delayed)
 
@@ -544,7 +656,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.dag.add_node(self.name + ' Ready for measurement')
 
         # Qubits measurements
-        self.dag.add_node(self.name + ' High Power Spectroscopy')
         self.dag.add_node(self.name + ' Anharmonicity')
         self.dag.add_node(self.name + ' Avoided Crossing')
         self.dag.add_node(self.name + ' T1')
@@ -600,8 +711,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.dag.add_edge(self.name + ' Calibrations',
                           self.name + ' Ro Pulse Amplitude')
         # Qubit
+        self.dag.add_edge(self.name + ' Spectroscopy Power',
+                          self.name + ' Frequency Coarse')
         self.dag.add_edge(self.name + ' Sweetspot',
                           self.name + ' Frequency Coarse')
+        self.dag.add_edge(self.name + ' Sweetspot',
+                          self.name + ' Spectroscopy Power')
         self.dag.add_edge(self.name + ' Rabi',
                           self.name + ' Sweetspot')
         self.dag.add_edge(self.name + ' Frequency Fine',
@@ -613,8 +728,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                           self.name + ' Rabi')
         self.dag.add_edge(self.name + ' ALLXY',
                           self.name + ' Frequency Fine')
-        self.dag.add_edge(self.name + ' ALLXY',
-                          self.name + ' RO power')
         self.dag.add_edge(self.name + ' Ready for measurement',
                           self.name + ' ALLXY')
         self.dag.add_edge(self.name + ' MOTZOI Calibration',
@@ -649,11 +762,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Measurements of anharmonicity and avoided crossing
         self.dag.add_edge(self.name + ' f_12 estimate',
-                          self.name + ' Frequency Fine')
-        self.dag.add_edge(self.name + ' High Power Spectroscopy',
                           self.name + ' Sweetspot')
         self.dag.add_edge(self.name + ' Anharmonicity',
-                          self.name + ' High Power Spectroscopy')
+                          self.name + ' f_12 estimate')
         self.dag.add_edge(self.name + ' Avoided Crossing',
                           self.name + ' DAC Arc Polynomial')
 
