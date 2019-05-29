@@ -486,11 +486,11 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10 ], 0) #alignment workaround
-    # k.gate(flux_cw, [2, 0])
-    k.gate(flux_cw, [10, 8])
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    k.gate(flux_cw, [2, 0])
+    #k.gate(flux_cw, [10, 8])
     
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10 ], 0) #alignment workaround
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('rx90', [qubit_idx])
     k.measure(qubit_idx)
@@ -500,11 +500,11 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
-    # k.gate(flux_cw, [2, 0])
-    k.gate(flux_cw, [10, 8])
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    k.gate(flux_cw, [2, 0])
+    #k.gate(flux_cw, [10, 8])
     
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('ry90', [qubit_idx])
     k.measure(qubit_idx)
