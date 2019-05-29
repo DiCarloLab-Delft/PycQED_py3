@@ -65,6 +65,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_anharmonicity', label='anharmonicity', unit='Hz',
                            initial_value=274e6, parameter_class=ManualParameter)
 
+        self.add_parameter('mock_spec_pow', label='optimal spec power', unit='dBm',
+                           initial_value=-35, parameter_class=ManualParameter)
+
         self.add_parameter('mock_12_spec_amp', label='amplitude for 12 transition',
                            unit='-', initial_value=0.5, parameter_class=ManualParameter)
 
@@ -74,7 +77,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_spec_baseline', label='resonator dip signal',
                            unit='V', parameter_class=ManualParameter)
 
-    def find_resonator_power(self, freqs=None, powers=None):
+    def find_resonator_power(self, freqs=None, powers=None, update=True):
         if freqs is None:
             freq_center = self.freq_res()
             freq_range = 10e6
@@ -84,7 +87,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         if powers is None:
             powers = np.arange(-40, 0, 4)
 
-        self.measure_resonator_power(freqs=freqs, powers=powers)
+        self.measure_resonator_power(freqs=freqs, powers=powers, analyze=False)
+
+        if update:
+            fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
+                                                      close_figig=True)
+            power = fit_res
 
         return True
 
@@ -115,6 +123,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         return True
 
     def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True):
+        '''
+        Should be edited such that it contains reference to different measurement
+        methods (tracking / 2D scan / broad spectroscopy)
+        '''
         if freqs is None:
             freq_center = self.freq_qubit()
             freq_range = 100e6
@@ -135,7 +147,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         t_end = time.strftime('%Y%m%d_%H%M%S')
 
         a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
-                              label='spectroscopy__' + self.name)
+                              label='spectroscopy__' + self.name,
+                              dac_key='Instrument settings.Mock_CCL.mock_current',
+                              degree=2)
         pc = a.fit_res['fit_polycoeffs'].value
         self.flux_polycoeffs(pc)
         sweetspot_current = -pc[1]/(2*pc[0])
@@ -226,14 +240,19 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         s = swf.None_Sweep(name='Homodyne Frequency', parameter_name='Frequency',
                            unit='Hz')
-        h = self.ro_pulse_amp_CW()*450e-3  # Lorentian baseline [V]
+        h = self.mock_spec_baseline() # Lorentian baseline [V]
         current = self.mock_current()
         Iref = self.mock_residual_flux_current()
         I0 = 10e-3
 
         # Height of peak [V]
-        A = 0.6*h*np.sqrt(np.abs(np.cos(2*np.pi*current-Iref)/I0))
-        w = 4e6    # Full width half maximum of peak
+        K = 1/np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
+        current_correction = np.sqrt(np.abs(np.cos(2*np.pi*current-Iref)/I0))
+        A = K*current_correction*h
+
+        # Width of peak
+        wbase = 4e6
+        w = wbase/np.sqrt(0.1+10**(-(self.spec_pow()+10)/7))+wbase
 
         df = 400e6
         f0 = self.mock_freq_qubit() - df*(np.sin(1/2*np.pi*(current-Iref)/I0))**2
@@ -356,7 +375,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         power = 20*np.log10(self.ro_pulse_amp_CW())
         h = 10**(power/20)*450e-3  # Lorentian baseline [V]
-        A = 0.8*h   # Height of peak [V]
+        A = 0.9*h   # Height of peak [V]
         w = 0.5e6
 
         if power <= res_power:
@@ -402,6 +421,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
+
+        # For mock: set the baseline of measurements
+        self.mock_spec_baseline(np.amin(mocked_values))
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, pulsed=True,
                                              MC=None, analyze=True, fluxChan=None,
