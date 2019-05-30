@@ -2367,14 +2367,32 @@ class QuDev_transmon(Qubit):
             #  the same but would be a good thing to do. First test if qutrit works
             #  well. idem in plot
             if qutrit:
+                ref_state = kw.get('ref_state', 'g')
                 logging.info("Starting Qutrit weight optimization")
-                basis = [iq_traces[l] - iq_traces['g'] for l in levels[1:]]
-                ortho_basis = math.gram_schmidt(np.array(basis).transpose())
-                ortho_basis = ortho_basis.transpose() # obtain basis vect as rows
-                self.ro_acq_weight_func_I(ortho_basis[0].real)
-                self.ro_acq_weight_func_Q(ortho_basis[0].imag)
-                self.ro_acq_weight_2nd_integr_I(ortho_basis[1].real)
-                self.ro_acq_weight_2nd_integr_Q(ortho_basis[1].imag)
+                basis = [iq_traces[l] - iq_traces[ref_state] for l in levels
+                         if l != ref_state]
+                basis_labels = [l + ref_state for l in levels if l != ref_state]
+                final_basis = math.gram_schmidt(np.array(basis).transpose())
+                final_basis = final_basis.transpose() # obtain basis vect as rows
+                # basis using second vector as primary vector
+                basis_2nd = list(reversed(basis))
+                final_basis_2nd = math.gram_schmidt(np.array(basis_2nd).transpose())
+                final_basis_2nd = final_basis_2nd.transpose()
+                if kw.get('non_ortho_basis', False):
+                    print("Using Non Orthonormal Basis: {}"
+                          .format(basis_labels))
+                    final_basis = np.array([final_basis[0], final_basis_2nd[0]])
+                elif kw.get('basis_2nd', False):
+                    print("Using 2nd ortho normal Basis: {} and ortho"
+                          .format(basis_labels[1]))
+                    final_basis = final_basis_2nd
+                else:
+                    print("Using 1st ortho normal Basis.: {} and ortho"
+                          .format(basis_labels[0]))
+                self.ro_acq_weight_func_I(final_basis[0].real)
+                self.ro_acq_weight_func_Q(final_basis[0].imag)
+                self.ro_acq_weight_2nd_integr_I(final_basis[1].real)
+                self.ro_acq_weight_2nd_integr_Q(final_basis[1].imag)
             else:
                 wre = np.real(iq_traces['e'] - iq_traces['g'])
                 wim = np.imag(iq_traces['e'] - iq_traces['g'])
@@ -2403,7 +2421,7 @@ class QuDev_transmon(Qubit):
                 ax[i].set_xlim(0, kw.get('tmax', 300))
                 ax[i].legend(loc='upper right')
             if qutrit:
-                for i, vect in enumerate(ortho_basis):
+                for i, vect in enumerate(final_basis):
                     ax[-1].plot(tbase / 1e-9, np.real(vect * modulation), '-',
                                 label='I_' + str(i))
                     ax[-1].plot(tbase / 1e-9, np.imag(vect * modulation), '-',
