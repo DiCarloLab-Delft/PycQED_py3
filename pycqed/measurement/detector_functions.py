@@ -2333,12 +2333,8 @@ class UHFQC_integration_logging_classifier_det(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_shots*self.nr_sweep_points,
             arm=False, acquisition_time=0.01)
-
-        print(data_raw)
-        print()
-        data = np.array([data_raw[key]
-                         for key in sorted(data_raw.keys())])*self.scaling_factor
-        print(data.shape, data)
+        data = np.array([data_raw[key] for key in
+                         sorted(data_raw.keys())])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -2346,14 +2342,18 @@ class UHFQC_integration_logging_classifier_det(Hard_Detector):
                 data[i] = data[i]-self.UHFQC.get(
                     'quex_trans_offset_weightfunction_{}'.format(channel))
 
-        # classify data into qutrit states
+        # Classify data into qutrit states
         # TODO: make this work for qubits as well!
-        state_prob_mtx = self.get_values_function_kwargs.get(
-                    'state_prob_mtx', None)
         classifier_params_list = self.get_values_function_kwargs.get(
                     'classifier_params', None)
         if not isinstance(classifier_params_list, list):
             classifier_params_list = [classifier_params_list]
+        state_prob_mtx_list = self.get_values_function_kwargs.get(
+                    'state_prob_mtx', None)
+        if state_prob_mtx_list is None:
+            state_prob_mtx_list = [None]*len(classifier_params_list)
+        elif not isinstance(state_prob_mtx_list, list):
+            state_prob_mtx_list = [state_prob_mtx_list]
 
         nr_states = len(self.state_labels)
         classified_data = np.zeros(
@@ -2363,10 +2363,9 @@ class UHFQC_integration_logging_classifier_det(Hard_Detector):
                 classified_data[nr_states*i: nr_states*i+nr_states, :] = \
                     self.classify_shots(data[2 * i:2 * i + 2, :],
                                         classifier_params_list[i],
-                                        state_prob_mtx,
+                                        state_prob_mtx_list[i],
                                         self.get_values_function_kwargs.get(
                                            'average', False))
-        print(classified_data.shape, classified_data)
         return classified_data
 
     def classify_shots(self, data, classifier_params_dict,
@@ -2383,6 +2382,7 @@ class UHFQC_integration_logging_classifier_det(Hard_Detector):
                                   classified_data.shape[1])), axis=0)
         if state_prob_mtx is not None:
             classified_data = np.linalg.inv(state_prob_mtx) @ classified_data.T
+            print('Corrected based on state_prob_mtx.')
         else:
             classified_data = classified_data.T
 

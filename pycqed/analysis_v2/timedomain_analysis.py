@@ -314,7 +314,12 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     key = [k for k in qb_data if 'pf' in k][0]
                 else:
                     key = [k for k in qb_data if 'pe' in k][0]
-                self.proc_data_dict['projected_data_dict'][qbn] = qb_data[key]
+                if len(qb_data[key].shape) > 1:
+                    self.proc_data_dict[
+                        'projected_data_dict'][qbn] = qb_data[key].T
+                else:
+                    self.proc_data_dict[
+                        'projected_data_dict'][qbn] = qb_data[key]
 
         for qbn in self.qb_names:
             if self.num_cal_points > 0:
@@ -709,7 +714,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'ylabel': self.raw_data_dict['ylabel'][0],
                 'yunit': yunit,
                 'title': title,
-                'clabel': 'Excited state population'}
+                'clabel': '$|f\\rangle$ state population' if self.for_ef else
+                          '$|e\\rangle$ state population'}
         else:
             self.plot_dicts[plot_name] = {
                 'plotfn': self.plot_line,
@@ -718,7 +724,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'xlabel': self.raw_data_dict['xlabel'][0],
                 'xunit': xunit,
                 'yvals': yvals,
-                'ylabel': 'Excited state population',
+                'ylabel': '$|f\\rangle$ state population' if self.for_ef else
+                          '$|e\\rangle$ state population',
                 'yunit': '',
                 'setlabel': 'Data',
                 'title': title,
@@ -3530,8 +3537,11 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                 self.proc_data_dict['analysis_params_dict'][qbn][key] = \
                     OrderedDict()
                 fit_res = self.fit_dicts[key]['fit_res']
+                for par in fit_res.params:
+                    if fit_res.params[par].stderr is None:
+                        fit_res.params[par].stderr = 0
 
-                if self.options_dict.get('for_ef', False):
+                if self.for_ef:
                     old_qb_freq = a_tools.get_param_value_from_file(
                         file_path=self.raw_data_dict['folder'][0],
                         instr_name=qbn, param_name='f_ef_qubit')
@@ -3788,7 +3798,8 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                     'xlabel': self.raw_data_dict['xlabel'][0],
                     'xunit': self.raw_data_dict['xunit'][0][0],
                     'yvals': data,
-                    'ylabel': 'Excited state population',
+                    'ylabel': '$|f\\rangle$ state population' if self.for_ef
+                                else '$|e\\rangle$ state population',
                     'yunit': '',
                     'setlabel': 'Data\n' + label_dict[msmt_label],
                     'title': (self.raw_data_dict['timestamps'][0] + ' ' +
@@ -4302,6 +4313,18 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             else:
                 self.leakage_qbname = None
 
+        if not self.options_dict.get('rotate_data', self.metadata.get(
+                'rotate_data', True)):
+            qb_data = self.proc_data_dict['meas_results_per_qb_per_ROch'][
+                self.cphase_qbname]
+            key = [k for k in qb_data if 'pe' in k][0]
+            if len(qb_data[key].shape) > 1:
+                self.proc_data_dict[
+                    'projected_data_dict'][self.cphase_qbname] = qb_data[key].T
+            else:
+                self.proc_data_dict[
+                    'projected_data_dict'][self.cphase_qbname] = qb_data[key]
+
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
         labels = ['e', 'g']
@@ -4324,6 +4347,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                         data=data)
                     guess_pars['amplitude'].vary = True
                     guess_pars['offset'].vary = True
+                    guess_pars['frequency'].value = 1/(2*np.pi)
                     guess_pars['frequency'].vary = False
                     guess_pars['phase'].vary = True
 
@@ -4437,8 +4461,8 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                                     'sweep_points_dict'][qbn][
                                     'cal_points_sweep_points'][cal_pts_idxs],
                                 'yvals': data[cal_pts_idxs],
-                                'setlabel': r'$|e\rangle$' if j == 0
-                                            else r'$|g\rangle$',
+                                'setlabel': list(
+                                    self.ordered_cal_states_dict)[i],
                                 'do_legend': row == 0,
                                 'legend_bbox_to_anchor': (1, 0.5),
                                 'legend_pos': 'center left',
@@ -4456,8 +4480,9 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                         'xlabel': self.raw_data_dict['parameter_names'][0][0],
                         'xunit': self.raw_data_dict['parameter_units'][0][0],
                         'yvals': data,
-                        'ylabel': 'Excited state population' if
-                            self.num_cal_points > 0 else 'Response (arb.)',
+                        'ylabel': '$|f\\rangle$ state population' if
+                                qbn==self.leakage_qbname else
+                                '$|e\\rangle$ state population',
                         'yunit': '',
                         'setlabel': 'Data',
                         'title': self.raw_data_dict['timestamps'][0] + ' ' +
