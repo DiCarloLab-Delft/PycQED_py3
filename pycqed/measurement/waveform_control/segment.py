@@ -1,4 +1,12 @@
+# Building block of Sequence Class. Segments are responsible for resolving
+# pulse timing, Z gates, generating trigger pulses and adding charge
+# compensation
+#
+# author: Michael Kerschbaum
+# created: 4/2019
+
 import numpy as np
+import math
 import logging
 from copy import deepcopy
 import pycqed.measurement.waveform_control.pulse_library as pl
@@ -15,7 +23,7 @@ class Segment:
     as well as an instance of class Pulse.
     """
 
-    def __init__(self, name, pulsar, pulse_pars_list=[]):
+    def __init__(self, name, pulse_pars_list=[]):
         self.name = name
         self.pulsar = ps.Pulsar.get_instance()
         self.unresolved_pulses = []
@@ -399,23 +407,28 @@ class Segment:
         self.gen_elements_on_awg()
 
         # Find the AWG hierarchy. Needed to add the trigger pulses first to
-        # the AWG that do not trigger any other AWGs, then the AWGs trigger
-        # these AWGs and so on.
+        # the AWG that do not trigger any other AWGs, then the AWGs that
+        # trigger these AWGs and so on.
         awg_hierarchy = self.find_awg_hierarchy()
 
         i = 1
         for awg in awg_hierarchy:
             if awg not in self.elements_on_awg:
                 continue
+            # for master AWG no trigger_pulse has to be added
+            if self.pulsar.get('master_awg') == awg:
+                continue
+
+            # used for updating the length of the trigger elements after adding
+            # the trigger pulses
+            trigger_el_set = set()
+
             for element in self.elements_on_awg[awg]:
                 [el_start, _] = self.element_start_length(element, awg)
 
-                # for master AWG no trigger_pulse has to be added
-                if self.pulsar.get('{}_trigger_channels'.format(awg)) == None:
-                    continue
-
-                trigger_pulse_time = el_start - self.pulsar.get(awg + '_delay')\
-                                    - self.trigger_pars['buffer_length_start']
+                trigger_pulse_time = el_start - \
+                                     - self.pulsar.get('{}_delay'.format(awg))\
+                                     - self.trigger_pars['buffer_length_start']
 
                 # Find the trigger_AWGs that trigger the AWG
                 trigger_awgs = set()
@@ -470,7 +483,17 @@ class Segment:
                         self.elements_on_awg[trigger_awg].append(
                             trigger_elements[trigger_awg])
 
-        self.test_overlap()
+                    trigger_el_set = trigger_el_set | set(
+                        trigger_elements.items())
+
+            # for all trigger elements update the start and length
+            for (awg, el) in trigger_el_set:
+                self.element_start_length(el, awg)
+
+        # checks if elements on AWGs overlap
+        self._test_overlap()
+        # checks if there is only one element on the master AWG
+        self._test_trigger_awg()
 
     def find_trigger_element(self, trigger_awg, trigger_pulse_time):
         """
@@ -517,7 +540,7 @@ class Segment:
         """
         return self.element_start_end[element][awg][0]
 
-    def test_overlap(self):
+    def _test_overlap(self):
         """
         Tests for all AWGs if any of their elements overlap.
         """
@@ -558,10 +581,11 @@ class Segment:
         self.gen_elements_on_awg()
 
         for awg in self.elements_on_awg:
-            if self.pulsar.get('{}_trigger_channels'.format(awg)) == None:
-                if len(self.elements_on_awg[awg]) > 1:
-                    raise ValueError(
-                        'There is more than one element on {}'.format(awg))
+            if self.pulsar.get('{}_trigger_channels'.format(awg)) is not None:
+                continue
+            if len(self.elements_on_awg[awg]) > 1:
+                raise ValueError(
+                    'There is more than one element on {}'.format(awg))
 
     def resolve_Z_gates(self):
         """
@@ -585,6 +609,10 @@ class Segment:
                     qubit_phases[pulse.basis] = 0
 
     def element_start_length(self, element, awg):
+        """
+        Finds and saves the start and length of an element on AWG awg
+        in self.element_start_end.
+        """
         if element not in self.element_start_end:
             self.element_start_end[element] = {}
 
@@ -608,11 +636,8 @@ class Segment:
         start_gran = self.pulsar.get(
             '{}_element_start_granularity'.format(awg))
 
-        # element start granularity is not working at the moment!
-        start_gran = None
-
         if start_gran != None:
-            t_start_awg = int(t_start / start_gran) * start_gran
+            t_start_awg = math.floor(t_start / start_gran) * start_gran
             # add the number of samples the element gets larger when changing
             # t_start
             add = self.time2sample(t_start - t_start_awg, awg=awg)
