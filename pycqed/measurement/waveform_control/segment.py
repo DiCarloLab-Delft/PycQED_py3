@@ -1,6 +1,6 @@
-# Building block of Sequence Class. Segments are responsible for resolving
-# pulse timing, Z gates, generating trigger pulses and adding charge
-# compensation
+# A Segment is the building block of Sequence Class. They are responsible
+# for resolving pulse timing, Z gates, generating trigger pulses and adding
+# charge compensation
 #
 # author: Michael Kerschbaum
 # created: 4/2019
@@ -18,9 +18,9 @@ from collections import OrderedDict as odict
 
 class Segment:
     """
-    Consists of a list of UnresolvedPulses, each of which contains information about in
-    which element the pulse is played and when it is played (reference point + delay)
-    as well as an instance of class Pulse.
+    Consists of a list of UnresolvedPulses, each of which contains information 
+    about in which element the pulse is played and when it is played 
+    (reference point + delay) as well as an instance of class Pulse.
     """
 
     def __init__(self, name, pulse_pars_list=[]):
@@ -651,103 +651,6 @@ class Segment:
         self.element_start_end[element][awg] = [t_start_awg, samples]
         return [t_start_awg, samples]
 
-    # Not used anymore
-    # def find_element_start_end(self, sort=False, awg_list=[]):
-    #     """
-    #     Given a segment, this method:
-    #         * finds the start time and number of samples for each element for
-    #           each AWG
-    #         * saves them in element_start_end, ordered by accending start time
-    #         * if sort: changes the order of self.elements dictionary by order
-    #           of start times
-    #     """
-
-    #     if self.elements == odict():
-    #         self.resolve_timing()
-
-    #     if sort:
-    #         # sorts the pulses in the elements with respect to increasing _t0
-    #         self.time_sort()
-    #         unordered_start = []
-    #         new_elements = odict()
-
-    #         for element in self.elements:
-    #             unordered_start.append(
-    #                 (self.elements[element][0].algorithm_time(), element))
-
-    #         for (t_start, element) in sorted(unordered_start):
-    #             new_elements[element] = self.elements[element]
-
-    #         self.elements = new_elements
-
-    #     awg_dict = self.gen_awg_dict()
-
-    #     for element in self.elements:
-    #         if element not in self.element_start_end:
-    #             self.element_start_end[element] = {}
-
-    #         t_start = float('inf')
-    #         t_end = -float('inf')
-
-    #         for pulse in self.elements[element]:
-    #             t_start = min(pulse.algorithm_time(), t_start)
-    #             t_end = max(pulse.algorithm_time() + pulse.length, t_end)
-
-    #         length = t_end - t_start
-    #         for awg in awg_dict[element]:
-    #             if awg_list != [] and awg not in awg_list:
-    #                 continue
-    #             # make sure that element length is multiple of
-    #             # sample granularity
-    #             gran = self.pulsar.get('{}_granularity'.format(awg))
-    #             samples = self.time2sample(length, awg=awg)
-    #             if samples % gran != 0:
-    #                 samples += gran - samples % gran
-
-    #             # make sure that element start is a multiple of element
-    #             # start granularity
-    #             start_gran = self.pulsar.get(
-    #                 '{}_element_start_granularity'.format(awg))
-
-    #             if start_gran != None:
-    #                 t_start_awg = int(t_start / start_gran) * start_gran
-    #             else:
-    #                 t_start_awg = t_start
-
-    #             self.element_start_end[element][awg] = [t_start_awg, samples]
-
-    # def time_sort(self):
-    #     """
-    #     Given a segment, this method sorts the entries of the elements
-    #     dictionary (which are lists of UnresolvedPulses) by accending _t0.
-    #     """
-
-    #     if self.elements == odict():
-    #         self.resolve_timing()
-
-    #     for element in self.elements:
-    #         # i takes care of pulses happening at the same time, to sort
-    #         # by order in which they were added
-    #         i = 0
-    #         old_list = []
-    #         for pulse in self.elements[element]:
-    #             old_list.append([pulse.algorithm_time(), i, pulse])
-    #             i += 1
-
-    #         new_list = sorted(old_list)
-    #         self.elements[element] = [pulse for (t0, i, pulse) in new_list]
-
-    # def reduce_to_segment_start(self):
-
-    #     # not used at the moment, change to self.elements
-
-    #     segment_t0 = float('inf')
-    #     for pulse in self.unresolved_pulses:
-    #         segment_t0 = min(segment_t0, pulse.pulse_obj.algorithm_time())
-
-    #     for pulse in self.unresolved_pulses:
-    #         pulse.delay -= segment_t0
-
     def waveforms(self, awgs=None, channels=None):
         """
         After all the pulses have been added, the timing resolved and the 
@@ -853,7 +756,7 @@ class Segment:
                         fir_kernels = distortion_dictionary.get('FIR', None)
                         if fir_kernels is not None:
                             if hasattr(fir_kernels, '__iter__') and not \
-                            hasattr(fir_kernels[0], '__iter__'): # 1 kernel only
+                            hasattr(fir_kernels[0], '__iter__'): # 1 kernel
                                 wf = flux_dist.filter_fir(fir_kernels, wf)
                             else:
                                 for kernel in fir_kernels:
