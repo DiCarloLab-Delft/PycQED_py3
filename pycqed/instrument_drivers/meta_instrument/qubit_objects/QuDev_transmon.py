@@ -2362,33 +2362,33 @@ class QuDev_transmon(Qubit):
         m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
         iq_traces = {l: m_a[l].measured_values[0]
                         + 1j * m_a[l].measured_values[1] for l in levels}
+        if qutrit:
+            ref_state = kw.get('ref_state', 'g')
+            basis = [iq_traces[l] - iq_traces[ref_state] for l in levels
+                     if l != ref_state]
+            basis_labels = [l + ref_state for l in levels if l != ref_state]
+            final_basis = math.gram_schmidt(np.array(basis).transpose())
+            final_basis = final_basis.transpose()  # obtain basis vect as rows
+            # basis using second vector as primary vector
+            basis_2nd = list(reversed(basis))
+            final_basis_2nd = math.gram_schmidt(np.array(basis_2nd).transpose())
+            final_basis_2nd = final_basis_2nd.transpose()
+            if kw.get('non_ortho_basis', False):
+                print("Using Non Orthonormal Basis: {}"
+                      .format(basis_labels))
+                final_basis = np.array([final_basis[0], final_basis_2nd[0]])
+            elif kw.get('basis_2nd', False):
+                print("Using 2nd ortho normal Basis: {} and ortho"
+                      .format(basis_labels[1]))
+                final_basis = final_basis_2nd
+            else:
+                print("Using 1st ortho normal Basis.: {} and ortho"
+                      .format(basis_labels[0]))
         if update:
             # FIXME: could merge qutrit and non qutrit although normalization is not
             #  the same but would be a good thing to do. First test if qutrit works
             #  well. idem in plot
             if qutrit:
-                ref_state = kw.get('ref_state', 'g')
-                logging.info("Starting Qutrit weight optimization")
-                basis = [iq_traces[l] - iq_traces[ref_state] for l in levels
-                         if l != ref_state]
-                basis_labels = [l + ref_state for l in levels if l != ref_state]
-                final_basis = math.gram_schmidt(np.array(basis).transpose())
-                final_basis = final_basis.transpose() # obtain basis vect as rows
-                # basis using second vector as primary vector
-                basis_2nd = list(reversed(basis))
-                final_basis_2nd = math.gram_schmidt(np.array(basis_2nd).transpose())
-                final_basis_2nd = final_basis_2nd.transpose()
-                if kw.get('non_ortho_basis', False):
-                    print("Using Non Orthonormal Basis: {}"
-                          .format(basis_labels))
-                    final_basis = np.array([final_basis[0], final_basis_2nd[0]])
-                elif kw.get('basis_2nd', False):
-                    print("Using 2nd ortho normal Basis: {} and ortho"
-                          .format(basis_labels[1]))
-                    final_basis = final_basis_2nd
-                else:
-                    print("Using 1st ortho normal Basis.: {} and ortho"
-                          .format(basis_labels[0]))
                 self.ro_acq_weight_func_I(final_basis[0].real)
                 self.ro_acq_weight_func_Q(final_basis[0].imag)
                 self.ro_acq_weight_2nd_integr_I(final_basis[1].real)
