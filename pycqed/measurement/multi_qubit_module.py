@@ -511,7 +511,7 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
     channels = []
     for qb in qubits:
         channels += [qb.RO_acq_weight_function_I()]
-        if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
+        if qb.ro_acq_weight_type() in ['SSB', 'DSB', 'optimal_qutrit']:
             if qb.RO_acq_weight_function_Q() is not None:
                 channels += [qb.RO_acq_weight_function_Q()]
     if add_channels is not None:
@@ -531,6 +531,10 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
 
     return {
         'int_log_det': det.UHFQC_integration_logging_det(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_shots=nr_shots,
+            result_logging_mode='raw', **kw),
+        'int_log_classif_det': det.UHFQC_integration_logging_classifier_det(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             integration_length=max_int_len, nr_shots=nr_shots,
             result_logging_mode='raw', **kw),

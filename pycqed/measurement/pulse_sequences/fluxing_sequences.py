@@ -2394,13 +2394,14 @@ def cphase_nz_seq(phases, flux_params_dict,
     pulse_list = []
     print(flux_params_dict)
     RO_pulse = deepcopy(operation_dict['RO mux'])
-    RO_pulse['pulse_delay'] = max_flux_length
-
+    if max_flux_length is not None:
+        RO_pulse['pulse_delay'] = max_flux_length
     print(max_flux_length)
     
     X180_control = deepcopy(operation_dict['X180 ' + qbc_name])
-    X90_target_2 = deepcopy(operation_dict['X90s ' + qbt_name])
     X90_target = deepcopy(operation_dict['X90s ' + qbt_name])
+    X180_control_2 = deepcopy(operation_dict['X180 ' + qbc_name])
+    X90_target_2 = deepcopy(operation_dict['X90 ' + qbt_name])
 
     CZ_pulse = deepcopy(operation_dict[CZ_pulse_name])
     for param_name, param_value in flux_params_dict.items():
@@ -2425,7 +2426,7 @@ def cphase_nz_seq(phases, flux_params_dict,
         reduced_pulse_list += [buffer_pulse]
 
     pulse_list.append(CZ_pulse)
-    pulse_list.append(X180_control)
+    # pulse_list.append(X180_control)
     pulse_list.append(X90_target_2)
     pulse_list.append(RO_pulse)
 
@@ -2448,22 +2449,52 @@ def cphase_nz_seq(phases, flux_params_dict,
             X180_control['amplitude'] = 0
         for i, phase in enumerate(unique_phases):
             el_iter = i if pipulse else len(unique_phases)+i
-            if cal_points and (i == (len(unique_phases)-4)
-                               or i == (len(unique_phases)-3)):
-                el = multi_pulse_elt(el_iter, station, [RO_pulse])
-            elif cal_points and (i == (len(unique_phases)-2)
-                                 or i == (len(unique_phases)-1)):
+            if cal_points and num_cal_points == 3 and \
+                    i == (len(unique_phases) - 3):
+                el = multi_pulse_elt(el_iter, station,
+                                     [operation_dict['RO mux']])
+            elif cal_points and num_cal_points == 3 and \
+                    i == (len(unique_phases) - 2):
                 el = multi_pulse_elt(el_iter, station,
                                      [operation_dict['X180 ' + qbc_name],
                                       operation_dict['X180s ' + qbt_name],
-                                      RO_pulse])
+                                      operation_dict['RO mux']])
+            elif cal_points and num_cal_points == 3 and \
+                    i == (len(unique_phases) - 1):
+                el = multi_pulse_elt(el_iter, station,
+                                     [operation_dict['X180 ' + qbc_name],
+                                      operation_dict['X180s ' + qbt_name],
+                                      operation_dict['X180_ef ' + qbc_name],
+                                      operation_dict['X180s_ef ' + qbt_name],
+                                      operation_dict['RO mux']])
+            elif cal_points and num_cal_points == 4 and \
+                    (i == (len(unique_phases) - 4) or
+                     i == (len(unique_phases) - 3)):
+                el = multi_pulse_elt(el_iter, station,
+                                     [operation_dict['RO mux']])
+            elif cal_points and num_cal_points == 4 and \
+                    (i == (len(unique_phases) - 2) or
+                     i == (len(unique_phases) - 1)):
+                el = multi_pulse_elt(el_iter, station,
+                                     [operation_dict['X180 ' + qbc_name],
+                                      operation_dict['X180s ' + qbt_name],
+                                      operation_dict['RO mux']])
+            elif cal_points and num_cal_points == 2 and \
+                    (i == (len(unique_phases) - 2) or
+                     i == (len(unique_phases) - 1)):
+                el = multi_pulse_elt(el_iter, station,
+                                     [operation_dict['RO mux']])
             else:
                 X90_target_2['phase'] = phase*180/np.pi
                 pulse_list = [X180_control, X90_target]
                 if 'pulse_length' in flux_params_dict:
                     pulse_list += [buffer_pulse]
-                pulse_list += [CZ_pulse, X180_control, 
-                              X90_target_2, RO_pulse]
+                if not pipulse:
+                    X90_target_2['refpoint'] = 'start'
+                    pulse_list += [CZ_pulse, X180_control_2,
+                                   X90_target_2, RO_pulse]
+                else:
+                    pulse_list += [CZ_pulse, X90_target_2, RO_pulse]
                 el = multi_pulse_elt(el_iter, station, pulse_list)
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
