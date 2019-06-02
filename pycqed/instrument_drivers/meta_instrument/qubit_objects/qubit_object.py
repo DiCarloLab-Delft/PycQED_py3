@@ -289,7 +289,7 @@ class Qubit(Instrument):
         else:
             f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
         if f_res > max(freqs) or f_res < min(freqs):
-            logging.warning('exracted frequency outside of range of scan')
+            logging.warning('extracted frequency outside of range of scan')
         elif update:  # don't update if the value is out of the scan range
             freq_res_par(f_res)
             freq_RO_par(f_res)

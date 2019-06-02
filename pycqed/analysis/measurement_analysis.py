@@ -7725,6 +7725,55 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
         if close_file:
             self.finish()
 
+        # For finding correct ro power and dispersive shift
+        f0 = np.zeros(len(self.sweep_points_2D))
+        for u, power in enumerate(self.sweep_points_2D):
+            f0[u] = self.fit_results[str(power)].values['f0']
+        self.f0 = f0
+
+        # Find low power regime
+        # For now, low and high power regimes look at frequency shifts only. 
+        # It could be extended by looking at the amplitude of the dip, such that
+        # fewer data points are necessary
+        threshold = 0.1e6
+        for u, f in enumerate(f0):
+            try:
+                if np.abs(f0[u] - f0[u+1]) < threshold:
+                    f_low = f0[u+1]
+                    P_result = self.sweep_points_2D[u+1]
+                else:
+                    break
+            except IndexError:
+                logging.warning('Dispersive shift not found. Remove attenuation'
+                                ' or check if qubit is coupled to resonator at all')
+        # High power regime
+
+        if np.abs(f0[-1] - f0[-2]) < threshold:
+            f_high = f0[-1]
+        else:
+            raise Exception('High power regime not found. Remove attenuation '
+                            'or check if qubit is couplet to resonator at all')
+        # for u in np.arange(len(self.sweep_points_2D), 0, -1):
+        #     try:
+        #         if f0[u] - f0[u-1] < threshold:
+        #             f_high = f0[u]
+        #         else:
+        #             break
+        #     except IndexError:
+        #         logging.warning('Dispersive shift not found. Remove attenuation'
+        #                         ' or check if qubit is coupled to resonator at all')
+        if (f_high < f_low):
+            shift = f_high - f_low
+        else:
+            shift = 0
+            print('f_high: ' + str(f_high))
+            print('f_low:  ' + str(f_low))
+            raise Exception('High power regime frequency found to be higher than'
+                            'low power regime frequency')
+        results = [shift, P_result]
+        self.results = results
+        return results
+
     def fit_hanger_model(self, sweep_values, measured_values):
         HangerModel = fit_mods.SlopedHangerAmplitudeModel
 

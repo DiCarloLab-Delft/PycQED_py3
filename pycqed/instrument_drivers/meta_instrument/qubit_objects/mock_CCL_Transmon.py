@@ -1,6 +1,7 @@
 from .CCL_Transmon import CCLight_Transmon
 import time
 import numpy as np
+import logging
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
@@ -36,7 +37,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_freq_qubit', label='qubit frequency', unit='Hz',
                            docstring='A fixed value, can be made fancier by making it depend on Flux through E_c, E_j and flux',
                            parameter_class=ManualParameter,
-                           initial_value=5.824567e9)
+                           initial_value=np.sqrt(8*self.mock_Ec()*self.mock_Ej()) - self.mock_Ec())
 
         self.add_parameter('mock_freq_res', label='resonator frequency', unit='Hz',
                            parameter_class=ManualParameter, initial_value=7.487628e9)
@@ -86,16 +87,24 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            unit='Hz', initial_value=5e6, parameter_class=ManualParameter)
 
         self.add_parameter('mock_chi01', label='coupling 01 transition', unit='Hz',
-                           initial_value=(self.mock_coupling01())**2/(self.mock_freq_qubit() - self.mock_freq_res()),
+                           initial_value=(self.mock_coupling01(
+                           ))**2/(self.mock_freq_qubit() - self.mock_freq_res()),
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_chi12', label='coupling 12 transition', unit='Hz',
-                           initial_value=(self.mock_coupling12())**2/(self.mock_freq_qubit()+self.mock_anharmonicity() - self.mock_freq_res()),
+                           initial_value=(self.mock_coupling12(
+                           ))**2/(self.mock_freq_qubit()+self.mock_anharmonicity() - self.mock_freq_res()),
                            parameter_class=ManualParameter)
-        
+
         self.add_parameter('mock_chi', label='dispersive shift', units='Hz',
                            initial_value=self.mock_chi01()-self.mock_chi12()/2,
                            parameter_class=ManualParameter)
+
+        self.add_parameter('noise', label='noise level', unit='V',
+                           initial_value=0.01e-3, parameter_class=ManualParameter)
+
+        self.add_parameter('mock_res_width', label='resonator peak width', unit='Hz',
+                           initial_value=1e6, parameter_class=ManualParameter)
 
     def find_resonator_power(self, freqs=None, powers=None, update=True):
         if freqs is None:
@@ -105,16 +114,59 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                               0.1e6)
 
         if powers is None:
-            powers = np.arange(-40, 0, 4)
+            powers = np.arange(-40, 10, 4)
 
         self.measure_resonator_power(freqs=freqs, powers=powers, analyze=False)
 
         if update:
             fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
                                                       close_figig=True)
-            power = fit_res
+            shift = fit_res.results[0]
+            power = fit_res.results[1]
+
+            ro_pow = 10**(power/20)
+            self.ro_pulse_amp_CW(ro_pow)
+
+            f_qubit_estimate = self.freq_res() + (60e6)**2/shift
+            self.freq_qubit(f_qubit_estimate)
 
         return True
+
+    def find_resonator_frequency_VNA(self, freqs=None, use_min=False, MC=None,
+                                     update=True):
+        '''
+        quick script that uses measure_heterodyne_spectroscopy on a wide range
+        to act as a sort of mock of a VNA resonator scan'.
+
+        If it is a first scan (no freq_res yet in qubit object) it will perform
+        a wide range scan. Otherwise it will zoom in on a resonator
+        '''
+
+        if freqs is None:
+            if self.freq_res() is None:
+                freqs = np.arange(7e9, 8.5e9, 2e6)
+            else:
+                freq_center = self.freq_res()
+                freq_span = 100e6
+                freqs = np.arange(freq_center-freq_span/2,
+                                  freq_center+freq_span/2, 1e6)
+
+        self.measure_heterodyne_spectroscopy(freqs=freqs, MC=MC, analyze=True)
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix)
+
+        if use_min:
+            f_res = a.min_frequency
+        else:
+            f_res = a.fit_results.params['f0'].value*1e9
+
+        if f_res > max(freqs) or f_res < max(freqs):
+            logging.warning(
+                'extracted frequency outside range of scan. Not updating')
+        if update:
+            print('Updating ' + self.msmt_suffix + '.freq_res')
+            self.freq_res(f_res)
+            self.ro_freq(f_res)
+        return f_res
 
     def find_resonator_sweetspot(self, freqs=None, dac_values=None, fluxChan=None):
         '''
@@ -288,7 +340,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             mocked_values = h + A*(w/2.0)**2 / ((w/2.0)**2 +
                                                 ((freqs - f0))**2)
 
-        mocked_values += np.random.normal(0, 10e-6, np.size(mocked_values))
+        mocked_values += np.random.normal(0,
+                                          self.noise(), np.size(mocked_values))
 
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
                               detector_control='soft', mock_values=mocked_values)
@@ -320,8 +373,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         for power in powers:
             h = 10**(power/20)*45e-3  # Lorentian baseline [V]
-            A = 0.8*h   # Height of peak [V]
-            w = 0.5e6
+            A = 0.9*h   # Height of peak [V]
+            w = self.mock_res_width()
             if power <= res_power:
                 # Good signal
                 f0 = self.mock_freq_res()
@@ -356,7 +409,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                                  ((freqs - f0))**2)
             mocked_values = np.concatenate([mocked_values, new_values])
 
-        mocked_values += np.random.normal(0, 0.1e-4, np.size(mocked_values))
+        mocked_values += np.random.normal(0,
+                                          self.noise(), np.size(mocked_values))
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
                               detector_control='soft', mock_values=mocked_values)
 
@@ -398,7 +452,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         power = 20*np.log10(self.ro_pulse_amp_CW())
         h = 10**(power/20)*45e-3  # Lorentian baseline [V]
         A = 0.9*h   # Height of peak [V]
-        w = 0.5e6
+        w = self.mock_res_width()
 
         if power <= res_power:
             # Good signal
@@ -430,7 +484,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             f0 = self.mock_freq_res() + self.mock_chi()
             mocked_values = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
 
-        mocked_values += np.random.normal(0, 0.01e-3, np.size(mocked_values))
+        mocked_values += np.random.normal(0,
+                                          self.noise(), np.size(mocked_values))
 
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
                               detector_control='soft', mock_values=mocked_values)
@@ -469,11 +524,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         for dac_value in dac_values:
             h = self.ro_pulse_amp_CW()*45e-3  # Lorentian baseline [V]
             A = 0.9*h   # Height of peak [V]
-            w = 0.5e6    # Full width half maximum of peak
+            w = self.mock_res_width()    # Full width half maximum of peak
             f0 = freq_res - df*(np.sin(1/2*np.pi*(dac_value-Iref)/I0))**2
             new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
                                              ((freqs - f0))**2)
-            new_values += np.random.normal(0, 0.1e-3, np.size(new_values))
+            new_values += np.random.normal(0,
+                                           self.noise(), np.size(new_values))
 
             mocked_values = np.concatenate([mocked_values, new_values])
 
@@ -525,8 +581,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         mocked_values = offset + signal_amp*np.cos(np.pi*f_rabi*amps)
 
         # Add (0,0.5) normal distributed noise
-        mocked_values += np.random.normal(0, 0.01e-3, np.size(mocked_values))
-        d = det.Mock_Detector(value_names=['Rabi Amplitude'], value_units=['-'],
+        mocked_values += np.random.normal(0,
+                                          self.noise(), np.size(mocked_values))
+        d = det.Mock_Detector(value_names=['raw w0'], value_units=['V'],
                               detector_control='soft', mock_values=mocked_values)  # Does not exist yet
 
         MC.set_sweep_function(s)
@@ -622,16 +679,26 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         s = swf.None_Sweep(parameter_name='Time', unit='s')
 
-        amplitude = 1
-        offset = 0
+        low_lvl = self.measurement_signal(excited=False)
+        high_lvl = self.measurement_signal(excited=True)
+
+        detuning = np.abs(self.freq_qubit() - self.mock_freq_qubit())/1e6
+        highlow = (high_lvl-low_lvl)*np.exp(-detuning)
+
+        high_lvl = low_lvl + highlow
+
+        amplitude = high_lvl - low_lvl
+        calibration = low_lvl + amplitude
+
         mocked_values = amplitude * \
-            np.exp(-(times[0:-4]/self.mock_T1())) + offset
-        mocked_values = np.concatenate([mocked_values, (0, 0, 1, 1)])
+            np.exp(-(times[0:-4]/self.mock_T1())) + low_lvl
+        mocked_values = np.concatenate(
+            [mocked_values, (0, 0, calibration, calibration)])
 
-        
-        mocked_values += np.random.normal(0, 0.05, np.size(mocked_values))
+        mocked_values += np.random.normal(0,
+                                          self.noise(), np.size(mocked_values))
 
-        d = det.Mock_Detector(value_names=['F|1>'], value_units=[''],
+        d = det.Mock_Detector(value_names=['raw w0'], value_units=['V'],
                               detector_control='soft', mock_values=mocked_values)
 
         MC.set_sweep_function(s)
@@ -653,14 +720,15 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         state, which results in a 2 chi shift of the resonator
         '''
         power = 20*np.log10(self.ro_pulse_amp_CW())
-        res_power = 20*np.log10(self.mock_ro_pulse_amp_CW())  # Low power regime power
+        # Low power regime power
+        res_power = 20*np.log10(self.mock_ro_pulse_amp_CW())
         pow_shift = self.mock_pow_shift()  # At which power the high power regime occurs
 
         f_ro = self.ro_freq()
 
         h = 10**(power/20)*45e-3  # Lorentian baseline [V]
         A = 0.9*h   # Height of peak [V]
-        w = 0.5e6
+        w = self.mock_res_width()
 
         # Determine if in high / low power regime:
         if power <= res_power:
@@ -690,7 +758,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         return signal
 
-
     ###########################################################################
     # AutoDepGraph
     ###########################################################################
@@ -700,9 +767,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.dag = AutoDepGraph_DAG(name=self.name+' DAG')
 
         self.dag.add_node('VNA Wide Search',
-                          calibrate_function=cal_True_delayed)
+                          calibrate_function=self.name + '.find_resonator_frequency_VNA')
         self.dag.add_node('VNA Zoom on resonators',
-                          calibrate_function=cal_True_delayed)
+                          calibrate_function=self.name + '.find_resonator_frequency_VNA')
         self.dag.add_node('VNA Resonators Power Scan',
                           calibrate_function=cal_True_delayed)
         self.dag.add_node('VNA Resonators Flux Sweep',
@@ -752,7 +819,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.dag.add_node(self.name + ' MOTZOI Calibration',
                           calibrate_function=self.name + '.calibrate_motzoi')
         # If all goes well, the qubit is fully 'calibrated' and can be controlled
-        self.dag.add_node(self.name + ' Ready for measurement')
 
         # Qubits measurements
         self.dag.add_node(self.name + ' Anharmonicity')
@@ -827,18 +893,16 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                           self.name + ' Rabi')
         self.dag.add_edge(self.name + ' ALLXY',
                           self.name + ' Frequency Fine')
-        self.dag.add_edge(self.name + ' Ready for measurement',
-                          self.name + ' ALLXY')
-        self.dag.add_edge(self.name + ' MOTZOI Calibration',
-                          self.name + ' ALLXY')
+        self.dag.add_edge(self.name + ' ALLXY',
+                          self.name + ' MOTZOI Calibration')
 
         # Perform initial measurements to see if they make sense
         self.dag.add_edge(self.name + ' T1',
-                          self.name + ' Ready for measurement')
+                          self.name + ' ALLXY')
         self.dag.add_edge(self.name + ' T2_Echo',
-                          self.name + ' Ready for measurement')
+                          self.name + ' ALLXY')
         self.dag.add_edge(self.name + ' T2_Star',
-                          self.name + ' Ready for measurement')
+                          self.name + ' ALLXY')
 
         # Measure as function of frequency and time
         self.dag.add_edge(self.name + ' T1(frequency)',
