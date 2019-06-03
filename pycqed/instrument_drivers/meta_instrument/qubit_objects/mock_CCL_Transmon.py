@@ -109,32 +109,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_flux_sensitivity', label='sensitivity to flux in current',
                            unit='A', initial_value=10e-3, parameter_class=ManualParameter)
 
-    def find_resonator_power(self, freqs=None, powers=None, update=True):
-        if freqs is None:
-            freq_center = self.freq_res()
-            freq_range = 10e6
-            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
-                              0.1e6)
-
-        if powers is None:
-            powers = np.arange(-40, 0.1, 4)
-
-        self.measure_resonator_power(freqs=freqs, powers=powers, analyze=False)
-
-        if update:
-            fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
-                                                      close_figig=True)
-            shift = fit_res.results[0]
-            power = fit_res.results[1]
-
-            ro_pow = 10**(power/20)
-            self.ro_pulse_amp_CW(ro_pow)
-
-            f_qubit_estimate = self.freq_res() + (60e6)**2/shift
-            self.freq_qubit(f_qubit_estimate)
-
-        return True
-
     def find_resonator_frequency_VNA(self, freqs=None, use_min=False, MC=None,
                                      update=True):
         '''
@@ -203,85 +177,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             self.fl_dc_V0(sweetspot_current)
 
         return True
-
-    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True, 
-                             set_to_sweetspot=True):
-        '''
-        Should be edited such that it contains reference to different measurement
-        methods (tracking / 2D scan / broad spectroscopy)
-
-        TODO: If spectroscopy does not yield a peak, it should discard it
-        '''
-        if freqs is None:
-            freq_center = self.freq_qubit()
-            freq_range = 300e6
-            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
-                              0.5e6)
-
-        if dac_values is None:
-            if self.fl_dc_V0() is not None:
-                dac_values = np.linspace(self.fl_dc_V0() - 1e-3,
-                                         self.fl_dc_V0() + 1e-3, 6)
-            else:
-                dac_values = np.linspace(-1e-3, 1e-3, 6)
-
-        t_start = time.time()
-        t_start = time.strftime('%Y%m%d_%H%M%S')
-
-        for dac_value in dac_values:
-            self.mock_current(dac_value)
-            self.find_frequency(freqs=freqs)
-
-        t_end = time.time()
-        t_end = time.strftime('%Y%m%d_%H%M%S')
-
-        a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
-                              label='spectroscopy__' + self.name,
-                              dac_key='Instrument settings.'+self.name+'.mock_current',
-                              degree=2)
-
-        pc = a.fit_res['fit_polycoeffs']
-
-        self.flux_polycoeff(pc)
-        sweetspot_current = -pc[1]/(2*pc[0])
-
-        if update:
-            self.fl_dc_V0(sweetspot_current)
-        if set_to_sweetspot:
-            self.mock_current(sweetspot_current)
-        
-        return True
-
-    def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
-                                    update=True):
-        '''
-        Finds an estimate of the anharmonicity by doing a spectroscopy around 
-        150 MHz below the qubit frequency.
-
-        TODO: if spec_pow is too low/high, it should adjust it to approx the 
-              ideal spec_pow + 25 dBm
-        '''
-
-        if anharmonicity is None:
-            # Standard estimate, negative by convention
-            anharmonicity = self.anharmonicity()
-
-        f12_estimate = self.freq_qubit()*2 + anharmonicity
-
-        if freqs is None:
-            freq_center = f12_estimate/2
-            freq_range = 100e6
-            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
-                              0.5e6)
-
-        self.spec_pow(self.spec_pow()+25)
-        self.measure_spectroscopy(freqs=freqs, pulsed=False, analyze=False)
-
-        a = ma.Homodyne_Analysis(label=self.msmt_suffix)
-        f02 = 2*a.params['f0'].value*1e9
-        if update:
-            self.anharmonicity(f02-2*self.freq_qubit())
-            return True
 
     def find_spec_pow(self, freqs=None, powers=None, update=True):
         '''
