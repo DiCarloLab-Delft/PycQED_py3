@@ -1780,7 +1780,7 @@ def predict_gm_proba_from_clf(X, clf_params):
     """
     reqs_params = ['means_', 'covariances_', 'covariance_type',
                    'weights_', 'precisions_cholesky_']
-    clf_params = clf_params.copy()
+    clf_params = deepcopy(clf_params)
     for r in reqs_params:
         assert r in clf_params, "Required Classifier parameter {} " \
                                 "not given.".format(r)

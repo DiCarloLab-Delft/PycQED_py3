@@ -2358,14 +2358,14 @@ class UHFQC_integration_logging_classifier_det(Hard_Detector):
         nr_states = len(self.state_labels)
         classified_data = np.zeros(
             (nr_states*len(self.channel_str_pairs),self.nr_sweep_points))
-        if self.get_values_function_kwargs.get('classify', False):
+        if self.get_values_function_kwargs.get('classify', True):
             for i in range(len(self.channel_str_pairs)):
                 classified_data[nr_states*i: nr_states*i+nr_states, :] = \
                     self.classify_shots(data[2*i: 2*i+2, :],
                                         classifier_params_list[i],
                                         state_prob_mtx_list[i],
                                         self.get_values_function_kwargs.get(
-                                           'average', False))
+                                           'average', True))
         return classified_data
 
     def classify_shots(self, data, classifier_params_dict,

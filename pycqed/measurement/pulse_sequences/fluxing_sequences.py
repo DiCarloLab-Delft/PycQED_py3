@@ -2381,6 +2381,7 @@ def cphase_nz_seq(phases, flux_params_dict,
                   operation_dict,
                   CZ_pulse_name,
                   CZ_pulse_channel,
+                  num_cz_gates=1,
                   max_flux_length=None,
                   verbose=False, cal_points=False,
                   num_cal_points=4,
@@ -2388,16 +2389,14 @@ def cphase_nz_seq(phases, flux_params_dict,
                   first_data_point=True
                   ):
 
+    assert num_cz_gates % 2 != 0
+
     seq_name = 'cphase_nz_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulse_list = []
     print(flux_params_dict)
     RO_pulse = deepcopy(operation_dict['RO mux'])
-    if max_flux_length is not None:
-        RO_pulse['pulse_delay'] = max_flux_length
-    print(max_flux_length)
-    
     X180_control = deepcopy(operation_dict['X180 ' + qbc_name])
     X90_target = deepcopy(operation_dict['X90s ' + qbt_name])
     X180_control_2 = deepcopy(operation_dict['X180 ' + qbc_name])
@@ -2407,6 +2406,13 @@ def cphase_nz_seq(phases, flux_params_dict,
     for param_name, param_value in flux_params_dict.items():
         CZ_pulse[param_name] = param_value
     CZ_pulse['channel'] = CZ_pulse_channel
+
+    if max_flux_length is not None:
+        max_flux_length += (CZ_pulse['buffer_length_start'] +
+                            CZ_pulse['buffer_length_end'])
+        max_flux_length *= num_cz_gates
+        # RO_pulse['pulse_delay'] = max_flux_length
+    print(max_flux_length)
 
     pulse_list.append(X180_control)
     pulse_list.append(X90_target)
@@ -2425,13 +2431,13 @@ def cphase_nz_seq(phases, flux_params_dict,
         pulse_list.append(buffer_pulse)
         reduced_pulse_list += [buffer_pulse]
 
-    pulse_list.append(CZ_pulse)
+    pulse_list.append(num_cz_gates*[CZ_pulse])
     # pulse_list.append(X180_control)
     pulse_list.append(X90_target_2)
     pulse_list.append(RO_pulse)
 
     if not first_data_point:
-        reduced_pulse_list += [CZ_pulse]
+        reduced_pulse_list += num_cz_gates*[CZ_pulse]
         upload_channels, upload_AWGs = get_required_upload_information(
             reduced_pulse_list, station)
         if X90_target['I_channel'].split('_')[0] in upload_AWGs:
@@ -2491,10 +2497,12 @@ def cphase_nz_seq(phases, flux_params_dict,
                     pulse_list += [buffer_pulse]
                 if not pipulse:
                     X90_target_2['refpoint'] = 'start'
-                    pulse_list += [CZ_pulse, X180_control_2,
+                    pulse_list += num_cz_gates*[CZ_pulse]
+                    pulse_list += [X180_control_2,
                                    X90_target_2, RO_pulse]
                 else:
-                    pulse_list += [CZ_pulse, X90_target_2, RO_pulse]
+                    pulse_list += num_cz_gates * [CZ_pulse]
+                    pulse_list += [X90_target_2, RO_pulse]
                 el = multi_pulse_elt(el_iter, station, pulse_list)
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)

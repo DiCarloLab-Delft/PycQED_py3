@@ -295,9 +295,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.data_to_fit = self.options_dict.get(
             'data_to_fit', self.metadata.get('data_to_fit', None))
         if self.cal_states_rotations is not None:
-            # TODO: make sure the projected_data_dict returned by
-            # cal_states_analysis has the same form as the one when we
-            # do no rotations
             self.cal_states_analysis()
         else:
             self.proc_data_dict['projected_data_dict'] = OrderedDict()
@@ -368,9 +365,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             for i in range(len(self.cal_states_rotations)):
                 cal_state = [k for k, idx in self.cal_states_rotations.items()
                              if idx == i][0]
-                self.cal_states_dict_for_rotation[
-                    self.get_latex_prob_label(cal_state)] = \
-                    self.cal_states_dict[self.get_latex_prob_label(cal_state)]
+                self.cal_states_dict_for_rotation[cal_state] = \
+                    self.cal_states_dict[cal_state]
 
         self.num_cal_points = np.array(list(
             self.cal_states_dict.values())).flatten().size
@@ -576,6 +572,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                 title_suffix = ''
                                 plot_name_suffix = data_key
                                 plot_cal_points = False
+                                data_axis_label = 'Population'
                             else:
                                 fig_name = 'projected_plot_' + qb_name + \
                                            data_key
@@ -584,11 +581,13 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                 plot_name_suffix = ''
                                 plot_cal_points = (
                                     not self.options_dict.get('TwoD', False))
+                                data_axis_label = ''
                             self.prepare_projected_data_plot(
                                 fig_name, data, qb_name=qb_name,
                                 data_label=data_label,
                                 title_suffix=title_suffix,
                                 plot_name_suffix=plot_name_suffix,
+                                data_axis_label=data_axis_label,
                                 plot_cal_points=plot_cal_points)
 
                     else:
@@ -672,8 +671,13 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
     def prepare_projected_data_plot(
             self, fig_name, data, qb_name,
             title_suffix='', plot_cal_points=True,
-            plot_name_suffix='', data_label='Data'):
+            plot_name_suffix='', data_label='Data', data_axis_label=''):
+        print(fig_name)
+        print(plot_name_suffix)
         title_suffix = qb_name + title_suffix
+        if data_axis_label == '':
+            data_axis_label = '{} state population'.format(
+                self.get_latex_prob_label(self.data_to_fit[qb_name]))
         plotsize = self.get_default_plot_params(set=False)['figure.figsize']
         plotsize = (plotsize[0], plotsize[0]/1.25)
         if plot_cal_points and self.num_cal_points != 0:
@@ -743,8 +747,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'ylabel': self.raw_data_dict['ylabel'][0],
                 'yunit': yunit,
                 'title': title,
-                'clabel': '{} state population'.format(
-                    self.get_latex_prob_label(self.data_to_fit[qb_name]))}
+                'clabel': data_axis_label}
         else:
             self.plot_dicts[plot_dict_name] = {
                 'plotfn': self.plot_line,
@@ -754,8 +757,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'xlabel': self.raw_data_dict['xlabel'][0],
                 'xunit': xunit,
                 'yvals': yvals,
-                'ylabel': '{} state population'.format(
-                    self.get_latex_prob_label(self.data_to_fit[qb_name])),
+                'ylabel': data_axis_label,
                 'yunit': '',
                 'setlabel': data_label,
                 'title': title,
@@ -3381,11 +3383,13 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
 
                 old_pipulse_val = a_tools.get_param_value_from_file(
                     file_path=self.raw_data_dict['folder'][0],
-                    instr_name=qbn, param_name='amp180')
+                    instr_name=qbn, param_name='amp180{}'.format(
+                        '_ef' if 'f' in self.data_to_fit[qbn] else ''))
                 old_pihalfpulse_val = old_pipulse_val * \
                     a_tools.get_param_value_from_file(
                     file_path=self.raw_data_dict['folder'][0],
-                    instr_name=qbn, param_name='amp90_scale')
+                    instr_name=qbn, param_name='amp90_scale{}'.format(
+                        '_ef' if 'f' in self.data_to_fit[qbn] else ''))
                 textstr = ('  $\pi-Amp$ = {:.3f} V'.format(
                     rabi_amplitudes[qbn]['piPulse']) +
                            ' $\pm$ {:.3f} V '.format(
@@ -3475,7 +3479,8 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
 
                 old_T1_val = a_tools.get_param_value_from_file(
                     file_path=self.raw_data_dict['folder'][0],
-                    instr_name=qbn, param_name='T1')
+                    instr_name=qbn, param_name='T1{}'.format(
+                        '_ef' if 'f' in self.data_to_fit[qbn] else '_'))
                 T1_dict = self.proc_data_dict['analysis_params_dict']
                 textstr = '$T_1$ = {:.2f} $\mu$s'.format(
                             T1_dict[qbn]['T1']*1e6) \
@@ -3895,7 +3900,6 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
     def __init__(self, *args, **kwargs):
         auto = kwargs.pop('auto', True)
         super().__init__(*args, auto=False, **kwargs)
-        # kwargs['auto'] = auto
         if self.options_dict.get('artificial_detuning', None) is not None:
             self.echo_analysis = RamseyAnalysis(*args, auto=False, **kwargs)
         else:
@@ -3947,12 +3951,8 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
                                  'Ramsey_'+qbn in key]
             if len(echo_plot_key_t1) != 0:
                 echo_plot_name = echo_plot_key_t1[0]
-                # self.echo_analysis.plot_dicts[base_plot_name] = \
-                    # self.echo_analysis.plot_dicts.pop(echo_plot_key_t1[0])
             elif len(echo_plot_key_ram) != 0:
                 echo_plot_name = echo_plot_key_ram[0]
-                # self.echo_analysis.plot_dicts[base_plot_name] = \
-                #     self.echo_analysis.plot_dicts.pop(echo_plot_key_ram[0])
             else:
                 raise ValueError('Neither T1 nor Ramsey plots were found.')
 
@@ -3963,13 +3963,15 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
 
             for plot_label in self.echo_analysis.plot_dicts:
                 if qbn in plot_label:
-                    if 'raw' not in plot_label:
+                    if 'raw' not in plot_label and 'projected' not in plot_label:
                         self.echo_analysis.plot_dicts[plot_label]['fig_id'] = \
                             figure_name
 
             old_T2e_val = a_tools.get_param_value_from_file(
                 file_path=self.echo_analysis.raw_data_dict['folder'][0],
-                instr_name=qbn, param_name='T2')
+                instr_name=qbn, param_name='T2{}'.format(
+                    '_ef' if 'f' in self.echo_analysis.data_to_fit[qbn]
+                    else '_'))
             T2_dict = self.proc_data_dict['analysis_params_dict']
             textstr = '$T_2$ echo = {:.2f} $\mu$s'.format(
                 T2_dict[qbn]['T2_echo']*1e6) \
@@ -4382,37 +4384,35 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                             'data_to_fit'][qbn], qbn)
                     
                 if self.do_fitting and len(self.proc_data_dict[
-                           'analysis_params_dict']['cphase']['val']) == 1:
-                    if qbn == self.cphase_qbname:
-                        textstr = 'Cphase = {:.2f}'.format(
-                            self.proc_data_dict['analysis_params_dict'][
-                                'cphase']['val'][0]*180/np.pi) + \
-                                  r'$^{\circ}$'
-                        textstr += '\nPopulation loss = {:.3f}'.format(
-                            self.proc_data_dict['analysis_params_dict'][
-                                'population_loss']['val'][0])
-                        self.plot_dicts['text_msg_' + qbn] = {
-                            'fig_id': 'Cphase_{}_{}'.format(
-                                qbn, self.data_to_fit[qbn]),
-                            'ypos': -0.2,
-                            'xpos': -0.05,
-                            'horizontalalignment': 'left',
-                            'verticalalignment': 'top',
-                            'plotfn': self.plot_text,
-                            'text_string': textstr}
-                    else:
-                        textstr = 'Leakage = {:.3f}'.format(
-                            self.proc_data_dict['analysis_params_dict'][
-                                'leakage']['val'][0])
-                        self.plot_dicts['text_msg_' + qbn] = {
-                            'fig_id': 'Leakage_{}_{}'.format(
-                                qbn, self.data_to_fit[qbn]),
-                            'ypos': -0.2,
-                            'xpos': -0.05,
-                            'horizontalalignment': 'left',
-                            'verticalalignment': 'top',
-                            'plotfn': self.plot_text,
-                            'text_string': textstr}
+                               'analysis_params_dict']['cphase']['val']) == 1:
+                        if qbn == self.cphase_qbname:
+                            textstr = 'Cphase = {:.2f}'.format(
+                                self.proc_data_dict['analysis_params_dict'][
+                                    'cphase']['val'][0]*180/np.pi) + \
+                                      r'$^{\circ}$'
+                            textstr += '\nPopulation loss = {:.3f}'.format(
+                                self.proc_data_dict['analysis_params_dict'][
+                                    'population_loss']['val'][0])
+                            self.plot_dicts['text_msg_' + qbn] = {
+                                'fig_id': base_plot_name,
+                                'ypos': -0.2,
+                                'xpos': -0.05,
+                                'horizontalalignment': 'left',
+                                'verticalalignment': 'top',
+                                'plotfn': self.plot_text,
+                                'text_string': textstr}
+                        else:
+                            textstr = 'Leakage = {:.5f}'.format(
+                                self.proc_data_dict['analysis_params_dict'][
+                                    'leakage']['val'][0])
+                            self.plot_dicts['text_msg_' + qbn] = {
+                                'fig_id': base_plot_name,
+                                'ypos': -0.2,
+                                'xpos': -0.05,
+                                'horizontalalignment': 'left',
+                                'verticalalignment': 'top',
+                                'plotfn': self.plot_text,
+                                'text_string': textstr}
 
         # plot analysis results
         if self.do_fitting and len(self.proc_data_dict[

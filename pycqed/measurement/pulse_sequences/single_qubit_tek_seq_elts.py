@@ -255,7 +255,7 @@ def mixer_skewness_cal_sqs(pulseIch,
                                 verbose=verbose)
 
 
-def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
+def rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
              cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
@@ -345,7 +345,7 @@ def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
         return seq
 
 
-def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
+def rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
                    verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence to determine amp90 scaling factor for a single qubit using the tektronix.
@@ -423,7 +423,7 @@ def T1_seq(times,
         return seq_name
 
 
-def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
+def ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                artificial_detuning=None,
                cal_points=True, cpmg_scheme=True,
                verbose=False,
@@ -529,7 +529,7 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
         return seq_name
 
 
-def Ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
+def ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
                           artificial_detuning=None,
                           cal_points=True,
                           verbose=False,
@@ -622,7 +622,7 @@ def Ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
         return seq_name
 
 
-def Ramsey_seq(times, pulse_pars, RO_pars,
+def ramsey_seq(times, pulse_pars, RO_pars,
                artificial_detuning=None,
                cal_points=True,
                verbose=False,
@@ -683,7 +683,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         return seq_name
 
 
-def Ramsey_seq_VZ(times, pulse_pars, RO_pars,
+def ramsey_seq_VZ(times, pulse_pars, RO_pars,
                    artificial_detuning=None,
                    cal_points=True,
                    verbose=False,
@@ -740,7 +740,7 @@ def Ramsey_seq_VZ(times, pulse_pars, RO_pars,
     else:
         return seq_name
 
-def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
+def ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
                artificial_detunings=None,
                cal_points=True,
                verbose=False,
@@ -795,7 +795,7 @@ def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
         return seq_name
 
 
-def Echo_seq(times, pulse_pars, RO_pars,
+def echo_seq(times, pulse_pars, RO_pars,
              artificial_detuning=None,
              cal_points=True,
              verbose=False,
@@ -1264,7 +1264,7 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     else:
         return seq_name
 
-def QScale(qscales, pulse_pars, RO_pars,
+def qscale(qscales, pulse_pars, RO_pars,
               cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Sequence used for calibrating the QScale factor used in the DRAG pulses.
