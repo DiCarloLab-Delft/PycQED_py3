@@ -101,10 +101,13 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('noise', label='noise level', unit='V',
-                           initial_value=0.01e-3, parameter_class=ManualParameter)
+                           initial_value=0.04e-3, parameter_class=ManualParameter)
 
         self.add_parameter('mock_res_width', label='resonator peak width', unit='Hz',
                            initial_value=1e6, parameter_class=ManualParameter)
+
+        self.add_parameter('mock_flux_sensitivity', label='sensitivity to flux in current',
+                           unit='A', initial_value=10e-3, parameter_class=ManualParameter)
 
     def find_resonator_power(self, freqs=None, powers=None, update=True):
         if freqs is None:
@@ -163,7 +166,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             logging.warning(
                 'extracted frequency outside range of scan. Not updating')
         if update:
-            print('Updating ' + self.msmt_suffix + '.freq_res')
             self.freq_res(f_res)
             self.ro_freq(f_res)
         return f_res
@@ -189,12 +191,16 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         if fluxChan is None:
             fluxChan = 'FBL_1'
-
+        
+        t_start = time.strftime('%Y%m%d_%H%M%S')
         self.measure_resonator_frequency_dac_scan(freqs=freqs, dac_values=dac_values,
                                                   fluxChan=fluxChan, analyze=False)
         if update:
-            import pycqed.analysis_v2.dac_scan_analysis as dsa
-            fit_res = dsa.Susceptibility_to_Flux_Bias(label='Resonator_dac_scan')
+
+            import pycqed.analysis_v2.spectroscopy_analysis as sa
+            fit_res = sa.VNA_DAC_Analysis(timestamp=t_start)
+            sweetspot_current = -1*fit_res.sweet_spot_value
+            self.fl_dc_V0(sweetspot_current)
 
         return True
 
@@ -208,12 +214,16 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         '''
         if freqs is None:
             freq_center = self.freq_qubit()
-            freq_range = 200e6
+            freq_range = 300e6
             freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
                               0.5e6)
 
         if dac_values is None:
-            dac_values = np.linspace(-1e-3, 1e-3, 6)
+            if self.fl_dc_V0() is not None:
+                dac_values = np.linspace(self.fl_dc_V0() - 1e-3,
+                                         self.fl_dc_V0() + 1e-3, 6)
+            else:
+                dac_values = np.linspace(-1e-3, 1e-3, 6)
 
         t_start = time.time()
         t_start = time.strftime('%Y%m%d_%H%M%S')
@@ -281,14 +291,16 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         if freqs is None:
             freq_center = self.freq_qubit()
-            freq_range = 100e6
+            freq_range = 200e6
             freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
                               0.5e6)
         if powers is None:
-            powers = [-30, -20, -10]
+            powers = np.arange(-40, -9, 2)
 
-        w = np.zeros(np.size(powers))
-        A = np.zeros(np.size(powers))
+        w = []
+        A = []
+
+        t_start = time.strftime('%Y%m%d_%H%M%S')
 
         for i, power in enumerate(powers):
             self.spec_pow(power)
@@ -296,17 +308,26 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
             a = ma.Homodyne_Analysis(label=self.msmt_suffix,
                                      fitting_model='lorentzian')
-            w[i] = a.params['kappa'].value
-            A[i] = a.params['A'].value
+            w.append(a.params['kappa'].value)
+            A.append(a.params['A'].value)
 
+        t_stop = time.strftime('%Y%m%d_%H%M%S')
         Awratio = np.divide(A, w)
 
-        ind = Awratio.index(max(Awratio))
+        ind = np.argmax(Awratio)
         best_spec_pow = powers[ind]  # Should be some analysis and iterative method to
         # find the optimum
-
+        print('from find_spec_pow:' + str(best_spec_pow))
         if update:
+            import pycqed.analysis_v2.spectroscopy_analysis as sa
+
+            a = sa.SpecPowAnalysis(t_start=t_start, t_stop=t_stop,
+                                   label='spectroscopy_'+self.msmt_suffix,
+                                   pow_key='Instrument settings.'+self.name+'.spec_pow')
+            best_spec_pow = a.fit_res['spec_pow']
+
             self.spec_pow(best_spec_pow)
+            print(self.spec_pow())
             return True
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None, analyze=True,
@@ -330,7 +351,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         current = self.mock_current()
         Iref = self.mock_residual_flux_current()
-        I0 = 20e-3
+        I0 = self.mock_flux_sensitivity()
 
         # Height of peak [V]
         K = 1/np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
@@ -343,11 +364,11 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # f0 = self.mock_freq_qubit() - df*(np.sin(1/2*np.pi*(current-Iref)/I0))**2
         f0 = np.sqrt(8*self.mock_Ec()*self.mock_Ej() *
-            np.abs(np.cos(np.pi*(current-Iref)/I0))) - self.mock_Ec()
+                     np.abs(np.cos(np.pi*(current-Iref)/I0))) - self.mock_Ec()
         if self.spec_amp() > self.mock_12_spec_amp():  # 1-2 transition
             A12 = A*0.5
             w12 = 1e6
-            f02over2 = self.mock_freq_qubit()-self.mock_anharmonicity()/2
+            f02over2 = f0 - self.mock_anharmonicity()/2
             mocked_values = h + A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2) + \
                 A12*(w12/2.0)**2 / ((w12/2.0)**2 + ((freqs - f02over2))**2)
         else:
@@ -442,7 +463,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             #                  close_fig=close_fig, normalize=True)
             a = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
                                                 close_figig=True)
-            print(a)
             return a
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None, analyze=True,
@@ -531,7 +551,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         freq_res = self.mock_freq_res()
         Iref = self.mock_residual_flux_current()
-        I0 = 20e-3
+        I0 = self.mock_flux_sensitivity()
         df = 2e6
 
         mocked_values = []

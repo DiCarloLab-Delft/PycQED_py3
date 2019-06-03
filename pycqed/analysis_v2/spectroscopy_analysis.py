@@ -1092,3 +1092,67 @@ class ResonatorDacSweep(ResonatorSpectroscopy):
                 [[tt] for tt in self.raw_data_dict['phase']])
             self.plot_amp = np.array(
                 [np.array([tt]).transpose() for tt in self.raw_data_dict['amp']])
+
+
+class SpecPowAnalysis(ba.BaseDataAnalysis):
+  '''
+  Finds the optimal spectroscopy power for the 01 transition from a series of 
+  measurements by finding the power where the ratio of the peak amplitude and
+  width is maximal.
+  
+  DOES NOT YIELD ACCURATE RESULTS YET
+  TODO: Could be done with less datapoints and some interpolation.
+  '''
+  def __init__(self, t_start: str=None, t_stop: str=None,
+               label: str='spectroscopy',
+               pow_key='Instrument settings.Q.spec_pow',
+               frequency_key='Analysis.Fitted Params HM.f0.value',
+               width_key='Analysis.Fitted Params HM.kappa.value',
+               amp_key='Analysis.Fitted Params HM.A.value',
+               do_fitting=True,
+               extract_only: bool=False):
+
+    super().__init__(t_start=t_start, t_stop=t_stop, 
+                     label=label,
+                     do_fitting=do_fitting, 
+                     extract_only=extract_only)
+
+    self.params_dict = {'power': pow_key,
+                        'qfreq': frequency_key,
+                        'width': width_key,
+                        'amp': amp_key,
+                        'measurementstring': 'measurementstring'}
+
+    self.numeric_params = ['power', 'qfreq', 'width', 'amp']
+
+    self.run_analysis()
+
+    w = self.raw_data_dict['width']
+    A = self.raw_data_dict['amp']
+    print(w)
+    print(A)
+    powers = self.raw_data_dict['power']
+    Awratio = np.divide(A, w)
+    print(Awratio)
+    ind = np.argmax(Awratio)
+    best_spec_pow = powers[ind]
+    print('index: ' + str(ind) + '; power: ' + str(best_spec_pow))
+    self.fit_res = {}
+    self.fit_res['ratio'] = Awratio
+    self.fit_res['spec_pow'] = best_spec_pow
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['power'],
+            'xlabel': 'TESTING',
+            'xunit': 'dBm',
+            'yvals': self.fit_res['ratio'],
+            'ylabel': 'A/w',
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'linestyle': '',
+            'marker': 'o',
+            'setlabel': 'data',
+            'color': 'C0',
+        }
