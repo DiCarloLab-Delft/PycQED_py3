@@ -7772,7 +7772,6 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                             'low power regime frequency')
         results = [shift, P_result]
         self.results = results
-        return results
 
     def fit_hanger_model(self, sweep_values, measured_values):
         HangerModel = fit_mods.SlopedHangerAmplitudeModel

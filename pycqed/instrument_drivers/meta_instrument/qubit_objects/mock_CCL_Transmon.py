@@ -48,7 +48,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         self.add_parameter('mock_residual_flux_current', label='magnitude of sweetspot current',
                            unit='A', parameter_class=ManualParameter,
-                           initial_value=0.5e-3)
+                           initial_value=0.25e-3)
 
         self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude', unit='V',
                            initial_value=0.5, parameter_class=ManualParameter)
@@ -114,7 +114,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                               0.1e6)
 
         if powers is None:
-            powers = np.arange(-40, 10, 4)
+            powers = np.arange(-40, 0.1, 4)
 
         self.measure_resonator_power(freqs=freqs, powers=powers, analyze=False)
 
@@ -168,7 +168,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             self.ro_freq(f_res)
         return f_res
 
-    def find_resonator_sweetspot(self, freqs=None, dac_values=None, fluxChan=None):
+    def find_resonator_sweetspot(self, freqs=None, dac_values=None, fluxChan=None,
+                                 update=True):
         '''
         Finds the resonator sweetspot current.
         TODO: - measure all FBL-resonator combinations
@@ -190,23 +191,29 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             fluxChan = 'FBL_1'
 
         self.measure_resonator_frequency_dac_scan(freqs=freqs, dac_values=dac_values,
-                                                  fluxChan=fluxChan)
+                                                  fluxChan=fluxChan, analyze=False)
+        if update:
+            import pycqed.analysis_v2.dac_scan_analysis as dsa
+            fit_res = dsa.Susceptibility_to_Flux_Bias(label='Resonator_dac_scan')
 
         return True
 
-    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True):
+    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True, 
+                             set_to_sweetspot=True):
         '''
         Should be edited such that it contains reference to different measurement
         methods (tracking / 2D scan / broad spectroscopy)
+
+        TODO: If spectroscopy does not yield a peak, it should discard it
         '''
         if freqs is None:
             freq_center = self.freq_qubit()
-            freq_range = 100e6
+            freq_range = 200e6
             freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
                               0.5e6)
 
         if dac_values is None:
-            dac_values = np.linspace(-1.5e-3, 1.5e-3, 21)
+            dac_values = np.linspace(-1e-3, 1e-3, 6)
 
         t_start = time.time()
         t_start = time.strftime('%Y%m%d_%H%M%S')
@@ -220,15 +227,20 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
                               label='spectroscopy__' + self.name,
-                              dac_key='Instrument settings.Mock_CCL.mock_current',
+                              dac_key='Instrument settings.'+self.name+'.mock_current',
                               degree=2)
-        pc = a.fit_res['fit_polycoeffs'].value
-        self.flux_polycoeffs(pc)
+
+        pc = a.fit_res['fit_polycoeffs']
+
+        self.flux_polycoeff(pc)
         sweetspot_current = -pc[1]/(2*pc[0])
 
         if update:
+            self.fl_dc_V0(sweetspot_current)
+        if set_to_sweetspot:
             self.mock_current(sweetspot_current)
-            return True
+        
+        return True
 
     def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
                                     update=True):
@@ -289,7 +301,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         Awratio = np.divide(A, w)
 
-        best_spec_pow = -26  # Should be some analysis and iterative method to
+        ind = Awratio.index(max(Awratio))
+        best_spec_pow = powers[ind]  # Should be some analysis and iterative method to
         # find the optimum
 
         if update:
@@ -317,7 +330,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         current = self.mock_current()
         Iref = self.mock_residual_flux_current()
-        I0 = 10e-3
+        I0 = 20e-3
 
         # Height of peak [V]
         K = 1/np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
@@ -326,10 +339,11 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Width of peak
         wbase = 4e6
-        w = wbase/np.sqrt(0.1+10**(-(self.spec_pow()+10)/7))+wbase
+        w = wbase/np.sqrt(0.1+10**(-(self.spec_pow()-self.mock_spec_pow()/2)/7))+wbase
 
-        df = 400e6
-        f0 = self.mock_freq_qubit() - df*(np.sin(1/2*np.pi*(current-Iref)/I0))**2
+        # f0 = self.mock_freq_qubit() - df*(np.sin(1/2*np.pi*(current-Iref)/I0))**2
+        f0 = np.sqrt(8*self.mock_Ec()*self.mock_Ej() *
+            np.abs(np.cos(np.pi*(current-Iref)/I0))) - self.mock_Ec()
         if self.spec_amp() > self.mock_12_spec_amp():  # 1-2 transition
             A12 = A*0.5
             w12 = 1e6
@@ -496,7 +510,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.run('Resonator_scan'+self.msmt_suffix)
 
         if analyze:
-            ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
+            ma.Homodyne_Analysis(label='Resonator_scan', close_fig=close_fig)
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, pulsed=True,
                                              MC=None, analyze=True, fluxChan=None,
@@ -517,7 +531,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         freq_res = self.mock_freq_res()
         Iref = self.mock_residual_flux_current()
-        I0 = 10e-3
+        I0 = 20e-3
         df = 2e6
 
         mocked_values = []
@@ -800,10 +814,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # Qubits calibration
         self.dag.add_node(self.name + ' Frequency Coarse',
                           calibrate_function=self.name + '.find_frequency')
+        self.dag.add_node(self.name + ' Frequency at Sweetspot',
+                          calibrate_function=self.name + '.find_frequency')
         self.dag.add_node(self.name + ' Spectroscopy Power',
                           calibrate_function=self.name + '.find_spec_pow')
         self.dag.add_node(self.name + ' Sweetspot',
-                          calibrate_function=cal_True_delayed)
+                          calibrate_function=self.name + '.find_qubit_sweetspot')
         self.dag.add_node(self.name + ' Rabi',
                           calibrate_function=cal_True_delayed)
         self.dag.add_node(self.name + ' Frequency Fine',
@@ -883,11 +899,14 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.dag.add_edge(self.name + ' Sweetspot',
                           self.name + ' Spectroscopy Power')
         self.dag.add_edge(self.name + ' Rabi',
-                          self.name + ' Sweetspot')
+                          self.name + ' Frequency at Sweetspot')
         self.dag.add_edge(self.name + ' Frequency Fine',
-                          self.name + ' Sweetspot')
+                          self.name + ' Frequency at Sweetspot')
         self.dag.add_edge(self.name + ' Frequency Fine',
                           self.name + ' Rabi')
+
+        self.dag.add_edge(self.name + ' Frequency at Sweetspot',
+                          self.name + ' Sweetspot')
 
         self.dag.add_edge(self.name + ' ALLXY',
                           self.name + ' Rabi')
@@ -921,11 +940,11 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                           self.name + ' T2_Star')
 
         self.dag.add_edge(self.name + ' DAC Arc Polynomial',
-                          self.name + ' Sweetspot')
+                          self.name + ' Frequency at Sweetspot')
 
         # Measurements of anharmonicity and avoided crossing
         self.dag.add_edge(self.name + ' f_12 estimate',
-                          self.name + ' Sweetspot')
+                          self.name + ' Frequency at Sweetspot')
         self.dag.add_edge(self.name + ' Anharmonicity',
                           self.name + ' f_12 estimate')
         self.dag.add_edge(self.name + ' Avoided Crossing',
