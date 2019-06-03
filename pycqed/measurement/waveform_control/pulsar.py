@@ -6,9 +6,9 @@
 import numpy as np
 import logging
 from qcodes.instrument.base import Instrument
-from qcodes.instrument.parameter import ManualParameter
+from qcodes.instrument.parameter import (
+    ManualParameter, InstrumentRefParameter)
 import qcodes.utils.validators as vals
-from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 import pycqed.measurement.waveform_control.element as element
 import string
 import time
@@ -1078,8 +1078,9 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
     def __init__(self, name='Pulsar', master_awg=None):
         super().__init__(name)
 
-        self.add_parameter('master_awg', parameter_class=InstrumentParameter,
-                           initial_value=master_awg, vals=vals.Strings())
+        self.add_parameter('master_awg', 
+                           parameter_class=InstrumentRefParameter,
+                           initial_value=master_awg)
         self.add_parameter('inter_element_spacing',
                            vals=vals.MultiType(vals.Numbers(0),
                                                vals.Enum('auto')),
@@ -1216,29 +1217,35 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         else:
             self._awgs_with_waveforms.add(awg)
 
-    def start(self):
+    def start(self, exclude=None):
         """
         Start the active AWGs. If multiple AWGs are used in a setup where the
         slave AWGs are triggered by the master AWG, then the slave AWGs must be
         running and waiting for trigger when the master AWG is started to
         ensure synchronous playback.
         """
+        if exclude is None:
+            exclude = []
 
         # Start only the AWGs which have at least one channel programmed, i.e.
         # where at least one channel has state = 1. 
         awgs_with_waveforms = self.awgs_with_waveforms()
         used_awgs = set(self.active_awgs()) & awgs_with_waveforms
-
+        
+        
         if self.master_awg() is None:
             for awg in used_awgs:
-                self._start_awg(awg)
+                if awg not in exclude:
+                    self._start_awg(awg)
         else:
+            if self.master_awg() not in exclude:
+                self.master_awg.get_instr().stop()
             for awg in used_awgs:
-                if awg != self.master_awg():
+                if awg != self.master_awg() and awg not in exclude:
                     self._start_awg(awg)
             tstart = time.time()
             for awg in used_awgs:
-                if awg == self.master_awg():
+                if awg == self.master_awg() or awg in exclude:
                     continue
                 good = False
                 while not (good or time.time() > tstart + 10):
@@ -1249,7 +1256,8 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                 if not good:
                     raise Exception('AWG {} did not start in 10s'
                                     .format(awg))
-            self._start_awg(self.master_awg())
+            if self.master_awg() not in exclude:
+                self.master_awg.get_instr().start()
 
     def stop(self):
         """

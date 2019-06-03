@@ -371,6 +371,7 @@ class QuDev_transmon(Qubit):
 
         self.int_avg_det_spec = det.UHFQC_integrated_average_detector(
             UHFQC=self.instr_uhf.get_instr(), 
+            AWG=self.instr_uhf.get_instr(), 
             channels=[self.acq_I_channel(), self.acq_Q_channel()], 
             nr_averages=self.acq_averages(),
             integration_length=self.acq_length(),
@@ -596,7 +597,7 @@ class QuDev_transmon(Qubit):
 
         with temporary_value(self.instr_trigger.get_instr().pulse_period, 
                              trigger_separation):
-            self.instr_pulsar.get_instr().start()
+            self.instr_pulsar.get_instr().start(exclude=[self.instr_uhf()])
             MC.run(name=label, mode=mode)
             self.instr_pulsar.get_instr().stop()
 
@@ -646,7 +647,7 @@ class QuDev_transmon(Qubit):
 
         with temporary_value(self.instr_trigger.get_instr().pulse_period, 
                              trigger_separation):
-            self.instr_pulsar.get_instr().start()
+            self.instr_pulsar.get_instr().start(exclude=[self.instr_uhf()])
             MC.run(name=label, mode=mode)
             self.instr_pulsar.get_instr().stop()
 
