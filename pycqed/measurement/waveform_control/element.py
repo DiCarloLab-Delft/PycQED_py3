@@ -9,6 +9,7 @@ from copy import deepcopy
 import logging
 import pycqed.measurement.waveform_control.fluxpulse_predistortion as flux_dist
 
+
 class Element:
     """
     Implementation of a sequence element.
@@ -37,15 +38,18 @@ class Element:
 
     # tools for time calculations
 
+    # returns number of samples that can be carried out in time t for channel c
     def _time2sample(self, c, t):
         return int(t * self._clock(c) + 0.5)
 
     def _time2sampletime(self, c, t):
         return self._sample2time(c, self._time2sample(c, t))
 
+    # calculates passed time given s samples
     def _sample2time(self, c, s):
         return s / self._clock(c)
 
+    # returns number of samples per second for channel c
     def _clock(self, c):
         return self.pulsar.clock(c)
 
@@ -61,8 +65,7 @@ class Element:
             for p in self.pulses:
                 for c in self.pulses[p].channels:
                     if self.pulsar.get('{}_active'.format(c)):
-                        t0s.append(self.pulses[p].t0() -
-                                   self.channel_delay(c))
+                        t0s.append(self.pulses[p].t0() - self.channel_delay(c))
             offset = min(t0s)
             if self.fixed_point_applied:
                 offset += calculate_time_correction(
@@ -104,8 +107,9 @@ class Element:
         add_spacing = self.pulsar.inter_element_spacing() - \
                       self.pulsar.get('{}_inter_element_deadtime'.format(c))
         samples += int(np.ceil(add_spacing / self._clock(c)))
-        samples = max(samples, int(self.pulsar.get('{}_min_length'.format(c)) *
-                               self._clock(c)))
+        samples = max(
+            samples,
+            int(self.pulsar.get('{}_min_length'.format(c)) * self._clock(c)))
         while samples % self.pulsar.get('{}_granularity'.format(c)) != 0:
             samples += 1
         return samples
@@ -115,12 +119,12 @@ class Element:
         Returns an actual time, i.e., the correction for delay
         is reversed. It is, however, correctly discretized.
         """
-        return int((t + self.channel_delay(c))*self._clock(c)
-                   + 0.5) / self._clock(c)
+        return int((t + self.channel_delay(c)) * self._clock(c) +
+                   0.5) / self._clock(c)
 
     def real_times(self, tvals, c):
-        return ((tvals + self.channel_delay(c))*self._clock(c)
-                + 0.5).astype(int) / self._clock(c)
+        return ((tvals + self.channel_delay(c)) * self._clock(c) +
+                0.5).astype(int) / self._clock(c)
 
     def shift_all_pulses(self, dt):
         """
@@ -147,12 +151,17 @@ class Element:
 
     def _auto_pulse_name(self, base='pulse'):
         i = 0
-        while base+'-'+str(i) in self.pulses:
+        while base + '-' + str(i) in self.pulses:
             i += 1
-        return base+'-'+str(i)
+        return base + '-' + str(i)
 
-    def add(self, pulse, name=None, start=0,
-            refpulse=None, refpoint='end', refpoint_new='start',
+    def add(self,
+            pulse,
+            name=None,
+            start=0,
+            refpulse=None,
+            refpoint='end',
+            refpoint_new='start',
             operation_type='other'):
         """
         Function adds a pulse to the element, there are several options to set
@@ -194,7 +203,7 @@ class Element:
                 if refpoint == 'start':
                     t0 -= self.pulses[refpulse].effective_length()
                 elif refpoint == 'center':
-                    t0 -= self.pulses[refpulse].effective_length()/2.
+                    t0 -= self.pulses[refpulse].effective_length() / 2.
 
             elif refpoint_new == 'end':
                 t0 += (self.pulses[refpulse].effective_stop() -
@@ -202,15 +211,15 @@ class Element:
                 if refpoint == 'start':
                     t0 -= self.pulses[refpulse].effective_length()
                 elif refpoint == 'center':
-                    t0 -= self.pulses[refpulse].effective_length()/2.
+                    t0 -= self.pulses[refpulse].effective_length() / 2.
 
             elif refpoint_new == 'center':
                 t0 += (self.pulses[refpulse].effective_stop() -
-                       pulse.effective_length()/2.)
+                       pulse.effective_length() / 2.)
                 if refpoint == 'start':
                     t0 -= self.pulses[refpulse].effective_length()
                 elif refpoint == 'center':
-                    t0 -= self.pulses[refpulse].effective_length()/2.
+                    t0 -= self.pulses[refpulse].effective_length() / 2.
 
         pulse._t0 = t0
         self.pulses[name] = pulse
@@ -232,11 +241,10 @@ class Element:
         n = None
         for i, p in enumerate(pulses):
             if i == 0:
-                n = self.add(p, refpulse=self._last_added_pulse,
-                             refpoint='end')
+                n = self.add(
+                    p, refpulse=self._last_added_pulse, refpoint='end')
             else:
-                n = self.add(p, refpulse=n,
-                             refpoint='end')
+                n = self.add(p, refpulse=n, refpoint='end')
         return n
 
     def next_pulse_time(self, cname, t0=0):
@@ -347,29 +355,31 @@ class Element:
             if self.pulsar.get('{}_type'.format(c)) == 'analog':
                 if self.pulsar.get('{}_charge_buildup_compensation'.format(c)):
                     tau = self.pulsar.get('{}_discharge_timescale'.format(c))
-                    comp_delay = self.pulsar.get('{}_compensation_pulse_delay'
-                                                 .format(c))
+                    comp_delay = self.pulsar.get(
+                        '{}_compensation_pulse_delay'.format(c))
                     amp = self.pulsar.get('{}_amp'.format(c))
-                    amp *= self.pulsar.get('{}_compensation_pulse_scale'
-                                           .format(c))
+                    amp *= self.pulsar.get(
+                        '{}_compensation_pulse_scale'.format(c))
                     t = tvals[c]
                     dt = t[1] - t[0]
                     tend = t[-1] + dt
                     wf = wfs[c]
                     if tau is None:
-                        integral = wf.sum()*dt
+                        integral = wf.sum() * dt
                         if integral > 0:
                             amp = -amp
-                        tcomp = -integral/amp
+                        tcomp = -integral / amp
                     else:
-                        integral = (wf*np.exp((t-tend)/tau)).sum()*dt
+                        integral = (wf * np.exp((t - tend) / tau)).sum() * dt
                         if integral > 0:
                             amp = -amp
-                        tcomp = tau*np.log(1 - integral/(amp*tau))
-                    textra = np.arange(tend, tend + tcomp + 2*comp_delay, dt)
+                        tcomp = tau * np.log(1 - integral / (amp * tau))
+                    textra = np.arange(tend, tend + tcomp + 2 * comp_delay, dt)
                     t = np.append(t, textra)
-                    wf = np.append(wf, amp*((textra < tend + tcomp + comp_delay)
-                                            * (textra >= tend + comp_delay)))
+                    wf = np.append(
+                        wf,
+                        amp * ((textra < tend + tcomp + comp_delay) *
+                               (textra >= tend + comp_delay)))
                     tvals[c] = t
                     wfs[c] = wf
 
@@ -378,7 +388,8 @@ class Element:
             if len(wfs[c]) == 0:
                 continue
             if self.pulsar.get('{}_type'.format(c)) == 'analog':
-                if self.pulsar.get('{}_distortion'.format(c)) == 'precalculate':
+                if self.pulsar.get(
+                        '{}_distortion'.format(c)) == 'precalculate':
                     distortion_dictionary = self.pulsar.get(
                         '{}_distortion_dict'.format(c))
                     fir_kernels = distortion_dictionary.get('FIR', None)
@@ -399,15 +410,17 @@ class Element:
             if self.pulsar.get('{}_type'.format(c)) == 'analog':
                 if np.max(wfs[c]) > amp:
                     logging.warning('Clipping waveform {} > {}'.format(
-                                    np.max(wfs[c]), amp))
+                        np.max(wfs[c]), amp))
                 if np.min(wfs[c]) < -amp:
                     logging.warning('Clipping waveform {} < {}'.format(
-                                    np.min(wfs[c]), -amp))
+                        np.min(wfs[c]), -amp))
                 np.clip(wfs[c], -amp, amp, out=wfs[c])
             elif self.pulsar.get('{}_type'.format(c)) == 'marker':
                 wfs[c][wfs[c] > 0] = amp
                 wfs[c][wfs[c] <= 0] = 0
         return tvals, wfs
+        #returns a dictionary wfs containing
+        #channel names as keys and the respective amplitudes as list in values
 
     def normalized_waveforms(self, channels=None):
         """
@@ -425,8 +438,10 @@ class Element:
             if self.pulsar.get('{}_type'.format(wf)) == 'analog':
                 wfs[wf] = wfs[wf] / amp
             if self.pulsar.get('{}_type'.format(wf)) == 'marker':
-                wfs[wf][wfs[wf] > 0] = 1
-                wfs[wf][wfs[wf] <= 0] = 0
+                wfs[wf] = (wfs[wf] > 0).astype(np.int)
+        # returns a dictionary wfs containing
+        # channel names as keys and the normalized (-1 to 1)
+        # amplitudes as list in values
         return tvals, wfs
 
     # testing and inspection
@@ -455,17 +470,20 @@ class Element:
                     pulses[p][c] = {}
                     pulses[p][c]['start time'] = self.pulse_start_time(p, c)
                     pulses[p][c]['end time'] = self.pulse_end_time(p, c)
-                    pulses[p][c]['start sample'] = self.pulse_start_sample(p, c)
+                    pulses[p][c]['start sample'] = self.pulse_start_sample(
+                        p, c)
                     pulses[p][c]['end sample'] = self.pulse_end_sample(p, c)
                     pulses[p][c]['samples'] = self.pulse_samples(p, c)
         pprint.pprint(overview)
+
 
 # Helper functions, previously part of the element object but moved outside
 # to be able to use them in other modules (eg higher level parts of the
 # sequencer)
 
+
 def calculate_time_correction(t0, fixed_point=1e-6):
-    return (fixed_point-t0) % fixed_point
+    return (fixed_point - t0) % fixed_point
 
 
 def is_divisible_by_clock(value, clock=1e9):
@@ -476,18 +494,22 @@ def is_divisible_by_clock(value, clock=1e9):
     It performs this by multiplying everything by 1e11 (looking at 0.01ns
     resolution for divisibility)
     """
-    if np.round(value*1e11) % (1/clock*1e11) == 0:
+    if np.round(value * 1e11) % (1 / clock * 1e11) == 0:
         return True
     else:
         return False
 
+
 def combine_elements(element_list):
     name = tuple(el.name for el in element_list)
-    element = Element(name, element_list[0].pulsar,
-                      ignore_offset_correction=True,
-                      global_time=True,
-                      time_offset=0,
-                      ignore_delays=element_list[0].ignore_delays)
+    # create new element with a tuple of the contained elements names as name
+    element = Element(
+        name,
+        element_list[0].pulsar,
+        ignore_offset_correction=True,
+        global_time=True,
+        time_offset=0,
+        ignore_delays=element_list[0].ignore_delays)
     element.fixed_point_applied = True
     for i, originalel in enumerate(element_list):
         pulsar = originalel.pulsar
@@ -495,11 +517,18 @@ def combine_elements(element_list):
         el = deepcopy(originalel)
         originalel.pulsar = pulsar
         if i != 0:
+            # shifts all pulses of the element to be added by one element length
+            # - the offset of the element
             el.shift_all_pulses(-originalel.offset() + element.ideal_length())
-        pulses = {el.name + '_' + p + '_' + str(i): el.pulses[p]
-                  for p in el.pulses}
+        # creates pulses dictionary to be added to the combined element
+        pulses = {
+            el.name + '_' + p + '_' + str(i): el.pulses[p]
+            for p in el.pulses
+        }
         for p in pulses:
+            # takes the pulse with key p and updates the name of the
+            # pulse to match the key
             pulses[p].name = p
+        # fills the originally empty pulse dict with the shifted pulses
         element.pulses.update(pulses)
     return element
-

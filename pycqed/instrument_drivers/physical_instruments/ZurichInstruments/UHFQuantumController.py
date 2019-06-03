@@ -9,6 +9,8 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
 from qcodes.instrument.parameter import ManualParameter
+import ctypes
+from ctypes.wintypes import MAX_PATH
 
 
 class UHFQC(Instrument):
@@ -54,7 +56,7 @@ class UHFQC(Instrument):
         else:
             self._device = device
             self._daq.connectDevice(self._device, interface)
-        #self._device = zi_utils.autoDetect(self._daq)
+            #self._device = zi_utils.autoDetect(self._daq)
         self._awgModule = self._daq.awgModule()
         self._awgModule.set('awgModule/device', self._device)
         self._awgModule.execute()
@@ -73,15 +75,15 @@ class UHFQC(Instrument):
 
         init = True
         try:
-            f = open(self._s_file_name).read()
-            s_node_pars = json.loads(f)
+            with open(self._s_file_name) as f:
+                s_node_pars = json.loads(f.read())
         except:
             print("parameter file for gettable parameters {} not found".format(
                 self._s_file_name))
             init = False
         try:
-            f = open(self._d_file_name).read()
-            d_node_pars = json.loads(f)
+            with open(self._d_file_name) as f:
+                d_node_pars = json.loads(f.read())
         except:
             print("parameter file for settable parameters {} not found".format(
                 self._d_file_name))
@@ -177,6 +179,18 @@ class UHFQC(Instrument):
 
         print('Initialized UHFQC', self._device,
               'in %.2fs' % (t1-t0))
+        
+        if os.name == 'nt':
+            dll = ctypes.windll.shell32
+            buf = ctypes.create_unicode_buffer(MAX_PATH + 1)
+            if dll.SHGetSpecialFolderPathW(None, buf, 0x0005, False):
+                _basedir = buf.value
+            else:
+                logging.warning('Could not extract my documents folder')
+        else:
+            _basedir = os.path.expanduser('~')
+        self.lab_one_webserver_path = os.path.join(
+            _basedir, 'Zurich Instruments', 'LabOne', 'WebServer')
 
     def load_default_settings(self):
         # standard configurations adapted from Haendbaek's notebook
@@ -313,6 +327,13 @@ class UHFQC(Instrument):
         with open(filename, 'r') as awg_file:
             sourcestring = awg_file.read()
             self.awg_string(sourcestring)
+    
+    def _write_csv_waveform(self, wf_name: str, waveform):
+        filename = os.path.join(
+            self.lab_one_webserver_path, 'awg', 'waves',
+            self._device+'_'+wf_name+'.csv')
+        # with open(filename, 'w') as f:
+        np.savetxt(filename, waveform, delimiter=",")
 
     def _do_set_AWG_file(self, filename):
         self.awg('UHFLI_AWG_sequences/'+filename)
@@ -366,12 +387,12 @@ class UHFQC(Instrument):
         if not success:
             # Printing is disabled because we put the waveform in the program
             # this should be changed when .csv waveforms are supported for UHFQC
-            # print("Compilation failed, printing program:")
-            # for i, line in enumerate(program_string.splitlines()):
-            #     print(i+1, '\t', line)
-            # print('\n')
-            #raise ziShellCompilationError(comp_msg)
-            #print("Possible error:", comp)
+            print("Compilation failed, printing program:")
+            for i, line in enumerate(program_string.splitlines()):
+                print(i+1, '\t', line)
+            print('\n')
+            raise ziShellCompilationError(comp_msg)
+            print("Possible error:", comp)
             pass
         # If succesful the comipilation success message is printed
         t1 = time.time()

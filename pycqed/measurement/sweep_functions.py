@@ -3,11 +3,13 @@ import time
 import os
 import numpy as np
 from pycqed.utilities.general import setInDict
-from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+from pycqed.measurement import mc_parameter_wrapper
+from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
+import qcodes 
 
 
 class Sweep_function(object):
@@ -1190,6 +1192,9 @@ class Offset_Sweep(Soft_Sweep):
     def __init__(self, sweep_function, offset,
                  name=None, parameter_name=None, unit=None):
         super().__init__()
+        if isinstance(sweep_function, qcodes.Parameter):
+            sweep_function = mc_parameter_wrapper.wrap_par_to_swf(
+                sweep_function)
         if sweep_function.sweep_control != 'soft':
             raise ValueError('Offset_Sweep: Only software sweeps supported')
         self.sweep_function = sweep_function

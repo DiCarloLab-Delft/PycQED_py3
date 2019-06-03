@@ -178,13 +178,15 @@ class MultiElemSegmentTimingSwf(swf.Hard_Sweep):
 class Rabi(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, RO_pars, n=1, cal_points=True,
+                 active_reset=False,
                  no_cal_points=2, upload=True, return_seq=False):
         super().__init__()
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
         self.n = n
         self.cal_points = cal_points
-        self.no_cal_points=no_cal_points
+        self.active_reset = active_reset
+        self.no_cal_points = no_cal_points
         self.upload = upload
         self.name = 'Rabi'
         self.parameter_name = 'amplitude'
@@ -192,20 +194,12 @@ class Rabi(swf.Hard_Sweep):
         self.return_seq = return_seq
 
     def prepare(self, **kw):
-        # if self.cal_points:
-        #     step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
-        #     self.sweep_points = np.concatenate(
-        #         [self.sweep_points,
-        #          [self.sweep_points[-1]+step,
-        #           self.sweep_points[-1]+2*step,
-        #           self.sweep_points[-1]+3*step,
-        #           self.sweep_points[-1]+4*step]])
-
         if self.upload:
             sqs.rabi_seq(amps=self.sweep_points,
                          pulse_pars=self.pulse_pars,
                          RO_pars=self.RO_pars,
                          cal_points=self.cal_points,
+                         active_reset=self.active_reset,
                          no_cal_points=self.no_cal_points,
                          n=self.n, return_seq=self.return_seq)
 
