@@ -1645,11 +1645,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         
         self.UHFQC.acquisition_arm()
 
-        time.sleep(0.05)
+        print('acquisition is arm... Waiting to start AWGs')
+        time.sleep(5)
 
         # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
+        # if self.AWG is not None:
+        #     self.AWG.start()
 
         # print(self.nr_sweep_points)
 

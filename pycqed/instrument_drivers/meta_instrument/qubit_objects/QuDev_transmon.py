@@ -40,7 +40,7 @@ class QuDev_transmon(Qubit):
 
         self.add_parameter('instr_mc', 
             parameter_class=InstrumentRefParameter)
-        self.add_parameter('instr_mw_lo', 
+        self.add_parameter('instr_ge_lo', 
             parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_pulsar',
             parameter_class=InstrumentRefParameter)
@@ -50,7 +50,7 @@ class QuDev_transmon(Qubit):
             parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_trigger', 
             parameter_class=InstrumentRefParameter)
-
+       
         # device parameters for user only
         # could be cleaned up
         self.add_parameter('f_RO_resonator', label='RO resonator frequency',
@@ -193,68 +193,68 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
 
         # qubit drive pulse parameters
-        self.add_parameter('mw_freq', label='Qubit drive frequency', unit='Hz',
+        self.add_parameter('ge_freq', label='Qubit drive frequency', unit='Hz',
                            initial_value=0, parameter_class=ManualParameter)
-        self.add_parameter('mw_lo_power', unit='dBm',
+        self.add_parameter('ge_lo_power', unit='dBm',
                            parameter_class=ManualParameter,
                            label='Qubit drive pulse mixer LO power')
-        self.add_parameter('mw_I_offset', unit='V', initial_value=0,
+        self.add_parameter('ge_I_offset', unit='V', initial_value=0,
                            parameter_class=ManualParameter,
                            label='DC offset for the drive line I channel')
-        self.add_parameter('mw_Q_offset', unit='V', initial_value=0,
+        self.add_parameter('ge_Q_offset', unit='V', initial_value=0,
                            parameter_class=ManualParameter,
                            label='DC offset for the drive line Q channel')
         # add drive pulse parameters
         self.add_operation('X180')
-        self.add_pulse_parameter('X180', 'mw_pulse_type', 'pulse_type',
+        self.add_pulse_parameter('X180', 'ge_pulse_type', 'pulse_type',
                                  initial_value='SSB_DRAG_pulse', 
                                  vals=vals.Enum('SSB_DRAG_pulse'))
-        self.add_pulse_parameter('X180', 'mw_I_channel', 'I_channel',
+        self.add_pulse_parameter('X180', 'ge_I_channel', 'I_channel',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('X180', 'mw_Q_channel', 'Q_channel',
+        self.add_pulse_parameter('X180', 'ge_Q_channel', 'Q_channel',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('X180', 'mw_amp180', 'amplitude',
+        self.add_pulse_parameter('X180', 'ge_amp180', 'amplitude',
                                  initial_value=0.001, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'mw_amp90_scale', 'amp90_scale',
+        self.add_pulse_parameter('X180', 'ge_amp90_scale', 'amp90_scale',
                                  initial_value=0.5, vals=vals.Numbers(0, 1))
-        self.add_pulse_parameter('X180', 'mw_delay', 'pulse_delay',
+        self.add_pulse_parameter('X180', 'ge_delay', 'pulse_delay',
                                  initial_value=0, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'mw_sigma', 'sigma',
+        self.add_pulse_parameter('X180', 'ge_sigma', 'sigma',
                                  initial_value=10e-9, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'mw_nr_sigma', 'nr_sigma',
+        self.add_pulse_parameter('X180', 'ge_nr_sigma', 'nr_sigma',
                                  initial_value=5, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'mw_motzoi', 'motzoi',
+        self.add_pulse_parameter('X180', 'ge_motzoi', 'motzoi',
                                  initial_value=0, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'mw_mod_freq', 'mod_frequency',
+        self.add_pulse_parameter('X180', 'ge_mod_freq', 'mod_frequency',
                                  initial_value=-100e6, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'mw_phi_skew', 'phi_skew',
+        self.add_pulse_parameter('X180', 'ge_phi_skew', 'phi_skew',
                                  initial_value=0, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'mw_alpha', 'alpha',
+        self.add_pulse_parameter('X180', 'ge_alpha', 'alpha',
                                  initial_value=1, vals=vals.Numbers())
-        self.add_pulse_parameter('X180', 'mw_X_phase', 'phase',
+        self.add_pulse_parameter('X180', 'ge_X_phase', 'phase',
                                  initial_value=0, vals=vals.Numbers())
         
         # qubit 2nd excitation drive pulse parameters
-        self.add_parameter('mw2_freq', label='Qubit ef drive frequency', 
+        self.add_parameter('ef_freq', label='Qubit ef drive frequency', 
                            unit='Hz', initial_value=0, 
                            parameter_class=ManualParameter)
         self.add_operation('X180_ef')
-        self.add_pulse_parameter('X180_ef', 'mw2_pulse_type', 'pulse_type',
+        self.add_pulse_parameter('X180_ef', 'ef_pulse_type', 'pulse_type',
                                  initial_value='SSB_DRAG_pulse', 
                                  vals=vals.Enum('SSB_DRAG_pulse'))
-        self.add_pulse_parameter('X180_ef', 'mw2_amp180', 'amplitude',
+        self.add_pulse_parameter('X180_ef', 'ef_amp180', 'amplitude',
                                  initial_value=0.001, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'mw2_amp90_scale', 'amp90_scale',
+        self.add_pulse_parameter('X180_ef', 'ef_amp90_scale', 'amp90_scale',
                                  initial_value=0.5, vals=vals.Numbers(0, 1))
-        self.add_pulse_parameter('X180_ef', 'mw2_delay', 'pulse_delay',
+        self.add_pulse_parameter('X180_ef', 'ef_delay', 'pulse_delay',
                                  initial_value=0, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'mw2_sigma', 'sigma',
+        self.add_pulse_parameter('X180_ef', 'ef_sigma', 'sigma',
                                  initial_value=10e-9, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'mw2_nr_sigma', 'nr_sigma',
+        self.add_pulse_parameter('X180_ef', 'ef_nr_sigma', 'nr_sigma',
                                  initial_value=5, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'mw2_motzoi', 'motzoi',
+        self.add_pulse_parameter('X180_ef', 'ef_motzoi', 'motzoi',
                                  initial_value=0, vals=vals.Numbers())
-        self.add_pulse_parameter('X180_ef', 'mw2_X_phase', 'phase',
+        self.add_pulse_parameter('X180_ef', 'ef_X_phase', 'phase',
                                  initial_value=0, vals=vals.Numbers())
 
         # add qubit spectroscopy parameters
@@ -273,24 +273,6 @@ class QuDev_transmon(Qubit):
                                  initial_value=5e-6, vals=vals.Numbers())
         self.add_pulse_parameter('Spec', 'spec_marker_delay', 'pulse_delay', 
                                  vals=vals.Numbers(), initial_value=None)
-
-        # add flux pulse parameters
-        self.add_operation('flux')
-        self.add_pulse_parameter('flux', 'flux_pulse_type', 'pulse_type',
-                                 initial_value='CosPulse',
-                                 vals=vals.Enum('CosPulse'))
-        self.add_pulse_parameter('flux', 'flux_pulse_channel', 'channel',
-                                 initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'flux_pulse_amp', 'amplitude',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_freq', 'frequency',
-                                 initial_value=0, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_phase', 'phase',
-                                 initial_value=0, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_length', 'length',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_delay', 'pulse_delay',
-                                 initial_value=None, vals=vals.Numbers())
 
         # dc flux parameters
         self.add_parameter('dc_flux_parameter', initial_value=None,
@@ -361,24 +343,24 @@ class QuDev_transmon(Qubit):
             lo.get_instr().on()
 
         # configure qubit drive local oscillator
-        lo = self.instr_mw_lo
+        lo = self.instr_ge_lo
         if lo() is not None:
             if drive is None:
                 lo.get_instr().off()
             elif drive == 'continuous_spec':
                 lo.get_instr().pulsemod_state('Off')
                 lo.get_instr().power(self.spec_power())
-                lo.get_instr().frequency(self.mw_freq())
+                lo.get_instr().frequency(self.ge_freq())
                 lo.get_instr().on()
             elif drive == 'pulsed_spec':
                 lo.get_instr().pulsemod_state('On')
                 lo.get_instr().power(self.spec_power())
-                lo.get_instr().frequency(self.mw_freq())
+                lo.get_instr().frequency(self.ge_freq())
                 lo.get_instr().on()
             elif drive == 'timedomain':
                 lo.get_instr().pulsemod_state('Off')
-                lo.get_instr().power(self.mw_lo_power())
-                lo.get_instr().frequency(self.mw_freq() - self.mw_mod_freq())
+                lo.get_instr().power(self.ge_lo_power())
+                lo.get_instr().frequency(self.ge_freq() - self.ge_mod_freq())
                 lo.get_instr().on()
             else:
                 raise ValueError("Invalid drive parameter '{}'".format(drive)
@@ -389,8 +371,8 @@ class QuDev_transmon(Qubit):
         offset_list = [('ro_I_channel', 'ro_I_offset'), 
                        ('ro_Q_channel', 'ro_Q_offset')]
         if drive == 'timedomain':
-            offset_list += [('mw_I_channel', 'mw_I_offset'), 
-                            ('mw_Q_channel', 'mw_Q_offset')]
+            offset_list += [('ge_I_channel', 'ge_I_offset'), 
+                            ('ge_Q_channel', 'ge_Q_offset')]
         for channel_par, offset_par in offset_list:
             self.instr_pulsar.get_instr().set(
                 self.get(channel_par) + '_offset', self.get(offset_par))
@@ -458,14 +440,11 @@ class QuDev_transmon(Qubit):
     def get_ro_pars(self):
         return self.get_operation_dict()['RO ' + self.name]
 
-    def get_mw_pars(self):
+    def get_ge_pars(self):
         return self.get_operation_dict()['X180 ' + self.name]
 
-    def get_mw2_pars(self):
+    def get_ef_pars(self):
         return self.get_operation_dict()['X180_ef ' + self.name]
-
-    def get_flux_pars(self):
-        return self.get_operation_dict()['flux ' + self.name]
 
     def get_operation_dict(self, operation_dict=None):
         if operation_dict is None:
@@ -475,7 +454,6 @@ class QuDev_transmon(Qubit):
         operation_dict['RO ' + self.name]['operation_type'] = 'RO'
         operation_dict['X180 ' + self.name]['operation_type'] = 'MW'
         operation_dict['X180_ef ' + self.name]['operation_type'] = 'MW'
-        operation_dict['flux ' + self.name]['operation_type'] = 'Flux'
         operation_dict['X180_ef ' + self.name]['I_channel'] = \
             operation_dict['X180 ' + self.name]['I_channel']
         operation_dict['X180_ef ' + self.name]['Q_channel'] = \
@@ -485,11 +463,11 @@ class QuDev_transmon(Qubit):
         operation_dict['X180_ef ' + self.name]['alpha'] = \
             operation_dict['X180 ' + self.name]['alpha']
 
-        if self.mw2_freq() == 0:
+        if self.ef_freq() == 0:
             operation_dict['X180_ef ' + self.name]['mod_frequency'] = None
         else:
             operation_dict['X180_ef ' + self.name]['mod_frequency'] = \
-                self.mw2_freq() - self.mw_freq() + self.mw_mod_freq()
+                self.ef_freq() - self.ge_freq() + self.ge_mod_freq()
 
         operation_dict.update(add_suffix_to_dict_keys(
             sq.get_pulse_dict_from_pars(
@@ -500,198 +478,108 @@ class QuDev_transmon(Qubit):
 
         return operation_dict
 
-    def measure_resonator_spectroscopy(self, freqs, upload=True,
+    def swf_ro_freq_lo(self):
+        return swf.Offset_Sweep(
+            self.instr_ro_lo.get_instr().frequency, 
+            -self.ro_mod_freq(),
+            name='Readout frequency', 
+            parameter_name='Readout frequency')
+
+    def measure_resonator_spectroscopy(self, freqs, sweep_points_2D=None,
+                                       sweep_function_2D=None,
                                        trigger_separation=3e-6, 
-                                       analyze=True, close_fig=True):
+                                       upload=True, analyze=True, 
+                                       close_fig=True, label=None):
         """ Varies the frequency of the microwave source to the resonator and
         measures the transmittance """
         if np.any(freqs < 500e6):
             logging.warning(('Some of the values in the freqs array might be '
                              'too small. The units should be Hz.'))
+    
+        if label is None:
+            if sweep_function_2D is not None:
+                label = 'resonator_scan_2d' + self.msmt_suffix
+            else:
+                label = 'resonator_scan' + self.msmt_suffix
 
         self.prepare(drive=None)
-
-        sq.pulse_list_list_seq([[self.get_ro_pars()]])
+        if upload:
+            sq.pulse_list_list_seq([[self.get_ro_pars()]])
 
         MC = self.instr_mc.get_instr()
-        MC.set_sweep_function(swf.Offset_Sweep(
-            self.instr_ro_lo.get_instr().frequency, 
-            -self.ro_mod_freq(),
-            name='Readout frequency', 
-            parameter_name='Readout frequency'))
+        MC.set_sweep_function(self.swf_ro_freq_lo())
+        if sweep_function_2D is not None:
+            MC.set_sweep_function_2D(sweep_function_2D)
+            mode = '2D'
+        else:
+            mode = '1D'
         MC.set_sweep_points(freqs)
+        if sweep_points_2D is not None:
+            MC.set_sweep_points_2D(sweep_points_2D)
         MC.set_detector_function(self.int_avg_det_spec)
 
         with temporary_value(self.instr_trigger.get_instr().pulse_period, 
                              trigger_separation):
             self.instr_pulsar.get_instr().start()
-            MC.run(name='resonator_scan'+self.msmt_suffix)
+            MC.run(name=label, mode=mode)
             self.instr_pulsar.get_instr().stop()
 
         if analyze:
-                ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                       qb_name=self.name)
+            ma.MeasurementAnalysis(close_fig=close_fig, qb_name=self.name, 
+                                   TwoD=(mode == '2D'))
 
-    def measure_resonator_spectroscopy_flux_sweep(self, freqs, voltages,
-            trigger_separation=3e-6, RO_marker_length=5e-9, upload=True,
-            flux_parameter=None, MC=None, analyze=True, close_fig=True):
-        if MC is None:
-            MC = self.MC
-        if flux_parameter is None:
-            flux_parameter = self.dc_flux_parameter()
-
-        self.prepare_for_continuous_wave()
-        MC.set_sweep_function(awg_swf.Resonator_spectroscopy(
-            RO_MWG=self.readout_UC_LO,
-            RO_IF=self.f_RO_mod(),
-            RO_channel=self.RO_acq_marker_channel(),
-            marker_interval=trigger_separation,
-            marker_length=RO_marker_length,
-            upload=upload))
-        MC.set_sweep_points(freqs)
-        MC.set_sweep_function_2D(flux_parameter)
-        MC.set_sweep_points_2D(voltages)
-        MC.set_detector_function(self.int_avg_det_spec)
-        self.instr_pulsar.get_instr().start()
-        MC.run_2D(name='resonator_spectoscopy_flux_sweep' + self.msmt_suffix)
-        self.instr_pulsar.get_instr().stop()
-
-        if analyze:
-            ma.TwoD_Analysis(label='resonator_spectoscopy_flux_sweep',
-                             close_fig=close_fig, close_file=True,
-                             qb_name=self.name)
-
-
-    def measure_qubit_spectroscopy_flux_sweep(self, freqs, voltages,
-            flux_parameter=None, pulsed=True, MC=None, analyze=True,
-            label=None, close_fig=True, upload=True):
-
-        if MC is None:
-            MC = self.MC
-        if flux_parameter is None:
-            flux_parameter = self.dc_flux_parameter()
-
-        if pulsed:
-            self.prepare_for_pulsed_spec()
-            spec_pars = self.get_spec_pars()
-            RO_pars = self.get_ro_pars()
-            sq.Pulsed_spec_ro_markers_seq(spec_pars, RO_pars, upload=upload)
-
-            MC.set_sweep_function(self.cw_source.frequency)
-            MC.set_sweep_points(freqs)
-            MC.set_sweep_function_2D(flux_parameter)
-            MC.set_sweep_points_2D(voltages)
-            MC.set_detector_function(self.int_avg_det_spec)
-
-            self.cw_source.on()
-            self.instr_pulsar.get_instr().start()
-            if label is None:
-                label = 'qubit_spectroscopy_flux_sweep' + self.msmt_suffix
-            MC.run_2D(name=label)
-
-        else:
-            raise NotImplementedError()
-
-        self.cw_source.off()
-        self.instr_pulsar.get_instr().stop()
-
-        if analyze:
-            ma.TwoD_Analysis(close_fig=close_fig, close_file=True,
-                             qb_name=self.name)
-
-
-    def measure_homodyne_acqusition_delay(self, delays=None, MC=None,
-                                          analyze=True, close_fig=True):
-        """
-        Varies the delay between the homodyne modulation signal and
-        acquisition. Measures the transmittance.
-        """
-        if delays is None:
-            raise ValueError("Unspecified delays for measure_homodyne_"
-                             "acquisition_delay")
-
-        if MC is None:
-            MC = self.MC
-
-        # set number of averages to 1 due to a readout bug
-        previous_nr_averages = self.heterodyne.nr_averages()
-        self.heterodyne.nr_averages(1)
-        previous_delay = self.heterodyne.acquisition_delay()
-
-        self.prepare_for_continuous_wave()
-        MC.set_sweep_function(pw.wrap_par_to_swf(
-            self.heterodyne.acquisition_delay))
-        MC.set_sweep_points(delays)
-        demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
-            else 'double'
-        MC.set_detector_function(det.Heterodyne_probe(
-            self.heterodyne,
-            trigger_separation=self.heterodyne.trigger_separation(),
-            demod_mode=demod_mode))
-        MC.run(name='acquisition_delay_scan'+self.msmt_suffix)
-
-        self.heterodyne.acquisition_delay(previous_delay)
-        self.heterodyne.nr_averages(previous_nr_averages)
-
-        if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
-
-
-    def measure_spectroscopy(self, freqs=None, pulsed=False, MC=None,
-                             trigger_separation=3e-6, RO_marker_length=5e-9,
-                             analyze=True, close_fig=True,upload=True,
-                             label=None):
+    def measure_qubit_spectroscopy(self, freqs, sweep_points_2D=None,
+            sweep_function_2D=None, pulsed=True, trigger_separation=13e-6, 
+            upload=True, analyze=True, close_fig=True, label=None):
         """ Varies qubit drive frequency and measures the resonator
         transmittance """
-        if freqs is None:
-            raise ValueError("Unspecified frequencies for measure_spectroscopy")
         if np.any(freqs < 500e6):
             logging.warning(('Some of the values in the freqs array might be '
                              'too small. The units should be Hz.'))
-
-        if MC is None:
-            MC = self.MC
-
-        if not pulsed:
-
+        if pulsed:
             if label is None:
-                label = 'spectroscopy'+self.msmt_suffix
-
-            self.prepare_for_continuous_wave()
-            sq.Resonator_spec_seq(RO_channel=self.RO_acq_marker_channel(),
-                                  marker_length=RO_marker_length,
-                                  marker_interval=trigger_separation,
-                                  upload=upload)
-
+                if sweep_function_2D is not None:
+                    label = 'pulsed_spec_2d' + self.msmt_suffix
+                else:
+                    label = 'pulsed_spec' + self.msmt_suffix
+            self.prepare(drive='pulsed_spec')
+            if upload:
+                sq.pulse_list_list_seq([[self.get_ro_pars()]])
         else:
-
             if label is None:
-                label = 'pulsed_spec'+self.msmt_suffix
-
-            self.prepare_for_pulsed_spec()
-            spec_pars = self.get_spec_pars()
-            RO_pars = self.get_ro_pars()
-            sq.Pulsed_spec_seq(spec_pars=spec_pars,
-                               RO_pars=RO_pars,
-                               upload=upload)
-
-        self.cw_source.on()
-        self.instr_pulsar.get_instr().start()
-
-        MC.set_sweep_function(self.cw_source.frequency)
+                if sweep_function_2D is not None:
+                    label = 'continuous_spec_2d' + self.msmt_suffix
+                else:
+                    label = 'continuous_spec' + self.msmt_suffix
+            self.prepare(drive='continuous_spec')
+            if upload:
+                sq.pulse_list_list_seq([[self.get_spec_pars(), 
+                                         self.get_ro_pars()]])
+        
+        MC = self.instr_mc.get_instr()
+        MC.set_sweep_function(self.instr_ge_lo.get_instr().frequency)
+        if sweep_function_2D is not None:
+            MC.set_sweep_function_2D(sweep_function_2D)
+            mode = '2D'
+        else:
+            mode = '1D'
         MC.set_sweep_points(freqs)
+        if sweep_points_2D is not None:
+            MC.set_sweep_points_2D(sweep_points_2D)
         MC.set_detector_function(self.int_avg_det_spec)
-        MC.run(name=label)
 
-        self.cw_source.off()
-        self.instr_pulsar.get_instr().stop()
+        with temporary_value(self.instr_trigger.get_instr().pulse_period, 
+                             trigger_separation):
+            self.instr_pulsar.get_instr().start()
+            MC.run(name=label, mode=mode)
+            self.instr_pulsar.get_instr().stop()
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            ma.MeasurementAnalysis(close_fig=close_fig, qb_name=self.name, 
+                                   TwoD=(mode == '2D'))
+        
 
-
-    def measure_rabi(self, amps=None, MC=None, analyze=True, active_reset=False,
+    def measure_rabi(self, amps, analyze=True, active_reset=False,
              close_fig=True, cal_points=True, no_cal_points=2,
              upload=True, label=None,  n=1, exp_metadata=None):
 
@@ -701,8 +589,7 @@ class QuDev_transmon(Qubit):
 
         Args:
             amps            the array of drive pulse amplitudes
-            MC              the MeasurementControl object
-            analyse         whether to create a (base) MeasurementAnalysis
+            analyze         whether to create a (base) MeasurementAnalysis
                             object for this measurement; offers possibility to
                             manually analyse data using the classes in
                             measurement_analysis.py
@@ -714,10 +601,6 @@ class QuDev_transmon(Qubit):
             n               the number of times the drive pulses with the same
                             amplitude should be repeated in each measurement
         """
-
-        if amps is None:
-            raise ValueError("Unspecified amplitudes for measure_rabi")
-
         # Define the measurement label
         if label is None:
             label = 'Rabi-n{}'.format(n) + self.msmt_suffix
@@ -743,7 +626,7 @@ class QuDev_transmon(Qubit):
 
         # Specify the sweep function, the sweep points,
         # and the detector function, and run the measurement
-        MC.set_sweep_function(awg_swf.Rabi(pulse_pars=self.get_mw_pars(),
+        MC.set_sweep_function(awg_swf.Rabi(pulse_pars=self.get_ge_pars(),
                                            RO_pars=self.get_ro_pars(), n=n,
                                            cal_points=cal_points,
                                            active_reset=active_reset,
@@ -797,8 +680,8 @@ class QuDev_transmon(Qubit):
                 sweep_points = amps
 
         MC.set_sweep_function(awg_swf.Rabi_2nd_exc(
-                        pulse_pars=self.get_mw_pars(),
-                        pulse_pars_2nd=self.get_mw2_pars(),
+                        pulse_pars=self.get_ge_pars(),
+                        pulse_pars_2nd=self.get_ef_pars(),
                         RO_pars=self.get_ro_pars(),
                         last_ge_pulse=last_ge_pulse,
                         n=n, upload=upload,
@@ -826,7 +709,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         MC.set_sweep_function(awg_swf.Rabi_amp90(
-            pulse_pars=self.get_mw_pars(), RO_pars=self.get_ro_pars(), n=n,
+            pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(), n=n,
             upload=upload))
         MC.set_sweep_points(scales)
         MC.set_detector_function(self.int_avg_det)
@@ -861,7 +744,7 @@ class QuDev_transmon(Qubit):
             sweep_points = times
 
         MC.set_sweep_function(awg_swf.T1(
-            pulse_pars=self.get_mw_pars(), RO_pars=self.get_ro_pars(),
+            pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
             upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
@@ -913,8 +796,8 @@ class QuDev_transmon(Qubit):
             sweep_points = times
 
         MC.set_sweep_function(awg_swf.T1_2nd_exc(
-                                pulse_pars=self.get_mw_pars(),
-                                pulse_pars_2nd=self.get_mw2_pars(),
+                                pulse_pars=self.get_ge_pars(),
+                                pulse_pars_2nd=self.get_ef_pars(),
                                 RO_pars=self.get_ro_pars(),
                                 upload=upload,
                                 cal_points=cal_points,
@@ -963,7 +846,7 @@ class QuDev_transmon(Qubit):
             sweep_points = qscales
 
         MC.set_sweep_function(awg_swf.QScale(
-                pulse_pars=self.get_mw_pars(), RO_pars=self.get_ro_pars(),
+                pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
                 upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
@@ -1019,8 +902,8 @@ class QuDev_transmon(Qubit):
 
         MC.set_sweep_function(awg_swf.QScale_2nd_exc(
             qscales=sweep_points,
-            pulse_pars=self.get_mw_pars(),
-            pulse_pars_2nd=self.get_mw2_pars(),
+            pulse_pars=self.get_ge_pars(),
+            pulse_pars_2nd=self.get_ef_pars(),
             RO_pars=self.get_ro_pars(),
             upload=upload, cal_points=cal_points, no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse))
@@ -1077,7 +960,7 @@ class QuDev_transmon(Qubit):
             sweep_points = times
 
         Rams_swf = awg_swf.Ramsey_multiple_detunings(
-            pulse_pars=self.get_mw_pars(), RO_pars=self.get_ro_pars(),
+            pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
             artificial_detunings=artificial_detunings, cal_points=cal_points,
             upload=upload)
         MC.set_sweep_function(Rams_swf)
@@ -1127,7 +1010,7 @@ class QuDev_transmon(Qubit):
             sweep_points = times
 
         Rams_swf = awg_swf.Ramsey(
-            pulse_pars=self.get_mw_pars(), RO_pars=self.get_ro_pars(),
+            pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
             artificial_detuning=artificial_detuning, cal_points=cal_points,
             upload=upload)
         MC.set_sweep_function(Rams_swf)
@@ -1184,7 +1067,7 @@ class QuDev_transmon(Qubit):
 
         Rams_swf = awg_swf.Ramsey_decoupling_swf(
             seq_func=seq_func,
-            pulse_pars=self.get_mw_pars(), RO_pars=self.get_ro_pars(),
+            pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
             artificial_detuning=artificial_detuning, cal_points=cal_points,
             upload=upload, nr_echo_pulses=nr_echo_pulses, cpmg_scheme=cpmg_scheme)
         MC.set_sweep_function(Rams_swf)
@@ -1253,8 +1136,8 @@ class QuDev_transmon(Qubit):
             sweep_points = times
 
         Rams_2nd_swf = awg_swf.Ramsey_2nd_exc(
-            pulse_pars=self.get_mw_pars(),
-            pulse_pars_2nd=self.get_mw2_pars(),
+            pulse_pars=self.get_ge_pars(),
+            pulse_pars_2nd=self.get_ef_pars(),
             RO_pars=self.get_ro_pars(),
             artificial_detuning=artificial_detuning,
             cal_points=cal_points, n=n, upload=upload,
@@ -1322,8 +1205,8 @@ class QuDev_transmon(Qubit):
             sweep_points = times
 
         Rams_2nd_swf = awg_swf.Ramsey_2nd_exc_multiple_detunings(
-            pulse_pars=self.get_mw_pars(),
-            pulse_pars_2nd=self.get_mw2_pars(),
+            pulse_pars=self.get_ge_pars(),
+            pulse_pars_2nd=self.get_ef_pars(),
             RO_pars=self.get_ro_pars(),
             artificial_detunings=artificial_detunings,
             cal_points=cal_points, n=n, upload=upload,
@@ -1370,7 +1253,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         Echo_swf = awg_swf.Echo(
-            pulse_pars=self.get_mw_pars(), RO_pars=self.get_ro_pars(),
+            pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
             artificial_detuning=artificial_detuning, upload=upload)
         MC.set_sweep_function(Echo_swf)
         MC.set_sweep_points(sweep_points)
@@ -1392,7 +1275,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         MC.set_sweep_function(awg_swf.AllXY(
-            pulse_pars=self.get_mw_pars(), RO_pars=self.get_ro_pars(),
+            pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
             double_points=double_points, upload=upload))
         MC.set_detector_function(self.int_avg_det)
         MC.run('AllXY'+self.msmt_suffix)
@@ -1450,7 +1333,7 @@ class QuDev_transmon(Qubit):
             sweep_points1D = nr_seeds_arr
 
         RB_sweepfunction = awg_swf.Randomized_Benchmarking_one_length(
-            pulse_pars=self.get_mw_pars(), RO_pars=RO_pars,
+            pulse_pars=self.get_ge_pars(), RO_pars=RO_pars,
             cal_points=cal_points, gate_decomposition=gate_decomp,
             nr_cliffords_value=nr_cliffords[0], upload=False,
             interleaved_gate=interleaved_gate)
@@ -1496,7 +1379,7 @@ class QuDev_transmon(Qubit):
         npoints = self.inp_avg_det.nr_samples
         if 'off' in cases:
             MC.set_sweep_function(awg_swf.OffOn(
-                pulse_pars=self.get_mw_pars(),
+                pulse_pars=self.get_ge_pars(),
                 RO_pars=self.get_ro_pars(),
                 pulse_comb='OffOff',
                 upload=upload))
@@ -1512,7 +1395,7 @@ class QuDev_transmon(Qubit):
 
         if 'on' in cases:
             MC.set_sweep_function(awg_swf.OffOn(
-                pulse_pars=self.get_mw_pars(),
+                pulse_pars=self.get_ge_pars(),
                 RO_pars=self.get_ro_pars(),
                 pulse_comb='OnOn',
                 upload=upload))
@@ -1576,7 +1459,7 @@ class QuDev_transmon(Qubit):
         self.prepare_for_timedomain()
         MC.set_sweep_function(awg_swf.Readout_pulse_scope_swf(
             delays=delays,
-            pulse_pars=self.get_mw_pars(),
+            pulse_pars=self.get_ge_pars(),
             RO_pars=self.get_ro_pars(),
             RO_separation=RO_separation,
             cal_points=cal_points,
@@ -1649,7 +1532,7 @@ class QuDev_transmon(Qubit):
             delay_to_relax=delays_to_relax[0],
             delay_buffer=delay_buffer,
             ramsey_times=ramsey_times,
-            pulse_pars=self.get_mw_pars(),
+            pulse_pars=self.get_ge_pars(),
             RO_pars=self.get_ro_pars(),
             cal_points=cal_points,
             verbose=verbose,
@@ -1920,7 +1803,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_points(DC_LO_freqs)
         MC.set_detector_function(self.int_avg_det_spec)
         self.instr_pulsar.get_instr().start()
-        MC.run('mw_uc_spectrum' + self.msmt_suffix)
+        MC.run('ge_uc_spectrum' + self.msmt_suffix)
         a = ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
 
         return a
@@ -2245,7 +2128,7 @@ class QuDev_transmon(Qubit):
         RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
 
         MC.set_sweep_function(awg_swf2.n_qubit_off_on(
-            pulse_pars_list=[self.get_mw_pars()],
+            pulse_pars_list=[self.get_ge_pars()],
             RO_pars=self.get_ro_pars(),
             upload=upload,
             preselection=preselection_pulse,
@@ -2325,7 +2208,7 @@ class QuDev_transmon(Qubit):
         self.RO_acq_shots(2*(self.RO_acq_shots()//2))
         self.prepare_for_timedomain()
         MC.set_sweep_function(awg_swf.OffOn(
-            pulse_pars=self.get_mw_pars(),
+            pulse_pars=self.get_ge_pars(),
             RO_pars=self.get_ro_pars(),
             upload=upload,
             preselection=False))
@@ -2502,7 +2385,7 @@ class QuDev_transmon(Qubit):
             self.instr_pulsar.get_instr(),
             MC,
             upload=upload,
-            pulse_pars=self.get_mw_pars(),
+            pulse_pars=self.get_ge_pars(),
             RO_pars=self.get_ro_pars())
         MC.set_detector_function(flux_detuning_det)
 
@@ -2691,7 +2574,7 @@ class QuDev_transmon(Qubit):
             if analyze_ef:
                 label = 'high_power_' + label
 
-            self.measure_spectroscopy(freqs, pulsed=False,
+            self.measure_qubit_spectroscopy(freqs, pulsed=False,
                                       trigger_separation=trigger_separation,
                                       RO_marker_length=RO_marker_length,
                                       MC=MC, label=label,
@@ -2702,7 +2585,7 @@ class QuDev_transmon(Qubit):
             if analyze_ef:
                 label = 'high_power_' + label
 
-            self.measure_spectroscopy(freqs, pulsed=True, MC=MC, label=label,
+            self.measure_qubit_spectroscopy(freqs, pulsed=True, MC=MC, label=label,
                                       close_fig=close_fig,upload=upload)
 
 
@@ -3719,7 +3602,7 @@ class QuDev_transmon(Qubit):
 
         for pulse_comb, label in [('OffOff', 'off-spec'), ('OnOn', 'on-spec')]:
             if upload:
-                sq.OffOn_seq(pulse_pars=self.get_mw_pars(), RO_pars=self.get_ro_pars(),
+                sq.OffOn_seq(pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
                             pulse_comb=pulse_comb, preselection=False)
             MC.set_sweep_function(awg_swf.Resonator_spectroscopy(
                 RO_MWG=self.readout_UC_LO,
