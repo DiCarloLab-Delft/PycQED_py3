@@ -1,3 +1,9 @@
+# A Sequence contains segments which then contain the pulses. The Sequence
+# provides the information for the AWGs, in which order to play the segments.
+#
+# author: Michael Kerschbaum
+# created: 04/2019
+
 import numpy as np
 from copy import deepcopy
 import pycqed.measurement.waveform_control.pulse_library as pl
@@ -28,8 +34,7 @@ class Sequence:
     def sequence_for_awg(self):
         """
         Returns for an AWG a sequence with the ordered lists containing
-        element name, segment name and 'RO' flag for readout elements and 
-        'codeword' flag for codeword elements
+        element name, segment name and 'RO' flag for readout elements.
         """
 
         self.awg_sequence = {}

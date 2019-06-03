@@ -1,4 +1,12 @@
+# A Segment is the building block of Sequence Class. They are responsible
+# for resolving pulse timing, Z gates, generating trigger pulses and adding
+# charge compensation
+#
+# author: Michael Kerschbaum
+# created: 4/2019
+
 import numpy as np
+import math
 import logging
 from copy import deepcopy
 import pycqed.measurement.waveform_control.pulse_library as pl
@@ -10,9 +18,9 @@ from collections import OrderedDict as odict
 
 class Segment:
     """
-    Consists of a list of UnresolvedPulses, each of which contains information about in
-    which element the pulse is played and when it is played (reference point + delay)
-    as well as an instance of class Pulse.
+    Consists of a list of UnresolvedPulses, each of which contains information 
+    about in which element the pulse is played and when it is played 
+    (reference point + delay) as well as an instance of class Pulse.
     """
 
     def __init__(self, name, pulse_pars_list=[]):
@@ -23,9 +31,11 @@ class Segment:
         self.elements = odict()
         self.element_start_end = {}
         self.elements_on_awg = {}
-        self.trigger_pars = {'pulse_length': 50e-9, 
-                             'amplitude': 0.5, 
-                             'buffer_length_start': 25e-9}
+        self.trigger_pars = {
+            'pulse_length': 50e-9,
+            'amplitude': 0.5,
+            'buffer_length_start': 25e-9
+        }
         self.trigger_pars['length'] = self.trigger_pars['pulse_length'] + \
                                       self.trigger_pars['buffer_length_start']
         self._pulse_names = set()
@@ -47,14 +57,18 @@ class Segment:
         self._pulse_names.add(pars_copy['name'])
 
         # Makes sure that element name is unique within sequence of segments
-        # and that RO pulses have their own elements
-        if pars_copy.get('operation_type', None) == 'RO':
-            i = len(self.acquisition_elements) + 1
-            pars_copy['element_name'] = 'RO_element_{}_{}'.format(i,self.name)
-            # add element to set of acquisition elements
-            self.acquisition_elements.add(pars_copy['element_name'])
-        elif pars_copy.get('element_name', None) == None:
-            pars_copy['element_name'] = 'default_{}'.format(self.name)
+        # and that RO pulses have their own elements if no element_name
+        # was provided
+
+        if pars_copy.get('element_name', None) == None:
+            if pars_copy.get('operation_type', None) == 'RO':
+                i = len(self.acquisition_elements) + 1
+                pars_copy['element_name'] = \
+                    'RO_element_{}_{}'.format(i, self.name)
+                # add element to set of acquisition elements
+                self.acquisition_elements.add(pars_copy['element_name'])
+            else:
+                pars_copy['element_name'] = 'default_{}'.format(self.name)
         else:
             pars_copy['element_name'] += '_' + self.name
 
@@ -393,23 +407,28 @@ class Segment:
         self.gen_elements_on_awg()
 
         # Find the AWG hierarchy. Needed to add the trigger pulses first to
-        # the AWG that do not trigger any other AWGs, then the AWGs trigger
-        # these AWGs and so on.
+        # the AWG that do not trigger any other AWGs, then the AWGs that
+        # trigger these AWGs and so on.
         awg_hierarchy = self.find_awg_hierarchy()
 
         i = 1
         for awg in awg_hierarchy:
             if awg not in self.elements_on_awg:
                 continue
+            # for master AWG no trigger_pulse has to be added
+            if self.pulsar.get('master_awg') == awg:
+                continue
+
+            # used for updating the length of the trigger elements after adding
+            # the trigger pulses
+            trigger_el_set = set()
+
             for element in self.elements_on_awg[awg]:
                 [el_start, _] = self.element_start_length(element, awg)
 
-                # for master AWG no trigger_pulse has to be added
-                if self.pulsar.get('{}_trigger_channels'.format(awg)) == None:
-                    continue
-
-                trigger_pulse_time = el_start - self.pulsar.get(awg + '_delay')\
-                                    - self.trigger_pars['buffer_length_start']
+                trigger_pulse_time = el_start - \
+                                     - self.pulsar.get('{}_delay'.format(awg))\
+                                     - self.trigger_pars['buffer_length_start']
 
                 # Find the trigger_AWGs that trigger the AWG
                 trigger_awgs = set()
@@ -464,7 +483,17 @@ class Segment:
                         self.elements_on_awg[trigger_awg].append(
                             trigger_elements[trigger_awg])
 
-        self.test_overlap()
+                    trigger_el_set = trigger_el_set | set(
+                        trigger_elements.items())
+
+            # for all trigger elements update the start and length
+            for (awg, el) in trigger_el_set:
+                self.element_start_length(el, awg)
+
+        # checks if elements on AWGs overlap
+        self._test_overlap()
+        # checks if there is only one element on the master AWG
+        self._test_trigger_awg()
 
     def find_trigger_element(self, trigger_awg, trigger_pulse_time):
         """
@@ -511,7 +540,7 @@ class Segment:
         """
         return self.element_start_end[element][awg][0]
 
-    def test_overlap(self):
+    def _test_overlap(self):
         """
         Tests for all AWGs if any of their elements overlap.
         """
@@ -531,16 +560,14 @@ class Segment:
                 el_prev_end = self.get_element_end(prev_el, awg)
                 el_length = el_prev_end - el_prev_start
 
-                # If element length is shorter than min length, 0s will be 
+                # If element length is shorter than min length, 0s will be
                 # appended by pulsar. Test for elements with at least
                 # min_el_len if they overlap.
                 min_el_len = self.pulsar.get('{}_min_length'.format(awg))
                 if el_length < min_el_len:
                     el_prev_end = el_prev_start + min_el_len
-                
-                el_new_start = el_list[i + 1][0]
-                
 
+                el_new_start = el_list[i + 1][0]
 
                 if el_prev_end > el_new_start:
                     raise ValueError('{} and {} overlap on {}'.format(
@@ -554,10 +581,11 @@ class Segment:
         self.gen_elements_on_awg()
 
         for awg in self.elements_on_awg:
-            if self.pulsar.get('{}_trigger_channels'.format(awg)) == None:
-                if len(self.elements_on_awg[awg]) > 1:
-                    raise ValueError(
-                        'There is more than one element on {}'.format(awg))
+            if self.pulsar.get('{}_trigger_channels'.format(awg)) is not None:
+                continue
+            if len(self.elements_on_awg[awg]) > 1:
+                raise ValueError(
+                    'There is more than one element on {}'.format(awg))
 
     def resolve_Z_gates(self):
         """
@@ -581,6 +609,10 @@ class Segment:
                     qubit_phases[pulse.basis] = 0
 
     def element_start_length(self, element, awg):
+        """
+        Finds and saves the start and length of an element on AWG awg
+        in self.element_start_end.
+        """
         if element not in self.element_start_end:
             self.element_start_end[element] = {}
 
@@ -604,11 +636,8 @@ class Segment:
         start_gran = self.pulsar.get(
             '{}_element_start_granularity'.format(awg))
 
-        # element start granularity is not working at the moment!
-        start_gran = None
-
         if start_gran != None:
-            t_start_awg = int(t_start / start_gran) * start_gran
+            t_start_awg = math.floor(t_start / start_gran) * start_gran
             # add the number of samples the element gets larger when changing
             # t_start
             add = self.time2sample(t_start - t_start_awg, awg=awg)
@@ -621,102 +650,6 @@ class Segment:
 
         self.element_start_end[element][awg] = [t_start_awg, samples]
         return [t_start_awg, samples]
-
-    def find_element_start_end(self, sort=False, awg_list=[]):
-        """
-        Given a segment, this method:
-            * finds the start time and number of samples for each element for 
-              each AWG 
-            * saves them in element_start_end, ordered by accending start time
-            * if sort: changes the order of self.elements dictionary by order 
-              of start times 
-        """
-
-        if self.elements == odict():
-            self.resolve_timing()
-
-        if sort:
-            # sorts the pulses in the elements with respect to increasing _t0
-            self.time_sort()
-            unordered_start = []
-            new_elements = odict()
-
-            for element in self.elements:
-                unordered_start.append(
-                    (self.elements[element][0].algorithm_time(), element))
-
-            for (t_start, element) in sorted(unordered_start):
-                new_elements[element] = self.elements[element]
-
-            self.elements = new_elements
-
-        awg_dict = self.gen_awg_dict()
-
-        for element in self.elements:
-            if element not in self.element_start_end:
-                self.element_start_end[element] = {}
-
-            t_start = float('inf')
-            t_end = -float('inf')
-
-            for pulse in self.elements[element]:
-                t_start = min(pulse.algorithm_time(), t_start)
-                t_end = max(pulse.algorithm_time() + pulse.length, t_end)
-
-            length = t_end - t_start
-            for awg in awg_dict[element]:
-                if awg_list != [] and awg not in awg_list:
-                    continue
-                # make sure that element length is multiple of
-                # sample granularity
-                gran = self.pulsar.get('{}_granularity'.format(awg))
-                samples = self.time2sample(length, awg=awg)
-                if samples % gran != 0:
-                    samples += gran - samples % gran
-
-                # make sure that element start is a multiple of element
-                # start granularity
-                start_gran = self.pulsar.get(
-                    '{}_element_start_granularity'.format(awg))
-
-                if start_gran != None:
-                    t_start_awg = int(t_start / start_gran) * start_gran
-                else:
-                    t_start_awg = t_start
-
-                self.element_start_end[element][awg] = [t_start_awg, samples]
-
-    def time_sort(self):
-        """
-        Given a segment, this method sorts the entries of the elements 
-        dictionary (which are lists of UnresolvedPulses) by accending _t0.
-        """
-
-        if self.elements == odict():
-            self.resolve_timing()
-
-        for element in self.elements:
-            # i takes care of pulses happening at the same time, to sort
-            # by order in which they were added
-            i = 0
-            old_list = []
-            for pulse in self.elements[element]:
-                old_list.append([pulse.algorithm_time(), i, pulse])
-                i += 1
-
-            new_list = sorted(old_list)
-            self.elements[element] = [pulse for (t0, i, pulse) in new_list]
-
-    def reduce_to_segment_start(self):
-
-        # not used at the moment, change to self.elements
-
-        segment_t0 = float('inf')
-        for pulse in self.unresolved_pulses:
-            segment_t0 = min(segment_t0, pulse.pulse_obj.algorithm_time())
-
-        for pulse in self.unresolved_pulses:
-            pulse.delay -= segment_t0
 
     def waveforms(self, awgs=None, channels=None):
         """
@@ -783,7 +716,7 @@ class Segment:
                     for channel in pulse_channels:
                         chan_tvals[channel] = tvals[channel].copy(
                         )[pulse_start:pulse_end]
-                    
+
                     if pulse.element_name in self.acquisition_elements:
                         pulse_wfs = pulse.get_wfs(chan_tvals, RO=True)
                     else:
@@ -823,7 +756,7 @@ class Segment:
                         fir_kernels = distortion_dictionary.get('FIR', None)
                         if fir_kernels is not None:
                             if hasattr(fir_kernels, '__iter__') and not \
-                            hasattr(fir_kernels[0], '__iter__'): # 1 kernel only
+                            hasattr(fir_kernels[0], '__iter__'): # 1 kernel
                                 wf = flux_dist.filter_fir(fir_kernels, wf)
                             else:
                                 for kernel in fir_kernels:
@@ -930,6 +863,9 @@ class UnresolvedPulse:
             self.ref_point = 0.5
         elif pulse_pars.get('ref_point', 'end') == 'start':
             self.ref_point = 0
+        else:
+            raise ValueError('Passed invalid value for ref_point. Allowed \
+                values are: start, end, middle. Default value: end')
 
         if pulse_pars.get('ref_point_new', 'start') == 'start':
             self.ref_point_new = 0
@@ -937,6 +873,9 @@ class UnresolvedPulse:
             self.ref_point_new = 0.5
         elif pulse_pars.get('ref_point_new', 'start') == 'end':
             self.ref_point_new = 1
+        else:
+            raise ValueError('Passed invalid value for ref_point_new. Allowed \
+                values are: start, end, middle. Default value: start')
 
         self.delay = pulse_pars['pulse_delay']
         self.original_phase = pulse_pars.get('phase', 0)
