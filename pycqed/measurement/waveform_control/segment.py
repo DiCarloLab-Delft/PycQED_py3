@@ -354,14 +354,15 @@ class Segment:
                         self.elements_on_awg[awg] = [element]
 
     def find_awg_hierarchy(self):
-        master = self.pulsar.master_awg()
+        masters = {awg for awg in self.pulsar.awgs
+            if len(self.pulsar.get('{}_trigger_channels'.format(awg))) == 0}
 
         # generate dictionary triggering_awgs (keys are trigger AWGs and
         # values triggered AWGs) and tirggered_awgs (keys are triggered AWGs
         # and values triggering AWGs)
         triggering_awgs = {}
         triggered_awgs = {}
-        awgs = set(self.pulsar.awgs) - {master}
+        awgs = set(self.pulsar.awgs) - masters
         for awg in awgs:
             for channel in self.pulsar.get('{}_trigger_channels'.format(awg)):
                 trigger_awg = self.pulsar.get('{}_awg'.format(channel))
@@ -375,10 +376,10 @@ class Segment:
                     triggered_awgs[awg] = [trigger_awg]
 
         # impletment Kahn's algorithm to sort the AWG by hierarchy
-        trigger_awgs = {master}
+        trigger_awgs = masters
         awg_hierarchy = []
 
-        while trigger_awgs != set():
+        while len(trigger_awgs) != 0:
             awg = trigger_awgs.pop()
             awg_hierarchy.append(awg)
             if awg not in triggering_awgs:
@@ -415,8 +416,9 @@ class Segment:
         for awg in awg_hierarchy:
             if awg not in self.elements_on_awg:
                 continue
+            
             # for master AWG no trigger_pulse has to be added
-            if self.pulsar.get('master_awg') == awg:
+            if len(self.pulsar.get('{}_trigger_channels'.format(awg))) == 0:
                 continue
 
             # used for updating the length of the trigger elements after adding
@@ -581,7 +583,7 @@ class Segment:
         self.gen_elements_on_awg()
 
         for awg in self.elements_on_awg:
-            if self.pulsar.get('{}_trigger_channels'.format(awg)) is not None:
+            if len(self.pulsar.get('{}_trigger_channels'.format(awg))) != 0:
                 continue
             if len(self.elements_on_awg[awg]) > 1:
                 raise ValueError(
