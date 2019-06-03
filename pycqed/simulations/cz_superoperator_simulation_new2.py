@@ -443,7 +443,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 if U_final_vec[i].type == 'oper':
                     U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
                 U_final_vec[i] = U_final_vec[i] * weights[i]
-            U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting average propagator
+            U_superop_average = sum(U_final_vec)              # computing resulting average propagator
             #print(czf.verify_CPTP(U_superop_average))
 
 
