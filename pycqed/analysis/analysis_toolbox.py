@@ -11,10 +11,13 @@ from collections import OrderedDict as od
 from matplotlib import pyplot as plt
 from matplotlib import colors
 import pandas as pd
+from sklearn.mixture import GaussianMixture as GM
+
 from pycqed.utilities.get_default_datadir import get_default_datadir
 from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
+from scipy.optimize import Bounds, LinearConstraint, minimize
 from scipy.signal import argrelextrema
 # to allow backwards compatibility with old a_tools code
 from .tools.file_handling import *
@@ -26,6 +29,7 @@ from pycqed.analysis import composite_analysis as RA
 from pycqed.measurement import hdf5_data
 
 from matplotlib.colors import LogNorm
+from scipy.stats import multivariate_normal
 
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
@@ -141,6 +145,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
 
     measdirs = []
     i = len(daydirs)-1
+
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
         # this makes sure that (most) non day dirs do not get searched
@@ -346,7 +351,7 @@ def get_qb_channel_map_from_file(qb_names, file_path,
             if ro_acq_weight_type in ['optimal', 'square_rot']:
                 channel_map[qbn] = [ro_type + str(
                     instr_settings[qbn].attrs['RO_acq_weight_function_I'])]
-            elif ro_acq_weight_type in ['SSB', 'DSB']:
+            elif ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
                 channel_map[qbn] = [
                     ro_type +
                     str(instr_settings[qbn].attrs['RO_acq_weight_function_I']),
@@ -788,6 +793,8 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                             label=None, exact_label_match=False, folder=None):
     if folder is None:
         folder = datadir
+    if not isinstance(label, list):
+        label = [label]
 
     datetime_start = datetime_from_timestamp(timestamp_start)
 
@@ -1552,7 +1559,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                               zero_coord=None, one_coord=None, **kw):
     '''
     Rotates and normalizes data with respect to some reference coordinates.
-    there are two ways to specify the reference coordinates.
+    There are two ways to specify the reference coordinates.
         1. Explicitly defining the coordinates
         2. Specifying which elements of the input data correspond to zero
             and one
@@ -1566,14 +1573,13 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                                  correspond to one
     '''
     # Extract zero and one coordinates
-
     if np.all([cal_zero_points==None, cal_one_points==None,
                zero_coord==None, one_coord==None]):
         # no cal points were used
         normalized_data = rotate_and_normalize_data_no_cal_points(data=data,
                                                                   **kw)
     elif np.all([cal_one_points==None, one_coord==None]) and \
-        (not np.all([cal_zero_points==None, zero_coord==None])):
+            (not np.all([cal_zero_points==None, zero_coord==None])):
         # only 2 cal points used; both are I pulses
         I_zero = np.mean(data[0][cal_zero_points])
         Q_zero = np.mean(data[1][cal_zero_points])
@@ -1654,6 +1660,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
     return [normalized_data, zero_coord, one_coord]
 
+
 def rotate_and_normalize_data_no_cal_points(data, **kw):
 
     """
@@ -1698,6 +1705,7 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
 
     return normalized_data
 
+
 def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
                       cal_one_points=np.arange(-2, 0, 1), **kw):
     '''
@@ -1720,6 +1728,67 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
     return normalized_data
 
+def predict_gm_proba_from_cal_points(X, cal_points):
+    """
+    For each point of the data array X, predicts the probability of being
+    in the states of each cal_point respectively,
+    in the limit of narrow gaussians.
+    Args:
+        X: Data (n, n_channels)
+        cal_points: array of calpoints where each row is a different state and
+        columns are number of channels (n_cal_points, n_channels)
+    """
+    def find_prob(p, s, mu):
+        approx = 0
+        for mu_i, p_i in zip(mu, p):
+            approx += mu_i*p_i
+        diff = np.abs(s - approx)
+        return np.sum(diff)
+    probas = []
+    initial_guess = np.ones(cal_points.shape[0])/cal_points.shape[0]
+    proba_bounds = Bounds(np.zeros(cal_points.shape[0]),
+                          np.ones(cal_points.shape[0]))
+    proba_sum_constr = LinearConstraint(np.ones(cal_points.shape[0]),
+                                        [1.], [1.])
+    for pt in X:
+        opt_results = minimize(find_prob, initial_guess,
+                               args=(pt, cal_points), method='SLSQP',
+                               bounds=proba_bounds,
+                               constraints=proba_sum_constr)
+        probas.append(opt_results.x)
+    return np.array(probas)
+
+def predict_gm_proba_from_clf(X, clf_params):
+    """
+    Predict gaussian mixture posterior probabilities for single shots
+    of different levels of a qudit.
+    Args:
+        X: Data (n_datapoints, n_channels)
+        clf_params: dictionary with parameters for Gaussian Mixture classifier
+            means_: array of means of each component of the GM
+            covariances_: covariance matrix
+            covariance_type: type of covariance matrix
+            weights_: array of priors of being in each level. (n_levels,)
+            precisions_cholesky_: array of precision_cholesky
+
+            For more info see about parameters see :
+            https://scikit-learn.org/stable/modules/generated/sklearn.mixture.
+            GaussianMixture.html
+    Returns: (n_datapoints, n_levels) array of posterior probability of being in
+        each level
+
+    """
+    reqs_params = ['means_', 'covariances_', 'covariance_type',
+                   'weights_', 'precisions_cholesky_']
+    clf_params = deepcopy(clf_params)
+    for r in reqs_params:
+        assert r in clf_params, "Required Classifier parameter {} " \
+                                "not given.".format(r)
+    gm = GM(covariance_type=clf_params.pop('covariance_type'))
+    for param_name, param_value in clf_params.items():
+        setattr(gm, param_name, param_value)
+    probas = gm.predict_proba(X)
+    return probas
 
 def datetime_from_timestamp(timestamp):
     try:

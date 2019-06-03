@@ -255,7 +255,7 @@ def mixer_skewness_cal_sqs(pulseIch,
                                 verbose=verbose)
 
 
-def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
+def rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
              cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
@@ -272,8 +272,9 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses_unmodified = get_pulse_dict_from_pars(pulse_pars)
+    # FIXME: Nathan 2019.05.07: I believe next line is useless since deepcopy is already done
+    # in get_pulse_dict_from_pars()
     pulses = deepcopy(pulses_unmodified)
-
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         if cal_points and no_cal_points==4 and \
                 (i == (len(amps)-4) or i == (len(amps)-3)):
@@ -344,7 +345,7 @@ def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
         return seq
 
 
-def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
+def rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
                    verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence to determine amp90 scaling factor for a single qubit using the tektronix.
@@ -422,7 +423,7 @@ def T1_seq(times,
         return seq_name
 
 
-def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
+def ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                artificial_detuning=None,
                cal_points=True, cpmg_scheme=True,
                verbose=False,
@@ -528,7 +529,7 @@ def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
         return seq_name
 
 
-def Ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
+def ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
                           artificial_detuning=None,
                           cal_points=True,
                           verbose=False,
@@ -621,7 +622,7 @@ def Ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
         return seq_name
 
 
-def Ramsey_seq(times, pulse_pars, RO_pars,
+def ramsey_seq(times, pulse_pars, RO_pars,
                artificial_detuning=None,
                cal_points=True,
                verbose=False,
@@ -682,7 +683,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         return seq_name
 
 
-def Ramsey_seq_VZ(times, pulse_pars, RO_pars,
+def ramsey_seq_VZ(times, pulse_pars, RO_pars,
                    artificial_detuning=None,
                    cal_points=True,
                    verbose=False,
@@ -739,7 +740,7 @@ def Ramsey_seq_VZ(times, pulse_pars, RO_pars,
     else:
         return seq_name
 
-def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
+def ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
                artificial_detunings=None,
                cal_points=True,
                verbose=False,
@@ -794,7 +795,7 @@ def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
         return seq_name
 
 
-def Echo_seq(times, pulse_pars, RO_pars,
+def echo_seq(times, pulse_pars, RO_pars,
              artificial_detuning=None,
              cal_points=True,
              verbose=False,
@@ -885,47 +886,66 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         return seq_name
 
 
-def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
-              upload=True, return_seq=False,  preselection=False):
+def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False,
+                     level='e', RO_spacing=300e-9,
+                     upload=True, return_seq=False, preselection=False):
     '''
     OffOn sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
     Input pars:
         pulse_pars:          dict containing the pulse parameters
         RO_pars:             dict containing the RO parameters
+        pulse_pars_2nd:      dict containing the pulse parameters of ef transition.
+                             Required if level is 'f'.
         Initialize:          adds an exta measurement before state preparation
                              to allow initialization by post-selection
         Post-measurement delay:  should be sufficiently long to avoid
                              photon-induced gate errors when post-selecting.
-        pulse_comb:          OffOn/OnOn/OffOff cobmination of pulses to play
+        level:               specifies for which level a pulse should be generated (g,e,f)
         preselection:        adds an extra readout pulse before other pulses.
     '''
-    seq_name = 'OffOn_sequence'
+    seq_name = 'single_level_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
-    # Create a dict with the parameters for all the pulses
-    pulses = get_pulse_dict_from_pars(pulse_pars)
-
-    if pulse_comb == 'OffOn':
-        pulse_combinations = ['I', 'X180']
-    elif pulse_comb == 'OnOn':
-        pulse_combinations = ['X180', 'X180']
-    elif pulse_comb == 'OffOff':
-        pulse_combinations = ['I', 'I']
+    # Create dicts with the parameters for all the pulses
+    pulse_1st = get_pulse_dict_from_pars(pulse_pars)
+    if level == 'g':
+        pulse_combination = [pulse_1st['I']]
+    elif level == 'e':
+        pulse_combination = [pulse_1st['X180']]
+    elif level == 'f':
+        assert pulse_pars_2nd is not None, \
+            "pulse_pars_2nd is a required parameter for f-level pulse."
+        pulse_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
+        pulse_combination = [pulse_1st['X180'], pulse_2nd['X180']]
+    else:
+        raise ValueError("Unrecognized Level: {}. Should be g, e or f.\n"
+                         "Note: Naming levels 'on' and 'off' is now deprecated "
+                         "to ensure clear denomination for 3 level readout. "
+                         "Please adapt your code:\n 'off' --> 'g'\n'on' --> 'e'"
+                         "\n'f' for f-level .")
 
     spacer = {'pulse_type': 'SquarePulse',
               'channel': RO_pars['acq_marker_channel'],
               'amplitude': 0.0,
-              'length': max(0, 300e-9 - pulse_pars['pulse_delay'] -
-                            pulse_pars['nr_sigma']*pulse_pars['sigma']),
+              'length': RO_spacing,
               'pulse_delay': 0}
 
-    for i, pulse_comb in enumerate(pulse_combinations):
-        if preselection:
-            pulse_list = [RO_pars, spacer, pulses[pulse_comb], RO_pars]
-        else:
-            pulse_list = [pulses[pulse_comb], RO_pars]
-        el = multi_pulse_elt(i, station, pulse_list)
+    # if preselection, add readout between each pulse
+    if preselection:
+        pulse_list = [RO_pars, spacer] + pulse_combination + [RO_pars]
+        el = multi_pulse_elt(0, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+        # for i, pulse in enumerate(pulse_combination):
+        #     pulse_list = [RO_pars, spacer, pulse, RO_pars]
+        #     el = multi_pulse_elt(i, station, pulse_list)
+        #     el_list.append(el)
+        #     seq.append_element(el, trigger_wait=True)
+    # otherwise use the pulse combination as is and add readout pulse at the end
+    else:
+        pulse_list = pulse_combination + [RO_pars]
+        el = multi_pulse_elt(0, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
@@ -1244,7 +1264,7 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     else:
         return seq_name
 
-def QScale(qscales, pulse_pars, RO_pars,
+def qscale(qscales, pulse_pars, RO_pars,
               cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Sequence used for calibrating the QScale factor used in the DRAG pulses.

@@ -999,7 +999,6 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         if preselection:
             pulse_comb = pulse_comb + ['RO presel', 'spacer']
         pulse_combinations.append(pulse_comb)
-    print('reloaded')
     for i, pulse_comb in enumerate(pulse_combinations):
         pulses = []
         for j, p in enumerate(pulse_comb):
@@ -1855,7 +1854,7 @@ def parity_correction_seq(
             .format(total_mod_phase/elements_length/360))
 
     # tomography elements
-    if parity_op in ['XX', ['XX,ZZ', 'ZZ,XX'][nr_parity_measurements%2]]:
+    if parity_op in ['XX', ['XX,ZZ', 'ZZ,XX'][nr_parity_measurements % 2]]:
         pretomo = pretomo_after_x
     else:
         pretomo = pretomo_after_z

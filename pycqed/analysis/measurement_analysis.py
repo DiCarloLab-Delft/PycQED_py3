@@ -56,7 +56,6 @@ from pycqed.analysis import composite_analysis as ca
 
 try:
     import qutip as qtp
-
 except ImportError as e:
     if str(e).find('qutip') >= 0:
         logging.warning('Could not import qutip')
@@ -11289,9 +11288,13 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
 
         ax.plot(thetas_fine, data_fit_fine, 'r')
 
-        ax.set_title('dynamic phase msmt {} at {:0.1f}ns {:0.4f}V {}'.format(
-            self.qb_name, self.flux_pulse_length*1e9,
-            self.flux_pulse_amp, self.timestamp_string))
+        if self.flux_pulse_amp is not None:
+            ax.set_title('dynamic phase msmt {} at {:0.1f}ns {:0.4f}V {}'.format(
+                self.qb_name, self.flux_pulse_length*1e9,
+                self.flux_pulse_amp, self.timestamp_string))
+        else:
+            ax.set_title('dynamic phase msmt {} at {:0.1f}ns {}'.format(
+                self.qb_name, self.flux_pulse_length*1e9, self.timestamp_string))
         ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
         ax.set_ylabel('Response (arb. units)')
 

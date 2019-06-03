@@ -580,6 +580,9 @@ class ResonatorSpectroscopy(Spectroscopy):
                                   1j*np.pi*proc_data_dict['plot_phase'][0]/180)-
                               proc_data_dict['plot_amp'][1]*np.exp(
                                   1j*np.pi*proc_data_dict['plot_phase'][1]/180))
+            # FIXME: Nathan 2019.05.08 I don't think this is the right place to adapt
+            #  the ro fequency (i.e. in prepare_plot)... I had a hard time finding
+            #  where it happened !
             self.f_RO = proc_data_dict['plot_frequency'][0][np.argmax(amp_diff)]
             self.plot_dicts['amp1'] = {'plotfn': plot_fn,
                                       'ax_id': 'amp',
@@ -769,7 +772,8 @@ class ResonatorSpectroscopy(Spectroscopy):
 
     def plot(self, key_list=None, axs_dict=None, presentation_mode=None, no_label=False):
         super(ResonatorSpectroscopy, self).plot(key_list=key_list,
-                                                axs_dict=axs_dict, presentation_mode=presentation_mode)
+                                                axs_dict=axs_dict,
+                                                presentation_mode=presentation_mode)
         if self.do_fitting:
             self.plot_fitting()
 

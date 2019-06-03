@@ -202,7 +202,7 @@ class Rabi(swf.Hard_Sweep):
         #           self.sweep_points[-1]+4*step]])
 
         if self.upload:
-            sqs.Rabi_seq(amps=self.sweep_points,
+            sqs.rabi_seq(amps=self.sweep_points,
                          pulse_pars=self.pulse_pars,
                          RO_pars=self.RO_pars,
                          cal_points=self.cal_points,
@@ -231,7 +231,7 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points,
+            sqs2.rabi_2nd_exc_seq(amps=self.sweep_points,
                                   last_ge_pulse=self.last_ge_pulse,
                                   pulse_pars=self.pulse_pars,
                                   pulse_pars_2nd=self.pulse_pars_2nd,
@@ -356,7 +356,7 @@ class Rabi_amp90(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.Rabi_amp90_seq(scales=self.sweep_points,
+            sqs.rabi_amp90_seq(scales=self.sweep_points,
                                pulse_pars=self.pulse_pars,
                                RO_pars=self.RO_pars,
                                n=self.n)
@@ -1005,24 +1005,28 @@ class AllXY(swf.Hard_Sweep):
                           double_points=self.double_points)
 
 
-class OffOn(swf.Hard_Sweep):
+class SingleLevel(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, RO_pars, upload=True,
-                 pulse_comb='OffOn', nr_samples=2, preselection=False):
+    def __init__(self, pulse_pars, RO_pars, pulse_pars_2nd=None, upload=True,
+                 RO_spacing=300e-9, level='e', nr_samples=2, preselection=False):
         super().__init__()
         self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
         self.RO_pars = RO_pars
+        self.RO_spacing = RO_spacing
         self.upload = upload
         self.parameter_name = 'sample'
         self.unit = '#'
-        self.name = pulse_comb
+        self.name = level
         self.preselection = preselection
         self.sweep_points = np.arange(nr_samples)
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.OffOn_seq(pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
-                          pulse_comb=self.name, preselection=self.preselection)
+            sqs.single_level_seq(pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+                                 pulse_pars_2nd=self.pulse_pars_2nd,
+                                 RO_spacing=self.RO_spacing,
+                                 level=self.name, preselection=self.preselection)
 
 
 class Butterfly(swf.Hard_Sweep):
@@ -1228,7 +1232,7 @@ class Ramsey(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.Ramsey_seq(times=self.sweep_points,
+            sqs.ramsey_seq(times=self.sweep_points,
                            pulse_pars=self.pulse_pars,
                            RO_pars=self.RO_pars,
                            artificial_detuning=self.artificial_detuning,
@@ -1254,7 +1258,7 @@ class Ramsey_multiple_detunings(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.Ramsey_seq_multiple_detunings(times=self.sweep_points,
+            sqs.ramsey_seq_multiple_detunings(times=self.sweep_points,
                            pulse_pars=self.pulse_pars,
                            RO_pars=self.RO_pars,
                            artificial_detunings=self.artificial_detunings,
@@ -1275,7 +1279,7 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
         self.n = n
         self.cal_points = cal_points
         self.upload = upload
-        self.name = 'Rabi 2nd excited state'
+        self.name = 'Ramsey 2nd excited state'
         self.parameter_name = 't'
         self.unit = 's'
         self.return_seq = return_seq
@@ -1284,7 +1288,7 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.Ramsey_2nd_exc_seq(times=self.sweep_points,
+            sqs2.ramsey_2nd_exc_seq(times=self.sweep_points,
                                     pulse_pars=self.pulse_pars,
                                     pulse_pars_2nd=self.pulse_pars_2nd,
                                     RO_pars=self.RO_pars,
@@ -1297,7 +1301,6 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
                                     last_ge_pulse=self.last_ge_pulse)
 
 class Ramsey_2nd_exc_multiple_detunings(swf.Hard_Sweep):
-
     def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
                  artificial_detunings=None, return_seq=False,
                  n=1, cal_points=True, upload=True, no_cal_points=6,
@@ -1319,7 +1322,7 @@ class Ramsey_2nd_exc_multiple_detunings(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.Ramsey_2nd_exc_seq_multiple_detunings(times=self.sweep_points,
+            sqs2.ramsey_2nd_exc_seq_multiple_detunings(times=self.sweep_points,
                                     pulse_pars=self.pulse_pars,
                                     pulse_pars_2nd=self.pulse_pars_2nd,
                                     RO_pars=self.RO_pars,
@@ -1378,11 +1381,45 @@ class Echo(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.Echo_seq(times=self.sweep_points,
+            sqs.echo_seq(times=self.sweep_points,
                          pulse_pars=self.pulse_pars,
                          RO_pars=self.RO_pars,
                          artificial_detuning=self.artificial_detuning,
                          cal_points=self.cal_points)
+
+
+class Echo_2nd_exc(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
+                 artificial_detuning=None, return_seq=False,
+                 cal_points=True, upload=True, no_cal_points=6,
+                 last_ge_pulse=True):
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.pulse_pars_2nd = pulse_pars_2nd
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.cal_points = cal_points
+        self.no_cal_points = no_cal_points
+        self.artificial_detuning = artificial_detuning
+        self.last_ge_pulse = last_ge_pulse
+        self.return_seq = return_seq
+        self.name = 'Echo 2nd excited state'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.echo_2nd_exc_seq(times=self.sweep_points,
+                                  pulse_pars=self.pulse_pars,
+                                  pulse_pars_2nd=self.pulse_pars_2nd,
+                                  RO_pars=self.RO_pars,
+                                  artificial_detuning=self.artificial_detuning,
+                                  cal_points=self.cal_points,
+                                  no_cal_points=self.no_cal_points,
+                                  upload=self.upload,
+                                  return_seq=self.return_seq,
+                                  last_ge_pulse=self.last_ge_pulse)
 
 
 class Motzoi_XY(swf.Hard_Sweep):
@@ -1428,7 +1465,7 @@ class QScale(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.QScale(qscales=self.sweep_points,
+            sqs.qscale(qscales=self.sweep_points,
                        pulse_pars=self.pulse_pars,
                        RO_pars=self.RO_pars,
                        cal_points=self.cal_points)
@@ -1454,7 +1491,7 @@ class QScale_2nd_exc(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.QScale_2nd_exc_seq(qscales=self.qscales,
+            sqs2.qscale_2nd_exc_seq(qscales=self.qscales,
                                       pulse_pars=self.pulse_pars,
                                       pulse_pars_2nd=self.pulse_pars_2nd,
                                       RO_pars=self.RO_pars,
@@ -2009,7 +2046,7 @@ class Load_Sequence_Tek(swf.Hard_Sweep):
 
 class Dynamic_phase(swf.Hard_Sweep):
 
-    def __init__(self, qb_name, CZ_pulse_name, flux_pulse_amp,
+    def __init__(self, qb_name, CZ_pulse_name,
                  operation_dict,
                  upload=True, cal_points=True):
         '''
@@ -2026,7 +2063,6 @@ class Dynamic_phase(swf.Hard_Sweep):
         # self.thetas = thetas
         self.qb_name = qb_name
         self.CZ_pulse_name = CZ_pulse_name
-        self.flux_pulse_amp = flux_pulse_amp
         self.operation_dict = operation_dict
         self.upload = upload
         self.cal_points = cal_points
@@ -2040,7 +2076,6 @@ class Dynamic_phase(swf.Hard_Sweep):
             fsqs.dynamic_phase_meas_seq(thetas=self.sweep_points,
                                         qb_name=self.qb_name,
                                         CZ_pulse_name=self.CZ_pulse_name,
-                                        flux_pulse_amp=self.flux_pulse_amp,
                                         operation_dict=self.operation_dict,
                                         cal_points=self.cal_points)
 
@@ -2172,7 +2207,7 @@ class Chevron_length_hard_swf(swf.Hard_Sweep):
 
 class Chevron_length_swf_new(swf.Hard_Sweep):
 
-    def __init__(self, lengths, flux_pulse_amp, frequency, alpha,
+    def __init__(self, hard_sweep_dict, soft_sweep_dict,
                  qbc_name, qbt_name, qbr_name,
                  CZ_pulse_name, operation_dict, readout_qbt=None,
                  verbose=False, cal_points=False,
@@ -2184,10 +2219,8 @@ class Chevron_length_swf_new(swf.Hard_Sweep):
         'fsqs.Chevron_length_seq(...)'''
 
         super().__init__()
-        self.lengths = lengths
-        self.flux_pulse_amp = flux_pulse_amp
-        self.frequency = frequency
-        self.alpha = alpha
+        self.hard_sweep_dict = hard_sweep_dict
+        self.soft_sweep_dict = soft_sweep_dict
         self.qbc_name = qbc_name
         self.qbt_name = qbt_name
         self.qbr_name = qbr_name
@@ -2206,10 +2239,8 @@ class Chevron_length_swf_new(swf.Hard_Sweep):
     def prepare(self, upload_all=True, **kw):
         if self.upload:
             fsqs.Chevron_length_seq_new(
-                lengths=self.lengths,
-                flux_pulse_amp=self.flux_pulse_amp,
-                frequency=self.frequency,
-                alpha=self.alpha,
+                hard_sweep_dict=self.hard_sweep_dict,
+                soft_sweep_dict=self.soft_sweep_dict,
                 qbc_name=self.qbc_name,
                 qbt_name=self.qbt_name,
                 qbr_name=self.qbr_name,
@@ -2268,7 +2299,7 @@ class Chevron_frequency_hard_swf(swf.Hard_Sweep):
 
 class Chevron_ampl_swf_new(swf.Soft_Sweep):
 
-    def __init__(self, hard_sweep):
+    def __init__(self, hard_sweep, parameter_name='', unit=''):
         '''
         Sweep function class (soft sweep) for 2D Chevron experiment where
         the amplitude of the fluxpulse is swept. Used in combination with
@@ -2281,8 +2312,8 @@ class Chevron_ampl_swf_new(swf.Soft_Sweep):
         '''
         super().__init__()
         self.name = 'Chevron flux pulse amplitude sweep'
-        self.parameter_name = 'Fluxpulse amplitude'
-        self.unit = 'V'
+        self.parameter_name = parameter_name
+        self.unit = unit
         self.hard_sweep = hard_sweep
         self.is_first_sweeppoint = True
 
@@ -2290,7 +2321,34 @@ class Chevron_ampl_swf_new(swf.Soft_Sweep):
         pass
 
     def set_parameter(self, val, **kw):
-        self.hard_sweep.flux_pulse_amp = val
+        first_key = list(self.hard_sweep.soft_sweep_dict)[0]
+        # TODO: do this properly!
+        self.hard_sweep.soft_sweep_dict[first_key] = val
+        self.hard_sweep.upload = True
+        self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
+        self.is_first_sweeppoint = False
+
+    def finish(self):
+        pass
+
+
+class Chevron_general_soft_swf(swf.Soft_Sweep):
+
+    def __init__(self, hard_sweep, parameter_name='', unit=''):
+        super().__init__()
+        self.name = 'Chevron flux pulse {} sweep'.format(parameter_name)
+        self.parameter_name = parameter_name
+        self.unit = unit
+        self.hard_sweep = hard_sweep
+        self.is_first_sweeppoint = True
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        first_key = list(self.hard_sweep.soft_sweep_dict)[0]
+        # TODO: do this properly!
+        self.hard_sweep.soft_sweep_dict[first_key] = val
         self.hard_sweep.upload = True
         self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
         self.is_first_sweeppoint = False
@@ -2677,48 +2735,52 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
 class CPhase_NZ_hard_swf(swf.Hard_Sweep):
 
     def __init__(self, phases, qbc_name, qbt_name, CZ_pulse_name,
-                 CZ_pulse_channel, operation_dict,
-                 max_flux_length, cal_points=False,
-                 upload=True, reference_measurements=False):
+                 CZ_pulse_channel, operation_dict, num_soft_sweepparams,
+                 max_flux_length, num_cz_gates=1,
+                 cal_points=False, first_data_point=True,
+                 num_cal_points=4, upload=True, reference_measurements=False):
 
         super().__init__()
         self.phases = phases
         self.qbc_name = qbc_name
         self.qbt_name = qbt_name
         self.operation_dict = operation_dict
+        self.num_soft_sweepparams = num_soft_sweepparams
         self.CZ_pulse_name = CZ_pulse_name
         self.CZ_pulse_channel = CZ_pulse_channel
         self.upload = upload
         self.cal_points = cal_points
+        self.num_cal_points = num_cal_points
         self.reference_measurements = reference_measurements
         self.name = 'flux_pulse_CPhase_measurement_phase_sweep'
         self.parameter_name = 'phase'
         self.unit = 'rad'
         self.max_flux_length = max_flux_length
-        self.flux_length = None
-        self.flux_amplitude = None
-        self.flux_alpha = None
+        self.num_cz_gates = num_cz_gates
+        self.flux_params_dict = {}
         self.values_complete = False
-        self.first_data_point = True
+        self.first_data_point = first_data_point
 
-    def prepare(self, flux_params=None, **kw):
-        print('flux params hard swf ', flux_params)
-        if flux_params is None:
+    def prepare(self, flux_params_dict={}, **kw):
+        print('flux params dict in hard swf ',
+              flux_params_dict)
+        if flux_params_dict == {}:
             return
-
+        print(self.upload)
         if self.upload:
-            print('Uploaded CPhase Sequence')
+            print('Uploading CPhase Sequence...')
             fsqs.cphase_nz_seq(
                 phases=self.phases,
-                flux_params=flux_params,
+                flux_params_dict=flux_params_dict,
                 max_flux_length=self.max_flux_length,
+                num_cz_gates=self.num_cz_gates,
                 qbc_name=self.qbc_name,
                 qbt_name=self.qbt_name,
                 operation_dict=self.operation_dict,
                 CZ_pulse_name=self.CZ_pulse_name,
                 CZ_pulse_channel=self.CZ_pulse_channel,
                 cal_points=self.cal_points,
-                reference_measurements=self.reference_measurements,
+                num_cal_points=self.num_cal_points,
                 upload=self.upload,
                 return_seq=True,
                 first_data_point=self.first_data_point
@@ -2732,22 +2794,12 @@ class CPhase_NZ_hard_swf(swf.Hard_Sweep):
             logging.warning('CPhase hard sweep set_parameter method was called '
                             'without a value type!')
             return
-        elif val_type == 'length':
-            self.flux_length = flux_val
-        elif val_type == 'amplitude':
-            self.flux_amplitude = flux_val
-        elif val_type == 'alpha':
-            self.flux_alpha = flux_val
         else:
-            logging.error('CPhase hard sweep does not recognize value type '
-                          'handed by set_parameter() method!')
-        if self.flux_length is not None and self.flux_amplitude is not None \
-                and self.flux_alpha is not None:
-            self.prepare(flux_params=[self.flux_length, self.flux_amplitude,
-                                      self.flux_alpha])
-            self.flux_length = None
-            self.flux_amplitude = None
-            self.flux_alpha = None
+            self.flux_params_dict.update({val_type: flux_val})
+
+        if len(self.flux_params_dict) == self.num_soft_sweepparams:
+            self.prepare(flux_params_dict=self.flux_params_dict)
+            self.flux_params_dict = {}
 
 
 class Flux_pulse_CPhase_hard_swf_frequency(swf.Hard_Sweep):
@@ -2840,7 +2892,7 @@ class Flux_pulse_CPhase_hard_swf_frequency(swf.Hard_Sweep):
 
 class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
 
-    def __init__(self, hard_sweep, sweep_param='length', upload=True):
+    def __init__(self, hard_sweep, sweep_param, unit='', upload=True):
         '''
             Flexible soft sweep function class for 2D CPhase
             experiments that can either sweep the amplitude or
@@ -2852,21 +2904,11 @@ class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
             hard_sweep: 1D hard sweep
         '''
         super().__init__()
+        self.sweep_param = sweep_param
         self.name = 'flux_pulse_CPhase_measurement_{}_2D_sweep'.format(
             sweep_param)
-        self.sweep_param = sweep_param
-        if sweep_param == 'length':
-            self.unit = 's'
-            self.parameter_name = 'flux_length'
-        elif sweep_param == 'amplitude':
-            self.unit = 'V'
-            self.parameter_name = 'flux_amp'
-        elif sweep_param == 'frequency':
-            self.unit = 'Hz'
-            self.parameter_name = 'frequency'
-        elif sweep_param == 'alpha':
-            self.unit = ''
-            self.parameter_name = 'alpha'
+        self.unit = unit
+        self.parameter_name = sweep_param
         self.hard_sweep = hard_sweep
         self.upload = upload
 
