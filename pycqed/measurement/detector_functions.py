@@ -2361,7 +2361,7 @@ class UHFQC_integration_logging_classifier_det(Hard_Detector):
         if self.get_values_function_kwargs.get('classify', False):
             for i in range(len(self.channel_str_pairs)):
                 classified_data[nr_states*i: nr_states*i+nr_states, :] = \
-                    self.classify_shots(data[2 * i:2 * i + 2, :],
+                    self.classify_shots(data[2*i: 2*i+2, :],
                                         classifier_params_list[i],
                                         state_prob_mtx_list[i],
                                         self.get_values_function_kwargs.get(
