@@ -101,7 +101,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('noise', label='noise level', unit='V',
-                           initial_value=0.04e-3, parameter_class=ManualParameter)
+                           initial_value=0.01e-3, parameter_class=ManualParameter)
 
         self.add_parameter('mock_res_width', label='resonator peak width', unit='Hz',
                            initial_value=1e6, parameter_class=ManualParameter)
@@ -109,6 +109,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_flux_sensitivity', label='sensitivity to flux in current',
                            unit='A', initial_value=10e-3, parameter_class=ManualParameter)
 
+        self.add_parameter('mock_fl_dc_ch', label='most closely coupled fluxline',
+                           unit='', initial_value='FBL_1', parameter_class=ManualParameter)    
+    
     def find_resonator_frequency_VNA(self, freqs=None, use_min=False, MC=None,
                                      update=True):
         '''
@@ -244,7 +247,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         h = self.measurement_signal(excited=False)  # Lorentian baseline [V]
         A0 = self.measurement_signal(excited=True) - h  # Peak height
 
-        current = self.mock_current()
+        current = self.instr_FluxCtrl.get_instr()[self.mock_fl_dc_ch()]()
         Iref = self.mock_residual_flux_current()
         I0 = self.mock_flux_sensitivity()
 
@@ -708,7 +711,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.dag.add_node(self.name + ' Resonator Frequency',
                           calibrate_function=self.name + '.find_resonator_frequency')
         self.dag.add_node(self.name + ' Resonator Power Scan',
-                          calibrate_function=self.name + '.find_resonator_power')
+                          calibrate_function=self.name + '.calibrate_ro_pulse_amp_CW')
         self.dag.add_node(self.name + ' Resonator Sweetspot',
                           calibrate_function=self.name + '.find_resonator_sweetspot')
 
