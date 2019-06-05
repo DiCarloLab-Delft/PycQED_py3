@@ -304,7 +304,6 @@ class Segment:
         """
 
         pulses = {}
-
         for pulse in self.unresolved_pulses:
             if pulse.ref_pulse not in pulses:
                 pulses[pulse.ref_pulse] = [pulse]
@@ -689,7 +688,6 @@ class Segment:
                 awg_wfs[awg][(i, element)] = {}
                 tvals = self.tvals(channel_list, element)
                 wfs = {}
-
                 element_start_time = self.get_element_start(element, awg)
                 for pulse in self.elements[element]:
                     # checks whether pulse is played on AWG
@@ -858,7 +856,6 @@ class UnresolvedPulse:
 
     def __init__(self, pulse_pars):
         self.ref_pulse = pulse_pars.get('ref_pulse', 'previous_pulse')
-
         if pulse_pars.get('ref_point', 'end') == 'end':
             self.ref_point = 1
         elif pulse_pars.get('ref_point', 'end') == 'middle':

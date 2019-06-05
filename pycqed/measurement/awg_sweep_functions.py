@@ -199,7 +199,7 @@ class Rabi(swf.Hard_Sweep):
                          pulse_pars=self.pulse_pars,
                          RO_pars=self.RO_pars,
                          cal_points=self.cal_points,
-                         active_reset=self.active_reset,
+                         # active_reset=self.active_reset,
                          no_cal_points=self.no_cal_points,
                          n=self.n, return_seq=self.return_seq)
 

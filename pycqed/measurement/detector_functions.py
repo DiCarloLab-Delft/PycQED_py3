@@ -1568,7 +1568,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             value_names=self.value_names, value_units=self.value_units,
             values_per_point=values_per_point,
             values_per_point_suffex=values_per_point_suffex)
-
         self.single_int_avg = single_int_avg
         if self.single_int_avg:
             self.detector_control = 'soft'
@@ -2215,7 +2214,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             self.AWG.stop()
 
 
-class UHFQC_integration_logging_classifier_det(Hard_Detector):
+class UHFQC_integration_average_classifier_det(Hard_Detector):
 
     '''
     Detector used for integrated average results with the UHFQC

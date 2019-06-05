@@ -24,7 +24,7 @@ def pulse_list_list_seq(pulse_list_list, name='pulse_list_list_sequence',
         ps.Pulsar.get_instance().program_awgs(seq)
     return seq
 
-def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1,
+def rabi_seq_active_reset(amps, pulse_pars, RO_pars, active_reset=False, n=1,
              post_msmt_delay=0, no_cal_points=2,
              cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
@@ -65,8 +65,6 @@ def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1,
             # # copy first element and set extra wait
             # pulse_list[0] = deepcopy(pulse_list[0])
             # pulse_list[0]['pulse_delay'] += post_msmt_delay
-        
-        
 
         if active_reset:
             # make sure drive pulses ar put into distinct elements
@@ -100,6 +98,55 @@ def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1,
     if active_reset:
         seg = segment.Segment('segment', pulse_list_with_ar)
         seg_list.append(seg)
+        seq.add(seg)
+
+    if upload:
+        ps.Pulsar.get_instance().program_awgs(seq)
+
+    if return_seq:
+        return seq, seg_list
+    else:
+        return seq
+
+def rabi_seq(amps, pulse_pars, RO_pars, n=1, no_cal_points=2,
+             cal_points=True, upload=True, return_seq=False):
+    '''
+    Rabi sequence for a single qubit using the tektronix.
+    Input pars:
+        amps:            array of pulse amplitudes (V)
+        pulse_pars:      dict containing the pulse parameters
+        RO_pars:         dict containing the RO parameters
+        n:               number of pulses (1 is conventional Rabi)
+        post_msmt_delay: extra wait time for resetless compatibility
+        cal_points:      whether to use calibration points or not
+        upload:          whether to upload sequence to instrument or not
+    '''
+    seq_name = 'Rabi_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulses_unmodified = get_pulse_dict_from_pars(pulse_pars)
+    # FIXME: Nathan 2019.05.07: I believe next line is useless since deepcopy is already done
+    # in get_pulse_dict_from_pars()
+    pulses = deepcopy(pulses_unmodified)
+    seg_list = []
+    for i, amp in enumerate(amps):  # seq has to have at least 2 elts
+        if cal_points and no_cal_points == 4 and \
+                (i == (len(amps)-4) or i == (len(amps)-3)):
+            seg = segment.Segment('segment_{}'.format(i),
+                                  [pulses_unmodified['I'], RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(amps)-2) or i == (len(amps)-1)):
+            seg = segment.Segment('segment_{}'.format(i),
+                                  [pulses_unmodified['X180'], RO_pars])
+        elif cal_points and no_cal_points == 2 and \
+                (i == (len(amps)-2) or i == (len(amps)-1)):
+            seg = segment.Segment('segment_{}'.format(i),
+                                  [pulses_unmodified['I'], RO_pars])
+        else:
+            pulses['X180']['amplitude'] = amp
+            pulse_list = n*[pulses['X180']]+[RO_pars]
+            seg = segment.Segment('segment_{}'.format(i), pulse_list)
+        seg_list += [seg]
         seq.add(seg)
 
     if upload:
@@ -183,8 +230,7 @@ def rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
 
 def T1_seq(times,
            pulse_pars, RO_pars,
-           cal_points=True,
-           verbose=False, upload=True, return_seq=False):
+           cal_points=True, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modulation used for RO
@@ -205,15 +251,17 @@ def T1_seq(times,
 
     for i, tau in enumerate(times):  # seq has to have at least 2 elts
         RO_pars['pulse_delay'] = RO_pulse_delay + tau
-        #RO_pars['refpoint'] = 'start'  # time defined between start of ops
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
             RO_pars['pulse_delay'] = RO_pulse_delay
-            seg = segment.Segment('segment_{}'.format(i), [pulses['I'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i),
+                                  [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
             RO_pars['pulse_delay'] = RO_pulse_delay
-            seg = segment.Segment('segment_{}'.format(i), [pulses['X180'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i),
+                                  [pulses['X180'], RO_pars])
         else:
-            seg = segment.Segment('segment_{}'.format(i), [pulses['X180'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i),
+                                  [pulses['X180'], RO_pars])
         seg_list.append(seg)
         seq.add(seg)
 
@@ -253,7 +301,7 @@ def ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
     pulse_pars_x2 = deepcopy(pulses['X90'])
-    pulse_pars_x2['refpoint'] = 'start'
+    pulse_pars_x2['ref_point'] = 'start'
 
     X180_pulse = deepcopy(pulses['X180'])
     Echo_pulses = nr_echo_pulses*[X180_pulse]
@@ -284,12 +332,12 @@ def ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                     start_end_delay = echo_pulse_delay/2
                     for p_nr, pulse_dict in enumerate(Echo_pulses):
                         pd = deepcopy(pulse_dict)
-                        pd['refpoint'] = 'end'
+                        pd['ref_point'] = 'end'
                         pd['pulse_delay'] = \
                             (start_end_delay if p_nr == 0 else echo_pulse_delay)
                         pulse_dict_list.append(pd)
 
-                    pulse_pars_x2['refpoint'] = 'end'
+                    pulse_pars_x2['ref_point'] = 'end'
                     pulse_pars_x2['pulse_delay'] = start_end_delay
                     pulse_dict_list += [pulse_pars_x2, RO_pars]
             else:
@@ -309,12 +357,12 @@ def ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                     pulse_dict_list = [pulses['X90']]
                     for p_nr, pulse_dict in enumerate(Echo_pulses):
                         pd = deepcopy(pulse_dict)
-                        pd['refpoint'] = 'end'
+                        pd['ref_point'] = 'end'
                         pd['pulse_delay'] = pulse_delays_func(
                             p_nr+1, nr_echo_pulses)
                         pulse_dict_list.append(pd)
 
-                    pulse_pars_x2['refpoint'] = 'end'
+                    pulse_pars_x2['ref_point'] = 'end'
                     pulse_pars_x2['pulse_delay'] = pulse_delays_func(
                         1, nr_echo_pulses)
                     pulse_dict_list += [pulse_pars_x2, RO_pars]
@@ -370,7 +418,7 @@ def ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
                  'phase': X180_pulse['phi_skew'],
                  'amplitude': cont_drive_ampl * X180_pulse['alpha'],
                  'pulse_delay': 0,
-                 'refpoint': 'end'}
+                 'ref_point': 'end'}
     sin_pulse = {'pulse_type': 'CosPulse_gauss_rise',
                  'channel': X180_pulse['Q_channel'],
                  'frequency': X180_pulse['mod_frequency'],
@@ -378,7 +426,7 @@ def ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
                  'phase': 90,
                  'amplitude': cont_drive_ampl * X180_pulse['alpha'],
                  'pulse_delay': 0,
-                 'refpoint': 'simultaneous'}
+                 'ref_point': 'simultaneous'}
 
     for i, tau in enumerate(times):
 
@@ -393,7 +441,7 @@ def ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
         else:
             X90_separation = tau - DRAG_length
             if X90_separation > 0:
-                pulse_pars_x2['refpoint'] = 'end'
+                pulse_pars_x2['ref_point'] = 'end'
                 cos_pls1 = deepcopy(cos_pulse)
                 sin_pls1 = deepcopy(sin_pulse)
                 cos_pls1['length'] = X90_separation/2
@@ -408,7 +456,7 @@ def ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
                 pulse_dict_list = [pulses['X90'], cos_pls1, sin_pls1,
                                    cos_pls2, sin_pls2, pulse_pars_x2, RO_pars]
             else:
-                pulse_pars_x2['refpoint'] = 'start'
+                pulse_pars_x2['ref_point'] = 'start'
                 pulse_pars_x2['pulse_delay'] = tau
                 pulse_dict_list = [pulses['X90'], pulse_pars_x2, RO_pars]
 
@@ -428,8 +476,7 @@ def ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
 def ramsey_seq(times, pulse_pars, RO_pars,
                artificial_detuning=None,
                cal_points=True,
-               verbose=False,
-               upload=True, return_seq=False, **kw):
+               upload=True, return_seq=False):
     '''
     Ramsey sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -450,30 +497,23 @@ def ramsey_seq(times, pulse_pars, RO_pars,
     # First extract values from input, later overwrite when generating
     # waveforms
     pulses = get_pulse_dict_from_pars(pulse_pars)
-
-    # pulses['I_fb'] = {
-    #     'pulse_type': 'SquarePulse',
-    #     'channel': RO_pars['acq_marker_channel'],
-    #     'amplitude': 0.0,
-    #     'length': 1e-6,
-    #     'pulse_delay': 0}
-
     pulse_pars_x2 = deepcopy(pulses['X90'])
-    pulse_pars_x2['refpoint'] = 'start'
+    pulse_pars_x2['ref_point'] = 'start'
     for i, tau in enumerate(times):
         pulse_pars_x2['pulse_delay'] = tau
-
         if artificial_detuning is not None:
             Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
             pulse_pars_x2['phase'] = Dphase
 
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-             seg = segment.Segment('segment_{}'.format(i), [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i),
+                                   [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-             seg = segment.Segment('segment_{}'.format(i), [pulses['X180'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i),
+                                   [pulses['X180'], RO_pars])
         else:
              seg = segment.Segment('segment_{}'.format(i),
-                                 [pulses['X90'], pulse_pars_x2, RO_pars])
+                                   [pulses['X90'], pulse_pars_x2, RO_pars])
 
         seg_list.append(seg)
         seq.add(seg)
@@ -513,7 +553,7 @@ def ramsey_seq_VZ(times, pulse_pars, RO_pars,
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
     pulse_pars_x2 = deepcopy(pulses['X90'])
-    pulse_pars_x2['refpoint'] = 'start'
+    pulse_pars_x2['ref_point'] = 'start'
     for i, tau in enumerate(times):
         pulse_pars_x2['pulse_delay'] = tau
 
@@ -570,7 +610,7 @@ def ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
     pulse_pars_x2 = deepcopy(pulses['X90'])
-    pulse_pars_x2['refpoint'] = 'start'
+    pulse_pars_x2['ref_point'] = 'start'
     for i, tau in enumerate(times):
         pulse_pars_x2['pulse_delay'] = tau
         art_det = artificial_detunings[i % len(artificial_detunings)]
@@ -600,9 +640,7 @@ def ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
 
 def echo_seq(times, pulse_pars, RO_pars,
              artificial_detuning=None,
-             cal_points=True,
-             verbose=False,
-             upload=True, return_seq=False):
+             cal_points=True, upload=True, return_seq=False):
     '''
     Echo sequence for a single qubit using the tektronix.
     Input pars:
@@ -619,8 +657,8 @@ def echo_seq(times, pulse_pars, RO_pars,
     pulses = get_pulse_dict_from_pars(pulse_pars)
     center_X180 = deepcopy(pulses['X180'])
     final_X90 = deepcopy(pulses['X90'])
-    center_X180['refpoint'] = 'start'
-    final_X90['refpoint'] = 'start'
+    center_X180['ref_point'] = 'start'
+    final_X90['ref_point'] = 'start'
 
     for i, tau in enumerate(times):
         center_X180['pulse_delay'] = tau/2
@@ -628,9 +666,11 @@ def echo_seq(times, pulse_pars, RO_pars,
         if artificial_detuning is not None:
             final_X90['phase'] = (tau-times[0]) * artificial_detuning * 360
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-             seg = segment.Segment('segment_{}'.format(i), [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i),
+                                   [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-             seg = segment.Segment('segment_{}'.format(i), [pulses['X180'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i),
+                                   [pulses['X180'], RO_pars])
         else:
              seg = segment.Segment('segment_{}'.format(i),
                                  [pulses['X90'], center_X180,
@@ -728,13 +768,13 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False,
                          "Please adapt your code:\n 'off' --> 'g'\n'on' --> 'e'"
                          "\n'f' for f-level .")
 
-    for i, pulse_comb in enumerate(pulse_combinations):
+    for i, pulse_comb in enumerate(pulse_combination):
         if preselection:
-            pulse = deepcopy(pulses[pulse_comb])
+            pulse = deepcopy(pulse_1st[pulse_comb])
             pulse['pulse_delay'] = 300e-9
             pulse_list = [RO_pars, pulse, RO_pars]
         else:
-            pulse_list = [pulses[pulse_comb], RO_pars]
+            pulse_list = [pulse_1st[pulse_comb], RO_pars]
         seg = segment.Segment('segment_{}'.format(i), pulse_list)
         seg_list.append(seg)
         seq.add(seg)
@@ -1063,7 +1103,7 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
         return seq_name
 
 def qscale(qscales, pulse_pars, RO_pars,
-              cal_points=True, verbose=False, upload=True, return_seq=False):
+           cal_points=True, upload=True, return_seq=False):
     '''
     Sequence used for calibrating the QScale factor used in the DRAG pulses.
     Applies X(pi/2)X(pi), X(pi/2)Y(pi), X(pi/2)Y(-pi) for each value of
@@ -1084,7 +1124,7 @@ def qscale(qscales, pulse_pars, RO_pars,
     seq_name = 'QScale'
     seq = sequence.Sequence(seq_name)
     seg_list = []
-    pulse_combinations=[['X90','X180'],['X90','Y180'],['X90','mY180']]
+    pulse_combinations=[['X90', 'X180'], ['X90', 'Y180'], ['X90', 'mY180']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, motzoi in enumerate(qscales):
         pulse_keys = pulse_combinations[i % 3]
@@ -1092,12 +1132,14 @@ def qscale(qscales, pulse_pars, RO_pars,
             pulses[p_name]['motzoi'] = motzoi
         if cal_points and (i == (len(qscales)-4) or
                                    i == (len(qscales)-3)):
-             seg = segment.Segment('segment_{}'.format(i), [pulses['I'], RO_pars])
+             seg = segment.Segment('segment_{}'.format(i),
+                                   [pulses['I'], RO_pars])
         elif cal_points and (i == (len(qscales)-2) or
                                      i == (len(qscales)-1)):
             # pick motzoi for calpoint in the middle of the range
             pulses['X180']['motzoi'] = np.mean(qscales)
-            seg = segment.Segment('segment_{}'.format(i), [pulses['X180'], RO_pars])
+            seg = segment.Segment('segment_{}'.format(i),
+                                  [pulses['X180'], RO_pars])
         else:
             pulse_list = [pulses[x] for x in pulse_keys]
             pulse_list += [RO_pars]
@@ -1220,7 +1262,7 @@ def get_pulse_dict_from_pars(pulse_pars):
 
     pulses_sim = {key + 's': deepcopy(val) for key, val in pulses.items()}
     for val in pulses_sim.values():
-        val['refpoint'] = 'simultaneous'
+        val['ref_point'] = 'simultaneous'
 
     pulses.update(pulses_sim)
 
@@ -1242,127 +1284,6 @@ def get_pulse_dict_from_pars(pulse_pars):
         pulses['mZ90']['basis_rotation'][target_qubit] += -90
 
     return pulses
-
-# def multi_elem_segment_timing_seq(phases, qbn, op_dict, ramsey_time,
-#                                   nr_wait_elems, elem_type='interleaved',
-#                                   cal_points=((-4, -3), (-2, -1)),
-#                                   return_seq=True, upload=True):
-#     """
-#     Args:
-#         phases: the phases for the second pi/2 pulse (in rad)
-#         qbn: qubit name
-#         op_dict: operation dictionaty
-#         ramsey_time: delay between the two pi/2 pulses
-#         nr_wait_elems: the number of waiting elements between the readout
-#                        pulses
-#         elem_type: 'fixed'/'codeword'/'interleaved'
-#     """
-#     # convert cal elems to correct range:
-#     cal_points = (
-#         tuple(i % len(phases) for i in cal_points[0]),
-#         tuple(i % len(phases) for i in cal_points[1])
-#     )
-
-#     ## Create elements
-#     seg_list = []
-
-#     idle_pulse = deepcopy(op_dict['I ' + qbn])
-#     idle_pulse['nr_sigma'] = 1
-#     idle_pulse['sigma'] = 2e-6
-#     start_elem = multi_pulse_elt(0, station,
-#                                  [idle_pulse, op_dict['X90 ' + qbn]], name='s',
-#                                  trigger=True)
-#     seg_list.append(start_elem)
-
-#     wait_pulse = deepcopy(op_dict['I ' + qbn])
-#     wait_pulse['nr_sigma'] = 1
-#     wait_pulse['sigma'] = ramsey_time/nr_wait_elems
-#     wait_pulse['sigma'] -= ps.Pulsar.get_instance().inter_element_spacing()
-#     wait_samples_tek = ramsey_time/nr_wait_elems*1.2e9
-#     dramsey_time = wait_samples_tek - 4*int(wait_samples_tek/4)
-#     dramsey_time *= nr_wait_elems/1.2e9
-#     print('wait_elem length {} Tektronix samples. Reduce ramsey time by {} s'
-#           .format(wait_samples_tek, dramsey_time) + ' to satisfy granularity '
-#           'constraint')
-#     wait_elem = multi_pulse_elt(1, station, [wait_pulse], name='w',
-#                                 trigger=False, previous_element=start_elem)
-#     el_list.append(wait_elem)
-
-#     # check that no phase is acquired over the wait element
-#     ifreq = op_dict['X180 ' + qbn]['mod_frequency']
-#     phase_from_if = 360*ifreq*wait_elem.ideal_length()
-#     dynamic_phase = wait_elem.drive_phase_offsets.get(qbn, 0)
-#     total_phase = phase_from_if + dynamic_phase
-#     total_mod_phase = total_phase - 360*(total_phase//360)
-#     print(qbn + ' aquires a phase of {} ≡ {} (mod 360)'.format(
-#         total_phase, total_mod_phase) + ' degrees each correction ' +
-#           'cycle. You should reduce the intermediate frequency by {} Hz.' \
-#           .format(total_mod_phase/wait_elem.ideal_length()/360))
-
-#     cal0_elem = multi_pulse_elt(2, station, [op_dict['I ' + qbn],
-#                                              op_dict['RO ' + qbn]], name='c0',
-#                                 trigger=True)
-#     el_list.append(cal0_elem)
-#     cal1_elem = multi_pulse_elt(3, station, [op_dict['X180 ' + qbn],
-#                                              op_dict['RO ' + qbn]], name='c1',
-#                                 trigger=True)
-#     el_list.append(cal1_elem)
-
-#     for i, phase in enumerate(phases):
-#         if i in cal_points[0] or i in cal_points[1]:
-#             continue
-#         x90_pulse_mes = deepcopy(op_dict['X90 ' + qbn])
-#         x90_pulse_mes['phase'] = phase*180/np.pi
-#         # multi-element-segment end element
-
-#         mes_end_pulses = [x90_pulse_mes, op_dict['RO ' + qbn]]
-#         mes_end_elem = multi_pulse_elt(4+2*i, station, mes_end_pulses,
-#                                        name='e{}'.format(i), trigger=False,
-#                                        previous_element=wait_elem)
-#         el_list.append(mes_end_elem)
-
-#         x90_pulse_ses = deepcopy(x90_pulse_mes)
-#         x90_pulse_ses['pulse_delay'] = ramsey_time
-#         x90_pulse_ses['pulse_delay'] += ps.Pulsar.get_instance().inter_element_spacing()
-#         ses_pulses = [idle_pulse, op_dict['X90 ' + qbn], x90_pulse_ses,
-#                       op_dict['RO ' + qbn]]
-#         ses_elem = multi_pulse_elt(5+2*i, station, ses_pulses,
-#                                        name='a{}'.format(i), trigger=True)
-#         el_list.append(ses_elem)
-
-#     ## Create sequence
-#     seq_name = 'Multi_elem_segment_timing_seq'
-#     seq = sequence.Sequence(seq_name)
-#     seq.codewords[0] = 'w'
-#     seq.codewords[1] = 'w'
-#     for i, phase in enumerate(phases):
-#         if i in cal_points[0]:
-#             seq.append('c0s{}'.format(i), 'c0', trigger_wait=True)
-#             seq.append('c0m{}'.format(i), 'c0', trigger_wait=True)
-#         elif i in cal_points[1]:
-#             seq.append('c0s{}'.format(i), 'c1', trigger_wait=True)
-#             seq.append('c0m{}'.format(i), 'c1', trigger_wait=True)
-#         else:
-#             seq.append('a{}'.format(i), 'a{}'.format(i), trigger_wait=True)
-#             seq.append('s{}'.format(i), 's', trigger_wait=True)
-#             for j in range(nr_wait_elems):
-#                 if elem_type == 'fixed':
-#                     wfname = 'w'
-#                 elif elem_type == 'codeword':
-#                     wfname = 'codeword'
-#                 elif elem_type == 'interleaved':
-#                     wfname = ['w', 'codeword'][j%2]
-#                 else:
-#                     raise ValueError('Invalid elem_type {}'.format(elem_type))
-#                 seq.append('w{}_{}'.format(j, i), wfname, trigger_wait=False)
-#             seq.append('e{}'.format(i), 'e{}'.format(i), trigger_wait=False)
-
-#     if upload:
-#         ps.Pulsar.get_instance().program_awgs(seq)
-#     if return_seq:
-#         return seq, seg_list
-#     else:
-#         return seq
 
 def Z(theta=0, pulse_pars=None):
 

@@ -428,8 +428,8 @@ def echo_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars,
 
     center_X180ef = deepcopy(pulses_2nd['X180'])
     final_X90ef = deepcopy(pulses_2nd['X90'])
-    center_X180ef['refpoint'] = 'start'
-    final_X90ef['refpoint'] = 'start'
+    center_X180ef['ref_point'] = 'start'
+    final_X90ef['ref_point'] = 'start'
 
     for i, tau in enumerate(times):
         center_X180ef['pulse_delay'] = tau/2

@@ -3381,15 +3381,29 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                         'sweep_points'][-1],
                     'colors': 'gray'}
 
-                old_pipulse_val = a_tools.get_param_value_from_file(
-                    file_path=self.raw_data_dict['folder'][0],
-                    instr_name=qbn, param_name='amp180{}'.format(
-                        '_ef' if 'f' in self.data_to_fit[qbn] else ''))
-                old_pihalfpulse_val = old_pipulse_val * \
-                    a_tools.get_param_value_from_file(
-                    file_path=self.raw_data_dict['folder'][0],
-                    instr_name=qbn, param_name='amp90_scale{}'.format(
-                        '_ef' if 'f' in self.data_to_fit[qbn] else ''))
+                try:
+                    old_pipulse_val = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='amp180{}'.format(
+                            '_ef' if 'f' in self.data_to_fit[qbn] else ''))
+                except KeyError:
+                    old_pipulse_val = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='{}_amp180'.format(
+                            'ef' if 'f' in self.data_to_fit[qbn] else 'ge'))
+                try:
+                    old_pihalfpulse_val = old_pipulse_val * \
+                        a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='amp90_scale{}'.format(
+                            '_ef' if 'f' in self.data_to_fit[qbn] else ''))
+                except KeyError:
+                    old_pihalfpulse_val = old_pipulse_val * \
+                        a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='{}_amp90_scale'.format(
+                            'ef' if 'f' in self.data_to_fit[qbn] else 'ge'))
+
                 textstr = ('  $\pi-Amp$ = {:.3f} V'.format(
                     rabi_amplitudes[qbn]['piPulse']) +
                            ' $\pm$ {:.3f} V '.format(
@@ -3480,7 +3494,7 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
                 old_T1_val = a_tools.get_param_value_from_file(
                     file_path=self.raw_data_dict['folder'][0],
                     instr_name=qbn, param_name='T1{}'.format(
-                        '_ef' if 'f' in self.data_to_fit[qbn] else '_'))
+                        '_ef' if 'f' in self.data_to_fit[qbn] else ''))
                 T1_dict = self.proc_data_dict['analysis_params_dict']
                 textstr = '$T_1$ = {:.2f} $\mu$s'.format(
                             T1_dict[qbn]['T1']*1e6) \
@@ -3561,10 +3575,16 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                     if fit_res.params[par].stderr is None:
                         fit_res.params[par].stderr = 0
 
-                old_qb_freq = a_tools.get_param_value_from_file(
-                    file_path=self.raw_data_dict['folder'][0],
-                    instr_name=qbn, param_name='f{}qubit'.format(
-                        '_ef_' if 'f' in self.data_to_fit[qbn] else '_'))
+                try:
+                    old_qb_freq = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='f{}qubit'.format(
+                            '_ef_' if 'f' in self.data_to_fit[qbn] else '_'))
+                except KeyError:
+                    old_qb_freq = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='{}_freq'.format(
+                            'ef' if 'f' in self.data_to_fit[qbn] else 'ge'))
                 self.proc_data_dict['analysis_params_dict'][qbn][key][
                     'old_qb_freq'] = old_qb_freq
                 self.proc_data_dict['analysis_params_dict'][qbn][key][
@@ -3836,11 +3856,19 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                         'legend_bbox_to_anchor': (1, 0.5),
                         'legend_pos': 'center left'}
 
-                    old_qscale_val = a_tools.get_param_value_from_file(
-                        file_path=self.raw_data_dict['folder'][0],
-                        instr_name=qbn,
-                        param_name='motzoi{}'.format(
-                            "_ef" if 'f' in self.data_to_fit[qbn] else ""))
+                    try:
+                        old_qscale_val = a_tools.get_param_value_from_file(
+                            file_path=self.raw_data_dict['folder'][0],
+                            instr_name=qbn,
+                            param_name='motzoi{}'.format(
+                                "_ef" if 'f' in self.data_to_fit[qbn] else ""))
+                    except KeyError:
+                        old_qscale_val = a_tools.get_param_value_from_file(
+                            file_path=self.raw_data_dict['folder'][0],
+                            instr_name=qbn,
+                            param_name='{}_motzoi'.format(
+                                "ef" if 'f' in self.data_to_fit[qbn] else "ge"))
+
                     textstr = 'Qscale = {:.4f} $\pm$ {:.4f}'.format(
                         self.proc_data_dict['analysis_params_dict'][qbn][
                             'qscale'],
@@ -3971,7 +3999,7 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
                 file_path=self.echo_analysis.raw_data_dict['folder'][0],
                 instr_name=qbn, param_name='T2{}'.format(
                     '_ef' if 'f' in self.echo_analysis.data_to_fit[qbn]
-                    else '_'))
+                    else ''))
             T2_dict = self.proc_data_dict['analysis_params_dict']
             textstr = '$T_2$ echo = {:.2f} $\mu$s'.format(
                 T2_dict[qbn]['T2_echo']*1e6) \
@@ -4014,9 +4042,17 @@ class OverUnderRotationAnalysis(MultiQubit_TimeDomain_Analysis):
     def analyze_fit_results(self):
         self.proc_data_dict['analysis_params_dict'] = OrderedDict()
         for qbn in self.qb_names:
-            old_amp180 = a_tools.get_param_value_from_file(
-                file_path=self.raw_data_dict['folder'][0],
-                instr_name=qbn, param_name='amp180')
+            try:
+                old_amp180 = a_tools.get_param_value_from_file(
+                    file_path=self.raw_data_dict['folder'][0],
+                    instr_name=qbn, param_name='amp180{}'.format(
+                        '_ef' if 'f' in self.data_to_fit[qbn] else ''))
+            except KeyError:
+                old_amp180 = a_tools.get_param_value_from_file(
+                    file_path=self.raw_data_dict['folder'][0],
+                    instr_name=qbn, param_name='{}_amp180'.format(
+                        'ef' if 'f' in self.data_to_fit[qbn] else 'ge'))
+
             self.proc_data_dict['analysis_params_dict'][qbn] = OrderedDict()
             self.proc_data_dict['analysis_params_dict'][qbn][
                 'corrected_amp'] = old_amp180 - self.fit_dicts[
@@ -4053,9 +4089,16 @@ class OverUnderRotationAnalysis(MultiQubit_TimeDomain_Analysis):
                     'legend_bbox_to_anchor': (1, -0.15),
                     'legend_pos': 'upper right'}
 
-                old_amp180 = a_tools.get_param_value_from_file(
-                    file_path=self.raw_data_dict['folder'][0],
-                    instr_name=qbn, param_name='amp180')
+                try:
+                    old_amp180 = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='amp180{}'.format(
+                            '_ef' if 'f' in self.data_to_fit[qbn] else ''))
+                except KeyError:
+                    old_amp180 = a_tools.get_param_value_from_file(
+                        file_path=self.raw_data_dict['folder'][0],
+                        instr_name=qbn, param_name='{}_amp180'.format(
+                            'ef' if 'f' in self.data_to_fit[qbn] else 'ge'))
                 correction_dict = self.proc_data_dict['analysis_params_dict']
                 fit_res = self.fit_dicts['fit_' + qbn]['fit_res']
                 textstr = '$\pi$-Amp = {:.4f} mV'.format(

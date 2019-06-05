@@ -316,10 +316,10 @@ def get_param_value_from_file(file_path, instr_name, param_name, h5mode='r+'):
         if param_name in list(instr_settings[instr_name].attrs):
             param_val = float(instr_settings[instr_name].attrs[param_name])
         else:
-            raise ValueError('"{}" does not exist for instrument "{}"'.format(
+            raise KeyError('"{}" does not exist for instrument "{}"'.format(
                 param_name, instr_name))
     else:
-        raise ValueError('"{}" does not exist in "Instrument settings."'.format(
+        raise KeyError('"{}" does not exist in "Instrument settings."'.format(
             instr_name))
 
     return param_val
@@ -347,16 +347,32 @@ def get_qb_channel_map_from_file(qb_names, file_path,
 
     for qbn in qb_names:
         try:
-            ro_acq_weight_type = instr_settings[qbn].attrs['ro_acq_weight_type']
+            if 'ro_acq_weight_type' in instr_settings[qbn].attrs:
+                ro_acq_weight_type = instr_settings[qbn].attrs[
+                    'ro_acq_weight_type']
+            else:
+                ro_acq_weight_type = instr_settings[qbn].attrs[
+                    'acq_weight_type']
             if ro_acq_weight_type in ['optimal', 'square_rot']:
-                channel_map[qbn] = [ro_type + str(
-                    instr_settings[qbn].attrs['RO_acq_weight_function_I'])]
+                if 'RO_acq_weight_function_I' in instr_settings[qbn].attrs:
+                    channel_map[qbn] = [ro_type + str(
+                        instr_settings[qbn].attrs['RO_acq_weight_function_I'])]
+                else:
+                    channel_map[qbn] = [ro_type + str(
+                        instr_settings[qbn].attrs['acq_I_channel'])]
             elif ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
-                channel_map[qbn] = [
-                    ro_type +
-                    str(instr_settings[qbn].attrs['RO_acq_weight_function_I']),
-                    ro_type +
-                    str(instr_settings[qbn].attrs['RO_acq_weight_function_Q'])]
+                if 'RO_acq_weight_function_I' in instr_settings[qbn].attrs:
+                    channel_map[qbn] = [
+                        ro_type + str(instr_settings[qbn].attrs[
+                                          'RO_acq_weight_function_I']),
+                        ro_type + str(instr_settings[qbn].attrs[
+                                          'RO_acq_weight_function_Q'])]
+                else:
+                    channel_map[qbn] = [
+                        ro_type + str(instr_settings[qbn].attrs[
+                                          'acq_I_channel']),
+                        ro_type + str(instr_settings[qbn].attrs[
+                                          'acq_Q_channel'])]
             else:
                 raise ValueError('Unknown ro_acq_weight_type "{}."'.format(
                     ro_acq_weight_type))

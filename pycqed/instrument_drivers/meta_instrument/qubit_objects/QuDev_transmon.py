@@ -181,37 +181,7 @@ class QuDev_transmon(Qubit):
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
         self.add_parameter('acq_weight_type', initial_value='SSB',
-        self.add_parameter('ro_acq_weight_2nd_integr_I', vals=vals.Arrays(),
-                           label='Optimized weights for second integration '
-                                 'channel I',
-                           docstring=("Used for double weighted integration "
-                                      "during qutrit readout"),
-                           parameter_class=ManualParameter)
-        self.add_parameter('ro_acq_weight_2nd_integr_Q', vals=vals.Arrays(),
-                           label='Optimized weights for second integration '
-                                 'channel Q',
-                           docstring=("Used for double weighted integration "
-                                      "during qutrit readout"),
-                           parameter_class=ManualParameter)
-        self.add_parameter('ro_acq_classifier_params', vals=vals.Dict(),
-                           label='Parameters for the qutrit classifier.',
-                           docstring=("Used in the int_log_classif_det to "
-                                      "classify single shots into g, e, f."),
-                           parameter_class=ManualParameter)
-        self.add_parameter('ro_acq_state_prob_mtx', vals=vals.Arrays(),
-                           label='SSRO correction matrix.',
-                           docstring=("Matrix of measured vs prepared qubit "
-                                      "states."),
-                           parameter_class=ManualParameter)
-        self.add_parameter('ro_acq_input_average_length', unit='s',
-                           initial_value=2.275e-6, docstring='The measurement '
-                               'time in input averaging mode',
-                           label='Input average measurement time',
-                           vals=vals.Numbers(0, 2.275e-6),
-                           parameter_class=ManualParameter)
-        self.add_parameter('ro_acq_weight_type', initial_value='SSB',
                            vals=vals.Enum('SSB', 'DSB', 'optimal',
-                                          'optimal_qutrit',
                                           'square_rot', 'manual'),
                            docstring=(
                                'Determines what type of integration weights to '
@@ -221,6 +191,28 @@ class QuDev_transmon(Qubit):
                                'and "ro_acq_weight_func_Q"\n\tsquare_rot: uses '
                                'a single integration channel with boxcar '
                                'weights'),
+                           parameter_class=ManualParameter)
+        self.add_parameter('acq_weights_I2', vals=vals.Arrays(),
+                           label='Optimized weights for second integration '
+                                 'channel I',
+                           docstring=("Used for double weighted integration "
+                                      "during qutrit readout"),
+                           parameter_class=ManualParameter)
+        self.add_parameter('acq_weights_Q2', vals=vals.Arrays(),
+                           label='Optimized weights for second integration '
+                                 'channel Q',
+                           docstring=("Used for double weighted integration "
+                                      "during qutrit readout"),
+                           parameter_class=ManualParameter)
+        self.add_parameter('acq_classifier_params', vals=vals.Dict(),
+                           label='Parameters for the qutrit classifier.',
+                           docstring=("Used in the int_avg_classif_det to "
+                                      "classify single shots into g, e, f."),
+                           parameter_class=ManualParameter)
+        self.add_parameter('acq_state_prob_mtx', vals=vals.Arrays(),
+                           label='SSRO correction matrix.',
+                           docstring=("Matrix of measured vs prepared qubit "
+                                      "states."),
                            parameter_class=ManualParameter)
 
         # qubit drive pulse parameters
@@ -314,15 +306,11 @@ class QuDev_transmon(Qubit):
         return {'driver': str(self.__class__), 'name': self.name}
 
     def update_detector_functions(self):
-        if self.ro_acq_weight_type() == "optimal_qutrit":
-            channels = [self.RO_acq_weight_function_I(),
-                        self.RO_acq_weight_function_Q()]
-        elif self.RO_acq_weight_function_Q() is None or \
-           self.ro_acq_weight_type() not in ['SSB', 'DSB']:
-            channels = [self.RO_acq_weight_function_I()]
+        if self.acq_Q_channel() is None or \
+           self.acq_weight_type() not in ['SSB', 'DSB', 'optimal_qutrit']:
+            channels = [self.acq_I_channel()]
         else:
-            channels = [self.acq_I_channel(),
-                        self.acq_Q_channel()]
+            channels = [self.acq_I_channel(), self.acq_Q_channel()]
 
         self.int_log_det = det.UHFQC_integration_logging_det(
             UHFQC=self.instr_uhf.get_instr(), 
@@ -331,13 +319,14 @@ class QuDev_transmon(Qubit):
             integration_length=self.acq_length(), 
             result_logging_mode='raw')
 
-        self.int_log_classif_det = det.UHFQC_integration_logging_classifier_det(
-            UHFQC=self.UHFQC, AWG=self.AWG, channels=channels,
-            integration_length=self.RO_acq_integration_length(),
-            nr_shots=self.RO_acq_shots(),
+        self.int_avg_classif_det = det.UHFQC_integration_average_classifier_det(
+            UHFQC=self.instr_uhf.get_instr(), 
+            AWG=self.instr_pulsar.get_instr(),  
+            channels=channels, nr_shots=self.acq_averages(),
+            integration_length=self.acq_length(),
             get_values_function_kwargs={
-                'classifier_params': self.ro_acq_classifier_params(),
-                'state_prob_mtx': self.ro_acq_state_prob_mtx()
+                'classifier_params': self.acq_classifier_params(),
+                'state_prob_mtx': self.acq_state_prob_mtx()
             })
 
         self.int_avg_det = det.UHFQC_integrated_average_detector(
@@ -433,8 +422,7 @@ class QuDev_transmon(Qubit):
         if type == 'manual':
             pass
         elif type == 'optimal':
-            if (self.acq_weights_I() is None or
-                    self.acq_weights_Q() is None):
+            if (self.acq_weights_I() is None or self.acq_weights_Q() is None):
                 logging.warning('Optimal weights are None, not setting '
                                 'integration weights')
                 return
@@ -449,9 +437,8 @@ class QuDev_transmon(Qubit):
             self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
                 self.acq_I_channel()), -1.0)
         elif type == 'optimal_qutrit':
-            for w_f in [self.ro_acq_weight_func_I, self.ro_acq_weight_func_Q,
-                        self.ro_acq_weight_2nd_integr_I,
-                        self.ro_acq_weight_2nd_integr_Q]:
+            for w_f in [self.acq_weights_I, self.acq_weights_Q,
+                        self.acq_weights_I2, self.acq_weights_Q2]:
                 if w_f() is None:
                     logging.warning('The optimal weights {} are None. '
                                     '\nNot setting integration weights.'
@@ -459,27 +446,27 @@ class QuDev_transmon(Qubit):
                     return
             # if all weights are not None, set first integration weights (real and
             # imag) on channel I amd second integration weights on channel Q.
-            self.UHFQC.set('quex_wint_weights_{}_real'.format(
-                self.RO_acq_weight_function_I()),
+            self.instr_uhf.get_instr().set('quex_wint_weights_{}_real'.format(
+                self.acq_weights_I()),
                 self.ro_acq_weight_func_I().copy())
-            self.UHFQC.set('quex_wint_weights_{}_imag'.format(
-                self.RO_acq_weight_function_I()),
+            self.instr_uhf.get_instr().set('quex_wint_weights_{}_imag'.format(
+                self.acq_weights_I()),
                 self.ro_acq_weight_func_Q().copy())
-            self.UHFQC.set('quex_wint_weights_{}_real'.format(
-                self.RO_acq_weight_function_Q()),
+            self.instr_uhf.get_instr().set('quex_wint_weights_{}_real'.format(
+                self.acq_weights_Q()),
                 self.ro_acq_weight_2nd_integr_I().copy())
-            self.UHFQC.set('quex_wint_weights_{}_imag'.format(
-                self.RO_acq_weight_function_Q()),
+            self.instr_uhf.get_instr().set('quex_wint_weights_{}_imag'.format(
+                self.acq_weights_Q()),
                 self.ro_acq_weight_2nd_integr_Q().copy())
 
-            self.UHFQC.set('quex_rot_{}_real'.format(
-                self.RO_acq_weight_function_I()), 1.0)
-            self.UHFQC.set('quex_rot_{}_imag'.format(
-                self.RO_acq_weight_function_I()), -1.0)
-            self.UHFQC.set('quex_rot_{}_real'.format(
-                self.RO_acq_weight_function_Q()), 1.0)
-            self.UHFQC.set('quex_rot_{}_imag'.format(
-                self.RO_acq_weight_function_Q()), -1.0)
+            self.instr_uhf.get_instr().set('quex_rot_{}_real'.format(
+                self.acq_weights_I()), 1.0)
+            self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
+                self.acq_weights_I()), -1.0)
+            self.instr_uhf.get_instr().set('quex_rot_{}_real'.format(
+                self.acq_weights_Q()), 1.0)
+            self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
+                self.acq_weights_Q()), -1.0)
 
         else:
             tbase = np.arange(0, 4096 / 1.8e9, 1 / 1.8e9)
@@ -716,8 +703,8 @@ class QuDev_transmon(Qubit):
                                            no_cal_points=no_cal_points,
                                            upload=upload))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -725,7 +712,7 @@ class QuDev_transmon(Qubit):
                              'use_cal_points': cal_points,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'}})
         MC.run(label, exp_metadata=exp_metadata)
@@ -745,10 +732,10 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'Rabi_ef-n{}'.format(n) + self.msmt_suffix
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
         cal_states_rotations = None
@@ -783,8 +770,8 @@ class QuDev_transmon(Qubit):
                         n=n, upload=upload,
                         cal_points=cal_points, no_cal_points=no_cal_points))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -794,7 +781,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None})
         MC.run(label, exp_metadata=exp_metadata)
 
@@ -804,10 +791,10 @@ class QuDev_transmon(Qubit):
     def measure_rabi_amp90(self, scales=np.linspace(0.3, 0.7, 31), n=1,
                            MC=None, analyze=True, close_fig=True, upload=True):
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         MC.set_sweep_function(awg_swf.Rabi_amp90(
             pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(), n=n,
@@ -827,10 +814,10 @@ class QuDev_transmon(Qubit):
             logging.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         # Define the measurement label
         if label is None:
@@ -852,15 +839,15 @@ class QuDev_transmon(Qubit):
             pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
             upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'},
                              'use_cal_points': cal_points})
@@ -879,13 +866,13 @@ class QuDev_transmon(Qubit):
             logging.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         if label is None:
             label = 'T1_ef' + self.msmt_suffix
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
         cal_states_rotations = None
@@ -924,8 +911,8 @@ class QuDev_transmon(Qubit):
                                 no_cal_points=no_cal_points,
                                 last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -934,7 +921,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None,
                              'last_ge_pulse': last_ge_pulse})
         MC.run(label, exp_metadata=exp_metadata)
@@ -954,10 +941,10 @@ class QuDev_transmon(Qubit):
             raise ValueError("The values in the qscales array are not repeated "
                              "3 times.")
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if label is None:
             label = 'QScale'+self.msmt_suffix
@@ -978,8 +965,8 @@ class QuDev_transmon(Qubit):
                 pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
                 upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -987,7 +974,7 @@ class QuDev_transmon(Qubit):
                              'use_cal_points': cal_points,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'}
                              })
@@ -1009,10 +996,10 @@ class QuDev_transmon(Qubit):
             raise ValueError("The values in the qscales array are not repeated "
                              "3 times.")
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if label is None:
             label = 'QScale_ef'+self.msmt_suffix
@@ -1053,8 +1040,8 @@ class QuDev_transmon(Qubit):
             upload=upload, cal_points=cal_points, no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1063,7 +1050,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None,
                              'last_ge_pulse': last_ge_pulse})
         MC.run(label, exp_metadata=exp_metadata)
@@ -1092,9 +1079,9 @@ class QuDev_transmon(Qubit):
             logging.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         # Define the measurement label
         if label == '':
@@ -1143,9 +1130,9 @@ class QuDev_transmon(Qubit):
             logging.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         # Define the measurement label
         if label == None:
@@ -1169,8 +1156,8 @@ class QuDev_transmon(Qubit):
             upload=upload)
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1178,7 +1165,7 @@ class QuDev_transmon(Qubit):
                              'use_cal_points': cal_points,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'},
                              'artificial_detuning': artificial_detuning})
@@ -1209,9 +1196,9 @@ class QuDev_transmon(Qubit):
         if seq_func is None:
             seq_func = sq.ramsey_seq
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         # Define the measurement label
         if label == '':
@@ -1272,9 +1259,9 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'Ramsey_ef'+self.msmt_suffix
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
         cal_states_rotations = None
@@ -1314,8 +1301,8 @@ class QuDev_transmon(Qubit):
             last_ge_pulse=last_ge_pulse)
         MC.set_sweep_function(Rams_2nd_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1325,7 +1312,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None,
                              'artificial_detuning': artificial_detuning})
         MC.run(label, exp_metadata=exp_metadata)
@@ -1351,9 +1338,9 @@ class QuDev_transmon(Qubit):
             logging.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if label is None:
             label = 'Ramsey_mult_det_ef'+self.msmt_suffix
@@ -1426,17 +1413,17 @@ class QuDev_transmon(Qubit):
             cal_states_dict = None
             cal_states_rotations = None
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         Echo_swf = awg_swf.Echo(
             pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
             artificial_detuning=artificial_detuning, upload=upload)
         MC.set_sweep_function(Echo_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1444,7 +1431,7 @@ class QuDev_transmon(Qubit):
                              'use_cal_points': cal_points,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'},
                              'artificial_detuning': artificial_detuning})
@@ -1472,9 +1459,9 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'Echo_ef' + self.msmt_suffix
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
         cal_states_rotations = None
@@ -1505,17 +1492,17 @@ class QuDev_transmon(Qubit):
             sweep_points = times
 
         Echo_2nd_swf = awg_swf.Echo_2nd_exc(
-            pulse_pars=self.get_drive_pars(),
-            pulse_pars_2nd=self.get_ef_drive_pars(),
-            RO_pars=self.get_RO_pars(),
+            pulse_pars=self.get_ge_pars(),
+            pulse_pars_2nd=self.get_ef_pars(),
+            RO_pars=self.get_ro_pars(),
             artificial_detuning=artificial_detuning,
             cal_points=cal_points, upload=upload,
             no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse)
         MC.set_sweep_function(Echo_2nd_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weight_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1525,7 +1512,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weight_type() != 'optimal_qutrit'
                                 else None,
                              'artificial_detuning': artificial_detuning})
         MC.run(label, exp_metadata=exp_metadata)
@@ -1535,9 +1522,9 @@ class QuDev_transmon(Qubit):
 
     def measure_allxy(self, double_points=True, MC=None, upload=True,
                       analyze=True, close_fig=True):
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         MC.set_sweep_function(awg_swf.AllXY(
             pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
@@ -1564,10 +1551,10 @@ class QuDev_transmon(Qubit):
         if nr_cliffords is None:
             raise ValueError("Unspecified nr_cliffords.")
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if RO_pars is None:
             RO_pars = self.get_ro_pars()
@@ -1583,8 +1570,8 @@ class QuDev_transmon(Qubit):
                         + self.msmt_suffix
 
         if thresholded:
-            if self.UHFQC.get('quex_thres_{}_level'.format(
-                    self.RO_acq_weight_function_I())) == 0.0:
+            if self.instr_uhf.get_instr().get('quex_thres_{}_level'.format(
+                    self.acq_weights_I())) == 0.0:
                 raise ValueError('The threshold value is not set.')
 
         nr_seeds_arr = np.arange(nr_seeds)
@@ -1641,12 +1628,12 @@ class QuDev_transmon(Qubit):
             "denomination for 3 level readout. Please adapt your code:\n " \
             "'off' --> 'g'\n'on' --> 'e'\n'f' for 3d level detection "
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
         name_extra = kw.get('name_extra', None)
         npoints = self.inp_avg_det.nr_samples
 
         # initialize instruments
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         for level in levels:
             if level not in ['g', 'e', 'f']:
@@ -1657,9 +1644,9 @@ class QuDev_transmon(Qubit):
 
             # set sweep function and run measurement
             MC.set_sweep_function(awg_swf.SingleLevel(
-                pulse_pars=self.get_drive_pars(),
-                pulse_pars_2nd=self.get_ef_drive_pars(),
-                RO_pars=self.get_RO_pars(),
+                pulse_pars=self.get_ge_pars(),
+                pulse_pars_2nd=self.get_ef_pars(),
+                RO_pars=self.get_ro_pars(),
                 level=level,
                 upload=upload))
             MC.set_sweep_points(np.linspace(0, npoints / 1.8e9, npoints, endpoint=False))
@@ -1717,20 +1704,20 @@ class QuDev_transmon(Qubit):
         """
 
         if delays is None:
-            raise ValueError("Unspecified amplitudes for "
+            raise ValueError("Unspecified delays for "
                              "measure_readout_pulse_scope")
         if label is None:
             label = 'Readout_pulse_scope' + self.msmt_suffix
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
         if freqs is None:
             freqs = self.f_qubit() + np.linspace(-50e6, 50e6, 201)
         if RO_separation is None:
-            RO_separation = 2 * self.RO_pulse_length()
+            RO_separation = 2 * self.ro_length()
             RO_separation += np.max(delays)
             RO_separation += 200e-9  # for slack
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         MC.set_sweep_function(awg_swf.Readout_pulse_scope_swf(
             delays=delays,
             pulse_pars=self.get_ge_pars(),
@@ -1743,13 +1730,15 @@ class QuDev_transmon(Qubit):
             upload=upload))
         MC.set_sweep_points(delays)
         MC.set_sweep_function_2D(swf.Offset_Sweep(
-            mc_parameter_wrapper.wrap_par_to_swf(self.drive_LO.frequency),
-            -self.f_pulse_mod(),
+            mc_parameter_wrapper.wrap_par_to_swf(
+                self.instr_ge_lo.get_instr().frequency),
+            -self.ge_mod_freq(),
             parameter_name=self.name + ' drive frequency'))
         MC.set_sweep_points_2D(freqs)
 
         d = det.UHFQC_integrated_average_detector(
-            self.UHFQC, self.instr_pulsar.get_instr(), nr_averages=self.RO_acq_averages(),
+            self.instr_uhf.get_instr(), self.instr_pulsar.get_instr(),
+            nr_averages=self.acq_averages(),
             channels=self.int_avg_det.channels,
             integration_length=self.acq_length(),
             values_per_point=2, values_per_point_suffex=['_probe', '_measure'])
@@ -1796,12 +1785,12 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'residual_readout_photons' + self.msmt_suffix
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
         # duplicate sweep points for the two preparation states
         ramsey_times = np.vstack((ramsey_times, ramsey_times)).\
                        reshape((-1,), order='F')
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         sf1 = awg_swf.readout_photons_in_resonator_swf(
             delay_to_relax=delays_to_relax[0],
             delay_buffer=delay_buffer,
@@ -1819,7 +1808,8 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_points_2D(delays_to_relax)
 
         d = det.UHFQC_integrated_average_detector(
-            self.UHFQC, self.instr_pulsar.get_instr(), nr_averages=self.RO_acq_averages(),
+            self.instr_uhf.get_instr(), self.instr_pulsar.get_instr(),
+            nr_averages=self.acq_averages(),
             channels=self.int_avg_det.channels,
             integration_length=self.acq_length(),
             values_per_point=2, values_per_point_suffex=['_test', '_measure'])
@@ -1860,9 +1850,9 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'Multi_element_segment_timing' + self.msmt_suffix
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         MC.set_sweep_function(awg_swf.MultiElemSegmentTimingSwf(
             phases=phases,
             qbn=self.name,
@@ -1874,7 +1864,7 @@ class QuDev_transmon(Qubit):
             upload=upload))
         MC.set_sweep_points(phases)
         d = det.UHFQC_integrated_average_detector(
-            self.UHFQC, self.instr_pulsar.get_instr(), nr_averages=self.RO_acq_averages(),
+            self.instr_uhf.get_instr(), self.instr_pulsar.get_instr(), nr_averages=self.acq_averages(),
             channels=self.int_avg_det.channels,
             integration_length=self.acq_length(),
             values_per_point=2, values_per_point_suffex=['_single_elem',
@@ -1918,7 +1908,7 @@ class QuDev_transmon(Qubit):
                                     'cv_n_fold':5,
                                     'polynomial_dimension':2}
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         std_devs = kwargs.pop('std_devs',[0.2,0.2])
         c = kwargs.pop('second_round_std_scale',0.3)
@@ -1984,7 +1974,7 @@ class QuDev_transmon(Qubit):
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
                                       initial_stepsize=0.01, trigger_sep=5e-6):
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
         self.prepare_for_mixer_calibration(suppress='drive LO')
         cal_elts.mixer_calibration_sequence(
             trigger_sep, 0, RO_pars=self.get_ro_pars(),
@@ -2023,13 +2013,13 @@ class QuDev_transmon(Qubit):
                                          initial_stepsize=(0.15, 10)):
         initial_stepsize = list(initial_stepsize)
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
         self.prepare_for_mixer_calibration('readout sideband', dc_if=dc_if)
         detector = det.UHFQC_readout_mixer_skewness_det(
-            self.UHFQC, None, [self.RO_acq_weight_function_I(),
-                                   self.RO_acq_weight_function_Q()],
-            self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(), self.RO_amp(),
-            self.RO_pulse_length(), self.RO_acq_averages(), verbose=False)
+            self.instr_uhf.get_instr(), None, [self.acq_weights_I(),
+                                   self.acq_weights_Q()],
+            self.ro_alpha, self.ro_phi_skew, self.ro_mod_freq(), self.ro_amp(),
+            self.ro_length(), self.acq_averages(), verbose=False)
         ad_func_pars = {'adaptive_function': opti.nelder_mead,
                         'x0': [self.ro_alpha(), self.ro_phi_skew()],
                         'initial_step': initial_stepsize,
@@ -2060,19 +2050,19 @@ class QuDev_transmon(Qubit):
     def measure_drive_mixer_spectrum(self, if_freqs, MC=None, amplitude=0.1,
                                      trigger_sep=5e-6):
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
         self.prepare_for_mixer_calibration('drive LO')
         cal_elts.mixer_calibration_sequence(
             trigger_sep, amplitude,
             trigger_channel=None,
             RO_pars=self.get_ro_pars(),
-            pulse_I_channel=self.pulse_I_channel(),
-            pulse_Q_channel=self.pulse_Q_channel(),
-            f_pulse_mod=self.f_pulse_mod(),
-            phi_skew=self.phi_skew(), alpha=self.alpha()
+            pulse_I_channel=self.ge_I_channel(),
+            pulse_Q_channel=self.ge_Q_channel(),
+            f_pulse_mod=self.ge_mod_freq(),
+            phi_skew=self.ge_phi_skew(), alpha=self.ge_alpha()
         )
         DC_LO_freqs = (if_freqs*trigger_sep).astype(np.int)/trigger_sep + \
-                      self.drive_LO.frequency() - self.f_RO_mod()
+                      self.instr_ge_lo.get_instr().frequency() - self.ro_mod_freq()
         MC.set_sweep_function(self.readout_DC_LO.frequency)
         MC.set_sweep_points(DC_LO_freqs)
         MC.set_detector_function(self.int_avg_det_spec)
@@ -2118,9 +2108,9 @@ class QuDev_transmon(Qubit):
         ma2 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
                                                 amplitude=amplitude,
                                                 trigger_sep=trigger_sep)
-        left_sb_f = self.drive_LO.frequency()+self.f_pulse_mod()-self.f_RO_mod()
-        lo_f = self.drive_LO.frequency()-self.f_RO_mod()
-        right_sb_f = self.drive_LO.frequency()-self.f_pulse_mod()-self.f_RO_mod()
+        left_sb_f = self.instr_ge_lo.get_instr().frequency()+self.ge_mod_freq()-self.ro_mod_freq()
+        lo_f = self.instr_ge_lo.get_instr().frequency()-self.ro_mod_freq()
+        right_sb_f = self.instr_ge_lo.get_instr().frequency()-self.ge_mod_freq()-self.ro_mod_freq()
         ma.Mixer_calibration_evaluation(ma1,ma2,voltage_peaks=[left_sb_f,lo_f,right_sb_f],
                                         make_fig=make_fig)
 
@@ -2152,7 +2142,7 @@ class QuDev_transmon(Qubit):
                                  'cv_n_fold':5,
                                  'polynomial_dimension':2}
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         std_devs = kwargs.get('std_devs',[0.3,10.])
         c = kwargs.pop('second_round_std_scale',0.4)
@@ -2193,7 +2183,7 @@ class QuDev_transmon(Qubit):
                 pulseQch=self.pulse_Q_channel(),
                 alpha=meas_grid[0],
                 phi_skew=meas_grid[1],
-                f_mod=self.f_pulse_mod(),
+                f_mod=self.ge_mod_freq(),
                 RO_trigger_channel=None,
                 RO_pars=self.get_ro_pars(),
                 amplitude=amplitude,
@@ -2230,24 +2220,24 @@ class QuDev_transmon(Qubit):
         if initial_stepsize is None:
             initial_stepsize = [0.15, 10]
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
         self.prepare_for_mixer_calibration(suppress='drive sideband')
         detector = det.UHFQC_mixer_skewness_det(
-            self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
-                                     self.RO_acq_weight_function_Q()],
+            self.instr_uhf.get_instr(), qc.station, [self.acq_weights_I(),
+                                     self.acq_weights_Q()],
             self.pulse_I_channel(), self.pulse_Q_channel(),
-            self.alpha, self.phi_skew, self.f_pulse_mod(),
+            self.alpha, self.phi_skew, self.ge_mod_freq(),
             self.RO_acq_marker_channel(),
             self.get_ro_pars(),
-            amplitude=amplitude, nr_averages=self.RO_acq_averages(),
+            amplitude=amplitude, nr_averages=self.acq_averages(),
             RO_trigger_separation=trigger_sep, verbose=False)
         # detector = det.UHFQC_readout_mixer_skewness_det(
-        #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
-        #                              self.RO_acq_weight_function_Q()],
-        #     self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(),
+        #     self.instr_uhf.get_instr(), qc.station, [self.acq_weights_I(),
+        #                              self.acq_weights_Q()],
+        #     self.ro_alpha, self.ro_phi_skew, self.ro_mod_freq(),
         #     self.RO_acq_marker_channel(),
-        #     nr_averages=self.RO_acq_averages(),
-        #     RO_pulse_length=self.RO_pulse_length(),
+        #     nr_averages=self.acq_averages(),
+        #     ro_length=self.ro_length(),
         #     verbose=False)
         ad_func_pars = {'adaptive_function': opti.nelder_mead,
                         'x0': [self.alpha(), self.phi_skew()],
@@ -2275,7 +2265,7 @@ class QuDev_transmon(Qubit):
     def measure_readout_mixer_spectrum(self, if_freqs, dc_if=50e6, MC=None,
                                        amplitude=0.1, trigger_sep=5e-6):
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
         self.prepare_for_mixer_calibration('readout LO', dc_if=dc_if)
         cal_elts.mixer_calibration_sequence(
             trigger_sep, 0, self.RO_acq_marker_channel())
@@ -2333,10 +2323,10 @@ class QuDev_transmon(Qubit):
             #  the same but would be a good thing to do. First test if qutrit works
             #  well. idem in plot
             if qutrit:
-                self.ro_acq_weight_func_I(final_basis[0].real)
-                self.ro_acq_weight_func_Q(final_basis[0].imag)
-                self.ro_acq_weight_2nd_integr_I(final_basis[1].real)
-                self.ro_acq_weight_2nd_integr_Q(final_basis[1].imag)
+                self.acq_weights_I(final_basis[0].real)
+                self.acq_weights_Q(final_basis[0].imag)
+                self.acq_weights_I2(final_basis[1].real)
+                self.acq_weights_Q2(final_basis[1].imag)
             else:
                 wre = np.real(iq_traces['e'] - iq_traces['g'])
                 wim = np.imag(iq_traces['e'] - iq_traces['g'])
@@ -2352,7 +2342,7 @@ class QuDev_transmon(Qubit):
                                 e='d.c. voltage,\nPi_ge pulse (V)',
                                 f='d.c. voltage,\nPi_gf pulse (V)')
             tbase = np.linspace(0, npoints/1.8e9, npoints, endpoint=False)
-            modulation = np.exp(2j * np.pi * self.f_RO_mod() * tbase)
+            modulation = np.exp(2j * np.pi * self.ro_mod_freq() * tbase)
             fig, ax = plt.subplots(len(levels) + 1, figsize=(20,20))
             plt.title('optimized weights ' + self.name +
                       "".join('\n' + m_a[l].timestamp_string for  l in levels))
@@ -2424,22 +2414,22 @@ class QuDev_transmon(Qubit):
         """
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         label = 'SSRO_fidelity'
         if thresholded:
             label += '_thresh'
 
-        prev_shots = self.RO_acq_shots()
-        self.RO_acq_shots(RO_shots)
+        prev_shots = self.acq_shots()
+        self.acq_shots(RO_shots)
         if preselection_pulse:
-            self.RO_acq_shots(4*(self.RO_acq_shots()//4))
+            self.acq_shots(4*(self.acq_shots()//4))
         else:
-            self.RO_acq_shots(2*(self.RO_acq_shots()//2))
+            self.acq_shots(2*(self.acq_shots()//2))
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
-        RO_spacing = self.UHFQC.quex_wint_delay()*2/1.8e9
+        RO_spacing = self.instr_uhf.get_instr().quex_wint_delay()*2/1.8e9
         RO_spacing += self.acq_length()
         RO_spacing += RO_slack # for slack
         RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
@@ -2450,10 +2440,10 @@ class QuDev_transmon(Qubit):
             upload=upload,
             preselection=preselection_pulse,
             RO_spacing=RO_spacing))
-        spoints = np.arange(self.RO_acq_shots())
+        spoints = np.arange(self.acq_shots())
         if preselection_pulse:
             spoints //= 2
-        MC.set_sweep_points(np.arange(self.RO_acq_shots()))
+        MC.set_sweep_points(np.arange(self.acq_shots()))
         if thresholded:
             MC.set_detector_function(self.dig_log_det)
         else:
@@ -2478,35 +2468,35 @@ class QuDev_transmon(Qubit):
                 "False."
             for level in levels:
                 MC.set_sweep_function(awg_swf.SingleLevel(
-                    pulse_pars=self.get_drive_pars(),
-                    pulse_pars_2nd=self.get_ef_drive_pars(),
-                    RO_pars=self.get_RO_pars(),
+                    pulse_pars=self.get_ge_pars(),
+                    pulse_pars_2nd=self.get_ef_pars(),
+                    RO_pars=self.get_ro_pars(),
                     RO_spacing=RO_spacing,
                     level=level,
                     upload=upload,
                     preselection=preselection_pulse))
-                spoints = np.arange(self.RO_acq_shots())
+                spoints = np.arange(self.acq_shots())
                 if preselection_pulse:
                     spoints //= 2
-                MC.set_sweep_points(np.arange(self.RO_acq_shots()))
+                MC.set_sweep_points(np.arange(self.acq_shots()))
                 MC.run(name=label + '_{}'.format(level) + self.msmt_suffix,
                        mode=mode)
 
         else:
             MC.set_sweep_function(awg_swf2.n_qubit_off_on(
-                pulse_pars_list=[self.get_drive_pars()],
-                RO_pars=self.get_RO_pars(),
+                pulse_pars_list=[self.get_ge_pars()],
+                RO_pars=self.get_ro_pars(),
                 upload=upload,
                 preselection=preselection_pulse,
                 RO_spacing=RO_spacing))
-            spoints = np.arange(self.RO_acq_shots())
+            spoints = np.arange(self.acq_shots())
             if preselection_pulse:
                 spoints //= 2
-            MC.set_sweep_points(np.arange(self.RO_acq_shots()))
+            MC.set_sweep_points(np.arange(self.acq_shots()))
             MC.run(name=label+self.msmt_suffix, mode=mode)
 
         MC.soft_avg(prev_avg)
-        self.RO_acq_shots(prev_shots)
+        self.acq_shots(prev_shots)
 
         if analyze:
             if qutrit:
@@ -2523,11 +2513,11 @@ class QuDev_transmon(Qubit):
                 classifier_params = ssqtro.proc_data_dict[
                            'analysis_params'].get('classifier_params', None)
                 if update:
-                    self.ro_acq_classifier_params(classifier_params)
-                    self.ro_acq_state_prob_mtx(state_prob_mtx)
+                    self.acq_classifier_params(classifier_params)
+                    self.acq_state_prob_mtx(state_prob_mtx)
                 return state_prob_mtx, classifier_params
             else:
-                rotate = self.ro_acq_weight_type() in {'SSB', 'DSB'}
+                rotate = self.acq_weight_type() in {'SSB', 'DSB'}
                 if thresholded:
                     channels = self.dig_log_det.value_names
                 else:
@@ -2567,23 +2557,23 @@ class QuDev_transmon(Qubit):
             nreps: Default 10.
         """
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         label = 'RO_theta'
-        if self.RO_acq_weight_function_Q() is None:
-            self.RO_acq_weight_function_Q(
-                (self.RO_acq_weight_function_I() + 1) % 9)
+        if self.acq_weights_Q() is None:
+            self.acq_weights_Q(
+                (self.acq_weights_I() + 1) % 9)
         self.set_readout_weights(type='SSB')
-        prev_shots = self.RO_acq_shots()
-        self.RO_acq_shots(2*(self.RO_acq_shots()//2))
-        self.prepare_for_timedomain()
+        prev_shots = self.acq_shots()
+        self.acq_shots(2*(self.acq_shots()//2))
+        self.prepare(drive='timedomain')
         MC.set_sweep_function(awg_swf.SingleLevel(
             pulse_pars=self.get_ge_pars(),
             RO_pars=self.get_ro_pars(),
             upload=upload,
             preselection=False))
-        spoints = np.arange(self.RO_acq_shots())
-        MC.set_sweep_points(np.arange(self.RO_acq_shots()))
+        spoints = np.arange(self.acq_shots())
+        MC.set_sweep_points(np.arange(self.acq_shots()))
         MC.set_detector_function(self.int_log_det)
         prev_avg = MC.soft_avg()
         MC.soft_avg(1)
@@ -2597,16 +2587,16 @@ class QuDev_transmon(Qubit):
         MC.run(name=label+self.msmt_suffix, mode=mode)
 
         MC.soft_avg(prev_avg)
-        self.RO_acq_shots(prev_shots)
+        self.acq_shots(prev_shots)
 
-        rotate = self.RO_acq_weight_function_Q() is not None
+        rotate = self.acq_weights_Q() is not None
         channels = self.int_log_det.value_names
         ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
                                rotate=rotate, no_fits=True,
                                channels=channels,
                                preselection=False)
         if update:
-            self.RO_IQ_angle(self.RO_IQ_angle() + ana.theta)
+            self.acq_IQ_angle(self.acq_IQ_angle() + ana.theta)
         return ana.theta
 
     def measure_dynamic_phase(self,
@@ -2623,7 +2613,7 @@ class QuDev_transmon(Qubit):
             raise ValueError('Unspecified thetas array.')
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if flux_pulse_channel is not None:
             flux_pulse_channel_backup = self.flux_pulse_channel()
@@ -2636,7 +2626,7 @@ class QuDev_transmon(Qubit):
             label = 'Dynamic_phase_measurement_{}_{}_filter'.format(
                 self.name, self.flux_pulse_channel())
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         flux_pulse_amp_backup = self.flux_pulse_amp()
         flux_pulse_length_backup = self.flux_pulse_length()
@@ -2672,184 +2662,6 @@ class QuDev_transmon(Qubit):
             self.flux_pulse_delay(flux_pulse_delay_backup)
 
         return MA
-
-    def measure_flux_detuning(self, flux_params=None, n=1, ramsey_times=None,
-                              artificial_detuning=0, MC=None,
-                              analyze=True, close_fig=True, upload=True,
-                              fluxing_channels=[]):
-        """
-        DCL code. Instead use qb.calibrate_flux_pulse_frequency()
-
-        Sweep over flux pulse amplitudes; for each, perform a Ramsey to get the
-        detuning from qubit parking position.
-
-        :param flux_amps: flux pulse amplitudes (V)
-        :param n: #ofPulses
-        :param MC: Measurement Control object
-        :param analyze: do you want to analyze your data?
-        :param close_fig: Close figure?
-        :param upload: Don't know
-        :return: Detuning of qubit freq from parking position with the applied
-        flux pulse amplitude.
-        """
-        if flux_params is None:
-            raise ValueError("Unspecified flux amplitudes "
-                             "for measure_flux_detuning")
-        if ramsey_times is None:
-            raise ValueError("Unspecified Ramsey times "
-                             "for measure_flux_detuning")
-
-        if MC is None:
-            MC = self.MC
-
-        self.prepare_for_timedomain()
-
-        flux_det_sweep = awg_swf.awg_seq_swf(fsqs.Ram_Z_seq,
-              awg_seq_func_kwargs={'operation_dict': self.get_operation_dict(),
-                                   'q0': self,
-                                   'operation_name': 'flux_detuning',
-                                   'times': ramsey_times,
-                                   'artificial_detuning': artificial_detuning,
-                                   'distortion_dict': self.dist_dict()},
-              fluxing_channels=fluxing_channels,
-              parameter_name='times')
-
-
-        MC.set_sweep_function(ram_Z_sweep)
-        MC.set_detector_function(self.int_avg_det)
-        MC.run('Flux_Detuning'+label+self.msmt_suffix)
-
-        if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
-
-        """------------------
-        #Soft sweep over flux amplitudes using
-        awg_swf.awg_seq_swf(fsqs.single_pulse_seq)
-        pulse_pars = {'pulse_type': 'SquarePulse',
-                      'pulse_delay': .1e-6,
-                      'channel': 'ch3',
-                      'amplitude': 0.5,
-                      'length': .1e-6,
-                      'dead_time_length': 10e-6}
-        square_pulse_seq=fsqs.single_pulse_seq(comp_pulse=False,return_seq=True)
-
-        awg_square_sweep_fcn=awg_swf.awg_seq_swf(
-            square_pulse_seq,
-            unit='V',
-            awg_seq_func_kwargs={'comp_pulse': False,
-                                 'q0': self.qubit.name,
-                                 'cal_points':self.cal_points,
-                                 'distortion_dict': self.dist_dict,
-                                 'upload': True})
-        MC.set_sweep_function(awg_square_sweep_fcn)
-        --------------------
-        #Set the sweep points=sweep over flux amplitudes
-        MC.set_sweep_points(flux_params['Amplitudes'])
-
-        #Use the composite_detector_function
-        flux_detuning_det=cdet.Flux_Detuning(
-            flux_params,
-            ramsey_times,
-            artificial_detuning,
-            self,
-            self.instr_pulsar.get_instr(),
-            MC,
-            upload=upload,
-            pulse_pars=self.get_ge_pars(),
-            RO_pars=self.get_ro_pars())
-        MC.set_detector_function(flux_detuning_det)
-
-        MC.run('Flux_Detuning-n{}'.format(n) + self.msmt_suffix)
-
-        #if analyze=True, instantiate a MeasurementAnalysis object,
-        #which will contain the Flux_Detuning_Analysis class, that
-        #will analyze the data and produce nice plots.
-        if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)"""
-
-    def find_resonator_frequency(self, freqs=None, update=False, MC=None,
-                                 close_fig=True, fitting_model='hanger', **kw):
-        """
-        Finds the resonator frequency by performing a heterodyne experiment
-        if freqs == None it will determine a default range dependent on the
-        last known frequency of the resonator.
-        WARNING: Does not automatically update the RO resonator parameters.
-        Set update=True if you want this!
-        """
-
-        if not update:
-            logging.warning("Does not automatically update the RO "
-                            "resonator parameters. "
-                            "Set update=True if you want this!")
-        if freqs is None:
-            if self.f_RO_resonator() != 0 and self.Q_RO_resonator() != 0:
-                fmin = self.f_RO_resonator()*(1-10/self.Q_RO_resonator())
-                fmax = self.f_RO_resonator()*(1+10/self.Q_RO_resonator())
-                freqs = np.linspace(fmin, fmax, 100)
-            else:
-                raise ValueError("Unspecified frequencies for find_resonator_"
-                                 "frequency and no previous value exists")
-
-        if np.any(freqs<500e6):
-            logging.warning(('Some of the values in the freqs array might be '
-                             'too small. The units should be Hz.'))
-
-        if MC is None:
-            MC = self.MC
-
-        self.measure_resonator_spectroscopy(freqs, MC, analyze=False)
-        label = 'resonator_scan' + self.msmt_suffix
-        HA = ma.Homodyne_Analysis(qb_name=self.name,
-                                  label=label, close_fig=close_fig,
-                                  fitting_model=fitting_model,**kw)
-        f0 = HA.fit_res.params['f0'].value
-        df0 = HA.fit_res.params['f0'].stderr
-        Q = HA.fit_res.params['Q'].value
-        dQ = HA.fit_res.params['Q'].stderr
-        if f0 > max(freqs) or f0 < min(freqs):
-            logging.warning('extracted frequency outside of range of scan')
-        elif df0 > f0:
-            logging.warning('resonator frequency uncertainty greater than '
-                            'value')
-        elif dQ > Q:
-            logging.warning('resonator Q factor uncertainty greater than '
-                            'value')
-        elif update:  # don't update if there was trouble
-            self.f_RO_resonator(f0)
-            self.Q_RO_resonator(Q)
-            self.heterodyne.frequency(f0)
-        return f0
-
-    def find_homodyne_acqusition_delay(self, delays=None, update=False, MC=None,
-                                         close_fig=True):
-        """
-        Finds the acquisition delay for a homodyne experiment that corresponds
-        to maximal signal strength.
-        WARNING: Does not automatically update the qubit acquisition delay.
-        Set update=True if you want this!
-        """
-
-        if not update:
-            logging.warning("Does not automatically update the qubit "
-                            "acquisition delay. "
-                            "Set update=True if you want this!")
-
-        if delays is None:
-            delays = np.linspace(0,1e-6,100)
-
-        if MC is None:
-            MC = self.MC
-
-        self.measure_homodyne_acqusition_delay(delays, MC, analyze=False)
-
-        DA = ma.Acquisition_Delay_Analysis(label=self.msmt_suffix,
-                                           close_fig=close_fig)
-        d = DA.max_delay
-
-        if update:
-            self.optimal_acquisition_delay(d)
-            self.heterodyne.acquisition_delay(d)
-        return d
 
     def find_frequency(self, freqs, method='cw_spectroscopy', update=False,
                        trigger_separation=3e-6, RO_marker_length=5e-9,
@@ -2922,9 +2734,6 @@ class QuDev_transmon(Qubit):
             logging.warning(('Some of the values in the freqs array might be '
                              'too small. The units should be Hz.'))
 
-        if MC is None:
-            MC = self.MC
-
         if freqs is None:
             f_span = kw.get('f_span', 100e6)
             f_mean = kw.get('f_mean', self.f_qubit())
@@ -2946,34 +2755,31 @@ class QuDev_transmon(Qubit):
 
             self.measure_qubit_spectroscopy(freqs, pulsed=False,
                                       trigger_separation=trigger_separation,
-                                      RO_marker_length=RO_marker_length,
-                                      MC=MC, label=label,
-                                      close_fig=close_fig)
+                                      label=label, close_fig=close_fig)
         else:
             if label is None:
                 label = 'pulsed_spec' + self.msmt_suffix
             if analyze_ef:
                 label = 'high_power_' + label
 
-            self.measure_qubit_spectroscopy(freqs, pulsed=True, MC=MC, label=label,
+            self.measure_qubit_spectroscopy(freqs, pulsed=True, label=label,
                                       close_fig=close_fig, upload=upload)
 
 
         if analyze:
-            amp_only = hasattr(self.heterodyne, 'RF')
             SpecA = ma.Qubit_Spectroscopy_Analysis(
                 qb_name=self.name,
                 analyze_ef=analyze_ef,
                 label=label,
-                close_fig=close_fig,**kw)
+                close_fig=close_fig, **kw)
 
             f0 = SpecA.fitted_freq
             if update:
                 if not analyze_ef:
-                    self.f_qubit(f0)
+                    self.ge_freq(f0)
                 else:
                     f0_ef = 2*SpecA.fitted_freq_gf_over_2 - f0
-                    self.f_ef_qubit(f0_ef)
+                    self.ef_freq(f0_ef)
             if analyze_ef:
                 return f0, f0_ef
             else:
@@ -3103,7 +2909,15 @@ class QuDev_transmon(Qubit):
             label += self.msmt_suffix
 
         #Perform Rabi
-        if for_ef is False:
+        if for_ef:
+            print("cal points {}".format(no_cal_points))
+            self.measure_rabi_2nd_exc(amps=rabi_amps, n=n,
+                                      close_fig=close_fig, label=label,
+                                      cal_points=cal_points,
+                                      last_ge_pulse=last_ge_pulse,
+                                      no_cal_points=no_cal_points,
+                                      upload=upload)
+        else:
             self.measure_rabi(amps=rabi_amps, n=n,
                               close_fig=close_fig,
                               label=label,
@@ -3111,14 +2925,6 @@ class QuDev_transmon(Qubit):
                               no_cal_points=no_cal_points,
                               active_reset=active_reset,
                               upload=upload)
-        else:
-            print("cal points {}".format(no_cal_points))
-            self.measure_rabi_2nd_exc(amps=rabi_amps, n=n, MC=MC,
-                                      close_fig=close_fig, label=label,
-                                      cal_points=cal_points,
-                                      last_ge_pulse=last_ge_pulse,
-                                      no_cal_points=no_cal_points,
-                                      upload=upload)
 
         #get pi and pi/2 amplitudes from the analysis results
         if analyze:
@@ -3126,12 +2932,12 @@ class QuDev_transmon(Qubit):
             if update:
                 amp180 = rabi_ana.proc_data_dict['analysis_params_dict'][
                     self.name]['piPulse']
-                if for_ef is False:
-                    self.amp180(amp180)
-                    self.amp90_scale(0.5)
+                if not for_ef:
+                    self.ge_amp180(amp180)
+                    self.ge_amp90_scale(0.5)
                 else:
-                    self.amp180_ef(amp180)
-                    self.amp90_scale_ef(0.5)
+                    self.ef_amp180(amp180)
+                    self.ef_amp90_scale(0.5)
 
         return
 
@@ -3212,7 +3018,7 @@ class QuDev_transmon(Qubit):
             no_cal_points = 0
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if label is None:
             if for_ef:
@@ -3289,7 +3095,7 @@ class QuDev_transmon(Qubit):
                                                   every_other))])
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if nr_cliffords is None:
             raise ValueError("Unspecified nr_cliffords")
@@ -3306,8 +3112,8 @@ class QuDev_transmon(Qubit):
                         + self.msmt_suffix
 
         if thresholded:
-            if self.UHFQC.get('quex_thres_{}_level'.format(
-                    self.RO_acq_weight_function_I())) == 0.0:
+            if self.instr_uhf.get_instr().get('quex_thres_{}_level'.format(
+                    self.acq_weights_I())) == 0.0:
                 raise ValueError('The threshold value is not set.')
 
         #Perform measurement
@@ -3418,7 +3224,7 @@ class QuDev_transmon(Qubit):
             no_cal_points = 0
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if label is None:
             if for_ef:
@@ -3536,7 +3342,7 @@ class QuDev_transmon(Qubit):
             if update:
                 if for_ef:
                     try:
-                        self.f_ef_qubit(new_qubit_freq)
+                        self.ef_freq(new_qubit_freq)
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
@@ -3547,7 +3353,7 @@ class QuDev_transmon(Qubit):
                                         'updated.'%e)
                 else:
                     try:
-                        self.f_qubit(new_qubit_freq)
+                        self.ge_freq(new_qubit_freq)
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
@@ -3621,7 +3427,7 @@ class QuDev_transmon(Qubit):
             no_cal_points = 0
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if label is None:
             if for_ef:
@@ -3778,7 +3584,7 @@ class QuDev_transmon(Qubit):
             no_cal_points = 0
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if label is None:
             if for_ef:
@@ -3817,9 +3623,9 @@ class QuDev_transmon(Qubit):
                 qscale = qscale_ana.proc_data_dict['analysis_params_dict'][
                     self.name]['qscale']
                 if for_ef:
-                    self.motzoi_ef(qscale)
+                    self.ef_motzoi(qscale)
                 else:
-                    self.motzoi(qscale)
+                    self.ge_motzoi(qscale)
 
         return
 
@@ -3919,7 +3725,7 @@ class QuDev_transmon(Qubit):
             logging.warning('Some of the values in the freqs array might be '
                             'too small. The units should be Hz.')
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         levels = ('g', 'e', 'f') if qutrit else ('g', 'e')
 
@@ -3981,7 +3787,7 @@ class QuDev_transmon(Qubit):
 
             if update:
                 # FIXME Nathan: update parameters accordingly
-                self.f_RO(SA.f_RO if not qutrit else fmax)
+                self.ro_freq(SA.f_RO if not qutrit else fmax)
                 self.chi(SA.chi)
                 self.f_RO_resonator(SA.f_RO_res)
                 self.f_RO_purcell(SA.f_PF)
@@ -3989,20 +3795,21 @@ class QuDev_transmon(Qubit):
                 self.RO_J_coupling(SA.J_)
                 if kw.pop('get_CLEAR_params', False):
                     if self.ro_CLEAR_segment_length is None:
-                        self.ro_CLEAR_segment_length = self.RO_pulse_length/10
+                        self.ro_CLEAR_segment_length = self.ro_length/10
                     if kw.get('max_amp_difference', False) :
                         '''this gives the ratio of the maximal hight for'''
                         '''the segments to the base amplitude'''
                         max_diff = kw.pop('max_amp_difference')
                     else:
                         max_diff = 3
-                    self.ro_CLEAR_delta_amp_segment = sim_CLEAR.get_CLEAR_amplitudes(
-                        self.f_RO_purcell, self.f_RO_resonator,self.f_RO,
-                        self.RO_purcell_kappa, self.RO_J_coupling, self.chi, 1,
-                        self.RO_pulse_length,
-                        length_segments=self.ro_CLEAR_segment_length,
-                        sigma=self.ro_pulse_filter_sigma,
-                        max_amp_diff=max_diff) * self.RO_amp
+                    self.ro_CLEAR_delta_amp_segment = \
+                        sim_CLEAR.get_CLEAR_amplitudes(
+                            self.f_RO_purcell, self.f_RO_resonator,
+                            self.ro_freq, self.RO_purcell_kappa,
+                            self.RO_J_coupling, self.chi, 1, self.ro_length,
+                            length_segments=self.ro_CLEAR_segment_length,
+                            sigma=self.ro_sigma,
+                            max_amp_diff=max_diff) * self.ro_amp
 
 
     def measure_dispersive_shift(self, freqs, MC=None, analyze=True, close_fig=True, upload=True):
@@ -4016,7 +3823,7 @@ class QuDev_transmon(Qubit):
                             'too small. The units should be Hz.'))
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         self.prepare_for_continuous_wave()
 
@@ -4026,7 +3833,7 @@ class QuDev_transmon(Qubit):
                             pulse_comb=pulse_comb, preselection=False)
             MC.set_sweep_function(awg_swf.Resonator_spectroscopy(
                 RO_MWG=self.readout_UC_LO,
-                RO_IF=self.f_RO_mod(),
+                RO_IF=self.ro_mod_freq(),
                 RO_channel=self.RO_acq_marker_channel(),
                 upload=False))
             MC.set_sweep_points(freqs)
@@ -4069,7 +3876,7 @@ class QuDev_transmon(Qubit):
             fitted_delay: float, only returned, if analyze is True.
         """
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         channel = self.flux_pulse_channel()
 
@@ -4085,7 +3892,7 @@ class QuDev_transmon(Qubit):
         if delays is None:
             delays = np.linspace(-100e-9, pulse_length + 100e-9, 40, endpoint=False)
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         detector_fun = self.int_avg_det
 
@@ -4154,7 +3961,7 @@ class QuDev_transmon(Qubit):
         """
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         channel = self.flux_pulse_channel()
         clock_rate = MC.station.pulsar.clock(channel)
@@ -4177,7 +3984,7 @@ class QuDev_transmon(Qubit):
             ampls = np.linspace(0, 1, 21)
             ampls_flag = True
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
         detector_fun = self.int_avg_det
 
         s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(
@@ -4292,7 +4099,7 @@ class QuDev_transmon(Qubit):
         """
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
         if flux_pulse_amp is None:
             flux_pulse_amp = self.flux_pulse_amp()
@@ -4379,7 +4186,7 @@ class QuDev_transmon(Qubit):
                                     the control qubit in the excited state is returned)
             upload_AWGs (list): list of the AWGs to be uploaded
             upload_channels (list): list of channels to be uploaded
-            prepare_for_timedomain (bool): if False, the self.prepare_for_timedomain()
+            prepare_for_timedomain (bool): if False, the self.prepare(drive='timedomain')
                                            is NOT called
 
         Returns:
@@ -4391,7 +4198,7 @@ class QuDev_transmon(Qubit):
                             'dimension.')
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
         if phases is None:
             phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
             phases = np.concatenate((phases,phases))
@@ -4417,8 +4224,8 @@ class QuDev_transmon(Qubit):
                                                    sweep_mode='amplitude',
                                                    upload=upload)
             if prepare_for_timedomain:
-                qb_target.prepare_for_timedomain()
-                self.prepare_for_timedomain()
+                qb_target.prepare(drive='timedomain')
+                self.prepare(drive='timedomain')
 
             MC.set_sweep_function(s1)
             MC.set_sweep_points(phases)
@@ -4506,9 +4313,9 @@ class QuDev_transmon(Qubit):
             self.flux_pulse_delay(pulse_delay)
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         s1 = awg_swf.Fluxpulse_scope_swf(self)
         s2 = awg_swf.Fluxpulse_scope_drive_freq_sweep(self)
@@ -4528,9 +4335,9 @@ class QuDev_transmon(Qubit):
             spacing=30e-9, MC=None):
 
         if MC is None:
-            MC = self.MC
+            MC = self.instr_mc.get_instr()
 
-        self.prepare_for_timedomain()
+        self.prepare(drive='timedomain')
 
         if cal_points:
             step = np.abs(delays[-1] - delays[-2])
