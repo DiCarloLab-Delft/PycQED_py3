@@ -934,9 +934,21 @@ class Initial_VNA_Analysis(ba.BaseDataAnalysis):
         dip_freq.append(freqs[dip_ind])
         dip_idx.append(dip_ind)
 
+      # Sometimes duplicates occur. This should remove them
 
-      self.peaks = dip_freq
-      self.peaks_idx = dip_idx
+      final_freqs = []
+      for freq in dip_freq:
+        if freq not in final_freqs:
+          final_freqs.append(freq)
+
+      final_idx = []
+      for idx in dip_idx:
+        if idx not in final_idx:
+          final_idx.append(idx)
+
+
+      self.peaks = final_freqs
+      self.peaks_idx = final_idx
       self.plot_fit_result()
 
     def plot_fit_result(self, normalize=False,
@@ -948,15 +960,6 @@ class Initial_VNA_Analysis(ba.BaseDataAnalysis):
       fig, ax = plt.subplots(figsize=figsize)
 
       savename = 'Found Peaks'
-
-      # if "xlabel" not in kw:
-      #   kw["xlabel"] = self.parameter_names[0]
-      # if "ylabel" not in kw:
-      #   kw["ylabel"] = self.parameter_names[1]
-      # if "xunit" not in kw:
-      #   kw["xunit"] = self.parameter_units[0]
-      # if "yunit" not in kw:
-      #   kw["yunit"] = self.parameter_units[1]
 
       ax.plot(self.raw_data_dict['freq'][0], self.raw_data_dict['amp'][0], marker='o')
       ax.plot(self.peaks, peak_height, marker='o', linestyle='', color='r')

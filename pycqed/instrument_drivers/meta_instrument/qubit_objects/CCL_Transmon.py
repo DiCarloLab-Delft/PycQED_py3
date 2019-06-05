@@ -1198,7 +1198,7 @@ class CCLight_Transmon(Qubit):
 
         if update:
             fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
-                                                      close_figig=True)
+                                                      close_fig=True)
             shift = fit_res.results[0]
             power = fit_res.results[1]
 
@@ -1237,9 +1237,9 @@ class CCLight_Transmon(Qubit):
         for i, dac_value in enumerate(dac_values):
             self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()](dac_value)
             if i == 0:
-              self.find_frequency(freqs=freqs)
+              self.find_frequency(freqs=freqs, update=True)
             else:
-              self.find_frequency(f_span=200e6)
+              self.find_frequency(update=True)
 
         t_end = time.time()
         t_end = time.strftime('%Y%m%d_%H%M%S')
