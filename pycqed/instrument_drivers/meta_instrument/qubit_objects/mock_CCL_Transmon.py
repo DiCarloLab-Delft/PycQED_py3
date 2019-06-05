@@ -5,11 +5,12 @@ import logging
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis import analysis_toolbox as antools
 from pycqed.analysis_v2 import measurement_analysis as ma2
+from pycqed.analysis_v2 import spectroscopy_analysis as sa2
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object import Qubit
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
-
 from autodepgraph import AutoDepGraph_DAG
 
 
@@ -41,6 +42,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         self.add_parameter('mock_freq_res', label='resonator frequency', unit='Hz',
                            parameter_class=ManualParameter, initial_value=7.487628e9)
+
+        self.add_parameter('mock_freq_test_res', label='test resonator frequency',
+                            unit='Hz', parameter_class=ManualParameter,
+                            initial_value=7.76459e9)
 
         self.add_parameter('mock_ro_pulse_amp_CW', label='Readout pulse amplitude',
                            unit='Hz', parameter_class=ManualParameter,
@@ -112,6 +117,41 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_fl_dc_ch', label='most closely coupled fluxline',
                            unit='', initial_value='FBL_1', parameter_class=ManualParameter)    
     
+        self.add_parameter('resonator_freqs', unit='Hz', parameter_class=ManualParameter)
+        
+    def find_resonators_VNA(self, start_freq=7e9, stop_freq=8e9, power=-40,
+                            bandwidth=200, timeout=200, npts=14001, name=None):
+        VNA = self.instr_VNA.get_instr()
+        t_start_meas = ma.a_tools.current_timestamp()
+
+        VNA.start_frequency(start_freq)
+        VNA.stop_frequency(stop_freq)
+        VNA.power(power)
+        VNA.bandwidth(bandwidth)
+        VNA.npts(npts)
+        # VNA.timeout(timeout)
+
+        if name is None:
+            if not False:
+                name = 'Initial_VNA'
+            else:
+                name = 'VNA'
+
+        self.measure_with_VNA(VNA, name=name)
+
+        t_stop_meas = ma.a_tools.current_timestamp()
+        t_start = ma.a_tools.get_timestamps_in_range(t_start_meas,
+                                                     t_stop_meas, label=name)
+
+        if not False:
+            result = sa2.Initial_VNA_Analysis(label=name)
+
+            self.resonator_freqs(result.peaks)
+            print(self.resonator_freqs())
+
+            # self.done_VNA(True)
+        # ma2.VNA_analysis(t_start=t_start)
+
     def find_resonator_frequency_VNA(self, freqs=None, use_min=False, MC=None,
                                      update=True):
         '''
@@ -227,6 +267,60 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             self.spec_pow(best_spec_pow)
             print(self.spec_pow())
             return True
+
+    def measure_with_VNA(self, VNA, MC=None, name='Mock_VNA', analyze=True):
+        """
+        Returns a SlopedHangerFuncAmplitude shaped function
+        """
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        s = swf.None_Sweep(name='Frequency', parameter_name='Frequency',
+                           unit='Hz')
+        freqs = np.linspace(VNA.start_frequency(), VNA.stop_frequency(),
+                            VNA.npts())
+        f0_res = self.mock_freq_res()/1e9
+        f0_test = self.mock_freq_test_res()/1e9
+
+        Q_test = 346215
+        Qe_test = 368762
+        Q = 290000
+        Qe = 255000
+        A = 0.37
+        theta = -0.1
+        slope = 0
+        f = freqs
+        from pycqed.analysis import fitting_models as fm
+
+        A_res = np.abs((slope * (f / 1.e9 - f0_res) / f0_res) *
+                        fm.HangerFuncAmplitude(f, f0_res, Q, Qe, A, theta))
+        A_test = np.abs((slope * (f / 1.e9 - f0_test) / f0_test) *
+                        fm.HangerFuncAmplitude(f, f0_res, Q_test, Qe_test, A, theta))
+
+        A_res = abs(A * (1. - Q / Qe * np.exp(1.j * theta) / (1. + 2.j * Q * (f / 1.e9 - f0_res) / f0_res)))
+        A_test = abs(A * (1. - Q_test / Qe_test * np.exp(1.j * theta) / (1. + 2.j * Q_test * (f / 1.e9 - f0_test) / f0_test)))
+
+        baseline = 0.40
+        A_res -= A
+        A_test -= A
+        mocked_values = A + A_res + A_test
+
+        mocked_values += np.random.normal(0, A/250, np.size(mocked_values))
+
+        d = det.Mock_Detector(value_names=['ampl'], value_units=['V'],
+                              detector_control='soft', mock_values=mocked_values)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(freqs)
+        MC.set_detector_function(d)
+
+        MC.run(name + self.msmt_suffix)
+
+        if analyze:
+            ma2.Basic1DAnalysis()
+
+            
+            
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None, analyze=True,
                              close_fig=True, label='',

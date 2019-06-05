@@ -882,6 +882,91 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
           self.save_fig(fig, figname=savename, **kw)
 
 
+class Initial_VNA_Analysis(ba.BaseDataAnalysis):
+    def __init__(self,
+                 label='Initial_VNA',
+                 do_fitting=False,
+                 extract_only=False):
+      super().__init__(label=label,
+                     do_fitting=do_fitting,
+                     extract_only=extract_only)
+      self.params_dict = {'freq_label': 'sweep_name',
+                          'freq_unit': 'sweep_unit',
+                          'measurementstring': 'measurementstring',
+                          'freq': 'sweep_points',
+                          'amp': 'amp'}
+      self.numeric_params = ['freq', 'amp']
+
+      self.run_analysis()
+
+    def process_data(self):
+
+      freqs = self.raw_data_dict['freq']
+      data = self.raw_data_dict['amp']
+
+      freqs = freqs[0]
+      data = data[0]
+
+
+      peaks = a_tools.peak_finder(freqs, data,
+                                  percentile=85,
+                                  optimize=True)
+
+      dips_idx = [peaks['dips_idx']]
+      dips_idx = np.append(dips_idx, dips_idx[-1])
+
+
+      single_peak_idx = [dips_idx[0]]
+      for i in range(len(dips_idx)-1):
+        ind = dips_idx[i]
+        if np.abs(ind - dips_idx[i+1]) > 25:  # Other peak
+          single_peak_idx.append(dips_idx[i+1])
+
+
+
+      dip_freq = []
+      dip_idx = []
+      for ind in single_peak_idx:
+        ind_min = ind-30
+        ind_max = ind+30
+        # Find index of local minimum:
+        dip_ind = np.where(data == np.amin(data[ind_min:ind_max]))[0][0]
+        dip_freq.append(freqs[dip_ind])
+        dip_idx.append(dip_ind)
+
+
+      self.peaks = dip_freq
+      self.peaks_idx = dip_idx
+      self.plot_fit_result()
+
+    def plot_fit_result(self, normalize=False,
+                        save_fig=True, figsize=None, **kw):
+      peak_height = []
+      for ind in self.peaks_idx:
+        peak_height.append(self.raw_data_dict['amp'][0][ind])
+
+      fig, ax = plt.subplots(figsize=figsize)
+
+      savename = 'Found Peaks'
+
+      # if "xlabel" not in kw:
+      #   kw["xlabel"] = self.parameter_names[0]
+      # if "ylabel" not in kw:
+      #   kw["ylabel"] = self.parameter_names[1]
+      # if "xunit" not in kw:
+      #   kw["xunit"] = self.parameter_units[0]
+      # if "yunit" not in kw:
+      #   kw["yunit"] = self.parameter_units[1]
+
+      ax.plot(self.raw_data_dict['freq'][0], self.raw_data_dict['amp'][0], marker='o')
+      ax.plot(self.peaks, peak_height, marker='o', linestyle='', color='r')
+
+      if save_fig:
+
+        filepath = self.raw_data_dict.get('folder')[0]
+        fname = filepath + "/" + savename + '.png'
+        fig.savefig(fname)
+
 
 class ResonatorSpectroscopy(Spectroscopy):
     def __init__(self, t_start,

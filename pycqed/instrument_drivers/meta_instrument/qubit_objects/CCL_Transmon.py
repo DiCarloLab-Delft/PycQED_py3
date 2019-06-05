@@ -85,6 +85,10 @@ class CCLight_Transmon(Qubit):
                 'Instrument used to control flux can either be an IVVI rack '
                 'or a meta instrument such as the Flux control.'),
             parameter_class=InstrumentRefParameter)
+        
+        self.add_parameter('instr_VNA', 
+                           docstring='Vector Network Analyzer',
+                           parameter_class=InstrumentRefParameter)
         # LutMan's
         self.add_parameter('instr_LutMan_MW',
                            docstring='Lookuptable manager  for '
