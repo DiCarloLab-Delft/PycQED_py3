@@ -637,7 +637,7 @@ class Segment:
         start_gran = self.pulsar.get(
             '{}_element_start_granularity'.format(awg))
 
-        if start_gran != None:
+        if start_gran is not None:
             t_start_awg = math.floor(t_start / start_gran) * start_gran
             # add the number of samples the element gets larger when changing
             # t_start
