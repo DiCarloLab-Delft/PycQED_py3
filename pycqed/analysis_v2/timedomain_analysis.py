@@ -238,6 +238,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 for qbn in self.qb_names:
                     self.channel_map[qbn] = value_names
 
+        if len(self.channel_map) == 0:
+            raise ValueError('No qubit RO channels have been found.')
+
     def process_data(self):
         """
         This takes care of rotating and normalizing the data if required.
@@ -672,8 +675,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             self, fig_name, data, qb_name,
             title_suffix='', plot_cal_points=True,
             plot_name_suffix='', data_label='Data', data_axis_label=''):
-        print(fig_name)
-        print(plot_name_suffix)
         title_suffix = qb_name + title_suffix
         if data_axis_label == '':
             data_axis_label = '{} state population'.format(
@@ -4257,9 +4258,9 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             lines_errs = np.array([fr.params['c'].stderr for fr in fit_res_objs])
             lines_errs[lines_errs == None] = 0.0
 
-            leakage = np.abs(lines[0::2] - lines[1::2])#/np.abs(lines[1::2])
+            leakage = lines[0::2] - lines[1::2]#/np.abs(lines[1::2])
             x = lines[1::2] - lines[0::2]
-            x_err = np.array(lines_errs[0::2]**2 + lines_errs[1::2]**2,
+            x_err = np.array(np.sqrt(lines_errs[0::2]**2 + lines_errs[1::2]**2),
                              dtype=np.float64)
             y = lines[1::2]
             y_err = lines_errs[1::2]
