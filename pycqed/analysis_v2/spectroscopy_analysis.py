@@ -337,15 +337,15 @@ class VNA_analysis(complex_spectroscopy):
         Qe = self.fit_dicts['reso_fit']['fit_res'].params['Qe']
         theta = self.fit_dicts['reso_fit']['fit_res'].params['theta']
 
-        Qc = 1/np.real(1/(Qe.value*np.exp(1j*theta.value)))
-        Qi = 1/(1/Q.value - 1/Qc)
+        Qc = 1/np.real(1/(Qe*np.exp(1j*theta)))
+        Qi = 1/(1/Q - 1/Qc)
 
-        msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.stderr/1e6)
-        msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.stderr/1e3)
+        msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq/1e6,freq.stderr/1e6)
+        msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q/1e3,Q.stderr/1e3)
         msg += '\n'
         msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
         msg += '\n'
-        msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+        msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe/1e3)
         msg += '\n'
         msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
 
@@ -882,6 +882,94 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
           self.save_fig(fig, figname=savename, **kw)
 
 
+class Initial_VNA_Analysis(ba.BaseDataAnalysis):
+    def __init__(self,
+                 label='Initial_VNA',
+                 do_fitting=False,
+                 extract_only=False):
+      super().__init__(label=label,
+                     do_fitting=do_fitting,
+                     extract_only=extract_only)
+      self.params_dict = {'freq_label': 'sweep_name',
+                          'freq_unit': 'sweep_unit',
+                          'measurementstring': 'measurementstring',
+                          'freq': 'sweep_points',
+                          'amp': 'amp'}
+      self.numeric_params = ['freq', 'amp']
+
+      self.run_analysis()
+
+    def process_data(self):
+
+      freqs = self.raw_data_dict['freq']
+      data = self.raw_data_dict['amp']
+
+      freqs = freqs[0]
+      data = data[0]
+
+
+      peaks = a_tools.peak_finder(freqs, data,
+                                  percentile=85,
+                                  optimize=True)
+
+      dips_idx = [peaks['dips_idx']]
+      dips_idx = np.append(dips_idx, dips_idx[-1])
+
+
+      single_peak_idx = [dips_idx[0]]
+      for i in range(len(dips_idx)-1):
+        ind = dips_idx[i]
+        if np.abs(ind - dips_idx[i+1]) > 25:  # Other peak
+          single_peak_idx.append(dips_idx[i+1])
+
+
+
+      dip_freq = []
+      dip_idx = []
+      for ind in single_peak_idx:
+        ind_min = ind-30
+        ind_max = ind+30
+        # Find index of local minimum:
+        dip_ind = np.where(data == np.amin(data[ind_min:ind_max]))[0][0]
+        dip_freq.append(freqs[dip_ind])
+        dip_idx.append(dip_ind)
+
+      # Sometimes duplicates occur. This should remove them
+
+      final_freqs = []
+      for freq in dip_freq:
+        if freq not in final_freqs:
+          final_freqs.append(freq)
+
+      final_idx = []
+      for idx in dip_idx:
+        if idx not in final_idx:
+          final_idx.append(idx)
+
+
+      self.peaks = final_freqs
+      self.peaks_idx = final_idx
+      self.plot_fit_result()
+
+    def plot_fit_result(self, normalize=False,
+                        save_fig=True, figsize=None, **kw):
+      peak_height = []
+      for ind in self.peaks_idx:
+        peak_height.append(self.raw_data_dict['amp'][0][ind])
+
+      fig, ax = plt.subplots(figsize=figsize)
+
+      savename = 'Found Peaks'
+
+      ax.plot(self.raw_data_dict['freq'][0], self.raw_data_dict['amp'][0], marker='o')
+      ax.plot(self.peaks, peak_height, marker='o', linestyle='', color='r')
+
+      if save_fig:
+
+        filepath = self.raw_data_dict.get('folder')[0]
+        fname = filepath + "/" + savename + '.png'
+        fig.savefig(fname)
+
 
 class ResonatorSpectroscopy(Spectroscopy):
     def __init__(self, t_start,
@@ -1092,3 +1180,67 @@ class ResonatorDacSweep(ResonatorSpectroscopy):
                 [[tt] for tt in self.raw_data_dict['phase']])
             self.plot_amp = np.array(
                 [np.array([tt]).transpose() for tt in self.raw_data_dict['amp']])
+
+
+class SpecPowAnalysis(ba.BaseDataAnalysis):
+  '''
+  Finds the optimal spectroscopy power for the 01 transition from a series of 
+  measurements by finding the power where the ratio of the peak amplitude and
+  width is maximal.
+  
+  DOES NOT YIELD ACCURATE RESULTS YET
+  TODO: Could be done with less datapoints and some interpolation.
+  '''
+  def __init__(self, t_start: str=None, t_stop: str=None,
+               label: str='spectroscopy',
+               pow_key='Instrument settings.Q.spec_pow',
+               frequency_key='Analysis.Fitted Params HM.f0',
+               width_key='Analysis.Fitted Params HM.kappa',
+               amp_key='Analysis.Fitted Params HM.A',
+               do_fitting=True,
+               extract_only: bool=False):
+
+    super().__init__(t_start=t_start, t_stop=t_stop, 
+                     label=label,
+                     do_fitting=do_fitting, 
+                     extract_only=extract_only)
+
+    self.params_dict = {'power': pow_key,
+                        'qfreq': frequency_key,
+                        'width': width_key,
+                        'amp': amp_key,
+                        'measurementstring': 'measurementstring'}
+
+    self.numeric_params = ['power', 'qfreq', 'width', 'amp']
+
+    self.run_analysis()
+
+    w = self.raw_data_dict['width']
+    A = self.raw_data_dict['amp']
+    print(w)
+    print(A)
+    powers = self.raw_data_dict['power']
+    Awratio = np.divide(A, w)
+    print(Awratio)
+    ind = np.argmax(Awratio)
+    best_spec_pow = powers[ind]
+    print('index: ' + str(ind) + '; power: ' + str(best_spec_pow))
+    self.fit_res = {}
+    self.fit_res['ratio'] = Awratio
+    self.fit_res['spec_pow'] = best_spec_pow
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['power'],
+            'xlabel': 'TESTING',
+            'xunit': 'dBm',
+            'yvals': self.fit_res['ratio'],
+            'ylabel': 'A/w',
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'linestyle': '',
+            'marker': 'o',
+            'setlabel': 'data',
+            'color': 'C0',
+        }
