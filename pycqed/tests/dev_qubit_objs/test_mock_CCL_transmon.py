@@ -125,17 +125,13 @@ class Test_Mock_CCL(unittest.TestCase):
         threshold = 0.01
         self.CCL_qubit.calibrate_mw_pulse_amplitude_coarse()
 
-        if self.cfg_with_vsm():
+        if self.CCL_qubit.cfg_with_vsm():
             assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_vsm_G_amp() + threshold
             assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_vsm_G_amp() - threshold
         else:
             assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_channel_amp() + threshold
             assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_channel_amp() - threshold
 
-    # def test_some_demo_for_timo(self):
-    #     assert 3 ==4.2
-
-        #assert self.CCL_qubit.mw_amp180 == self.CCL_qubit.mock_mw_amp180()
     def test_ramsey(self):
         self.CCL_qubit.mock_T2_star(23e-6)
 
