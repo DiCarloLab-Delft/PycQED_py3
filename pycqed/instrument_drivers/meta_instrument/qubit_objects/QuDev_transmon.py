@@ -179,7 +179,7 @@ class QuDev_transmon(Qubit):
         self.add_parameter('acq_weights_Q', vals=vals.Arrays(),
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
-        self.add_parameter('acq_weight_type', initial_value='SSB',
+        self.add_parameter('acq_weights_type', initial_value='SSB',
                            vals=vals.Enum('SSB', 'DSB', 'optimal',
                                           'square_rot', 'manual'),
                            docstring=(
@@ -272,7 +272,7 @@ class QuDev_transmon(Qubit):
         self.add_pulse_parameter('Spec', 'spec_marker_length', 'length',
                                  initial_value=5e-6, vals=vals.Numbers())
         self.add_pulse_parameter('Spec', 'spec_marker_delay', 'pulse_delay', 
-                                 vals=vals.Numbers(), initial_value=None)
+                                 vals=vals.Numbers(), initial_value=0)
 
         # dc flux parameters
         self.add_parameter('dc_flux_parameter', initial_value=None,
@@ -284,7 +284,7 @@ class QuDev_transmon(Qubit):
 
     def update_detector_functions(self):
         if self.acq_Q_channel() is None or \
-           self.acq_weight_type() not in ['SSB', 'DSB']:
+           self.acq_weights_type() not in ['SSB', 'DSB']:
             channels = [self.acq_I_channel()]
         else:
             channels = [self.acq_I_channel(),
@@ -384,7 +384,7 @@ class QuDev_transmon(Qubit):
 
     def set_readout_weights(self, type=None, f_mod=None):
         if type is None:
-            type = self.acq_weight_type()
+            type = self.acq_weights_type()
         if f_mod is None:
             f_mod = self.ro_mod_freq()
         if type == 'manual':
@@ -451,7 +451,7 @@ class QuDev_transmon(Qubit):
         if operation_dict is None:
             operation_dict = {}
         operation_dict = super().get_operation_dict(operation_dict)
-        operation_dict['Spec ' + self.name]['operation_type'] = 'MW'
+        operation_dict['Spec ' + self.name]['operation_type'] = 'Other'
         operation_dict['RO ' + self.name]['operation_type'] = 'RO'
         operation_dict['X180 ' + self.name]['operation_type'] = 'MW'
         operation_dict['X180_ef ' + self.name]['operation_type'] = 'MW'
@@ -545,7 +545,8 @@ class QuDev_transmon(Qubit):
                     label = 'pulsed_spec' + self.msmt_suffix
             self.prepare(drive='pulsed_spec')
             if upload:
-                sq.pulse_list_list_seq([[self.get_ro_pars()]])
+                sq.pulse_list_list_seq([[self.get_spec_pars(),
+                                         self.get_ro_pars()]])
         else:
             if label is None:
                 if sweep_function_2D is not None:
@@ -554,8 +555,7 @@ class QuDev_transmon(Qubit):
                     label = 'continuous_spec' + self.msmt_suffix
             self.prepare(drive='continuous_spec')
             if upload:
-                sq.pulse_list_list_seq([[self.get_spec_pars(), 
-                                         self.get_ro_pars()]])
+                sq.pulse_list_list_seq([[self.get_ro_pars()]])
         
         MC = self.instr_mc.get_instr()
         MC.set_sweep_function(self.instr_ge_lo.get_instr().frequency)

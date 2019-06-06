@@ -33,71 +33,41 @@ def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1,
         amps:            array of pulse amplitudes (V)
         pulse_pars:      dict containing the pulse parameters
         RO_pars:         dict containing the RO parameters
-        active_reset:    boolean flag specifying if active reset is used
         n:               number of pulses (1 is conventional Rabi)
         post_msmt_delay: extra wait time for resetless compatibility
         cal_points:      whether to use calibration points or not
         upload:          whether to upload sequence to instrument or not
     '''
-
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name)
     seg_list = []
-    pulse_list_with_ar = []
     pulses_unmodified = get_pulse_dict_from_pars(pulse_pars)
+    # FIXME: Nathan 2019.05.07: I believe next line is useless since deepcopy is already done
+    # in get_pulse_dict_from_pars()
     pulses = deepcopy(pulses_unmodified)
-
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         if cal_points and no_cal_points==4 and \
                 (i == (len(amps)-4) or i == (len(amps)-3)):
-            pulse_list = [pulses_unmodified['I'], RO_pars]
+            seg = segment.Segment('segment_{}'.format(i), 
+                [pulses_unmodified['I'], RO_pars])
         elif cal_points and no_cal_points==4 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-            pulse_list = [pulses_unmodified['X180'], RO_pars]
+            seg = segment.Segment('segment_{}'.format(i), 
+                [pulses_unmodified['X180'], RO_pars])
         elif cal_points and no_cal_points==2 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-            pulse_list = [pulses_unmodified['I'], RO_pars]
+            seg = segment.Segment('segment_{}'.format(i), 
+                [pulses_unmodified['I'], RO_pars])
         else:
             pulses['X180']['amplitude'] = amp
             pulse_list = n*[pulses['X180']]+[RO_pars]
 
-            # # copy first element and set extra wait
-            # pulse_list[0] = deepcopy(pulse_list[0])
-            # pulse_list[0]['pulse_delay'] += post_msmt_delay
-        
-        
-
-        if active_reset:
-            # make sure drive pulses ar put into distinct elements
-            for pulse in pulse_list:
-                pulse['element_name'] = 'drive_element_{}'.format(i)
-                pulse['pulse_delay'] = 50e-9
-            
-            ar_pars_list = [deepcopy(pulses_unmodified['I']),
-                            # deepcopy(pulses_unmodified['I'])]
-                            deepcopy(pulses_unmodified['X180'])]
-
-            ar_pars_list[0]['pulse_delay'] = 69*(16/1.2e9)
-            # want both I and X180 to happen at the same time
-            ar_pars_list[1]['ref_point'] = 'start'
-            ar_pars_list[1]['pulse_delay'] = 0
-            
-            for j in range(2):
-                # map I to 0 and X180 to 1
-                ar_pars_list[j]['codeword'] = j
-                ar_pars_list[j]['element_name'] = 'reset_element_{}'.format(i)
-                # set dealy for reset pulses
-            pulse_list_with_ar += deepcopy(pulse_list) + ar_pars_list
-        else:
-            for pulse in pulse_list:
-                pulse['element_name'] = 'drive_element'
+            # copy first element and set extra wait
+            pulse_list[0] = deepcopy(pulse_list[0])
+            pulse_list[0]['pulse_delay'] += post_msmt_delay
 
             seg = segment.Segment('segment_{}'.format(i), pulse_list)
-            seg_list.append(seg)
-            seq.add(seg)
 
-    if active_reset:
-        seg = segment.Segment('segment', pulse_list_with_ar)
         seg_list.append(seg)
         seq.add(seg)
 
@@ -105,7 +75,7 @@ def Rabi_seq(amps, pulse_pars, RO_pars, active_reset=False, n=1,
         ps.Pulsar.get_instance().program_awgs(seq)
 
     if return_seq:
-        return seq, seg_list
+        return seq, el_list
     else:
         return seq
 
