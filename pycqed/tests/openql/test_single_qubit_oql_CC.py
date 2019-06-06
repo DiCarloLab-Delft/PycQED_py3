@@ -8,6 +8,7 @@
 
 """
 import os
+import pytest
 from openql import openql as ql
 import test_single_qubit_oql as parent  # rename to stop pytest from running tests directly
 

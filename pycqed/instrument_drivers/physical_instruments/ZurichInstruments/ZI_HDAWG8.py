@@ -336,7 +336,7 @@ class ZI_HDAWG8(ZI_HDAWG_core):
         # FIXME: cleanup
         # Activate the new DIO triggering functionality where the instrument does not specifically use
         # the flanks of the toggle signal  signal for sampling the DIO values, but an internally generated
-        # counter locked to the expected period of the toggle signal (in 300 MHz cyclees) and the first edge
+        # counter locked to the expected period of the toggle signal (in 300 MHz cycles) and the first edge
         # of the toggle signal
         TOGGLE_PERIOD = 12
         self._dev.seti('awgs/*/dio/strobe/width', 0)

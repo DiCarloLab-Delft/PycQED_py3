@@ -27,10 +27,6 @@ class QuTechCC_core(SCPIBase):
                  transport: Transport):
         super().__init__(name, transport)
 
-        # self.get_idn()
-        # self._add_parameters()
-        # self.connect_message()
-
     def sequence_program(self, program_string: str) -> None:
         """
         upload sequence program string
@@ -42,9 +38,11 @@ class QuTechCC_core(SCPIBase):
     # FIXME: add function to get assembly errors
 
     def set_q1_reg(self, ccio: int, reg: int, val: int) -> None:
+        # only possible if CC is stopped
         self._transport.write('QUTech:CCIO{}:Q1REG{} {}'.format(ccio, reg, val))
 
     def get_q1_reg(self, ccio: int, reg: int) -> int:
+        # only possible if CC is stopped
         return self._transport.ask_int('QUTech:CCIO{}:Q1REG{}'.format(ccio, reg))
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_39_ps_steps: int) -> None:
