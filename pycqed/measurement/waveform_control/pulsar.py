@@ -237,7 +237,8 @@ class UHFQCPulsar:
                     pass 
 
                 if name_ch1 is not None or name_ch2 is not None:
-                    main_loop += self._UHFQC_element_seqc(name_ch1, name_ch2, 'RO' in el_info)
+                    main_loop += self._UHFQC_element_seqc(name_ch1, name_ch2,
+                                                          'RO' in el_info)
 
         awg_str = header + main_loop + footer
 

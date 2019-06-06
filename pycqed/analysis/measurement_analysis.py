@@ -37,7 +37,6 @@ from scipy.constants import *
 from copy import deepcopy
 from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
-from math import floor
 from pycqed.measurement import optimization as opt
 try:
     from pycqed.analysis import machine_learning_toolbox as mlt
@@ -57,7 +56,6 @@ from pycqed.analysis import composite_analysis as ca
 
 try:
     import qutip as qtp
-
 except ImportError as e:
     if str(e).find('qutip') >= 0:
         logging.warning('Could not import qutip')
@@ -573,7 +571,7 @@ class MeasurementAnalysis(object):
                     cmap_chosen=self.cmap_chosen,
                     **kw)
 
-                ax.set_title(self.zlabels[i], y=1.05, size=self.font_size)
+                ax.set_title(self.zlabels[i], size=self.font_size)
                 ax.xaxis.label.set_size(self.font_size)
                 ax.yaxis.label.set_size(self.font_size)
                 ax.tick_params(labelsize=self.font_size,
@@ -582,20 +580,21 @@ class MeasurementAnalysis(object):
                 cbar.ax.tick_params(labelsize=self.font_size,
                                     length=self.tick_length,
                                     width=self.tick_width)
+                if i == 0:
+                    plot_title = '{measurement}\n{timestamp}'.format(
+                        timestamp=self.timestamp_string,
+                        measurement=self.measurementstring)
+                    fig.text(0.5, 1.1, plot_title, fontsize=self.font_size,
+                             horizontalalignment='center',
+                             verticalalignment='bottom',
+                             transform=ax.transAxes)
 
             fig.subplots_adjust(hspace=1.5)
 
             # Make space for title
             # fig.tight_layout(h_pad=1.5)
             # fig.subplots_adjust(top=3.0)
-            plot_title = '{measurement}\n{timestamp}'.format(
-                timestamp=self.timestamp_string,
-                measurement=self.measurementstring)
             # fig.suptitle(plot_title)
-            fig.text(0.5, 1, plot_title, fontsize=self.font_size,
-                     horizontalalignment='center',
-                     verticalalignment='bottom',
-                     transform=ax.transAxes)
             if show:
                 plt.show()
 
@@ -732,11 +731,30 @@ class MeasurementAnalysis(object):
                 ax.hlines(np.mean(y[cal_one_points]),
                           min(x), max(x),
                           linestyles='--', color='C7')
+
+                l = 'f' if kw.get("for_ef", False) else 'e'
                 ax.text(np.mean(x[cal_one_points]),
-                        np.mean(y[cal_one_points])-0.05, r'$|e\rangle$',
+                        np.mean(y[cal_one_points])-0.05,
+                        r'$|{}\rangle$'.format(l),
                         fontsize=font_size, verticalalignment='top',
                         horizontalalignment='center', color='k')
                 NoCalPoints += len(cal_one_points)
+
+                # hacky way to get the e level drawn on figure
+                # even if not given when doing 3-level readout with 6 calibration points
+                if l == 'f' and kw.get("no_cal_points", NoCalPoints) == 6:
+                    cal_points_e = np.array(cal_one_points, dtype=np.int) - 2
+                    ax.plot(x[cal_points_e], y[cal_points_e], '.k')
+                    ax.text(np.mean(x[cal_points_e]),
+                            np.mean(y[cal_points_e]) - 0.05,
+                            r'$|e\rangle$',
+                            fontsize=font_size, verticalalignment='top',
+                            horizontalalignment='center', color='k')
+            # FIXME: issue when 6 cal points are used, because method above recovers
+            #  only 4 although 6 were used. the first two cal points are then
+            #  interpreted as data. therefore, for now I allow a dirty override
+            #  of the parameter by parent function. Should be fixed more thoroughly !!
+            NoCalPoints = kw.get("no_cal_points", NoCalPoints)
 
             line = ax.plot(x[:-NoCalPoints], y[:-NoCalPoints],
                            marker, markersize=self.marker_size,
@@ -975,6 +993,97 @@ class MeasurementAnalysis(object):
         if new_sweep_points is not None:
             self.sweep_points_from_file = self.sweep_points
             self.sweep_points(new_sweep_points)
+
+    def get_naming_and_values_2D_tuples(self):
+        if 'datasaving_format' in list(self.g.attrs.keys()):
+            datasaving_format = self.get_key('datasaving_format')
+        else:
+            print('Using legacy data loading, assuming old formatting')
+            datasaving_format = 'Version 1'
+
+        if datasaving_format == 'Version 1':
+            # Get naming
+            self.sweep_name = self.get_key('sweep_parameter_name')
+            self.sweep_unit = self.get_key('sweep_parameter_unit')
+            self.sweep_name_2D = self.get_key('sweep_parameter_2D_name')
+            self.sweep_unit_2D = self.get_key('sweep_parameter_2D_unit')
+            self.value_names = self.get_key('value_names')
+
+            value_units = self.get_key('value_units')
+
+            # get values
+            self.sweep_points = self.get_values(self.sweep_name)
+            self.sweep_points_2D = self.get_values(self.sweep_name_2D)
+            self.measured_values = []
+            self.zlabels = []
+            for i in range(len(self.value_names)):
+                self.measured_values.append(
+                    self.get_values(self.value_names[i]))
+                self.zlabels.append(str(
+                    self.value_names[i] + '(' + value_units[i] + ')'))
+            self.xlabel = str(self.sweep_name + '(' + self.sweep_unit + ')')
+            self.ylabel = str(self.sweep_name_2D + '(' + self.sweep_unit_2D + ')')
+
+        elif datasaving_format == 'Version 2':
+            self.parameter_names = self.get_key('sweep_parameter_names')
+            self.parameter_units = self.get_key('sweep_parameter_units')
+            if len(self.parameter_names) != len(self.parameter_units):
+                logging.error(' Number of parameter names does not match number'
+                              'of parameter units! Check sweep configuration!')
+            self.sweep_names = []
+            self.sweep_units = []
+            for it in range(len(self.parameter_names)):
+                self.sweep_names.append(self.parameter_names[it])
+                self.sweep_units.append(self.parameter_units[it])
+            self.value_names = self.get_key('value_names')
+            self.value_units = self.get_key('value_units')
+            self.data = self.get_values('Data').transpose()
+
+            x = self.data[0]
+            cols = np.unique(x).shape[0]
+            nr_missing_values = 0
+            if len(x) % cols != 0:
+                nr_missing_values = cols - len(x) % cols
+            x = np.append(x, np.zeros((1, nr_missing_values))+np.nan)
+            self.X = x.reshape(-1, cols)
+            self.sweep_points = self.X[0]
+
+            self.sweep_points_2D = []
+            self.Y = []
+            for i in range(1,len(self.parameter_names)):
+                y = self.data[i]
+                y = np.append(y,np.zeros((1,nr_missing_values)))
+                Y = y.reshape(-1,cols)
+                self.Y.append(Y)
+                self.sweep_points_2D.append(Y.T[0])
+
+            col_idx_data_start = len(self.sweep_points_2D)+1
+            if len(self.value_names) == 1:
+                z = self.data[col_idx_data_start]
+                z = np.append(z, np.zeros(nr_missing_values)+np.nan)
+                self.Z = z.reshape(-1, cols)
+                self.measured_values = [self.Z.T]
+            else:
+                self.Z = []
+                self.measured_values = []
+                for i in range(len(self.value_names)):
+                    z = self.data[col_idx_data_start + i]
+                    z = np.append(z, np.zeros(nr_missing_values)+np.nan)
+                    Z = z.reshape(-1, cols)
+                    self.Z.append(Z)
+                    self.measured_values.append(Z.T)
+            self.xlabel = self.parameter_names[0] + ' (' + \
+                          self.parameter_units[0] + ')'
+            self.ylabel = self.parameter_names[1] + ' (' + \
+                          self.parameter_units[1] + ')' + '_' + \
+                          self.parameter_names[2] + ' (' + \
+                          self.parameter_units[2] + ')'
+
+            self.parameter_labels = [a + ' (' + b + ')' for a, b in zip(
+                self.parameter_names,
+                self.parameter_units)]
+            self.zlabels = [a + ' (' + b + ')' for a, b in zip(self.value_names,
+                                                               self.value_units)]
 
     def get_best_fit_results(self, peak=False, weighted=False):
         if len(self.data_file['Analysis']) is 1:
@@ -1615,7 +1724,9 @@ class TD_Analysis(MeasurementAnalysis):
                 marker='o-',
                 save=False,
                 plot_title=plot_title,
-                add_half_line=add_half_line)
+                add_half_line=add_half_line,
+                no_cal_points=self.NoCalPoints,
+                for_ef=self.for_ef)
             if save_fig:
                 if not close_main_fig:
                     # Hacked in here, good idea to only show the main fig but
@@ -7272,9 +7383,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             except (TypeError, KeyError, ValueError):
                 logging.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
-            label += 'f0={:.5f} GHz ' \
-                 '\nkappa0={:.4f} MHz'.format(
-                self.fit_res.params['f0'].value * scale,
+            label += '\nkappa0={:.4f} MHz'.format(
                 self.fit_res.params['kappa'].value / 1e6)
 
         self.add_textbox(label, fig_dist, ax_dist)
@@ -10463,7 +10572,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
         self.drive_pulse_length = drive_pulse_length
         self.return_fit = kw.pop('return_fit', False)
         self.cal_points = cal_points
-        self.reference_measurements=reference_measurements
+        self.reference_measurements = reference_measurements
 
         super(Fluxpulse_Ramsey_2D_Analysis_Predictive, self).__init__(TwoD=True,
                                                            start_at_zero=True,
@@ -10629,7 +10738,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
 
 
     def unwrap_phases_extrapolation(self,phases):
-        for i in range(2,len(phases)):
+        for i in range(2, len(phases)):
             phase_diff_extrapolation = (phases[i-1]
                                         + (phases[i-1]
                                            - phases[i-2]) - phases[i])
@@ -10656,7 +10765,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
         only_cos_fits = kw.pop('only_cos_fits', False)
         fit_statistics = kw.pop('fit_statistics', False)
         fontsize = 14.
-        legend_fontsize=12.
+        legend_fontsize = 12.
         if cal_points is None:
             cal_points = self.cal_points
 
@@ -10666,12 +10775,13 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
         offset_list = []
 
         length_single = len(self.sweep_points)
+
+        amps_all = np.zeros((len(self.sweep_points_2D[0]), length_single))
         if fit_statistics:
-            amps_all = np.zeros((len(self.sweep_points_2D[0]),length_single))
-            thetas_fit = self.data[0,:length_single]
+            thetas_fit = self.data[0, :length_single]
         if plot:
             if only_cos_fits:
-                self.fig, self.ax = plt.subplots(figsize=(10,7))
+                self.fig, self.ax = plt.subplots(figsize=(10, 7))
                 ax = self.ax
             else:
                 self.fig, self.ax = plt.subplots(2, 1)
@@ -10681,13 +10791,15 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
 
         data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(
             np.array([self.data[3], self.data[4]]))
+        self.data_rotated = data_rotated
         if fit_range is None:
             i_start = 0
             i_end = length_single*len(self.sweep_points_2D[0])
         else:
             i_start = length_single*fit_range[0]
             i_end = length_single*fit_range[1]
-        for mod,i in enumerate(np.arange(i_start, i_end, length_single)):
+
+        for mod, i in enumerate(np.arange(i_start, i_end, length_single)):
             thetas = self.data[0, i:i+length_single]
             ampls = data_rotated[i:i+length_single]
 
@@ -10700,12 +10812,12 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                                           print_fit_results=False,
                                           phase_guess=phase_guess,
                                           cal_points=cal_points)
-
+            self.fit_results += [fit_res]
             phase_list.append(fit_res.best_values['phase'])
             amplitude_list.append(fit_res.best_values['amplitude'])
             frequency_list.append(fit_res.best_values['frequency'])
             offset_list.append(fit_res.best_values['offset'])
-
+            amps_all[mod, :] = ampls
             if plot:
                 if not fit_statistics:
                     if mod % 2 == 0:
@@ -10724,12 +10836,12 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                             markersize=marker_size_meas,marker=marker_style_meas,
                             alpha=0.7)
                     thetas_plot = np.linspace(thetas[0],thetas[-1], 128)
-                    ampls_plot= fit_res.eval(t=thetas_plot)
+                    ampls_plot = fit_res.eval(t=thetas_plot)
                     ax.plot(thetas_plot, ampls_plot,color=linecolor_inter,
                             linestyle=linestyle_inter,linewidth=linewidth_inter)
                 else:
                     amps_all[mod, :] = ampls
-
+        self.amps_all = amps_all
         phase_list.pop(0)
         phase_list = np.array(phase_list)
         amplitude_list = np.array(amplitude_list)
@@ -10915,7 +11027,8 @@ class OptimizationAnalysis_Predictive2D:
         except:
             optimization_method = 'Numerical'
         if self.target_value_names is None:
-            self.target_value_names  =['none_label' for i in range(self.output_dim)]
+            self.target_value_names = ['none_label' for i
+                                       in range(self.output_dim)]
         self.target_value_names.append(r"$||z||_2 [a.u]$")
         pre_proc_dict = self.estimator.pre_proc_dict
         output_scale = pre_proc_dict.get('output',{}).get('scaling',1.)
@@ -10936,11 +11049,14 @@ class OptimizationAnalysis_Predictive2D:
                          0.2*np.std(self.training_grid[:,1])
         x_mesh = (np.linspace(lower_x,upper_x,200)-input_means[0])/input_scale[0]
         y_mesh = (np.linspace(lower_y,upper_y,200)-input_means[1])/input_scale[1]
+        alpha_rescaled = (self.optimization_result[2]-input_means[2])/input_scale[2]
+        print(alpha_rescaled)
         Xm,Ym = np.meshgrid(x_mesh,y_mesh)
         Zm = np.zeros((self.output_dim+1,200,200))
         for k in range(np.size(x_mesh)):
             for l in range(np.size(y_mesh)):
-                pred = self.estimator.predict([[Xm[k,l],Ym[k,l]]])[0]
+                # print(Xm[k, l], Ym[k, l])
+                pred = self.estimator.predict([[Xm[k,l],Ym[k,l],alpha_rescaled]])[0]
                 for j in range(self.output_dim+1):
                     if j==self.output_dim:
                         new_val = 0.
@@ -10964,7 +11080,7 @@ class OptimizationAnalysis_Predictive2D:
                                       self.ma.parameter_units[it+1])
             textstr+='\n'
             base_figname += self.ma.parameter_names[it]+'_'
-        textstr+='Empirical error: '+'%.2f' % ((1.-self.estimator.score)*100.) +'%'
+        # textstr+='Empirical error: '+'%.2f' % ((1.-self.estimator.score)*100.) +'%'
         figname = self.ma.timestamp_string+' '
         figname += self.estimator_name+' fitted landscape'
         savename = self.ma.timestamp_string + '_' + base_figname
@@ -11000,8 +11116,8 @@ class OptimizationAnalysis_Predictive2D:
                 ax.legend(loc='upper left',framealpha=0.75,fontsize=fontsize)
                 tot = tot+1
 
-        fig.suptitle(figname,fontsize=16.)
-        self.ma.save_fig(fig,figname=savename,**kw)
+        fig.suptitle(figname, fontsize=16.)
+        self.ma.save_fig(fig, figname=savename, **kw)
 
         base_figname = 'CPhase_interpolated landscapes_'+self.ma.timestamp_string
         f, (ax1,ax2) = plt.subplots(1,2)
@@ -11172,9 +11288,13 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
 
         ax.plot(thetas_fine, data_fit_fine, 'r')
 
-        ax.set_title('dynamic phase msmt {} at {:0.1f}ns {:0.4f}V {}'.format(
-            self.qb_name, self.flux_pulse_length*1e9,
-            self.flux_pulse_amp, self.timestamp_string))
+        if self.flux_pulse_amp is not None:
+            ax.set_title('dynamic phase msmt {} at {:0.1f}ns {:0.4f}V {}'.format(
+                self.qb_name, self.flux_pulse_length*1e9,
+                self.flux_pulse_amp, self.timestamp_string))
+        else:
+            ax.set_title('dynamic phase msmt {} at {:0.1f}ns {}'.format(
+                self.qb_name, self.flux_pulse_length*1e9, self.timestamp_string))
         ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
         ax.set_ylabel('Response (arb. units)')
 
@@ -11341,7 +11461,10 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
                                             plot=False, print_res=False)
             self.fit_res = fit_res
             fitted_freqs[i] = fit_res.best_values['mu']
-            fitted_stds[i] = np.sqrt(fit_res.covar[2, 2])
+            if fit_res.covar is not None:
+                fitted_stds[i] = np.sqrt(fit_res.covar[2, 2])
+            else:
+                fitted_stds[i] = 0
 
         if plot:
             fig, ax = plt.subplots()

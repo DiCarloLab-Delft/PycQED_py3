@@ -48,8 +48,8 @@ data_dir_dict = {'Aprilia_Jr': '\\TUD278336',
                  # 'Ramiro_Desktop': r'\\131.180.82.190\\Experiments\\1611_Starmon\\Data',
                  r'Nathans_Laptop': 'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
                  'Bart_Laptop': 'C:\Experiments/NumericalOptimization/Data',
-                 'Qudev_testbench' : r'D:\pydata_temp',
-                #  'Qudev_testbench' : r'Z:',
+                 'Qudev_testbench' : r'D:\pydata',
+                 #'Qudev_testbench' : r'Z:',
                  'LaVespa': r'D:\Experiments\18031_Intel_resonators',
                  'LaAprilia_1' : r'D:\Experiments\1802_IntelS7Airbridges'
                  #'LaAprilia_1' : r'D:\Experiments\1802_Argon\Data'

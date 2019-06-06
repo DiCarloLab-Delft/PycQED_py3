@@ -63,7 +63,7 @@ class BaseDataAnalysis(object):
     '''
 
     def __init__(self, t_start: str = None, t_stop: str = None,
-                 label: str = '', data_file_path: str = None,
+                 label: str or list = '', data_file_path: str = None,
                  close_figs: bool = True, options_dict: dict = None,
                  extract_only: bool = False, do_fitting: bool = False):
         '''
@@ -152,8 +152,16 @@ class BaseDataAnalysis(object):
             # This is quite a hacky way to support finding the last file
             # with a certain label, something that was trivial in the old
             # analysis. A better solution should be implemented.
-            self.t_start = a_tools.latest_data(scan_label,
-                                               return_timestamp=True)[0]
+            if isinstance(scan_label, list) and len(scan_label) > 1:
+                timestamps = []
+                for label in scan_label:
+                    timestamps.append(a_tools.latest_data(label,
+                                               return_timestamp=True)[0])
+                self.t_start = timestamps
+                self.timestamps = timestamps
+            else:
+                self.t_start = a_tools.latest_data(scan_label,
+                                                   return_timestamp=True)[0]
         elif data_file_path is not None:
             # Data file path specified ignore timestamps
             self.extract_from_file = True
@@ -280,18 +288,21 @@ class BaseDataAnalysis(object):
                                    .format(self.data_file_path, extension))
             return
 
-        self.get_timestamps()
+        if not hasattr(self, 'timestamps'):
+            self.get_timestamps()
+
         # this disables the data extraction for other files if there is only
         # one file being used to load data from
         if self.single_timestamp:
             self.timestamps = [self.timestamps[0]]
         TwoD = self.options_dict.get('TwoD', False)
+        TwoD_tuples = self.options_dict.get('TwoD_tuples', False)
         # this should always be extracted as it is used to determine where
         # the file is as required for datasaving
         self.params_dict['folder'] = 'folder'
         self.raw_data_dict = a_tools.get_data_from_timestamp_list(
             self.timestamps, param_names=self.params_dict,
-            ma_type=self.ma_type,
+            ma_type=self.ma_type, TwoD_tuples=TwoD_tuples,
             TwoD=TwoD, numeric_params=self.numeric_params,
             filter_no_analysis=self.filter_no_analysis)
 
@@ -379,6 +390,7 @@ class BaseDataAnalysis(object):
                      tag_tstamp: bool = True, dpi: int = 300,
                      fmt: str = 'png', key_list: list = 'auto',
                      close_figs: bool = True):
+
         if savedir is None:
             savedir = self.raw_data_dict.get('folder', '')
             if isinstance(savedir, list):
@@ -606,6 +618,9 @@ class BaseDataAnalysis(object):
                 except ValueError:
                     # If the processed data group already exists.
                     proc_data_group = analysis_group['Processed data']
+
+                if key in proc_data_group.keys():
+                    del proc_data_group[key]
 
                 d = {key: self.proc_data_dict[key]}
                 write_dict_to_hdf5(d, entry_point=proc_data_group, 
@@ -1578,6 +1593,7 @@ class BaseDataAnalysis(object):
         tick_length = kwargs.pop('tick_length', 5)
         tick_width = kwargs.pop('tick_width', 1)
         tick_color = kwargs.get('tick_color', 'k')
+        ticks_direction = kwargs.get('ticks_direction', 'out')
         axes_labelcolor = kwargs.get('axes_labelcolor', 'k')
 
         fig_size_dim = 10
@@ -1598,8 +1614,8 @@ class BaseDataAnalysis(object):
                   'axes.linewidth': axes_line_width,
                   'lines.markersize': marker_size,
                   'lines.linewidth': line_width,
-                  'xtick.direction': 'in',
-                  'ytick.direction': 'in',
+                  'xtick.direction': ticks_direction,
+                  'ytick.direction': ticks_direction,
                   'xtick.labelsize': font_size,
                   'ytick.labelsize': font_size,
                   'xtick.color': tick_color,

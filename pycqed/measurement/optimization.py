@@ -364,7 +364,9 @@ def neural_network_opt(fun, training_grid, target_values = None,
     if len(np.shape(training_grid)) == 1:
         training_grid = np.transpose(np.array([training_grid]))
     n_samples = np.size(training_grid,0)
+    print('Nr Samples: ', n_samples)
     n_features = np.size(training_grid,1)
+    print('Nr Features: ', n_features)
 
     if fun is None:
         output_dim = np.size(target_values,1)
@@ -431,14 +433,22 @@ def neural_network_opt(fun, training_grid, target_values = None,
 
     def estimator_wrapper(X):
         pred = est.predict([X])
+        print('pred: ', pred)
         if output_dim == 1.:
             return np.abs(pred+1.)
         else:
             pred = pred[0]
             norm = 0.
             for it in range(len(pred)):
-                norm += np.abs(pred[it] + 1.)
+                print(it)
+                if it == 0:
+                    w = 1
+                else:
+                    w = 1
+                norm += w*np.abs(pred[it] + 1.)
             output = norm
+            print('norm: ', norm)
+            print('')
 
             return output
 
@@ -452,10 +462,18 @@ def neural_network_opt(fun, training_grid, target_values = None,
         res = fmin_l_bfgs_b(estimator_wrapper, x_init, bounds=bounds,
                             approx_grad=True)
     else:
+        print('x_init minimizer:', x_init)
         for it in range(n_features):
             x_init[it] = (x_init[it]-input_feature_means[it])/input_feature_ext[it] # scale initial value
-        res = fmin_l_bfgs_b(estimator_wrapper, x_init, approx_grad=True)
+        bounds=[(-1.,0.5) for i in range(n_features)]
+        res = fmin_l_bfgs_b(estimator_wrapper, x_init, approx_grad=True, bounds=bounds)
+        # res = minimize(estimator_wrapper, x_init, method='Nelder-Mead')
+        # res = [res.x]
+        print('result:', res)
+        # print(res)
 
+
+    # result = res.x
     result = res[0]
     opti_flag = True
 
@@ -469,7 +487,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
               'of at least one data feature mean value! Values will still be updated.')
     # Rescale values
     amp = est.predict([result])[0]
-    print('amp: ',amp)
+    print('amp: ', amp)
     if output_dim == 1.:
         amp = amp*output_feature_ext+output_feature_means
     else:

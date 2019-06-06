@@ -37,6 +37,7 @@ def set_axis_label(axis_type, axes, label, unit=None, **kw):
         set_label = axes.set_zlabel
     else:
         raise KeyError('No axis named' + str(axis_type))
+
     if unit is not None and unit != '':
         ticks = get_ticks()
 
@@ -77,8 +78,10 @@ def SI_prefix_and_scale_factor(val, unit=None):
         scale_factor (float) : scale_factor needed to convert value
         unit (str)           : unit including the prefix
     """
+
     validtypes = (float, int, np.integer, np.floating)
     if unit in SI_UNITS and isinstance(val, validtypes):
+
         if val == 0:
             prefix_power = 0
         else:
@@ -107,6 +110,7 @@ def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
     SI prefixes.
     the value_str is of the type specified in return_type (str) by default.
     """
+    print(unit)
     validtypes = (float, int, np.integer, np.floating)
     if unit in SI_UNITS and isinstance(val, validtypes):
         if val == 0:
@@ -124,6 +128,7 @@ def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
 
     value_str = return_type(val)
     # To ensure right type of return value
+    print(unit)
     if unit is None:
         unit = ''
     return value_str, unit
