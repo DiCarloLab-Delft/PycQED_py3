@@ -1,4 +1,5 @@
 import unittest
+import pytest
 import numpy as np
 import os
 import pycqed as pq
@@ -153,25 +154,30 @@ class Test_Mock_CCL(unittest.TestCase):
     # Test MW pulse calibration
     ###########################################################
     def test_calibrate_mw_pulse_amplitude_coarse(self):
-        self.CCL_qubit.mock_mw_amp180(.345)
-        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
-        self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
-        threshold = 0.05
-        self.CCL_qubit.calibrate_mw_pulse_amplitude_coarse()
+        for with_vsm in [True, False]:
+            self.CCL_qubit.cfg_with_vsm(with_vsm)
 
-        if self.CCL_qubit.cfg_with_vsm():
-            assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_vsm_G_amp() + threshold
-            assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_vsm_G_amp() - threshold
-        else:
-            assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_channel_amp() + threshold
-            assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_channel_amp() - threshold
+            self.CCL_qubit.mock_mw_amp180(.345)
+            self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+            self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
 
-    # def test_some_demo_for_timo(self):
-    #     assert 3 ==4.2
+            self.CCL_qubit.calibrate_mw_pulse_amplitude_coarse()
 
-        #assert self.CCL_qubit.mw_amp180 == self.CCL_qubit.mock_mw_amp180()
+            eps = 0.05
+            if self.CCL_qubit.cfg_with_vsm():
+                assert self.CCL_qubit.mw_vsm_G_amp() == pytest.approx(
+                        self.CCL_qubit.mock_mw_amp180(), eps)
+                # assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_vsm_G_amp() + threshold
+                # assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_vsm_G_amp() - threshold
+            else:
+                assert self.CCL_qubit.mw_channel_amp() == pytest.approx(
+                        self.CCL_qubit.mw_channel_amp(), eps)
+                # assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_channel_amp() + threshold
+                # assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_channel_amp() - threshold
+    ###########################################################
+    # Test Ramsey
+    ###########################################################
     @unittest.expectedFailure
-
     def test_ramsey(self):
 
         self.CCL_qubit.mock_Ec(250e6)
