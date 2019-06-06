@@ -55,7 +55,8 @@ class UHFQCPulsar:
         self.add_parameter('{}_granularity'.format(awg.name),
                            get_cmd=lambda: 16)
         self.add_parameter('{}_element_start_granularity'.format(awg.name),
-                           get_cmd=lambda: 8/(1.8e9))
+                           initial_value=8/(1.8e9),
+                           parameter_class=ManualParameter)
         self.add_parameter('{}_min_length'.format(awg.name),
                            get_cmd=lambda: 16 /(1.8e9))
         self.add_parameter('{}_inter_element_deadtime'.format(awg.name),
@@ -305,7 +306,8 @@ class HDAWG8Pulsar:
         self.add_parameter('{}_granularity'.format(awg.name),
                            get_cmd=lambda: 16)
         self.add_parameter('{}_element_start_granularity'.format(awg.name),
-                           get_cmd=lambda: 8/(2.4e9))
+                           initial_value=8/(2.4e9),
+                           parameter_class=ManualParameter)
         self.add_parameter('{}_min_length'.format(awg.name),
                            get_cmd=lambda: 16 /(2.4e9))
         self.add_parameter('{}_inter_element_deadtime'.format(awg.name),
@@ -824,7 +826,8 @@ class AWG5014Pulsar:
         self.add_parameter('{}_granularity'.format(awg.name),
                            get_cmd=lambda: 4)
         self.add_parameter('{}_element_start_granularity'.format(awg.name),
-                            get_cmd=lambda: 4/(1.2e9))
+                           initial_value=4/(1.2e9),
+                           parameter_class=ManualParameter)
         self.add_parameter('{}_min_length'.format(awg.name),
                            get_cmd=lambda: 256/(1.2e9)) # Can not be triggered 
                                                         # faster than 210 ns.

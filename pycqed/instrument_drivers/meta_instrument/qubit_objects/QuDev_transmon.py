@@ -180,7 +180,7 @@ class QuDev_transmon(Qubit):
         self.add_parameter('acq_weights_Q', vals=vals.Arrays(),
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
-        self.add_parameter('acq_weight_type', initial_value='SSB',
+        self.add_parameter('acq_weights_type', initial_value='SSB',
                            vals=vals.Enum('SSB', 'DSB', 'optimal',
                                           'square_rot', 'manual'),
                            docstring=(
@@ -295,7 +295,7 @@ class QuDev_transmon(Qubit):
         self.add_pulse_parameter('Spec', 'spec_marker_length', 'length',
                                  initial_value=5e-6, vals=vals.Numbers())
         self.add_pulse_parameter('Spec', 'spec_marker_delay', 'pulse_delay', 
-                                 vals=vals.Numbers(), initial_value=None)
+                                 vals=vals.Numbers(), initial_value=0)
 
         # dc flux parameters
         self.add_parameter('dc_flux_parameter', initial_value=None,
@@ -307,7 +307,7 @@ class QuDev_transmon(Qubit):
 
     def update_detector_functions(self):
         if self.acq_Q_channel() is None or \
-           self.acq_weight_type() not in ['SSB', 'DSB', 'optimal_qutrit']:
+           self.acq_weights_type() not in ['SSB', 'DSB', 'optimal_qutrit']:
             channels = [self.acq_I_channel()]
         else:
             channels = [self.acq_I_channel(), self.acq_Q_channel()]
@@ -414,14 +414,14 @@ class QuDev_transmon(Qubit):
         self.update_detector_functions()
         self.set_readout_weights()
 
-    def set_readout_weights(self, type=None, f_mod=None):
-        if type is None:
-            type = self.acq_weight_type()
+    def set_readout_weights(self, weights_type=None, f_mod=None):
+        if weights_type is None:
+            weights_type = self.acq_weights_type()
         if f_mod is None:
             f_mod = self.ro_mod_freq()
-        if type == 'manual':
+        if weights_type == 'manual':
             pass
-        elif type == 'optimal':
+        elif weights_type == 'optimal':
             if (self.acq_weights_I() is None or self.acq_weights_Q() is None):
                 logging.warning('Optimal weights are None, not setting '
                                 'integration weights')
@@ -436,7 +436,7 @@ class QuDev_transmon(Qubit):
                 self.acq_I_channel()), 1.0)
             self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
                 self.acq_I_channel()), -1.0)
-        elif type == 'optimal_qutrit':
+        elif weights_type == 'optimal_qutrit':
             for w_f in [self.acq_weights_I, self.acq_weights_Q,
                         self.acq_weights_I2, self.acq_weights_Q2]:
                 if w_f() is None:
@@ -444,30 +444,30 @@ class QuDev_transmon(Qubit):
                                     '\nNot setting integration weights.'
                                     .format(w_f.name))
                     return
-            # if all weights are not None, set first integration weights (real and
-            # imag) on channel I amd second integration weights on channel Q.
+            # if all weights are not None, set first integration weights (real 
+            # and imag) on channel I amd second integration weights on channel 
+            # Q.
             self.instr_uhf.get_instr().set('quex_wint_weights_{}_real'.format(
-                self.acq_weights_I()),
-                self.ro_acq_weight_func_I().copy())
+                self.acq_I_channel()),
+                self.acq_weights_I().copy())
             self.instr_uhf.get_instr().set('quex_wint_weights_{}_imag'.format(
-                self.acq_weights_I()),
-                self.ro_acq_weight_func_Q().copy())
+                self.acq_I_channel()),
+                self.acq_weights_Q().copy())
             self.instr_uhf.get_instr().set('quex_wint_weights_{}_real'.format(
-                self.acq_weights_Q()),
-                self.ro_acq_weight_2nd_integr_I().copy())
+                self.acq_Q_channel()),
+                self.acq_weights_I2().copy())
             self.instr_uhf.get_instr().set('quex_wint_weights_{}_imag'.format(
-                self.acq_weights_Q()),
-                self.ro_acq_weight_2nd_integr_Q().copy())
+                self.acq_Q_channel()),
+                self.acq_weights_Q2().copy())
 
             self.instr_uhf.get_instr().set('quex_rot_{}_real'.format(
-                self.acq_weights_I()), 1.0)
+                self.acq_I_channel()), 1.0)
             self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
-                self.acq_weights_I()), -1.0)
+                self.acq_I_channel()), -1.0)
             self.instr_uhf.get_instr().set('quex_rot_{}_real'.format(
-                self.acq_weights_Q()), 1.0)
+                self.acq_Q_channel()), 1.0)
             self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
-                self.acq_weights_Q()), -1.0)
-
+                self.acq_Q_channel()), -1.0)
         else:
             tbase = np.arange(0, 4096 / 1.8e9, 1 / 1.8e9)
             theta = self.acq_IQ_angle()
@@ -476,7 +476,7 @@ class QuDev_transmon(Qubit):
             c1 = self.acq_I_channel()
             c2 = self.acq_Q_channel()
             uhf = self.instr_uhf.get_instr()
-            if type == 'SSB':
+            if weights_type == 'SSB':
                 uhf.set('quex_wint_weights_{}_real'.format(c1), cosI)
                 uhf.set('quex_rot_{}_real'.format(c1), 1)
                 uhf.set('quex_wint_weights_{}_real'.format(c2), sinI)
@@ -485,18 +485,20 @@ class QuDev_transmon(Qubit):
                 uhf.set('quex_rot_{}_imag'.format(c1), 1)
                 uhf.set('quex_wint_weights_{}_imag'.format(c2), cosI)
                 uhf.set('quex_rot_{}_imag'.format(c2), -1)
-            elif type == 'DSB':
+            elif weights_type == 'DSB':
                 uhf.set('quex_wint_weights_{}_real'.format(c1), cosI)
                 uhf.set('quex_rot_{}_real'.format(c1), 1)
                 uhf.set('quex_wint_weights_{}_real'.format(c2), sinI)
                 uhf.set('quex_rot_{}_real'.format(c2), 1)
                 uhf.set('quex_rot_{}_imag'.format(c1), 0)
                 uhf.set('quex_rot_{}_imag'.format(c2), 0)
-            elif type == 'square_rot':
+            elif weights_type == 'square_rot':
                 uhf.set('quex_wint_weights_{}_real'.format(c1), cosI)
                 uhf.set('quex_rot_{}_real'.format(c1), 1)
                 uhf.set('quex_wint_weights_{}_imag'.format(c1), sinI)
                 uhf.set('quex_rot_{}_imag'.format(c1), 1)
+            else:
+                raise KeyError('Invalid weights type: {}'.format(weights_type))
 
     def get_spec_pars(self):
         return self.get_operation_dict()['Spec ' + self.name]
@@ -514,7 +516,7 @@ class QuDev_transmon(Qubit):
         if operation_dict is None:
             operation_dict = {}
         operation_dict = super().get_operation_dict(operation_dict)
-        operation_dict['Spec ' + self.name]['operation_type'] = 'MW'
+        operation_dict['Spec ' + self.name]['operation_type'] = 'Other'
         operation_dict['RO ' + self.name]['operation_type'] = 'RO'
         operation_dict['X180 ' + self.name]['operation_type'] = 'MW'
         operation_dict['X180_ef ' + self.name]['operation_type'] = 'MW'
@@ -608,7 +610,8 @@ class QuDev_transmon(Qubit):
                     label = 'pulsed_spec' + self.msmt_suffix
             self.prepare(drive='pulsed_spec')
             if upload:
-                sq.pulse_list_list_seq([[self.get_ro_pars()]])
+                sq.pulse_list_list_seq([[self.get_spec_pars(),
+                                         self.get_ro_pars()]])
         else:
             if label is None:
                 if sweep_function_2D is not None:
@@ -617,8 +620,7 @@ class QuDev_transmon(Qubit):
                     label = 'continuous_spec' + self.msmt_suffix
             self.prepare(drive='continuous_spec')
             if upload:
-                sq.pulse_list_list_seq([[self.get_spec_pars(), 
-                                         self.get_ro_pars()]])
+                sq.pulse_list_list_seq([[self.get_ro_pars()]])
         
         MC = self.instr_mc.get_instr()
         MC.set_sweep_function(self.instr_ge_lo.get_instr().frequency)
@@ -704,7 +706,7 @@ class QuDev_transmon(Qubit):
                                            upload=upload))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -712,7 +714,7 @@ class QuDev_transmon(Qubit):
                              'use_cal_points': cal_points,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'}})
         MC.run(label, exp_metadata=exp_metadata)
@@ -771,7 +773,7 @@ class QuDev_transmon(Qubit):
                         cal_points=cal_points, no_cal_points=no_cal_points))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -781,7 +783,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None})
         MC.run(label, exp_metadata=exp_metadata)
 
@@ -840,14 +842,14 @@ class QuDev_transmon(Qubit):
             upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'},
                              'use_cal_points': cal_points})
@@ -912,7 +914,7 @@ class QuDev_transmon(Qubit):
                                 last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -921,7 +923,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'last_ge_pulse': last_ge_pulse})
         MC.run(label, exp_metadata=exp_metadata)
@@ -966,7 +968,7 @@ class QuDev_transmon(Qubit):
                 upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -974,7 +976,7 @@ class QuDev_transmon(Qubit):
                              'use_cal_points': cal_points,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'}
                              })
@@ -1041,7 +1043,7 @@ class QuDev_transmon(Qubit):
             last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1050,7 +1052,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'last_ge_pulse': last_ge_pulse})
         MC.run(label, exp_metadata=exp_metadata)
@@ -1115,8 +1117,8 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name)
 
 
-    def measure_ramsey(self, times=None, artificial_detuning=0, label=None,
-                       MC=None, analyze=True, close_fig=True, cal_points=True,
+    def measure_ramsey(self, times=None, artificial_detuning=0, label=None, 
+                       analyze=True, close_fig=True, cal_points=True,
                        upload=True, exp_metadata=None):
 
         if times is None:
@@ -1131,11 +1133,10 @@ class QuDev_transmon(Qubit):
                             'The units should be seconds.')
 
         self.prepare(drive='timedomain')
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+        MC = self.instr_mc.get_instr()
 
         # Define the measurement label
-        if label == None:
+        if label is None:
             label = 'Ramsey' + self.msmt_suffix
 
         if cal_points:
@@ -1157,7 +1158,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1165,7 +1166,7 @@ class QuDev_transmon(Qubit):
                              'use_cal_points': cal_points,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'},
                              'artificial_detuning': artificial_detuning})
@@ -1302,7 +1303,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_2nd_swf)
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1312,7 +1313,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'artificial_detuning': artificial_detuning})
         MC.run(label, exp_metadata=exp_metadata)
@@ -1423,7 +1424,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Echo_swf)
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1431,7 +1432,7 @@ class QuDev_transmon(Qubit):
                              'use_cal_points': cal_points,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'},
                              'artificial_detuning': artificial_detuning})
@@ -1502,7 +1503,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Echo_2nd_swf)
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weight_type() == 'optimal_qutrit'
+                                 self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1512,7 +1513,7 @@ class QuDev_transmon(Qubit):
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
-                                self.acq_weight_type() != 'optimal_qutrit'
+                                self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'artificial_detuning': artificial_detuning})
         MC.run(label, exp_metadata=exp_metadata)
@@ -2517,7 +2518,7 @@ class QuDev_transmon(Qubit):
                     self.acq_state_prob_mtx(state_prob_mtx)
                 return state_prob_mtx, classifier_params
             else:
-                rotate = self.acq_weight_type() in {'SSB', 'DSB'}
+                rotate = self.acq_weights_type() in {'SSB', 'DSB'}
                 if thresholded:
                     channels = self.dig_log_det.value_names
                 else:
@@ -2563,7 +2564,7 @@ class QuDev_transmon(Qubit):
         if self.acq_weights_Q() is None:
             self.acq_weights_Q(
                 (self.acq_weights_I() + 1) % 9)
-        self.set_readout_weights(type='SSB')
+        self.set_readout_weights(weights_type='SSB')
         prev_shots = self.acq_shots()
         self.acq_shots(2*(self.acq_shots()//2))
         self.prepare(drive='timedomain')

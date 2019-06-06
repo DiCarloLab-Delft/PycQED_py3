@@ -637,7 +637,7 @@ class Segment:
         start_gran = self.pulsar.get(
             '{}_element_start_granularity'.format(awg))
 
-        if start_gran != None:
+        if start_gran is not None:
             t_start_awg = math.floor(t_start / start_gran) * start_gran
             # add the number of samples the element gets larger when changing
             # t_start
@@ -717,10 +717,7 @@ class Segment:
                         chan_tvals[channel] = tvals[channel].copy(
                         )[pulse_start:pulse_end]
 
-                    if pulse.element_name in self.acquisition_elements:
-                        pulse_wfs = pulse.get_wfs(chan_tvals, RO=True)
-                    else:
-                        pulse_wfs = pulse.get_wfs(chan_tvals)
+                    pulse_wfs = pulse.get_wfs(chan_tvals)
 
                     for channel in pulse_channels:
                         wfs[pulse.codeword][channel][
@@ -863,8 +860,8 @@ class UnresolvedPulse:
         elif pulse_pars.get('ref_point', 'end') == 'start':
             self.ref_point = 0
         else:
-            raise ValueError('Passed invalid value for ref_point. Allowed \
-                values are: start, end, middle. Default value: end')
+            raise ValueError('Passed invalid value for ref_point. Allowed '
+                'values are: start, end, middle. Default value: end')
 
         if pulse_pars.get('ref_point_new', 'start') == 'start':
             self.ref_point_new = 0
@@ -873,10 +870,10 @@ class UnresolvedPulse:
         elif pulse_pars.get('ref_point_new', 'start') == 'end':
             self.ref_point_new = 1
         else:
-            raise ValueError('Passed invalid value for ref_point_new. Allowed \
-                values are: start, end, middle. Default value: start')
+            raise ValueError('Passed invalid value for ref_point_new. Allowed '
+                'values are: start, end, middle. Default value: start')
 
-        self.delay = pulse_pars['pulse_delay']
+        self.delay = pulse_pars.get('pulse_delay', 0)
         self.original_phase = pulse_pars.get('phase', 0)
         self.basis = pulse_pars.get('basis', None)
         self.operation_type = pulse_pars.get('operation_type', None)

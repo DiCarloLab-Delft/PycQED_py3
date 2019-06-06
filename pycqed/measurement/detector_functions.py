@@ -2061,8 +2061,10 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+        # self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout', 
+                                self._get_readout())
+        # self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()

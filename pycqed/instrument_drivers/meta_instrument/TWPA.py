@@ -3,7 +3,7 @@ from qcodes.instrument.parameter import (
     ManualParameter, InstrumentRefParameter)
 from qcodes.utils import validators as vals
 from pycqed.measurement import detector_functions as det
-from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
+from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis_v2 import amplifier_characterization as ca
@@ -23,7 +23,7 @@ class TWPAObject(qc.Instrument):
         self.add_parameter('instr_signal',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_lo', parameter_class=InstrumentRefParameter)
-        self.add_parameter('instr_uhfqc',
+        self.add_parameter('instr_uhf',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_mc', parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_pulsar',
@@ -76,11 +76,6 @@ class TWPAObject(qc.Instrument):
                            initial_value=225e6)
         self.add_parameter('acq_averages', parameter_class=ManualParameter,
                            vals=vals.Ints(0), initial_value=2**10)
-        self.add_parameter('acq_trigger_separation', vals=vals.Numbers(0),
-                           parameter_class=ManualParameter, unit='s',
-                           initial_value=3e-6)
-        self.add_parameter('acq_trigger_channel',
-                           parameter_class=ManualParameter)
         self.add_parameter('acq_weights_type', parameter_class=ManualParameter,
                            vals=vals.Enum('DSB', 'SSB'), initial_value='SSB')
 
@@ -94,7 +89,8 @@ class TWPAObject(qc.Instrument):
         self.instr_pump.get_instr().off()
 
     def prepare_readout(self):
-        UHFQC = self.instr_uhfqc.get_instr()
+        UHF = self.instr_uhf.get_instr()
+        pulsar = self.instr_pulsar.get_instr()
 
         # Prepare MWG states
         self.instr_pump.get_instr().pulsemod_state('Off')
@@ -107,22 +103,24 @@ class TWPAObject(qc.Instrument):
 
         # Prepare integration weights
         if self.acq_weights_type() == 'SSB':
-            UHFQC.prepare_SSB_weight_and_rotation(IF=self.acq_mod_freq())
+            UHF.prepare_SSB_weight_and_rotation(IF=self.acq_mod_freq())
         else:
-            UHFQC.prepare_DSB_weight_and_rotation(IF=self.acq_mod_freq())
+            UHF.prepare_DSB_weight_and_rotation(IF=self.acq_mod_freq())
 
-        # Program UHFQC awg-sequencer
-        UHFQC.awg_sequence_acquisition()
-
-        # Start the AWG
-        cal_elts.mixer_calibration_sequence(self.acq_trigger_separation(), 0,
-                                            self.acq_trigger_channel())
-        self.instr_pulsar.get_instr().start()
+        
+        # Program the AWG
+        dummy_pulse = {'pulse_type': 'SquarePulse',
+                       'channels': pulsar.find_awg_channels(UHF.name),
+                       'amplitude': 0,
+                       'length': 100e-9,
+                       'operation_type': 'RO'}
+        sq.pulse_list_list_seq([[dummy_pulse]])
+        pulsar.start(exclude=[UHF.name])
 
         # Create the detector
         return det.UHFQC_correlation_detector(
-            UHFQC=UHFQC,
-            AWG=None,
+            UHFQC=UHF,
+            AWG=UHF,
             integration_length=self.acq_length(),
             nr_averages=self.acq_averages(),
             channels=[0, 1],

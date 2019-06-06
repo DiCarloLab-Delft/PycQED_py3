@@ -1,6 +1,7 @@
 # some convenience tools
 #
 import logging
+log = logging.getLogger(__name__)
 import numpy as np
 import os
 import time
@@ -352,7 +353,7 @@ def get_qb_channel_map_from_file(qb_names, file_path,
                     'ro_acq_weight_type']
             else:
                 ro_acq_weight_type = instr_settings[qbn].attrs[
-                    'acq_weight_type']
+                    'acq_weights_type']
             if ro_acq_weight_type in ['optimal', 'square_rot']:
                 if 'RO_acq_weight_function_I' in instr_settings[qbn].attrs:
                     channel_map[qbn] = [ro_type + str(
@@ -377,7 +378,7 @@ def get_qb_channel_map_from_file(qb_names, file_path,
                 raise ValueError('Unknown ro_acq_weight_type "{}."'.format(
                     ro_acq_weight_type))
         except KeyError:
-            print('Could not get channels')
+            log.warning('Could not get channels')
             pass
     return channel_map
 
