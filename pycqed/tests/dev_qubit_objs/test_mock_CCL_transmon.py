@@ -26,6 +26,7 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import 
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
+import pycqed.instrument_drivers.virtual_instruments.virtual_SPI_S4g_FluxCurrent as flx
 
 Dummy_VSM_not_fixed = False
 
@@ -36,6 +37,16 @@ class Test_Mock_CCL(unittest.TestCase):
     def setUpClass(self):
         self.station = station.Station()
         self.CCL_qubit = ct.Mock_CCLight_Transmon('CCL_qubit')
+
+        self.fluxcurrent = flx.virtual_SPI_S4g_FluxCurrent(
+                'fluxcurrent',
+                channel_map={
+                    'FBL_1': (0, 0),
+                    'FBL_2': (0, 1),
+                })
+        self.fluxcurrent.FBL_1(0)
+        self.fluxcurrent.FBL_2(0)
+        self.station.add_component(self.fluxcurrent)
 
         self.MW1 = vmw.VirtualMWsource('MW1')
         self.MW2 = vmw.VirtualMWsource('MW2')
@@ -82,7 +93,7 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.instr_CC(self.CCL.name)
         self.CCL_qubit.instr_LutMan_RO(self.ro_lutman.name)
         self.CCL_qubit.instr_MC(self.MC.name)
-
+        self.CCL_qubit.instr_FluxCtrl(self.fluxcurrent.name)
         self.CCL_qubit.instr_SH(self.SH.name)
 
         config_fn = os.path.join(
@@ -108,24 +119,47 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.mw_mixer_offs_DQ(.4)
 
     ###########################################################
-    # Test MW pulse calibration
+    # Test find qubit frequency
     ###########################################################
     def test_find_frequency(self):
-        self.CCL_qubit.mock_freq_res(7.48920e9)
-        self.CCL_qubit.freq_res(7.4e9)
+        self.CCL_qubit.mock_Ec(250e6)
+        self.CCL_qubit.mock_Ej(16e9)
+
+        self.CCL_qubit.mock_freq_qubit(
+            np.sqrt(8*self.CCL_qubit.mock_Ec()*self.CCL_qubit.mock_Ej()) - 
+            self.CCL_qubit.mock_Ec())
+
+        self.CCL_qubit.freq_qubit(
+            np.sqrt(8*self.CCL_qubit.mock_Ec()*self.CCL_qubit.mock_Ej()) - 
+            self.CCL_qubit.mock_Ec())
+
+        self.CCL_qubit.ro_pulse_amp_CW(self.CCL_qubit.mock_ro_pulse_amp_CW())
+        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.ro_freq(self.CCL_qubit.mock_freq_res())
+
+        fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
+        current = self.CCL_qubit.mock_sweetspot_current()['FBL_1']
+
+        fluxcurrent[self.CCL_qubit.mock_fl_dc_ch()](current)
+
         threshold = 0.01e9
 
         self.CCL_qubit.find_frequency()
 
-        assert np.abs(self.CCL_qubit.mock_freq_res() -
-                      self.CCL_qubit.freq_res()) <= threshold
+        assert np.abs(self.CCL_qubit.mock_freq_qubit() -
+                      self.CCL_qubit.freq_qubit()) <= threshold
 
+    ###########################################################
+    # Test MW pulse calibration
+    ###########################################################
     def test_calibrate_mw_pulse_amplitude_coarse(self):
         self.CCL_qubit.mock_mw_amp180(.345)
-        threshold = 0.01
+        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
+        threshold = 0.05
         self.CCL_qubit.calibrate_mw_pulse_amplitude_coarse()
 
-        if self.cfg_with_vsm():
+        if self.CCL_qubit.cfg_with_vsm():
             assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_vsm_G_amp() + threshold
             assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_vsm_G_amp() - threshold
         else:
@@ -136,10 +170,36 @@ class Test_Mock_CCL(unittest.TestCase):
     #     assert 3 ==4.2
 
         #assert self.CCL_qubit.mw_amp180 == self.CCL_qubit.mock_mw_amp180()
+    @unittest.expectedFailure
     def test_ramsey(self):
-        self.CCL_qubit.mock_T2_star(23e-6)
 
+        self.CCL_qubit.mock_Ec(250e6)
+        self.CCL_qubit.mock_Ej(16e9)
+
+        self.CCL_qubit.mock_freq_qubit(
+            np.sqrt(8*self.CCL_qubit.mock_Ec()*self.CCL_qubit.mock_Ej()) - 
+            self.CCL_qubit.mock_Ec())
+
+        self.CCL_qubit.freq_qubit(
+            np.sqrt(8*self.CCL_qubit.mock_Ec()*self.CCL_qubit.mock_Ej()) - 
+            self.CCL_qubit.mock_Ec())
+
+        self.CCL_qubit.ro_pulse_amp_CW(self.CCL_qubit.mock_ro_pulse_amp_CW())
+        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.ro_freq(self.CCL_qubit.mock_freq_res())
+        
+        fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
+        current = self.CCL_qubit.mock_sweetspot_current()['FBL_1']
+
+        fluxcurrent[self.CCL_qubit.mock_fl_dc_ch()](current)
+
+        self.CCL_qubit.mock_T2_star(23e-6)
+        self.CCL_qubit.T2_star(20e-6)
         self.CCL_qubit.measure_ramsey()
+
+        threshold = 5e-6
+        assert np.abs(self.CCL_qubit.mock_T2_star() - 
+                      self.CCL_qubit.T2_star()) < threshold
 
     @classmethod
     def tearDownClass(self):

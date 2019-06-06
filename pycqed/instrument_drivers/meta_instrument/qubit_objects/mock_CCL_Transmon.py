@@ -124,7 +124,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            parameter_class=ManualParameter)
 
     def find_resonators_VNA(self, start_freq=7e9, stop_freq=8e9, power=-40,
-                            bandwidth=200, timeout=200, npts=14001, name='VNA'):
+                            bandwidth=200, timeout=200, npts=50001, name='VNA'):
         VNA = self.instr_VNA.get_instr()
         t_start_meas = ma.a_tools.current_timestamp()
 
@@ -135,26 +135,24 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         VNA.npts(npts)
         # VNA.timeout(timeout)
 
-        if self.resonator_freqs() is None:  # No scan has done before
-            name = 'Initial_VNA'
+        name = 'Initial_VNA'
 
         self.measure_with_VNA(VNA, name=name)
 
-        if self.resonator_freqs() is None:
-            result = sa2.Initial_VNA_Analysis(label=name)
+        result = sa2.Initial_VNA_Analysis(label=name)
 
-            peak_freqs = []
-            for peak in result.peaks:
-                if peak not in peak_freqs:
-                    peak_freqs.append(peak)
+        peak_freqs = []
+        for peak in result.peaks:
+            if peak not in peak_freqs:
+                peak_freqs.append(peak)
 
-            self.resonator_freqs(result.peaks)
+        self.resonator_freqs(result.peaks)
 
-            self.res_dict = {}
-            for i, freq in enumerate(result.peaks):
-                self.res_dict[str(i)] = ['unknown', freq, {}, None]
+        self.res_dict = {}
+        for i, freq in enumerate(result.peaks):
+            self.res_dict[str(i)] = ['unknown', freq, {}, None]
 
-            print(self.resonator_freqs())
+        print(self.resonator_freqs())
         return True
 
     def find_resonator_frequency_VNA(self, start_freq=7e9, stop_freq=8e9,
@@ -224,6 +222,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                     state = 'test_resonator'
                 self.res_dict[resonator][0] = state
                 self.res_dict[resonator][1] = freq
+        print(self.res_dict)
         return True
 
     def find_qubit_resonator_fluxline_VNA(self):
@@ -241,16 +240,21 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                 freqs = np.arange(freq-5e6, freq+5e6, 0.11e6)
                 for fluxline in fluxcurrent.channel_map:
                     t_start = time.strftime('%Y%m%d_%H%M%S')
-                    print('Starting ' + resonator + ' VNA Flux sweep with ' + fluxline)
+                    print('Starting resonator ' + resonator + 
+                          ' VNA Flux sweep with ' + fluxline)
                     self.measure_resonator_frequency_dac_scan(freqs=freqs,
                                                               dac_values=dac_values,
                                                               fluxChan=fluxline,
                                                               analyze=False)
                     print('Done VNA flux sweep with ' + fluxline)
-
+                    t_stop = time.strftime('%Y%m%d_%H%M%S')
                     ma.TwoD_Analysis(label='Resonator_dac_scan', normalize=False)
+
+                    timestamp = antools.get_timestamps_in_range(t_start,
+                                                                label=self.msmt_suffix)[0]
+
                     import pycqed.analysis_v2.spectroscopy_analysis as sa
-                    fit_res = sa.VNA_DAC_Analysis(timestamp=t_start)
+                    fit_res = sa.VNA_DAC_Analysis(timestamp)
                     amplitude = fit_res.dac_fit_res.params['amplitude'].value
                     print(amplitude)
                     items[2][fluxline] = amplitude
@@ -476,6 +480,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         res_power = 20*np.log10(self.mock_ro_pulse_amp_CW())
         pow_shift = 20
         mocked_values = []
+        
 
         for power in powers:
             h = 10**(power/20)*45e-3  # Lorentian baseline [V]
@@ -513,6 +518,13 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                 f0 = self.mock_freq_res() + self.mock_chi()
                 new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
                                                  ((freqs - f0))**2)
+            # Test resonator
+            f0_test_res = self.mock_freq_test_res()
+            A = 0.9*h
+            w = self.mock_res_width()
+            testres_dip = A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0_test_res))**2)
+            new_values -= testres_dip
+
             mocked_values = np.concatenate([mocked_values, new_values])
 
         mocked_values += np.random.normal(0,
@@ -588,6 +600,14 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             # High power regime
             f0 = self.mock_freq_res() + self.mock_chi()
             mocked_values = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
+
+        # TEST RESONATOR:
+        f0_test_res = self.mock_freq_test_res()
+        A = 0.9*h
+        w = self.mock_res_width()
+        testres_dip = A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0_test_res))**2)
+
+        mocked_values -= testres_dip
 
         mocked_values += np.random.normal(0,
                                           self.noise(), np.size(mocked_values))
@@ -694,7 +714,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
         MC.set_detector_function(d)
-        MC.run('mock_rabi_')
+        MC.run('mock_rabi'+self.msmt_suffix)
         a = ma.Rabi_Analysis(label='rabi_')
 
         return a.rabi_amplitudes['piPulse']
@@ -731,33 +751,45 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # self.instr_Lo_mw.get_instr().set('frequency', freq_qubit -
             # self.mw_freq_mod.get() + artificial_detuning)
 
-        s = swf.None_Sweep(parameter_name='Time',
+        s = swf.None_Sweep(name='T2_star', parameter_name='Time',
                            unit='s')
+        
+        low_lvl = self.measurement_signal(excited=False)
+        high_lvl = self.measurement_signal(excited=True)
+        detuning = np.abs(self.freq_qubit() - self.mock_freq_qubit())/1e6
+        highlow = (high_lvl-low_lvl)*np.exp(-detuning)
+        high_lvl = low_lvl + highlow
+
+        signal_amp = (high_lvl - low_lvl)/2
+        offset = (high_lvl + low_lvl)/2
+
         phase = 0
         oscillation_offset = 0
-        exponential_offset = 0.5
+        exponential_offset = offset
         frequency = self.mock_freq_qubit() - freq_qubit + artificial_detuning
-        # Mock values without calibration points
-        mocked_values = 0.5 * np.exp(-(times[0:-4] / self.mock_T2_star())) * (np.cos(
-            2 * np.pi * frequency * times[0:-4] + phase) + oscillation_offset) + exponential_offset
-        mocked_values = np.concatenate(
-            [mocked_values, (0, 0, 1, 1)])  # Calibration points
-        # Add noise:
-        mocked_values += np.random.normal(0, 0.01, np.size(mocked_values))
 
-        d = det.Mock_Detector(value_names=['F|1>'], value_units=['V'],
+        # Mock values without calibration points
+        mocked_values = signal_amp * np.exp(-(times[0:-4] / self.mock_T2_star())) * (np.cos(
+            2 * np.pi * frequency * times[0:-4] + phase) + oscillation_offset) + exponential_offset
+        
+        mocked_values = np.concatenate(
+            [mocked_values, [low_lvl, low_lvl, high_lvl, high_lvl]])  # Calibration points
+
+        # Add noise:
+        mocked_values += np.random.normal(0, self.noise(), np.size(mocked_values))
+
+        d = det.Mock_Detector(value_names=['raw w0'], value_units=['V'],
                               detector_control='soft', mock_values=mocked_values)
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('mock_ramsey_')
+        MC.run('mock_ramsey' + self.msmt_suffix)
 
         if analyze:
             a = ma.Ramsey_Analysis(auto=True, closefig=True,
                                    freq_qubit=freq_qubit,
-                                   artificial_detuning=artificial_detuning,
-                                   textbox=False)  # Textbox gives error on std of 'tau'
+                                   artificial_detuning=artificial_detuning)
             self.T2_star(a.T2_star['T2_star'])
             res = {'T2star': a.T2_star['T2_star'],
                    'frequency': a.qubit_frequency}
@@ -1052,7 +1084,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # Create folder
         datadir = r'D:\GitHubRepos\PycQED_py3\pycqed\tests\test_output'
         datestr = time.strftime('%Y%m%d')
-        timestr = time.strftime('%Y%m%d_%H%M%S')
+        timestr = time.strftime('%H%M%S')
         folder_name = '_Dep_Graph_Maintenance'
 
         try:

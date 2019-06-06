@@ -337,15 +337,15 @@ class VNA_analysis(complex_spectroscopy):
         Qe = self.fit_dicts['reso_fit']['fit_res'].params['Qe']
         theta = self.fit_dicts['reso_fit']['fit_res'].params['theta']
 
-        Qc = 1/np.real(1/(Qe.value*np.exp(1j*theta.value)))
-        Qi = 1/(1/Q.value - 1/Qc)
+        Qc = 1/np.real(1/(Qe*np.exp(1j*theta)))
+        Qi = 1/(1/Q - 1/Qc)
 
-        msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.stderr/1e6)
-        msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.stderr/1e3)
+        msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq/1e6,freq.stderr/1e6)
+        msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q/1e3,Q.stderr/1e3)
         msg += '\n'
         msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
         msg += '\n'
-        msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+        msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe/1e3)
         msg += '\n'
         msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
 
@@ -1194,9 +1194,9 @@ class SpecPowAnalysis(ba.BaseDataAnalysis):
   def __init__(self, t_start: str=None, t_stop: str=None,
                label: str='spectroscopy',
                pow_key='Instrument settings.Q.spec_pow',
-               frequency_key='Analysis.Fitted Params HM.f0.value',
-               width_key='Analysis.Fitted Params HM.kappa.value',
-               amp_key='Analysis.Fitted Params HM.A.value',
+               frequency_key='Analysis.Fitted Params HM.f0',
+               width_key='Analysis.Fitted Params HM.kappa',
+               amp_key='Analysis.Fitted Params HM.A',
                do_fitting=True,
                extract_only: bool=False):
 
