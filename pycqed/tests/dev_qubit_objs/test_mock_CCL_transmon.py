@@ -166,11 +166,14 @@ class Test_Mock_CCL(unittest.TestCase):
             assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_channel_amp() + threshold
             assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_channel_amp() - threshold
 
+<<<<<<< HEAD
     # def test_some_demo_for_timo(self):
     #     assert 3 ==4.2
 
         #assert self.CCL_qubit.mw_amp180 == self.CCL_qubit.mock_mw_amp180()
     @unittest.expectedFailure
+=======
+>>>>>>> 12734619f63dd08cf7d986924841be34c5bf2505
     def test_ramsey(self):
 
         self.CCL_qubit.mock_Ec(250e6)

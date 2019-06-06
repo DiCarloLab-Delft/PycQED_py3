@@ -6,10 +6,9 @@ import logging
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
-from pycqed.analysis import analysis_toolbox as antools
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis_v2 import spectroscopy_analysis as sa2
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object import Qubit
+import pycqed.analysis.analysis_toolbox as a_tools
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from autodepgraph import AutoDepGraph_DAG
@@ -31,42 +30,53 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         """
 
         self.add_parameter('mock_Ec', label='charging energy', unit='Hz',
-                           parameter_class=ManualParameter, initial_value=266.3e6)
+                           parameter_class=ManualParameter,
+                           initial_value=266.3e6)
 
         self.add_parameter('mock_Ej', label='josephson energy', unit='Hz',
-                           parameter_class=ManualParameter, initial_value=17.76e9)
-
-        self.add_parameter('mock_freq_qubit', label='qubit frequency', unit='Hz',
-                           docstring='A fixed value, can be made fancier by making it depend on Flux through E_c, E_j and flux',
                            parameter_class=ManualParameter,
-                           initial_value=np.sqrt(8*self.mock_Ec()*self.mock_Ej()) - self.mock_Ec())
+                           initial_value=17.76e9)
 
-        self.add_parameter('mock_freq_res', label='resonator frequency', unit='Hz',
-                           parameter_class=ManualParameter, initial_value=7.487628e9)
+        self.add_parameter(
+            'mock_freq_qubit', label='qubit frequency', unit='Hz',
+            parameter_class=ManualParameter,
+            initial_value=(np.sqrt(8*self.mock_Ec()*self.mock_Ej())
+                           - self.mock_Ec()))
 
-        self.add_parameter('mock_freq_test_res', label='test resonator frequency',
-                            unit='Hz', parameter_class=ManualParameter,
-                            initial_value=7.76459e9)
+        self.add_parameter('mock_freq_res', label='resonator frequency',
+                           unit='Hz', parameter_class=ManualParameter,
+                           initial_value=7.487628e9)
 
-        self.add_parameter('mock_ro_pulse_amp_CW', label='Readout pulse amplitude',
+        self.add_parameter('mock_freq_test_res',
+                           label='test resonator frequency',
+                           unit='Hz', parameter_class=ManualParameter,
+                           initial_value=7.76459e9)
+
+        self.add_parameter('mock_ro_pulse_amp_CW',
+                           label='Readout pulse amplitude',
                            unit='Hz', parameter_class=ManualParameter,
                            initial_value=0.048739)
 
-        self.add_parameter('mock_sweetspot_current', label='magnitude of sweetspot current',
+        self.add_parameter('mock_sweetspot_current',
+                           label='magnitude of sweetspot current',
                            unit='A', parameter_class=ManualParameter,
-                           initial_value= {'FBL_1': 0.25e-3, 'FBL_2': 0})
+                           initial_value={'FBL_1': 0.25e-3, 'FBL_2': 0})
 
-        self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude', unit='V',
-                           initial_value=0.5, parameter_class=ManualParameter)
+        self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude',
+                           unit='V', initial_value=0.5,
+                           parameter_class=ManualParameter)
 
         self.add_parameter('mock_T1', label='relaxation time', unit='s',
-                           initial_value=29e-6, parameter_class=ManualParameter)
+                           initial_value=29e-6,
+                           parameter_class=ManualParameter)
 
         self.add_parameter('mock_T2_star', label='Ramsey T2', unit='s',
-                           initial_value=1e-6, parameter_class=ManualParameter)
+                           initial_value=1e-6,
+                           parameter_class=ManualParameter)
 
-        self.add_parameter('mock_anharmonicity', label='anharmonicity', unit='Hz',
-                           initial_value=274e6, parameter_class=ManualParameter)
+        self.add_parameter('mock_anharmonicity', label='anharmonicity',
+                           unit='Hz', initial_value=274e6,
+                           parameter_class=ManualParameter)
 
         self.add_parameter('mock_spec_pow', label='optimal spec power', unit='dBm',
                            initial_value=-35, parameter_class=ManualParameter)
@@ -102,7 +112,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            ))**2/(self.mock_freq_qubit()+self.mock_anharmonicity() - self.mock_freq_res()),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mock_chi', label='dispersive shift', units='Hz',
+        self.add_parameter('mock_chi', label='dispersive shift', unit='Hz',
                            initial_value=self.mock_chi01()-self.mock_chi12()/2,
                            parameter_class=ManualParameter)
 
@@ -118,8 +128,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_fl_dc_ch', label='most closely coupled fluxline',
-                           unit='', initial_value='FBL_1', parameter_class=ManualParameter)    
-    
+                           unit='', initial_value='FBL_1', parameter_class=ManualParameter)
+
         self.add_parameter('resonator_freqs', unit='Hz', initial_value=None,
                            parameter_class=ManualParameter)
 
@@ -240,18 +250,21 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                 freqs = np.arange(freq-5e6, freq+5e6, 0.11e6)
                 for fluxline in fluxcurrent.channel_map:
                     t_start = time.strftime('%Y%m%d_%H%M%S')
-                    print('Starting resonator ' + resonator + 
-                          ' VNA Flux sweep with ' + fluxline)
+
                     self.measure_resonator_frequency_dac_scan(freqs=freqs,
                                                               dac_values=dac_values,
                                                               fluxChan=fluxline,
                                                               analyze=False)
                     print('Done VNA flux sweep with ' + fluxline)
+
                     t_stop = time.strftime('%Y%m%d_%H%M%S')
                     ma.TwoD_Analysis(label='Resonator_dac_scan', normalize=False)
 
-                    timestamp = antools.get_timestamps_in_range(t_start,
+                    timestamp = a_tools.get_timestamps_in_range(t_start,
                                                                 label=self.msmt_suffix)[0]
+
+                    ma.TwoD_Analysis(
+                        label='Resonator_dac_scan', normalize=False)
 
                     import pycqed.analysis_v2.spectroscopy_analysis as sa
                     fit_res = sa.VNA_DAC_Analysis(timestamp)
@@ -265,9 +278,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         return True
 
-
-
-
     def find_resonator_sweetspot(self, freqs=None, dac_values=None, fluxChan=None,
                                  update=True):
         '''
@@ -275,7 +285,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         TODO: - measure all FBL-resonator combinations
         TODO: - implement way of distinguishing which fluxline is most coupled
         TODO: - create method that moves qubits away from sweetspot when they are
-                not being measured (should not move them to some other qubit 
+                not being measured (should not move them to some other qubit
                 frequency of course)
         '''
         if freqs is None:
@@ -289,7 +299,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         if fluxChan is None:
             fluxChan = 'FBL_1'
-        
+
         t_start = time.strftime('%Y%m%d_%H%M%S')
         self.measure_resonator_frequency_dac_scan(freqs=freqs, dac_values=dac_values,
                                                   fluxChan=fluxChan, analyze=False)
@@ -306,7 +316,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
     def find_spec_pow(self, freqs=None, powers=None, update=True):
         '''
-        Should find the optimal spectroscopy power where the A/w ratio is 
+        Should find the optimal spectroscopy power where the A/w ratio is
         at a maximum
         '''
 
@@ -336,7 +346,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         Awratio = np.divide(A, w)
 
         ind = np.argmax(Awratio)
-        best_spec_pow = powers[ind]  # Should be some analysis and iterative method to
+        # Should be some analysis and iterative method to
+        best_spec_pow = powers[ind]
         # find the optimum
         print('from find_spec_pow:' + str(best_spec_pow))
         if update:
@@ -377,12 +388,14 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         from pycqed.analysis import fitting_models as fm
 
         A_res = np.abs((slope * (f / 1.e9 - f0_res) / f0_res) *
-                        fm.HangerFuncAmplitude(f, f0_res, Q, Qe, A, theta))
+                       fm.HangerFuncAmplitude(f, f0_res, Q, Qe, A, theta))
         A_test = np.abs((slope * (f / 1.e9 - f0_test) / f0_test) *
                         fm.HangerFuncAmplitude(f, f0_res, Q_test, Qe_test, A, theta))
 
-        A_res = abs(A * (1. - Q / Qe * np.exp(1.j * theta) / (1. + 2.j * Q * (f / 1.e9 - f0_res) / f0_res)))
-        A_test = abs(A * (1. - Q_test / Qe_test * np.exp(1.j * theta) / (1. + 2.j * Q_test * (f / 1.e9 - f0_test) / f0_test)))
+        A_res = abs(A * (1. - Q / Qe * np.exp(1.j * theta) /
+                         (1. + 2.j * Q * (f / 1.e9 - f0_res) / f0_res)))
+        A_test = abs(A * (1. - Q_test / Qe_test * np.exp(1.j * theta) /
+                          (1. + 2.j * Q_test * (f / 1.e9 - f0_test) / f0_test)))
 
         baseline = 0.40
         A_res -= A
@@ -402,14 +415,11 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         if analyze:
             ma2.Basic1DAnalysis()
 
-            
-            
-
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None, analyze=True,
                              close_fig=True, label='',
                              prepare_for_continuous_wave=True):
         '''
-        Can be made fancier by implementing different types of spectroscopy 
+        Can be made fancier by implementing different types of spectroscopy
         (e.g. pulsed/CW) and by imp using cfg_spec_mode.
 
         Uses a Lorentzian as a result for now
@@ -435,7 +445,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Width of peak
         wbase = 4e6
-        w = wbase/np.sqrt(0.1+10**(-(self.spec_pow()-self.mock_spec_pow()/2)/7))+wbase
+        w = wbase / \
+            np.sqrt(0.1+10**(-(self.spec_pow()-self.mock_spec_pow()/2)/7))+wbase
 
         # f0 = self.mock_freq_qubit() - df*(np.sin(1/2*np.pi*(current-Iref)/I0))**2
         f0 = np.sqrt(8*self.mock_Ec()*self.mock_Ej() *
@@ -624,7 +635,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             ma.Homodyne_Analysis(label='Resonator_scan', close_fig=close_fig)
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, fluxChan,
-                                             pulsed=True, MC=None, 
+                                             pulsed=True, MC=None,
                                              analyze=True, close_fig=True,
                                              nested_resonator_calibration=False,
                                              resonator_freqs=None):
@@ -851,9 +862,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
     def measurement_signal(self, excited=False):
         '''
-        Sets the readout signal level, depending on the readout frequency and 
+        Sets the readout signal level, depending on the readout frequency and
         resonator frequency.
-        The 'excited' parameter indicates whether the qubit is in the excited 
+        The 'excited' parameter indicates whether the qubit is in the excited
         state, which results in a 2 chi shift of the resonator
         '''
         power = 20*np.log10(self.ro_pulse_amp_CW())
@@ -1077,10 +1088,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.dag.update_monitor()
         self.dag.cfg_svg_filename
 
-
         url = self.dag.open_html_viewer()
         print('Dependancy Graph Created. URL = '+url)
-        
+
         # Create folder
         datadir = r'D:\GitHubRepos\PycQED_py3\pycqed\tests\test_output'
         datestr = time.strftime('%Y%m%d')
