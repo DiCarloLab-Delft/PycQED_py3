@@ -471,14 +471,17 @@ class CCLight_Transmon(Qubit):
         return self._mw_fine_delay
 
     def _set_flux_fine_delay(self,val):
-        lutman = self.find_instrument(self.instr_LutMan_Flux())
-        AWG = lutman.find_instrument(lutman.AWG())
-        using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
-        if using_QWG:
-            logging.warning('CCL transmon is using QWG. Not implemented.')
-        else:
-            AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
-            # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
+        if self.instr_LutMan_Flux() is not None: 
+            lutman = self.find_instrument(self.instr_LutMan_Flux())
+            AWG = lutman.find_instrument(lutman.AWG())
+            using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+            if using_QWG:
+                logging.warning('CCL transmon is using QWG. Not implemented.')
+            else:
+                AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
+                # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
+        else: 
+            logging.warning('No Flux LutMan specified, could not set flux timing fine')
         self._flux_fine_delay = val
 
 

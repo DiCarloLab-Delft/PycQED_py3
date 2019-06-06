@@ -14,6 +14,8 @@ from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 
+import numpy.fft as fft
+
 
 class Detector_Function(object):
 
@@ -1499,8 +1501,8 @@ class UHFQC_spectroscopy_detector(Soft_Detector):
     def acquire_data_point(self):
         RESULT_LENGTH = 1600
         vals = self.UHFQC.acquisition(samples=RESULT_LENGTH, acquisition_time=0.010, timeout=10)
-        a = max(np.abs(fft.fft(vals[0][1:int(len(RESULT_LENGTH)/2)])))
-        b = max(np.abs(fft.fft(vals[1][1:int(len(RESULT_LENGTH)/2)])))
+        a = max(np.abs(fft.fft(vals[0][1:int(RESULT_LENGTH/2)])))
+        b = max(np.abs(fft.fft(vals[1][1:int(RESULT_LENGTH/2)])))
         return a+b
 
 
