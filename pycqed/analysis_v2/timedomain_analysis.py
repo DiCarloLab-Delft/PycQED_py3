@@ -308,6 +308,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     self.proc_data_dict['projected_data_dict'][qbn].update(
                         {state_prob: data for key, data in data_dict.items() if
                          state_prob in key})
+            if self.cal_states_dict is None:
+                self.cal_states_dict = {}
             self.num_cal_points = np.array(list(
                 self.cal_states_dict.values())).flatten().size
 

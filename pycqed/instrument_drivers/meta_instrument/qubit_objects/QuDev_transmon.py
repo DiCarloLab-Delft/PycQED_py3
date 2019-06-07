@@ -3300,7 +3300,6 @@ class QuDev_transmon(Qubit):
             if for_ef is False:
                 self.measure_ramsey(times=times,
                                     artificial_detuning=artificial_detuning,
-                                    MC=MC,
                                     cal_points=cal_points,
                                     close_fig=close_fig,
                                     upload=upload, label=label)
