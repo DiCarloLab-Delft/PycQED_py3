@@ -12,6 +12,7 @@ import pycqed.analysis.analysis_toolbox as a_tools
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from autodepgraph import AutoDepGraph_DAG
+import matplotlib.pyplot as plt
 
 
 class Mock_CCLight_Transmon(CCLight_Transmon):
@@ -127,46 +128,84 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            initial_value={'FBL_1': 10e-3, 'FBL_2': 1},
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mock_fl_dc_ch', label='most closely coupled fluxline',
+        self.add_parameter('mock_cfg_dc_flux_ch', label='most closely coupled fluxline',
                            unit='', initial_value='FBL_1', parameter_class=ManualParameter)
 
-        self.add_parameter('resonator_freqs', unit='Hz', initial_value=None,
-                           parameter_class=ManualParameter)
+    def find_resonators(self, start_freq=7e9, stop_freq=8e9, power=-40,
+                        bandwidth=200, timeout=200, npts=2001, VNA=None):
+        
+        if VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    VNA = False
+                else:
+                    VNA = True
+            except:
+                VNA = False
 
-    def find_resonators_VNA(self, start_freq=7e9, stop_freq=8e9, power=-40,
-                            bandwidth=200, timeout=200, npts=50001, name='VNA'):
-        VNA = self.instr_VNA.get_instr()
-        t_start_meas = ma.a_tools.current_timestamp()
+        if VNA:
+            VNA = self.instr_VNA.get_instr()
+            t_start_meas = ma.a_tools.current_timestamp()
 
-        VNA.start_frequency(start_freq)
-        VNA.stop_frequency(stop_freq)
-        VNA.power(power)
-        VNA.bandwidth(bandwidth)
-        VNA.npts(npts)
-        # VNA.timeout(timeout)
+            VNA.start_frequency(start_freq)
+            VNA.stop_frequency(stop_freq)
+            VNA.power(power)
+            VNA.bandwidth(bandwidth)
+            VNA.npts(npts)
+            # VNA.timeout(timeout)
+            name = 'Initial_VNA'
 
-        name = 'Initial_VNA'
+            self.measure_with_VNA(VNA, name=name)
 
-        self.measure_with_VNA(VNA, name=name)
+            result = sa2.Initial_Resonator_Scan_Analysis(label=name)
+        else:
+            self.ro_pulse_amp_CW(0.01)
+            freqs = np.linspace(start_freq, stop_freq, npts)
+            self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
+            result = sa2.Initial_Resonator_Scan_Analysis()
 
-        result = sa2.Initial_VNA_Analysis(label=name)
 
         peak_freqs = []
         for peak in result.peaks:
             if peak not in peak_freqs:
                 peak_freqs.append(peak)
 
-        self.resonator_freqs(result.peaks)
-
         self.res_dict = {}
         for i, freq in enumerate(result.peaks):
-            self.res_dict[str(i)] = ['unknown', freq, {}, None]
+            self.res_dict[str(i)] = [freq, 'unknown', {}, None]
 
-        print(self.resonator_freqs())
+        print(self.res_dict)
         return True
 
-    def find_resonator_frequency_VNA(self, start_freq=7e9, stop_freq=8e9,
-                                     use_min=False, MC=None, update=True):
+    def calibrate_spec_pow(self, freqs=None, start_power=None):
+        if freqs is None:
+            freqs = np.arange(self.freq_qubit() - 50e6,
+                              self.freq_qubit() + 50e6, 1e6)
+
+        if start_power is None:
+            start_power = -40
+        power = start_power
+
+        w0, w = 1, 1
+
+        while w < 1.05*w0:
+            self.spec_pow(power)
+            self.measure_spectroscopy(freqs=freqs, analyze=False,
+                                      label='spec_pow_' + str(power) + '_dBm')
+
+            a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
+                                               qb_name=self.name)
+
+            w = a.params['kappa'].value
+
+            if w < w0:
+                w0 = w
+        return True
+
+
+    def find_resonator_frequency_initial(self, start_freq=7e9, stop_freq=8e9,
+                                         npts=50001, use_min=False, MC=None, 
+                                         update=True, VNA=None):
         '''
         quick script that uses measure_heterodyne_spectroscopy on a wide range
         to act as a sort of mock of a VNA resonator scan'.
@@ -174,47 +213,92 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         If it is a first scan (no freq_res yet in qubit object) it will perform
         a wide range scan. Otherwise it will zoom in on a resonator
         '''
+        if VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    VNA = False
+                else:
+                    VNA = True
+            except:
+                VNA = False
 
-        VNA = self.instr_VNA.get_instr()
-
+        delkeys = []
         for resonator, items in self.res_dict.items():
-            freq = items[1]
-
-            VNA.start_frequency(freq - 10e6)
-            VNA.stop_frequency(freq+10e6)
-            name = 'VNA_resonator_scan_' + str(round(freq/1e9, 4)) + 'GHz'
-
-            self.measure_with_VNA(VNA, name=name)
-            a = ma.Homodyne_Analysis(label=name)
-
-            if use_min:
-                f_res = a.min_frequency
+            freq = items[0]
+            if VNA:
+                start_freq = freq - 10e6
+                stop_freq = freq + 10e6
+                name = 'VNA_Resonator_scan_' + str(round(freq/1e9, 4)) + 'GHz'
+                self.measure_with_VNA(VNA, start_freq, stop_freq, npts)
             else:
-                f_res = a.fit_results.params['f0'].value*1e9
-            self.res_dict[resonator][1] = f_res
+                freqs = np.arange(freq-5e6, freq+5e6, 0.1e6)
+                name = 'Resonator_Scan' + self.msmt_suffix
+                self.measure_heterodyne_spectroscopy(freqs=freqs,
+                                                     analyze=False)
 
-        # if f_res > max(freqs) or f_res < max(freqs):
-        #     logging.warning(
-        #         'extracted frequency outside range of scan. Not updating')
-        if update:
-            self.freq_res(f_res)
-            self.ro_freq(f_res)
+            a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
+
+            dip = np.amin(a.data_y)
+            offset = a.fit_results.params['A'].value
+
+            if np.abs(dip/offset) > 0.5:
+                print('Removed candidate ' + resonator + ' (' + 
+                      str(round(freq/1e9, 3)) + ' GHz): Not a resonator')
+                delkeys.append(resonator) 
+            else:
+                if use_min:
+                    f_res = a.min_frequency
+                else:
+                    f_res = a.fit_results.params['f0'].value*1e9
+
+                # Check if not a duplicate
+                i = int(resonator)
+                if i > 0:
+                    prev_freq = self.res_dict[str(i-1)][0]
+                    if np.abs(prev_freq - f_res) < 10e6:
+                        delkeys.append(resonator)
+                        print('Removed candidate: ' + resonator + ' (' + 
+                              str(round(f_res/1e9, 3)) + ' GHz): Duplicate')
+                    else:
+                        self.res_dict[resonator][0] = f_res
+                        print("Added resonator " + resonator + ' (' + 
+                              str(round(f_res/1e9, 3)) + ' GHz)')
+
+        for delkey in delkeys:
+            self.res_dict.pop(delkey)
+
+        # Rearrange dictionary to start from 0 again:
+        i = 0
+        newdict = {}
+        for resonator, items in self.res_dict.items():
+            newdict[str(i)] = items
+            i += 1
+
+        self.res_dict = newdict
         return True
 
-    def find_test_resonators_VNA(self):
+    def find_test_resonators(self, VNA=None):
         """
-        Does a power sweep over the VNAs to see if they have a qubit attached
+        Does a power sweep over the resonators to see if they have a qubit attached
         or not, and changes the state in the res_dict
         """
-        VNA = self.instr_VNA.get_instr()
+        if VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    VNA = False
+                else:
+                    VNA = True
+            except:
+                VNA = False
 
         for resonator, items in self.res_dict.items():
-            freq = items[1]
-            state = items[0]
+            freq = items[0]
+            state = items[1]
 
             if state == 'unknown':
-                VNA.start_frequency(freq - 20e6)
-                VNA.stop_frequency(freq + 20e6)
+                if VNA:
+                    VNA.start_frequency(freq - 20e6)
+                    VNA.stop_frequency(freq + 20e6)
 
                 self.measure_resonator_power(freqs=np.arange(freq-20e6, freq+20e6, 0.5e6),
                                              powers=np.arange(-40, 10, 5),
@@ -228,26 +312,36 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
                 if np.abs(shift) > 1e6:
                     state = 'qubit_resonator'
+                    self.freq_res(freq)
                 else:
                     state = 'test_resonator'
-                self.res_dict[resonator][0] = state
-                self.res_dict[resonator][1] = freq
-        print(self.res_dict)
+                self.res_dict[resonator][0] = freq
+                self.res_dict[resonator][1] = state
         return True
 
-    def find_qubit_resonator_fluxline_VNA(self):
-        VNA = self.instr_VNA.get_instr()
+    def find_qubit_resonator_fluxline(self, VNA=False):
+        if VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    VNA = False
+                else:
+                    VNA = True
+            except:
+                VNA = False
+
         fluxcurrent = self.instr_FluxCtrl.get_instr()
-        print(fluxcurrent)
-        dac_values = np.arange(-40e-3, 40e-3, 0.1e-3)
+
+        dac_values = np.arange(0, 40e-3, 2e-3)
 
         for resonator, items in self.res_dict.items():
             best_amplitude = 0  # For comparing which one is coupled closest
-            if items[0] == 'qubit_resonator':
-                freq = items[1]
-                VNA.start_frequency(freq-20e6)
-                VNA.stop_frequency(freq+20e6)
-                freqs = np.arange(freq-5e6, freq+5e6, 0.11e6)
+            if items[1] == 'qubit_resonator':
+                freq = items[0]
+                if VNA:
+                    VNA = self.instr_VNA.get_instr()
+                    VNA.start_frequency(freq-20e6)
+                    VNA.stop_frequency(freq+20e6)
+                freqs = np.arange(freq-5e6, freq+5e6, 0.5e6)
                 for fluxline in fluxcurrent.channel_map:
                     t_start = time.strftime('%Y%m%d_%H%M%S')
 
@@ -258,7 +352,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                     print('Done VNA flux sweep with ' + fluxline)
 
                     t_stop = time.strftime('%Y%m%d_%H%M%S')
-                    ma.TwoD_Analysis(label='Resonator_dac_scan', normalize=False)
+                    ma.TwoD_Analysis(
+                        label='Resonator_dac_scan', normalize=False)
 
                     timestamp = a_tools.get_timestamps_in_range(t_start,
                                                                 label=self.msmt_suffix)[0]
@@ -274,7 +369,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
                     if amplitude > best_amplitude:
                         best_amplitude = amplitude
-                        self.fl_dc_ch(fluxline)
+                        self.cfg_dc_flux_ch(fluxline)
+                        self.res_dict[resonator][3] = 'Q' + fluxline[4]
 
         return True
 
@@ -298,7 +394,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             dac_values = np.linspace(-10e-3, 10e-3, 101)
 
         if fluxChan is None:
-            fluxChan = 'FBL_1'
+            if self.cfg_dc_flux_ch() == 1:  # Initial value
+                fluxChan = 'FBL_1'
+            else:
+                fluxChan = self.cfg_dc_flux_ch()
 
         t_start = time.strftime('%Y%m%d_%H%M%S')
         self.measure_resonator_frequency_dac_scan(freqs=freqs, dac_values=dac_values,
@@ -310,7 +409,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             sweetspot_current = -1*fit_res.sweet_spot_value
             self.fl_dc_V0(sweetspot_current)
             fluxcurrent = self.instr_FluxCtrl.get_instr()
-            fluxcurrent[self.fl_dc_ch()](sweetspot_current)
+            fluxcurrent[self.cfg_dc_flux_ch()](sweetspot_current)
 
         return True
 
@@ -338,7 +437,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             self.measure_spectroscopy(freqs=freqs, analyze=False)
 
             a = ma.Homodyne_Analysis(label=self.msmt_suffix,
-                                     fitting_model='lorentzian')
+                                     fitting_model='lorentzian',
+                                     qb_name=self.name)
             w.append(a.params['kappa'].value)
             A.append(a.params['A'].value)
 
@@ -355,17 +455,24 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
             a = sa.SpecPowAnalysis(t_start=t_start, t_stop=t_stop,
                                    label='spectroscopy_'+self.msmt_suffix,
-                                   pow_key='Instrument settings.'+self.name+'.spec_pow')
+                                   pow_key='Instrument settings.'+self.name +
+                                           '.spec_pow.value')
             best_spec_pow = a.fit_res['spec_pow']
 
             self.spec_pow(best_spec_pow)
             print(self.spec_pow())
             return True
 
-    def measure_with_VNA(self, VNA, MC=None, name='Mock_VNA', analyze=True):
+    def measure_with_VNA(self, start_freq, stop_freq, npts,
+                         MC=None, name='Mock_VNA', analyze=True):
         """
         Returns a SlopedHangerFuncAmplitude shaped function
         """
+        VNA = self.instr_VNA.get_instr()
+
+        VNA.start_frequency(start_freq)
+        VNA.stop_frequency(stop_freq)
+        VNA.npts(npts)
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -434,7 +541,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         h = self.measurement_signal(excited=False)  # Lorentian baseline [V]
         A0 = self.measurement_signal(excited=True) - h  # Peak height
 
-        current = self.instr_FluxCtrl.get_instr()[self.mock_fl_dc_ch()]()
+        current = self.instr_FluxCtrl.get_instr()[self.mock_cfg_dc_flux_ch()]()
         Iref = self.mock_sweetspot_current()['FBL_1']
         I0 = self.mock_flux_sensitivity()['FBL_1']
 
@@ -470,7 +577,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_points(freqs)
 
         MC.set_detector_function(d)
-        MC.run('mock_spectroscopy_'+self.msmt_suffix)
+        MC.run('mock_spectroscopy_'+self.msmt_suffix+label)
 
         if analyze:
             a = ma.Homodyne_Analysis(
@@ -491,7 +598,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         res_power = 20*np.log10(self.mock_ro_pulse_amp_CW())
         pow_shift = 20
         mocked_values = []
-        
 
         for power in powers:
             h = 10**(power/20)*45e-3  # Lorentian baseline [V]
@@ -533,7 +639,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             f0_test_res = self.mock_freq_test_res()
             A = 0.9*h
             w = self.mock_res_width()
-            testres_dip = A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0_test_res))**2)
+            testres_dip = A*(w/2.0)**2 / ((w/2.0)**2 +
+                                          ((freqs - f0_test_res))**2)
             new_values -= testres_dip
 
             mocked_values = np.concatenate([mocked_values, new_values])
@@ -629,10 +736,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_function(s)
         MC.set_sweep_points(freqs)
         MC.set_detector_function(d)
-        MC.run('Resonator_scan'+self.msmt_suffix)
+        MC.run('Resonator_Scan'+self.msmt_suffix)
 
         if analyze:
-            ma.Homodyne_Analysis(label='Resonator_scan', close_fig=close_fig)
+            ma.Homodyne_Analysis(label='Resonator_Scan', close_fig=close_fig)
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, fluxChan,
                                              pulsed=True, MC=None,
@@ -650,9 +757,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                             unit='Hz')
         s2 = swf.None_Sweep(name='Flux', parameter_name=fluxChan,
                             unit='A')
-
         freq_res = self.mock_freq_res()
-        Iref = self.mock_sweetspot_current()[fluxChan]
+        
+        fluxcurrent = self.instr_FluxCtrl.get_instr()
+        Iref = fluxcurrent[fluxChan]()
         I0 = self.mock_flux_sensitivity()[fluxChan]
         df = 2e6
 
@@ -764,7 +872,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         s = swf.None_Sweep(name='T2_star', parameter_name='Time',
                            unit='s')
-        
+
         low_lvl = self.measurement_signal(excited=False)
         high_lvl = self.measurement_signal(excited=True)
         detuning = np.abs(self.freq_qubit() - self.mock_freq_qubit())/1e6
@@ -782,12 +890,13 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # Mock values without calibration points
         mocked_values = signal_amp * np.exp(-(times[0:-4] / self.mock_T2_star())) * (np.cos(
             2 * np.pi * frequency * times[0:-4] + phase) + oscillation_offset) + exponential_offset
-        
+
         mocked_values = np.concatenate(
             [mocked_values, [low_lvl, low_lvl, high_lvl, high_lvl]])  # Calibration points
 
         # Add noise:
-        mocked_values += np.random.normal(0, self.noise(), np.size(mocked_values))
+        mocked_values += np.random.normal(0,
+                                          self.noise(), np.size(mocked_values))
 
         d = det.Mock_Detector(value_names=['raw w0'], value_units=['V'],
                               detector_control='soft', mock_values=mocked_values)

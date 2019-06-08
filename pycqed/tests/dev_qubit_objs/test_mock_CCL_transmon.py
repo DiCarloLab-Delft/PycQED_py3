@@ -174,6 +174,21 @@ class Test_Mock_CCL(unittest.TestCase):
                         self.CCL_qubit.mw_channel_amp(), eps)
                 # assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_channel_amp() + threshold
                 # assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_channel_amp() - threshold
+    
+    ###########################################################
+    # Test RO pulse calibration
+    ###########################################################    
+    def test_calibrate_ro_pulse_CW(self):
+        self.CCL_qubit.mock_ro_pulse_amp_CW(0.06)
+
+        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+
+        self.CCL_qubit.calibrate_ro_pulse_amp_CW()
+        eps = 0.1
+        assert self.CCL_qubit.ro_pulse_amp_CW() == pytest.approx(
+                self.CCL_qubit.mock_ro_pulse_amp_CW(), eps)
+
+
     ###########################################################
     # Test Ramsey
     ###########################################################

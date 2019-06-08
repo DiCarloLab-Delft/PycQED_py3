@@ -14,7 +14,7 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
-
+import logging
 
 import importlib
 importlib.reload(ba)
@@ -801,7 +801,7 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
       params = Model.make_params()
       fit_res = Model.fit(data=f0s,t=DAC_values, verbose=False)
 
-      print(fit_res.params)
+
 
       return fit_res
 
@@ -882,9 +882,9 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
           self.save_fig(fig, figname=savename, **kw)
 
 
-class Initial_VNA_Analysis(ba.BaseDataAnalysis):
+class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
     def __init__(self,
-                 label='Initial_VNA',
+                 label='Resonator_Scan',
                  do_fitting=False,
                  extract_only=False):
       super().__init__(label=label,
@@ -907,48 +907,47 @@ class Initial_VNA_Analysis(ba.BaseDataAnalysis):
       freqs = freqs[0]
       data = data[0]
 
+      peak_freqs, peak_heights, data = a_tools.peak_finder_v3(freqs, 
+                                                          data,
+                                                          perc=99, factor=-1,
+                                                          window_len=11)
 
-      peaks = a_tools.peak_finder(freqs, data,
-                                  percentile=85,
-                                  optimize=True)
-
-      dips_idx = [peaks['dips_idx']]
-      dips_idx = np.append(dips_idx, dips_idx[-1])
-
-
-      single_peak_idx = [dips_idx[0]]
-      for i in range(len(dips_idx)-1):
-        ind = dips_idx[i]
-        if np.abs(ind - dips_idx[i+1]) > 25:  # Other peak
-          single_peak_idx.append(dips_idx[i+1])
-
-
-
-      dip_freq = []
-      dip_idx = []
-      for ind in single_peak_idx:
-        ind_min = ind-30
-        ind_max = ind+30
-        # Find index of local minimum:
-        dip_ind = np.where(data == np.amin(data[ind_min:ind_max]))[0][0]
-        dip_freq.append(freqs[dip_ind])
-        dip_idx.append(dip_ind)
+      if len(peak_freqs) == 0:
+        logging.warning('No resonator peaks found!')
+      else:
+        single_peak_freqs = [peak_freqs[0]]
+        for i in range(len(peak_freqs) - 1):
+          if np.abs(peak_freqs[i]-peak_freqs[i+1]) > 5e6:
+            single_peak_freqs.append(peak_freqs[i+1])
 
       # Sometimes duplicates occur. This should remove them
-
       final_freqs = []
-      for freq in dip_freq:
+      for freq in single_peak_freqs:
         if freq not in final_freqs:
           final_freqs.append(freq)
 
-      final_idx = []
-      for idx in dip_idx:
-        if idx not in final_idx:
-          final_idx.append(idx)
+      idx = []
+      for freq in final_freqs:
+        idx.append(np.where(freqs==freq)[0][0])
 
+      # Find local minima:
+      dip_idx = []
+      dip_freqs = []
+      for ind in idx:
+        width = int(round(np.abs(5e6/(freqs[0]-freqs[1]))))
+        min_ind = ind - 20
+        max_ind = ind + 20
+        new_ind = np.where(data == np.amin(data[min_ind:max_ind]))[0][0]
+        dip_idx.append(new_ind)
+        dip_freqs.append(freqs[new_ind])
 
-      self.peaks = final_freqs
-      self.peaks_idx = final_idx
+      for ind in dip_idx:
+        if np.abs(data[ind]) < 0.5*np.std(data):
+          dip_idx.remove(ind)
+          dip_freqs.remove(freqs[ind])
+
+      self.peaks = dip_freqs
+      self.peaks_idx = dip_idx
       self.plot_fit_result()
 
     def plot_fit_result(self, normalize=False,
@@ -1194,9 +1193,9 @@ class SpecPowAnalysis(ba.BaseDataAnalysis):
   def __init__(self, t_start: str=None, t_stop: str=None,
                label: str='spectroscopy',
                pow_key='Instrument settings.Q.spec_pow',
-               frequency_key='Analysis.Fitted Params HM.f0',
-               width_key='Analysis.Fitted Params HM.kappa',
-               amp_key='Analysis.Fitted Params HM.A',
+               frequency_key='Analysis.Fitted Params HM.f0.value',
+               width_key='Analysis.Fitted Params HM.kappa.value',
+               amp_key='Analysis.Fitted Params HM.A.value',
                do_fitting=True,
                extract_only: bool=False):
 

@@ -325,7 +325,7 @@ class Qubit(Instrument):
 
             label = 'spec'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(
-                label=label, close_fig=True)
+                label=label, close_fig=True, qb_name=self.name)
 
             if update:
                 if use_max:
@@ -860,7 +860,7 @@ class Transmon(Qubit):
             else:
                 label = 'spectroscopy'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(
-                label=label, close_fig=True)
+                label=label, close_fig=True, qb_name=self.name)
 
             if update:
                 if use_max:

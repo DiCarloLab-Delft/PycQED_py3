@@ -88,7 +88,8 @@ class CCLight_Transmon(Qubit):
         
         self.add_parameter('instr_VNA', 
                            docstring='Vector Network Analyzer',
-                           parameter_class=InstrumentRefParameter)
+                           parameter_class=InstrumentRefParameter,
+                           initial_value=None)
         # LutMan's
         self.add_parameter('instr_LutMan_MW',
                            docstring='Lookuptable manager  for '
@@ -1235,7 +1236,7 @@ class CCLight_Transmon(Qubit):
         t_start = time.strftime('%Y%m%d_%H%M%S')
 
         for i, dac_value in enumerate(dac_values):
-            self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()](dac_value)
+            self.instr_FluxCtrl.get_instr()[self.cfg_dc_flux_ch()](dac_value)
             if i == 0:
               self.find_frequency(freqs=freqs, update=True)
             else:
@@ -1246,7 +1247,7 @@ class CCLight_Transmon(Qubit):
 
         a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
                               label='spectroscopy__' + self.name,
-                              dac_key='Instrument settings.fluxcurrent.'+self.fl_dc_ch(),
+                              dac_key='Instrument settings.fluxcurrent.'+self.cfg_dc_flux_ch(),
                               degree=2)
 
         pc = a.fit_res['fit_polycoeffs']
@@ -1257,7 +1258,7 @@ class CCLight_Transmon(Qubit):
         if update:
             self.fl_dc_V0(sweetspot_current)
         if set_to_sweetspot:
-            self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()](sweetspot_current)
+            self.instr_FluxCtrl.get_instr()[self.cfg_dc_flux_ch()](sweetspot_current)
         
         return True
 

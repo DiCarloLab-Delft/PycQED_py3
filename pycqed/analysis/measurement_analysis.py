@@ -7757,8 +7757,8 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
             shift = f_high - f_low
         else:
             shift = 0
-            print('f_high: ' + str(f_high))
-            print('f_low:  ' + str(f_low))
+            logging.warning('No resonator shift found. Check if test resonator'
+                            ' or add/remove attenuation.')
             # raise Exception('High power regime frequency found to be higher than'
             #                 'low power regime frequency')
         results = [shift, P_result, f_low, f_high]
