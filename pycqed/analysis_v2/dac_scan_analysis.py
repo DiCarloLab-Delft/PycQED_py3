@@ -670,13 +670,13 @@ class DAC_analysis(ma.TwoD_Analysis):
         self.linecut_fit_result = linecut_fit_result
         f0s = []
         for res in self.linecut_fit_result:
-            f0s.append(res.values['f0']*1e9)
+            f0s.append(res.values['f0'])
         self.f0s = np.array(f0s)
         self.run_full_analysis()
         self.dac_fit_res = self.fit_dac_arc()
         self.sweet_spot_value = self.dac_fit_res['sweetspot_dac']
         self.plot_fit_result()
-    
+
     def fit_linecuts(self):
         linecut_mag = np.array(self.measured_values)[0].T
         sweep_points = self.sweep_points
@@ -685,77 +685,104 @@ class DAC_analysis(ma.TwoD_Analysis):
             fit_result.append(self.qubit_fit(sweep_points, linecut))
         return fit_result
 
-    def qubit_fit(self, sweep_points, linecut_mag):
-        min_index = np.argmin(linecut_mag)
-        max_index = np.argmax(linecut_mag)
+    def qubit_fit(self, sweep_points, linecut_mag, **kw):
+        """
+        This is basically a modified copy of the 'fit_data' function of the
+        Qubit_Spectroscopy_Analysis method.
+        Does not support 2nd peak fitting, as it does not seem necessary.
+        """
+        frequency_guess = kw.get('frequency_guess', None)
+        percentile = kw.get('percentile', 20)
+        num_sigma_threshold = kw.get('num_sigma_threshold', 5)
+        window_len_filter = kw.get('window_len_filter', 3)
+        optimize = kw.pop('optimize', True)
+        verbose = kw.get('verbose', False)
 
-        min_frequency = sweep_points[min_index]
-        max_frequency = sweep_points[max_index]
+        self.data_dist = linecut_mag
 
-        measured_powers_smooth = a_tools.smooth(linecut_mag,
-                                                window_len=11)
-        peaks = a_tools.peak_finder((sweep_points),
-                                    measured_powers_smooth,
-                                    window_len=0)
+        data_dist_smooth = a_tools.smooth(self.data_dist,
+                                          window_len=window_len_filter)
+        self.peaks = a_tools.peak_finder(sweep_points,
+                                         data_dist_smooth,
+                                         percentile=percentile,
+                                         num_sigma_threshold=num_sigma_threshold,
+                                         optimize=optimize,
+                                         window_len=0)
 
-        # Search for peak
-        if peaks['peak'] is not None:  # look for peaks first
-            f0 = peaks['peak']
-            amplitude_factor = -1.
-        elif peaks['dip'] is not None:  # then look for dips
-            f0 = peaks['dip']
-            amplitude_factor = 1.
-        else:  # Otherwise take center of range
-            f0 = np.median(sweep_points)
-            amplitude_factor = -1.
-            logging.warning('No peaks or dips in range')
-            # If this error is raised, it should continue the analysis but
-            # not use it to update the qubit object
-            # N.B. This not updating is not implemented as of 9/2017
+        # extract highest peak -> ge transition
+        if frequency_guess is not None:
+            f0 = frequency_guess
+            kappa_guess = (max(self.sweep_points)-min(self.sweep_points))/20
+            key = 'peak'
+        elif self.peaks['dip'] is None:
+            f0 = self.peaks['peak']
+            kappa_guess = self.peaks['peak_width'] / 4
+            key = 'peak'
+        elif self.peaks['peak'] is None:
+            f0 = self.peaks['dip']
+            kappa_guess = self.peaks['dip_width'] / 4
+            key = 'dip'
+        # elif self.peaks['dip'] < self.peaks['peak']:
+        elif np.abs(data_dist_smooth[self.peaks['dip_idx']]) < \
+                np.abs(data_dist_smooth[self.peaks['peak_idx']]):
+            f0 = self.peaks['peak']
+            kappa_guess = self.peaks['peak_width'] / 4
+            key = 'peak'
+        # elif self.peaks['peak'] < self.peaks['dip']:
+        elif np.abs(data_dist_smooth[self.peaks['dip_idx']]) > \
+                np.abs(data_dist_smooth[self.peaks['peak_idx']]):
+            f0 = self.peaks['dip']
+            kappa_guess = self.peaks['dip_width'] / 4
+            key = 'dip'
+        else:  # Otherwise take center of range and raise warning
+            f0 = np.median(self.sweep_points)
+            kappa_guess = 0.005 * 1e9
+            logging.warning('No peaks or dips have been found. Initial '
+                            'frequency guess taken '
+                            'as median of sweep points (f_guess={}), '
+                            'initial linewidth '
+                            'guess was taken as kappa_guess={}'.format(
+                                f0, kappa_guess))
+            key = 'peak'
 
-            # f is expected in Hz but f0 in GHz!
-        Model = fit_mods.SlopedHangerAmplitudeModel
-        # added reject outliers to be robust agains CBox data acq bug.
-        # this should have no effect on regular data acquisition and is
-        # only used in the guess.
-        amplitude_guess = max(dm_tools.reject_outliers(np.sqrt(linecut_mag)))
+        tallest_peak = f0  # the ge freq
+        if verbose:
+            print('Largest ' + key + ' is at ', tallest_peak)
+        if f0 == self.peaks[key]:
+            tallest_peak_idx = self.peaks[key + '_idx']
+            if verbose:
+                print('Largest ' + key + ' idx is ', tallest_peak_idx)
 
-        # Creating parameters and estimations
-        S21min = (min(dm_tools.reject_outliers(np.sqrt(linecut_mag))) /
-                  max(dm_tools.reject_outliers(np.sqrt(linecut_mag))))
+        amplitude_guess = np.pi * kappa_guess * \
+            abs(max(self.data_dist) - min(self.data_dist))
+        if key == 'dip':
+            amplitude_guess = -amplitude_guess
 
-        Q = f0 / abs(min_frequency - max_frequency)
-        Qe = abs(Q / abs(1 - S21min))
+        LorentzianModel = fit_mods.LorentzianModel
 
-        # Note: input to the fit function is in GHz for convenience
-        Model.set_param_hint('f0', value=f0 * 1e-9,
-                             min=min(sweep_points) * 1e-9,
-                             max=max(sweep_points) * 1e-9)
-        Model.set_param_hint('A', value=amplitude_guess)
-        Model.set_param_hint('Q', value=Q, min=1, max=50e6)
-        Model.set_param_hint('Qe', value=Qe, min=1, max=50e6)
-        # NB! Expressions are broken in lmfit for python 3.5 this has
-        # been fixed in the lmfit repository but is not yet released
-        # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
-        Model.set_param_hint('Qi', expr='abs(1./(1./Q-1./Qe*cos(theta)))',
-                             vary=False)
-        Model.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
-        Model.set_param_hint('theta', value=0, min=-np.pi / 2,
-                             max=np.pi / 2)
-        Model.set_param_hint('slope', value=0, vary=True)
+        LorentzianModel.set_param_hint('f0',
+                                       min=min(self.sweep_points),
+                                       max=max(self.sweep_points),
+                                       value=f0)
+        LorentzianModel.set_param_hint('A',
+                                       value=amplitude_guess)
 
-        params = Model.make_params()
+        LorentzianModel.set_param_hint('offset',
+                                       value=np.mean(self.data_dist),
+                                       vary=True)
+        LorentzianModel.set_param_hint('kappa',
+                                       value=kappa_guess,
+                                       min=1,
+                                       vary=True)
+        LorentzianModel.set_param_hint('Q',
+                                       expr='f0/kappa',
+                                       vary=False)
+        self.params = LorentzianModel.make_params()
 
+        fit_res = LorentzianModel.fit(data=self.data_dist,
+                                      f=self.sweep_points,
+                                      params=self.params)
 
-        data_x = sweep_points
-        data_y = np.sqrt(linecut_mag)
-
-        # # make sure that frequencies are in Hz
-        # if np.floor(data_x[0]/1e8) == 0:  # frequency is defined in GHz
-        #     data_x = data_x*1e9
-
-        fit_res = Model.fit(data=data_y,
-                            f=data_x, verbose=False)
         return fit_res
 
     def fit_dac_arc(self):

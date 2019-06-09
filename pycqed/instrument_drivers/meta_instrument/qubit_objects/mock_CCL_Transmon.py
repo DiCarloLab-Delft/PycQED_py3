@@ -61,10 +61,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_sweetspot_current',
                            label='magnitude of sweetspot current',
                            unit='A', parameter_class=ManualParameter,
-                           initial_value=0.25e-3)
+                           initial_value=1.3e-3)
 
         self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude',
-                           unit='V', initial_value=0.5,
+                           unit='V', initial_value=0.41235468,
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_T1', label='relaxation time', unit='s',
@@ -72,7 +72,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_T2_star', label='Ramsey T2', unit='s',
-                           initial_value=1e-6,
+                           initial_value=23.478921e-6,
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_anharmonicity', label='anharmonicity',
@@ -118,7 +118,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('noise', label='noise level', unit='V',
-                           initial_value=0.01e-3, parameter_class=ManualParameter)
+                           initial_value=1e-6, parameter_class=ManualParameter)
 
         self.add_parameter('mock_res_width', label='resonator peak width', unit='Hz',
                            initial_value=1e6, parameter_class=ManualParameter)
@@ -208,6 +208,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             power += 5
             if w < w0:
                 w0 = w
+        
+        print('setting spectroscopy power to {}'.format(power-5))
+        self.spec_pow(power-5)
         return True
 
     def find_resonator_frequency_initial(self, start_freq=7e9, stop_freq=8e9,
@@ -566,6 +569,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         I0 = self.mock_flux_current_overall()
 
         total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
+
         # Height of peak [V]
         K_power = 1/np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
         K_current = np.sqrt(np.abs(np.cos(2*np.pi*total_flux))) 
@@ -621,8 +625,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         mocked_values = []
 
         for power in powers:
-            h = 10**(power/20)*45e-3  # Lorentian baseline [V]
-            A = 0.9*h   # Height of peak [V]
+            h = 10**(power/20)*10e-3  # Lorentian baseline [V]
+            A = 0.8*h   # Height of peak [V]
             w = self.mock_res_width()
             if power <= res_power:
                 # Good signal
@@ -658,7 +662,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                                  ((freqs - f0))**2)
             # Test resonator
             f0_test_res = self.mock_freq_test_res()
-            A = 0.9*h
+            A = 0.8*h
             w = self.mock_res_width()
             testres_dip = A*(w/2.0)**2 / ((w/2.0)**2 +
                                           ((freqs - f0_test_res))**2)
@@ -706,8 +710,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         pow_shift = self.mock_pow_shift()  # At which power the high power regime occurs
 
         power = 20*np.log10(self.ro_pulse_amp_CW())
-        h = 10**(power/20)*45e-3  # Lorentian baseline [V]
-        A = 0.9*h   # Height of peak [V]
+        h = 10**(power/20)*10e-3  # Lorentian baseline [V]
+        A = 0.8*h   # Height of peak [V]
         w = self.mock_res_width()
 
         if power <= res_power:
@@ -742,7 +746,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # TEST RESONATOR:
         f0_test_res = self.mock_freq_test_res()
-        A = 0.9*h
+        A = 0.8*h
         w = self.mock_res_width()
         testres_dip = A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0_test_res))**2)
 
@@ -801,7 +805,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             h = self.measurement_signal(excited=False)
             A0 = self.measurement_signal(excited=True) - h
 
-            K_current = np.sqrt(np.abs(np.cos(2*np.pi*(dac_value-Iref)/I0)))
+            K_current = np.sqrt(np.abs(np.cos(2*np.pi*total_flux)))
             K_power = 1 / \
                 np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
             A = K_current*K_power*A0   # Height of peak [V]
@@ -811,7 +815,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                          self.mock_spec_pow()/2)/7)) + wbase
 
             f0 = np.sqrt(8*self.mock_Ec()*self.mock_Ej() *
-                         np.abs(np.cos(np.pi*(dac_value-Iref)/I0))) - self.mock_Ec()
+                         np.abs(np.cos(np.pi*(total_flux)))) - self.mock_Ec()
             
             new_values = h + A*(w/2.0)**2 / ((w/2.0)**2 +
                                              ((freqs - f0))**2)
@@ -860,19 +864,26 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                             unit='Hz')
         s2 = swf.None_Sweep(name='Flux', parameter_name=fluxChan,
                             unit='A')
-        freq_res = self.mock_freq_res()
 
+        freq_res = self.mock_freq_res()
         fluxcurrent = self.instr_FluxCtrl.get_instr()
-        Iref = fluxcurrent[fluxChan]()
-        I0 = self.mock_flux_sensitivity()[fluxChan]
         df = 2e6
 
         mocked_values = []
         for dac_value in dac_values:
-            h = self.ro_pulse_amp_CW()*45e-3  # Lorentian baseline [V]
-            A = 0.9*h   # Height of peak [V]
+            fluxcurrent[fluxChan](dac_value)
+
+            fluxbias = 0
+            for i in self.mock_flux_sensitivity():
+                fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
+
+            I0 = self.mock_flux_current_overall()
+            total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
+
+            h = self.ro_pulse_amp_CW()*10e-3  # Lorentian baseline [V]
+            A = 0.8*h   # Height of peak [V]
             w = self.mock_res_width()    # Full width half maximum of peak
-            f0 = freq_res - df*(np.sin(1/2*np.pi*(dac_value-Iref)/I0))**2
+            f0 = freq_res - df*(np.sin(1/2*np.pi*(total_flux)))**2
             new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
                                              ((freqs - f0))**2)
             new_values += np.random.normal(0,
@@ -927,17 +938,17 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         offset = (high_lvl + low_lvl)/2
         mocked_values = offset + signal_amp*np.cos(np.pi*f_rabi*amps)
 
-        # Add (0,0.5) normal distributed noise
-        mocked_values += np.random.normal(0,
-                                          self.noise(), np.size(mocked_values))
-        d = det.Mock_Detector(value_names=['raw w0'], value_units=['V'],
-                              detector_control='soft', mock_values=mocked_values)  # Does not exist yet
+        mocked_values = self.values_to_IQ(mocked_values)  # This adds noise too
+
+        d = det.Mock_Detector(value_names=['raw w0', 'raw w1'], 
+                              value_units=['V', 'V'], detector_control='soft', 
+                              mock_values=mocked_values) 
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
         MC.set_detector_function(d)
         MC.run('mock_rabi'+self.msmt_suffix)
-        a = ma.Rabi_Analysis(label='rabi_')
+        a = ma.Rabi_Analysis(label='rabi_', close_fig=close_fig)
 
         return a.rabi_amplitudes['piPulse']
 
@@ -950,12 +961,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             MC = self.instr_MC.get_instr()
 
         if times is None:
-            stepsize = (self.mock_T2_star()*4/61)//(abs(self.cfg_cycle_time())) \
+            stepsize = (self.T2_star()*4/61)//(abs(self.cfg_cycle_time())) \
                 * abs(self.cfg_cycle_time())
-            times = np.arange(0, self.mock_T2_star()*4, stepsize)
+            times = np.arange(0, self.T2_star()*4, stepsize)
 
         if artificial_detuning is None:
-            artificial_detuning = 5/times[-1]
+            artificial_detuning = 3/times[-1]
 
         # Calibration points:
         dt = times[1] - times[0]
@@ -964,8 +975,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                  times[-1]+2*dt,
                                  times[-1]+3*dt,
                                  times[-1]+4*dt)])
-        if prepare_for_timedomain:
-            self.prepare_for_timedomain()
+        # if prepare_for_timedomain:
+        #     self.prepare_for_timedomain()
 
         if freq_qubit is None:
             freq_qubit = self.freq_qubit()
@@ -1001,7 +1012,11 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         mocked_values += np.random.normal(0,
                                           self.noise(), np.size(mocked_values))
 
-        d = det.Mock_Detector(value_names=['raw w0'], value_units=['V'],
+
+        mocked_values = self.values_to_IQ(mocked_values)
+
+        d = det.Mock_Detector(value_names=['raw w1', 'raw w0'], 
+                              value_units=['V', 'V'],
                               detector_control='soft', mock_values=mocked_values)
 
         MC.set_sweep_function(s)
@@ -1058,8 +1073,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         mocked_values += np.random.normal(0,
                                           self.noise(), np.size(mocked_values))
 
-        d = det.Mock_Detector(value_names=['raw w0'], value_units=['V'],
-                              detector_control='soft', mock_values=mocked_values)
+        mocked_values = self.values_to_IQ(mocked_values)
+        d = det.Mock_Detector(value_names=['raw w0', 'raw w1'], 
+                              value_units=['V', 'V'], detector_control='soft',
+                              mock_values=mocked_values)
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
@@ -1086,8 +1103,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         f_ro = self.ro_freq()
 
-        h = 10**(power/20)*45e-3  # Lorentian baseline [V]
-        A = 0.9*h   # Height of peak [V]
+        h = 10**(power/20)*10e-3  # Lorentian baseline [V]
+        A = 0.8*h   # Height of peak [V]
         w = self.mock_res_width()
 
         # Determine if in high / low power regime:
@@ -1117,6 +1134,18 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             signal = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((f_ro - f0))**2)
 
         return signal
+
+    def values_to_IQ(self, mocked_values, theta=15):
+        theta = theta * np.pi/180
+        MockI = 1/np.sqrt(2) * np.real(mocked_values*np.exp(1j*theta))
+        MockQ = 1/np.sqrt(2) * np.real(mocked_values*np.exp(1j*(theta-np.pi/2)))
+
+        vals = []
+        for I, Q in zip(MockI, MockQ):
+            I += np.random.normal(0, self.noise(), 1)
+            Q += np.random.normal(0, self.noise(), 1)
+            vals.append([I, Q])
+        return vals
 
     ###########################################################################
     # AutoDepGraph

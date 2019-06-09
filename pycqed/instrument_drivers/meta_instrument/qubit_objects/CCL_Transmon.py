@@ -1229,9 +1229,9 @@ class CCLight_Transmon(Qubit):
         if dac_values is None:
             if self.fl_dc_V0() is not None:
                 dac_values = np.linspace(self.fl_dc_V0() - 0.5e-3,
-                                         self.fl_dc_V0() + 0.5e-3, 6)
+                                         self.fl_dc_V0() + 0.5e-3, 4)
             else:
-                dac_values = np.linspace(-0.5e-3, 0.5e-3, 6)
+                dac_values = np.linspace(-0.5e-3, 0.5e-3, 4)
 
         if fluxChan is None:
             if self.cfg_dc_flux_ch() is not None:
@@ -1253,7 +1253,7 @@ class CCLight_Transmon(Qubit):
             a = ma2.da.DAC_analysis(timestamp=timestamp)
             self.flux_polycoeff(a.dac_fit_res['fit_polycoeffs'])
             sweetspot_current = a.dac_fit_res['sweetspot_dac']
-            
+
         elif method == 'tracked':
             t_start = time.strftime('%Y%m%d_%H%M%S')
 
