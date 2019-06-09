@@ -10,7 +10,7 @@ from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
 from pycqed.measurement.openql_experiments import pygsti_oql
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.analysis.tools import cryoscope_tools as ct
-
+from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import gen_sweep_pts
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
@@ -1212,11 +1212,13 @@ class CCLight_Transmon(Qubit):
         return True
 
     def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True, 
-                             set_to_sweetspot=True):
+                             set_to_sweetspot=True, method='DAC', fluxChan=None):
         '''
         Should be edited such that it contains reference to different measurement
         methods (tracking / 2D scan / broad spectroscopy)
-
+  
+        method = 'DAC' - uses ordinary 2D DAC scan
+                 'tracked - uses tracked spectroscopy (not really implemented)'
         TODO: If spectroscopy does not yield a peak, it should discard it
         '''
         if freqs is None:
@@ -1224,36 +1226,59 @@ class CCLight_Transmon(Qubit):
             freq_range = 300e6
             freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
                               0.5e6)
-
         if dac_values is None:
             if self.fl_dc_V0() is not None:
-                dac_values = np.linspace(self.fl_dc_V0() - 1e-3,
-                                         self.fl_dc_V0() + 1e-3, 6)
+                dac_values = np.linspace(self.fl_dc_V0() - 0.5e-3,
+                                         self.fl_dc_V0() + 0.5e-3, 6)
             else:
-                dac_values = np.linspace(-1e-3, 1e-3, 6)
+                dac_values = np.linspace(-0.5e-3, 0.5e-3, 6)
 
-        t_start = time.time()
-        t_start = time.strftime('%Y%m%d_%H%M%S')
-
-        for i, dac_value in enumerate(dac_values):
-            self.instr_FluxCtrl.get_instr()[self.cfg_dc_flux_ch()](dac_value)
-            if i == 0:
-              self.find_frequency(freqs=freqs, update=True)
+        if fluxChan is None:
+            if self.cfg_dc_flux_ch() is not None:
+                fluxChan = self.cfg_dc_flux_ch()
             else:
-              self.find_frequency(update=True)
+                logging.error('No fluxchannel found or specified. Please '
+                              'specify fluxChan')
 
-        t_end = time.time()
-        t_end = time.strftime('%Y%m%d_%H%M%S')
+        if method == 'DAC':
+            t_start = time.strftime('%Y%m%d_%H%M%S')
+            self.measure_qubit_frequency_dac_scan(freqs=freqs, 
+                                                  dac_values=dac_values,
+                                                  fluxChan=fluxChan,
+                                                  analyze=False)
+            timestamp = a_tools.get_timestamps_in_range(t_start, 
+                                                        label='Qubit_dac_scan'+
+                                                              self.msmt_suffix)
+            timestamp = timestamp[0]
+            a = ma2.da.DAC_analysis(timestamp=timestamp)
+            self.flux_polycoeff(a.dac_fit_res['fit_polycoeffs'])
+            sweetspot_current = a.dac_fit_res['sweetspot_dac']
+            
+        elif method == 'tracked':
+            t_start = time.strftime('%Y%m%d_%H%M%S')
 
-        a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
-                              label='spectroscopy__' + self.name,
-                              dac_key='Instrument settings.fluxcurrent.'+self.cfg_dc_flux_ch(),
-                              degree=2)
+            for i, dac_value in enumerate(dac_values):
+                self.instr_FluxCtrl.get_instr()[self.cfg_dc_flux_ch()](dac_value)
+                if i == 0:
+                    self.find_frequency(freqs=freqs, update=True)
+                else:
+                    self.find_frequency(update=True)
 
-        pc = a.fit_res['fit_polycoeffs']
+            t_end = time.strftime('%Y%m%d_%H%M%S')
 
-        self.flux_polycoeff(pc)
-        sweetspot_current = -pc[1]/(2*pc[0])
+            a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
+                                  label='spectroscopy__' + self.name,
+                                  dac_key='Instrument settings.fluxcurrent.'+self.cfg_dc_flux_ch(),
+                                  degree=2)
+
+            pc = a.fit_res['fit_polycoeffs']
+
+            self.flux_polycoeff(pc)
+            sweetspot_current = -pc[1]/(2*pc[0])
+
+        else:
+            logging.error('Sweetspot method {} unknown. '
+                          'Use "DAC" or "tracked".'.format(method))
 
         if update:
             self.fl_dc_V0(sweetspot_current)

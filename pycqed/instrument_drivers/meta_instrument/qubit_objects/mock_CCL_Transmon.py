@@ -61,7 +61,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_sweetspot_current',
                            label='magnitude of sweetspot current',
                            unit='A', parameter_class=ManualParameter,
-                           initial_value={'FBL_1': 0.25e-3, 'FBL_2': 0})
+                           initial_value=0.25e-3)
 
         self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude',
                            unit='V', initial_value=0.5,
@@ -125,15 +125,20 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         self.add_parameter('mock_flux_sensitivity', label='sensitivity to flux in current',
                            unit='A',
-                           initial_value={'FBL_1': 10e-3, 'FBL_2': 1},
+                           initial_value={'FBL_1': 1, 'FBL_2': 0.001},
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('mock_flux_current_overall', unit='A',
+                           initial_value=10e-3, 
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_cfg_dc_flux_ch', label='most closely coupled fluxline',
                            unit='', initial_value='FBL_1', parameter_class=ManualParameter)
 
     def find_resonators(self, start_freq=7e9, stop_freq=8e9, power=-40,
-                        bandwidth=200, timeout=200, npts=2001, VNA=None):
-        
+                        bandwidth=200, timeout=200, npts=2001, VNA=None,
+                        display=True):
+
         if VNA is None:
             try:
                 if self.instr_VNA.get_instr() == '':
@@ -164,7 +169,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
             result = sa2.Initial_Resonator_Scan_Analysis()
 
-
         peak_freqs = []
         for peak in result.peaks:
             if peak not in peak_freqs:
@@ -172,9 +176,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         self.res_dict = {}
         for i, freq in enumerate(result.peaks):
-            self.res_dict[str(i)] = [freq, 'unknown', {}, None]
+            self.res_dict[str(i)] = [freq, 'unknown', {}, None, 0]
 
-        print(self.res_dict)
+        if display:
+            for resonator, items in self.res_dict.items():
+                print(resonator + ': ' + str(items[0]))
+
         return True
 
     def calibrate_spec_pow(self, freqs=None, start_power=None):
@@ -186,9 +193,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             start_power = -40
         power = start_power
 
-        w0, w = 1, 1
+        w0, w = 1e9, 1e9
 
-        while w < 1.05*w0:
+        while w < 1.1*w0:
             self.spec_pow(power)
             self.measure_spectroscopy(freqs=freqs, analyze=False,
                                       label='spec_pow_' + str(power) + '_dBm')
@@ -197,14 +204,14 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                                qb_name=self.name)
 
             w = a.params['kappa'].value
-
+            print('Power: {} w: {}'.format(power, w))
+            power += 5
             if w < w0:
                 w0 = w
         return True
 
-
     def find_resonator_frequency_initial(self, start_freq=7e9, stop_freq=8e9,
-                                         npts=50001, use_min=False, MC=None, 
+                                         npts=50001, use_min=False, MC=None,
                                          update=True, VNA=None):
         '''
         quick script that uses measure_heterodyne_spectroscopy on a wide range
@@ -242,9 +249,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             offset = a.fit_results.params['A'].value
 
             if np.abs(dip/offset) > 0.5:
-                print('Removed candidate ' + resonator + ' (' + 
+                print('Removed candidate ' + resonator + ' (' +
                       str(round(freq/1e9, 3)) + ' GHz): Not a resonator')
-                delkeys.append(resonator) 
+                delkeys.append(resonator)
             else:
                 if use_min:
                     f_res = a.min_frequency
@@ -257,11 +264,11 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                     prev_freq = self.res_dict[str(i-1)][0]
                     if np.abs(prev_freq - f_res) < 10e6:
                         delkeys.append(resonator)
-                        print('Removed candidate: ' + resonator + ' (' + 
+                        print('Removed candidate: ' + resonator + ' (' +
                               str(round(f_res/1e9, 3)) + ' GHz): Duplicate')
                     else:
                         self.res_dict[resonator][0] = f_res
-                        print("Added resonator " + resonator + ' (' + 
+                        print("Added resonator " + resonator + ' (' +
                               str(round(f_res/1e9, 3)) + ' GHz)')
 
         for delkey in delkeys:
@@ -331,7 +338,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         fluxcurrent = self.instr_FluxCtrl.get_instr()
 
-        dac_values = np.arange(0, 40e-3, 2e-3)
+        dac_values = np.arange(-20e-3, 20e-3, 2e-3)
 
         for resonator, items in self.res_dict.items():
             best_amplitude = 0  # For comparing which one is coupled closest
@@ -349,7 +356,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                                               dac_values=dac_values,
                                                               fluxChan=fluxline,
                                                               analyze=False)
-                    print('Done VNA flux sweep with ' + fluxline)
+                    print('Done flux sweep resonator {} ({} GHz) with {}'.format(
+                          resonator, round(freq/1e9, 3), fluxline))
 
                     t_stop = time.strftime('%Y%m%d_%H%M%S')
                     ma.TwoD_Analysis(
@@ -361,16 +369,22 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                     ma.TwoD_Analysis(
                         label='Resonator_dac_scan', normalize=False)
 
-                    import pycqed.analysis_v2.spectroscopy_analysis as sa
-                    fit_res = sa.VNA_DAC_Analysis(timestamp)
+                    fluxcurrent[fluxline](0)
+
+                    fit_res = ma2.VNA_DAC_Analysis(timestamp)
                     amplitude = fit_res.dac_fit_res.params['amplitude'].value
-                    print(amplitude)
+                    sweetspot_current = fit_res.sweet_spot_value
+
                     items[2][fluxline] = amplitude
 
                     if amplitude > best_amplitude:
                         best_amplitude = amplitude
                         self.cfg_dc_flux_ch(fluxline)
                         self.res_dict[resonator][3] = 'Q' + fluxline[4]
+                        self.res_dict[resonator][4] = sweetspot_current
+
+                        self.fl_dc_V0(sweetspot_current)
+                        fluxcurrent[fluxline](sweetspot_current)
 
         return True
 
@@ -406,7 +420,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
             import pycqed.analysis_v2.spectroscopy_analysis as sa
             fit_res = sa.VNA_DAC_Analysis(timestamp=t_start)
-            sweetspot_current = -1*fit_res.sweet_spot_value
+            sweetspot_current = fit_res.sweet_spot_value
             self.fl_dc_V0(sweetspot_current)
             fluxcurrent = self.instr_FluxCtrl.get_instr()
             fluxcurrent[self.cfg_dc_flux_ch()](sweetspot_current)
@@ -541,14 +555,21 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         h = self.measurement_signal(excited=False)  # Lorentian baseline [V]
         A0 = self.measurement_signal(excited=True) - h  # Peak height
 
-        current = self.instr_FluxCtrl.get_instr()[self.mock_cfg_dc_flux_ch()]()
-        Iref = self.mock_sweetspot_current()['FBL_1']
-        I0 = self.mock_flux_sensitivity()['FBL_1']
+        fluxcurrent = self.instr_FluxCtrl.get_instr()
 
+        # Calculate Phi/Phi_0 by summing all currents and giving them weights
+        # to match how close they are to the qubit.
+        fluxbias = 0
+        for i in self.mock_flux_sensitivity():
+            fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
+
+        I0 = self.mock_flux_current_overall()
+
+        total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
         # Height of peak [V]
-        K = 1/np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
-        current_correction = np.sqrt(np.abs(np.cos(2*np.pi*(current-Iref)/I0)))
-        A = K*current_correction*A0
+        K_power = 1/np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
+        K_current = np.sqrt(np.abs(np.cos(2*np.pi*total_flux))) 
+        A = K_power*K_current*A0
 
         # Width of peak
         wbase = 4e6
@@ -557,7 +578,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # f0 = self.mock_freq_qubit() - df*(np.sin(1/2*np.pi*(current-Iref)/I0))**2
         f0 = np.sqrt(8*self.mock_Ec()*self.mock_Ej() *
-                     np.abs(np.cos(np.pi*(current-Iref)/I0))) - self.mock_Ec()
+                     np.abs(np.cos(np.pi*total_flux))) - self.mock_Ec()
         if self.spec_amp() > self.mock_12_spec_amp() and self.spec_pow() > -10:  # 1-2 transition
             A12 = A*0.5
             w12 = 1e6
@@ -741,6 +762,88 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         if analyze:
             ma.Homodyne_Analysis(label='Resonator_Scan', close_fig=close_fig)
 
+    def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
+                                         MC=None, analyze=True, fluxChan=None,
+                                         close_fig=True,
+                                         nested_resonator_calibration=False,
+                                         resonator_freqs=None):
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # Assume flux is controlled by SPI rack
+        fluxcurrent = self.instr_FluxCtrl.get_instr()
+        if fluxChan is None:
+            dac_par = fluxcurrent.parameters[(self.cfg_dc_flux_ch())]
+        else:
+            dac_par = fluxcurrent.parameters[(fluxChan)]
+
+        s1 = swf.None_Sweep(name='Frequency', parameter_name='Frequency',
+                            unit='Hz')
+        s2 = swf.None_Sweep(name='Flux', parameter_name=fluxChan, unit='A')
+
+
+        fluxcurrent = self.instr_FluxCtrl.get_instr()
+
+
+        mocked_values = []
+        for dac_value in dac_values:
+            fluxcurrent[fluxChan](dac_value)
+
+            fluxbias = 0
+            for i in self.mock_flux_sensitivity():
+                fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
+
+            I0 = self.mock_flux_current_overall()
+
+            total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
+
+            h = self.measurement_signal(excited=False)
+            A0 = self.measurement_signal(excited=True) - h
+
+            K_current = np.sqrt(np.abs(np.cos(2*np.pi*(dac_value-Iref)/I0)))
+            K_power = 1 / \
+                np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
+            A = K_current*K_power*A0   # Height of peak [V]
+
+            wbase = 4e6
+            w = wbase/np.sqrt(0.1+10**(-(self.spec_pow() -
+                                         self.mock_spec_pow()/2)/7)) + wbase
+
+            f0 = np.sqrt(8*self.mock_Ec()*self.mock_Ej() *
+                         np.abs(np.cos(np.pi*(dac_value-Iref)/I0))) - self.mock_Ec()
+            
+            new_values = h + A*(w/2.0)**2 / ((w/2.0)**2 +
+                                             ((freqs - f0))**2)
+
+
+            new_values += np.random.normal(0, self.noise(), np.size(new_values))
+
+            mocked_values = np.concatenate([mocked_values, new_values])
+
+        d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
+                              detector_control='soft', mock_values=mocked_values)
+
+        MC.set_sweep_function(s1)
+        MC.set_sweep_function_2D(s2)
+
+        MC.set_sweep_points(freqs)
+        MC.set_sweep_points_2D(dac_values)
+
+        MC.set_detector_function(d)
+        t_start=time.strftime('%Y%m%d_%H%M%S')
+        MC.run(name='Qubit_dac_scan'+self.msmt_suffix, mode='2D')
+
+        if analyze:
+            ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
+            timestamp = a_tools.get_timestamps_in_range(t_start, 
+                                                        label='Qubit_dac_scan'+
+                                                              self.msmt_suffix)
+            timestamp = timestamp[0]
+            a = ma2.da.DAC_analysis(timestamp=timestamp)
+            print(a)
+
+
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, fluxChan,
                                              pulsed=True, MC=None,
                                              analyze=True, close_fig=True,
@@ -758,7 +861,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         s2 = swf.None_Sweep(name='Flux', parameter_name=fluxChan,
                             unit='A')
         freq_res = self.mock_freq_res()
-        
+
         fluxcurrent = self.instr_FluxCtrl.get_instr()
         Iref = fluxcurrent[fluxChan]()
         I0 = self.mock_flux_sensitivity()[fluxChan]

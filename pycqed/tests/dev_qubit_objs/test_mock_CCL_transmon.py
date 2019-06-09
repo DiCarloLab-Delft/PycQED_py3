@@ -139,9 +139,9 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.ro_freq(self.CCL_qubit.mock_freq_res())
 
         fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
-        current = self.CCL_qubit.mock_sweetspot_current()['FBL_1']
+        current = self.CCL_qubit.mock_sweetspot_current()
 
-        fluxcurrent[self.CCL_qubit.mock_fl_dc_ch()](current)
+        fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
 
         threshold = 0.01e9
 
@@ -154,13 +154,16 @@ class Test_Mock_CCL(unittest.TestCase):
     # Test MW pulse calibration
     ###########################################################
     def test_calibrate_mw_pulse_amplitude_coarse(self):
+        fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
+        current = self.CCL_qubit.mock_sweetspot_current()
+
+        fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
+        
         for with_vsm in [True, False]:
             self.CCL_qubit.cfg_with_vsm(with_vsm)
-
             self.CCL_qubit.mock_mw_amp180(.345)
-            self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
-            self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
-
             self.CCL_qubit.calibrate_mw_pulse_amplitude_coarse()
 
             eps = 0.05
@@ -185,8 +188,25 @@ class Test_Mock_CCL(unittest.TestCase):
 
         self.CCL_qubit.calibrate_ro_pulse_amp_CW()
         eps = 0.1
-        assert self.CCL_qubit.ro_pulse_amp_CW() == pytest.approx(
-                self.CCL_qubit.mock_ro_pulse_amp_CW(), eps)
+        assert self.CCL_qubit.ro_pulse_amp_CW() <= self.CCL_qubit.mock_ro_pulse_amp_CW()
+
+    ###########################################################
+    # Test find test resonators
+    ###########################################################
+    def test_find_test_resonators(self):
+        self.CCL_qubit.mock_freq_res(7.78542e9)
+        self.CCL_qubit.mock_freq_test_res(7.9862432e9)
+
+        self.CCL_qubit.res_dict = {'0': [7.785e9, 'unknown', {}, None, 0],
+                         '1': [7.986e9, 'unknown', {}, None, 0]}
+
+        for resonator in ['0', '1']:
+            self.CCL_qubit.find_test_resonators()
+
+            if resonator == '0':
+                assert self.CCL_qubit.res_dict[resonator][1] == 'qubit_resonator'
+            elif resonator == '1':
+                assert self.CCL_qubit.res_dict[resonator][1] == 'test_resonator'
 
 
     ###########################################################
