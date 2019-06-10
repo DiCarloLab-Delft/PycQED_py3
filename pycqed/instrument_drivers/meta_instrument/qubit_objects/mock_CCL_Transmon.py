@@ -1006,8 +1006,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         if freq_qubit is None:
             freq_qubit = self.freq_qubit()
 
-        # self.instr_Lo_mw.get_instr().set('frequency', freq_qubit -
-            # self.mw_freq_mod.get() + artificial_detuning)
+        self.instr_LO_mw.get_instr().set('frequency', freq_qubit -
+            self.mw_freq_mod.get() + artificial_detuning)
 
         s = swf.None_Sweep(name='T2_star', parameter_name='Time',
                            unit='s')
@@ -1024,7 +1024,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         phase = 0
         oscillation_offset = 0
         exponential_offset = offset
-        frequency = self.mock_freq_qubit() - freq_qubit + artificial_detuning
+        frequency = self.mock_freq_qubit() - (freq_qubit + artificial_detuning)
 
         # Mock values without calibration points
         mocked_values = (signal_amp *
@@ -1050,7 +1050,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('mock_ramsey' + self.msmt_suffix)
+        MC.run('mock_Ramsey' + self.msmt_suffix)
 
         if analyze:
             a = ma.Ramsey_Analysis(auto=True, closefig=True,

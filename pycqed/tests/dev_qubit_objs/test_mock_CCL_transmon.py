@@ -241,7 +241,7 @@ class Test_Mock_CCL(unittest.TestCase):
     ###########################################################
     # Test Ramsey
     ###########################################################
-    @unittest.expectedFailure
+    # @unittest.expectedFailure
     def test_ramsey(self):
 
         self.CCL_qubit.mock_Ec(250e6)
@@ -255,20 +255,21 @@ class Test_Mock_CCL(unittest.TestCase):
             np.sqrt(8*self.CCL_qubit.mock_Ec()*self.CCL_qubit.mock_Ej()) - 
             self.CCL_qubit.mock_Ec())
 
-        self.CCL_qubit.ro_pulse_amp_CW(self.CCL_qubit.mock_ro_pulse_amp_CW())
-        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
-        self.CCL_qubit.ro_freq(self.CCL_qubit.mock_freq_res())
-        
         fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
-        current = self.CCL_qubit.mock_sweetspot_current()['FBL_1']
+        current = self.CCL_qubit.mock_sweetspot_current()
 
-        fluxcurrent[self.CCL_qubit.mock_fl_dc_ch()](current)
+        fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
+
+        self.CCL_qubit.ro_pulse_amp_CW(self.CCL_qubit.mock_ro_pulse_amp_CW())
+        self.CCL_qubit.ro_freq(self.CCL_qubit.mock_freq_res())
 
         self.CCL_qubit.mock_T2_star(23e-6)
         self.CCL_qubit.T2_star(20e-6)
         self.CCL_qubit.measure_ramsey()
 
-        threshold = 5e-6
+        threshold = 1e-6
         assert np.abs(self.CCL_qubit.mock_T2_star() - 
                       self.CCL_qubit.T2_star()) < threshold
 
