@@ -120,6 +120,19 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.mw_mixer_offs_DQ(.4)
 
     ###########################################################
+    # Test find resonator frequency
+    ###########################################################
+    def test_find_resonator_frequency(self):
+        self.CCL_qubit.mock_freq_res(7.58726e9)
+        self.CCL_qubit.freq_res(7.59e9)
+        self.CCL_qubit.mock_sweetspot_current(0)
+
+        self.CCL_qubit.find_resonator_frequency()
+
+        assert self.CCL_qubit.freq_res() == pytest.approx(self.CCL_qubit.mock_freq_res(),
+                                                          abs=1e6)
+
+    ###########################################################
     # Test find qubit frequency
     ###########################################################
     def test_find_frequency(self):
@@ -177,12 +190,28 @@ class Test_Mock_CCL(unittest.TestCase):
                         self.CCL_qubit.mw_channel_amp(), eps)
                 # assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_channel_amp() + threshold
                 # assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_channel_amp() - threshold
-    
+
+    ###########################################################
+    # Test find qubit sweetspot
+    ###########################################################
+    def test_find_qubit_sweetspot(self):
+        self.CCL_qubit.mock_sweetspot_current(0.43145521465e-3)
+        self.CCL_qubit.fl_dc_V0(0.4e-3)
+        self.CCL_qubit.cfg_dc_flux_ch(self.CCL_qubit.mock_cfg_dc_flux_ch())
+        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
+
+        self.CCL_qubit.find_qubit_sweetspot()
+
+        assert self.CCL_qubit.fl_dc_V0() == pytest.approx(
+                                    self.CCL_qubit.mock_sweetspot_current(),
+                                    abs=10e-6)
+
     ###########################################################
     # Test RO pulse calibration
-    ###########################################################    
+    ###########################################################
     def test_calibrate_ro_pulse_CW(self):
-        self.CCL_qubit.mock_ro_pulse_amp_CW(0.06)
+        self.CCL_qubit.mock_ro_pulse_amp_CW(0.05)
 
         self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
 

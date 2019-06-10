@@ -778,7 +778,7 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
         self.f0s = np.array(f0s)
         self.run_full_analysis()
         self.dac_fit_res = self.fit_dac_arc()
-        self.sweet_spot_value = self.dac_fit_res.values['phase']
+        self.sweet_spot_value = -1*self.dac_fit_res.values['phase']
         self.current_to_flux = 1/self.dac_fit_res.values['frequency']
         self.plot_fit_result()
 
