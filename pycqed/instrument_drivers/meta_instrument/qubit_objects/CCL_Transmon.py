@@ -1206,7 +1206,7 @@ class CCLight_Transmon(Qubit):
             ro_pow = 10**(power/20)
             self.ro_pulse_amp_CW(ro_pow)
 
-            f_qubit_estimate = self.freq_res() + (60e6)**2/shift
+            f_qubit_estimate = self.freq_res() + (50e6)**2/shift
             self.freq_qubit(f_qubit_estimate)
 
         return True
@@ -1306,14 +1306,15 @@ class CCLight_Transmon(Qubit):
         if freqs is None:
             freq_center = f12_estimate/2
             freq_range = 100e6
-            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+            freqs = np.arange(freq_center-1/2*freq_range, self.freq_qubit()+1/2*freq_range,
                               0.5e6)
 
         self.spec_pow(self.spec_pow()+25)
         self.measure_spectroscopy(freqs=freqs, pulsed=False, analyze=False)
 
-        a = ma.Homodyne_Analysis(label=self.msmt_suffix)
-        f02 = 2*a.params['f0'].value*1e9
+        a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix, 
+                                           analyze_ef=True)
+        f02 = 2*a.params['f0_gf_over_2'].value*1e9
         if update:
             self.anharmonicity(f02-2*self.freq_qubit())
             return True

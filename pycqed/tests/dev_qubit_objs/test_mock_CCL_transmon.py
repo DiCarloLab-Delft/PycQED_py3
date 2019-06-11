@@ -136,16 +136,17 @@ class Test_Mock_CCL(unittest.TestCase):
     # Test find qubit frequency
     ###########################################################
     def test_find_frequency(self):
+        fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
+        current = self.CCL_qubit.mock_sweetspot_current()
+
+        fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+
         self.CCL_qubit.mock_Ec(250e6)
         self.CCL_qubit.mock_Ej(16e9)
 
-        self.CCL_qubit.mock_freq_qubit(
-            np.sqrt(8*self.CCL_qubit.mock_Ec()*self.CCL_qubit.mock_Ej()) - 
-            self.CCL_qubit.mock_Ec())
+        f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
 
-        self.CCL_qubit.freq_qubit(
-            np.sqrt(8*self.CCL_qubit.mock_Ec()*self.CCL_qubit.mock_Ej()) - 
-            self.CCL_qubit.mock_Ec())
+        self.CCL_qubit.freq_qubit(f_qubit)
 
         self.CCL_qubit.ro_pulse_amp_CW(self.CCL_qubit.mock_ro_pulse_amp_CW())
         self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
@@ -160,8 +161,7 @@ class Test_Mock_CCL(unittest.TestCase):
 
         self.CCL_qubit.find_frequency()
 
-        assert np.abs(self.CCL_qubit.mock_freq_qubit() -
-                      self.CCL_qubit.freq_qubit()) <= threshold
+        assert np.abs(f_qubit - self.CCL_qubit.freq_qubit()) <= threshold
 
     ###########################################################
     # Test MW pulse calibration
@@ -172,8 +172,10 @@ class Test_Mock_CCL(unittest.TestCase):
             current = self.CCL_qubit.mock_sweetspot_current()
 
             fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+            f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
+
             self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
-            self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
+            self.CCL_qubit.freq_qubit(f_qubit)
 
             self.CCL_qubit.cfg_with_vsm(with_vsm)
             self.CCL_qubit.mock_mw_amp180(.345)
@@ -182,10 +184,10 @@ class Test_Mock_CCL(unittest.TestCase):
             eps = 0.05
             if self.CCL_qubit.cfg_with_vsm():
                 assert self.CCL_qubit.mw_vsm_G_amp() == pytest.approx(
-                        self.CCL_qubit.mock_mw_amp180(), eps)
+                        self.CCL_qubit.mock_mw_amp180(), abs=eps)
             else:
                 assert self.CCL_qubit.mw_channel_amp() == pytest.approx(
-                        self.CCL_qubit.mw_channel_amp(), eps)
+                        self.CCL_qubit.mw_channel_amp(), abs=eps)
 
     ###########################################################
     # Test find qubit sweetspot
@@ -195,7 +197,9 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.fl_dc_V0(0.4e-3)
         self.CCL_qubit.cfg_dc_flux_ch(self.CCL_qubit.mock_cfg_dc_flux_ch())
         self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
-        self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
+
+        f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
+        self.CCL_qubit.freq_qubit(f_qubit)
 
         self.CCL_qubit.find_qubit_sweetspot()
 
@@ -243,20 +247,15 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.mock_Ec(250e6)
         self.CCL_qubit.mock_Ej(16e9)
 
-        self.CCL_qubit.mock_freq_qubit(
-            np.sqrt(8*self.CCL_qubit.mock_Ec()*self.CCL_qubit.mock_Ej()) - 
-            self.CCL_qubit.mock_Ec())
-
-        self.CCL_qubit.freq_qubit(
-            np.sqrt(8*self.CCL_qubit.mock_Ec()*self.CCL_qubit.mock_Ej()) - 
-            self.CCL_qubit.mock_Ec())
-
         fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
         current = self.CCL_qubit.mock_sweetspot_current()
 
         fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+
+        f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
+        self.CCL_qubit.freq_qubit(f_qubit)
+
         self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
-        self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
 
         self.CCL_qubit.ro_pulse_amp_CW(self.CCL_qubit.mock_ro_pulse_amp_CW())
         self.CCL_qubit.ro_freq(self.CCL_qubit.mock_freq_res())
