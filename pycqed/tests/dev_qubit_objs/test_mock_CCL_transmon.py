@@ -167,14 +167,14 @@ class Test_Mock_CCL(unittest.TestCase):
     # Test MW pulse calibration
     ###########################################################
     def test_calibrate_mw_pulse_amplitude_coarse(self):
-        fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
-        current = self.CCL_qubit.mock_sweetspot_current()
-
-        fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
-        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
-        self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
-        
         for with_vsm in [True, False]:
+            fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
+            current = self.CCL_qubit.mock_sweetspot_current()
+
+            fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+            self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+            self.CCL_qubit.freq_qubit(self.CCL_qubit.mock_freq_qubit())
+
             self.CCL_qubit.cfg_with_vsm(with_vsm)
             self.CCL_qubit.mock_mw_amp180(.345)
             self.CCL_qubit.calibrate_mw_pulse_amplitude_coarse()
@@ -183,13 +183,9 @@ class Test_Mock_CCL(unittest.TestCase):
             if self.CCL_qubit.cfg_with_vsm():
                 assert self.CCL_qubit.mw_vsm_G_amp() == pytest.approx(
                         self.CCL_qubit.mock_mw_amp180(), eps)
-                # assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_vsm_G_amp() + threshold
-                # assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_vsm_G_amp() - threshold
             else:
                 assert self.CCL_qubit.mw_channel_amp() == pytest.approx(
                         self.CCL_qubit.mw_channel_amp(), eps)
-                # assert self.CCL_qubit.mock_mw_amp180() <= self.CCL_qubit.mw_channel_amp() + threshold
-                # assert self.CCL_qubit.mock_mw_amp180() >= self.CCL_qubit.mw_channel_amp() - threshold
 
     ###########################################################
     # Test find qubit sweetspot
@@ -269,9 +265,9 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.T2_star(20e-6)
         self.CCL_qubit.measure_ramsey()
 
-        threshold = 1e-6
-        assert np.abs(self.CCL_qubit.mock_T2_star() - 
-                      self.CCL_qubit.T2_star()) < threshold
+        threshold = 2e-6
+        assert self.CCL_qubit.T2_star() == pytest.approx(self.CCL_qubit.mock_T2_star(),
+                                                         abs=threshold)
 
     @classmethod
     def tearDownClass(self):

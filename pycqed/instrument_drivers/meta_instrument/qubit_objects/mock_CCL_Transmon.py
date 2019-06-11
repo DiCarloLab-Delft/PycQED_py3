@@ -62,7 +62,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_sweetspot_current',
                            label='magnitude of sweetspot current',
                            unit='A', parameter_class=ManualParameter,
-                           initial_value=1.3e-3)
+                           initial_value=-5.87525e-3)
 
         self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude',
                            unit='V', initial_value=0.41235468,
@@ -137,7 +137,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_flux_sensitivity',
                            label='sensitivity to flux in current',
                            unit='A',
-                           initial_value={'FBL_1': 1, 'FBL_2': 0.1},
+                           initial_value={'FBL_1': 1, 'FBL_2': 0.01},
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_flux_current_overall', unit='A',
@@ -151,7 +151,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
     def find_resonators(self, start_freq=7e9, stop_freq=8e9, power=-40,
                         bandwidth=200, timeout=200, npts=2001, VNA=None,
-                        display=True):
+                        verbose=True):
 
         if VNA is None:
             try:
@@ -191,13 +191,13 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         for i, freq in enumerate(result.peaks):
             self.res_dict[str(i)] = [freq, 'unknown', {}, None, 0]
 
-        if display:
+        if verbose:
             for resonator, items in self.res_dict.items():
-                print(resonator + ': ' + str(items[0]))
+                print('{}:\t{:.3f} GHz'.format(resonator, items[0]/1e9))
 
         return True
 
-    def calibrate_spec_pow(self, freqs=None, start_power=None):
+    def calibrate_spec_pow(self, freqs=None, start_power=None, verbose=True):
         if freqs is None:
             freqs = np.arange(self.freq_qubit() - 50e6,
                               self.freq_qubit() + 50e6, 1e6)
@@ -217,18 +217,17 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                                qb_name=self.name)
 
             w = a.params['kappa'].value
-            print('Power: {} w: {}'.format(power, w))
             power += 5
             if w < w0:
                 w0 = w
-
-        print('setting spectroscopy power to {}'.format(power-5))
+        if verbose:
+            print('setting spectroscopy power to {}'.format(power-5))
         self.spec_pow(power-5)
         return True
 
     def find_resonator_frequency_initial(self, start_freq=7e9, stop_freq=8e9,
                                          npts=50001, use_min=False, MC=None,
-                                         update=True, VNA=None):
+                                         update=True, with_VNA=None):
         '''
         quick script that uses measure_heterodyne_spectroscopy on a wide range
         to act as a sort of mock of a VNA resonator scan'.
@@ -236,19 +235,20 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         If it is a first scan (no freq_res yet in qubit object) it will perform
         a wide range scan. Otherwise it will zoom in on a resonator
         '''
-        if VNA is None:
+        if with_VNA is None:
             try:
                 if self.instr_VNA.get_instr() == '':
-                    VNA = False
+                    with_VNA = False
                 else:
-                    VNA = True
+                    with_VNA = True
             except:
-                VNA = False
+                with_VNA = False
 
         delkeys = []
         for resonator, items in self.res_dict.items():
             freq = items[0]
-            if VNA:
+            if with_VNA:
+                VNA = self.instr_VNA.get_instr()
                 start_freq = freq - 10e6
                 stop_freq = freq + 10e6
                 name = 'VNA_Resonator_scan_' + str(round(freq/1e9, 4)) + 'GHz'
@@ -265,8 +265,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             offset = a.fit_results.params['A'].value
 
             if np.abs(dip/offset) > 0.5:
-                print('Removed candidate ' + resonator + ' (' +
-                      str(round(freq/1e9, 3)) + ' GHz): Not a resonator')
+                print('Removed candidate {} ({:.3f} GHz): Not a resonator'
+                      .format(resonator, freq/1e9))
+                delkeys.append(resonator)
+            elif np.isnan(a.fit_results.params['Qc'].stderr):
+                print('Removed candidate {} ({:.3f} GHz): Not a resonator'
+                      .format(resonator, freq/1e9))
                 delkeys.append(resonator)
             else:
                 if use_min:
@@ -300,32 +304,33 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.res_dict = newdict
         return True
 
-    def find_test_resonators(self, VNA=None):
+    def find_test_resonators(self, with_VNA=None):
         """
         Does a power sweep over the resonators to see if they have a qubit
         attached or not, and changes the state in the res_dict
         """
-        if VNA is None:
+        if with_VNA is None:
             try:
                 if self.instr_VNA.get_instr() == '':
-                    VNA = False
+                    with_VNA = False
                 else:
-                    VNA = True
+                    with_VNA = True
             except:
-                VNA = False
+                with_VNA = False
 
         for resonator, items in self.res_dict.items():
             freq = items[0]
             state = items[1]
 
             if state == 'unknown':
-                if VNA:
+                if with_VNA:
+                    VNA = self.instr_VNA.get_instr()
                     VNA.start_frequency(freq - 20e6)
                     VNA.stop_frequency(freq + 20e6)
 
-                self.measure_resonator_power(freqs=np.arange(freq-20e6,
-                                                             freq+20e6, 0.5e6),
-                                             powers=np.arange(-40, 10, 5),
+                self.measure_resonator_power(freqs=np.arange(freq-5e6,
+                                                             freq+5e6, 0.5e6),
+                                             powers=np.arange(-40, 0.1, 10),
                                              analyze=False)
                 # self.measure_VNA_power_sweep()
                 fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
@@ -343,17 +348,19 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                 self.res_dict[resonator][1] = state
         return True
 
-    def find_qubit_resonator_fluxline(self, VNA=False):
-        if VNA is None:
+    def find_qubit_resonator_fluxline(self, with_VNA=None, verbose=True):
+        if with_VNA is None:
             try:
                 if self.instr_VNA.get_instr() == '':
-                    VNA = False
+                    with_VNA = False
                 else:
-                    VNA = True
+                    with_VNA = True
             except:
-                VNA = False
+                with_VNA = False
 
         fluxcurrent = self.instr_FluxCtrl.get_instr()
+        for FBL in fluxcurrent.channel_map:
+            fluxcurrent[FBL](0)
 
         dac_values = np.arange(-20e-3, 20e-3, 2e-3)
 
@@ -361,11 +368,11 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             best_amplitude = 0  # For comparing which one is coupled closest
             if items[1] == 'qubit_resonator':
                 freq = items[0]
-                if VNA:
+                if with_VNA:
                     VNA = self.instr_VNA.get_instr()
                     VNA.start_frequency(freq-20e6)
                     VNA.stop_frequency(freq+20e6)
-                freqs = np.arange(freq-5e6, freq+5e6, 0.5e6)
+                freqs = np.arange(freq-5e6, freq+5e6, 0.1e6)
                 for fluxline in fluxcurrent.channel_map:
                     t_start = time.strftime('%Y%m%d_%H%M%S')
 
@@ -403,6 +410,13 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                         self.fl_dc_V0(sweetspot_current)
                         fluxcurrent[fluxline](sweetspot_current)
 
+        if verbose:
+            for items in self.res_dict.values():
+                print('{},\tf = {:.3f}, linked to {},'
+                      ' sweetspot current = {:.3f} mA'.format(items[1],
+                                                             items[0]/1e9,
+                                                             items[3],
+                                                             items[4]*1e3))
         return True
 
     def find_resonator_sweetspot(self, freqs=None, dac_values=None,
@@ -1007,7 +1021,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             freq_qubit = self.freq_qubit()
 
         self.instr_LO_mw.get_instr().set('frequency', freq_qubit -
-            self.mw_freq_mod.get() + artificial_detuning)
+                                         self.mw_freq_mod.get() +
+                                         artificial_detuning)
 
         s = swf.None_Sweep(name='T2_star', parameter_name='Time',
                            unit='s')
