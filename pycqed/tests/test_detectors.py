@@ -196,6 +196,22 @@ class TestDetectors:
         np.testing.assert_array_almost_equal(y[0], dset[:, 3])
         np.testing.assert_array_almost_equal(y[1], dset[:, 4])
 
+    def test_Mock_Detector(self):
+        x = np.linspace(0, 20, 31)
+        y = x**2
+
+        d = det.Mock_Detector(value_names=['val'], value_units=['s'],
+                              detector_control='soft',
+                              mock_values=y)
+        self.MC.set_sweep_function(None_Sweep(sweep_control='soft'))
+        self.MC.set_sweep_points(x)
+        self.MC.set_detector_function(d)
+        dat = self.MC.run('Mock_detector')
+        xm = dat['dset'][:, 0]
+        ym = dat['dset'][:, 1]
+        assert (x == xm).all()
+        assert (y == ym).all()
+
     @classmethod
     def teardown_class(cls):
         cls.MC.close()

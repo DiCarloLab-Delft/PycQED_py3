@@ -85,6 +85,10 @@ class CCLight_Transmon(Qubit):
                 'Instrument used to control flux can either be an IVVI rack '
                 'or a meta instrument such as the Flux control.'),
             parameter_class=InstrumentRefParameter)
+        
+        self.add_parameter('instr_VNA', 
+                           docstring='Vector Network Analyzer',
+                           parameter_class=InstrumentRefParameter)
         # LutMan's
         self.add_parameter('instr_LutMan_MW',
                            docstring='Lookuptable manager  for '
@@ -471,14 +475,17 @@ class CCLight_Transmon(Qubit):
         return self._mw_fine_delay
 
     def _set_flux_fine_delay(self,val):
-        lutman = self.find_instrument(self.instr_LutMan_Flux())
-        AWG = lutman.find_instrument(lutman.AWG())
-        using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
-        if using_QWG:
-            logging.warning('CCL transmon is using QWG. Not implemented.')
-        else:
-            AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
-            # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
+        if self.instr_LutMan_Flux() is not None: 
+            lutman = self.find_instrument(self.instr_LutMan_Flux())
+            AWG = lutman.find_instrument(lutman.AWG())
+            using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+            if using_QWG:
+                logging.warning('CCL transmon is using QWG. Not implemented.')
+            else:
+                AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
+                # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
+        else: 
+            logging.warning('No Flux LutMan specified, could not set flux timing fine')
         self._flux_fine_delay = val
 
 
@@ -1180,6 +1187,114 @@ class CCLight_Transmon(Qubit):
     ####################################################
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
+    def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
+        if freqs is None:
+            freq_center = self.freq_res()
+            freq_range = 10e6
+            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+                              0.1e6)
+
+        if powers is None:
+            powers = np.arange(-40, 0.1, 4)
+
+        self.measure_resonator_power(freqs=freqs, powers=powers, analyze=False)
+
+        if update:
+            fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
+                                                      close_fig=True)
+            shift = fit_res.results[0]
+            power = fit_res.results[1]
+
+            ro_pow = 10**(power/20)
+            self.ro_pulse_amp_CW(ro_pow)
+
+            f_qubit_estimate = self.freq_res() + (60e6)**2/shift
+            self.freq_qubit(f_qubit_estimate)
+
+        return True
+
+    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True, 
+                             set_to_sweetspot=True):
+        '''
+        Should be edited such that it contains reference to different measurement
+        methods (tracking / 2D scan / broad spectroscopy)
+
+        TODO: If spectroscopy does not yield a peak, it should discard it
+        '''
+        if freqs is None:
+            freq_center = self.freq_qubit()
+            freq_range = 300e6
+            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+                              0.5e6)
+
+        if dac_values is None:
+            if self.fl_dc_V0() is not None:
+                dac_values = np.linspace(self.fl_dc_V0() - 1e-3,
+                                         self.fl_dc_V0() + 1e-3, 6)
+            else:
+                dac_values = np.linspace(-1e-3, 1e-3, 6)
+
+        t_start = time.time()
+        t_start = time.strftime('%Y%m%d_%H%M%S')
+
+        for i, dac_value in enumerate(dac_values):
+            self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()](dac_value)
+            if i == 0:
+              self.find_frequency(freqs=freqs, update=True)
+            else:
+              self.find_frequency(update=True)
+
+        t_end = time.time()
+        t_end = time.strftime('%Y%m%d_%H%M%S')
+
+        a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
+                              label='spectroscopy__' + self.name,
+                              dac_key='Instrument settings.fluxcurrent.'+self.fl_dc_ch(),
+                              degree=2)
+
+        pc = a.fit_res['fit_polycoeffs']
+
+        self.flux_polycoeff(pc)
+        sweetspot_current = -pc[1]/(2*pc[0])
+
+        if update:
+            self.fl_dc_V0(sweetspot_current)
+        if set_to_sweetspot:
+            self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()](sweetspot_current)
+        
+        return True
+
+    def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
+                                    update=True):
+        '''
+        Finds an estimate of the anharmonicity by doing a spectroscopy around 
+        150 MHz below the qubit frequency.
+
+        TODO: if spec_pow is too low/high, it should adjust it to approx the 
+              ideal spec_pow + 25 dBm
+        '''
+
+        if anharmonicity is None:
+            # Standard estimate, negative by convention
+            anharmonicity = self.anharmonicity()
+
+        f12_estimate = self.freq_qubit()*2 + anharmonicity
+
+        if freqs is None:
+            freq_center = f12_estimate/2
+            freq_range = 100e6
+            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+                              0.5e6)
+
+        self.spec_pow(self.spec_pow()+25)
+        self.measure_spectroscopy(freqs=freqs, pulsed=False, analyze=False)
+
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix)
+        f02 = 2*a.params['f0'].value*1e9
+        if update:
+            self.anharmonicity(f02-2*self.freq_qubit())
+            return True
+
 
     def calibrate_mw_pulse_amplitude_coarse(self,
                                             amps=None,
@@ -1199,7 +1314,7 @@ class CCLight_Transmon(Qubit):
                           all_modules=all_modules)
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
         try:
-            if self.cfg_with_vsm():
+            if self.cfg_with_vsm(): 
                 self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
             else:
                 self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
@@ -2412,6 +2527,9 @@ class CCLight_Transmon(Qubit):
     def measure_rabi(self, MC=None, amps=None,
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
+        """
+        Perform a Rabi experiment.
+        """
         if self.cfg_with_vsm():
             self.measure_rabi_vsm(MC, amps,
                                   analyze, close_fig, real_imag,

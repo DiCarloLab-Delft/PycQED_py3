@@ -14,6 +14,8 @@ from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 
+import numpy.fft as fft
+
 
 class Detector_Function(object):
 
@@ -36,6 +38,36 @@ class Detector_Function(object):
 
     def get_values(self):
         pass
+
+    def prepare(self, **kw):
+        pass
+
+    def finish(self, **kw):
+        pass
+
+class Mock_Detector(Detector_Function):
+    def __init__(self, value_names=['val'], value_units=['arb. units'],
+                 detector_control='soft',
+                 mock_values=np.zeros([20, 1]),
+                 **kw):
+        self.name = self.__class__.__name__
+        self.set_kw()
+        self.value_names = value_names
+        self.value_units = value_units
+        self.detector_control=detector_control
+        self.mock_values = mock_values
+        self._iteration = 0
+
+    def acquire_data_point(self, **kw):
+        '''
+        Returns something random for testing
+        '''
+        idx = self._iteration % (np.shape(self.mock_values)[0])
+        self._iteration += 1
+        return self.mock_values[idx]
+
+    def get_values(self):
+        return self.mock_values
 
     def prepare(self, **kw):
         pass
@@ -1499,8 +1531,8 @@ class UHFQC_spectroscopy_detector(Soft_Detector):
     def acquire_data_point(self):
         RESULT_LENGTH = 1600
         vals = self.UHFQC.acquisition(samples=RESULT_LENGTH, acquisition_time=0.010, timeout=10)
-        a = max(np.abs(fft.fft(vals[0][1:int(len(RESULT_LENGTH)/2)])))
-        b = max(np.abs(fft.fft(vals[1][1:int(len(RESULT_LENGTH)/2)])))
+        a = max(np.abs(fft.fft(vals[0][1:int(RESULT_LENGTH/2)])))
+        b = max(np.abs(fft.fft(vals[1][1:int(RESULT_LENGTH/2)])))
         return a+b
 
 
