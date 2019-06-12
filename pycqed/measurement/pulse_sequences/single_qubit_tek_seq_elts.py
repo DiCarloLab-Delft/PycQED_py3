@@ -1124,18 +1124,16 @@ def qscale(qscales, pulse_pars, RO_pars,
     seq_name = 'QScale'
     seq = sequence.Sequence(seq_name)
     seg_list = []
-    pulse_combinations=[['X90', 'X180'], ['X90', 'Y180'], ['X90', 'mY180']]
+    pulse_combinations = [['X90', 'X180'], ['X90', 'Y180'], ['X90', 'mY180']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, motzoi in enumerate(qscales):
         pulse_keys = pulse_combinations[i % 3]
         for p_name in ['X180', 'Y180', 'X90', 'mY180']:
             pulses[p_name]['motzoi'] = motzoi
-        if cal_points and (i == (len(qscales)-4) or
-                                   i == (len(qscales)-3)):
-             seg = segment.Segment('segment_{}'.format(i),
-                                   [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(qscales)-2) or
-                                     i == (len(qscales)-1)):
+        if cal_points and (i == (len(qscales)-4) or i == (len(qscales)-3)):
+            seg = segment.Segment('segment_{}'.format(i),
+                                  [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(qscales)-2) or i == (len(qscales)-1)):
             # pick motzoi for calpoint in the middle of the range
             pulses['X180']['motzoi'] = np.mean(qscales)
             seg = segment.Segment('segment_{}'.format(i),

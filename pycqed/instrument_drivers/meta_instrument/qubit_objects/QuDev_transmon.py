@@ -933,8 +933,7 @@ class QuDev_transmon(Qubit):
 
 
     def measure_qscale(self, qscales=None, MC=None, analyze=True, upload=True,
-                       close_fig=True, label=None, cal_points=True,
-                       exp_metadata=None):
+                       label=None, cal_points=True, exp_metadata=None):
 
         if qscales is None:
             raise ValueError("Unspecified qscale values for measure_qscale")
@@ -3483,7 +3482,7 @@ class QuDev_transmon(Qubit):
 
 
     def find_qscale(self, qscales, label=None, for_ef=False, update=False,
-                    MC=None, close_fig=True, last_ge_pulse=True, upload=True,
+                    close_fig=True, last_ge_pulse=True, upload=True,
                     cal_points=True, no_cal_points=None, **kw):
 
         '''
@@ -3583,9 +3582,6 @@ class QuDev_transmon(Qubit):
         if not cal_points:
             no_cal_points = 0
 
-        if MC is None:
-            MC = self.instr_mc.get_instr()
-
         if label is None:
             if for_ef:
                 label = 'QScale_ef' + self.msmt_suffix
@@ -3606,14 +3602,13 @@ class QuDev_transmon(Qubit):
         #Perform the qscale calibration measurement
         if for_ef:
             # Run measuremet
-            self.measure_qscale_2nd_exc(qscales=qscales, MC=MC, upload=upload,
+            self.measure_qscale_2nd_exc(qscales=qscales, upload=upload,
                                         close_fig=close_fig, label=label,
                                         last_ge_pulse=last_ge_pulse,
                                         cal_points=cal_points,
                                         no_cal_points=no_cal_points)
         else:
-            self.measure_qscale(qscales=qscales, MC=MC, upload=upload,
-                                close_fig=close_fig, label=label)
+            self.measure_qscale(qscales=qscales, upload=upload, label=label)
 
         # Perform analysis and extract the optimal qscale parameter
         # Returns the optimal qscale parameter
