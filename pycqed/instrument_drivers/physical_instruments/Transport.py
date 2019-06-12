@@ -42,34 +42,33 @@ class IPTransport(Transport):
     Based on: SCPI.py, QCoDeS::IPInstrument
     """
 
-    def __init__(self, host: str, port: int = 5025, timeout = 1.0) -> None:
+    def __init__(self, host: str,
+                 port: int = 5025,
+                 timeout = 1.0,
+                 snd_buf_size: int = 512 * 1024) -> None:
         """
         establish connection, e.g. IPTransport('192.168.0.16', 4000)
         """
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(timeout)  # first set timeout (before connect)
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, snd_buf_size) # beef up buffer
         self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # send things immediately
-
-        # beef up buffer, to prevent socket.send() not sending all our data in one go
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 512 * 1024)
         self._socket.connect((host, port))
 
     def close(self) -> None:
         self._socket.close()
 
     def write(self, cmd_str: str) -> None:
-        outStr = cmd_str + '\n'
-        # FIXME: check return value, maybe encode() can be improved on by not using unicode strings?
-        self.write_binary(outStr.encode('ascii'))
+        out_str = cmd_str + '\n'
+        self.write_binary(out_str.encode('ascii'))
 
     def write_binary(self, data: bytes) -> None:
         exp_len = len(data)
-        act_len = self._socket.send(data)
-        if(act_len != exp_len):
-            # FIXME: handle this case by calling send again. Or enlarge
-            # socket.SO_SNDBUF even further
-            raise UserWarning(
-                'not all data sent: expected %d, actual %d' % (exp_len, act_len))
+        act_len = 0
+        while True:
+            act_len += self._socket.send(data[act_len:exp_len])
+            if act_len == exp_len:
+                break
 
     def read_binary(self, size: int) -> bytes:
         data = self._socket.recv(size)
@@ -85,12 +84,35 @@ class IPTransport(Transport):
 
 
 class VisaTransport(Transport):
+    # FIXME: implement
     pass
 
 
 class FileTransport(Transport):
-    pass
+    def __init__(self, out_file_name: str,
+                 in_file_name: str = '') -> None:
+        """
+        input/output from/to file to support driver testing
+        """
+        self._out_file = open(out_file_name, "wb+")
+
+    def close(self) -> None:
+        self._out_file.close()
+
+    def write(self, cmd_str: str) -> None:
+        out_str = cmd_str + '\n'
+        self.write_binary(out_str.encode('ascii'))
+
+    def write_binary(self, data: bytes) -> None:
+        self._out_file.write(data)
+
+    def read_binary(self, size: int) -> bytes:
+        pass # FIXME: implement
+
+    def readline(self) -> str:
+        pass # FIXME: implement
+
 
 
 class DummyTransport(Transport):
-    pass
+    pass # NB: only supports output (which goes nowhere) for now

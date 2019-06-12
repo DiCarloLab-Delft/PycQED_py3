@@ -2,7 +2,8 @@
     File:               QuTechCC_core.py
     Author:             Wouter Vlothuizen, QuTech
     Purpose:            Python control of Qutech Central Controller. Core driver independent of QCoDeS
-    Notes:
+    Notes:              here, we follow the SCPI convention of NOT checking parameter values but leaving that to
+                        the device
     Usage:
     Bugs:
 
@@ -45,14 +46,14 @@ class QuTechCC_core(SCPIBase):
         # only possible if CC is stopped
         return self._transport.ask_int('QUTech:CCIO{}:Q1REG{}'.format(ccio, reg))
 
-    def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_39_ps_steps: int) -> None:
-        self._transport.write('QUTech:CCIO{}:VSMbit{}:RISEDELAY {}'.format(ccio, bit, cnt_in_39_ps_steps))
+    def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
+        self._transport.write('QUTech:CCIO{}:VSMbit{}:RISEDELAY {}'.format(ccio, bit, cnt_in_833_ps_steps))
 
     def get_vsm_delay_rise(self, ccio: int, bit: int) -> int:
         return self._transport._ask_int('QUTech:CCIO#:VSMbit#:RISEDELAY?'.format(ccio, bit))
 
-    def set_vsm_delay_fall(self, ccio: int, bit: int, cnt_in_39_ps_steps: int) -> None:
-        self._transport.write('QUTech:CCIO{}:VSMbit{}:FALLDELAY {}'.format(ccio, bit, cnt_in_39_ps_steps))
+    def set_vsm_delay_fall(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
+        self._transport.write('QUTech:CCIO{}:VSMbit{}:FALLDELAY {}'.format(ccio, bit, cnt_in_833_ps_steps))
 
     def get_vsm_delay_fall(self, ccio: int, bit: int) -> int:
         return self._transport._ask_int('QUTech:CCIO{}:VSMbit{}:FALLDELAY?'.format(ccio, bit))
