@@ -488,6 +488,8 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
     k.gate(flux_cw, [2, 0])
+    #k.gate(flux_cw, [10, 8])
+    
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('rx90', [qubit_idx])
@@ -500,6 +502,8 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
     k.gate(flux_cw, [2, 0])
+    #k.gate(flux_cw, [10, 8])
+    
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('ry90', [qubit_idx])
@@ -698,9 +702,16 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
 
     if buffer_nanoseconds > 0:
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+
+    # For CCLight
+    # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    # k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
+    # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+
+    # For QCC 
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10 ], 0) #alignment workaround
+    k.gate('fl_cw_{:02}'.format(flux_cw), [10, 8]) 
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10 ], 0) #alignment workaround
 
     if buffer_nanoseconds2 > 0:
         k.gate('wait', [qubit_idx], buffer_nanoseconds2)
@@ -823,9 +834,10 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate(prep_pulse_q1, [q1])
             # FIXME hardcoded edge because of
             # brainless "directed edge recources" in compiler
-            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],  0) #alignment workaround
             k.gate('fl_cw_01', [2, 0])
-            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+            k.gate('fl_cw_01', [10, 8]) # For QCC config 
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],  0) #alignment workaround
             # after-rotations
             k.gate(after_pulse_q1, [q1])
             # possibly wait
@@ -1302,22 +1314,26 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                     if wait_time_between > 0:
                         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
                         k.gate('wait', [2, 0], wait_time_between)
-                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-                    k.gate(flux_codeword, [2, 0])
-                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
+                    # k.gate(flux_codeword, [2, 0])
+                    k.gate(flux_codeword, [10, 8]) # Hack for QCC
+
+                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
                     if q2 is not None:
-                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-                        k.gate(flux_codeword2, [2, 0])
-                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
+                        # k.gate(flux_codeword2, [2, 0])
+                        k.gate(flux_codeword2, [10, 8]) # Hack for QCC
+
+                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
             else:
                 for j in range(nr_of_repeated_gates):
-                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
                     k.gate('wait', [2, 0], wait_time_between + CZ_duration)
-                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
             if wait_time_after > 0:
-                k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
                 k.gate('wait', [2, 0], (wait_time_after))
-                k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
                 # special because the cw phase pulses go in mult of 20 deg

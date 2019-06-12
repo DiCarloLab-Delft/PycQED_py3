@@ -230,7 +230,7 @@ class UHFQC(Instrument):
 
         # Configure the codeword protocol
         if self.DIO:
-            self.awgs_0_dio_strobe_index(31)
+            self.awgs_0_dio_strobe_index(15) # 15 for QCC, 31 for CCL 
             self.awgs_0_dio_strobe_slope(1)  # rising edge
             self.awgs_0_dio_valid_index(16)
             self.awgs_0_dio_valid_polarity(2)  # high polarity
@@ -694,7 +694,8 @@ class UHFQC(Instrument):
                                         weight_function_I=0,
                                         weight_function_Q=1,
                                         rotation_angle=0,
-                                        length=4096/1.8e9):
+                                        length=4096/1.8e9,
+                                        scaling_factor=1):
         """
         Sets defualt integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
@@ -712,15 +713,15 @@ class UHFQC(Instrument):
                  np.array(cosI))
         self.set('quex_wint_weights_{}_imag'.format(weight_function_I),
                  np.array(sinI))
-        self.set('quex_rot_{}_real'.format(weight_function_I), 1.0)
-        self.set('quex_rot_{}_imag'.format(weight_function_I), 1.0)
+        self.set('quex_rot_{}_real'.format(weight_function_I), 1.0*scaling_factor)
+        self.set('quex_rot_{}_imag'.format(weight_function_I), 1.0*scaling_factor)
         if weight_function_Q!=None:
             self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
                      np.array(sinI))
             self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
                      np.array(cosI))
-            self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
-            self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
+            self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0*scaling_factor)
+            self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0*scaling_factor)
 
     def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
@@ -883,6 +884,9 @@ class UHFQC(Instrument):
         # adding the final part of the sequence including a default wave
         sequence = (sequence +
                     '  default:\n' +
+                    # the default wave should never trigger, noneteless if it does trigger 
+                    # it indicates that 1. the correct codeword can not be triggered and 
+                    # 2. that there are triggers bio received. 
                     '   playWave(ones(36), ones(36));\n' +
                     ' }\n' +
                     ' wait(wait_delay);\n' +
@@ -893,6 +897,101 @@ class UHFQC(Instrument):
                     'wait(300);\n' +
                     'setTrigger(0);\n')
         self.awg_string(sequence, timeout=timeout)
+
+    def awg_sequence_acquisition_and_DIO_RED_test(
+            self, Iwaves, Qwaves, cases, acquisition_delay, 
+            codewords, timeout=5):
+        # setting the acquisition delay samples
+        delay_samples = int(acquisition_delay*1.8e9/8)
+        # setting the delay in the instrument
+        self.awgs_0_userregs_2(delay_samples)
+
+        sequence = (
+            'const TRIGGER1  = 0x000001;\n' +
+            'const WINT_TRIG = 0x000010;\n' +
+            'const IAVG_TRIG = 0x000020;\n' +
+            'const WINT_EN   = 0x1ff0000;\n' +
+            'const DIO_VALID = 0x00010000;\n' +
+            'setTrigger(WINT_EN);\n' +
+            'var loop_cnt = getUserReg(0);\n' +
+            'var wait_delay = getUserReg(2);\n' +
+            'var RO_TRIG;\n' +
+            'if(getUserReg(1)){\n' +
+            ' RO_TRIG=IAVG_TRIG;\n' +
+            '}else{\n' +
+            ' RO_TRIG=WINT_TRIG;\n' +
+            '}\n' +
+            'var trigvalid = 0;\n' +
+            'var dio_in = 0;\n' +
+            'var cw = 0;\n' +
+            'cvar i;\n'+
+            'const length = {};\n'.format(len(codewords))
+            )
+
+
+        codewordstring = self.array_to_combined_vector_string(
+                codewords, "codewords")
+
+        sequence = sequence + codewordstring
+
+        # loop to generate the wave list
+        for i in range(len(Iwaves)):
+            Iwave = Iwaves[i]
+            Qwave = Qwaves[i]
+            if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
+                raise KeyError(
+                    "exceeding AWG range for I channel, all values should be within +/-1")
+            elif np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
+                raise KeyError(
+                    "exceeding AWG range for Q channel, all values should be within +/-1")
+            elif len(Iwave) > 16384:
+                raise KeyError(
+                    "exceeding max AWG wave lenght of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+            elif len(Qwave) > 16384:
+                raise KeyError(
+                    "exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
+            wave_I_string = self.array_to_combined_vector_string(
+                Iwave, "Iwave{}".format(i))
+            wave_Q_string = self.array_to_combined_vector_string(
+                Qwave, "Qwave{}".format(i))
+            sequence = sequence+wave_I_string+wave_Q_string
+        # starting the loop and switch statement
+        sequence = sequence+(
+            'for (i = 0; i < length; i = i + 1) {\n' +
+            ' waitDIOTrigger();\n' +
+            ' var dio = getDIOTriggered();\n' +
+            # now hardcoded for 7 bits (cc-light)
+            ' cw = (dio >> 17) & 0x1f;\n' +
+            '  switch(cw) {\n')
+        # adding the case statements
+        for i in range(len(Iwaves)):
+            # generating the case statement string
+            case = '  case {}:\n'.format(int(cases[i]))
+            case_play = '   playWave(Iwave{}, Qwave{});\n'.format(i, i)
+            # adding the individual case statements to the sequence
+            # FIXME: this is a hack to work around missing timing in OpenQL
+            # Oct 2017
+            sequence = sequence + case+case_play
+
+        # adding the final part of the sequence including a default wave
+        sequence = (sequence +
+                    '  default:\n' +
+                    # the default wave should never trigger, noneteless if it does trigger 
+                    # it indicates that 1. the correct codeword can not be triggered and 
+                    # 2. that there are triggers bio received. 
+                    '   playWave(ones(36), ones(36));\n' +
+                    ' }\n' +
+                    ' wait(wait_delay);\n' +
+                    ' var codeword =  codewords[i];\n'+
+                    ' setDIO(codeword);\n'+
+                    ' setTrigger(WINT_EN + RO_TRIG);\n' +
+                    ' setTrigger(WINT_EN);\n' +
+                    #' waitWave();\n'+ #removing this waitwave for now
+                    '}\n' +
+                    'wait(300);\n' +
+                    'setTrigger(0);\n')
+        self.awg_string(sequence, timeout=timeout)
+
 
     def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay, dig_trigger=True):
         if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:

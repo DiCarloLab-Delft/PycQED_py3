@@ -714,9 +714,12 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         k = oqh.create_kernel('pi_flux_pi', p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         k.gate('fl_cw_02', [2, 0])
+        # k.gate('fl_cw_02', [10, 8])
         if t_nanoseconds > 10:
-            k.gate("wait", [qubit_idx], t_nanoseconds)
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
+            # k.gate("wait", [qubit_idx], t_nanoseconds)
         k.gate('rx90', [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)

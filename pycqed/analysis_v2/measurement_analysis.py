@@ -41,6 +41,9 @@ reload(gsa)
 import pycqed.analysis_v2.fluxing_analysis as fla
 reload(fla)
 
+import pycqed.analysis_v2.timing_cal_analysis as ta
+reload(ta)
+
 
 from pycqed.analysis_v2.base_analysis import *
 from pycqed.analysis_v2.simple_analysis import (

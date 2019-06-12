@@ -490,16 +490,4 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             return np.array(return_values)[self.qoi_mask]
             
         else: 
-            return return_values 
-
-
-
-
-
-
-
-
-
-
-
-
+            return return_values
