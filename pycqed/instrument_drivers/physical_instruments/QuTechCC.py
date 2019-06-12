@@ -35,24 +35,24 @@ class QuTechCC(QuTechCC_core, Instrument):
         self._ccio_slot_driving_vsm = ccio_slot_driving_vsm  # the slot number of the CCIO driving the VSM (FIXME: supports one VSM only)
 
         # fixed constants
-        self._q1reg_dio_delay = 63  # the register used in OpenQL generated programs to set DIO delay
-        self._num_vsm_ch = 32  # the number of VSM channels used per connector
+        self._Q1REG_DIO_DELAY = 63  # the register used in OpenQL generated programs to set DIO delay
+        self._NUM_VSM_CH = 32  # the number of VSM channels used per connector
         self._CCIO_MAX_VSM_DELAY = 48
 
-        self._add_parameters(self._num_ccio, self._num_vsm_ch)
-        self._add_compatibility_parameters(self._num_ccio, self._num_vsm_ch)
+        self._add_parameters(self._num_ccio)
+        self._add_compatibility_parameters(self._num_ccio)
 
 
     ##########################################################################
     # QCoDeS parameter definitions
     ##########################################################################
 
-    def _add_parameters(self, num_ccio: int, num_vsm_ch: int) -> None:
+    def _add_parameters(self, num_ccio: int) -> None:
         """
         add CC native parameters
         """
 
-        for vsm_ch in range(0, num_vsm_ch):  # NB: VSM channel starts from 0 on CC-light/QCC
+        for vsm_ch in range(0, self._NUM_VSM_CH):  # NB: VSM channel starts from 0 on CC-light/QCC
             self.add_parameter(
                 'vsm_rise_delay{}'.format(vsm_ch),
                 label='VSM rise {} delay'.format(vsm_ch),
@@ -72,7 +72,7 @@ class QuTechCC(QuTechCC_core, Instrument):
                 get_cmd=_gen_get_func_1par(self._get_vsm_fall_delay, vsm_ch)
             )
 
-    def _add_compatibility_parameters(self, num_ccio: int, num_vsm_ch: int) -> None:
+    def _add_compatibility_parameters(self, num_ccio: int) -> None:
         """
         parameters for the end user, CC-light 'emulation'
         FIXME:  these are compatibility hacks to ease integration in the existing CC-light toolchain,
@@ -107,7 +107,7 @@ class QuTechCC(QuTechCC_core, Instrument):
         # NB: CC supports 1/1200 MHz ~= 833 ps resolution
         # NB: CC supports setting trailing edge delay separately
         # NB: on CCL, index is qubit, not channel
-        for vsm_ch in range(0, num_vsm_ch):  # NB: VSM channel starts from 0 on CC-light/QCC
+        for vsm_ch in range(0, self._NUM_VSM_CH):  # NB: VSM channel starts from 0 on CC-light/QCC
             self.add_parameter(
                 'vsm_channel_delay{}'.format(vsm_ch),
                 label='VSM Channel {} delay'.format(vsm_ch),
@@ -176,7 +176,7 @@ class QuTechCC(QuTechCC_core, Instrument):
     # helper for parameter 'dio{}_out_delay'
     def _set_dio_delay(self, ccio: int, cnt_in_20ns_steps: int) -> None:
         self.stop()
-        self.set_q1_reg(ccio, self._q1reg_dio_delay, cnt_in_20ns_steps)
+        self.set_q1_reg(ccio, self._Q1REG_DIO_DELAY, cnt_in_20ns_steps)
         self.start()
 
 
