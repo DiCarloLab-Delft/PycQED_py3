@@ -83,7 +83,6 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
         self.assertGreaterEqual(value, min_v)
         self.assertLessEqual(value, max_v)
 
-    @unittest.expectedFailure
     def test_SSRO_analysis_basic_1D(self):
         t_start = '20171016_135112'
         t_stop = t_start

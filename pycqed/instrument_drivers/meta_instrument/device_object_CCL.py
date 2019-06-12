@@ -1437,7 +1437,7 @@ class DeviceCCL(Instrument):
 
         if max_delay == 'auto':
             max_delay = np.max(times) + 40e-9
-
+ 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
         if waveform_name == 'square':
@@ -1496,23 +1496,23 @@ class DeviceCCL(Instrument):
         assert q0 in self.qubits()
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        fl_lutman.sq_length(10e-9)
+        fl_lutman.sq_length(40e-9)
 
 
         CC = self.instr_CC.get_instr()
 
         # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 80ns 
-        p = sqo.FluxTimingCalibration(X.cfg_qubit_nr(),
+        p = sqo.FluxTimingCalibration(q0idx,
                               times=[40e-9], 
-                              platf_cfg=device.cfg_openql_platform_fn(),
+                              platf_cfg=self.cfg_openql_platform_fn(),
                               cal_points=False)
         CC.eqasm_program(p.filename)
 
-        d = device.get_int_avg_det(qubits=['X'], single_int_avg=True)
+        d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
         MC.set_detector_function(d)
 
-        s = swf.tim_flux_latency_sweep(device)
-        s2 = swf.tim_mw_latency_sweep(device)
+        s = swf.tim_flux_latency_sweep(self)
+        s2 = swf.tim_mw_latency_sweep(self)
         MC.set_sweep_functions([s,s2])
 
         MC.set_sweep_points(flux_latencies)

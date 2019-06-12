@@ -112,8 +112,9 @@ def bounce_correction(ysig, tau: float, amp: float,
 def exponential_decay_correction_hw_friendly(ysig, tau: float, amp: float,
                                              sampling_rate: float=1,
                                              inverse: bool=False,
-                                             paths = 8,
-                                             ppl = 2):
+                                             paths=8,
+                                             ppl=2,
+                                             downsampling: bool = True):
     """
     Corrects for an exponential decay using "multipath_filter2".
 
@@ -135,11 +136,16 @@ def exponential_decay_correction_hw_friendly(ysig, tau: float, amp: float,
         # compensating low-pass by an overshoot
         # correction filter y[n] = (1+k)*x[n] - k*u[n] = x[n] - k*(u[n]-x[n])
         # where u[n] = u[n-1] + alpha*(x[n] - u[n-1])
-        # the correction filter differs just in the sign of k, so allow the k to be negative here
+        # the correction filter differs just in the sign of k, so allow the
+        # k to be negative here
         k = amp/(1+amp)/(1-alpha)
 
-
-    filtered_signal = multipath_filter2(sig=ysig, alpha=alpha, k=k, paths=paths, ppl=ppl)
+    if downsampling:
+        filtered_signal = multipath_filter2(sig=ysig, alpha=alpha, k=k,
+                                            paths=paths, ppl=ppl)
+    else:
+        filtered_signal = multipath_filter3(sig=ysig, alpha=alpha, k=k,
+                                            paths=paths, ppl=ppl)
 
     if inverse:
         raise NotImplementedError()
@@ -154,14 +160,17 @@ def build_piecewise_kernel(x_list, x_start=4, x_pw=2):
     kernel = np.zeros(x_start + x_pw*(len(x_list) - x_start))
 
     for i, x in enumerate(x_list[x_start:]):
-        kernel[x_pw*i + x_start : x_pw*i + x_start + x_pw] = x
+        kernel[x_pw*i + x_start: x_pw*i + x_start + x_pw] = x
 
     kernel[0:x_start] = x_list[0:x_start]
 
     return kernel
 
 # Delay a signal by d clock cycles.
-# This is done by adding d zero entries to the front of the signal array, and by removing the last d entries.
+# This is done by adding d zero entries to the front of the signal array,
+# and by removing the last d entries.
+
+
 def sigdelay(sig, d):
     # delays the signal sig by d clock cycles. The argument d must be an integer.
     s = np.zeros(sig.shape)
@@ -234,7 +243,6 @@ def multipath_filter(sig, alpha, k, paths):
     return sig + k * (duf - sig)
 
 
-
 def multipath_filter2(sig, alpha, k, paths, ppl,
                       hw_rounding: bool=True):
     """
@@ -282,6 +290,40 @@ def multipath_filter2(sig, alpha, k, paths, ppl,
             duf = np.append(duf, tpl * acc[j])
     duf = duf[0:sig.size]
     return sig + hw_k * (duf - sig)
+
+
+def multipath_filter3(sig, alpha, k, paths, ppl,
+                      hw_rounding: bool=True):
+    """
+    hardware friendly
+    exponential moving average correction filter with pipeline simulation but
+    without downsampling
+    """
+    ma_len = ppl*paths  # length of the moving average
+
+    hw_alpha = alpha*float(ma_len)  # note, we factor out ma_len and make it
+    # part of hw_alpha
+    hw_k = k
+
+    if hw_rounding:
+        hw_alpha = coef_round(hw_alpha)
+        hw_k = coef_round(hw_k)
+
+    # pad array by ma_len samples
+    sig_padded = np.concatenate((np.zeros(ma_len - 1), sig))
+
+    # reserve space for internal state variable
+    u = np.zeros(len(sig_padded))
+
+    # recursively apply difference equation for internal state variable
+    for n in range(ma_len, len(sig_padded)):
+        # average over the last ma_len samples
+        avg = np.sum(sig_padded[n - ma_len: n])/ma_len
+        u[n] = u[n - ma_len] + hw_alpha*(avg - u[n - ma_len])
+
+    # when computing the output, make sure to correctly remove the padding
+    y = sig + hw_k * (u[ma_len - 1:] - sig)
+    return y
 
 
 def first_order_bounce_corr(sig, delay, amp, awg_sample_rate,

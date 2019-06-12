@@ -1153,10 +1153,25 @@ class FLsweep(Soft_Sweep):
         self.unit = par.unit
         self.name = par.name
 
+
+        AWG = self.lm.AWG.get_instr()
+        awg_unit = self.lm.cfg_awg_channel()//2
+        self.AWG_ready_par = AWG.parameters['awgs_{}_ready'.format(awg_unit)]
+
     def set_parameter(self, val):
         self.par(val)
         self.lm.load_waveform_realtime(self.waveform_name,
                                        regenerate_waveforms=True)
+        t0 = time.time()
+        time.sleep(1.5)
+        while not self.AWG_ready_par(): 
+            print('\rAWG not ready')
+            if (time.time()-t0)>10 :
+                raise TimeoutError
+        return 
+
+
+
 
 
 class FLsweep_QWG(Soft_Sweep):
