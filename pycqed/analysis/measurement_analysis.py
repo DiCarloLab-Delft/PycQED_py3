@@ -2363,8 +2363,8 @@ class Echo_analysis_V15(TD_Analysis):
     New echo analysis for varying phase pulses. Based on old ramsey analysis.
     Should be replaced asap by a V2-style analysis
 
-    -Luc 
-    """ 
+    -Luc
+    """
 
     def __init__(self, label='echo', phase_sweep_only=False, **kw):
         kw['label'] = label
@@ -6438,6 +6438,71 @@ class Homodyne_Analysis(MeasurementAnalysis):
         return fit_res
 
 
+class Homodyne_Analysis_Mutipeak(MeasurementAnalysis):
+
+    def __init__(self, label='', dip=False, **kw):
+        # Custome power message is used to create a message in resonator measurements
+        # dict must be custom_power_message={'Power': -15, 'Atten': 86, 'res_len':3e-6}
+        # Power in dBm, Atten in dB and resonator length in m
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        self.dip = dip
+        super().__init__(**kw)
+
+    def run_default_analysis(self,
+                             close_file=False,
+                             show=False, **kw):
+        '''
+
+        '''
+        super(self.__class__, self).run_default_analysis(
+            close_file=False, show=show, **kw)
+        self.add_analysis_datagroup_to_file()
+
+        window_len_filter = kw.get('window_len_filter', 11)
+
+        data_x = self.sweep_points
+        data_y = self.measured_values[0]
+        if self.dip:
+            data_y_find = -data_y
+        else:
+            data_y_find = data_y
+
+        self.peaks = a_tools.peak_finder_v2(data_x, data_y_find,
+                                            window_len=window_len_filter, perc=92)
+        self.peak_indices = np.array([list(data_x).index(p) for p in self.peaks])
+        self.peak_vals = data_y[self.peak_indices]
+        self.peak_amps = np.abs(self.peak_vals-np.mean(data_y))
+
+        fig, ax = self.default_ax()
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.measured_values[0],
+                                        fig=fig, ax=ax,
+                                        xlabel=self.sweep_name,
+                                        x_unit=self.sweep_unit[0],
+                                        ylabel=str('S21_mag'),
+                                        y_unit=self.value_units[0],
+                                        save=False)
+        # ensures that amplitude plot starts at zero
+        ax.set_ylim(ymin=0.000)
+
+        ax.plot(self.peaks, self.peak_vals, 'o',
+                        ms=self.marker_size_special)
+
+        textstr = 'Peak positions and heights'
+        for pos, amp in zip(self.peaks, self.peak_amps):
+            textstr += '\n $f=${:.4g} GHz; $A=${:.2g}'.format(pos/1e9,amp)
+
+        fig.text(1, 0.5, textstr, transform=ax.transAxes,
+                 fontsize=self.font_size,
+                 verticalalignment='center',
+                 horizontalalignment='left', bbox=self.box_props)
+
+        self.save_fig(fig, xlabel=self.xlabel, ylabel='peaks', **kw)
+
+        return self.peaks
+
+
 ################
 # VNA analysis #
 ################
@@ -8665,7 +8730,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                              add_title=add_title,
                              xlabel=xlabel, ylabel=ylabel)
 
-        self.peaks_low, self.peaks_high = self.find_peaks()
+        self.peaks_low, self.peaks_high = self.find_peaks(**kw)
         self.f, self.ax = self.make_unfiltered_figure(self.peaks_low, self.peaks_high,
                                                       transpose=transpose, cmap=cmap,
                                                       add_title=add_title,
@@ -8712,7 +8777,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
         peaks = np.zeros((len(self.X), 2))
         for i in range(len(self.X)):
-            p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i])
+            p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i], **kw)
             peaks[i, :] = np.sort(p_dict[:2])
 
         peaks_low = peaks[:, 0]

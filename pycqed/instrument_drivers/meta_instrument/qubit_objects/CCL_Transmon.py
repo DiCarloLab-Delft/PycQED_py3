@@ -1904,7 +1904,7 @@ class CCLight_Transmon(Qubit):
         """
         Measures anharmonicity of the transmon using three-tone spectroscopy.
 
-        Typically a good guess for the 12 transition frequencies is 
+        Typically a good guess for the 12 transition frequencies is
         f01 + alpha where alpha is the anharmonicity and typically ~ -300 MHz
         """
         f_anharmonicity = np.mean(freqs_01) - np.mean(freqs_12)
@@ -3220,7 +3220,7 @@ class CCLight_Transmon(Qubit):
                 amp_old = self.mw_channel_amp()
                 self.mw_channel_amp(scale_factor*amp_old)
 
-            print('Pulse amplitude changed from {:.3f} to {:.3f}'.format(amp_old,amp_old*amp_old))
+            print('Pulse amplitude changed from {:.3f} to {:.3f}'.format(amp_old,scale_factor*amp_old))
         return a
 
     def measure_motzoi(self, motzoi_amps=None,
