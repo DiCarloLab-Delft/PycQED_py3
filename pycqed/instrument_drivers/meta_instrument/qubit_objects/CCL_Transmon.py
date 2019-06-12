@@ -3707,6 +3707,68 @@ class CCLight_Transmon(Qubit):
         a = ma2.GST_SingleQubit_DataExtraction(label='Single_qubit_GST')
         return a
 
+    ###########################################################################
+    # Dep graph check functions
+    ###########################################################################
+    def check_qubit_spectroscopy(self, freqs=None, MC=None):
+        """
+        Check the qubit frequency with spectroscopy of 15 points.
+
+        Uses bot the peak finder and the lorentzian fit to determine the
+        outcome of the check:
+        - Peak finder: if no peak is found, there is only noise. Will 
+                       definitely need recalibration.
+        - Fitting: if a peak is found, will do normal spectroscopy fitting
+                   and determine deviation from what it thinks the qubit 
+                   frequency is
+        """
+        if freqs is None:
+            freq_center = self.freq_qubit()
+            freq_span = 10e6
+            freqs = np.linspace(freq_center - freq_span/2,
+                                freq_center + freq_span/2,
+                                15)
+        self.measure_spectroscopy(MC=MC, freqs=freqs)
+
+        label = 'spec'
+        a = ma.Qubit_Spectroscopy_Analysis(label=label, close_fig=True, 
+                                           qb_name=self.name)
+
+        freq_peak = a.peaks['peak']
+        if freq_peak is None:
+            result = 1.0
+        else:
+            freq = a.fitted_freq
+            result = np.abs(self.freq_qubit() - freq)/self.freq_qubit()
+        return result
+
+    def check_rabi(self, MC=None, amps=None):
+        """
+        Takes 5 equidistantly space points: 3 before channel amp, one at
+        channel amp and one after. Compares them with the expected Rabi curve
+        and returns a value in [0,1] to show the quality of the calibration
+        """
+        if amps is None:
+            amps = np.linspace(0, 4/3*self.mw_channel_amp(), 5)
+
+        amp = self.measure_rabi(MC=MC, amps=amps, analyze=False)
+        old_amp = self.mw_channel_amp()
+        return np.abs(amp-old_amp)
+
+    def check_ramsey(self, MC=None, times=None, artificial_detuning=None):
+
+        if artificial_detuning is None:
+            artificial_detuning = 0.1e6
+
+        if times is None:
+            times = np.linspace(0, 0.5/artificial_detuning, 6)
+
+        a = self.measure_ramsey(times=times, MC=MC,
+                                artificial_detuning=artificial_detuning)
+        freq = a['frequency']
+        check_result = (freq-self.freq_qubit())/freq
+        return check_result
+
     def create_dep_graph(self):
         dag = AutoDepGraph_DAG(name=self.name+' DAG')
 

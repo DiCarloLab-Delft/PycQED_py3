@@ -1053,7 +1053,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         phase = 0
         oscillation_offset = 0
         exponential_offset = offset
-        frequency = freq_qubit - (mock_freq_qubit + artificial_detuning)
+        frequency = freq_qubit - mock_freq_qubit + artificial_detuning
 
         # Mock values without calibration points
         mocked_values = (signal_amp *
@@ -1067,8 +1067,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Add noise:
         mocked_values += np.random.normal(0,
-                                  self.noise()/np.sqrt(self.ro_acq_averages()),
-                                  np.size(mocked_values))
+                                          self.noise()/np.sqrt(self.ro_acq_averages()),
+                                          np.size(mocked_values))
 
         mocked_values = self.values_to_IQ(mocked_values)
 
@@ -1272,8 +1272,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         IQ_values = []
         for I, Q in zip(MockI, MockQ):
-            I += np.random.normal(0, self.noise()/np.sqrt(self.ro_acq_averages()), 1)
-            Q += np.random.normal(0, self.noise()/np.sqrt(self.ro_acq_averages()), 1)
+            I += np.random.normal(0, self.noise() /
+                                  np.sqrt(self.ro_acq_averages()), 1)
+            Q += np.random.normal(0, self.noise() /
+                                  np.sqrt(self.ro_acq_averages()), 1)
             IQ_values.append([I, Q])
         return IQ_values
 
@@ -1368,21 +1370,23 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Qubits calibration
         self.dag.add_node(self.name + ' Frequency Coarse',
-                          calibrate_function=self.name + '.find_frequency')
+                          calibrate_function=self.name + '.find_frequency',
+                          check_function=self.name + '.check_qubit_spectroscopy',
+                          tolerance=0.2e-3)
         self.dag.add_node(self.name + ' Frequency at Sweetspot',
                           calibrate_function=self.name + '.find_frequency')
         self.dag.add_node(self.name + ' Spectroscopy Power',
-                          calibrate_function=self.name + '.find_spec_pow')
+                          calibrate_function=self.name + '.calibrate_spec_pow')
         self.dag.add_node(self.name + ' Sweetspot',
                           calibrate_function=self.name + '.find_qubit_sweetspot')
         self.dag.add_node(self.name + ' Rabi',
-                          calibrate_function=cal_True_delayed)
+                          calibrate_function=self.name + '.calibrate_mw_pulse_amplitude_coarse',
+                          check_function=self.name + '.check_rabi',
+                          tolerance=0.01)
         self.dag.add_node(self.name + ' Frequency Fine',
-                          calibrate_function=self.name + '.calibrate_frequency_ramsey')
-        self.dag.add_node(self.name + ' f_12 estimate',
-                          calibrate_function=self.name + '.find_anharmonicity_estimate')
-        self.dag.add_node(self.name + ' DAC Arc Polynomial',
-                          calibrate_function=cal_True_delayed)
+                          calibrate_function=self.name + '.calibrate_frequency_ramsey',
+                          check_function=self.name + '.check_ramsey',
+                          tolerance=0.1e-3)
 
         # Validate qubit calibration
         self.dag.add_node(self.name + ' ALLXY',
