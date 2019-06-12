@@ -41,7 +41,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_freq_qubit_bare', label='qubit frequency',
                            unit='Hz',
                            initial_value=(np.sqrt(8*self.mock_Ec() *
-                                                    self.mock_Ej()) -
+                                                  self.mock_Ej()) -
                                           self.mock_Ec()),
                            parameter_class=ManualParameter)
 
@@ -81,7 +81,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_anharmonicity', label='anharmonicity',
-                           unit='Hz', initial_value=274e6,
+                           unit='Hz', initial_value=self.mock_Ec(),
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_spec_pow', label='optimal spec power',
@@ -133,8 +133,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         self.add_parameter('mock_freq_res', label='resonator frequency',
                            unit='Hz', parameter_class=ManualParameter,
-                           initial_value=self.mock_freq_res_bare() - 
-                                         self.mock_chi12() / 2)
+                           initial_value=self.mock_freq_res_bare() -
+                           self.mock_chi12() / 2)
 
         self.add_parameter('mock_res_width', label='resonator peak width',
                            unit='Hz', initial_value=1e6,
@@ -155,23 +155,23 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            unit='', initial_value='FBL_1',
                            parameter_class=ManualParameter)
 
-        self.add_parameter('noise', label='noise level', unit='V',
-                           initial_value=5e-6, parameter_class=ManualParameter)
+        self.add_parameter('noise', label='nominal noise level', unit='V',
+                           initial_value=0.16e-3, parameter_class=ManualParameter)
 
     def find_resonators(self, start_freq=7e9, stop_freq=8e9, power=-40,
-                        bandwidth=200, timeout=200, npts=2001, VNA=None,
+                        bandwidth=200, timeout=200, npts=2001, with_VNA=None,
                         verbose=True):
 
-        if VNA is None:
+        if with_VNA is None:
             try:
                 if self.instr_VNA.get_instr() == '':
-                    VNA = False
+                    with_VNA = False
                 else:
-                    VNA = True
+                    with_VNA = True
             except:
-                VNA = False
+                with_VNA = False
 
-        if VNA:
+        if with_VNA:
             VNA = self.instr_VNA.get_instr()
 
             VNA.start_frequency(start_freq)
@@ -519,6 +519,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             print(self.spec_pow())
             return True
 
+    ###########################################################################
+    # Mock measurement methods
+    ###########################################################################
     def measure_with_VNA(self, start_freq, stop_freq, npts,
                          MC=None, name='Mock_VNA', analyze=True):
         """
@@ -559,7 +562,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         A_res = abs(A * (1. - Q / Qe * np.exp(1.j * theta) /
                          (1. + 2.j * Q * (f / 1.e9 - f0_res) / f0_res)))
         A_test = abs(A * (1. - Q_test / Qe_test * np.exp(1.j * theta) /
-                         (1. + 2.j * Q_test * (f / 1.e9 - f0_test) / f0_test)))
+                          (1. + 2.j * Q_test * (f / 1.e9 - f0_test) / f0_test)))
 
         baseline = 0.40
         A_res -= A
@@ -569,7 +572,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         mocked_values += np.random.normal(0, A/500, np.size(mocked_values))
 
         d = det.Mock_Detector(value_names=['ampl'], value_units=['V'],
-                              detector_control='soft', 
+                              detector_control='soft',
                               mock_values=mocked_values)
         MC.set_sweep_function(s)
         MC.set_sweep_points(freqs)
@@ -638,7 +641,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         mocked_values = h + peak_01 + peak_02
 
         mocked_values += np.random.normal(0,
-                                          self.noise(), np.size(mocked_values))
+                                          self.noise()/np.sqrt(self.ro_acq_averages()), np.size(mocked_values))
 
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
                               detector_control='soft',
@@ -717,7 +720,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             mocked_values = np.concatenate([mocked_values, new_values])
 
         mocked_values += np.random.normal(0,
-                                          self.noise(), np.size(mocked_values))
+                                          self.noise()/np.sqrt(self.ro_acq_averages()), np.size(mocked_values))
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
                               detector_control='soft',
                               mock_values=mocked_values)
@@ -801,7 +804,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         mocked_values -= testres_dip
 
         mocked_values += np.random.normal(0,
-                                          self.noise(), np.size(mocked_values))
+                                          self.noise()/np.sqrt(self.ro_acq_averages()), np.size(mocked_values))
 
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
                               detector_control='soft',
@@ -862,7 +865,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             new_values = h + A*(w/2.0)**2 / ((w/2.0)**2 +
                                              ((freqs - f0))**2)
 
-            new_values += np.random.normal(0, self.noise(),
+            new_values += np.random.normal(0, self.noise()/np.sqrt(self.ro_acq_averages()),
                                            np.size(new_values))
 
             mocked_values = np.concatenate([mocked_values, new_values])
@@ -884,7 +887,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         if analyze:
             ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
             timestamp = a_tools.get_timestamps_in_range(t_start,
-                                                        label='Qubit_dac_scan'+
+                                                        label='Qubit_dac_scan' +
                                                               self.msmt_suffix)
             timestamp = timestamp[0]
             ma2.da.DAC_analysis(timestamp=timestamp)
@@ -929,7 +932,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
                                              ((freqs - f0))**2)
             new_values += np.random.normal(0,
-                                           self.noise(), np.size(new_values))
+                                           self.noise()/np.sqrt(self.ro_acq_averages()), np.size(new_values))
 
             mocked_values = np.concatenate([mocked_values, new_values])
 
@@ -1038,7 +1041,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         low_lvl = self.measurement_signal(excited=False)
         high_lvl = self.measurement_signal(excited=True)
 
-        freq_qubit = self.calculate_mock_qubit_frequency()
+        mock_freq_qubit = self.calculate_mock_qubit_frequency()
 
         detuning = np.abs(self.freq_qubit() - freq_qubit)/1e6
         highlow = (high_lvl-low_lvl)*np.exp(-detuning)
@@ -1050,7 +1053,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         phase = 0
         oscillation_offset = 0
         exponential_offset = offset
-        frequency = freq_qubit - (freq_qubit + artificial_detuning)
+        frequency = freq_qubit - (mock_freq_qubit + artificial_detuning)
 
         # Mock values without calibration points
         mocked_values = (signal_amp *
@@ -1060,11 +1063,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Calibration points
         mocked_values = np.concatenate([mocked_values,
-                                       [low_lvl, low_lvl, high_lvl, high_lvl]])
+                                        [low_lvl, low_lvl, high_lvl, high_lvl]])
 
         # Add noise:
         mocked_values += np.random.normal(0,
-                                          self.noise(), np.size(mocked_values))
+                                  self.noise()/np.sqrt(self.ro_acq_averages()),
+                                  np.size(mocked_values))
 
         mocked_values = self.values_to_IQ(mocked_values)
 
@@ -1268,8 +1272,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         IQ_values = []
         for I, Q in zip(MockI, MockQ):
-            I += np.random.normal(0, self.noise(), 1)
-            Q += np.random.normal(0, self.noise(), 1)
+            I += np.random.normal(0, self.noise()/np.sqrt(self.ro_acq_averages()), 1)
+            Q += np.random.normal(0, self.noise()/np.sqrt(self.ro_acq_averages()), 1)
             IQ_values.append([I, Q])
         return IQ_values
 
@@ -1332,39 +1336,35 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
     ###########################################################################
 
     def dep_graph(self):
+        self.dag = AutoDepGraph_DAG('DAG')
         cal_True_delayed = 'autodepgraph.node_functions.calibration_functions.test_calibration_True_delayed'
-        self.dag = AutoDepGraph_DAG(name=self.name+' DAG')
+        self.dag.add_node('Resonators Wide Search',
+                          calibrate_function=self.name + '.find_resonators')
+        self.dag.add_node('Zoom on resonators',
+                          calibrate_function=self.name + '.find_resonator_frequency_initial')
+        self.dag.add_node('Resonators Power Scan',
+                          calibrate_function=self.name + '.find_test_resonators')
+        self.dag.add_node('Resonators Flux Sweep',
+                          calibrate_function=self.name + '.find_qubit_resonator_fluxline')
 
-        self.dag.add_node('VNA Wide Search',
-                          calibrate_function=self.name + '.find_resonators_VNA')
-        self.dag.add_node('VNA Zoom on resonators',
-                          calibrate_function=self.name + '.find_resonator_frequency_VNA')
-        self.dag.add_node('VNA Resonators Power Scan',
-                          calibrate_function=self.name + '.find_test_resonators_VNA')
-        self.dag.add_node('VNA Resonators Flux Sweep',
-                          calibrate_function=self.name + '.find_qubit_resonator_fluxline_VNA')
-
-        # Resonators
         self.dag.add_node(self.name + ' Resonator Frequency',
                           calibrate_function=self.name + '.find_resonator_frequency')
         self.dag.add_node(self.name + ' Resonator Power Scan',
                           calibrate_function=self.name + '.calibrate_ro_pulse_amp_CW')
-        self.dag.add_node(self.name + ' Resonator Sweetspot',
-                          calibrate_function=self.name + '.find_resonator_sweetspot')
 
         # Calibration of instruments and ro
-        self.dag.add_node(self.name + ' Calibrations',
-                          calibrate_function=cal_True_delayed)
-        self.dag.add_node(self.name + ' Mixer Skewness',
-                          calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
-        self.dag.add_node(self.name + ' Mixer Offset Drive',
-                          calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
-        self.dag.add_node(self.name + ' Mixer Offset Readout',
-                          calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
-        self.dag.add_node(self.name + ' Ro/MW pulse timing',
-                          calibrate_function=cal_True_delayed)
-        self.dag.add_node(self.name + ' Ro Pulse Amplitude',
-                          calibrate_function=self.name + '.ro_pulse_amp_CW')
+        # self.dag.add_node(self.name + ' Calibrations',
+        #                   calibrate_function=cal_True_delayed)
+        # self.dag.add_node(self.name + ' Mixer Skewness',
+        #                   calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
+        # self.dag.add_node(self.name + ' Mixer Offset Drive',
+        #                   calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
+        # self.dag.add_node(self.name + ' Mixer Offset Readout',
+        #                   calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
+        # self.dag.add_node(self.name + ' Ro/MW pulse timing',
+        #                   calibrate_function=cal_True_delayed)
+        # self.dag.add_node(self.name + ' Ro Pulse Amplitude',
+        #                   calibrate_function=self.name + '.ro_pulse_amp_CW')
 
         # Qubits calibration
         self.dag.add_node(self.name + ' Frequency Coarse',
@@ -1408,27 +1408,22 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         #######################################################################
 
         # VNA
-        self.dag.add_edge('VNA Zoom on resonators', 'VNA Wide Search')
-        self.dag.add_edge('VNA Resonators Power Scan',
-                          'VNA Zoom on resonators')
-        self.dag.add_edge('VNA Resonators Flux Sweep',
-                          'VNA Zoom on resonators')
-        self.dag.add_edge('VNA Resonators Flux Sweep',
-                          'VNA Resonators Power Scan')
+        self.dag.add_edge('Zoom on resonators', 'Resonators Wide Search')
+        self.dag.add_edge('Resonators Power Scan',
+                          'Zoom on resonators')
+        self.dag.add_edge('Resonators Flux Sweep',
+                          'Zoom on resonators')
+        self.dag.add_edge('Resonators Flux Sweep',
+                          'Resonators Power Scan')
         # Resonators
         self.dag.add_edge(self.name + ' Resonator Frequency',
-                          'VNA Resonators Power Scan')
+                          'Resonators Power Scan')
         self.dag.add_edge(self.name + ' Resonator Frequency',
-                          'VNA Resonators Flux Sweep')
+                          'Resonators Flux Sweep')
         self.dag.add_edge(self.name + ' Resonator Power Scan',
-                          self.name + ' Resonator Frequency')
-        self.dag.add_edge(self.name + ' Resonator Sweetspot',
                           self.name + ' Resonator Frequency')
         self.dag.add_edge(self.name + ' Frequency Coarse',
                           self.name + ' Resonator Power Scan')
-        self.dag.add_edge(self.name + ' Frequency Coarse',
-                          self.name + ' Resonator Sweetspot')
-
         # Qubit Calibrations
         self.dag.add_edge(self.name + ' Frequency Coarse',
                           self.name + ' Resonator Frequency')
@@ -1436,16 +1431,16 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         #                   self.name + ' Calibrations')
 
         # Calibrations
-        self.dag.add_edge(self.name + ' Calibrations',
-                          self.name + ' Mixer Skewness')
-        self.dag.add_edge(self.name + ' Calibrations',
-                          self.name + ' Mixer Offset Drive')
-        self.dag.add_edge(self.name + ' Calibrations',
-                          self.name + ' Mixer Offset Readout')
-        self.dag.add_edge(self.name + ' Calibrations',
-                          self.name + ' Ro/MW pulse timing')
-        self.dag.add_edge(self.name + ' Calibrations',
-                          self.name + ' Ro Pulse Amplitude')
+        # self.dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Mixer Skewness')
+        # self.dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Mixer Offset Drive')
+        # self.dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Mixer Offset Readout')
+        # self.dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Ro/MW pulse timing')
+        # self.dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Ro Pulse Amplitude')
         # Qubit
         self.dag.add_edge(self.name + ' Spectroscopy Power',
                           self.name + ' Frequency Coarse')
