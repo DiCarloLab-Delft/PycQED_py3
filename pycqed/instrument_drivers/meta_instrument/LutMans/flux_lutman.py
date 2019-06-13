@@ -21,7 +21,7 @@ class Base_Flux_LutMan(Base_LutMan):
     # this default lutman is if a flux pulse can be done with only one
     # other qubit. this needs to be expanded if there are more qubits
     # to interact with.
-    _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
+    _def_lm = ['i', 'cz_z', 'square', 'park', 'custom_wf']
 
     def render_wave(self, wave_name, show=True, time_units='s',
                     reload_pulses: bool = True, render_distorted_wave: bool = True,
@@ -568,16 +568,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             vals=vals.Lists(vals.Enum('+', '-', 0)),
             parameter_class=ManualParameter)
 
-        self.add_parameter('mcz_nr_of_repeated_gates',
-                           initial_value=1, vals=vals.PermissiveInts(1, 40),
-                           parameter_class=ManualParameter)
-        self.add_parameter('mcz_gate_separation', unit='s',
-                           label='Gate separation',  initial_value=0,
-                           docstring=('Separtion between the start of CZ gates'
-                                      'in the "multi_cz" gate'),
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(min_value=0))
-
         self.add_parameter(
             'custom_wf',
             initial_value=np.array([]),
@@ -619,12 +609,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         self._wave_dict['idle_z'] = self._gen_idle_z()
         self._wave_dict['custom_wf'] = self._gen_custom_wf()
-        self._wave_dict['multi_square'] = self._gen_multi_square(
-            regenerate_square=False)
-        # multi_cz is used because there is no real-time flux correction yet
-        self._wave_dict['multi_cz'] = self._gen_multi_cz(regenerate_cz=False)
-        self._wave_dict['multi_idle_z'] = self._gen_multi_idle_z(
-            regenerate_cz=False)
 
     def _gen_i(self):
         return np.zeros(42)
@@ -780,54 +764,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         return cz_z
 
-    def _gen_multi_square(self, regenerate_square=True):
-        """
-        Composite waveform containing multiple cz gates
-        """
-        if regenerate_square:
-            self._wave_dict['square'] = self._gen_square()
-
-        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
-
-        waveform = np.zeros(max_nr_samples)
-        for i in range(self.mcz_nr_of_repeated_gates()):
-            sample_start_idx = int(self.mcz_gate_separation() *
-                                   self.sampling_rate())*i
-            sq = self._wave_dict['square']
-            try:
-                waveform[sample_start_idx:sample_start_idx+len(sq)] += sq
-            except ValueError as e:
-                logging.warning('Could not add square pulse {} in {}'.format(
-                    i, self.name))
-                logging.warning(e)
-                break
-        return waveform
-
-    def _gen_multi_cz(self, regenerate_cz=True):
-        """
-        Composite waveform containing multiple cz gates
-        """
-        if regenerate_cz:
-            self._wave_dict['cz'] = self._gen_cz()
-            self._wave_dict['cz_z'] = self._gen_cz_z()
-
-        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
-
-        waveform = np.zeros(max_nr_samples)
-        for i in range(self.mcz_nr_of_repeated_gates()):
-            cz_z = self._wave_dict['cz_z']
-            sample_start_idx = int(self.mcz_gate_separation() *
-                                   self.sampling_rate())*i
-            try:
-                waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
-            except ValueError as e:
-                logging.warning('Could not add cz_z pulse {} in {}'.format(
-                    i, self.name))
-                logging.warning(e)
-                break
-        # CZ with phase correction
-        return waveform
-
     def _gen_custom_wf(self):
         base_wf = copy(self.custom_wf())
 
@@ -887,40 +823,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             base_wf=np.zeros(int(self.cz_length()*self.sampling_rate()+1)))
 
         return idle_z
-
-    def _gen_multi_idle_z(self, regenerate_cz=False):
-        """
-        Composite waveform containing multiple cz gates
-        """
-        if regenerate_cz:
-            self._wave_dict['idle_z'] = self._gen_cz(
-                regenerate_cz=regenerate_cz)
-        idle_z = self._wave_dict['idle_z']
-        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
-
-        waveform = np.zeros(max_nr_samples)
-        for i in range(self.mcz_nr_of_repeated_gates()):
-            # if self.mcz_identical_phase_corr():
-            # phase_corr = self._gen_phase_corr(cz_offset_comp=False)
-            # else:
-            #     phase_corr = wf.single_channel_block(
-            #         amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
-            #         length=self.cz_phase_corr_length(),
-            #         sampling_rate=self.sampling_rate(), delay=0)
-            # idle_z = np.concatenate([np.zeros(len(self._wave_dict['cz'])),
-            #                        phase_corr])
-            sample_start_idx = int(self.mcz_gate_separation() *
-                                   self.sampling_rate())*i
-            try:
-                waveform[sample_start_idx:sample_start_idx +
-                         len(idle_z)] += idle_z
-            except ValueError as e:
-                logging.warning('Could not add idle_z pulse {} in {}'.format(
-                    i, self.name))
-                logging.warning(e)
-                break
-        # CZ with phase correction
-        return waveform
 
     ###########################################################
     #  Waveform generation net-zero phase correction methods  #
