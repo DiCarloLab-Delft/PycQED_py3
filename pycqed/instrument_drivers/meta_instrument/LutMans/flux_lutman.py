@@ -16,20 +16,55 @@ import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import time
 
+_def_lm = {
+    0: {"name": "i", "type": "idle"},
+    1: {"name": "cz_NE", "type": "idle_z"},
+    2: {"name": "cz_SE",    "theta": 180, "phi": 90, "type": "cz"},
+    3: {"name": "cz_SW",     "theta": 90, "phi": 0, "type": "cz"},
+    4: {"name": "cz_NW",     "theta": 90, "phi": 90, "type": "idle_z"},
+    5: {"name": "park", "type": "square"},
+    6: {"name": "square", "type": "square"},
+    7: {"name": "custom_wf", "type": "custom"}
+}
+
+valid_types = {'idle', 'cz', 'idle_z', 'square', 'custom'}
+
+
+def flux_lutmap_is_valid(lutmap: dict) -> bool:
+    """
+    Test if lutmap obeys schema.
+
+    Args:
+        lutmap
+    Return:
+        valid (bool):
+    """
+    # FIXME: make this part of the validator for the LutMap parameter.
+    for key, value in lutmap.items():
+        if not isinstance(key, int):
+            raise TypeError
+        if value['type'] not in valid_types:
+            raise ValueError("{} not in {}".format(value['type'],
+                                                   valid_types))
+
+    return True
+
 
 class Base_Flux_LutMan(Base_LutMan):
-    # this default lutman is if a flux pulse can be done with only one
-    # other qubit. this needs to be expanded if there are more qubits
-    # to interact with.
-    _def_lm = ['i',     # Idle
-               'cz_NE', # 2Q gates
-               'cz_SE',
-               'cz_SW',
-               'cz_NW', 
-               'park',  # 1Q gates
-               'square',
-               'custom_wf'] # custom
+    """
+    The default scheme of this LutMap allows for 4 different 2Q gates.
 
+    NW         NE
+      \       /
+       \     /
+        \   /
+          Q
+        /   \
+       /     \
+      /       \ 
+    SW         SE
+
+    """
     def render_wave(self, wave_name, show=True, time_units='s',
                     reload_pulses: bool = True, render_distorted_wave: bool = True,
                     QtPlot_win=None):
@@ -76,12 +111,33 @@ class Base_Flux_LutMan(Base_LutMan):
 
 class HDAWG_Flux_LutMan(Base_Flux_LutMan):
     
-    _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self._wave_dict_dist = dict()
         self.sampling_rate(2.4e9)
         self._add_qubit_parameters()
+
+    def set_default_lutmap(self):
+        """Set the default lutmap for standard microwave drive pulses."""
+        self.LutMap(default_mw_lutmap.copy())
+
+    def generate_standard_waveforms(self):
+        """
+        Generates all the standard waveforms and populates self._wave_dict
+        """
+        self._wave_dict = {}
+        # N.B. the  naming convention ._gen_{waveform_name} must be preserved
+        # as it is used in the load_waveform_onto_AWG_lookuptable method.
+        self._wave_dict['i'] = self._gen_i()
+        self._wave_dict['square'] = self._gen_square()
+        self._wave_dict['park'] = self._gen_park()
+        self._wave_dict['custom_wf'] = self._gen_custom_wf()
+
+        # FIXME: reenable this
+        for which_gate in ['NE','NW','SW','SE']:
+            self._wave_dict['cz_%s'%which_gate] = self._gen_cz(which_gate=which_gate)
+            self._wave_dict['idle_z_%s'%which_gate] = self._gen_idle_z(which_gate=which_gate)
+
 
 class QWG_Flux_LutMan(AWG8_Flux_LutMan):
 
@@ -196,7 +252,9 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
 #########################################################################
 
 class AWG8_Flux_LutMan(Base_Flux_LutMan):
-    
+    # this default lutman is if a flux pulse can be done with only one
+    # other qubit. this needs to be expanded if there are more qubits
+    # to interact with.
     _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
