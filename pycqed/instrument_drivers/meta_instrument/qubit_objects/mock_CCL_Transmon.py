@@ -147,7 +147,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_flux_current_overall', unit='A',
-                           initial_value=10e-3,
+                           initial_value=12e-3,
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_cfg_dc_flux_ch',
@@ -617,8 +617,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Height of peak [V]
         K_power = 1/np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
-        K_current = np.sqrt(np.abs(np.cos(2*np.pi*total_flux)))
-        A = K_power*K_current*A0
+        # K_current = np.sqrt(np.abs(np.cos(2*np.pi*total_flux)))
+        A = K_power*A0  # K_current*
 
         # Width of peak
         wbase = 4e6
