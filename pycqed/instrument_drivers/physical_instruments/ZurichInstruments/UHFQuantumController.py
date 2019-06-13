@@ -1,4 +1,13 @@
 """
+To do:
+- split off application dependent code, as done for ZI_HDAWG8.py
+
+Notes:
+- this driver builds on zhinst.ziPython and zhinst.utils directly, whereas the HDAWG driver inserts zishell_NH and
+  ZI_base_instrument on top of these.
+- some code (get*, set*) in this driver resembles code in zishell_NH and ZI_base_instrument
+
+
 Changelog:
 
 20190113 WJV
@@ -27,10 +36,6 @@ Changelog:
 - merged branch 'QCC_testing' into 'feature/cc', changes:
     adds awg_sequence_acquisition_and_DIO_RED_test()
 
-Notes:
-- this driver builds on zhinst.ziPython and zhinst.utils directly, whereas the HDAWG driver inserts zishell_NH and
-  ZI_base_instrument on top of these.
-- some code (get*, set*) in this driver resembles code in zishell_NH and ZI_base_instrument
 
 """
 
