@@ -1185,6 +1185,331 @@ class CCLight_Transmon(Qubit):
     ####################################################
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
+
+
+    ####################################################
+    # FOR TESTING (TEMPORARY)
+    ####################################################
+
+    def find_resonators(self, start_freq=7e9, stop_freq=8e9, VNA_power=-40,
+                        bandwidth=200, timeout=200, npts=2001, with_VNA=None,
+                        verbose=True):
+        """
+        Performs a wide range scan to find all resonator dips. Will use VNA if one
+        is connected and linked to the qubit object, or if specified via 'with_VNA'.
+        
+        TODO: Add measure_with_VNA to CCL Transmon object
+        """
+        if with_VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    with_VNA = False
+                else:
+                    with_VNA = True
+            except:
+                with_VNA = False
+
+        if with_VNA:
+            VNA = self.instr_VNA.get_instr()
+
+            VNA.start_frequency(start_freq)
+            VNA.stop_frequency(stop_freq)
+            VNA.power(VNA_power)
+            VNA.bandwidth(bandwidth)
+            VNA.npts(npts)
+            # VNA.timeout(timeout)
+            name = 'Initial_VNA'
+
+            self.measure_with_VNA(VNA, name=name)
+
+            result = ma2.sa.Initial_Resonator_Scan_Analysis(label=name)
+        else:
+            self.ro_pulse_amp_CW(0.01)
+            freqs = np.linspace(start_freq, stop_freq, npts)
+            self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
+            result = ma2.sa.Initial_Resonator_Scan_Analysis()
+
+        peak_freqs = []
+        for peak in result.peaks:
+            if peak not in peak_freqs:
+                peak_freqs.append(peak)
+
+        self.res_dict = {}
+        for i, freq in enumerate(result.peaks):
+            self.res_dict[str(i)] = [freq, 'unknown', {}, None, 0]
+
+        if verbose:
+            for resonator, items in self.res_dict.items():
+                print('{}:\t{:.3f} GHz'.format(resonator, items[0]/1e9))
+
+        return True
+
+    def calibrate_spec_pow(self, freqs=None, start_power=None, verbose=True):
+        if freqs is None:
+            freqs = np.arange(self.freq_qubit() - 50e6,
+                              self.freq_qubit() + 50e6, 1e6)
+
+        if start_power is None:
+            start_power = -35
+        power = start_power
+
+        w0, w = 1e9, 1e9
+
+        while w < 1.1*w0:
+            self.spec_pow(power)
+            self.measure_spectroscopy(freqs=freqs, analyze=False,
+                                      label='spec_pow_' + str(power) + '_dBm')
+
+            a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
+                                               qb_name=self.name)
+
+            w = a.params['kappa'].value
+            power += 5
+            if w < w0:
+                w0 = w
+        if verbose:
+            print('setting spectroscopy power to {}'.format(power-5))
+        self.spec_pow(power-5)
+        return True
+
+    def find_resonator_frequency_initial(self, start_freq=7e9, stop_freq=8e9,
+                                         npts=50001, use_min=False, MC=None,
+                                         update=True, with_VNA=None):
+        '''
+        quick script that uses measure_heterodyne_spectroscopy on a wide range
+        to act as a sort of mock of a VNA resonator scan'.
+
+        If it is a first scan (no freq_res yet in qubit object) it will perform
+        a wide range scan. Otherwise it will zoom in on a resonator
+        '''
+        if with_VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    with_VNA = False
+                else:
+                    with_VNA = True
+            except:
+                with_VNA = False
+
+        delkeys = []
+        for resonator, items in self.res_dict.items():
+            freq = items[0]
+            if with_VNA:
+                VNA = self.instr_VNA.get_instr()
+                start_freq = freq - 10e6
+                stop_freq = freq + 10e6
+                name = 'VNA_Resonator_scan_' + str(round(freq/1e9, 4)) + 'GHz'
+                self.measure_with_VNA(VNA, start_freq, stop_freq, npts)
+            else:
+                freqs = np.arange(freq-5e6, freq+5e6, 0.1e6)
+                name = 'Resonator_scan' + self.msmt_suffix
+                self.measure_heterodyne_spectroscopy(freqs=freqs,
+                                                     analyze=False)
+
+            a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
+
+            dip = np.amin(a.data_y)
+            offset = a.fit_results.params['A'].value
+
+            if np.abs(dip/offset) > 0.5:
+                print('Removed candidate {} ({:.3f} GHz): Not a resonator'
+                      .format(resonator, freq/1e9))
+                delkeys.append(resonator)
+            elif np.isnan(a.fit_results.params['Qc'].stderr):
+                print('Removed candidate {} ({:.3f} GHz): Not a resonator'
+                      .format(resonator, freq/1e9))
+                delkeys.append(resonator)
+            else:
+                if use_min:
+                    f_res = a.min_frequency
+                else:
+                    f_res = a.fit_results.params['f0'].value*1e9
+
+                # Check if not a duplicate
+                i = int(resonator)
+                if i > 0:
+                    prev_freq = self.res_dict[str(i-1)][0]
+                    if np.abs(prev_freq - f_res) < 10e6:
+                        delkeys.append(resonator)
+                        print('Removed candidate: ' + resonator + ' (' +
+                              str(round(f_res/1e9, 3)) + ' GHz): Duplicate')
+                    else:
+                        self.res_dict[resonator][0] = f_res
+                        print("Added resonator " + resonator + ' (' +
+                              str(round(f_res/1e9, 3)) + ' GHz)')
+
+        for delkey in delkeys:
+            self.res_dict.pop(delkey)
+
+        # Rearrange dictionary to start from 0 again:
+        i = 0
+        newdict = {}
+        for resonator, items in self.res_dict.items():
+            newdict[str(i)] = items
+            i += 1
+
+        self.res_dict = newdict
+        return True
+
+    def find_test_resonators(self, with_VNA=None):
+        """
+        Does a power sweep over the resonators to see if they have a qubit
+        attached or not, and changes the state in the res_dict
+        """
+        if with_VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    with_VNA = False
+                else:
+                    with_VNA = True
+            except:
+                with_VNA = False
+
+        for resonator, items in self.res_dict.items():
+            freq = items[0]
+            state = items[1]
+
+            if state == 'unknown':
+                if with_VNA:
+                    VNA = self.instr_VNA.get_instr()
+                    VNA.start_frequency(freq - 20e6)
+                    VNA.stop_frequency(freq + 20e6)
+
+                self.measure_resonator_power(freqs=np.arange(freq-5e6,
+                                                             freq+5e6, 0.1e6),
+                                             powers=np.arange(-40, 0.1, 10),
+                                             analyze=False)
+                # self.measure_VNA_power_sweep()
+                fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
+                                                          close_fig=True)
+                shift = fit_res.results[0]
+                freq = fit_res.results[2]
+                power = fit_res.results[1]
+
+                if np.abs(shift) > 100e3:
+                    state = 'qubit_resonator'
+                    self.freq_res(freq)
+                else:
+                    state = 'test_resonator'
+                self.res_dict[resonator][0] = freq
+                self.res_dict[resonator][1] = state
+        return True
+
+    def find_qubit_resonator_fluxline(self, with_VNA=None, verbose=True):
+        if with_VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    with_VNA = False
+                else:
+                    with_VNA = True
+            except:
+                with_VNA = False
+
+        fluxcurrent = self.instr_FluxCtrl.get_instr()
+        for FBL in fluxcurrent.channel_map:
+            fluxcurrent[FBL](0)
+
+        dac_values = np.arange(-20e-3, 20e-3, 2e-3)
+
+        for resonator, items in self.res_dict.items():
+            best_amplitude = 0  # For comparing which one is coupled closest
+            if items[1] == 'qubit_resonator':
+                freq = items[0]
+                if with_VNA:
+                    VNA = self.instr_VNA.get_instr()
+                    VNA.start_frequency(freq-20e6)
+                    VNA.stop_frequency(freq+20e6)
+                freqs = np.arange(freq-5e6, freq+5e6, 0.1e6)
+                for fluxline in fluxcurrent.channel_map:
+                    t_start = time.strftime('%Y%m%d_%H%M%S')
+
+                    self.measure_resonator_frequency_dac_scan(freqs=freqs,
+                                                              dac_values=dac_values,
+                                                              fluxChan=fluxline,
+                                                              analyze=False)
+                    print('Done flux sweep resonator {} ({} GHz) with {}'.format(
+                          resonator, round(freq/1e9, 3), fluxline))
+
+                    ma.TwoD_Analysis(
+                        label='Resonator_dac_scan', normalize=False)
+
+                    timestamp = a_tools.get_timestamps_in_range(t_start,
+                                                                label=self.msmt_suffix)[0]
+
+                    ma.TwoD_Analysis(
+                        label='Resonator_dac_scan', normalize=False)
+
+                    fluxcurrent[fluxline](0)
+
+                    fit_res = ma2.VNA_DAC_Analysis(timestamp)
+                    amplitude = fit_res.dac_fit_res.params['amplitude'].value
+                    sweetspot_current = fit_res.sweet_spot_value
+
+                    items[2][fluxline] = amplitude
+
+                    if amplitude > best_amplitude:
+                        best_amplitude = amplitude
+                        self.cfg_dc_flux_ch(fluxline)
+                        self.res_dict[resonator][3] = 'Q' + fluxline[4]
+                        self.res_dict[resonator][4] = sweetspot_current
+
+                        self.fl_dc_V0(sweetspot_current)
+                        fluxcurrent[fluxline](sweetspot_current)
+
+        if verbose:
+            for items in self.res_dict.values():
+                print('{}, f = {:.3f}, linked to {},'
+                      ' sweetspot current = {:.3f} mA'.format(items[1],
+                                                              items[0]/1e9,
+                                                              items[3],
+                                                              items[4]*1e3))
+        return True
+
+    def find_resonator_sweetspot(self, freqs=None, dac_values=None,
+                                 fluxChan=None, update=True):
+        '''
+        Finds the resonator sweetspot current.
+        TODO: - measure all FBL-resonator combinations
+        TODO: - implement way of distinguishing which fluxline is most coupled
+        TODO: - create method that moves qubits away from sweetspot when they
+                are not being measured (should not move them to some other
+                qubit frequency of course)
+        '''
+        if freqs is None:
+            freq_center = self.freq_res()
+            freq_range = 20e6
+            freqs = np.arange(freq_center-freq_range/2,
+                              freq_center+freq_range/2, 0.5e6)
+
+        if dac_values is None:
+            dac_values = np.linspace(-10e-3, 10e-3, 101)
+
+        if fluxChan is None:
+            if self.cfg_dc_flux_ch() == 1:  # Initial value
+                fluxChan = 'FBL_1'
+            else:
+                fluxChan = self.cfg_dc_flux_ch()
+
+        t_start = time.strftime('%Y%m%d_%H%M%S')
+        self.measure_resonator_frequency_dac_scan(freqs=freqs,
+                                                  dac_values=dac_values,
+                                                  fluxChan=fluxChan,
+                                                  analyze=False)
+        if update:
+
+            import pycqed.analysis_v2.spectroscopy_analysis as sa
+            fit_res = sa.VNA_DAC_Analysis(timestamp=t_start)
+            sweetspot_current = fit_res.sweet_spot_value
+            self.fl_dc_V0(sweetspot_current)
+            fluxcurrent = self.instr_FluxCtrl.get_instr()
+            fluxcurrent[self.cfg_dc_flux_ch()](sweetspot_current)
+
+        return True
+    ####################################################
+    ####################################################
+    ####################################################
+    ####################################################
+
     def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
         if freqs is None:
             freq_center = self.freq_res()
@@ -1204,9 +1529,9 @@ class CCLight_Transmon(Qubit):
             power = fit_res.results[1]
 
             ro_pow = 10**(power/20)
-            self.ro_pulse_amp_CW(ro_pow)
+            self.ro_pulse_amp_CW(ro_pow/3)
 
-            f_qubit_estimate = self.freq_res() + (50e6)**2/shift
+            f_qubit_estimate = self.freq_res() + (70e6)**2/shift
             self.freq_qubit(f_qubit_estimate)
 
         return True
@@ -2825,9 +3150,14 @@ class CCLight_Transmon(Qubit):
             nested_MC = self.instr_nested_MC.get_instr()
 
         if parameter_list is None:
-            parameter_list = ["freq_qubit",
-                              "mw_vsm_G_amp",
-                              "mw_vsm_D_amp"]
+            if self.cfg_with_vsm():
+                parameter_list = ["freq_qubit",
+                                  "mw_vsm_G_amp",
+                                  "mw_vsm_D_amp"]
+            else:
+                parameter_list = ["freq_qubit",
+                                   "mw_channel_amp",
+                                   "mw_motzoi"]
 
         nested_MC.set_sweep_functions([
             self.__getattr__(p) for p in parameter_list])
@@ -3769,100 +4099,188 @@ class CCLight_Transmon(Qubit):
         check_result = (freq-self.freq_qubit())/freq
         return check_result
 
+    ###########################################################################
+    # Dep graph
+    ###########################################################################
     def create_dep_graph(self):
         dag = AutoDepGraph_DAG(name=self.name+' DAG')
+        cal_True_delayed = 'autodepgraph.node_functions.calibration_functions.test_calibration_True_delayed'
 
-        dag.add_node(self.name+' resonator frequency',
-                     calibrate_function=self.name + '.find_resonator')
-        dag.add_node(self.name+' frequency coarse',
-                     calibrate_function=self.name + '.find_frequency')
-        dag.add_edge(self.name+' frequency coarse',
-                     self.name+' resonator frequency')
+        dag.add_node('Resonators Wide Search',
+                          calibrate_function=self.name + '.find_resonators')
+        dag.add_node('Zoom on resonators',
+                          calibrate_function=self.name + '.find_resonator_frequency_initial')
+        dag.add_node('Resonators Power Scan',
+                          calibrate_function=self.name + '.find_test_resonators')
+        dag.add_node('Resonators Flux Sweep',
+                          calibrate_function=self.name + '.find_qubit_resonator_fluxline')
 
-        dag.add_node(self.name+' mixer offsets drive',
-                     calibrate_function=self.name +
-                     '.calibrate_mixer_offsets_drive')
-        dag.add_node(self.name+' mixer skewness drive',
-                     calibrate_function=self.name +
-                     '.calibrate_mixer_skewness_drive')
-        dag.add_node(self.name+' mixer offsets readout',
-                     calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
+        dag.add_node(self.name + ' Resonator Frequency',
+                          calibrate_function=self.name + '.find_resonator_frequency')
+        dag.add_node(self.name + ' Resonator Power Scan',
+                          calibrate_function=self.name + '.calibrate_ro_pulse_amp_CW')
 
-        dag.add_node(self.name + ' pulse amplitude coarse',
-                     calibrate_function=self.name + '.measure_rabi_vsm')
-        dag.add_edge(self.name + ' pulse amplitude coarse',
-                     self.name+' frequency coarse')
-        dag.add_edge(self.name + ' pulse amplitude coarse',
-                     self.name+' mixer offsets drive')
-        dag.add_edge(self.name + ' pulse amplitude coarse',
-                     self.name+' mixer skewness drive')
-        dag.add_edge(self.name + ' pulse amplitude coarse',
-                     self.name+' mixer offsets readout')
+        # Calibration of instruments and ro
+        # dag.add_node(self.name + ' Calibrations',
+        #                   calibrate_function=cal_True_delayed)
+        # dag.add_node(self.name + ' Mixer Skewness',
+        #                   calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
+        # dag.add_node(self.name + ' Mixer Offset Drive',
+        #                   calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
+        # dag.add_node(self.name + ' Mixer Offset Readout',
+        #                   calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
+        # dag.add_node(self.name + ' Ro/MW pulse timing',
+        #                   calibrate_function=cal_True_delayed)
+        # dag.add_node(self.name + ' Ro Pulse Amplitude',
+        #                   calibrate_function=self.name + '.ro_pulse_amp_CW')
 
-        dag.add_node(self.name + ' ro pulse-acq window timing')
+        # Qubits calibration
+        dag.add_node(self.name + ' Frequency Coarse',
+                          calibrate_function=self.name + '.find_frequency',
+                          check_function=self.name + '.check_qubit_spectroscopy',
+                          tolerance=0.2e-3)
+        dag.add_node(self.name + ' Frequency at Sweetspot',
+                          calibrate_function=self.name + '.find_frequency')
+        dag.add_node(self.name + ' Spectroscopy Power',
+                          calibrate_function=self.name + '.calibrate_spec_pow')
+        dag.add_node(self.name + ' Sweetspot',
+                          calibrate_function=self.name + '.find_qubit_sweetspot')
+        dag.add_node(self.name + ' Rabi',
+                          calibrate_function=self.name + '.calibrate_mw_pulse_amplitude_coarse',
+                          check_function=self.name + '.check_rabi',
+                          tolerance=0.01)
+        dag.add_node(self.name + ' Frequency Fine',
+                          calibrate_function=self.name + '.calibrate_frequency_ramsey',
+                          check_function=self.name + '.check_ramsey',
+                          tolerance=0.1e-3)
+        dag.add_node(self.name +  ' f_12 estimate',
+                     calibrate_function=self.name + ' find_anharmonicity_estimate')
+        dag.add_node(self.name + ' DAC Arc Polynomial',
+                     calibrate_function=cal_True_delayed)
 
-        dag.add_node(self.name + ' readout coarse',
-                     check_function=self.name + '.measure_ssro')
+        # Validate qubit calibration
+        dag.add_node(self.name + ' ALLXY',
+                          calibrate_function=self.name + '.measure_allxy')
+        dag.add_node(self.name + ' MOTZOI Calibration',
+                          calibrate_function=self.name + '.calibrate_motzoi')
 
-        dag.add_edge(self.name + ' readout coarse',
-                     self.name + ' ro pulse-acq window timing')
+        # If all goes well, the qubit is fully 'calibrated' and can be controlled
 
-        dag.add_edge(self.name + ' readout coarse',
-                     self.name + ' pulse amplitude coarse')
+        # Qubits measurements
+        dag.add_node(self.name + ' Anharmonicity')
+        dag.add_node(self.name + ' Avoided Crossing')
+        dag.add_node(self.name + ' T1')
+        dag.add_node(self.name + ' T1(time)')
+        dag.add_node(self.name + ' T1(frequency)')
+        dag.add_node(self.name + ' T2_Echo')
+        dag.add_node(self.name + ' T2_Echo(time)')
+        dag.add_node(self.name + ' T2_Echo(frequency)')
+        dag.add_node(self.name + ' T2_Star')
+        dag.add_node(self.name + ' T2_Star(time)')
+        dag.add_node(self.name + ' T2_Star(frequency)')
+        #######################################################################
+        # EDGES
+        #######################################################################
 
-        dag.add_node(self.name+' T1',
-                     calibrate_function=self.name + '.measure_T1')
-        dag.add_node(self.name+' T2-echo',
-                     calibrate_function=self.name + '.measure_echo')
-        dag.add_node(self.name+' T2-star',
-                     calibrate_function=self.name + '.measure_ramsey')
-        dag.add_edge(self.name + ' T1', self.name+' pulse amplitude coarse')
-        dag.add_edge(self.name + ' T2-echo',
-                     self.name+' pulse amplitude coarse')
-        dag.add_edge(self.name + ' T2-star',
-                     self.name+' pulse amplitude coarse')
+        # Resonators
+        dag.add_edge('Zoom on resonators', 'Resonators Wide Search')
+        dag.add_edge('Resonators Power Scan',
+                          'Zoom on resonators')
+        dag.add_edge('Resonators Flux Sweep',
+                          'Zoom on resonators')
+        dag.add_edge('Resonators Flux Sweep',
+                          'Resonators Power Scan')
 
-        dag.add_node(
-            self.name+' frequency fine',
-            calibrate_function=self.name+'.calibrate_frequency_ramsey')
-        dag.add_edge(self.name + ' frequency fine',
-                     self.name+' pulse amplitude coarse')
+        dag.add_edge(self.name + ' Resonator Frequency',
+                          'Resonators Power Scan')
+        dag.add_edge(self.name + ' Resonator Frequency',
+                          'Resonators Flux Sweep')
+        dag.add_edge(self.name + ' Resonator Power Scan',
+                          self.name + ' Resonator Frequency')
+        dag.add_edge(self.name + ' Frequency Coarse',
+                          self.name + ' Resonator Power Scan')
+        # Qubit Calibrations
+        dag.add_edge(self.name + ' Frequency Coarse',
+                          self.name + ' Resonator Frequency')
+        # dag.add_edge(self.name + ' Frequency Coarse',
+        #                   self.name + ' Calibrations')
 
-        dag.add_edge(self.name + ' frequency fine',
-                     self.name + ' readout coarse')
+        # Calibrations
+        # dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Mixer Skewness')
+        # dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Mixer Offset Drive')
+        # dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Mixer Offset Readout')
+        # dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Ro/MW pulse timing')
+        # dag.add_edge(self.name + ' Calibrations',
+        #                   self.name + ' Ro Pulse Amplitude')
+        # Qubit
+        dag.add_edge(self.name + ' Spectroscopy Power',
+                          self.name + ' Frequency Coarse')
+        dag.add_edge(self.name + ' Sweetspot',
+                          self.name + ' Frequency Coarse')
+        dag.add_edge(self.name + ' Sweetspot',
+                          self.name + ' Spectroscopy Power')
+        dag.add_edge(self.name + ' Rabi',
+                          self.name + ' Frequency at Sweetspot')
+        dag.add_edge(self.name + ' Frequency Fine',
+                          self.name + ' Frequency at Sweetspot')
+        dag.add_edge(self.name + ' Frequency Fine',
+                          self.name + ' Rabi')
 
-        dag.add_node(self.name + ' pulse amplitude med',
-                     calibrate_function=self.name + '.measure_rabi')
-        dag.add_edge(self.name + ' pulse amplitude med',
-                     self.name+' frequency fine')
+        dag.add_edge(self.name + ' Frequency at Sweetspot',
+                          self.name + ' Sweetspot')
 
-        dag.add_node(self.name + ' optimal weights',
-                     calibrate_function=self.name+'.calibrate_optimal_weights')
-        dag.add_edge(self.name + ' optimal weights',
-                     self.name+' pulse amplitude med')
+        dag.add_edge(self.name + ' ALLXY',
+                          self.name + ' Rabi')
+        dag.add_edge(self.name + ' ALLXY',
+                          self.name + ' Frequency Fine')
+        dag.add_edge(self.name + ' ALLXY',
+                          self.name + ' MOTZOI Calibration')
 
-        dag.add_node(
-            self.name+' single qubit gates fine',
-            calibrate_function=self.name + '.calibrate_mw_gates_rb')
-        dag.add_edge(self.name + ' single qubit gates fine',
-                     self.name+' optimal weights')
+        # Perform initial measurements to see if they make sense
+        dag.add_edge(self.name + ' T1',
+                          self.name + ' ALLXY')
+        dag.add_edge(self.name + ' T2_Echo',
+                          self.name + ' ALLXY')
+        dag.add_edge(self.name + ' T2_Star',
+                          self.name + ' ALLXY')
 
-        # easy to implement a check
-        dag.add_node(
-            self.name+' frequency fine',
-            calibrate_function=self.name + '.calibrate_frequency_ramsey')
-        dag.add_node(self.name+' room temp. dist. corr.')
-        dag.add_node(self.name+' pulsed flux arc')
-        dag.add_node(self.name+' cryo dist. corr.')
+        # Measure as function of frequency and time
+        dag.add_edge(self.name + ' T1(frequency)',
+                          self.name + ' T1')
+        dag.add_edge(self.name + ' T1(time)',
+                          self.name + ' T1')
 
-        dag.add_edge(self.name+' pulsed flux arc',
-                     self.name+' room temp. dist. corr.')
+        dag.add_edge(self.name + ' T2_Echo(frequency)',
+                          self.name + ' T2_Echo')
+        dag.add_edge(self.name + ' T2_Echo(time)',
+                          self.name + ' T2_Echo')
 
-        dag.add_edge(self.name+' cryo dist. corr.',
-                     self.name+' pulsed flux arc')
+        dag.add_edge(self.name + ' T2_Star(frequency)',
+                          self.name + ' T2_Star')
+        dag.add_edge(self.name + ' T2_Star(time)',
+                          self.name + ' T2_Star')
 
-        dag.add_edge(self.name+' cryo dist. corr.',
-                     self.name+' single qubit gates fine')
+        dag.add_edge(self.name + ' DAC Arc Polynomial',
+                          self.name + ' Frequency at Sweetspot')
+
+        # Measurements of anharmonicity and avoided crossing
+        dag.add_edge(self.name + ' f_12 estimate',
+                          self.name + ' Frequency at Sweetspot')
+        dag.add_edge(self.name + ' Anharmonicity',
+                          self.name + ' f_12 estimate')
+        dag.add_edge(self.name + ' Avoided Crossing',
+                          self.name + ' DAC Arc Polynomial')
+
+        dag.cfg_plot_mode = 'svg'
+        dag.update_monitor()
+        dag.cfg_svg_filename
+
+        url = dag.open_html_viewer()
+        print('Dependancy Graph Created. URL = '+url)
         self._dag = dag
         return dag
 

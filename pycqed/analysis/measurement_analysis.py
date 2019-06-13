@@ -4937,30 +4937,31 @@ class Ramsey_Analysis(TD_Analysis):
 
         if isinstance(art_det, list):
             art_det = art_det[0]
-        if textbox:
-            textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
-                       % (self.qubit_freq_spec * 1e-9) +
-                       '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
-                       % (self.qubit_frequency * 1e-9,
-                          fit_res.params['frequency'].stderr * 1e-9) +
-                       '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
-                       % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
-                          fit_res.params['frequency'].stderr * 1e-6) +
-                       '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
-                       % (fit_res.params['frequency'].value * 1e-6,
-                          fit_res.params['frequency'].stderr * 1e-6) +
-                       '\n$T_2^\star$ = %.6g '
-                       % (fit_res.params['tau'].value * self.scale) +
-                       self.units + ' $\pm$ (%.6g) '
-                       % (fit_res.params['tau'].stderr * self.scale) +
-                       self.units +
-                       '\nartificial detuning = %.2g MHz'
-                       % (art_det * 1e-6))
+        # print(fit_res.params['tau'])
+        # if textbox:
+        #     textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
+        #                % (self.qubit_freq_spec * 1e-9) +
+        #                '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
+        #                % (self.qubit_frequency * 1e-9,
+        #                   fit_res.params['frequency'].stderr * 1e-9) +
+        #                '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
+        #                % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
+        #                   fit_res.params['frequency'].stderr * 1e-6) +
+        #                '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
+        #                % (fit_res.params['frequency'].value * 1e-6,
+        #                   fit_res.params['frequency'].stderr * 1e-6) +
+        #                '\n$T_2^\star$ = %.6g '
+        #                % (fit_res.params['tau'].value * self.scale) +
+        #                self.units + ' $\pm$ (%.6g) '
+        #                % (fit_res.params['tau'].stderr * self.scale) +
+        #                self.units +
+        #                '\nartificial detuning = %.2g MHz'
+        #                % (art_det * 1e-6))
 
-            fig.text(0.5, 0, textstr, fontsize=self.font_size,
-                     transform=ax.transAxes,
-                     verticalalignment='top',
-                     horizontalalignment='center', bbox=self.box_props)
+        #     fig.text(0.5, 0, textstr, fontsize=self.font_size,
+        #              transform=ax.transAxes,
+        #              verticalalignment='top',
+        #              horizontalalignment='center', bbox=self.box_props)
 
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints - 1],
@@ -7735,14 +7736,14 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
         # It could be extended by looking at the amplitude of the dip, such that
         # fewer data points are necessary
 
-        threshold = 0.25e6
+        threshold = 0.1e6
         f_low = 0
         P_result = np.max(self.sweep_points_2D)
         try:
             for u, f in enumerate(f0):
-                if np.abs(f0[u] - f0[u+1]) < threshold:
+                if np.abs(f0[0] - f0[u+1]) < threshold:
                     f_low = f0[u+1]
-                    P_result = self.sweep_points_2D[u+1]
+                    P_result = self.sweep_points_2D[u-1]
                 else:
                     break
         except IndexError:
@@ -7756,8 +7757,9 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
             shift = f_high - f_low
         else:
             shift = 0
-            logging.warning('No resonator shift found. Check if test resonator'
-                            ' or add/remove attenuation.')
+            print('f_high: ' + str(f_high))
+            print('f_low:  ' + str(f_low))
+            logging.warning('No power shift found. Consider attenuation')
             # raise Exception('High power regime frequency found to be higher than'
             #                 'low power regime frequency')
         results = [shift, P_result, f_low, f_high]

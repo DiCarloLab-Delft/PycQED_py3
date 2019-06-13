@@ -312,6 +312,16 @@ class Qubit(Instrument):
         method.
         Frequency prediction is done using
         """
+        try:
+            if not self.done_spectroscopy:
+                f_span = 2e9
+                self.done_spectroscopy = True
+                freqs = np.arange(self.freq_qubit() - f_span/2,
+                                  self.freq_qubit() + f_span/2,
+                                  f_step)
+
+        except:
+            pass
 
         if method.lower() == 'spectroscopy':
             if freqs is None:

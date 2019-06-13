@@ -884,7 +884,7 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
 
 class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
     def __init__(self,
-                 label='Resonator_Scan',
+                 label='Resonator_scan',
                  do_fitting=False,
                  extract_only=False):
       super().__init__(label=label,
