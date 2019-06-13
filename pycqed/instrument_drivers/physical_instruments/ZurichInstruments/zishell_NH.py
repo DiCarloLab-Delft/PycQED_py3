@@ -253,9 +253,12 @@ class ziShellEnvironment:
         # Handle absolute path
         if path[0] == '/':
             self.daq.vectorWrite(path, value)
+            # Fixme: Replace with the following call in the future
+            #self.daq.setVector(path, value)
         else:
             for device in self.devices:
-                self.daq.vectorWrite('/' + device + '/' + path, value)
+                # self.daq.vectorWrite('/' + device + '/' + path, value)
+                self.daq.setVector('/' + device + '/' + path, value)
 
     def geti(self, paths, deep=True):
         if not self.daq:

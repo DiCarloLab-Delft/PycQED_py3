@@ -112,6 +112,10 @@ class CCL(SCPI):
         qmap_fn = os.path.join(curdir, '_CCL', 'qisa_opcode.qmap')
         self.qisa_opcode(qmap_fn)
 
+    # FIXME: Introduced by niels@zhinst.com in order to make the code run
+    def getOperationComplete(self):
+        return True
+
     def stop(self, getOperationComplete=True):
         self.run(0),
         self.enable(0)

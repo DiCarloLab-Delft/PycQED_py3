@@ -260,19 +260,20 @@ class ZI_HDAWG_core(ZI_base_instrument):
         self._dev.seti('awgs/{}/enable'.format(awg_nr), 0)
         self._dev.subs('awgs/{}/ready'.format(awg_nr))
         self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
-        #self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
+        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
         # Try as float32 instead
-        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c.astype(np.float32))
+        # Using new-style indexed waveform write
+        #self._dev.setv('awgs/{}/waveform/indexed/{}'.format(awg_nr, wf_nr), c.astype(np.float32))
 
         # Commented out checking if ready.
         # creates too much time overhead.
-        # data = self._dev.poll()
-        # t0 = time.time()
-        # while not data:
-        #     data = self._dev.poll()
-        #     if time.time()-t0> self.timeout():
-        #         raise TimeoutError
-        # self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
+        data = self._dev.poll(0.01)
+        t0 = time.time()
+        while not data:
+            data = self._dev.poll(0.01)
+            if time.time()-t0> self.timeout():
+                raise TimeoutError
+        self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
         self._dev.seti('awgs/{}/enable'.format(awg_nr), 1)
 
     ##########################################################################
