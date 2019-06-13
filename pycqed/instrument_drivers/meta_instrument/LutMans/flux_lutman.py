@@ -138,6 +138,174 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             self._wave_dict['cz_%s'%which_gate] = self._gen_cz(which_gate=which_gate)
             self._wave_dict['idle_z_%s'%which_gate] = self._gen_idle_z(which_gate=which_gate)
 
+    def _gen_i(self):
+        return np.zeros(int(self.idling_length()*self.sampling_rate()))
+
+    def _gen_square(self):
+        return wf.single_channel_block(
+            amp=self.sq_amp(), length=self.sq_length(),
+            sampling_rate=self.sampling_rate(), delay=0)
+
+    def _gen_park(self):
+        return self.park_amp()*np.ones(int(self.park_length()*self.sampling_rate()))
+
+    def _add_waveform_parameters(self):
+        """
+        Here comments
+        """
+        # CODEWORD 1: Idling
+        self.add_parameter('idling_length', unit='s',
+                           label='Idling pulse length',
+                           initial_value=40e-9,
+                           vals=vals.Numbers(0, 100e-6),
+                           parameter_class=ManualParameter)
+        """
+            # CODEWORDS 1-4: CZ
+            self.add_parameter('cz_length', vals=vals.Numbers(),
+                               unit='s', initial_value=35e-9,
+                               parameter_class=ManualParameter)
+            self.add_parameter('cz_lambda_2', vals=vals.Numbers(),
+                               initial_value=0,
+                               parameter_class=ManualParameter)
+            self.add_parameter('cz_lambda_3', vals=vals.Numbers(),
+                               initial_value=0,
+                               parameter_class=ManualParameter)
+            self.add_parameter('cz_theta_f', vals=vals.Numbers(),
+                               unit='deg',
+                               initial_value=80,
+                               parameter_class=ManualParameter)
+
+            self.add_parameter('czd_length_ratio',
+                               vals=vals.MultiType(vals.Numbers(0, 1),
+                                                   vals.Enum('auto')),
+                               initial_value=0.5,
+                               docstring='When using a net-zero pulse, this '
+                               'parameter is used to determine the length ratio'
+                               ' of the positive and negative parts of the pulse.'
+                               'If this is set to "auto", the ratio will be '
+                               'automatically determined to ensure the integral '
+                               'of the net-zero pulse is close to zero.',
+                               parameter_class=ManualParameter)
+            self.add_parameter(
+                'czd_lambda_2',
+                docstring='lambda_2 parameter of the negative part of the cz pulse'
+                ' if set to np.nan will default to the value of the main parameter',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=np.nan,
+                parameter_class=ManualParameter)
+
+            self.add_parameter(
+                'czd_lambda_3',
+                docstring='lambda_3 parameter of the negative part of the cz pulse'
+                ' if set to np.nan will default to the value of the main parameter',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=np.nan,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'czd_theta_f',
+                docstring='theta_f parameter of the negative part of the cz pulse'
+                ' if set to np.nan will default to the value of the main parameter',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                unit='deg',
+                initial_value=np.nan,
+                parameter_class=ManualParameter)
+
+            self.add_parameter('cz_phase_corr_length', unit='s',
+                               initial_value=5e-9, vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+            self.add_parameter('cz_phase_corr_amp',
+                               unit='dac value',
+                               initial_value=0, vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+
+            self.add_parameter('czd_amp_ratio',
+                               docstring='Amplitude ratio for double sided CZ gate',
+                               initial_value=1,
+                               vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+
+            self.add_parameter('czd_amp_offset',
+                               docstring='used to add an offset to the negative '
+                               ' pulse that is used in the net-zero cz gate',
+                               initial_value=0,
+                               unit='dac value',
+                               vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+
+            self.add_parameter(
+                'czd_net_integral', docstring='Used determine what the integral of'
+                ' the CZ waveform should evaluate to. This is realized by adding'
+                ' an offset to the phase correction pulse.\nBy setting this '
+                'parameter to np.nan no offset correction is performed.',
+                initial_value=np.nan,
+                unit='dac value * samples',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                parameter_class=ManualParameter)
+            self.add_parameter('disable_cz_only_z',
+                               initial_value=False,
+                               vals=vals.Bool(),
+                               parameter_class=ManualParameter)
+
+            self.add_parameter('czd_double_sided',
+                               initial_value=False,
+                               vals=vals.Bool(),
+                               parameter_class=ManualParameter)
+
+            self.add_parameter(
+                'czd_signs', initial_value=['+', '-'],
+                docstring='Used to determine the sign of the two parts of the '
+                'double sided CZ pulse. This should be a list of two elements,'
+                ' where "+" is a positive pulse, "-" a negative amplitude and "0" '
+                'a disabled pulse.',
+                vals=vals.Lists(vals.Enum('+', '-', 0)),
+                parameter_class=ManualParameter)
+        """
+        # CODEWORD 6: SQUARE
+        self.add_parameter('sq_amp', initial_value=.5,
+                           # units is part of the total range of AWG8
+                           label='Square pulse amplitude',
+                           unit='dac value', vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('sq_length', unit='s',
+                           label='Square pulse length',
+                           initial_value=40e-9,
+                           vals=vals.Numbers(0, 100e-6),
+                           parameter_class=ManualParameter)
+
+        # CODEWORD 1: Idling
+        self.add_parameter('park_length', unit='s',
+                           label='Parking pulse length',
+                           initial_value=40e-9,
+                           vals=vals.Numbers(0, 100e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('park_amp', initial_value=0,
+                           # units is part of the total range of AWG8
+                           label='Parking pulse amplitude',
+                           unit='dac value', vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+
+        # CODEWORD 7: CUSTOM
+
+        self.add_parameter(
+            'custom_wf',
+            initial_value=np.array([]),
+            label='Custom waveform',
+            docstring=('Specifies a custom waveform, note that '
+                       '`custom_wf_length` is used to cut of the waveform if'
+                       'it is set.'),
+            parameter_class=ManualParameter,
+            vals=vals.Arrays())
+        self.add_parameter(
+            'custom_wf_length',
+            unit='s',
+            label='Custom waveform length',
+            initial_value=np.inf,
+            docstring=('Used to determine at what sample the custom waveform '
+                       'is forced to zero. This is used to facilitate easy '
+                       'cryoscope measurements of custom waveforms.'),
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(min_value=0))
+
 
 class QWG_Flux_LutMan(AWG8_Flux_LutMan):
 
