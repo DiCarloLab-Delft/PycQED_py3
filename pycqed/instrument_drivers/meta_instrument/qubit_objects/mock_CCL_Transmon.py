@@ -147,7 +147,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_flux_current_overall', unit='A',
-                           initial_value=12e-3,
+                           initial_value=10e-3,
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_cfg_dc_flux_ch',
@@ -1086,10 +1086,24 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             a = ma.Ramsey_Analysis(auto=True, closefig=True,
                                    freq_qubit=freq_qubit,
                                    artificial_detuning=artificial_detuning)
-            self.T2_star(a.T2_star['T2_star'])
-            res = {'T2star': a.T2_star['T2_star'],
-                   'frequency': a.qubit_frequency}
-            return res
+            if update:
+                self.T2_star(a.T2_star['T2_star'])
+            if double_fit:
+                b = ma.DoubleFrequency()
+                res = {
+                       'T2star1': b.tau1,
+                       'T2star2': b.tau2,
+                       'frequency1': b.f1,
+                       'frequency2': b.f2
+                    }
+                return res
+
+            else:
+                res = {
+                    'T2star': a.T2_star['T2_star'],
+                 'frequency': a.qubit_frequency,
+                    }
+                return res
 
     def measure_echo(self, times=None, MC=None, analyze=True, close_fig=True,
                      update=True, label: str = ''):
