@@ -654,18 +654,34 @@ class DACarcPolyFit(ba.BaseDataAnalysis):
 
 
 class DAC_analysis(ma.TwoD_Analysis):
+    """
+    Analyzes 2D qubit DAC arcs. Fits a Lorentzian to each linecut to extract
+    the qubit frequency at each DAC value.
+
+    Fits a 2nd degree polynomial through the extracted qubit frequencies with
+    the np.polyfit method. 
+
+    This function can be called with the timestamp of the DAC arc as its only
+    argument. It is heavily inspired by the VNA_DAC_Analysis in
+    analysis_v2.spectroscopy_analysis.
+
+    Important returned variables are:
+    self.dac_fit_res['fit_polycoeffs']: the coefficients describing the DAC arc
+                                        parabola
+    self.sweet_spot_value: The current at which the parabola is at a maximum,
+                           obtained by -b/2a (parabola = ax^2 + bx +c)
+    """
+
     def __init__(self, timestamp,
                  options_dict=None,
                  do_fitting=True,
                  extract_only=False,
-                 auto=True,
-                 degree=2):
+                 auto=True):
         super(ma.TwoD_Analysis, self).__init__(timestamp=timestamp,
                                                options_dict=options_dict,
                                                extract_only=extract_only,
                                                auto=auto,
                                                do_fitting=do_fitting)
-        self.degree = degree
         linecut_fit_result = self.fit_linecuts()
         self.linecut_fit_result = linecut_fit_result
         f0s = []
@@ -789,7 +805,7 @@ class DAC_analysis(ma.TwoD_Analysis):
         DAC_values = self.sweep_points_2D
         f0s = self.f0s
 
-        polycoeffs = np.polyfit(DAC_values, f0s, self.degree)
+        polycoeffs = np.polyfit(DAC_values, f0s, 2)
         sweetspot_dac = -polycoeffs[1]/(2*polycoeffs[0])
         fit_res = {}
         fit_res['fit_polycoeffs'] = polycoeffs

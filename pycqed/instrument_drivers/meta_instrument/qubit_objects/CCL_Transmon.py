@@ -3707,15 +3707,31 @@ class CCLight_Transmon(Qubit):
         a = ma2.GST_SingleQubit_DataExtraction(label='Single_qubit_GST')
         return a
 
-    def make_qubit_dac_arc(self, dac_values=None, polycoeffs=None, MC=None,
-                           nested_MC=None, fluxChan=None):
+    def measure_flux_arc_tracked_spectroscopy(self, dac_values=None,
+                                              polycoeffs=None, MC=None,
+                                              nested_MC=None, fluxChan=None):
         """
         Creates a qubit DAC arc by fitting a polynomial function through qubit
         frequencies obtained by spectroscopy.
 
+        If polycoeffs is given, it will predict the first frequencies to
+        measure by from this estimate. If not, it will use a wider range in
+        spectroscopy for the first to values to ensure a peak in spectroscopy
+        is found.
+
+        It will fit a 2nd degree polynomial each time qubit spectroscopy is
+        performed, and all measured qubit frequencies to construct a new
+        polynomial after each spectroscopy measurement.
+
         Arguments:
-        - dac_values: DAC values that are to be probed
-        - polycoeffs: initial coefficients of a second order polynomial.
+        - dac_values: DAC values that are to be probed, which control the flux
+                      bias
+        - polycoeffs: initial coefficients of a second order polynomial. Used
+                      for predicting the qubit frequencies in the arc.
+        - MC: main MC that varies the DAC current
+        - nested_MC: MC that will measure spectroscopy for each current.
+                     Is used inside the composite detector
+        - fluxChan: Fluxchannel that is varied. Defaults to self.cfg_dc_flux_ch
         """
 
         if dac_values is None:
@@ -3743,12 +3759,15 @@ class CCLight_Transmon(Qubit):
         else:
             dac_par = fluxcontrol.parameters[(fluxChan)]
 
+        if polycoeffs is None:
+            polycoeffs = self.flux_polycoeff()
+
         d = cdf.Tracked_Qubit_Spectroscopy(qubit=self,
                                            nested_MC=nested_MC,
                                            qubit_initial_frequency=self.freq_qubit(),
                                            resonator_initial_frequency=self.freq_res(),
                                            sweep_points=dac_values,
-                                           polycoeffs=self.flux_polycoeff())
+                                           polycoeffs=polycoeffs)
 
         MC.set_sweep_function(dac_par)
         MC.set_sweep_points(dac_values)

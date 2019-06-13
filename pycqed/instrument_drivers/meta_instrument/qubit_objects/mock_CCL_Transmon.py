@@ -1225,7 +1225,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
     def measure_ALLXY(self, MC=None, label: str = '', analyze=True,
                       close_fig=True):
-
+        """
+        NOT IMPLEMENTED YET
+        """
         if MC is None:
             MC = self.instr_MC.get_instr()
 

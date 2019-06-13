@@ -9,6 +9,7 @@ from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.analysis import analysis_toolbox as a_tools
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement.waveform_control_CC import QWG_fluxing_seqs as qwfs
+from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor as scale_unit
 
 
 class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
@@ -1240,7 +1241,6 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
 
     def determine_frequencies(self, loopcnt):
         if self.loopcnt == 0:
-            print(self.polycoeffs)
             '''
             Uses the inital frequencies to determine where to look
             '''
@@ -1331,12 +1331,21 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
         frequencies = self.determine_frequencies(self.loopcnt)
 
         # Resonator
-        print('\nScanning for resonator.' +
-              'range: {fmin} - {fmax} GHz   span {span} MHz'.format(
-                  fmin=frequencies['f_resonator_start']/1e9,
-                  fmax=frequencies['f_resonator_end']/1e9,
-                  span=(frequencies['f_resonator_end'] -
-                        frequencies['f_resonator_start'])/1e6))
+        f_res_start_scale, f_res_start_unit = scale_unit(
+            frequencies['f_resonator_start'], 'Hz')
+        f_res_end_scale, f_res_end_unit = scale_unit(
+            frequencies['f_resonator_end'], 'Hz')
+        f_res_span_scale, f_res_span_unit = scale_unit(
+            frequencies['f_resonator_end'] - frequencies['f_resonator_start'],
+            'Hz')
+        print('\nScanning for resonator. ' +
+              'Range: {:.3f} {} - {:.3f} {} (span of {:.1f} {})'.format(
+                frequencies['f_resonator_start']*f_res_start_scale,
+                f_res_start_unit,
+                frequencies['f_resonator_end']*f_res_end_scale,
+                f_res_end_unit,
+                (frequencies['f_resonator_end'] - frequencies['f_resonator_start']) * f_res_span_scale,
+                f_res_span_unit))
 
         # if self.alternate_t_int:
         #     self.HM.set_t_int(self.resonator_t_int)
@@ -1359,12 +1368,21 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
         print('Finished resonator scan. Readout frequency: ', f_resonator)
 
         # Qubit
-        print('Scanning for qubit.' +
-              'range: {fmin} - {fmax} GHz   span {span} MHz'.format(
-                  fmin=frequencies['f_qubit_start']/1e9,
-                  fmax=frequencies['f_qubit_end']/1e9,
-                  span=(frequencies['f_qubit_end'] -
-                        frequencies['f_qubit_start'])/1e6))
+        f_qub_start_scale, f_qub_start_unit = scale_unit(
+            frequencies['f_qubit_start'], 'Hz')
+        f_qub_end_scale, f_qub_end_unit = scale_unit(
+            frequencies['f_qubit_end'], 'Hz')
+        f_qub_span_scale, f_qub_span_unit = scale_unit(
+            frequencies['f_qubit_end'] - frequencies['f_qubit_start'],
+            'Hz')
+        print('\nScanning for qubit. ' +
+              'Range: {:.3f} {} - {:.3f} {} (span of {:.1f} {})'.format(
+                frequencies['f_qubit_start']*f_qub_start_scale,
+                f_qub_start_unit,
+                frequencies['f_qubit_end']*f_qub_end_scale,
+                f_qub_end_unit,
+                (frequencies['f_qubit_end'] - frequencies['f_qubit_start']) * f_qub_span_scale,
+                f_qub_span_unit))
 
         self.qubit.ro_freq(f_resonator)
         freqs_qub = np.arange(frequencies['f_qubit_start'],
