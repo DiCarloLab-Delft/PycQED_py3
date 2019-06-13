@@ -768,29 +768,25 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False,
                          "Please adapt your code:\n 'off' --> 'g'\n'on' --> 'e'"
                          "\n'f' for f-level .")
 
-    for i, pulse_comb in enumerate(pulse_combination):
-        if preselection:
-            pulse = deepcopy(pulse_1st[pulse_comb])
-            pulse['pulse_delay'] = 300e-9
-            pulse_list = [RO_pars, pulse, RO_pars]
-        else:
-            pulse_list = [pulse_1st[pulse_comb], RO_pars]
-        seg = segment.Segment('segment_{}'.format(i), pulse_list)
-        seg_list.append(seg)
-        seq.add(seg)
-        # for i, pulse in enumerate(pulse_combination):
-        #     pulse_list = [RO_pars, spacer, pulse, RO_pars]
-        #     el = multi_pulse_elt(i, station, pulse_list)
-        #     el_list.append(el)
-        #     seq.append_element(el, trigger_wait=True)
-    # otherwise use the pulse combination as is and add readout pulse at the end
+    
+    if preselection:
+        pulse_list = [RO_pars]
+        pulse = deepcopy(pulse_combination[0])
+        pulse['pulse_delay'] = 500e-9
+        pulse_list += [pulse]
+        if len(pulse_combination) > 1:
+            pulse_list += pulse_combination[1:]
+        pulse_list += [RO_pars]    
     else:
-        pulse_list = pulse_combination + [RO_pars]
-        el = multi_pulse_elt(0, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+        pulse_list = pulse_combination+[RO_pars]
+    print(pulse_list)
+    seg = segment.Segment('segment_{}_level'.format(level), pulse_list)
+    seg_list.append(seg)
+    seq.add(seg)
+    
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
+
     if return_seq:
         return seq, seg_list
     else:
@@ -1262,7 +1258,7 @@ def get_pulse_dict_from_pars(pulse_pars):
 
     pulses_sim = {key + 's': deepcopy(val) for key, val in pulses.items()}
     for val in pulses_sim.values():
-        val['ref_point'] = 'simultaneous'
+        val['ref_point'] = 'start'
 
     pulses.update(pulses_sim)
 

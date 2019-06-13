@@ -59,18 +59,23 @@ class Segment:
         # Makes sure that element name is unique within sequence of segments
         # and that RO pulses have their own elements if no element_name
         # was provided
+        i = len(self.acquisition_elements) + 1
 
         if pars_copy.get('element_name', None) == None:
             if pars_copy.get('operation_type', None) == 'RO':
-                i = len(self.acquisition_elements) + 1
                 pars_copy['element_name'] = \
                     'RO_element_{}_{}'.format(i, self.name)
-                # add element to set of acquisition elements
-                self.acquisition_elements.add(pars_copy['element_name'])
             else:
                 pars_copy['element_name'] = 'default_{}'.format(self.name)
         else:
             pars_copy['element_name'] += '_' + self.name
+
+        
+        # add element to set of acquisition elements
+        if pars_copy.get('operation_type', None) == 'RO':
+            if pars_copy['element_name'] not in self.acquisition_elements:
+                self.acquisition_elements.add(pars_copy['element_name'])
+        
 
         new_pulse = UnresolvedPulse(pars_copy)
 
