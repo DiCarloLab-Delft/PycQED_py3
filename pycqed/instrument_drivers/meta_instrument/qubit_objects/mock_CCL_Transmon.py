@@ -310,8 +310,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Height of peak [V]
         K_power = 1/np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
-        K_current = np.sqrt(np.abs(np.cos(2*np.pi*total_flux)))
-        A = K_power*K_current*A0
+        # K_current = np.sqrt(np.abs(np.cos(2*np.pi*total_flux)))
+        A = K_power*A0  # K_current*
 
         # Width of peak
         wbase = 4e6
@@ -779,10 +779,24 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             a = ma.Ramsey_Analysis(auto=True, closefig=True,
                                    freq_qubit=freq_qubit,
                                    artificial_detuning=artificial_detuning)
-            self.T2_star(a.T2_star['T2_star'])
-            res = {'T2star': a.T2_star['T2_star'],
-                   'frequency': a.qubit_frequency}
-            return res
+            if update:
+                self.T2_star(a.T2_star['T2_star'])
+            if double_fit:
+                b = ma.DoubleFrequency()
+                res = {
+                       'T2star1': b.tau1,
+                       'T2star2': b.tau2,
+                       'frequency1': b.f1,
+                       'frequency2': b.f2
+                    }
+                return res
+
+            else:
+                res = {
+                    'T2star': a.T2_star['T2_star'],
+                 'frequency': a.qubit_frequency,
+                    }
+                return res
 
     def measure_echo(self, times=None, MC=None, analyze=True, close_fig=True,
                      update=True, label: str = ''):
@@ -904,7 +918,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
     def measure_ALLXY(self, MC=None, label: str = '', analyze=True,
                       close_fig=True):
-
+        """
+        NOT IMPLEMENTED YET
+        """
         if MC is None:
             MC = self.instr_MC.get_instr()
 

@@ -25,7 +25,7 @@ from pycqed.measurement.openql_experiments.openql_helpers import \
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
-import warnings
+import pycqed.measurement.composite_detector_functions as cdf
 
 
 import cma
@@ -4037,6 +4037,73 @@ class CCLight_Transmon(Qubit):
         a = ma2.GST_SingleQubit_DataExtraction(label='Single_qubit_GST')
         return a
 
+    def measure_flux_arc_tracked_spectroscopy(self, dac_values=None,
+                                              polycoeffs=None, MC=None,
+                                              nested_MC=None, fluxChan=None):
+        """
+        Creates a qubit DAC arc by fitting a polynomial function through qubit
+        frequencies obtained by spectroscopy.
+
+        If polycoeffs is given, it will predict the first frequencies to
+        measure by from this estimate. If not, it will use a wider range in
+        spectroscopy for the first to values to ensure a peak in spectroscopy
+        is found.
+
+        It will fit a 2nd degree polynomial each time qubit spectroscopy is
+        performed, and all measured qubit frequencies to construct a new
+        polynomial after each spectroscopy measurement.
+
+        Arguments:
+        - dac_values: DAC values that are to be probed, which control the flux
+                      bias
+        - polycoeffs: initial coefficients of a second order polynomial. Used
+                      for predicting the qubit frequencies in the arc.
+        - MC: main MC that varies the DAC current
+        - nested_MC: MC that will measure spectroscopy for each current.
+                     Is used inside the composite detector
+        - fluxChan: Fluxchannel that is varied. Defaults to self.cfg_dc_flux_ch
+        """
+
+        if dac_values is None:
+            if self.fl_dc_V0() is None:
+                dac_values = np.linspace(-3e-3, 3e-3, 11)
+            else:
+                dac_values_1 = np.linspace(self.fl_dc_V0(),
+                                           self.fl_dc_V0() + 3e-3,
+                                           11)
+                dac_values_2 = np.linspace(self.fl_dc_V0(),
+                                           self.fl_dc_V0() - 3e-3,
+                                           11)
+
+        dac_values = np.concatenate([dac_values_1, dac_values_2])
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        fluxcontrol = self.instr_FluxCtrl.get_instr()
+        if fluxChan is None:
+            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+        else:
+            dac_par = fluxcontrol.parameters[(fluxChan)]
+
+        if polycoeffs is None:
+            polycoeffs = self.flux_polycoeff()
+
+        d = cdf.Tracked_Qubit_Spectroscopy(qubit=self,
+                                           nested_MC=nested_MC,
+                                           qubit_initial_frequency=self.freq_qubit(),
+                                           resonator_initial_frequency=self.freq_res(),
+                                           sweep_points=dac_values,
+                                           polycoeffs=polycoeffs)
+
+        MC.set_sweep_function(dac_par)
+        MC.set_sweep_points(dac_values)
+        MC.set_detector_function(d)
+        MC.run(name='Tracked_Spectroscopy')
+
     ###########################################################################
     # Dep graph check functions
     ###########################################################################
@@ -4044,7 +4111,7 @@ class CCLight_Transmon(Qubit):
         """
         Check the qubit frequency with spectroscopy of 15 points.
 
-        Uses bot the peak finder and the lorentzian fit to determine the
+        Uses both the peak finder and the lorentzian fit to determine the
         outcome of the check:
         - Peak finder: if no peak is found, there is only noise. Will 
                        definitely need recalibration.
