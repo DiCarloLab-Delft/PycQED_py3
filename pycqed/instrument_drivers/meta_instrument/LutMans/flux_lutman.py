@@ -74,9 +74,130 @@ class Base_Flux_LutMan(Base_LutMan):
 
         return QtPlot_win
 
+class HDAWG_Flux_LutMan(Base_Flux_LutMan):
+    
+    _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
+        self._wave_dict_dist = dict()
+        self.sampling_rate(2.4e9)
+        self._add_qubit_parameters()
+
+class QWG_Flux_LutMan(AWG8_Flux_LutMan):
+
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
+        self._wave_dict_dist = dict()
+        self.sampling_rate(1e9)
+
+        self.add_parameter('cfg_oldstyle_kernel_enabled',
+                           initial_value=False,
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter)
+
+    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
+                                           regenerate_waveforms: bool = False):
+        """
+        Loads a specific waveform to the AWG
+        """
+        if regenerate_waveforms:
+            # only regenerate the one waveform that is desired
+            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
+            self._wave_dict[waveform_name] = gen_wf_func()
+
+        waveform = self._wave_dict[waveform_name]
+        codeword = self.LutMap()[waveform_name]
+
+        if self.cfg_append_compensation():
+            waveform = self.add_compensation_pulses(waveform)
+
+        if self.cfg_distort():
+            waveform = self.distort_waveform(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+        else:
+            waveform = self._append_zero_samples(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+
+        # N.B. method identical to AWG8 version with the exception 
+        # of AWG.stop() and AWG.start() 
+        self.AWG.get_instr().stop()
+        self.AWG.get_instr().set(codeword, waveform)
+        self.AWG.get_instr().start()
+
+    def distort_waveform(self, waveform):
+        """
+        Modifies the ideal waveform to correct for distortions and correct
+        fine delays.
+        Distortions are corrected using the kernel object.
+        Modified to implement also normal kernels.
+        """
+
+        # FIXME: this function looks identical to the one in the parent class 
+        # maybe this should be deleted/cleaned up? -MAR Jan 2019
+        k = self.instr_distortion_kernel.get_instr()
+
+        # Prepend zeros to delay waveform to correct for fine timing
+        delay_samples = int(self.cfg_pre_pulse_delay()*self.sampling_rate())
+        waveform = np.pad(waveform, (delay_samples, 0), 'constant')
+
+        # duck typing the distort waveform method
+        if hasattr(k, 'distort_waveform'):
+            distorted_waveform = k.distort_waveform(
+                waveform,
+                length_samples=int(
+                    self.cfg_max_wf_length()*self.sampling_rate()))
+        else:  # old kernel object does not have this method
+            distorted_waveform = k.convolve_kernel(
+                [k.kernel(), waveform],
+                length_samples=int(self.cfg_max_wf_length() *
+                                   self.sampling_rate()))
+
+        if self.cfg_oldstyle_kernel_enabled():
+            # hotfix: to distort adding abounce model
+            kernel_oldstyle = self.kernel_oldstyle
+            distorted_waveform = self.convolve_kernel(
+                [kernel_oldstyle, distorted_waveform],
+                length_samples=int(self.cfg_max_wf_length() *
+                                   self.sampling_rate()))
+
+        return distorted_waveform
+
+    def convolve_kernel(self, kernel_list, length_samples=None):
+        """
+        kernel_list : (list of arrays)
+        length_samples      : (int) maximum for convolution
+        Performs a convolution of different kernels
+        """
+        kernels = kernel_list[0]
+        for k in kernel_list[1:]:
+            kernels = np.convolve(k, kernels)[
+                :max(len(k), int(length_samples))]
+        if length_samples is not None:
+            return kernels[:int(length_samples)]
+        return kernels
+
+    def get_dac_val_to_amp_scalefactor(self):
+        """
+        Returns the scale factor to transform an amplitude in 'dac value' to an
+        amplitude in 'V'.
+
+        N.B. the implementation is specific to this type of AWG (QWG)
+        """
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()
+
+        channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
+        scalefactor = channel_amp
+        return scalefactor
+
+
+#########################################################################
+# Legacy classes below
+#########################################################################
 
 class AWG8_Flux_LutMan(Base_Flux_LutMan):
-
+    
+    _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self._wave_dict_dist = dict()
@@ -575,6 +696,16 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             vals=vals.Lists(vals.Enum('+', '-', 0)),
             parameter_class=ManualParameter)
 
+        self.add_parameter('mcz_nr_of_repeated_gates',
+                           initial_value=1, vals=vals.PermissiveInts(1, 40),
+                           parameter_class=ManualParameter)
+        self.add_parameter('mcz_gate_separation', unit='s',
+                           label='Gate separation',  initial_value=0,
+                           docstring=('Separtion between the start of CZ gates'
+                                      'in the "multi_cz" gate'),
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(min_value=0))
+
         self.add_parameter(
             'custom_wf',
             initial_value=np.array([]),
@@ -616,6 +747,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         self._wave_dict['idle_z'] = self._gen_idle_z()
         self._wave_dict['custom_wf'] = self._gen_custom_wf()
+        self._wave_dict['multi_square'] = self._gen_multi_square(
+            regenerate_square=False)
+        # multi_cz is used because there is no real-time flux correction yet
+        self._wave_dict['multi_cz'] = self._gen_multi_cz(regenerate_cz=False)
+        self._wave_dict['multi_idle_z'] = self._gen_multi_idle_z(
+            regenerate_cz=False)
 
     def _gen_i(self):
         return np.zeros(42)
@@ -771,6 +908,54 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         return cz_z
 
+    def _gen_multi_square(self, regenerate_square=True):
+        """
+        Composite waveform containing multiple cz gates
+        """
+        if regenerate_square:
+            self._wave_dict['square'] = self._gen_square()
+
+        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
+
+        waveform = np.zeros(max_nr_samples)
+        for i in range(self.mcz_nr_of_repeated_gates()):
+            sample_start_idx = int(self.mcz_gate_separation() *
+                                   self.sampling_rate())*i
+            sq = self._wave_dict['square']
+            try:
+                waveform[sample_start_idx:sample_start_idx+len(sq)] += sq
+            except ValueError as e:
+                logging.warning('Could not add square pulse {} in {}'.format(
+                    i, self.name))
+                logging.warning(e)
+                break
+        return waveform
+
+    def _gen_multi_cz(self, regenerate_cz=True):
+        """
+        Composite waveform containing multiple cz gates
+        """
+        if regenerate_cz:
+            self._wave_dict['cz'] = self._gen_cz()
+            self._wave_dict['cz_z'] = self._gen_cz_z()
+
+        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
+
+        waveform = np.zeros(max_nr_samples)
+        for i in range(self.mcz_nr_of_repeated_gates()):
+            cz_z = self._wave_dict['cz_z']
+            sample_start_idx = int(self.mcz_gate_separation() *
+                                   self.sampling_rate())*i
+            try:
+                waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+            except ValueError as e:
+                logging.warning('Could not add cz_z pulse {} in {}'.format(
+                    i, self.name))
+                logging.warning(e)
+                break
+        # CZ with phase correction
+        return waveform
+
     def _gen_custom_wf(self):
         base_wf = copy(self.custom_wf())
 
@@ -830,6 +1015,40 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             base_wf=np.zeros(int(self.cz_length()*self.sampling_rate()+1)))
 
         return idle_z
+
+    def _gen_multi_idle_z(self, regenerate_cz=False):
+        """
+        Composite waveform containing multiple cz gates
+        """
+        if regenerate_cz:
+            self._wave_dict['idle_z'] = self._gen_cz(
+                regenerate_cz=regenerate_cz)
+        idle_z = self._wave_dict['idle_z']
+        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
+
+        waveform = np.zeros(max_nr_samples)
+        for i in range(self.mcz_nr_of_repeated_gates()):
+            # if self.mcz_identical_phase_corr():
+            # phase_corr = self._gen_phase_corr(cz_offset_comp=False)
+            # else:
+            #     phase_corr = wf.single_channel_block(
+            #         amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
+            #         length=self.cz_phase_corr_length(),
+            #         sampling_rate=self.sampling_rate(), delay=0)
+            # idle_z = np.concatenate([np.zeros(len(self._wave_dict['cz'])),
+            #                        phase_corr])
+            sample_start_idx = int(self.mcz_gate_separation() *
+                                   self.sampling_rate())*i
+            try:
+                waveform[sample_start_idx:sample_start_idx +
+                         len(idle_z)] += idle_z
+            except ValueError as e:
+                logging.warning('Could not add idle_z pulse {} in {}'.format(
+                    i, self.name))
+                logging.warning(e)
+                break
+        # CZ with phase correction
+        return waveform
 
     ###########################################################
     #  Waveform generation net-zero phase correction methods  #
@@ -943,6 +1162,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         else:
             modified_wf = np.concatenate([base_wf, corr_pulse])
         return modified_wf
+
+
 
     #################################
     #  Waveform loading methods     #
@@ -1381,113 +1602,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return ax
 
-
-class QWG_Flux_LutMan(AWG8_Flux_LutMan):
-
-    def __init__(self, name, **kw):
-        super().__init__(name, **kw)
-        self._wave_dict_dist = dict()
-        self.sampling_rate(1e9)
-
-        self.add_parameter('cfg_oldstyle_kernel_enabled',
-                           initial_value=False,
-                           vals=vals.Bool(),
-                           parameter_class=ManualParameter)
-
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool = False):
-        """
-        Loads a specific waveform to the AWG
-        """
-        if regenerate_waveforms:
-            # only regenerate the one waveform that is desired
-            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
-            self._wave_dict[waveform_name] = gen_wf_func()
-
-        waveform = self._wave_dict[waveform_name]
-        codeword = self.LutMap()[waveform_name]
-
-        if self.cfg_append_compensation():
-            waveform = self.add_compensation_pulses(waveform)
-
-        if self.cfg_distort():
-            waveform = self.distort_waveform(waveform)
-            self._wave_dict_dist[waveform_name] = waveform
-        else:
-            waveform = self._append_zero_samples(waveform)
-            self._wave_dict_dist[waveform_name] = waveform
-
-        # N.B. method identical to AWG8 version with the exception 
-        # of AWG.stop() and AWG.start() 
-        self.AWG.get_instr().stop()
-        self.AWG.get_instr().set(codeword, waveform)
-        self.AWG.get_instr().start()
-
-    def distort_waveform(self, waveform):
-        """
-        Modifies the ideal waveform to correct for distortions and correct
-        fine delays.
-        Distortions are corrected using the kernel object.
-        Modified to implement also normal kernels.
-        """
-
-        # FIXME: this function looks identical to the one in the parent class 
-        # maybe this should be deleted/cleaned up? -MAR Jan 2019
-        k = self.instr_distortion_kernel.get_instr()
-
-        # Prepend zeros to delay waveform to correct for fine timing
-        delay_samples = int(self.cfg_pre_pulse_delay()*self.sampling_rate())
-        waveform = np.pad(waveform, (delay_samples, 0), 'constant')
-
-        # duck typing the distort waveform method
-        if hasattr(k, 'distort_waveform'):
-            distorted_waveform = k.distort_waveform(
-                waveform,
-                length_samples=int(
-                    self.cfg_max_wf_length()*self.sampling_rate()))
-        else:  # old kernel object does not have this method
-            distorted_waveform = k.convolve_kernel(
-                [k.kernel(), waveform],
-                length_samples=int(self.cfg_max_wf_length() *
-                                   self.sampling_rate()))
-
-        if self.cfg_oldstyle_kernel_enabled():
-            # hotfix: to distort adding abounce model
-            kernel_oldstyle = self.kernel_oldstyle
-            distorted_waveform = self.convolve_kernel(
-                [kernel_oldstyle, distorted_waveform],
-                length_samples=int(self.cfg_max_wf_length() *
-                                   self.sampling_rate()))
-
-        return distorted_waveform
-
-    def convolve_kernel(self, kernel_list, length_samples=None):
-        """
-        kernel_list : (list of arrays)
-        length_samples      : (int) maximum for convolution
-        Performs a convolution of different kernels
-        """
-        kernels = kernel_list[0]
-        for k in kernel_list[1:]:
-            kernels = np.convolve(k, kernels)[
-                :max(len(k), int(length_samples))]
-        if length_samples is not None:
-            return kernels[:int(length_samples)]
-        return kernels
-
-    def get_dac_val_to_amp_scalefactor(self):
-        """
-        Returns the scale factor to transform an amplitude in 'dac value' to an
-        amplitude in 'V'.
-
-        N.B. the implementation is specific to this type of AWG (QWG)
-        """
-        AWG = self.AWG.get_instr()
-        awg_ch = self.cfg_awg_channel()
-
-        channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
-        scalefactor = channel_amp
-        return scalefactor
 
 #########################################################################
 # Convenience functions below
