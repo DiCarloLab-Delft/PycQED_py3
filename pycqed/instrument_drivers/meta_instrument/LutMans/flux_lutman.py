@@ -21,7 +21,14 @@ class Base_Flux_LutMan(Base_LutMan):
     # this default lutman is if a flux pulse can be done with only one
     # other qubit. this needs to be expanded if there are more qubits
     # to interact with.
-    _def_lm = ['i', 'cz_z', 'square', 'park', 'custom_wf']
+    _def_lm = ['i',     # Idle
+               'cz_NE', # 2Q gates
+               'cz_SE',
+               'cz_SW',
+               'cz_NW', 
+               'park',  # 1Q gates
+               'square',
+               'custom_wf'] # custom
 
     def render_wave(self, wave_name, show=True, time_units='s',
                     reload_pulses: bool = True, render_distorted_wave: bool = True,
