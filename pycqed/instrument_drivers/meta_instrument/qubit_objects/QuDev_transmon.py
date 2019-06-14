@@ -806,7 +806,7 @@ class QuDev_transmon(Qubit):
         MC.run('Rabi_amp90_scales_n{}'.format(n)+self.msmt_suffix)
 
 
-    def measure_T1(self, times=None, MC=None, analyze=True, upload=True,
+    def measure_T1(self, times=None, analyze=True, upload=True,
                    close_fig=True, cal_points=True, label=None,
                    exp_metadata=None):
 
@@ -818,8 +818,7 @@ class QuDev_transmon(Qubit):
 
         self.prepare(drive='timedomain')
 
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+        MC = self.instr_mc.get_instr()
 
         # Define the measurement label
         if label is None:
@@ -1390,7 +1389,7 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name)
 
 
-    def measure_echo(self, times=None, MC=None, artificial_detuning=None,
+    def measure_echo(self, times=None, artificial_detuning=None,
                      upload=True, analyze=True, close_fig=True, cal_points=True,
                      label=None, exp_metadata=None):
 
@@ -1414,8 +1413,8 @@ class QuDev_transmon(Qubit):
             cal_states_rotations = None
 
         self.prepare(drive='timedomain')
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+        
+        MC = self.instr_mc.get_instr()
 
         Echo_swf = awg_swf.Echo(
             pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
@@ -1653,21 +1652,21 @@ class QuDev_transmon(Qubit):
             MC.set_detector_function(self.inp_avg_det)
             MC.run(name=name + self.msmt_suffix)
 
-        if 'on' in cases:
-            MC.set_sweep_function(awg_swf.OffOn(
-                pulse_pars=self.get_ge_pars(),
-                RO_pars=self.get_ro_pars(),
-                pulse_comb='OnOn',
-                upload=upload))
-            MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
-                                            endpoint=False))
-            MC.set_detector_function(self.inp_avg_det)
-            if name_extra is not None:
-                MC.run(name='timetrace_on_' + name_extra + self.msmt_suffix)
-            else:
-                MC.run(name='timetrace_on' + self.msmt_suffix)
-            if analyze:
-                ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
+        # if 'on' in cases:
+        #     MC.set_sweep_function(awg_swf.OffOn(
+        #         pulse_pars=self.get_ge_pars(),
+        #         RO_pars=self.get_ro_pars(),
+        #         pulse_comb='OnOn',
+        #         upload=upload))
+        #     MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
+        #                                     endpoint=False))
+        #     MC.set_detector_function(self.inp_avg_det)
+        #     if name_extra is not None:
+        #         MC.run(name='timetrace_on_' + name_extra + self.msmt_suffix)
+        #     else:
+        #         MC.run(name='timetrace_on' + self.msmt_suffix)
+        #     if analyze:
+        #         ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
 
     def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
@@ -2333,8 +2332,8 @@ class QuDev_transmon(Qubit):
                 k = max(np.max(np.abs(wre)), np.max(np.abs(wim)))
                 wre /= k
                 wim /= k
-                self.ro_acq_weight_func_I(wre)
-                self.ro_acq_weight_func_Q(wim)
+                self.acq_weights_I(wre)
+                self.acq_weights_Q(wim)
         if kw.get('plot', True):
             # TODO: Nathan: plot amplitude instead of I, Q ?
             npoints = len(m_a['g'].sweep_points)
@@ -2436,7 +2435,7 @@ class QuDev_transmon(Qubit):
 
         MC.set_sweep_function(awg_swf2.n_qubit_off_on(
             pulse_pars_list=[self.get_ge_pars()],
-            RO_pars=self.get_ro_pars(),
+            RO_pars_list=[self.get_ro_pars()],
             upload=upload,
             preselection=preselection_pulse,
             RO_spacing=RO_spacing))
@@ -2485,7 +2484,7 @@ class QuDev_transmon(Qubit):
         else:
             MC.set_sweep_function(awg_swf2.n_qubit_off_on(
                 pulse_pars_list=[self.get_ge_pars()],
-                RO_pars=self.get_ro_pars(),
+                RO_pars_list=[self.get_ro_pars()],
                 upload=upload,
                 preselection=preselection_pulse,
                 RO_spacing=RO_spacing))
@@ -2886,7 +2885,7 @@ class QuDev_transmon(Qubit):
 
         if rabi_amps is None:
             amps_span = kw.get('amps_span', 1.)
-            amps_mean = kw.get('amps_mean', self.amp180())
+            amps_mean = kw.get('amps_mean', self.ge_amp180())
             nr_points = kw.get('nr_points', 30)
             if amps_mean == 0:
                 logging.warning("find_amplitudes does not know over which "
@@ -2942,7 +2941,7 @@ class QuDev_transmon(Qubit):
         return
 
 
-    def find_T1(self, times, label=None, for_ef=False, update=False, MC=None,
+    def find_T1(self, times, label=None, for_ef=False, update=False,
                 cal_points=True, no_cal_points=None, close_fig=True,
                 last_ge_pulse=True, upload=True, **kw):
 
@@ -3017,8 +3016,7 @@ class QuDev_transmon(Qubit):
         if not cal_points:
             no_cal_points = 0
 
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+        MC = self.instr_mc.get_instr()
 
         if label is None:
             if for_ef:
@@ -3041,7 +3039,7 @@ class QuDev_transmon(Qubit):
 
         #Perform measurement
         if for_ef:
-            self.measure_T1_2nd_exc(times=times, MC=MC,
+            self.measure_T1_2nd_exc(times=times,
                                     close_fig=close_fig,
                                     cal_points=cal_points,
                                     no_cal_points=no_cal_points,
@@ -3049,7 +3047,7 @@ class QuDev_transmon(Qubit):
                                     upload=upload, label=label)
 
         else:
-            self.measure_T1(times=times, MC=MC,
+            self.measure_T1(times=times,
                             close_fig=close_fig,
                             cal_points=cal_points,
                             upload=upload, label=label)
@@ -3146,7 +3144,7 @@ class QuDev_transmon(Qubit):
 
 
     def find_frequency_T2_ramsey(self, times, artificial_detuning=0,
-                                 upload=True, MC=None, label=None,
+                                 upload=True, label=None,
                                  cal_points=True, no_cal_points=None,
                                  analyze=True, close_fig=True, update=False,
                                  for_ef=False, last_ge_pulse=False, **kw):
@@ -3173,7 +3171,6 @@ class QuDev_transmon(Qubit):
             upload:                  upload sequence to AWG
             update:                  update the qubit frequency and T2*
                                         parameters
-            MC:                      the measurement control object
             label:                   measurement label
             cal_points:              use calibration points or not
             no_cal_points:           number of cal_points (4 for ge;
@@ -3223,8 +3220,7 @@ class QuDev_transmon(Qubit):
         if not cal_points:
             no_cal_points = 0
 
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+        MC = self.instr_mc.get_instr()
 
         if label is None:
             if for_ef:
@@ -3260,7 +3256,6 @@ class QuDev_transmon(Qubit):
                 self.measure_ramsey_multiple_detunings(
                     times=times,
                     artificial_detunings=artificial_detuning,
-                    MC=MC,
                     label=label,
                     cal_points=cal_points,
                     close_fig=close_fig, upload=upload)
@@ -3271,7 +3266,7 @@ class QuDev_transmon(Qubit):
                     artificial_detunings=artificial_detuning,
                     cal_points=cal_points, no_cal_points=no_cal_points,
                     close_fig=close_fig, upload=upload,
-                    last_ge_pulse=last_ge_pulse, MC=MC, label=label)
+                    last_ge_pulse=last_ge_pulse, label=label)
 
         else:
             # 1 ARTIFICIAL_DETUNING VALUE
@@ -3307,7 +3302,7 @@ class QuDev_transmon(Qubit):
                 self.measure_ramsey_2nd_exc(
                     times=times,
                     artificial_detuning=artificial_detuning,
-                    MC=MC, cal_points=cal_points,
+                    cal_points=cal_points,
                     close_fig=close_fig, upload=upload,
                     last_ge_pulse=last_ge_pulse,
                     no_cal_points=no_cal_points, label=label)
@@ -3362,10 +3357,9 @@ class QuDev_transmon(Qubit):
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
 
-        return
 
     def find_T2_echo(self, times, artificial_detuning=None,
-                     upload=True, MC=None, label=None,
+                     upload=True, label=None,
                      cal_points=True, no_cal_points=None,
                      analyze=True, for_ef=False,
                      close_fig=True, update=False,
@@ -3387,7 +3381,6 @@ class QuDev_transmon(Qubit):
             upload:                  upload sequence to AWG
             update:                  update the qubit frequency and T2*
                                         parameters
-            MC:                      the measurement control object
             label:                   measurement label
             cal_points:              use calibration points or not
             analyze:                 perform analysis
@@ -3425,8 +3418,7 @@ class QuDev_transmon(Qubit):
         if not cal_points:
             no_cal_points = 0
 
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+        MC = self.instr_mc.get_instr()
 
         if label is None:
             if for_ef:
@@ -3812,29 +3804,25 @@ class QuDev_transmon(Qubit):
         measures the transmittance """
 
         if freqs is None:
-            raise ValueError("Unspecified frequencies for measure_dispersive_shift")
+            raise ValueError("Unspecified frequencies for measure_resonator_spectroscopy")
         if np.any(freqs < 500e6):
-            logging.warning(('Some of the values in the freqs array might be '
-                            'too small. The units should be Hz.'))
+            logging.warning(('Some of the values in the freqs array might be too small. The units should be Hz.'))
 
-        if MC is None:
-            MC = self.instr_mc.get_instr()
 
-        self.prepare_for_continuous_wave()
+        self.prepare(drive='timedomain')
+        MC = self.instr_mc.get_instr()
 
-        for pulse_comb, label in [('OffOff', 'off-spec'), ('OnOn', 'on-spec')]:
+        for level, label in [('g', 'off-spec'), ('e', 'on-spec')]:
             if upload:
-                sq.OffOn_seq(pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
-                            pulse_comb=pulse_comb, preselection=False)
-            MC.set_sweep_function(awg_swf.Resonator_spectroscopy(
-                RO_MWG=self.readout_UC_LO,
-                RO_IF=self.ro_mod_freq(),
-                RO_channel=self.RO_acq_marker_channel(),
-                upload=False))
+                sq.single_level_seq(pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
+                                    level=level, preselection=False)
+    #             sq.OffOn_seq(pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+    #                           pulse_comb=pulse_comb, preselection=False)
+            MC.set_sweep_function(self.swf_ro_freq_lo()) 
             MC.set_sweep_points(freqs)
             MC.set_detector_function(self.int_avg_det_spec)
 
-            self.instr_pulsar.get_instr().start()
+            self.instr_pulsar.get_instr().start(exclude=[self.instr_uhf()])
             MC.run(name=label + self.msmt_suffix)
             self.instr_pulsar.get_instr().stop()
 

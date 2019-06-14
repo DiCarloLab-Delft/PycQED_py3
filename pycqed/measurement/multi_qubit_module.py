@@ -16,12 +16,16 @@ import pycqed.measurement.awg_sweep_functions_multi_qubit as awg_swf2
 import pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts as mqs
 import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 import pycqed.measurement.detector_functions as det
+from pycqed.measurement.waveform_control import pulsar as ps
 import pycqed.measurement.composite_detector_functions as cdet
 import pycqed.analysis.measurement_analysis as ma
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
 import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis_v2.timedomain_analysis as tda
 import pycqed.analysis.tomography as tomo
+
+import pycqed.measurement.waveform_control.sequence as sequence
+
 try:
     import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as uhfqc
 except ModuleNotFoundError:
@@ -510,8 +514,7 @@ def get_multiplexed_readout_pulse_dictionary_pulsar(qubits):
             'target_qubit': ','.join([qb.name for qb in qubits])}
 
 def get_operation_dict(qubits):
-    operation_dict = {'RO mux':
-                      get_multiplexed_readout_pulse_dictionary(qubits)}
+    operation_dict = dict()
     for qb in qubits:
         operation_dict.update(qb.get_operation_dict())
     return operation_dict
@@ -526,15 +529,15 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                **kw):
     max_int_len = 0
     for qb in qubits:
-        if qb.RO_acq_integration_length() > max_int_len:
-            max_int_len = qb.RO_acq_integration_length()
+        if qb.acq_length() > max_int_len:
+            max_int_len = qb.acq_length()
 
     channels = []
     for qb in qubits:
-        channels += [qb.RO_acq_weight_function_I()]
-        if qb.ro_acq_weight_type() in ['SSB', 'DSB', 'optimal_qutrit']:
-            if qb.RO_acq_weight_function_Q() is not None:
-                channels += [qb.RO_acq_weight_function_Q()]
+        channels += [qb.acq_I_channel()]
+        if qb.acq_weights_type() in ['SSB', 'DSB', 'optimal_qutrit']:
+            if qb.acq_Q_channel() is not None:
+                channels += [qb.acq_Q_channel()]
     if add_channels is not None:
         channels += add_channels
 
@@ -545,9 +548,9 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
 
     for qb in qubits:
         if UHFQC is None:
-            UHFQC = qb.UHFQC
+            UHFQC = qb.instr_uhf.get_instr()
         if pulsar is None:
-            pulsar = qb.AWG
+            pulsar = qb.instr_pulsar.get_instr()
         break
 
     return {
@@ -555,10 +558,10 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             integration_length=max_int_len, nr_shots=nr_shots,
             result_logging_mode='raw', **kw),
-        'int_log_classif_det': det.UHFQC_integration_logging_classifier_det(
-            UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            integration_length=max_int_len, nr_shots=nr_shots,
-            result_logging_mode='raw', **kw),
+        # 'int_log_classif_det': det.UHFQC_integration_logging_classifier_det(
+        #     UHFQC=UHFQC, AWG=pulsar, channels=channels,
+        #     integration_length=max_int_len, nr_shots=nr_shots,
+        #     result_logging_mode='raw', **kw),
         'dig_log_det': det.UHFQC_integration_logging_det(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             integration_length=max_int_len, nr_shots=nr_shots,
@@ -626,37 +629,32 @@ def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
     return ro_spacing
 
 
-def measure_multiplexed_readout(qubits, f_LO, nreps=1, liveplot=False,
+def measure_multiplexed_readout(qubits, nreps=1, liveplot=False,
                                 shots=5000,
-                                RO_spacing=None, preselection=True, MC=None,
+                                RO_spacing=None, preselection=True, 
                                 thresholds=None, thresholded=False,
                                 analyse=True):
 
-    multiplexed_pulse(qubits, f_LO, upload=True)
+    for qb in qubits:
+        MC = qb.instr_mc.get_instr()
 
     for qb in qubits:
-        if MC is None:
-            MC = qb.MC
-        else:
-            break
-
-    for qb in qubits:
-        qb.prepare_for_timedomain(multiplexed=True)
-
-    UHFQC = qubits[0].UHFQC
+        qb.prepare(drive='timedomain')
 
     if RO_spacing is None:
+        UHFQC = qubits[0].instr_uhf.get_instr()
         RO_spacing = UHFQC.quex_wint_delay()*2/1.8e9
         RO_spacing += UHFQC.quex_wint_length()/1.8e9
         RO_spacing += 50e-9  # for slack
         RO_spacing = np.ceil(RO_spacing*225e6/3)/225e6*3
-
+    
     sf = awg_swf2.n_qubit_off_on(
-        [qb.get_drive_pars() for qb in qubits],
-        get_multiplexed_readout_pulse_dictionary(qubits),
+        [qb.get_ge_pars() for qb in qubits],
+        [qb.get_ro_pars() for qb in qubits],
         preselection=preselection,
         parallel_pulses=True,
         RO_spacing=RO_spacing)
+    
 
     m = 2 ** (len(qubits))
     if preselection:
@@ -669,6 +667,9 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=1, liveplot=False,
     else:
         df = get_multiplexed_readout_detector_functions(qubits,
                  nr_shots=shots)['int_log_det']
+    print('Hi!')
+    print(shots)
+    print(nreps)
 
 
     MC.live_plot_enabled(liveplot)
@@ -855,13 +856,12 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
         exp_metadata=exp_metadata)
 
 
-def measure_tomography(qubits, prep_sequence, state_name, f_LO,
+def measure_tomography(qubits, prep_sequence, state_name,
                        rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                        use_cal_points=True,
                        preselection=True,
                        rho_target=None,
                        shots=None,
-                       MC=None,
                        ro_spacing=1e-6,
                        ro_slack=10e-9,
                        thresholded=False,
@@ -871,20 +871,25 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
     exp_metadata = {}
 
     for qb in qubits:
-        if MC is None:
-            MC = qb.MC
-        else:
-            break
+        MC = qb.instr_mc.get_instr()
 
-    # set up multiplexed readout
-    multiplexed_pulse(qubits, f_LO, upload=True)
+    for qb in qubits:
+        qb.prepare(drive='timedomain')
 
     if ro_spacing is None:
         ro_spacing = calculate_minimal_readout_spacing(qubits, ro_slack,
                                                            drive_pulses=1)
 
     qubit_names = [qb.name for qb in qubits]
-    seq_tomo, elts_tomo = mqs.n_qubit_tomo_seq(qubit_names,
+    if preselection:
+        label = '{}_tomography_ssro_preselection_{}'.format(state_name, '-'.join(
+                [qb.name for qb in qubits]))
+    else:
+        label = '{}_tomography_ssro_{}'.format(state_name, '-'.join(
+            [qb.name for qb in qubits]))
+    seq = sequence.Sequence(label)
+    
+    seq_tomo, seg_list_tomo = mqs.n_qubit_tomo_seq(qubit_names,
                                                get_operation_dict(qubits),
                                                prep_sequence=prep_sequence,
                                                rots_basis=rots_basis,
@@ -892,21 +897,26 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
                                                upload=False,
                                                preselection=preselection,
                                                ro_spacing=ro_spacing)
-    seq = seq_tomo
-    elts = elts_tomo
+    seg_list = seg_list_tomo
 
     if use_cal_points:
-        seq_cal, elts_cal = mqs.n_qubit_ref_all_seq(qubit_names,
+        seq_cal, seg_list_cal = mqs.n_qubit_ref_all_seq(qubit_names,
                                                     get_operation_dict(qubits),
                                                     return_seq=True,
                                                     upload=False,
                                                     preselection=preselection,
                                                     ro_spacing=ro_spacing)
-        seq += seq_cal
-        elts += elts_cal
-    n_segments = len(seq.elements)
+        # seq += seq_cal
+        seg_list += seg_list_cal
+    seq = sequence.Sequence(label)
+    for seg in seg_list:
+        seq.add(seg)
+
+    n_segments = len(seg_list)
     if preselection:
         n_segments *= 2
+    
+    
     print(n_segments)
     # from this point on number of segments is fixed
     sf = awg_swf2.n_qubit_seq_sweep(seq_len=n_segments)
@@ -924,9 +934,7 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
     else:
         df = get_multiplexed_readout_detector_functions(qubits,
                                             nr_shots=shots)['int_log_det']
-    for qb in qubits:
-        qb.prepare_for_timedomain(multiplexed=True)
-
+    
     # make a channel map
     # fixme - channels and qubits are not always in the same order
     # getting a channel map should be a nice function, but where ?
@@ -945,10 +953,10 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
             for qb in qubits:
                 if preselection:
                     cal_defs[i][channel_map[qb.name]] = \
-                        [2*len(seq_tomo.elements) + 2*i + 1]
+                        [2*len(seg_list) + 2*i + 1]
                 else:
                     cal_defs[i][channel_map[qb.name]] = \
-                        [len(seq_tomo.elements) + i]
+                        [len(seg_list) + i]
     else:
         cal_defs = None
 
@@ -961,7 +969,7 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
     exp_metadata["use_preselection"] = preselection
 
     if upload:
-        station.pulsar.program_awgs(seq, *elts)
+        ps.Pulsar.get_instance().program_awgs(seq)
 
     MC.live_plot_enabled(liveplot)
     MC.soft_avg(1)
@@ -971,16 +979,9 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
     if run:
-        if preselection:
-            label = '{}_tomography_ssro_preselection_{}'.format(state_name, '-'.join(
-                [qb.name for qb in qubits]))
-        else:
-            label = '{}_tomography_ssro_{}'.format(state_name, '-'.join(
-                [qb.name for qb in qubits]))
-
         MC.run_2D(label, exp_metadata=exp_metadata)
 
-    return elts
+    return 'Tomo'
 
 
 def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
