@@ -1,6 +1,6 @@
 """
 To do:
--
+- replace print() by logging
 
 Notes:
 
@@ -43,6 +43,7 @@ from zlib import crc32
 from . import zishell_NH as zs
 from .ZI_base_instrument import ZI_base_instrument
 
+log = logging.getLogger(__name__)
 
 class ZI_HDAWG_core(ZI_base_instrument):
     """
@@ -60,14 +61,13 @@ class ZI_HDAWG_core(ZI_base_instrument):
     def __init__(self, name: str,
                  device: str,
                  server: str = 'localhost', port = 8004,
-                 num_codewords: int = 32, **kw) -> None:
+                 **kw) -> None:
         """
         Input arguments:
             name:           (str) name of the instrument as seen by the user
             device          (str) the name of the device e.g., "dev8008"
             server          (str) the ZI data server
             port            (int) the port to connect to
-            FIXME: comment incomplete
         """
 
         super().__init__(name=name, **kw)
@@ -87,7 +87,6 @@ class ZI_HDAWG_core(ZI_base_instrument):
 
         # save some parameters
         self._devname = device
-        self._num_codewords = num_codewords
 
         # connect to data server and device
         self._dev = zs.ziShellDevice()
@@ -104,7 +103,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
         try:
             self.add_parameters_from_file(filename=filename)  # NB: defined in parent class
         except FileNotFoundError:
-            logging.error("parameter file for data parameters"
+            log.error("parameter file for data parameters"
                             " {} not found".format(filename))
             raise
             # FIXME: we need to be capable to generate file if none exists
@@ -120,20 +119,20 @@ class ZI_HDAWG_core(ZI_base_instrument):
         else:
             raise Exception("Unknown device type '{}'".format(dev_type))
 
-        # FIXME: check features
-        # FIXME: check version (also /ZI/VERSION ?)
-        # show some info. FIXME: fails
-        #zi_version = self._dev.geti('/zi/about/version')      # LabOne version
-        #zi_revision = self._dev.geti('/zi/about/revision')    # Data Server version
-        #logging.info('LabOne version {}, Data Server revision {}'.format(zi_version, zi_revision))
-
+        # show some info
+        serial = self.get('features_serial')
+        options = self.get('features_options') # FIXME: check that we have what we need
+        fw_revision = self.get('system_fwrevision') # Revision of the device internal controller software FIXME: check against minimum we need
+        fpga_revision = self.get('system_fpgarevision') # HDL firmware revision FIXME: check against minimum we need
+        log.info('AWG8: serial={}, options={}, fw_revision={}, fpga_revision={}'
+                 .format(serial, options.replace('\n','|'), fw_revision, fpga_revision))
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
 
-    # FIXME: incomplete
     def load_default_settings(self):
         """
         bring device into known state
+        FIXME: incomplete
         """
         # clear output
 
@@ -229,6 +228,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
         self._dev.configure_awg_from_string(awg_nr=awg_nr,
                                             program_string=program_string,
                                             timeout=timeout)
+        # FIXME: side effect: the function above touches '/dio/strobe/slope'
         hash_val = crc32(program_string.encode('utf-8'))
         self.set('awgs_{}_sequencer_program_crc32_hash'.format(awg_nr),
                  hash_val)
@@ -331,7 +331,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
             return np.genfromtxt(filename, delimiter=',')
         except OSError as e:
             # if the waveform does not exist yet dont raise exception
-            logging.warning(e)
+            log.warning(e)
             print(e)
             return None
 

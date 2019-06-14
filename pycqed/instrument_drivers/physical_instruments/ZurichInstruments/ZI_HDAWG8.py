@@ -62,6 +62,8 @@ from .ZI_HDAWG_core import ZI_HDAWG_core
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
+log = logging.getLogger(__name__)
+
 class ZI_HDAWG8(ZI_HDAWG_core):
 
     def __init__(self, name: str,
@@ -78,7 +80,8 @@ class ZI_HDAWG8(ZI_HDAWG_core):
         """
 
         t0 = time.time()
-        super().__init__(name, device, server, port, num_codewords, **kw)
+        super().__init__(name, device, server, port, **kw)
+        self._num_codewords = num_codewords
         self._add_extra_parameters()
         self._add_codeword_parameters()
         self.connect_message(begin_time=t0)
@@ -157,7 +160,7 @@ class ZI_HDAWG8(ZI_HDAWG_core):
                         # amp mode. It forces all AWGs of a pair to behave identical.
                         cw1 = cw0
                         # FIXME: the above is no longer true
-                        logging.warning('applied outdated flux channel duplication hack')
+                        log.warning('applied outdated flux channel duplication hack')
                     # if both wfs are triggered play both
                     if (cw0 != 0) and (cw1 != 0):
                         # if both waveforms exist, upload
@@ -261,7 +264,7 @@ class ZI_HDAWG8(ZI_HDAWG_core):
                 # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
             else:
-                logging.error('unknown value for cfg_codeword_protocol')
+                log.error('unknown value for cfg_codeword_protocol')
                 # FIXME: exception?
 
         # Disable all function generators
@@ -354,9 +357,9 @@ class ZI_HDAWG8(ZI_HDAWG_core):
 
     def _debug_report_dio(self):
         # FIXME: only DIO 0 for now
-        logging.info('DIO bits with timing errors:  0x%08X' % self._dev.geti('awgs/0/dio/error/timing'))
-        logging.info('DIO bits detected high:       0x%08X' % self._dev.geti('awgs/0/dio/highbits'))
-        logging.info('DIO bits detected low:        0x%08X' % self._dev.geti('awgs/0/dio/lowbits'))
+        log.info('DIO bits with timing errors:  0x%08X' % self._dev.geti('awgs/0/dio/error/timing'))
+        log.info('DIO bits detected high:       0x%08X' % self._dev.geti('awgs/0/dio/highbits'))
+        log.info('DIO bits detected low:        0x%08X' % self._dev.geti('awgs/0/dio/lowbits'))
         # AWGS/0/DIO/ERROR/WIDTH
         # AWGS/0/DIO/DATA
 
