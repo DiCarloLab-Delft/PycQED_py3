@@ -1,9 +1,10 @@
 """
+Notes:
+- this is the 'core' driver for the ZI HDAWG: it contains the generic parts of
+  the driver. Application dependent parts (e.g. codeword handling) reside in ZI_HDAWG8.py
+
 To do:
 - replace print() by logging
-
-Notes:
-
 
 Changelog:
 
@@ -126,6 +127,8 @@ class ZI_HDAWG_core(ZI_base_instrument):
         fpga_revision = self.get('system_fpgarevision') # HDL firmware revision FIXME: check against minimum we need
         log.info('AWG8: serial={}, options={}, fw_revision={}, fpga_revision={}'
                  .format(serial, options.replace('\n','|'), fw_revision, fpga_revision))
+        log.info('DIO interface found in mode {} (0=CMOS, 1=LVDS)'.
+                 format(self.get('dios_0_interface'))) # NB: mode is persistent across device restarts
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
 

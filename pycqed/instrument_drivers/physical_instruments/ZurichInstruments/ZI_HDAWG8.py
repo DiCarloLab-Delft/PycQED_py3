@@ -1,9 +1,11 @@
 """
-To do:
--
-
 Notes:
+- this is the application dependent part of the ZI HDAWG driver: it handles all codeword related
+  functionality including DIO configuration. Generic parts reside in ZI_HDAWG_core.py
 
+To do:
+- replace print() by logging
+-
 
 Changelog:
 
@@ -264,8 +266,7 @@ class ZI_HDAWG8(ZI_HDAWG_core):
                 # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
             else:
-                log.error('unknown value for cfg_codeword_protocol')
-                # FIXME: exception?
+                raise Exception('unknown value for cfg_codeword_protocol')
 
         # Disable all function generators
         self._dev.daq.setInt('/' + self._dev.device +
