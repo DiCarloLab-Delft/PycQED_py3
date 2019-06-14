@@ -221,7 +221,7 @@ class Test_Mock_CCL(unittest.TestCase):
     ###########################################################
     def test_calibrate_ro_pulse_CW(self):
         self.CCL_qubit.mock_ro_pulse_amp_CW(0.05)
-
+        self.CCL_qubit.mock_freq_res(7.5e9)
         self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
 
         self.CCL_qubit.calibrate_ro_pulse_amp_CW()

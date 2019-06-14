@@ -258,7 +258,7 @@ class Qubit(Instrument):
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
 
-    def find_resonators(self, start_freq=7e9, stop_freq=8e9, VNA_power=-40,
+    def find_resonators(self, start_freq=7.3e9, stop_freq=7.55e9, VNA_power=-40,
                         bandwidth=200, timeout=200, npts=2001, with_VNA=None,
                         verbose=True):
         """
@@ -267,6 +267,9 @@ class Qubit(Instrument):
         
         TODO: Add measure_with_VNA to CCL Transmon object
         """
+        if self.ro_freq() is None:
+            self.ro_freq(7.5e9)
+
         if with_VNA is None:
             try:
                 if self.instr_VNA.get_instr() == '':
@@ -291,7 +294,8 @@ class Qubit(Instrument):
 
             result = ma2.sa.Initial_Resonator_Scan_Analysis(label=name)
         else:
-            self.ro_pulse_amp_CW(0.01)
+            self.ro_pulse_amp(1)
+            self.ro_pulse_amp_CW(0.3)  # High power te give best SNR, dont care about resonator shift yet
             freqs = np.linspace(start_freq, stop_freq, npts)
             self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
             result = ma2.sa.Initial_Resonator_Scan_Analysis()
@@ -371,6 +375,8 @@ class Qubit(Instrument):
                 name = 'VNA_Resonator_scan_' + str(round(freq/1e9, 4)) + 'GHz'
                 self.measure_with_VNA(VNA, start_freq, stop_freq, npts)
             else:
+                self.ro_pulse_amp(0.06)
+                self.ro_pulse_amp_CW(0.01)
                 freqs = np.arange(freq-5e6, freq+5e6, 0.1e6)
                 name = 'Resonator_scan' + self.msmt_suffix
                 self.measure_heterodyne_spectroscopy(freqs=freqs,
