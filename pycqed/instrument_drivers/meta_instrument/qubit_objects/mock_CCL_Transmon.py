@@ -284,8 +284,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         (e.g. pulsed/CW) and by imp using cfg_spec_mode.
 
         Uses a Lorentzian as a result for now
-
-        TODO: include sensitivity to both fluxlines
         '''
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -526,8 +524,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         s1 = swf.None_Sweep(name='Frequency', parameter_name='Frequency',
                             unit='Hz')
         s2 = swf.None_Sweep(name='Flux', parameter_name=fluxChan, unit='A')
-
-        fluxcurrent = self.instr_FluxCtrl.get_instr()
 
         mocked_values = []
         for dac_value in dac_values:
@@ -972,6 +968,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             f0 = self.mock_freq_res() + 2*self.mock_chi()
             signal = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((f_ro - f0))**2)
 
+        if type(signal) is list:
+            signal = signal[0]
         return signal
 
     def values_to_IQ(self, mocked_values, theta=15):

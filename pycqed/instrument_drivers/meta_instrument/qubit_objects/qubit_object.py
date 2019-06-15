@@ -259,7 +259,7 @@ class Qubit(Instrument):
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
 
-    def find_resonators(self, start_freq=7.3e9, stop_freq=7.55e9, VNA_power=-40,
+    def find_resonators(self, start_freq=7e9, stop_freq=8e9, VNA_power=-40,
                         bandwidth=200, timeout=200, npts=2001, with_VNA=None,
                         verbose=True):
         """
@@ -267,11 +267,20 @@ class Qubit(Instrument):
         one is connected and linked to the qubit object, or if specified via
         'with_VNA'.
 
+        Creates a resonator dictionary in the qubit object, and tries to make
+        one in the device object as well (if device object is specified). This
+        dictionary contains a list of properties indexed as:
+        0: Frequency of the resonator;
+        1: Type of resonator (qubit/test), obtained from powerscan;
+        2: Flux bias line dictionary. Keys are the fluxline names, and the
+           ascribed values are the amplitude from a cosine fit;
+        3: Qubit this resonator is ascribed to (from fluxline amplitude, can
+           be improved upon). Defaults to None for test resonators;
+        4: Sweetspot current obtained from DAC scan of best coupled fluxline;
+        5: Frequency shift of a power scan (used to predict qubit freq);
+
         TODO: Add measure_with_VNA to CCL Transmon object
         """
-        if self.ro_freq() is None:
-            self.ro_freq(7.5e9)
-
         if with_VNA is None:
             try:
                 if self.instr_VNA.get_instr() == '':
@@ -297,7 +306,7 @@ class Qubit(Instrument):
             result = ma2.sa.Initial_Resonator_Scan_Analysis(label=name)
         else:
             self.ro_pulse_amp(1)
-            self.ro_pulse_amp_CW(0.3)  # High power te give best SNR, dont care about resonator shift yet
+            self.ro_pulse_amp_CW(1)
             freqs = np.linspace(start_freq, stop_freq, npts)
             self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
             # ma.Homodyne_Analysis()
@@ -317,7 +326,8 @@ class Qubit(Instrument):
                 print('{}:\t{:.3f} GHz'.format(resonator, items[0]/1e9))
 
         try:
-            self.device.res_dict = self.res_dict
+            device = self.device
+            device.res_dict = self.res_dict
         except AttributeError:
             logging.warning('Could not update device resonator dictionary: '
                             'No device found for {}'.format(self.name))
@@ -359,11 +369,9 @@ class Qubit(Instrument):
                                          npts=50001, use_min=False, MC=None,
                                          update=True, with_VNA=None):
         '''
-        quick script that uses measure_heterodyne_spectroscopy on a wide range
-        to act as a sort of mock of a VNA resonator scan'.
-
-        If it is a first scan (no freq_res yet in qubit object) it will perform
-        a wide range scan. Otherwise it will zoom in on a resonator
+        Zooms in on each resonator defined in self.res_dict (may be obtained
+        from find_resontaros) to see and determines whether it actually is a
+        resonator or just noise.
         '''
         if with_VNA is None:
             try:
@@ -560,8 +568,11 @@ class Qubit(Instrument):
                     if qubit.name == items[3]:
                         qubit.freq_res(items[0])
                         qubit.ro_freq(items[0])
+                        qubit.fl_dc_V0(items[4])
+                        qubit.cfg_dc_flux_ch('FBL_' + items[3][-1])
                         qubit.freq_qubit(items[0] - np.abs(
                             (50e6)**2/(2*items[5])))
+
         except AttributeError:
             logging.warning('Could not link qubits to resonators: '
                             'No device found')

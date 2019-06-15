@@ -875,104 +875,98 @@ class DAC_analysis(ma.TwoD_Analysis):
                           transpose=False, figsize=None, filtered=False,
                           subtract_mean_x=False, subtract_mean_y=False,
                           **kw):
-          '''
-          Args:
-              linecut_log (bool):
-                  log scale for the line cut?
-                  Remember to set the labels correctly.
-              colorplot_log (string/bool):
-                  True/False for z axis scaling, or any string containing any
-                  combination of letters x, y, z for scaling of the according axis.
-                  Remember to set the labels correctly.
+        '''
+        Args:
+          linecut_log (bool):
+              log scale for the line cut?
+              Remember to set the labels correctly.
+          colorplot_log (string/bool):
+              True/False for z axis scaling, or any string containing any
+              combination of letters x, y, z for scaling of the according axis.
+              Remember to set the labels correctly.
 
-          '''
-          close_file = kw.pop('close_file', True)
-          self.fig_array = []
-          self.ax_array = []
+        '''
+        close_file = kw.pop('close_file', True)
+        self.fig_array = []
+        self.ax_array = []
 
-          for i, meas_vals in enumerate(self.measured_values[:1]):
-              if filtered:
-                  # print(self.measured_values)
-                  # print(self.value_names)
-                  if self.value_names[i] == 'Phase':
-                      self.measured_values[i] = dm_tools.filter_resonator_visibility(
-                                                          x=self.sweep_points,
-                                                          y=self.sweep_points_2D,
-                                                          z=self.measured_values[i],
-                                                          **kw)
+        for i, meas_vals in enumerate(self.measured_values[:1]):
+            if filtered:
+                # print(self.measured_values)
+                # print(self.value_names)
+                if self.value_names[i] == 'Phase':
+                    self.measured_values[i] = dm_tools.filter_resonator_visibility(
+                                                      x=self.sweep_points,
+                                                      y=self.sweep_points_2D,
+                                                      z=self.measured_values[i],
+                                                      **kw)
 
-              if (not plot_all) & (i >= 1):
-                  break
-              # Linecuts are above because somehow normalization applies to both
-              # colorplot and linecuts otherwise.
-              if plot_linecuts:
-                  fig, ax = plt.subplots(figsize=figsize)
-                  self.fig_array.append(fig)
-                  self.ax_array.append(ax)
-                  savename = 'linecut_{}'.format(self.value_names[i])
-                  fig_title = '{} {} \nlinecut {}'.format(
-                      self.timestamp_string, self.measurementstring,
-                      self.value_names[i])
-                  a_tools.linecut_plot(x=self.sweep_points,
-                                       y=self.sweep_points_2D,
-                                       z=self.measured_values[i],
-                                       y_name=self.parameter_names[1],
-                                       y_unit=self.parameter_units[1],
-                                       log=linecut_log,
-                                       zlabel=self.zlabels[i],
-                                       fig=fig, ax=ax, **kw)
-                  ax.set_title(fig_title)
-                  set_xlabel(ax, self.parameter_names[0],
-                             self.parameter_units[0])
-                  # ylabel is value units as we are plotting linecuts
-                  set_ylabel(ax, self.value_names[i],
-                             self.value_units[i])
+            if (not plot_all) & (i >= 1):
+                break
+            # Linecuts are above because somehow normalization applies to both
+            # colorplot and linecuts otherwise.
+            if plot_linecuts:
+                fig, ax = plt.subplots(figsize=figsize)
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                savename = 'linecut_{}'.format(self.value_names[i])
+                fig_title = '{} {} \nlinecut {}'.format(
+                    self.timestamp_string, self.measurementstring,
+                    self.value_names[i])
+                a_tools.linecut_plot(x=self.sweep_points,
+                                     y=self.sweep_points_2D,
+                                     z=self.measured_values[i],
+                                     y_name=self.parameter_names[1],
+                                     y_unit=self.parameter_units[1],
+                                     log=linecut_log,
+                                     zlabel=self.zlabels[i],
+                                     fig=fig, ax=ax, **kw)
+                ax.set_title(fig_title)
+                set_xlabel(ax, self.parameter_names[0],
+                           self.parameter_units[0])
+                # ylabel is value units as we are plotting linecuts
+                set_ylabel(ax, self.value_names[i],
+                           self.value_units[i])
 
-                  if save_fig:
-                      self.save_fig(fig, figname=savename,
-                                    fig_tight=False, **kw)
+                if save_fig:
+                    self.save_fig(fig, figname=savename,
+                                  fig_tight=False, **kw)
+            # Heatmap
+            fig, ax = plt.subplots(figsize=figsize)
+            self.fig_array.append(fig)
+            self.ax_array.append(ax)
+            if normalize:
+                print("normalize on")
+            self.ax_array.append(ax)
+            savename = 'Heatmap_{}'.format(self.value_names[i])
+            fig_title = '{} {} \n{}'.format(
+              self.timestamp_string, self.measurementstring,
+              self.value_names[i])
 
-              fig, ax = plt.subplots(figsize=figsize)
-              self.fig_array.append(fig)
-              self.ax_array.append(ax)
-              if normalize:
-                  print("normalize on")
-              self.ax_array.append(ax)
-              savename = 'Heatmap_{}'.format(self.value_names[i])
-              fig_title = '{} {} \n{}'.format(
-                  self.timestamp_string, self.measurementstring,
-                  self.value_names[i])
+            if "xlabel" not in kw:
+                kw["xlabel"] = self.parameter_names[0]
+            if "ylabel" not in kw:
+                kw["ylabel"] = self.parameter_names[1]
+            if "xunit" not in kw:
+                kw["xunit"] = self.parameter_units[0]
+            if "yunit" not in kw:
+                kw["yunit"] = self.parameter_units[1]
 
-              if "xlabel" not in kw:
-                  kw["xlabel"] = self.parameter_names[0]
-              if "ylabel" not in kw:
-                  kw["ylabel"] = self.parameter_names[1]
-              if "xunit" not in kw:
-                  kw["xunit"] = self.parameter_units[0]
-              if "yunit" not in kw:
-                  kw["yunit"] = self.parameter_units[1]
+            # subtract mean from each row/column if demanded
+            plot_zvals = meas_vals.transpose()
+            if subtract_mean_x:
+                plot_zvals = plot_zvals - np.mean(plot_zvals, axis=1)[:, None]
+            if subtract_mean_y:
+                plot_zvals = plot_zvals - np.mean(plot_zvals, axis=0)[None, :]
 
-              # subtract mean from each row/column if demanded
-              plot_zvals = meas_vals.transpose()
-              if subtract_mean_x:
-                  plot_zvals = plot_zvals - np.mean(plot_zvals,axis=1)[:,None]
-              if subtract_mean_y:
-                  plot_zvals = plot_zvals - np.mean(plot_zvals,axis=0)[None,:]
-
-              a_tools.color_plot(x=self.sweep_points,
-                                 y=self.sweep_points_2D,
-                                 z=plot_zvals,
-                                 zlabel=self.zlabels[i],
-                                 fig=fig, ax=ax,
-                                 log=colorplot_log,
-                                 transpose=transpose,
-                                 normalize=normalize,
-                                 **kw)
-              ax.plot(self.f0s,self.sweep_points_2D,'ro-')
-              
-              ax.set_title(fig_title)
-
-              if save_fig:
-                  self.save_fig(fig, figname=savename, **kw)
-          if close_file:
-              self.finish()
+            a_tools.color_plot(x=self.sweep_points,
+                               y=self.sweep_points_2D,
+                               z=plot_zvals,
+                               zlabel=self.zlabels[i],
+                               fig=fig, ax=ax,
+                               log=colorplot_log,
+                               transpose=transpose,
+                               normalize=normalize,
+                               **kw)
+            ax.set_title(fig_title)
+            
