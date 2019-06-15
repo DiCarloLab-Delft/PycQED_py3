@@ -11,6 +11,7 @@ from pycqed.utilities.general import gen_sweep_pts
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis import fitting_models as fit_mods
+from pycqed.analysis import analysis_toolbox as a_tools
 
 
 class Qubit(Instrument):
@@ -262,9 +263,10 @@ class Qubit(Instrument):
                         bandwidth=200, timeout=200, npts=2001, with_VNA=None,
                         verbose=True):
         """
-        Performs a wide range scan to find all resonator dips. Will use VNA if one
-        is connected and linked to the qubit object, or if specified via 'with_VNA'.
-        
+        Performs a wide range scan to find all resonator dips. Will use VNA if
+        one is connected and linked to the qubit object, or if specified via
+        'with_VNA'.
+
         TODO: Add measure_with_VNA to CCL Transmon object
         """
         if with_VNA is None:
@@ -294,6 +296,7 @@ class Qubit(Instrument):
             self.ro_pulse_amp_CW(0.01)
             freqs = np.linspace(start_freq, stop_freq, npts)
             self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
+            # ma.Homodyne_Analysis()
             result = ma2.sa.Initial_Resonator_Scan_Analysis()
 
         peak_freqs = []
@@ -303,11 +306,17 @@ class Qubit(Instrument):
 
         self.res_dict = {}
         for i, freq in enumerate(result.peaks):
-            self.res_dict[str(i)] = [freq, 'unknown', {}, None, 0]
+            self.res_dict[str(i)] = [freq, 'unknown', {}, None, 0, 0]
 
         if verbose:
             for resonator, items in self.res_dict.items():
                 print('{}:\t{:.3f} GHz'.format(resonator, items[0]/1e9))
+
+        try:
+            self.device.res_dict = self.res_dict
+        except AttributeError:
+            logging.warning('Could not update device resonator dictionary: '
+                            'No device found for {}'.format(self.name))
 
         return True
 
@@ -463,6 +472,7 @@ class Qubit(Instrument):
                     state = 'test_resonator'
                 self.res_dict[resonator][0] = freq
                 self.res_dict[resonator][1] = state
+                self.res_dict[resonator][5] = shift
         return True
 
     def find_qubit_resonator_fluxline(self, with_VNA=None, verbose=True):
@@ -533,6 +543,22 @@ class Qubit(Instrument):
                                                               items[0]/1e9,
                                                               items[3],
                                                               items[4]*1e3))
+        try:
+            device = self.device
+            device.res_dict = self.res_dict
+            for q in device.qubits():
+                if q == 'fakequbit':
+                    pass
+                qubit = device.find_instrument(q)
+                for resonator, items in self.res_dict.items():
+                    if qubit.name == items[3]:
+                        qubit.freq_res(items[0])
+                        qubit.ro_freq(items[0])
+                        qubit.freq_qubit(items[0] - np.abs(
+                            (50e6)**2/(2*items[5])))
+        except AttributeError:
+            logging.warning('Could not link qubits to resonators: '
+                            'No device found')
         return True
 
     def find_resonator_sweetspot(self, freqs=None, dac_values=None,
@@ -632,12 +658,12 @@ class Qubit(Instrument):
         """
         try:
             if not self.done_spectroscopy:
+                self.spec_pow(-10)  # Then we see something for sure
                 f_span = 2e9
-                self.done_spectroscopy = True
                 freqs = np.arange(self.freq_qubit() - f_span/2,
                                   self.freq_qubit() + f_span/2,
                                   f_step)
-
+                self.done_spectroscopy = True
         except:
             pass
 

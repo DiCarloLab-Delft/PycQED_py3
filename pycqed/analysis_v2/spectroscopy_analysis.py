@@ -947,6 +947,21 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
         fname = filepath + "/" + savename + '.png'
         fig.savefig(fname)
 
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['freq'],
+            'yvals': self.raw_data_dict['amp'],
+            'xunit': 'Hz',
+            'yunit': 'V',
+            'xlabel': 'Frequency',
+            'ylabel': 'Amp',
+            'title': 'Found peaks 2',
+            'linestyle': '-',
+            'marker': 'o',
+            'setlabel': 'data',
+            'color': 'C0'
+        }
 
 class ResonatorSpectroscopy(Spectroscopy):
     def __init__(self, t_start,
