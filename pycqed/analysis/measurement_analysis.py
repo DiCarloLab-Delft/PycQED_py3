@@ -7750,7 +7750,7 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
             pass
 
         # High power regime: just use the value at highest power
-
+        f_low = f0[0]
         f_high = f0[-1]
 
         if (f_high < f_low):
