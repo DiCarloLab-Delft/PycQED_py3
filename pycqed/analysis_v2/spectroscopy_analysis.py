@@ -926,20 +926,21 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
 
       self.peaks = dip_freqs
       self.peaks_idx = dip_idx
-      self.plot_fit_result()
+      self.peak_height = []
+      for ind in self.peaks_idx:
+        self.peak_height.append(self.raw_data_dict['amp'][0][ind])
+      # self.plot_fit_result()
 
     def plot_fit_result(self, normalize=False,
                         save_fig=True, figsize=None, **kw):
-      peak_height = []
-      for ind in self.peaks_idx:
-        peak_height.append(self.raw_data_dict['amp'][0][ind])
 
       fig, ax = plt.subplots(figsize=figsize)
 
       savename = 'Found Peaks'
 
-      ax.plot(self.raw_data_dict['freq'][0], self.raw_data_dict['amp'][0], marker='o')
-      ax.plot(self.peaks, peak_height, marker='o', linestyle='', color='r')
+      ax.plot(self.raw_data_dict['freq'][0], self.raw_data_dict['amp'][0], 
+              marker='o', color='C0')
+      ax.plot(self.peaks, self.peak_height, marker='o', linestyle='', color='r')
 
       if save_fig:
 
@@ -948,8 +949,11 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
         fig.savefig(fname)
 
     def prepare_plots(self):
+        plotfn = self.plot_line
+        print(plotfn)
         self.plot_dicts['main'] = {
-            'plotfn': self.plot_line,
+            'plotfn': plotfn,
+            'ax_id': 'main',
             'xvals': self.raw_data_dict['freq'],
             'yvals': self.raw_data_dict['amp'],
             'xunit': 'Hz',
@@ -961,6 +965,36 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
             'marker': 'o',
             'setlabel': 'data',
             'color': 'C0'
+        }
+        self.plot_dicts['fit_main'] = {
+            'plotfn': plotfn,
+            'ax_id': 'fit',
+            'xvals': self.raw_data_dict['freq'],
+            'yvals': self.raw_data_dict['amp'],
+            'xunit': 'Hz',
+            'yunit': 'V',
+            'xlabel': 'Frequency',
+            'ylabel': 'Amp',
+            'title': 'Found peaks 2',
+            'linestyle': '-',
+            'marker': 'o',
+            'setlabel': 'data',
+            'color': 'C0'
+        }
+        self.plot_dicts['peaks'] = {
+            'plotfn': plotfn,
+            'ax_id': 'fit',
+            'xvals': self.peaks,
+            'yvals': self.peak_height,
+            'xunit': 'Hz',
+            'yunit': 'V',
+            'xlabel': 'Frequency',
+            'ylabel': 'Amp',
+            'title': 'Found peaks 2',
+            'linestyle': '',
+            'marker': 'o',
+            'setlabel': 'data',
+            'color': 'r',
         }
 
 class ResonatorSpectroscopy(Spectroscopy):

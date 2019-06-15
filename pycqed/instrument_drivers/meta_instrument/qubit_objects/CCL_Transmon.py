@@ -1206,9 +1206,9 @@ class CCLight_Transmon(Qubit):
 
             ro_pow = 10**(power/20)
             self.ro_pulse_amp_CW(ro_pow/3)
-
-            f_qubit_estimate = self.freq_res() + (70e6)**2/shift
-            self.freq_qubit(f_qubit_estimate)
+            if self.freq_qubit() is None:
+                f_qubit_estimate = self.freq_res() + (65e6)**(2*shift)
+                self.freq_qubit(f_qubit_estimate)
 
         return True
 
