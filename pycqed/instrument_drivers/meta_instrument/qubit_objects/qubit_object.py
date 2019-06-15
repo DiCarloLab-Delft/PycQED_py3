@@ -664,7 +664,7 @@ class Qubit(Instrument):
         """
         try:
             if not self.done_spectroscopy:
-                self.spec_pow(-10)  # Then we see something for sure
+                self.spec_pow(-20) 
                 f_span = 2e9
                 freqs = np.arange(self.freq_qubit() - f_span/2,
                                   self.freq_qubit() + f_span/2,
