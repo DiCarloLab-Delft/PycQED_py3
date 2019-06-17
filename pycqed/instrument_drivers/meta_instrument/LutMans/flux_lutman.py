@@ -149,6 +149,58 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
     def _gen_park(self):
         return self.park_amp()*np.ones(int(self.park_length()*self.sampling_rate()))
 
+    def _add_qubit_parameters(self):
+        """
+        Adds parameters responsible for keeping track of qubit frequencies,
+        coupling strengths etc.
+        """
+        self.add_parameter(
+            'q_polycoeffs_freq_01_det',
+            docstring='Coefficients of the polynomial used to convert '
+            'amplitude in V to detuning in Hz. \nN.B. it is important to '
+            'include both the AWG range and channel amplitude in the params.\n'
+            'N.B.2 Sign convention: positive detuning means frequency is '
+            'higher than current  frequency, negative detuning means its '
+            'smaller.\n'
+            'In order to convert a set of cryoscope flux arc coefficients to '
+            ' units of Volts they can be rescaled using [c0*sc**2, c1*sc, c2]'
+            ' where sc is the desired scaling factor that includes the sq_amp '
+            'used and the range of the AWG (5 in amp mode).',
+            vals=vals.Arrays(),
+            # initial value is chosen to not raise errors
+            initial_value=np.array([-2e9, 0, 0]),
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'q_polycoeffs_anharm',
+            docstring='coefficients of the polynomial used to calculate '
+            'the anharmonicity (Hz) as a function of amplitude in V. '
+            'N.B. it is important to '
+            'include both the AWG range and channel amplitude in the params.\n',
+            vals=vals.Arrays(),
+            # initial value sets a flux independent anharmonicity of 300MHz
+            initial_value=np.array([0, 0, -300e6]),
+            parameter_class=ManualParameter)
+
+        self.add_parameter('q_freq_01', vals=vals.Numbers(),
+                           docstring='Current operating frequency of qubit',
+                           # initial value is chosen to not raise errors
+                           initial_value=6e9,
+                           unit='Hz', parameter_class=ManualParameter)
+
+        for this_cz in ['NE','NW','SW','SE']:
+            self.add_parameter('q_freq_10_%s'%thiz_cz, vals=vals.Numbers(),
+                               docstring='Current operating frequency of qubit'
+                               ' with which a CZ gate can be performed.',
+                               # initial value is chosen to not raise errors
+                               initial_value=6e9,
+                               unit='Hz', parameter_class=ManualParameter)
+            self.add_parameter('q_J2_%s'%thiz_cz, vals=vals.Numbers(), unit='Hz',
+                               docstring='effective coupling between the 11 and '
+                               '02 states.',
+                               # initial value is chosen to not raise errors
+                               initial_value=15e6,
+                               parameter_class=ManualParameter)
+
     def _add_waveform_parameters(self):
         """
         Here comments
@@ -159,23 +211,101 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            initial_value=40e-9,
                            vals=vals.Numbers(0, 100e-6),
                            parameter_class=ManualParameter)
-        """
-            # CODEWORDS 1-4: CZ
-            self.add_parameter('cz_length', vals=vals.Numbers(),
+        # CODEWORDS 1-4: CZ
+        for this_cz in ['NE','NW','SW','SE']:
+            self.add_parameter('czd_double_sided_%s'%this_cz,
+                               initial_value=False,
+                               vals=vals.Bool(),
+                               parameter_class=ManualParameter)
+            self.add_parameter('disable_cz_only_z_%s'%this_cz,
+                               initial_value=False,
+                               vals=vals.Bool(),
+                               parameter_class=ManualParameter)
+
+            self.add_parameter(
+                'czd_net_integral_%s'%this_cz,
+                docstring='Used determine what the integral of'
+                ' the CZ waveform should evaluate to. This is realized by adding'
+                ' an offset to the phase correction pulse.\nBy setting this '
+                'parameter to np.nan no offset correction is performed.',
+                initial_value=np.nan,
+                unit='dac value * samples',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                parameter_class=ManualParameter)
+
+            self.add_parameter('cz_phase_corr_length_%s'%this_cz,
+                               unit='s',
+                               initial_value=5e-9, vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+            self.add_parameter('cz_phase_corr_amp_%s'%this_cz,
+                               unit='dac value',
+                               initial_value=0,
+                               vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+            self.add_parameter('cz_length_%s'%this_cz,
+                               vals=vals.Numbers(),
                                unit='s', initial_value=35e-9,
                                parameter_class=ManualParameter)
-            self.add_parameter('cz_lambda_2', vals=vals.Numbers(),
+            self.add_parameter('cz_lambda_2_%s'%this_cz,
+                               vals=vals.Numbers(),
                                initial_value=0,
                                parameter_class=ManualParameter)
-            self.add_parameter('cz_lambda_3', vals=vals.Numbers(),
+            self.add_parameter('cz_lambda_3_%s'%this_cz,
+                               vals=vals.Numbers(),
                                initial_value=0,
                                parameter_class=ManualParameter)
-            self.add_parameter('cz_theta_f', vals=vals.Numbers(),
+            self.add_parameter('cz_theta_f_%s'%this_cz,
+                               vals=vals.Numbers(),
                                unit='deg',
                                initial_value=80,
                                parameter_class=ManualParameter)
+            self.add_parameter(
+                'czd_lambda_2_%s'%this_cz,
+                docstring='lambda_2 parameter of the negative part of the cz pulse'
+                ' if set to np.nan will default to the value of the main parameter',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=np.nan,
+                parameter_class=ManualParameter)
 
-            self.add_parameter('czd_length_ratio',
+            self.add_parameter(
+                'czd_lambda_3_%s'%this_cz,
+                docstring='lambda_3 parameter of the negative part of the cz pulse'
+                ' if set to np.nan will default to the value of the main parameter',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=np.nan,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'czd_theta_f_%s'%this_cz,
+                docstring='theta_f parameter of the negative part of the cz pulse'
+                ' if set to np.nan will default to the value of the main parameter',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                unit='deg',
+                initial_value=np.nan,
+                parameter_class=ManualParameter)
+
+
+            self.add_parameter('czd_amp_ratio_%s'%this_cz,
+                               docstring='Amplitude ratio for double sided CZ gate',
+                               initial_value=1,
+                               vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+
+            self.add_parameter('czd_amp_offset_%s'%this_cz,
+                               docstring='used to add an offset to the negative '
+                               ' pulse that is used in the net-zero cz gate',
+                               initial_value=0,
+                               unit='dac value',
+                               vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+            self.add_parameter(
+                'czd_signs_%s'%this_cz, initial_value=['+', '-'],
+                docstring='Used to determine the sign of the two parts of the '
+                'double sided CZ pulse. This should be a list of two elements,'
+                ' where "+" is a positive pulse, "-" a negative amplitude and "0" '
+                'a disabled pulse.',
+                vals=vals.Lists(vals.Enum('+', '-', 0)),
+                parameter_class=ManualParameter)
+            self.add_parameter('czd_length_ratio_%s'%thiz_cz,
                                vals=vals.MultiType(vals.Numbers(0, 1),
                                                    vals.Enum('auto')),
                                initial_value=0.5,
@@ -186,80 +316,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                'automatically determined to ensure the integral '
                                'of the net-zero pulse is close to zero.',
                                parameter_class=ManualParameter)
-            self.add_parameter(
-                'czd_lambda_2',
-                docstring='lambda_2 parameter of the negative part of the cz pulse'
-                ' if set to np.nan will default to the value of the main parameter',
-                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
-                initial_value=np.nan,
-                parameter_class=ManualParameter)
 
-            self.add_parameter(
-                'czd_lambda_3',
-                docstring='lambda_3 parameter of the negative part of the cz pulse'
-                ' if set to np.nan will default to the value of the main parameter',
-                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
-                initial_value=np.nan,
-                parameter_class=ManualParameter)
-            self.add_parameter(
-                'czd_theta_f',
-                docstring='theta_f parameter of the negative part of the cz pulse'
-                ' if set to np.nan will default to the value of the main parameter',
-                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
-                unit='deg',
-                initial_value=np.nan,
-                parameter_class=ManualParameter)
 
-            self.add_parameter('cz_phase_corr_length', unit='s',
-                               initial_value=5e-9, vals=vals.Numbers(),
-                               parameter_class=ManualParameter)
-            self.add_parameter('cz_phase_corr_amp',
-                               unit='dac value',
-                               initial_value=0, vals=vals.Numbers(),
-                               parameter_class=ManualParameter)
-
-            self.add_parameter('czd_amp_ratio',
-                               docstring='Amplitude ratio for double sided CZ gate',
-                               initial_value=1,
-                               vals=vals.Numbers(),
-                               parameter_class=ManualParameter)
-
-            self.add_parameter('czd_amp_offset',
-                               docstring='used to add an offset to the negative '
-                               ' pulse that is used in the net-zero cz gate',
-                               initial_value=0,
-                               unit='dac value',
-                               vals=vals.Numbers(),
-                               parameter_class=ManualParameter)
-
-            self.add_parameter(
-                'czd_net_integral', docstring='Used determine what the integral of'
-                ' the CZ waveform should evaluate to. This is realized by adding'
-                ' an offset to the phase correction pulse.\nBy setting this '
-                'parameter to np.nan no offset correction is performed.',
-                initial_value=np.nan,
-                unit='dac value * samples',
-                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
-                parameter_class=ManualParameter)
-            self.add_parameter('disable_cz_only_z',
-                               initial_value=False,
-                               vals=vals.Bool(),
-                               parameter_class=ManualParameter)
-
-            self.add_parameter('czd_double_sided',
-                               initial_value=False,
-                               vals=vals.Bool(),
-                               parameter_class=ManualParameter)
-
-            self.add_parameter(
-                'czd_signs', initial_value=['+', '-'],
-                docstring='Used to determine the sign of the two parts of the '
-                'double sided CZ pulse. This should be a list of two elements,'
-                ' where "+" is a positive pulse, "-" a negative amplitude and "0" '
-                'a disabled pulse.',
-                vals=vals.Lists(vals.Enum('+', '-', 0)),
-                parameter_class=ManualParameter)
-        """
         # CODEWORD 6: SQUARE
         self.add_parameter('sq_amp', initial_value=.5,
                            # units is part of the total range of AWG8
@@ -305,6 +363,320 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                        'cryoscope measurements of custom waveforms.'),
             parameter_class=ManualParameter,
             vals=vals.Numbers(min_value=0))
+
+    def _gen_idle_z(self, which_gate):
+        cz_length = self.get('cz_length_%s'%which_gate)
+        idle_z = self._get_phase_corrected_pulse(
+            base_wf=np.zeros(int(cz_length*self.sampling_rate()+1)),
+            which_gate=which_gate)
+
+        return idle_z
+
+    def _get_phase_corrected_pulse(self, base_wf, which_gate):
+        """
+        Creates a phase correction pulse using a cosine with an offset
+        to correct any picked up phase.
+
+        Two properties are obeyed.
+            - The net-integral (if net-zero) is set to 'czd_net_integral'
+            - The amplitude of the cosine is set to 'cz_phase_corr_amp'
+        """
+        is_double_sided = self.get('czd_double_sided_%s'%which_gate)
+        disable_cz_only_z = self.get('disable_cz_only_z_%s'%which_gate)
+        cz_integral = self.get('czd_net_integral_%s'%which_gate)
+        corr_len = self.get('cz_phase_corr_length_%s'%which_gate)
+        corr_amp = self.get('cz_phase_corr_amp_%s'%which_gate)
+
+
+        corr_samples = int(corr_len*self.sampling_rate())
+
+        # First the offset to guarantee net-zero integral
+        if is_double_sided and not np.isnan(cz_integral):
+            curr_int = np.sum(base_wf)
+            corr_int = cz_integral-curr_int
+
+            corr_pulse = phase_corr_square(
+                int_val=corr_int, nr_samples=corr_samples)
+            if np.max(corr_pulse) > 0.5:
+                logging.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
+                    np.max(corr_pulse)))
+        else:
+            corr_pulse = np.zeros(corr_samples)
+
+        # Now the sinusoidal step for phase acquisition
+        if is_double_sided:
+            corr_pulse += phase_corr_sine_series([corr_amp],
+                                                 corr_samples)
+        else:
+            corr_pulse += phase_corr_sine_series_half([corr_amp],
+                                                      corr_samples)
+
+        if disable_cz_only_z:
+            modified_wf = np.concatenate([base_wf*0, corr_pulse])
+        else:
+            modified_wf = np.concatenate([base_wf, corr_pulse])
+        return modified_wf
+
+    def _gen_cz(self, which_gate, regenerate_cz=True):
+        gate_str = 'cz_%s'%which_gate
+        if regenerate_cz:
+            self._wave_dict[gate_str] = self._gen_adiabatic_pulse(which_gate=which_gate)
+
+        # Commented out snippet is old (deprecated ) phase corr 19/6/2018 MAR
+        # phase_corr = self._gen_phase_corr(cz_offset_comp=True)
+        # # CZ with phase correction
+        # cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
+
+        cz_pulse = self._get_phase_corrected_pulse(base_wf=self._wave_dict[gate_str],
+                                                   which_gate=gate_str)
+
+        return cz_pulse
+
+    def _gen_adiabatic_pulse(self, which_gate):
+        """
+        Generates the CZ waveform.
+        """
+
+        # getting the right parameters for the gate
+        is_double_sided = self.get('czd_double_sided_%s'%which_gate)
+        cz_length = self.get('cz_length_%s'%which_gate)
+        cz_theta_f = self.get('cz_theta_f_%s'%which_gate)
+        cz_lambda_2 = self.get('cz_lambda_2_%s'%which_gate)
+        cz_lambda_3 = self.get('cz_lambda_3_%s'%which_gate)
+        q_J2 = self.get('q_J2_%s'%which_gate)
+        czd_signs = self.get('czd_signs_%s'%which_gate)
+
+        czd_theta_f = self.get('czd_theta_f_%s'%which_gate)
+        czd_lambda_2 = self.get('czd_lambda_2_%s'%which_gate)
+        czd_lambda_3 = self.get('czd_lambda_3_%s'%which_gate)
+
+        czd_amp_ratio = self.get('czd_amp_ratio_%s'%which_gate)
+        czd_amp_offset = self.get('czd_amp_offset_%s'%which_gate)
+
+        dac_scalefactor = self.get_amp_to_dac_val_scalefactor()
+        eps_i = self.calc_amp_to_eps(0, state_A='11',
+                                     state_B='02',
+                                     which_gate=which_gate)
+        # Beware theta in radian!
+        theta_i = wfl.eps_to_theta(eps_i, g=q_J2)
+
+        if not is_double_sided:
+            CZ_theta = wfl.martinis_flux_pulse(
+                cz_length, theta_i=theta_i,
+                theta_f=np.deg2rad(cz_theta_f),
+                lambda_2=cz_lambda_2, lambda_3=cz_lambda_3)
+            CZ_eps = wfl.theta_to_eps(CZ_theta, g=q_J2)
+            CZ_amp = self.calc_eps_to_amp(CZ_eps, state_A='11',
+                                          state_B='02',
+                                          which_gate=which_gate)
+
+            # convert amplitude in V to amplitude in awg dac value
+            CZ = dac_scalefactor*CZ_amp
+            return CZ
+
+        else:
+            signs = czd_signs
+
+            # Simple double sided CZ pulse implemented in most basic form.
+            # repeats the same CZ gate twice and sticks it together.
+            length_ratio = self.calc_net_zero_length_ratio(which_gate=which_gate)
+
+            CZ_theta_A = wfl.martinis_flux_pulse(
+                self.cz_length*length_ratio, theta_i=theta_i,
+                theta_f=np.deg2rad(cz_theta_f),
+                lambda_2=cz_lambda_2, lambda_3=cz_lambda_3)
+            CZ_eps_A = wfl.theta_to_eps(CZ_theta_A, g=q_J2)
+
+            CZ_amp_A = self.calc_eps_to_amp(CZ_eps_A, state_A='11',
+                                            state_B='02',
+                                            positive_branch=(signs[0] == '+'),
+                                            which_gate=which_gate)
+
+            CZ_A = dac_scalefactor*CZ_amp_A
+            if signs[0] == 0:
+                CZ_A *= 0
+
+            # Generate the second CZ pulse. If the params are np.nan, default
+            # to the main parameter
+            if not np.isnan(czd_theta_f):
+                d_theta_f = czd_theta_f
+            else:
+                d_theta_f = cz_theta_f
+
+            if not np.isnan(czd_lambda_2):
+                d_lambda_2 = czd_lambda_2
+            else:
+                d_lambda_2 = cz_lambda_2
+            if not np.isnan(czd_lambda_3):
+                d_lambda_3 = czd_lambda_3
+            else:
+                d_lambda_3 = cz_lambda_3
+
+            CZ_theta_B = wfl.martinis_flux_pulse(
+                self.cz_length()*(1-length_ratio), theta_i=theta_i,
+                theta_f=np.deg2rad(d_theta_f),
+                lambda_2=d_lambda_2, lambda_3=d_lambda_3)
+            CZ_eps_B = wfl.theta_to_eps(CZ_theta_B, g=self.q_J2())
+            CZ_amp_B = self.calc_eps_to_amp(CZ_eps_B,
+                                            state_A='11', state_B='02',
+                                            positive_branch=(signs[1] == '+'),
+                                            which_gate=which_gate)
+
+            CZ_B = dac_scalefactor*CZ_amp_B
+            if signs[1] == 0:
+                CZ_B *= 0
+            # Combine both halves of the double sided CZ gate
+            amp_rat = czd_amp_ratio
+            waveform = np.concatenate(
+                [CZ_A, amp_rat*CZ_B + czd_amp_offset])
+
+            return waveform
+
+    """
+    STILL UNDER WORK
+    """
+    def calc_amp_to_eps(self, amp: float,
+                        state_A: str = '01',
+                        state_B: str = '02',
+                        which_gate: str = 'NE'):
+        """
+        Calculates detuning between two levels as a function of pulse
+        amplitude in Volt.
+
+            ε(V) = f_B (V) - f_A (V)
+
+        Args:
+            amp (float) : amplitude in Volt
+            state_A (str) : string of 2 numbers denoting the state. The numbers
+                correspond to the number of excitations in each qubits.
+                The LSQ (right) corresponds to the qubit being fluxed and
+                under control of this flux lutman.
+            state_B (str) :
+
+        N.B. this method assumes that the polycoeffs are with respect to the
+            amplitude in units of V, including rescaling due to the channel
+            amplitude and range settings of the AWG8.
+            See also `self.get_dac_val_to_amp_scalefactor`.
+
+                amp_Volts = amp_dac_val * channel_amp * channel_range
+        """
+        polycoeffs_A = self.get_polycoeffs_state(state=state_A,
+                                                 which_gate=which_gate)
+        polycoeffs_B = self.get_polycoeffs_state(state=state_B,
+                                                 which_gate=which_gate)
+        polycoeffs = polycoeffs_B - polycoeffs_A
+        return np.polyval(polycoeffs, amp)
+
+    def calc_eps_to_amp(self, eps,
+                        state_A: str = '01',
+                        state_B: str = '02',
+                        which_gate: str = 'NE',
+                        positive_branch=True):
+        """
+        Calculates amplitude in Volt corresponding to an energy difference
+        between two states in Hz.
+            V(ε) = V(f_b - f_a)
+
+        N.B. this method assumes that the polycoeffs are with respect to the
+            amplitude in units of V, including rescaling due to the channel
+            amplitude and range settings of the AWG8.
+            See also `self.get_dac_val_to_amp_scalefactor`.
+
+                amp_Volts = amp_dac_val * channel_amp * channel_range
+        """
+        # recursive allows dealing with an array of freqs
+        if isinstance(eps, (list, np.ndarray)):
+            return np.array([self.calc_eps_to_amp(
+                eps=e, state_A=state_A, state_B=state_B, which_gate=which_gate,
+                positive_branch=positive_branch) for e in eps])
+
+        polycoeffs_A = self.get_polycoeffs_state(state=state_A,
+                                                 which_gate=which_gate)
+        if state_B is not None:
+            polycoeffs_B = self.get_polycoeffs_state(state=state_B,
+                                                     which_gate=which_gate)
+            polycoeffs = polycoeffs_B - polycoeffs_A
+        else:
+            polycoeffs = copy(polycoeffs_A)
+            polycoeffs[-1] = 0
+
+        p = np.poly1d(polycoeffs)
+        sols = (p-eps).roots
+
+        # sols returns 2 solutions (for a 2nd order polynomial)
+        if positive_branch:
+            sol = np.max(sols)
+        else:
+            sol = np.min(sols)
+
+        # imaginary part is ignored, instead sticking to closest real value
+        # float is because of a typecasting bug in np 1.12 (solved in 1.14)
+        return float(np.real(sol))
+
+    def calc_net_zero_length_ratio(self, which_gate):
+        """
+        Determines the lenght ratio of the net-zero pulses based on the
+        parameter "czd_length_ratio".
+
+        If czd_length_ratio is set to auto, uses the interaction amplitudes
+        to determine the scaling of lengths. Note that this is a coarse
+        approximation.
+        """
+        czd_length_ratio = self.get('czd_length_ratio_%s'%which_gate)
+        if czd_length_ratio != 'auto':
+            return czd_length_ratio
+        else:
+            amp_J2_pos = self.calc_eps_to_amp(0, state_A='11', state_B='02',
+                                              which_gate=which_gate,
+                                              positive_branch=True)
+            amp_J2_neg = self.calc_eps_to_amp(0, state_A='11', state_B='02',
+                                              which_gate=which_gate,
+                                              positive_branch=False)
+
+            # lr chosen to satisfy (amp_pos*lr + amp_neg*(1-lr) = 0 )
+            lr = - amp_J2_neg/(amp_J2_pos-amp_J2_neg)
+            return lr
+
+    def get_polycoeffs_state(self, state: str, which_gate: str):
+        """
+        Args:
+            state (str) : string of 2 numbers denoting the state. The numbers
+                correspond to the number of excitations in each qubits.
+                The LSQ (right) corresponds to the qubit being fluxed and
+                under control of this flux lutman.
+
+        Get's the polynomial coefficients that are used to calculate the
+        energy levels of specific states.
+        Note that avoided crossings are not taken into account here.
+
+
+        """
+        # Depending on the interaction (North or South) this qubit fluxes or not.
+        # depending or whether it fluxes, it is LSQ or MSQ
+        # depending on that, we use q_polycoeffs_freq_01_det or q_polycoeffs_freq_NE_det
+
+
+
+        polycoeffs = np.zeros(3)
+        freq_10 = self.get('q_freq_10_%s'%which_gate)
+        if state == '00':
+            pass
+        elif state == '01':
+            polycoeffs += self.q_polycoeffs_freq_01_det()
+            polycoeffs[2] += self.q_freq_01()
+        elif state == '02':
+            polycoeffs += 2*self.q_polycoeffs_freq_01_det()
+            polycoeffs += self.q_polycoeffs_anharm()
+            polycoeffs[2] += 2*self.q_freq_01()
+        elif state == '10':
+            polycoeffs[2] += freq_10
+        elif state == '11':
+            polycoeffs += self.q_polycoeffs_freq_01_det()
+            polycoeffs[2] += self.q_freq_01() + freq_10
+        else:
+            raise ValueError('State {} not recognized'.format(state))
+        return polycoeffs
+
 
 
 class QWG_Flux_LutMan(AWG8_Flux_LutMan):
