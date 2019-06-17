@@ -98,7 +98,7 @@ class SSB_DRAG_pulse(Pulse):
 
         gauss_env = self.amplitude * np.exp(-(0.5 * (
             (t - mu)**2) / self.sigma**2))
-        deriv_gauss_env = self.motzoi * -1 * (t - mu) / (self.sigma**
+        deriv_gauss_env = self.motzoi * -1 * (t - mu) / (self.sigma **
                                                          1) * gauss_env
         # substract offsets
         gauss_env -= (gauss_env[0] + gauss_env[-1]) / 2.

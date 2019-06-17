@@ -276,14 +276,18 @@ class UHFQCPulsar:
         wait_wave_str = '\t\twaitWave();\n'
         trigger_str = '\t\twaitDigTrigger(1, 1);\n'
         if name1 is None:
+            prefetch_str = '\t\tprefetch({});\n'.format(name2)
             play_str = '\t\tplayWave(2, {});\n'.format(name2)
         elif name2 is None:
+            prefetch_str = '\t\tprefetch({});\n'.format(name1)
             play_str = '\t\tplayWave(1, {});\n'.format(name1)
         else:
+            prefetch_str = '\t\tprefetch({}, {});\n'.format(name1, name2)
             play_str = '\t\tplayWave({}, {});\n'.format(name1, name2)
         readout_str = '\t\tsetTrigger(WINT_EN+RO_TRIG);\n' if readout else ''
         readout_str += '\t\tsetTrigger(WINT_EN);\n' if readout else ''
-        return wait_wave_str + trigger_str + play_str + readout_str
+        return wait_wave_str + prefetch_str + trigger_str + \
+               play_str + readout_str
 
     def _clock(self, obj, cid=None):
         if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):

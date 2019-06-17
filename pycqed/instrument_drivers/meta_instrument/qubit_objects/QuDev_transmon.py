@@ -931,20 +931,18 @@ class QuDev_transmon(Qubit):
             tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
 
-    def measure_qscale(self, qscales=None, MC=None, analyze=True, upload=True,
+    def measure_qscale(self, qscales=None, analyze=True, upload=True,
                        label=None, cal_points=True, exp_metadata=None):
 
         if qscales is None:
             raise ValueError("Unspecified qscale values for measure_qscale")
         uniques = np.unique(qscales[range(3)])
-        if uniques.size>1:
+        if uniques.size > 1:
             raise ValueError("The values in the qscales array are not repeated "
                              "3 times.")
 
         self.prepare(drive='timedomain')
-
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+        MC = self.instr_mc.get_instr()
 
         if label is None:
             label = 'QScale'+self.msmt_suffix
@@ -3585,11 +3583,7 @@ class QuDev_transmon(Qubit):
                             "qscale values to sweep. Please specify the "
                             "qscales_mean or the qscales function"
                             " parameter.")
-        temp_array = np.zeros(3*qscales.size)
-        np.put(temp_array,list(range(0,temp_array.size,3)),qscales)
-        np.put(temp_array,list(range(1,temp_array.size,3)),qscales)
-        np.put(temp_array,list(range(2,temp_array.size,3)),qscales)
-        qscales = temp_array
+        qscales = np.repeat(qscales, 3)
 
         #Perform the qscale calibration measurement
         if for_ef:
