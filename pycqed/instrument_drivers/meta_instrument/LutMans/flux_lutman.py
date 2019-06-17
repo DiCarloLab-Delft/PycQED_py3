@@ -18,10 +18,10 @@ import time
 
 _def_lm = {
     0: {"name": "i", "type": "idle"},
-    1: {"name": "cz_NE", "type": "idle_z"},
-    2: {"name": "cz_SE",    "theta": 180, "phi": 90, "type": "cz"},
-    3: {"name": "cz_SW",     "theta": 90, "phi": 0, "type": "cz"},
-    4: {"name": "cz_NW",     "theta": 90, "phi": 90, "type": "idle_z"},
+    1: {"name": "cz_NE", "type": "idle_z", "which": "NE"},
+    2: {"name": "cz_SE", "type": "cz", "which": "SE"},
+    3: {"name": "cz_SW", "type": "cz", "which": "SW"},
+    4: {"name": "cz_NW", "type": "idle_z", "which": "NW"},
     5: {"name": "park", "type": "square"},
     6: {"name": "square", "type": "square"},
     7: {"name": "custom_wf", "type": "custom"}
@@ -29,6 +29,13 @@ _def_lm = {
 
 valid_types = {'idle', 'cz', 'idle_z', 'square', 'custom'}
 
+
+# JUST FOR TESTING. DELETE ME AFTER TESTS PASS
+def clocks_to_s(time, clock_cycle=20e-9):
+    """
+    Converts a time in clocks to a time in s
+    """
+    return time*clock_cycle
 
 def flux_lutmap_is_valid(lutmap: dict) -> bool:
     """
@@ -119,7 +126,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
-        self.LutMap(default_mw_lutmap.copy())
+        self.LutMap(_def_lm.copy())
 
     def generate_standard_waveforms(self):
         """
@@ -133,10 +140,15 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['park'] = self._gen_park()
         self._wave_dict['custom_wf'] = self._gen_custom_wf()
 
-        # FIXME: reenable this
-        for which_gate in ['NE','NW','SW','SE']:
-            self._wave_dict['cz_%s'%which_gate] = self._gen_cz(which_gate=which_gate)
-            self._wave_dict['idle_z_%s'%which_gate] = self._gen_idle_z(which_gate=which_gate)
+
+        for idx, waveform in self.LutMap().items():
+            wave_name = waveform['name']
+            if waveform['type']=='cz' or waveform['type']=='idle_z':
+                which_gate = waveform['which']
+            if waveform['type']=='cz':
+                self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
+            elif waveform['type']=='idle_z':
+                self._wave_dict[wave_name] = self._gen_idle_z(which_gate=which_gate)
 
     def _gen_i(self):
         return np.zeros(int(self.idling_length()*self.sampling_rate()))
@@ -188,13 +200,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            unit='Hz', parameter_class=ManualParameter)
 
         for this_cz in ['NE','NW','SW','SE']:
-            self.add_parameter('q_freq_10_%s'%thiz_cz, vals=vals.Numbers(),
+            self.add_parameter('q_freq_10_%s'%this_cz, vals=vals.Numbers(),
                                docstring='Current operating frequency of qubit'
                                ' with which a CZ gate can be performed.',
                                # initial value is chosen to not raise errors
                                initial_value=6e9,
                                unit='Hz', parameter_class=ManualParameter)
-            self.add_parameter('q_J2_%s'%thiz_cz, vals=vals.Numbers(), unit='Hz',
+            self.add_parameter('q_J2_%s'%this_cz, vals=vals.Numbers(), unit='Hz',
                                docstring='effective coupling between the 11 and '
                                '02 states.',
                                # initial value is chosen to not raise errors
@@ -305,7 +317,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 'a disabled pulse.',
                 vals=vals.Lists(vals.Enum('+', '-', 0)),
                 parameter_class=ManualParameter)
-            self.add_parameter('czd_length_ratio_%s'%thiz_cz,
+            self.add_parameter('czd_length_ratio_%s'%this_cz,
                                vals=vals.MultiType(vals.Numbers(0, 1),
                                                    vals.Enum('auto')),
                                initial_value=0.5,
@@ -532,9 +544,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
             return waveform
 
-    """
-    STILL UNDER WORK
-    """
     def calc_amp_to_eps(self, amp: float,
                         state_A: str = '01',
                         state_B: str = '02',
@@ -677,19 +686,264 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             raise ValueError('State {} not recognized'.format(state))
         return polycoeffs
 
+    def _get_awg_channel_amplitude(self):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
+        awg_nr = awg_ch//2
+        ch_pair = awg_ch % 2
+        for i in range(5):
+            channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
+                awg_nr, ch_pair))
+            if channel_amp is not None:
+                break
+            time.sleep(0.5)
+        return channel_amp
+
+    def _get_awg_channel_range(self):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
+        # channel range of 5 corresponds to -2.5V to +2.5V
+        for i in range(5):
+            channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
+            if channel_range_pp is not None:
+                break
+            time.sleep(0.5)
+        return channel_range_pp
+
+    def _gen_composite_wf(self, primitive_waveform_name: str,
+                          time_tuples: list):
+        """
+        Generates a composite waveform based on a timetuple.
+        Only relies on the first element of the timetuple which is expected
+        to be the starting time of the pulse in clock cycles.
 
 
-class QWG_Flux_LutMan(AWG8_Flux_LutMan):
+        N.B. No waveforms are regenerated here!
+        This relies on the base waveforms being up to date in self._wave_dict
 
-    def __init__(self, name, **kw):
-        super().__init__(name, **kw)
-        self._wave_dict_dist = dict()
-        self.sampling_rate(1e9)
+        """
 
-        self.add_parameter('cfg_oldstyle_kernel_enabled',
-                           initial_value=False,
+        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
+        waveform = np.zeros(max_nr_samples)
+
+        for i, tt in enumerate(time_tuples):
+            t_start = clocks_to_s(tt[0])
+            sample = self.time_to_sample(t_start)
+            if sample > max_nr_samples:
+                raise ValueError('Waveform longer than max wf lenght')
+
+            if (primitive_waveform_name == 'cz_z' or
+                    primitive_waveform_name == 'idle_z'):
+                phase_corr = wf.single_channel_block(
+                    amp=self.get('cz_phase_corr_amp'),
+                    length=self.cz_phase_corr_length(),
+                    sampling_rate=self.sampling_rate(), delay=0)
+                # phase_corr = wf.single_channel_block(
+                #     amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
+                #     length=self.cz_phase_corr_length(),
+                #     sampling_rate=self.sampling_rate(), delay=0)
+                if primitive_waveform_name == 'cz_z':
+                    prim_wf = np.concatenate(
+                        [self._wave_dict['cz'], phase_corr])
+                elif primitive_waveform_name == 'idle_z':
+                    prim_wf = np.concatenate(
+                        [np.zeros(len(self._wave_dict['cz'])), phase_corr])
+            else:
+                prim_wf = self._wave_dict[primitive_waveform_name]
+            waveform[sample:sample+len(prim_wf)] += prim_wf
+
+        return waveform
+
+    def _get_wf_name_from_cw(self, codeword: int):
+        for idx, waveform in self.LutMap().items():
+            if int(idx) == codeword:
+                return waveform['name']
+        raise ValueError("Codeword {} not specified"
+                         " in LutMap".format(codeword))
+
+    def _get_cw_from_wf_name(self, wf_name: str):
+        for idx, waveform in self.LutMap().items():
+            if wf_name == waveform['name']:
+                return int(idx)
+        raise ValueError("Waveform {} not specified"
+                         " in LutMap".format(wf_name))
+
+    def _gen_custom_wf(self):
+        base_wf = copy(self.custom_wf())
+
+        if self.custom_wf_length() != np.inf:
+            # cuts of the waveform at a certain length by setting
+            # all subsequent samples to 0.
+            max_sample = int(self.custom_wf_length()*self.sampling_rate())
+            base_wf[max_sample:] = 0
+        return base_wf
+    """
+    UNTOUCHED
+    """
+
+    def _add_cfg_parameters(self):
+
+        self.add_parameter('cfg_awg_channel',
+                           initial_value=1,
+                           vals=vals.Ints(1, 8),
+                           parameter_class=ManualParameter)
+        self.add_parameter('cfg_distort',
+                           initial_value=True,
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_append_compensation', docstring=(
+                'If True compensation pulses will be added to individual '
+                ' waveforms creating very long waveforms for each codeword'),
+            initial_value=True, vals=vals.Bool(),
+            parameter_class=ManualParameter)
+        self.add_parameter('cfg_compensation_delay',
+                           parameter_class=ManualParameter,
+                           initial_value=3e-6,
+                           unit='s',
+                           vals=vals.Numbers())
+
+        self.add_parameter(
+            'cfg_pre_pulse_delay', unit='s', label='Pre pulse delay',
+            docstring='This parameter is used for fine timing corrections, the'
+                      ' correction is applied in distort_waveform.',
+            initial_value=0e-9,
+            vals=vals.Numbers(0, 1e-6),
+            parameter_class=ManualParameter)
+
+        self.add_parameter('instr_distortion_kernel',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_partner_lutman',
+                           docstring='LutMan responsible for the corresponding'
+                           'channel in the AWG8 channel pair. '
+                           'Reference is used when uploading waveforms',
+                           parameter_class=InstrumentRefParameter)
+
+        self.add_parameter(
+            '_awgs_fl_sequencer_program_expected_hash',
+            docstring='crc32 hash of the awg8 sequencer program. '
+            'This parameter is used to dynamically determine '
+            'if the program needs to be uploaded. The initial_value is'
+            ' None, indicating that the program needs to be uploaded.'
+            ' After the first program is uploaded, the value is set.',
+            parameter_class=ManualParameter, initial_value=None,
+            vals=vals.Ints())
+
+        self.add_parameter(
+            'cfg_operating_mode',
+            initial_value='Codeword_normal',
+            vals=vals.Enum('Codeword_normal'),
+            # 'CW_single_01', 'CW_single_02',
+            # 'CW_single_03', 'CW_single_04',
+            # 'CW_single_05', 'CW_single_06'),
+            docstring='Used to determine what program to load in the AWG8. '
+            'If set to "Codeword_normal" it does codeword triggering, '
+            'other modes exist to play only a specific single waveform.',
+            set_cmd=self._set_cfg_operating_mode,
+            get_cmd=self._get_cfg_operating_mode)
+        self._cfg_operating_mode = 'Codeword_normal'
+
+        self.add_parameter('cfg_max_wf_length',
+                           parameter_class=ManualParameter,
+                           initial_value=10e-6,
+                           unit='s', vals=vals.Numbers(0, 100e-6))
+        self.add_parameter('cfg_awg_channel_range',
+                           docstring='peak peak value, channel range of 5 corresponds to -2.5V to +2.5V',
+                           get_cmd=self._get_awg_channel_range,
+                           unit='V_pp')
+        self.add_parameter('cfg_awg_channel_amplitude',
+                           docstring='digital scale factor between 0 and 1',
+                           get_cmd=self._get_awg_channel_amplitude,
+                           unit='a.u.', vals=vals.Numbers(0, 1))
+
+    def _set_cfg_operating_mode(self, val):
+        self._cfg_operating_mode = val
+        # this is to ensure changing the mode requires reuploading the program
+        self._awgs_fl_sequencer_program_expected_hash(101)
+
+    def _get_cfg_operating_mode(self):
+        return self._cfg_operating_mode
+
+
+    ###########################################################
+    #  Waveform generation net-zero phase correction methods  #
+    ###########################################################
+    def _calc_modified_wf(self, base_wf, a_i, corr_samples):
+
+        if not np.isnan(self.czd_net_integral()):
+            curr_int = np.sum(base_wf)
+            corr_int = self.czd_net_integral()-curr_int
+            #corr_pulse = phase_corr_triangle(
+            #    int_val=corr_int, nr_samples=corr_samples)
+
+            corr_pulse = phase_corr_square(
+                int_val=corr_int, nr_samples=corr_samples)
+            if np.max(corr_pulse) > 0.5:
+                logging.warning('net-zero integral correction({:.2f}) larger than 0.5'.format(
+                    np.max(corr_pulse)))
+        else:
+            corr_pulse = np.zeros(corr_samples)
+
+        corr_pulse += phase_corr_sine_series(a_i, corr_samples)
+
+        modified_wf = np.concatenate([base_wf, corr_pulse])
+        return modified_wf
+
+    def _phase_corr_cost_func(self, base_wf, a_i, corr_samples,
+                              print_result=False):
+        """
+        The cost function of the cz_z waveform is designed to meet
+        the following criteria
+        1. Net-zero character of waveform
+            Integral of wf = 0
+        2. Single qubit phase correction
+            Integral of phase_corr_part**2 = desired constant
+        3. Target_wf ends at 0
+        4. No-distortions present after cutting of waveform
+            predistorted_wf ends at 0 smoothly (as many derivatives as possible 0)
+
+        5. Minimize the maximum amplitude
+            Prefer small non-violent pulses
+        """
+        # samples to quanitify leftover distortions
+        tail_samples = 500
+
+        target_wf = self._calc_modified_wf(
+            base_wf, a_i=a_i, corr_samples=corr_samples)
+        if self.cfg_distort():
+            k0 = self.instr_distortion_kernel.get_instr()
+            predistorted_wf = k0.distort_waveform(target_wf,
+                                                  len(target_wf)+tail_samples)
+        else:
+            predistorted_wf = target_wf
+
+        # 2. Phase correction pulse
+        phase_corr_int = np.sum(
+            target_wf[len(base_wf):len(base_wf)+corr_samples]**2)/corr_samples
+        cv_2 = ((phase_corr_int - self.cz_phase_corr_amp()**2)*1000)**2
+
+        # 4. No-distortions present after cutting of waveform
+        cv_4 = np.sum(abs(predistorted_wf[-tail_samples+50:]))*20
+        # 5. no violent waveform
+        cv_5 = np.max(abs(target_wf)*100)**2
+
+        cost_val = cv_2 + cv_4+cv_5
+
+        #     if print_result:
+        #         print("Cost function value")''
+
+        # #         print("cv_1 net_zero_character: {:.6f}".format(cv_1))
+        #         print("cv_2 phase corr pulse  : {:.6f}".format(cv_2))
+        # #         print("cv_3 ends at 0         : {:.6f}".format(cv_3))
+        #         print("cv_4 distortions tail  : {:.6f}".format(cv_4))
+        #         print("cv_5 non violent       : {:.6f}".format(cv_5))
+
+        return cost_val
+
+
+    #################################
+    #  Waveform loading methods     #
+    #################################
 
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
                                            regenerate_waveforms: bool = False):
@@ -708,28 +962,272 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
             waveform = self.add_compensation_pulses(waveform)
 
         if self.cfg_distort():
+            # This is where the fixed length waveform is 
+            # set to cfg_max_wf_length
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
         else:
+            # This is where the fixed length waveform is 
+            # set to cfg_max_wf_length
             waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
 
-        # N.B. method identical to AWG8 version with the exception 
-        # of AWG.stop() and AWG.start() 
-        self.AWG.get_instr().stop()
         self.AWG.get_instr().set(codeword, waveform)
-        self.AWG.get_instr().start()
 
-    def distort_waveform(self, waveform):
+    def load_waveforms_onto_AWG_lookuptable(
+            self, regenerate_waveforms: bool = True, stop_start: bool = True,
+            force_load_sequencer_program: bool = False):
+        """
+        Loads all waveforms specified in the LutMap to an AWG for both this
+        LutMap and the partner LutMap.
+
+        Args:
+            regenerate_waveforms (bool): if True calls
+                generate_standard_waveforms before uploading.
+            stop_start           (bool): if True stops and starts the AWG.
+
+
+        Because of realtime loading vs the DIO sequencer program the uploading
+        flow for the AWG8 is slightly different.
+        """
+
+        # Generate the waveforms and link them to the AWG8 parameters
+        lutmans = [self]
+        # If statement is here because it should be possible to function
+        # independently
+        if self.instr_partner_lutman() is None:
+            logging.warning('No partner_lutman specified')
+        else:
+            lutmans += [self.instr_partner_lutman.get_instr()]
+
+        if self.cfg_operating_mode() != 'Codeword_normal':
+            # Regenerating only one waveform in this case, see below
+            regenerate_waveforms_realtime = regenerate_waveforms
+            regenerate_waveforms = False
+
+        for lm in lutmans:
+            if regenerate_waveforms:
+                lm.generate_standard_waveforms()
+                for idx, waveform in lm.LutMap().items():
+                    waveform_name = waveform['name']
+                    lm.load_waveform_onto_AWG_lookuptable(waveform_name)
+
+        # Uploading the codeword program if required
+        if self._program_hash_differs() or force_load_sequencer_program:
+            # FIXME: List of conditions in which reloading is required
+            # - program hash differs
+            # - max waveform length has changed
+            # N.B. these other conditions need to be included here.
+            # This ensures only the channels that are relevant get reconfigured
+            awg_nr = (self.cfg_awg_channel()-1)//2
+            self._upload_codeword_program(awg_nr)
+
+        if self.cfg_operating_mode() == 'Codeword_normal':
+            for idx, waveform in lm.LutMap().items():
+                self.load_waveform_realtime(
+                    waveform_name=waveform['name'],
+                    wf_nr=None, regenerate_waveforms=False)
+        else:
+            # Only load one waveform and do it in realtime.
+            cw_idx = int(self.cfg_operating_mode()[-2:])
+            waveform_name = self._get_wf_name_from_cw(cw_idx)
+            self.load_waveform_realtime(
+                waveform_name=waveform_name,
+                wf_nr=None, regenerate_waveforms=regenerate_waveforms_realtime)
+        #updating channel amplitude and range
+        self.cfg_awg_channel_amplitude()
+        self.cfg_awg_channel_range()
+        self._update_expected_program_hash()
+
+    def load_waveform_realtime(self, waveform_name: str,
+                               wf_nr: int = None,
+                               regenerate_waveforms: bool = True):
+        """
+        Args:
+            waveform_name:        (str) : name of the waveform
+            wf_nr                 (int) : what codeword to load the pulse onto
+                if set to None, will determine awg_nr based on self.LutMap
+            regenerate_waveforms (bool) : if True regenerates all waveforms
+
+        """
+
+        if wf_nr is None:
+            wf_nr = self._get_cw_from_wf_name(waveform_name)
+
+        if regenerate_waveforms:
+            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
+            waveform = gen_wf_func()
+            if self.cfg_append_compensation():
+                waveform = self.add_compensation_pulses(waveform)
+            if self.cfg_distort():
+                waveform = self.distort_waveform(waveform)
+                self._wave_dict_dist[waveform_name] = waveform
+            else:
+                waveform = self._append_zero_samples(waveform)
+                self._wave_dict_dist[waveform_name] = waveform
+
+        waveform = self._wave_dict_dist[waveform_name]
+        codeword = wf_nr
+        self.AWG.get_instr().set('wave_ch{}_cw{:03}'.format(self.cfg_awg_channel(),codeword), waveform)
+
+        if self.instr_partner_lutman() is None:
+            logging.warning('no partner lutman specified')
+            other_waveform = np.zeros(len(waveform))
+        else:
+            partner_lm = self.instr_partner_lutman.get_instr()
+            prtnr_wf_name = partner_lm._get_wf_name_from_cw(codeword=wf_nr)
+            if regenerate_waveforms:
+                gen_wf_func = getattr(partner_lm,
+                                      '_gen_{}'.format(prtnr_wf_name))
+                prtnr_wf = gen_wf_func()
+
+                if partner_lm.cfg_append_compensation():
+                    prtnr_wf = partner_lm.add_compensation_pulses(prtnr_wf)
+
+                if partner_lm.cfg_distort():
+                    prtnr_wf = partner_lm.distort_waveform(prtnr_wf)
+                    partner_lm._wave_dict_dist[prtnr_wf_name] = prtnr_wf
+
+            other_waveform = partner_lm._wave_dict_dist[prtnr_wf_name]
+
+        if len(waveform) != len(other_waveform):
+            other_waveform = np.zeros(len(waveform))
+            msg = ('Lenghts of waveforms "{}" ({}) and "{}" ({}) do '
+                   'not match.'.format(waveform_name, len(waveform),
+                                       prtnr_wf_name, len(other_waveform)))
+            logging.warning(msg)
+            logging.warning('Setting "other waveform" to array of zeros.')
+
+        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
+        ch_pair = awg_ch % 2
+        awg_nr = awg_ch//2
+
+        if ch_pair == 0:
+            waveforms = (waveform, other_waveform)
+        else:
+            waveforms = (other_waveform, waveform)
+
+        self.AWG.get_instr().upload_waveform_realtime(
+            w0=waveforms[0], w1=waveforms[1], awg_nr=awg_nr, wf_nr=wf_nr)
+
+    def _generate_single_cw_program(self, cw_idx):
+        devname = self.AWG.get_instr()._devname
+        ch = self.cfg_awg_channel() - (self.cfg_awg_channel()+1) % 2
+        awg_single_wf_program = (
+            '\nwhile (1) {\n' +
+            'waitDIOTrigger();\n' +
+            'playWave("{}_wave_ch{}_cw{:03}", '.format(devname, ch, cw_idx) +
+            '"{}_wave_ch{}_cw{:03}");'.format(devname, ch+1, cw_idx) + '\n}')
+        return awg_single_wf_program
+
+    def _upload_codeword_program(self, awg_nr):
+        awg = self.AWG.get_instr()
+        if self.cfg_operating_mode() == 'Codeword_normal':
+            awg.upload_codeword_program(awgs=[awg_nr])
+        else:
+            cw_idx = int(self.cfg_operating_mode()[-2:])
+            single_cw_program = self._generate_single_cw_program(cw_idx)
+            awg.configure_awg_from_string(awg_nr, single_cw_program)
+            awg.configure_codeword_protocol()
+            awg.start()
+
+    def _append_zero_samples(self, waveform):
+        """
+        Helper method to ensure waveforms have the desired length
+        """
+        length_samples = roundup1024(int(self.sampling_rate()*self.cfg_max_wf_length()))
+        extra_samples = length_samples - len(waveform)
+        if extra_samples >= 0:
+            y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
+        else:
+            y_sig = waveform[:extra_samples]
+        return y_sig
+
+    def _update_expected_program_hash(self):
+        """
+        Updates the expected AWG sequencer program hash with the current
+        hash of the sequencer program. This is intended to be called after
+        setting the hash.
+        """
+        awg_nr = (self.cfg_awg_channel()-1)//2
+        hash = self.AWG.get_instr().get(
+            'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
+        self._awgs_fl_sequencer_program_expected_hash(hash)
+
+    def _program_hash_differs(self)-> bool:
+        """
+        Args:
+            --
+        Returns:
+            hash_different (bool): returns True if one of the hashes does not
+                correspond to the expected hash.
+
+        Compares current AWG sequencer program hash for the relevant channels
+        with the expected program hash and, returns True if one ore more
+        hashes do not match, indicating that uploading the programs is
+        required.
+        """
+        awg_nr = (self.cfg_awg_channel()-1)//2
+        hash = self.AWG.get_instr().get(
+            'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
+        expected_hash = self._awgs_fl_sequencer_program_expected_hash()
+        hash_differs = (hash != expected_hash)
+
+        return hash_differs
+
+    def load_composite_waveform_onto_AWG_lookuptable(
+        self,
+            primitive_waveform_name: str,
+            time_tuples: list,
+            codeword: int):
+        """
+        Creates a composite waveform based on time_tuples extracted from a qisa
+        file.
+        """
+        waveform_name = 'comp_{}_cw{:03}'.format(primitive_waveform_name,
+                                                 codeword)
+
+        # assigning for post loading rendering purposes
+        self._wave_dict[waveform_name] = self._gen_composite_wf(
+            primitive_waveform_name,  time_tuples)
+        waveform = self._wave_dict[waveform_name]
+
+        codeword = 'wave_ch{}_cw{:03}'.format(self.cfg_awg_channel(),
+                                              codeword)
+
+        if self.cfg_append_compensation():
+            waveform = self.add_compensation_pulses(waveform)
+
+        if self.cfg_distort():
+            # This is where the fixed length waveform is 
+            # set to cfg_max_wf_length
+            waveform = self.distort_waveform(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+        else:
+            # This is where the fixed length waveform is 
+            # set to cfg_max_wf_length
+            waveform = self._append_zero_samples(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+
+        self.AWG.get_instr().set(codeword, waveform)
+
+    def add_compensation_pulses(self, waveform):
+        """
+        Adds the inverse of the pulses at the end of a waveform to
+        ensure flux discharging.
+        """
+        wf = np.array(waveform)  # catches a rare bug when wf is a list
+        delay_samples = np.zeros(int(self.sampling_rate() *
+                                     self.cfg_compensation_delay()))
+        comp_wf = np.concatenate([wf, delay_samples, -1*wf])
+        return comp_wf
+
+    def distort_waveform(self, waveform, inverse=False):
         """
         Modifies the ideal waveform to correct for distortions and correct
         fine delays.
         Distortions are corrected using the kernel object.
-        Modified to implement also normal kernels.
         """
-
-        # FIXME: this function looks identical to the one in the parent class 
-        # maybe this should be deleted/cleaned up? -MAR Jan 2019
         k = self.instr_distortion_kernel.get_instr()
 
         # Prepend zeros to delay waveform to correct for fine timing
@@ -741,50 +1239,148 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
             distorted_waveform = k.distort_waveform(
                 waveform,
                 length_samples=int(
-                    self.cfg_max_wf_length()*self.sampling_rate()))
+                    roundup1024(self.cfg_max_wf_length()*self.sampling_rate())),
+                inverse=inverse)
         else:  # old kernel object does not have this method
+            if inverse:
+                raise NotImplementedError()
             distorted_waveform = k.convolve_kernel(
                 [k.kernel(), waveform],
                 length_samples=int(self.cfg_max_wf_length() *
                                    self.sampling_rate()))
-
-        if self.cfg_oldstyle_kernel_enabled():
-            # hotfix: to distort adding abounce model
-            kernel_oldstyle = self.kernel_oldstyle
-            distorted_waveform = self.convolve_kernel(
-                [kernel_oldstyle, distorted_waveform],
-                length_samples=int(self.cfg_max_wf_length() *
-                                   self.sampling_rate()))
-
         return distorted_waveform
 
-    def convolve_kernel(self, kernel_list, length_samples=None):
-        """
-        kernel_list : (list of arrays)
-        length_samples      : (int) maximum for convolution
-        Performs a convolution of different kernels
-        """
-        kernels = kernel_list[0]
-        for k in kernel_list[1:]:
-            kernels = np.convolve(k, kernels)[
-                :max(len(k), int(length_samples))]
-        if length_samples is not None:
-            return kernels[:int(length_samples)]
-        return kernels
+    #################################
+    #  Plotting methods            #
+    #################################
 
-    def get_dac_val_to_amp_scalefactor(self):
+    def plot_cz_trajectory(self, axs=None, show=True,
+                           extra_plot_samples: int = 50):
         """
-        Returns the scale factor to transform an amplitude in 'dac value' to an
-        amplitude in 'V'.
-
-        N.B. the implementation is specific to this type of AWG (QWG)
+        Plots the cz trajectory in frequency space.
         """
-        AWG = self.AWG.get_instr()
-        awg_ch = self.cfg_awg_channel()
+        if axs is None:
+            f, axs = plt.subplots(figsize=(5, 7), nrows=3, sharex=True)
+        nr_plot_samples = int((self.cz_length()+self.cz_phase_corr_length()) *
+                              self.sampling_rate() + extra_plot_samples)
 
-        channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
-        scalefactor = channel_amp
-        return scalefactor
+        dac_amps = self._wave_dict['cz_z'][:nr_plot_samples]
+        t = np.arange(0, len(dac_amps))*1/self.sampling_rate()
+
+        CZ_amp = dac_amps*self.get_dac_val_to_amp_scalefactor()
+        CZ_eps = self.calc_amp_to_eps(CZ_amp, '11', '02')
+        CZ_theta = wfl.eps_to_theta(CZ_eps, self.q_J2())
+
+        axs[0].plot(t, np.rad2deg(CZ_theta), marker='.')
+        axs[0].fill_between(t, np.rad2deg(CZ_theta), color='C0', alpha=.5)
+        set_ylabel(axs[0], r'$\theta$', 'deg')
+
+        axs[1].plot(t, CZ_eps, marker='.')
+        axs[1].fill_between(t, CZ_eps, color='C0', alpha=.5)
+        set_ylabel(axs[1], r'$\epsilon_{11-02}$', 'Hz')
+
+        axs[2].plot(t, CZ_amp, marker='.')
+        axs[2].fill_between(t, CZ_amp, color='C0', alpha=.1)
+        set_xlabel(axs[2], 'Time', 's')
+        set_ylabel(axs[2], r'Amp.', 'V')
+        # axs[2].set_ylim(-1, 1)
+        axs[2].axhline(0, lw=.2, color='grey')
+        CZ_amp_pred = self.distort_waveform(CZ_amp)[:len(CZ_amp)]
+        axs[2].plot(t, CZ_amp_pred, marker='.')
+        axs[2].fill_between(t, CZ_amp_pred, color='C1', alpha=.3)
+        if show:
+            plt.show()
+        return axs
+
+    def plot_level_diagram(self, ax=None, show=True):
+        """
+        Plots the level diagram as specified by the q_ parameters.
+            1. Plotting levels
+            2. Annotating feature of interest
+            3. Adding legend etc.
+            4. Add a twin x-axis to denote scale in dac amplitude
+
+        """
+
+        if ax is None:
+            f, ax = plt.subplots()
+        # 1. Plotting levels
+        # maximum voltage of AWG in amp mode
+        amps = np.linspace(-2.5, 2.5, 101)
+        freqs = self.calc_amp_to_freq(amps, state='01')
+        ax.plot(amps, freqs, label='$f_{01}$')
+        ax.text(0, self.calc_amp_to_freq(0, state='01'), '01', color='C0',
+                ha='left', va='bottom', clip_on=True)
+
+        freqs = self.calc_amp_to_freq(amps, state='02')
+        ax.plot(amps, freqs, label='$f_{02}$')
+        ax.text(0, self.calc_amp_to_freq(0, state='02'), '02', color='C1',
+                ha='left', va='bottom', clip_on=True)
+
+        freqs = self.calc_amp_to_freq(amps, state='10')
+        ax.plot(amps, freqs, label='$f_{10}$')
+        ax.text(0, self.calc_amp_to_freq(0, state='10'), '10', color='C2',
+                ha='left', va='bottom', clip_on=True)
+
+        freqs = self.calc_amp_to_freq(amps, state='11')
+        ax.plot(amps, freqs, label='$f_{11}$')
+        ax.text(0, self.calc_amp_to_freq(0, state='11'), '11', color='C3',
+                ha='left', va='bottom', clip_on=True)
+
+        # 2. Annotating feature of interest
+        ax.axvline(0, 0, 1e10, linestyle='dotted', c='grey')
+
+        amp_J2 = self.calc_eps_to_amp(0, state_A='11', state_B='02')
+        amp_J1 = self.calc_eps_to_amp(0, state_A='10', state_B='01')
+
+        ax.axvline(amp_J2, ls='--', lw=1, c='C4')
+        ax.axvline(amp_J1, ls='--', lw=1, c='C6')
+
+        f_11_02 = self.calc_amp_to_freq(amp_J2, state='11')
+        ax.plot([amp_J2], [f_11_02],
+                color='C4', marker='o', label='11-02')
+        ax.text(amp_J2, f_11_02,
+                '({:.4f},{:.2f})'.format(amp_J2, f_11_02*1e-9),
+                color='C4',
+                ha='left', va='bottom', clip_on=True)
+
+        f_10_01 = self.calc_amp_to_freq(amp_J1, state='01')
+
+        ax.plot([amp_J1], [f_10_01],
+                color='C5', marker='o', label='10-01')
+        ax.text(amp_J1, f_10_01,
+                '({:.4f},{:.2f})'.format(amp_J1, f_10_01*1e-9),
+                color='C5', ha='left', va='bottom', clip_on=True)
+
+        # 3. Adding legend etc.
+        title = ('Calibration visualization\n{}\nchannel {}'.format(
+            self.AWG(), self.cfg_awg_channel()))
+        leg = ax.legend(title=title, loc=(1.05, .3))
+        leg._legend_box.align = 'center'
+        set_xlabel(ax, 'AWG amplitude', 'V')
+        set_ylabel(ax, 'Frequency', 'Hz')
+        ax.set_xlim(-2.5, 2.5)
+
+        ax.set_ylim(0, self.calc_amp_to_freq(0, state='02')*1.1)
+
+        # 4. Add a twin x-axis to denote scale in dac amplitude
+        dac_val_axis = ax.twiny()
+        dac_ax_lims = np.array(ax.get_xlim()) * \
+            self.get_amp_to_dac_val_scalefactor()
+        dac_val_axis.set_xlim(dac_ax_lims)
+        set_xlabel(dac_val_axis, 'AWG amplitude', 'dac')
+
+        dac_val_axis.axvspan(1, 1000, facecolor='.5', alpha=0.5)
+        dac_val_axis.axvspan(-1000, -1, facecolor='.5', alpha=0.5)
+        # get figure is here in case an axis object was passed as input
+        f = ax.get_figure()
+        f.subplots_adjust(right=.7)
+        if show:
+            plt.show()
+        return ax
+
+
+
 
 
 #########################################################################
@@ -1712,14 +2308,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         cost_val = cv_2 + cv_4+cv_5
 
-    #     if print_result:
-    #         print("Cost function value")''
+        #     if print_result:
+        #         print("Cost function value")''
 
-    # #         print("cv_1 net_zero_character: {:.6f}".format(cv_1))
-    #         print("cv_2 phase corr pulse  : {:.6f}".format(cv_2))
-    # #         print("cv_3 ends at 0         : {:.6f}".format(cv_3))
-    #         print("cv_4 distortions tail  : {:.6f}".format(cv_4))
-    #         print("cv_5 non violent       : {:.6f}".format(cv_5))
+        # #         print("cv_1 net_zero_character: {:.6f}".format(cv_1))
+        #         print("cv_2 phase corr pulse  : {:.6f}".format(cv_2))
+        # #         print("cv_3 ends at 0         : {:.6f}".format(cv_3))
+        #         print("cv_4 distortions tail  : {:.6f}".format(cv_4))
+        #         print("cv_5 non violent       : {:.6f}".format(cv_5))
 
         return cost_val
 
@@ -1738,8 +2334,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             curr_int = np.sum(base_wf)
             corr_int = self.czd_net_integral()-curr_int
 
-#            corr_pulse = phase_corr_triangle(
-#                int_val=corr_int, nr_samples=corr_samples)
+           # corr_pulse = phase_corr_triangle(
+           #     int_val=corr_int, nr_samples=corr_samples)
             corr_pulse = phase_corr_square(
                 int_val=corr_int, nr_samples=corr_samples)
             if np.max(corr_pulse) > 0.5:
@@ -2200,6 +2796,114 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return ax
 
+
+
+class QWG_Flux_LutMan(AWG8_Flux_LutMan):
+
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
+        self._wave_dict_dist = dict()
+        self.sampling_rate(1e9)
+
+        self.add_parameter('cfg_oldstyle_kernel_enabled',
+                           initial_value=False,
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter)
+
+    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
+                                           regenerate_waveforms: bool = False):
+        """
+        Loads a specific waveform to the AWG
+        """
+        if regenerate_waveforms:
+            # only regenerate the one waveform that is desired
+            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
+            self._wave_dict[waveform_name] = gen_wf_func()
+
+        waveform = self._wave_dict[waveform_name]
+        codeword = self.LutMap()[waveform_name]
+
+        if self.cfg_append_compensation():
+            waveform = self.add_compensation_pulses(waveform)
+
+        if self.cfg_distort():
+            waveform = self.distort_waveform(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+        else:
+            waveform = self._append_zero_samples(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+
+        # N.B. method identical to AWG8 version with the exception 
+        # of AWG.stop() and AWG.start() 
+        self.AWG.get_instr().stop()
+        self.AWG.get_instr().set(codeword, waveform)
+        self.AWG.get_instr().start()
+
+    def distort_waveform(self, waveform):
+        """
+        Modifies the ideal waveform to correct for distortions and correct
+        fine delays.
+        Distortions are corrected using the kernel object.
+        Modified to implement also normal kernels.
+        """
+
+        # FIXME: this function looks identical to the one in the parent class 
+        # maybe this should be deleted/cleaned up? -MAR Jan 2019
+        k = self.instr_distortion_kernel.get_instr()
+
+        # Prepend zeros to delay waveform to correct for fine timing
+        delay_samples = int(self.cfg_pre_pulse_delay()*self.sampling_rate())
+        waveform = np.pad(waveform, (delay_samples, 0), 'constant')
+
+        # duck typing the distort waveform method
+        if hasattr(k, 'distort_waveform'):
+            distorted_waveform = k.distort_waveform(
+                waveform,
+                length_samples=int(
+                    self.cfg_max_wf_length()*self.sampling_rate()))
+        else:  # old kernel object does not have this method
+            distorted_waveform = k.convolve_kernel(
+                [k.kernel(), waveform],
+                length_samples=int(self.cfg_max_wf_length() *
+                                   self.sampling_rate()))
+
+        if self.cfg_oldstyle_kernel_enabled():
+            # hotfix: to distort adding abounce model
+            kernel_oldstyle = self.kernel_oldstyle
+            distorted_waveform = self.convolve_kernel(
+                [kernel_oldstyle, distorted_waveform],
+                length_samples=int(self.cfg_max_wf_length() *
+                                   self.sampling_rate()))
+
+        return distorted_waveform
+
+    def convolve_kernel(self, kernel_list, length_samples=None):
+        """
+        kernel_list : (list of arrays)
+        length_samples      : (int) maximum for convolution
+        Performs a convolution of different kernels
+        """
+        kernels = kernel_list[0]
+        for k in kernel_list[1:]:
+            kernels = np.convolve(k, kernels)[
+                :max(len(k), int(length_samples))]
+        if length_samples is not None:
+            return kernels[:int(length_samples)]
+        return kernels
+
+    def get_dac_val_to_amp_scalefactor(self):
+        """
+        Returns the scale factor to transform an amplitude in 'dac value' to an
+        amplitude in 'V'.
+
+        N.B. the implementation is specific to this type of AWG (QWG)
+        """
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()
+
+        channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
+        scalefactor = channel_amp
+        return scalefactor
 
 #########################################################################
 # Convenience functions below
