@@ -140,7 +140,9 @@ class BaseDataAnalysis(object):
         # These options determine what data to extract #
         ################################################
         scan_label = self.options_dict.get('scan_label', label)
-        if type(scan_label) is not list:
+        if scan_label is None:
+            self.labels = []
+        elif type(scan_label) is not list:
             self.labels = [scan_label]
         else:
             self.labels = scan_label
@@ -494,7 +496,8 @@ class BaseDataAnalysis(object):
         Only model fitting is implemented here. Minimizing fitting should
         be implemented here.
         '''
-        self.fit_res = {}
+        if not hasattr(self, "fit_res"):
+            self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
@@ -1017,9 +1020,13 @@ class BaseDataAnalysis(object):
         plot_linestyle = pdict.get('linestyle', '-')
         plot_marker = pdict.get('marker', 'o')
         dataset_desc = pdict.get('setdesc', '')
-        # Fixme, this default creates a nasty bug when not plotting a set of
-        # lines.
-        dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
+        if np.ndim(plot_yvals) == 2:
+            default_labels = list(range(len(plot_yvals)))
+        elif np.ndim(plot_yvals) == 1:
+            default_labels = [0]
+        else:
+            raise ValueError("number of plot_yvals not understood")
+        dataset_label = pdict.get('setlabel', default_labels)
         do_legend = pdict.get('do_legend', False)
 
         # Detect if two arrays/lists of x and yvals are passed or a list
