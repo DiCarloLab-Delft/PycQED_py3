@@ -6745,7 +6745,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             # Quick fix to make it work with pulsed spec which does not
             # return both I,Q and, amp and phase
             # only using the amplitude!!
-            self.data_dist = self.measured_values[0]
+            self.data_dist = self.measured_values[0] - np.min(self.measured_values[0])
 
         # Smooth the data by "filtering"
         data_dist_smooth = a_tools.smooth(self.data_dist,

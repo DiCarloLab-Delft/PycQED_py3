@@ -1185,6 +1185,62 @@ class CCLight_Transmon(Qubit):
     ####################################################
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
+    def find_frequency_adaptive(self, f_start=None, f_span=100e6, f_step=1e6,
+                                MC=None, update=True, use_max=True,
+                                verbose=True):
+        """
+        'Adaptive' measurement for finding the qubit frequency. Will look with
+        a range of the current frequency estimate, and if it does not find a
+        peak it will move and look f_span Hz above and below the estimate. Will
+        continue to do such a shift until a peak is found.
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if f_start is None:
+            f_start = self.freq_qubit()
+
+        self.spec_pow(-20)
+        # Repeat measurement while no peak is found:
+        success = False
+        freq_center = f_start
+        n = 0
+        while not success:
+            freq_center += f_span*n*(-1)**n
+            n += 1
+            if verbose:  # Hardcoded for now
+                print('Doing adaptive spectroscopy around {:.3f} {} with a '
+                      'span of {:.0f} {}.'.format(freq_center/1e9, 'GHz', 
+                                                  f_span/1e6, 'MHz'))
+            freqs = np.arange(freq_center - f_span/2,
+                              freq_center + f_span/2,
+                              f_step)
+            self.measure_spectroscopy(MC=MC, freqs=freqs)
+            label = 'spec'
+
+            # Use 'try' because it can give a TypeError when no peak is found
+            try:
+                analysis_spec = ma.Qubit_Spectroscopy_Analysis(label=label,
+                                                               close_fig=True,
+                                                               qb_name=self.name)
+            except TypeError:
+                continue
+            # Check for peak and check its height
+            freq_peak = analysis_spec.peaks['peak']
+            offset = analysis_spec.fit_res.params['offset'].value
+            peak_height = np.amax(analysis_spec.data_dist) - offset
+            if freq_peak is None:
+                success = False
+            elif peak_height < 3*offset:
+                success = False
+            else:
+                success = True
+
+            if update:
+                if use_max:
+                    self.freq_qubit(analysis_spec.peaks['peak'])
+                else:
+                    self.freq_qubit(analysis_spec.fitted_freq)
 
     def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
         if freqs is None:

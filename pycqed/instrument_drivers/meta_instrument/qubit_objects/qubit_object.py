@@ -574,7 +574,7 @@ class Qubit(Instrument):
         for FBL in fluxcurrent.channel_map:
             fluxcurrent[FBL](0)
 
-        dac_values = np.arange(-20e-3, 20e-3, 5e-3)
+        dac_values = np.arange(-20e-3, 20e-3, 4e-3)
 
         for resonator, items in res_dict.items():
             self.ro_pulse_amp(items[6])

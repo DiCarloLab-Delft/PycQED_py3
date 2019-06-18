@@ -85,7 +85,7 @@ class octobox_dep_graph(AutoDepGraph_DAG):
 
             # Qubits calibration
             self.add_node(Qubit.name + ' Frequency Coarse',
-                          calibrate_function=Qubit.name + '.find_frequency',
+                          calibrate_function=Qubit.name + '.find_frequency_adaptive',
                           check_function=Qubit.name + '.check_qubit_spectroscopy',
                           tolerance=0.2e-3)
             self.add_node(Qubit.name + ' Frequency at Sweetspot',
