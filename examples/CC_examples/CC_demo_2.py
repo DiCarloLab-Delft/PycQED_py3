@@ -16,6 +16,20 @@ import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 
 from qcodes import station
 
+
+def set_waveforms(awg, waveform_type, sequence_length):
+    if waveform_type == 'square':
+        for ch in range(8):
+            for i in range(sequence_length):
+                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), (np.ones(48) * i / (sequence_length - 1)))
+    elif waveform_type == 'cos':
+        for ch in range(8):
+            for i in range(sequence_length):
+                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), (np.cos(np.arange(48) / 2) * i / (sequence_length - 1)))
+    else:
+        raise KeyError()
+
+
 log = logging.getLogger('pycqed')
 log.setLevel(logging.DEBUG)
 
@@ -83,10 +97,12 @@ if conf.mw_0 != '':
                          (3, list(reversed(staircase_sequence)))]
 
     # configure instrument
-    #set_waveforms(instr.mw_0, 'square', sequence_length)
+    instr.mw_0.load_default_settings()
+    instr.mw_0.assure_ext_clock()
+    set_waveforms(instr.mw_0, 'square', sequence_length)
     instr.mw_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
     instr.mw_0.cfg_codeword_protocol('microwave')
-    instr.mw_0.configure_codeword_protocol()
+    #FIXME instr.mw_0.configure_codeword_protocol()
     instr.mw_0.upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
 
@@ -100,10 +116,12 @@ if conf.flux_0 != '':
                          (3, list(staircase_sequence))]
 
     # configure instrument
-    #set_waveforms(instr.flux_0, 'square', sequence_length)
+    instr.mw_0.load_default_settings()
+    instr.flux_0.assure_ext_clock()
+    set_waveforms(instr.flux_0, 'square', sequence_length)
     instr.flux_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
     instr.flux_0.cfg_codeword_protocol('flux')
-    instr.flux_0.configure_codeword_protocol()
+    #FIXME instr.flux_0.configure_codeword_protocol()
     instr.flux_0.upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
 
@@ -126,19 +144,5 @@ if 1:
 
     log.debug('starting CC')
     instr.cc.start()
-
-
-def set_waveforms(awg, waveform_type, sequence_length):
-    if waveform_type == 'square':
-        for ch in range(8):
-            for i in range(sequence_length):
-                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), (np.ones(48) * i / (sequence_length - 1)))
-    elif waveform_type == 'cos':
-        for ch in range(8):
-            for i in range(sequence_length):
-                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), (np.cos(np.arange(48) / 2) * i / (sequence_length - 1)))
-    else:
-        raise KeyError()
-
 
 

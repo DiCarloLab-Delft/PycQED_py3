@@ -130,16 +130,19 @@ class ZI_HDAWG_core(ZI_base_instrument):
         fpga_revision = self.get('system_fpgarevision') # HDL firmware revision FIXME: check against minimum we need
         log.info('{}: serial={}, options={}, fw_revision={}, fpga_revision={}'
                  .format(self._devname, serial, options.replace('\n','|'), fw_revision, fpga_revision))
-        log.info('{}: DIO interface found in mode {} (0=CMOS, 1=LVDS)'.
-                 format(self._devname, self.get('dios_0_interface'))) # NB: mode is persistent across device restarts
+        log.info('{}: DIO interface found in mode {} (0=CMOS, 1=LVDS)'
+                 .format(self._devname, self.get('dios_0_interface'))) # NB: mode is persistent across device restarts
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
 
     def load_default_settings(self):
         """
         bring device into known state
-        FIXME: incomplete
         """
+
+        log.warning('{}: loading default settings (FIXME: still incomplete)'
+                    .format(self._devname))
+
         # clear output
 
         # clear AWGs
@@ -318,8 +321,6 @@ class ZI_HDAWG_core(ZI_base_instrument):
         filename = os.path.join(
             self._lab_one_webserver_path, 'awg', 'waves',
             self._devname+'_'+wf_name+'.csv')
-#        with open(filename, 'w') as f:  # FIXME: unused
-#            np.savetxt(filename, waveform, delimiter=",")
         np.savetxt(filename, waveform, delimiter=",")
 
     def _gen_read_csv(self, wf_name):

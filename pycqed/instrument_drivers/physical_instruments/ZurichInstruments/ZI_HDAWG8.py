@@ -116,6 +116,7 @@ class ZI_HDAWG8(ZI_HDAWG_core):
         awgs (array): the awg numbers to which to upload the codeword program.
                     By default uploads to all channels but can be specific to
                     speed up the process.
+        FIXME: assumes 'system/awg/channelgrouping' to be '4x2'
         """
         # Type conversion to ensure lists do not produce weird results
         awgs = np.array(awgs)
