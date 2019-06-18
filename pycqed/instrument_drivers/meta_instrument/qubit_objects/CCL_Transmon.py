@@ -1207,7 +1207,7 @@ class CCLight_Transmon(Qubit):
             ro_pow = 10**(power/20)
             self.ro_pulse_amp_CW(ro_pow/3)
             if self.freq_qubit() is None:
-                f_qubit_estimate = self.freq_res() + (65e6)**(2*shift)
+                f_qubit_estimate = self.freq_res() + (65e6)**2/(shift) - 500e6
                 self.freq_qubit(f_qubit_estimate)
 
         return True
@@ -1229,10 +1229,10 @@ class CCLight_Transmon(Qubit):
                               0.5e6)
         if dac_values is None:
             if self.fl_dc_V0() is not None:
-                dac_values = np.linspace(self.fl_dc_V0() - 0.5e-3,
-                                         self.fl_dc_V0() + 0.5e-3, 4)
+                dac_values = np.linspace(self.fl_dc_V0() - 1e-3,
+                                         self.fl_dc_V0() + 1e-3, 8)
             else:
-                dac_values = np.linspace(-0.5e-3, 0.5e-3, 4)
+                dac_values = np.linspace(-1-3, 1e-3, 8)
 
         if fluxChan is None:
             if self.cfg_dc_flux_ch() is not None:
@@ -3865,7 +3865,17 @@ class CCLight_Transmon(Qubit):
 
         # Calibration of instruments and ro
         dag.add_node(self.name + ' Calibrations',
+
                      calibrate_function=cal_True_delayed)
+        dag.add_node(self.name + ' Mixer Skewness',
+                     calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
+        dag.add_node(self.name + ' Mixer Offset Drive',
+                     calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
+        dag.add_node(self.name + ' Mixer Offset Readout',
+                     calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
+        dag.add_node(self.name + ' Ro/MW pulse timing',
+                     calibrate_function=cal_True_delayed)
+
         dag.add_node(self.name + ' Mixer Skewness',
                      calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
         dag.add_node(self.name + ' Mixer Offset Drive',
@@ -3896,7 +3906,7 @@ class CCLight_Transmon(Qubit):
                      calibrate_function=self.name + '.calibrate_frequency_ramsey',
                      check_function=self.name + '.check_ramsey',
                      tolerance=0.1e-3)
-        dag.add_node(self.name +  ' f_12 estimate',
+        dag.add_node(self.name + ' f_12 estimate',
                      calibrate_function=self.name + ' find_anharmonicity_estimate')
         dag.add_node(self.name + ' DAC Arc Polynomial',
                      calibrate_function=cal_True_delayed)

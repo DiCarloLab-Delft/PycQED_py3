@@ -7738,12 +7738,12 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
 
         threshold = 0.1e6
         f_low = 0
-        P_result = np.max(self.sweep_points_2D)
+        # P_result = np.max(self.sweep_points_2D)
         try:
             for u, f in enumerate(f0):
                 if np.abs(f0[0] - f0[u+1]) < threshold:
                     f_low = f0[u+1]
-                    P_result = self.sweep_points_2D[u-1]
+                    P_result = self.sweep_points_2D[u]
                 else:
                     break
         except IndexError:

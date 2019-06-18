@@ -412,6 +412,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         mocked_values += np.random.normal(0,
                                           self.noise()/np.sqrt(self.ro_acq_averages()), np.size(mocked_values))
+        mocked_values = np.abs(mocked_values)
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
                               detector_control='soft',
                               mock_values=mocked_values)
@@ -624,6 +625,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                            self.noise()/np.sqrt(self.ro_acq_averages()), np.size(new_values))
 
             mocked_values = np.concatenate([mocked_values, new_values])
+        mocked_values = np.abs(mocked_values)
 
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
                               detector_control='soft',
