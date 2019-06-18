@@ -3850,52 +3850,52 @@ class CCLight_Transmon(Qubit):
         cal_True_delayed = 'autodepgraph.node_functions.calibration_functions.test_calibration_True_delayed'
 
         dag.add_node('Resonators Wide Search',
-                          calibrate_function=self.name + '.find_resonators')
+                     calibrate_function=self.name + '.find_resonators')
         dag.add_node('Zoom on resonators',
-                          calibrate_function=self.name + '.find_resonator_frequency_initial')
+                     calibrate_function=self.name + '.find_resonator_frequency_initial')
         dag.add_node('Resonators Power Scan',
-                          calibrate_function=self.name + '.find_test_resonators')
+                     calibrate_function=self.name + '.find_test_resonators')
         dag.add_node('Resonators Flux Sweep',
-                          calibrate_function=self.name + '.find_qubit_resonator_fluxline')
+                     calibrate_function=self.name + '.find_qubit_resonator_fluxline')
 
         dag.add_node(self.name + ' Resonator Frequency',
-                          calibrate_function=self.name + '.find_resonator_frequency')
+                     calibrate_function=self.name + '.find_resonator_frequency')
         dag.add_node(self.name + ' Resonator Power Scan',
-                          calibrate_function=self.name + '.calibrate_ro_pulse_amp_CW')
+                     calibrate_function=self.name + '.calibrate_ro_pulse_amp_CW')
 
         # Calibration of instruments and ro
-        # dag.add_node(self.name + ' Calibrations',
-        #                   calibrate_function=cal_True_delayed)
-        # dag.add_node(self.name + ' Mixer Skewness',
-        #                   calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
-        # dag.add_node(self.name + ' Mixer Offset Drive',
-        #                   calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
-        # dag.add_node(self.name + ' Mixer Offset Readout',
-        #                   calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
-        # dag.add_node(self.name + ' Ro/MW pulse timing',
-        #                   calibrate_function=cal_True_delayed)
-        # dag.add_node(self.name + ' Ro Pulse Amplitude',
-        #                   calibrate_function=self.name + '.ro_pulse_amp_CW')
+        dag.add_node(self.name + ' Calibrations',
+                     calibrate_function=cal_True_delayed)
+        dag.add_node(self.name + ' Mixer Skewness',
+                     calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
+        dag.add_node(self.name + ' Mixer Offset Drive',
+                     calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
+        dag.add_node(self.name + ' Mixer Offset Readout',
+                     calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
+        dag.add_node(self.name + ' Ro/MW pulse timing',
+                     calibrate_function=cal_True_delayed)
+        dag.add_node(self.name + ' Ro Pulse Amplitude',
+                     calibrate_function=self.name + '.ro_pulse_amp_CW')
 
         # Qubits calibration
         dag.add_node(self.name + ' Frequency Coarse',
-                          calibrate_function=self.name + '.find_frequency',
-                          check_function=self.name + '.check_qubit_spectroscopy',
-                          tolerance=0.2e-3)
+                     calibrate_function=self.name + '.find_frequency',
+                     check_function=self.name + '.check_qubit_spectroscopy',
+                     tolerance=0.2e-3)
         dag.add_node(self.name + ' Frequency at Sweetspot',
-                          calibrate_function=self.name + '.find_frequency')
+                     calibrate_function=self.name + '.find_frequency')
         dag.add_node(self.name + ' Spectroscopy Power',
-                          calibrate_function=self.name + '.calibrate_spec_pow')
+                     calibrate_function=self.name + '.calibrate_spec_pow')
         dag.add_node(self.name + ' Sweetspot',
-                          calibrate_function=self.name + '.find_qubit_sweetspot')
+                     calibrate_function=self.name + '.find_qubit_sweetspot')
         dag.add_node(self.name + ' Rabi',
-                          calibrate_function=self.name + '.calibrate_mw_pulse_amplitude_coarse',
-                          check_function=self.name + '.check_rabi',
-                          tolerance=0.01)
+                     calibrate_function=self.name + '.calibrate_mw_pulse_amplitude_coarse',
+                     check_function=self.name + '.check_rabi',
+                     tolerance=0.01)
         dag.add_node(self.name + ' Frequency Fine',
-                          calibrate_function=self.name + '.calibrate_frequency_ramsey',
-                          check_function=self.name + '.check_ramsey',
-                          tolerance=0.1e-3)
+                     calibrate_function=self.name + '.calibrate_frequency_ramsey',
+                     check_function=self.name + '.check_ramsey',
+                     tolerance=0.1e-3)
         dag.add_node(self.name +  ' f_12 estimate',
                      calibrate_function=self.name + ' find_anharmonicity_estimate')
         dag.add_node(self.name + ' DAC Arc Polynomial',
@@ -3903,9 +3903,9 @@ class CCLight_Transmon(Qubit):
 
         # Validate qubit calibration
         dag.add_node(self.name + ' ALLXY',
-                          calibrate_function=self.name + '.measure_allxy')
+                     calibrate_function=self.name + '.measure_allxy')
         dag.add_node(self.name + ' MOTZOI Calibration',
-                          calibrate_function=self.name + '.calibrate_motzoi')
+                     calibrate_function=self.name + '.calibrate_motzoi')
 
         # If all goes well, the qubit is fully 'calibrated' and can be controlled
 
@@ -3928,95 +3928,95 @@ class CCLight_Transmon(Qubit):
         # Resonators
         dag.add_edge('Zoom on resonators', 'Resonators Wide Search')
         dag.add_edge('Resonators Power Scan',
-                          'Zoom on resonators')
+                     'Zoom on resonators')
         dag.add_edge('Resonators Flux Sweep',
-                          'Zoom on resonators')
+                     'Zoom on resonators')
         dag.add_edge('Resonators Flux Sweep',
-                          'Resonators Power Scan')
+                     'Resonators Power Scan')
 
         dag.add_edge(self.name + ' Resonator Frequency',
-                          'Resonators Power Scan')
+                     'Resonators Power Scan')
         dag.add_edge(self.name + ' Resonator Frequency',
-                          'Resonators Flux Sweep')
+                     'Resonators Flux Sweep')
         dag.add_edge(self.name + ' Resonator Power Scan',
-                          self.name + ' Resonator Frequency')
+                     self.name + ' Resonator Frequency')
         dag.add_edge(self.name + ' Frequency Coarse',
-                          self.name + ' Resonator Power Scan')
+                     self.name + ' Resonator Power Scan')
         # Qubit Calibrations
         dag.add_edge(self.name + ' Frequency Coarse',
-                          self.name + ' Resonator Frequency')
-        # dag.add_edge(self.name + ' Frequency Coarse',
-        #                   self.name + ' Calibrations')
+                     self.name + ' Resonator Frequency')
+        dag.add_edge(self.name + ' Resonator Frequency',
+                     self.name + ' Calibrations')
 
         # Calibrations
-        # dag.add_edge(self.name + ' Calibrations',
-        #                   self.name + ' Mixer Skewness')
-        # dag.add_edge(self.name + ' Calibrations',
-        #                   self.name + ' Mixer Offset Drive')
-        # dag.add_edge(self.name + ' Calibrations',
-        #                   self.name + ' Mixer Offset Readout')
-        # dag.add_edge(self.name + ' Calibrations',
-        #                   self.name + ' Ro/MW pulse timing')
-        # dag.add_edge(self.name + ' Calibrations',
-        #                   self.name + ' Ro Pulse Amplitude')
+        dag.add_edge(self.name + ' Calibrations',
+                     self.name + ' Mixer Skewness')
+        dag.add_edge(self.name + ' Calibrations',
+                     self.name + ' Mixer Offset Drive')
+        dag.add_edge(self.name + ' Calibrations',
+                     self.name + ' Mixer Offset Readout')
+        dag.add_edge(self.name + ' Calibrations',
+                     self.name + ' Ro/MW pulse timing')
+        dag.add_edge(self.name + ' Calibrations',
+                     self.name + ' Ro Pulse Amplitude')
         # Qubit
         dag.add_edge(self.name + ' Spectroscopy Power',
-                          self.name + ' Frequency Coarse')
+                     self.name + ' Frequency Coarse')
         dag.add_edge(self.name + ' Sweetspot',
-                          self.name + ' Frequency Coarse')
+                     self.name + ' Frequency Coarse')
         dag.add_edge(self.name + ' Sweetspot',
-                          self.name + ' Spectroscopy Power')
+                     self.name + ' Spectroscopy Power')
         dag.add_edge(self.name + ' Rabi',
-                          self.name + ' Frequency at Sweetspot')
+                     self.name + ' Frequency at Sweetspot')
         dag.add_edge(self.name + ' Frequency Fine',
-                          self.name + ' Frequency at Sweetspot')
+                     self.name + ' Frequency at Sweetspot')
         dag.add_edge(self.name + ' Frequency Fine',
-                          self.name + ' Rabi')
+                     self.name + ' Rabi')
 
         dag.add_edge(self.name + ' Frequency at Sweetspot',
-                          self.name + ' Sweetspot')
+                     self.name + ' Sweetspot')
 
         dag.add_edge(self.name + ' ALLXY',
-                          self.name + ' Rabi')
+                     self.name + ' Rabi')
         dag.add_edge(self.name + ' ALLXY',
-                          self.name + ' Frequency Fine')
+                     self.name + ' Frequency Fine')
         dag.add_edge(self.name + ' ALLXY',
-                          self.name + ' MOTZOI Calibration')
+                     self.name + ' MOTZOI Calibration')
 
         # Perform initial measurements to see if they make sense
         dag.add_edge(self.name + ' T1',
-                          self.name + ' ALLXY')
+                     self.name + ' ALLXY')
         dag.add_edge(self.name + ' T2_Echo',
-                          self.name + ' ALLXY')
+                     self.name + ' ALLXY')
         dag.add_edge(self.name + ' T2_Star',
-                          self.name + ' ALLXY')
+                     self.name + ' ALLXY')
 
         # Measure as function of frequency and time
         dag.add_edge(self.name + ' T1(frequency)',
-                          self.name + ' T1')
+                     self.name + ' T1')
         dag.add_edge(self.name + ' T1(time)',
-                          self.name + ' T1')
+                     self.name + ' T1')
 
         dag.add_edge(self.name + ' T2_Echo(frequency)',
-                          self.name + ' T2_Echo')
+                     self.name + ' T2_Echo')
         dag.add_edge(self.name + ' T2_Echo(time)',
-                          self.name + ' T2_Echo')
+                     self.name + ' T2_Echo')
 
         dag.add_edge(self.name + ' T2_Star(frequency)',
-                          self.name + ' T2_Star')
+                     self.name + ' T2_Star')
         dag.add_edge(self.name + ' T2_Star(time)',
-                          self.name + ' T2_Star')
+                     self.name + ' T2_Star')
 
         dag.add_edge(self.name + ' DAC Arc Polynomial',
-                          self.name + ' Frequency at Sweetspot')
+                     self.name + ' Frequency at Sweetspot')
 
         # Measurements of anharmonicity and avoided crossing
         dag.add_edge(self.name + ' f_12 estimate',
-                          self.name + ' Frequency at Sweetspot')
+                     self.name + ' Frequency at Sweetspot')
         dag.add_edge(self.name + ' Anharmonicity',
-                          self.name + ' f_12 estimate')
+                     self.name + ' f_12 estimate')
         dag.add_edge(self.name + ' Avoided Crossing',
-                          self.name + ' DAC Arc Polynomial')
+                     self.name + ' DAC Arc Polynomial')
 
         dag.cfg_plot_mode = 'svg'
         dag.update_monitor()
