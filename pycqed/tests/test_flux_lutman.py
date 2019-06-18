@@ -23,13 +23,17 @@ class TestMultiQubitFluxLutMan:
         self.k0.instr_AWG(self.AWG.name)
 
         self.k0.filter_model_00(
-            {'model': 'exponential', 'params': {'tau': 1e-8, 'amp': -0.08}})
+            {'model': 'exponential', 'params': {'tau': 1e-8, 'amp': -0.08},
+            'real-time': False})
         self.k0.filter_model_01(
-            {'model': 'exponential', 'params': {'tau': 6e-9, 'amp': -0.01}})
+            {'model': 'exponential', 'params': {'tau': 6e-9, 'amp': -0.01},
+            'real-time': False})
         self.k0.filter_model_02(
-            {'model': 'exponential', 'params': {'tau': 1.8e-9, 'amp': -0.1}})
+            {'model': 'exponential', 'params': {'tau': 1.8e-9, 'amp': -0.1},
+            'real-time': False})
         self.k0.filter_model_03(
-            {'model': 'exponential', 'params': {'tau': 1.e-9, 'amp': -0.1}})
+            {'model': 'exponential', 'params': {'tau': 1.e-9, 'amp': -0.1},
+            'real-time': False})
 
         self.fluxlutman.AWG(self.AWG.name)
         self.fluxlutman.sampling_rate(2.4e9)
@@ -88,28 +92,28 @@ class TestMultiQubitFluxLutMan:
         hash_differs = self.fluxlutman._program_hash_differs()
         assert not hash_differs
 
-    # def test_amp_to_dac_val_conversions(self):
-    #     self.fluxlutman.cfg_awg_channel(1)
+    def test_amp_to_dac_val_conversions(self):
+        self.fluxlutman.cfg_awg_channel(1)
 
-    #     self.AWG.awgs_0_outputs_0_amplitude(.5)
-    #     self.AWG.sigouts_0_range(5)
-    #     sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
-    #     np.testing.assert_allclose(sf, 0.5*5/2)
+        self.AWG.awgs_0_outputs_0_amplitude(.5)
+        self.AWG.sigouts_0_range(5)
+        sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
+        np.testing.assert_allclose(sf, 0.5*5/2)
 
-    #     self.AWG.sigouts_0_range(.8)
-    #     sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
-    #     np.testing.assert_allclose(sf, 0.5*0.8/2)
+        self.AWG.sigouts_0_range(.8)
+        sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
+        np.testing.assert_allclose(sf, 0.5*0.8/2)
 
-    #     self.fluxlutman.cfg_awg_channel(2)
-    #     self.AWG.awgs_0_outputs_1_amplitude(.2)
-    #     self.AWG.sigouts_1_range(.8)
-    #     sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
-    #     np.testing.assert_allclose(sf, 0.2*0.8/2)
+        self.fluxlutman.cfg_awg_channel(2)
+        self.AWG.awgs_0_outputs_1_amplitude(.2)
+        self.AWG.sigouts_1_range(.8)
+        sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
+        np.testing.assert_allclose(sf, 0.2*0.8/2)
 
-    #     sc_inv = self.fluxlutman.get_amp_to_dac_val_scalefactor()
-    #     np.testing.assert_allclose(sc_inv, 1/sf)
+        sc_inv = self.fluxlutman.get_amp_to_dac_val_scalefactor()
+        np.testing.assert_allclose(sc_inv, 1/sf)
 
-    #     self.fluxlutman.cfg_awg_channel(1)
+        self.fluxlutman.cfg_awg_channel(1)
 
     def test_partner_lutman_loading(self):
         self.fluxlutman.sq_amp(.3)
@@ -128,76 +132,77 @@ class TestMultiQubitFluxLutMan:
     #     self.fluxlutman.plot_cz_trajectory(show=False)
 
     def test_standard_cz_waveform(self):
-        self.fluxlutman.czd_double_sided(False)
+        self.fluxlutman.czd_double_sided_SE(False)
         self.fluxlutman.generate_standard_waveforms()
 
-    # def test_double_sided_cz_waveform(self):
-    #     """
-    #     This test mostly tests if the parameters have some effect.
-    #     They do not test the generated output.
-    #     """
-    #     self.fluxlutman.czd_double_sided(True)
-    #     self.fluxlutman.generate_standard_waveforms()
+    def test_double_sided_cz_waveform(self):
+        """
+        This test mostly tests if the parameters have some effect.
+        They do not test the generated output.
+        """
+        self.fluxlutman.czd_double_sided_SE(True)
+        self.fluxlutman.generate_standard_waveforms()
 
-    #     czA = self.fluxlutman._wave_dict['cz_z']
-    #     self.fluxlutman.czd_amp_ratio(1.1)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czB = self.fluxlutman._wave_dict['cz_z']
-    #     with pytest.raises(AssertionError):
-    #         np.testing.assert_array_equal(czA, czB)
-    #     self.fluxlutman.czd_amp_ratio(1.)
+        czA = self.fluxlutman._wave_dict['cz_SE']
+        self.fluxlutman.czd_amp_ratio_SE(1.1)
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_SE']
+        with pytest.raises(AssertionError):
+            np.testing.assert_array_equal(czA, czB)
+        self.fluxlutman.czd_amp_ratio_SE(1.)
 
-    #     czA = self.fluxlutman._wave_dict['cz_z']
-    #     self.fluxlutman.czd_length_ratio(.6)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czB = self.fluxlutman._wave_dict['cz_z']
-    #     with pytest.raises(AssertionError):
-    #         np.testing.assert_array_equal(czA, czB)
+        czA = self.fluxlutman._wave_dict['cz_SE']
+        self.fluxlutman.czd_length_ratio_SE(.6)
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_SE']
+        with pytest.raises(AssertionError):
+            np.testing.assert_array_equal(czA, czB)
 
-    #     self.fluxlutman.czd_lambda_2(np.nan)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czA = self.fluxlutman._wave_dict['cz_z']
+        self.fluxlutman.czd_lambda_2_SE(np.nan)
+        self.fluxlutman.generate_standard_waveforms()
+        czA = self.fluxlutman._wave_dict['cz_SE']
 
-    #     self.fluxlutman.czd_lambda_2(self.fluxlutman.cz_lambda_2())
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czB = self.fluxlutman._wave_dict['cz_z']
-    #     np.testing.assert_array_equal(czA, czB)
+        self.fluxlutman.czd_lambda_2_SE(self.fluxlutman.cz_lambda_2_SE())
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_SE']
+        np.testing.assert_array_equal(czA, czB)
 
-    #     self.fluxlutman.czd_lambda_2(self.fluxlutman.cz_lambda_2()+.05)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czC = self.fluxlutman._wave_dict['cz_z']
-    #     with pytest.raises(AssertionError):
-    #         np.testing.assert_array_equal(czA, czC)
+        #until here
+        self.fluxlutman.czd_lambda_2_SE(self.fluxlutman.cz_lambda_2_SE()+.05)
+        self.fluxlutman.generate_standard_waveforms()
+        czC = self.fluxlutman._wave_dict['cz_SE']
+        with pytest.raises(AssertionError):
+            np.testing.assert_array_equal(czA, czC)
 
-    #     self.fluxlutman.czd_lambda_3(np.nan)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czA = self.fluxlutman._wave_dict['cz_z']
+        self.fluxlutman.czd_lambda_3_SE(np.nan)
+        self.fluxlutman.generate_standard_waveforms()
+        czA = self.fluxlutman._wave_dict['cz_SE']
 
-    #     self.fluxlutman.czd_lambda_3(self.fluxlutman.cz_lambda_3())
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czB = self.fluxlutman._wave_dict['cz_z']
-    #     np.testing.assert_array_equal(czA, czB)
+        self.fluxlutman.czd_lambda_3_SE(self.fluxlutman.cz_lambda_3_SE())
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_SE']
+        np.testing.assert_array_equal(czA, czB)
 
-    #     self.fluxlutman.czd_lambda_3(self.fluxlutman.cz_lambda_3()+0.05)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czC = self.fluxlutman._wave_dict['cz_z']
-    #     with pytest.raises(AssertionError):
-    #         np.testing.assert_array_equal(czA, czC)
+        self.fluxlutman.czd_lambda_3_SE(self.fluxlutman.cz_lambda_3_SE()+0.05)
+        self.fluxlutman.generate_standard_waveforms()
+        czC = self.fluxlutman._wave_dict['cz_SE']
+        with pytest.raises(AssertionError):
+            np.testing.assert_array_equal(czA, czC)
 
-    #     self.fluxlutman.czd_theta_f(np.nan)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czA = self.fluxlutman._wave_dict['cz_z']
+        self.fluxlutman.czd_theta_f_SE(np.nan)
+        self.fluxlutman.generate_standard_waveforms()
+        czA = self.fluxlutman._wave_dict['cz_SE']
 
-    #     self.fluxlutman.czd_theta_f(self.fluxlutman.czd_theta_f())
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czB = self.fluxlutman._wave_dict['cz_z']
-    #     np.testing.assert_array_equal(czA, czB)
+        self.fluxlutman.czd_theta_f_SE(self.fluxlutman.czd_theta_f_SE())
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_SE']
+        np.testing.assert_array_equal(czA, czB)
 
-    #     self.fluxlutman.czd_theta_f(self.fluxlutman.cz_theta_f()+15)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     czC = self.fluxlutman._wave_dict['cz_z']
-    #     with pytest.raises(AssertionError):
-    #         np.testing.assert_array_equal(czA, czC)
+        self.fluxlutman.czd_theta_f_SE(self.fluxlutman.cz_theta_f_SE()+15)
+        self.fluxlutman.generate_standard_waveforms()
+        czC = self.fluxlutman._wave_dict['cz_SE']
+        with pytest.raises(AssertionError):
+            np.testing.assert_array_equal(czA, czC)
 
     # def test_calc_amp_to_freq_unknown_state(self):
     #     with pytest.raises(ValueError):
@@ -280,34 +285,34 @@ class TestMultiQubitFluxLutMan:
     #         freqs_02, state_A=state_A, state_B=state_B, positive_branch=False)
     #     np.testing.assert_array_almost_equal(amps, amps_inv)
 
-    # def test_custom_wf(self):
-    #     self.fluxlutman.generate_standard_waveforms()
+    def test_custom_wf(self):
+        self.fluxlutman.generate_standard_waveforms()
 
-    #     np.testing.assert_array_almost_equal(
-    #         self.fluxlutman._wave_dict['custom_wf'],
-    #         np.array([]))
+        np.testing.assert_array_almost_equal(
+            self.fluxlutman._wave_dict['custom_wf'],
+            np.array([]))
 
-    #     # Tests if the custom wf is part of the default lutmap
-    #     self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
-    #     assert 'custom_wf' in self.fluxlutman._wave_dict_dist
+        # Tests if the custom wf is part of the default lutmap
+        self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
+        assert 'custom_wf' in self.fluxlutman._wave_dict_dist
 
-    #     x = np.arange(200)
-    #     y = np.cos(x)/20
-    #     self.fluxlutman.custom_wf(y)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     np.testing.assert_array_almost_equal(
-    #         self.fluxlutman._wave_dict['custom_wf'], y)
+        x = np.arange(200)
+        y = np.cos(x)/20
+        self.fluxlutman.custom_wf(y)
+        self.fluxlutman.generate_standard_waveforms()
+        np.testing.assert_array_almost_equal(
+            self.fluxlutman._wave_dict['custom_wf'], y)
 
-    #     self.fluxlutman.custom_wf_length(30e-9)
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     y_cut = np.cos(x)/20
-    #     cut_sample = 72  # 30ns * 2.4GSps
-    #     y_cut[cut_sample:] = 0
-    #     np.testing.assert_array_almost_equal(
-    #         self.fluxlutman._wave_dict['custom_wf'], y_cut)
-    #     # base waveform is not changed
-    #     np.testing.assert_array_almost_equal(
-    #         self.fluxlutman.custom_wf(), y)
+        self.fluxlutman.custom_wf_length(30e-9)
+        self.fluxlutman.generate_standard_waveforms()
+        y_cut = np.cos(x)/20
+        cut_sample = 72  # 30ns * 2.4GSps
+        y_cut[cut_sample:] = 0
+        np.testing.assert_array_almost_equal(
+            self.fluxlutman._wave_dict['custom_wf'], y_cut)
+        # base waveform is not changed
+        np.testing.assert_array_almost_equal(
+            self.fluxlutman.custom_wf(), y)
 
     # def test_generate_standard_flux_waveforms(self):
     #     self.fluxlutman.generate_standard_waveforms()
