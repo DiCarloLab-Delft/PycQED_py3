@@ -76,6 +76,9 @@ class ZI_HDAWG_core(ZI_base_instrument):
 
         super().__init__(name=name, **kw)
 
+        # save some parameters
+        self._devname = device
+
         # determine path for LabOne web server
         if os.name == 'nt':
             dll = ctypes.windll.shell32
@@ -88,9 +91,6 @@ class ZI_HDAWG_core(ZI_base_instrument):
             _basedir = os.path.expanduser('~')
         self._lab_one_webserver_path = os.path.join(
             _basedir, 'Zurich Instruments', 'LabOne', 'WebServer')
-
-        # save some parameters
-        self._devname = device
 
         # connect to data server and device
         self._dev = zs.ziShellDevice()
@@ -107,8 +107,8 @@ class ZI_HDAWG_core(ZI_base_instrument):
         try:
             self.add_parameters_from_file(filename=filename)  # NB: defined in parent class
         except FileNotFoundError:
-            log.error("parameter file for data parameters"
-                            " {} not found".format(filename))
+            log.error("{}: parameter file for data parameters {} not found".
+                      format(self._devname, filename))
             raise
             # FIXME: we need to be capable to generate file if none exists
 
@@ -128,10 +128,10 @@ class ZI_HDAWG_core(ZI_base_instrument):
         options = self.get('features_options') # FIXME: check that we have what we need
         fw_revision = self.get('system_fwrevision') # Revision of the device internal controller software FIXME: check against minimum we need
         fpga_revision = self.get('system_fpgarevision') # HDL firmware revision FIXME: check against minimum we need
-        log.info('AWG8: serial={}, options={}, fw_revision={}, fpga_revision={}'
-                 .format(serial, options.replace('\n','|'), fw_revision, fpga_revision))
-        log.info('DIO interface found in mode {} (0=CMOS, 1=LVDS)'.
-                 format(self.get('dios_0_interface'))) # NB: mode is persistent across device restarts
+        log.info('{}: serial={}, options={}, fw_revision={}, fpga_revision={}'
+                 .format(self._devname, serial, options.replace('\n','|'), fw_revision, fpga_revision))
+        log.info('{}: DIO interface found in mode {} (0=CMOS, 1=LVDS)'.
+                 format(self._devname, self.get('dios_0_interface'))) # NB: mode is persistent across device restarts
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
 

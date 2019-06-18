@@ -975,7 +975,7 @@ class UHFQC(Instrument):
             self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0 * scaling_factor)
             self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0 * scaling_factor)
 
-def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1) -> None:
+    def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1) -> None:
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
@@ -1281,7 +1281,7 @@ def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_functi
                     'setTrigger(0);\n')
         self.awg_string(sequence, timeout=timeout)
 
-def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay, dig_trigger=True) -> None:
+    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay, dig_trigger=True) -> None:
         if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
             raise KeyError(
                 "exceeding AWG range for I channel, all values should be within +/-1")
