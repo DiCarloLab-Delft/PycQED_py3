@@ -3866,6 +3866,7 @@ class CCLight_Transmon(Qubit):
         # Calibration of instruments and ro
         dag.add_node(self.name + ' Calibrations',
 
+<<<<<<< HEAD
                      calibrate_function=cal_True_delayed)
         dag.add_node(self.name + ' Mixer Skewness',
                      calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
@@ -3874,6 +3875,8 @@ class CCLight_Transmon(Qubit):
         dag.add_node(self.name + ' Mixer Offset Readout',
                      calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
         dag.add_node(self.name + ' Ro/MW pulse timing',
+=======
+>>>>>>> 8ccb53bd66a2601fc9915d05719896c46c0a8c44
                      calibrate_function=cal_True_delayed)
 
         dag.add_node(self.name + ' Mixer Skewness',
@@ -3884,8 +3887,18 @@ class CCLight_Transmon(Qubit):
                      calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
         dag.add_node(self.name + ' Ro/MW pulse timing',
                      calibrate_function=cal_True_delayed)
+
+        dag.add_node(self.name + ' Mixer Skewness',
+                          calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
+        dag.add_node(self.name + ' Mixer Offset Drive',
+                          calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
+        dag.add_node(self.name + ' Mixer Offset Readout',
+                          calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
+        dag.add_node(self.name + ' Ro/MW pulse timing',
+                          calibrate_function=cal_True_delayed)
         dag.add_node(self.name + ' Ro Pulse Amplitude',
-                     calibrate_function=self.name + '.ro_pulse_amp_CW')
+                          calibrate_function=self.name + '.ro_pulse_amp_CW')
+
 
         # Qubits calibration
         dag.add_node(self.name + ' Frequency Coarse',
