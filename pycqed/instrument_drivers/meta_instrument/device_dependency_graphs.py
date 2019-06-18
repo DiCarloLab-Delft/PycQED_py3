@@ -44,7 +44,6 @@ class octobox_dep_graph(AutoDepGraph_DAG):
 
         cal_True_delayed = 'autodepgraph.node_functions.calibration_functions.test_calibration_True_delayed'
 
-        # dag = AutoDepGraph_DAG(name='FULLGRPAH')
         # Initial Resonator things:
         self.add_node('Resonators Wide Search',
                       calibrate_function=Qubit.name + '.find_resonators')

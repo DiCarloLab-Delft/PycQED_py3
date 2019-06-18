@@ -949,7 +949,6 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         plotfn = self.plot_line
-        print(plotfn)
         self.plot_dicts['main'] = {
             'plotfn': plotfn,
             'ax_id': 'main',
@@ -959,7 +958,8 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
             'yunit': 'V',
             'xlabel': 'Frequency',
             'ylabel': 'Amp',
-            'title': 'Found peaks 2',
+            'title': 'Wide range resonator scan \n{}'.format(
+                self.raw_data_dict['timestamps'][0]),
             'linestyle': '-',
             'marker': 'o',
             'setlabel': 'data',
@@ -974,7 +974,8 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
             'yunit': 'V',
             'xlabel': 'Frequency',
             'ylabel': 'Amp',
-            'title': 'Found peaks 2',
+            'title': 'Found peaks \n{}'.format(
+                self.raw_data_dict['timestamps'][0]),
             'linestyle': '-',
             'marker': 'o',
             'setlabel': 'data',
@@ -989,7 +990,8 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
             'yunit': 'V',
             'xlabel': 'Frequency',
             'ylabel': 'Amp',
-            'title': 'Found peaks 2',
+            'title': 'Found peaks \n{}'.format(
+                self.raw_data_dict['timestamps'][0]),
             'linestyle': '',
             'marker': 'o',
             'setlabel': 'data',

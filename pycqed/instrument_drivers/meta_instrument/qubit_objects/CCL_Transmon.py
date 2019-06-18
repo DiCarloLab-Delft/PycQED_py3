@@ -1229,15 +1229,10 @@ class CCLight_Transmon(Qubit):
                               0.5e6)
         if dac_values is None:
             if self.fl_dc_V0() is not None:
-<<<<<<< HEAD
-                dac_values = np.linspace(self.fl_dc_V0() - 0.5e-3,
-                                         self.fl_dc_V0() + 0.5e-3, 8)
-=======
                 dac_values = np.linspace(self.fl_dc_V0() - 1e-3,
                                          self.fl_dc_V0() + 1e-3, 8)
->>>>>>> 5aa8c9f0bcfeb693612b19234a9335b541fa1f44
             else:
-                dac_values = np.linspace(-1-3, 1e-3, 8)
+                dac_values = np.linspace(-1e3, 1e-3, 8)
 
         if fluxChan is None:
             if self.cfg_dc_flux_ch() is not None:
@@ -1294,11 +1289,11 @@ class CCLight_Transmon(Qubit):
         # Sanity check: does this peak move with flux?
         check_vals = [self.calc_current_to_freq(np.min(dac_values)),
                       self.calc_current_to_freq(self.fl_dc_V0()),
-                      self.calc_freq_to_current(np.max(dac_values))]
+                      self.calc_current_to_freq(np.max(dac_values))]
 
-        if vals[0] == pytest.approx(vals[1], abs=0.5e6):
-            if vals[0] == pytest.approx(vals[2], abs=0.5e6):
-                if vals[1] == pytest.approx(vals[2], abs=0.5e6):
+        if check_vals[0] == pytest.approx(check_vals[1], abs=0.5e6):
+            if check_vals[0] == pytest.approx(check_vals[2], abs=0.5e6):
+                if check_vals[1] == pytest.approx(check_vals[2], abs=0.5e6):
                     logging.warning('No qubit shift found with varying flux. '
                                     'Peak is not a qubit')
                     return False
