@@ -2680,11 +2680,12 @@ def measure_cphase(qbc, qbt, qbr, lengths, amps, alphas=None,
 
 
 def measure_cphase_nz(qbc, qbt, soft_sweep_params_dict, f_LO,
-                       CZ_pulse_name=None, max_flux_length=None,
-                       phases=None, MC=None,
-                       UHFQC=None, pulsar=None,
-                       cal_points=True, num_cal_points=4, plot=False,
-                       analyze=True, upload=True, upload_all=True, **kw):
+                      CZ_pulse_name=None, max_flux_length=None,
+                      num_cz_gates=1,
+                      phases=None, MC=None,
+                      UHFQC=None, pulsar=None,
+                      cal_points=True, num_cal_points=4, plot=False,
+                      analyze=True, upload=True, upload_all=True, **kw):
     '''
     method to measure the leakage and the phase acquired during a flux pulse
     conditioned on the state of the control qubit (self).
@@ -2765,6 +2766,7 @@ def measure_cphase_nz(qbc, qbt, soft_sweep_params_dict, f_LO,
                                     operation_dict,
                                     len(soft_sweep_params_dict),
                                     max_flux_length,
+                                    num_cz_gates=num_cz_gates,
                                     first_data_point=upload_all,
                                     cal_points=cal_points,
                                     num_cal_points=num_cal_points,

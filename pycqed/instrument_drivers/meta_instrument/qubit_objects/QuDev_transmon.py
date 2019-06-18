@@ -189,6 +189,16 @@ class QuDev_transmon(Qubit):
                            docstring=("Used for double weighted integration "
                                       "during qutrit readout"),
                            parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_classifier_params', vals=vals.Dict(),
+                           label='Parameters for the qutrit classifier.',
+                           docstring=("Used in the int_log_classif_det to "
+                                      "classify single shots into g, e, f."),
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_state_prob_mtx', vals=vals.Arrays(),
+                           label='SSRO correction matrix.',
+                           docstring=("Matrix of measured vs prepared qubit "
+                                      "states."),
+                           parameter_class=ManualParameter)
         self.add_parameter('ro_acq_input_average_length', unit='s',
                            initial_value=2.275e-6, docstring='The measurement '
                                'time in input averaging mode',
@@ -394,6 +404,15 @@ class QuDev_transmon(Qubit):
             UHFQC=self.UHFQC, AWG=self.AWG, channels=channels,
             integration_length=self.RO_acq_integration_length(),
             nr_shots=self.RO_acq_shots())
+
+        self.int_log_classif_det = det.UHFQC_integration_logging_classifier_det(
+            UHFQC=self.UHFQC, AWG=self.AWG, channels=channels,
+            integration_length=self.RO_acq_integration_length(),
+            nr_shots=self.RO_acq_shots(),
+            get_values_function_kwargs={
+                'classifier_params': self.ro_acq_classifier_params(),
+                'state_prob_mtx': self.ro_acq_state_prob_mtx()
+            })
 
         self.int_avg_det = det.UHFQC_integrated_average_detector(
             self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
@@ -946,15 +965,21 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        cal_states_dict = None
+        cal_states_rotations = None
         if cal_points:
             step = np.abs(amps[-1]-amps[-2])
             if no_cal_points == 4:
                 sweep_points = np.concatenate(
                     [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
                         amps[-1]+4*step]])
+                cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'e': 1}
             elif no_cal_points == 2:
                 sweep_points = np.concatenate(
                     [amps, [amps[-1]+step, amps[-1]+2*step]])
+                cal_states_dict = {'g': [-2, -1]}
+                cal_states_rotations = {'g': 0}
             else:
                 sweep_points = amps
         else:
@@ -968,18 +993,23 @@ class QuDev_transmon(Qubit):
                                            no_cal_points=no_cal_points,
                                            upload=upload))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
-                             'num_cal_points': no_cal_points})
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None,
+                             'data_to_fit': {self.name: 'pe'}})
         MC.run(label, exp_metadata=exp_metadata)
 
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
     def measure_rabi_2nd_exc(self, amps=None, n=1, MC=None, analyze=True,
                              label=None, last_ge_pulse=True,
@@ -990,26 +1020,35 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unspecified amplitudes for measure_rabi")
 
         if label is None:
-            label = 'Rabi_2nd_exc-n{}'.format(n) + self.msmt_suffix
+            label = 'Rabi_ef-n{}'.format(n) + self.msmt_suffix
 
         self.prepare_for_timedomain()
 
         if MC is None:
             MC = self.MC
 
+        cal_states_dict = None
+        cal_states_rotations = None
         if cal_points:
             step = np.abs(amps[-1]-amps[-2])
             if no_cal_points == 6:
                 sweep_points = np.concatenate(
                     [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
                         amps[-1]+4*step, amps[-1]+5*step, amps[-1]+6*step]])
+                cal_states_dict = {'g': [-6, -5], 'e': [-4, -3], 'f': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'f': 1} if last_ge_pulse else \
+                    {'e': 0, 'f': 1}
             elif no_cal_points == 4:
                 sweep_points = np.concatenate(
                     [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
                         amps[-1]+4*step]])
+                cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'e': 1}
             elif no_cal_points == 2:
                 sweep_points = np.concatenate(
                     [amps, [amps[-1]+step, amps[-1]+2*step]])
+                cal_states_dict = {'g': [-2, -1]}
+                cal_states_rotations = {'g': 0}
             else:
                 sweep_points = amps
         MC.set_sweep_function(awg_swf.Rabi_2nd_exc(
@@ -1020,18 +1059,23 @@ class QuDev_transmon(Qubit):
                         n=n, upload=upload,
                         cal_points=cal_points, no_cal_points=no_cal_points))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
-                             'num_cal_points': no_cal_points,
-                             'last_ge_pulse': last_ge_pulse})
+                             'last_ge_pulse': last_ge_pulse,
+                             'data_to_fit': {self.name: 'pf'},
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None})
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
     def measure_rabi_amp90(self, scales=np.linspace(0.3, 0.7, 31), n=1,
                            MC=None, analyze=True, close_fig=True, upload=True):
@@ -1073,23 +1117,33 @@ class QuDev_transmon(Qubit):
             sweep_points = np.concatenate(
                 [times, [times[-1]+step,  times[-1]+2*step,
                     times[-1]+3*step, times[-1]+4*step]])
+            cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+            cal_states_rotations = {'g': 0, 'e': 1}
         else:
             sweep_points = times
+            cal_states_dict = None
+            cal_states_rotations = None
 
         MC.set_sweep_function(awg_swf.T1(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None,
+                             'data_to_fit': {self.name: 'pe'},
                              'use_cal_points': cal_points})
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
     def measure_T1_2nd_exc(self, times=None, MC=None, analyze=True, upload=True,
                            close_fig=True, cal_points=True, no_cal_points=6,
@@ -1104,11 +1158,13 @@ class QuDev_transmon(Qubit):
         self.prepare_for_timedomain()
 
         if label is None:
-            label = 'T1_2nd' + self.msmt_suffix
+            label = 'T1_ef' + self.msmt_suffix
 
         if MC is None:
             MC = self.MC
 
+        cal_states_dict = None
+        cal_states_rotations = None
         if cal_points:
             step = np.abs(times[-1]-times[-2])
             if no_cal_points == 6:
@@ -1116,13 +1172,20 @@ class QuDev_transmon(Qubit):
                     [times, [times[-1]+step,  times[-1]+2*step,
                                  times[-1]+3*step, times[-1]+4*step,
                                  times[-1]+5*step, times[-1]+6*step]])
+                cal_states_dict = {'g': [-6, -5], 'e': [-4, -3], 'f': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'f': 1} if last_ge_pulse else \
+                    {'e': 0, 'f': 1}
             elif no_cal_points == 4:
                 sweep_points = np.concatenate(
                     [times, [times[-1]+step,  times[-1]+2*step,
                                  times[-1]+3*step, times[-1]+4*step]])
+                cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'e': 1}
             elif no_cal_points == 2:
                 sweep_points = np.concatenate(
                     [times, [times[-1]+step,  times[-1]+2*step]])
+                cal_states_dict = {'g': [-2, -1]}
+                cal_states_rotations = {'g': 0}
             else:
                 sweep_points = times
         else:
@@ -1137,18 +1200,23 @@ class QuDev_transmon(Qubit):
                                 no_cal_points=no_cal_points,
                                 last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
-                             'num_cal_points': no_cal_points,
+                             'data_to_fit': {self.name: 'pf'},
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None,
                              'last_ge_pulse': last_ge_pulse})
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
 
     def measure_qscale(self, qscales=None, MC=None, analyze=True, upload=True,
@@ -1175,23 +1243,34 @@ class QuDev_transmon(Qubit):
             sweep_points = np.concatenate(
                 [qscales, [qscales[-1] + step, qscales[-1] + 2*step,
                     qscales[-1] + 3*step, qscales[-1] + 4*step]])
+            cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+            cal_states_rotations = {'g': 0, 'e': 1}
         else:
             sweep_points = qscales
+            cal_states_dict = None
+            cal_states_rotations = None
 
         MC.set_sweep_function(awg_swf.QScale(
                 pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
                 upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
-                             'use_cal_points': cal_points})
+                             'use_cal_points': cal_points,
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None,
+                             'data_to_fit': {self.name: 'pe'}
+                             })
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
     def measure_qscale_2nd_exc(self, qscales=None, MC=None, analyze=True,
                                upload=True, close_fig=True, label=None,
@@ -1212,8 +1291,10 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         if label is None:
-            label = 'QScale_2nd_exc'+self.msmt_suffix
+            label = 'QScale_ef'+self.msmt_suffix
 
+        cal_states_dict = None
+        cal_states_rotations = None
         if cal_points:
             step = np.abs(qscales[-1] - qscales[-4])
             if no_cal_points == 6:
@@ -1221,13 +1302,20 @@ class QuDev_transmon(Qubit):
                     [qscales, [qscales[-1] + step, qscales[-1] + 2*step,
                                qscales[-1] + 3*step, qscales[-1] + 4*step,
                                qscales[-1] + 5*step, qscales[-1] + 6*step]])
+                cal_states_dict = {'g': [-6, -5], 'e': [-4, -3], 'f': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'f': 1} if last_ge_pulse else \
+                    {'e': 0, 'f': 1}
             elif no_cal_points == 4:
                 sweep_points = np.concatenate(
                     [qscales, [qscales[-1] + step, qscales[-1] + 2*step,
                                qscales[-1] + 3*step, qscales[-1] + 4*step]])
+                cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'e': 1}
             elif no_cal_points == 2:
                 sweep_points = np.concatenate(
                     [qscales, [qscales[-1] + step, qscales[-1] + 2*step]])
+                cal_states_dict = {'g': [-2, -1]}
+                cal_states_rotations = {'g': 0}
             else:
                 sweep_points = qscales
         else:
@@ -1241,18 +1329,23 @@ class QuDev_transmon(Qubit):
             upload=upload, cal_points=cal_points, no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
-                             'num_cal_points': no_cal_points,
+                             'data_to_fit': {self.name: 'pf'},
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None,
                              'last_ge_pulse': last_ge_pulse})
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
     def measure_ramsey_multiple_detunings(self, times=None,
                                           artificial_detunings=None, label='',
@@ -1339,8 +1432,12 @@ class QuDev_transmon(Qubit):
             sweep_points = np.concatenate(
                 [times, [times[-1]+step,  times[-1]+2*step,
                              times[-1]+3*step, times[-1]+4*step]])
+            cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+            cal_states_rotations = {'g': 0, 'e': 1}
         else:
             sweep_points = times
+            cal_states_dict = None
+            cal_states_rotations = None
 
         Rams_swf = awg_swf.Ramsey(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
@@ -1348,17 +1445,23 @@ class QuDev_transmon(Qubit):
             upload=upload)
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None,
+                             'data_to_fit': {self.name: 'pe'},
                              'artificial_detuning': artificial_detuning})
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
     def measure_ramsey_dyn_decoupling(self, times=None, artificial_detuning=0,
                                       label='', MC=None, analyze=True,
@@ -1380,7 +1483,7 @@ class QuDev_transmon(Qubit):
                             'should be Hz.')
 
         if seq_func is None:
-            seq_func = sq.Ramsey_seq
+            seq_func = sq.ramsey_seq
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -1443,26 +1546,35 @@ class QuDev_transmon(Qubit):
                             'The units should be seconds.')
 
         if label is None:
-            label = 'Ramsey_2nd'+self.msmt_suffix
+            label = 'Ramsey_ef'+self.msmt_suffix
 
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
 
+        cal_states_dict = None
+        cal_states_rotations = None
         if cal_points:
             step = np.abs(times[-1]-times[-2])
             if no_cal_points == 6:
                 sweep_points = np.concatenate(
                     [times, [times[-1]+step,  times[-1]+2*step,
                                  times[-1]+3*step, times[-1]+4*step,
-                                 times[-1]+4*step, times[-1]+6*step]])
+                                 times[-1]+5*step, times[-1]+6*step]])
+                cal_states_dict = {'g': [-6, -5], 'e': [-4, -3], 'f': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'f': 1} if last_ge_pulse else \
+                    {'e': 0, 'f': 1}
             elif no_cal_points == 4:
                 sweep_points = np.concatenate(
                     [times, [times[-1]+step,  times[-1]+2*step,
                                  times[-1]+3*step, times[-1]+4*step]])
+                cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'e': 1}
             elif no_cal_points == 2:
                 sweep_points = np.concatenate(
                     [times, [times[-1]+step,  times[-1]+2*step]])
+                cal_states_dict = {'g': [-2, -1]}
+                cal_states_rotations = {'g': 0}
             else:
                 sweep_points = times
         else:
@@ -1478,19 +1590,24 @@ class QuDev_transmon(Qubit):
             last_ge_pulse=last_ge_pulse)
         MC.set_sweep_function(Rams_2nd_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
-                             'num_cal_points': no_cal_points,
                              'last_ge_pulse': last_ge_pulse,
+                             'data_to_fit': {self.name: 'pf'},
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None,
                              'artificial_detuning': artificial_detuning})
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
     def measure_ramsey_2nd_exc_multiple_detunings(self, times=None,
                                artificial_detunings=None, label=None,
@@ -1515,7 +1632,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         if label is None:
-            label = 'Ramsey_mult_det_2nd'+self.msmt_suffix
+            label = 'Ramsey_mult_det_ef'+self.msmt_suffix
 
         if cal_points:
             len_art_det = len(artificial_detunings)
@@ -1578,8 +1695,12 @@ class QuDev_transmon(Qubit):
             sweep_points = np.concatenate(
                 [times, [times[-1]+step,  times[-1]+2*step,
                          times[-1]+3*step, times[-1]+4*step]])
+            cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+            cal_states_rotations = {'g': 0, 'e': 1}
         else:
             sweep_points = times
+            cal_states_dict = None
+            cal_states_rotations = None
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -1590,16 +1711,103 @@ class QuDev_transmon(Qubit):
             artificial_detuning=artificial_detuning, upload=upload)
         MC.set_sweep_function(Echo_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
-                             'cal_points': cal_points,
+                             'use_cal_points': cal_points,
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None,
+                             'data_to_fit': {self.name: 'pe'},
                              'artificial_detuning': artificial_detuning})
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
+
+    def measure_echo_2nd_exc(self, times=None, artificial_detuning=None,
+                             label=None, MC=None, analyze=True,
+                             cal_points=True, no_cal_points=6, upload=True,
+                             last_ge_pulse=True, exp_metadata=None):
+
+        if times is None:
+            raise ValueError("Unspecified times for measure_ramsey")
+        if artificial_detuning is None:
+            logging.warning('Artificial detuning is 0.')
+        if np.abs(artificial_detuning) < 1e3:
+            logging.warning('The artificial detuning is too small. The units'
+                            'should be Hz.')
+        if np.any(times > 1e-3):
+            logging.warning('The values in the times array might be too large.'
+                            'The units should be seconds.')
+
+        if label is None:
+            label = 'Echo_ef' + self.msmt_suffix
+
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC
+
+        cal_states_dict = None
+        cal_states_rotations = None
+        if cal_points:
+            step = np.abs(times[-1]-times[-2])
+            if no_cal_points == 6:
+                sweep_points = np.concatenate(
+                    [times, [times[-1]+step,  times[-1]+2*step,
+                                 times[-1]+3*step, times[-1]+4*step,
+                                 times[-1]+5*step, times[-1]+6*step]])
+                cal_states_dict = {'g': [-6, -5], 'e': [-4, -3], 'f': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'f': 1} if last_ge_pulse else \
+                    {'e': 0, 'f': 1}
+            elif no_cal_points == 4:
+                sweep_points = np.concatenate(
+                    [times, [times[-1]+step,  times[-1]+2*step,
+                                 times[-1]+3*step, times[-1]+4*step]])
+                cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
+                cal_states_rotations = {'g': 0, 'e': 1}
+            elif no_cal_points == 2:
+                sweep_points = np.concatenate(
+                    [times, [times[-1]+step,  times[-1]+2*step]])
+                cal_states_dict = {'g': [-2, -1]}
+                cal_states_rotations = {'g': 0}
+            else:
+                sweep_points = times
+        else:
+            sweep_points = times
+
+        Echo_2nd_swf = awg_swf.Echo_2nd_exc(
+            pulse_pars=self.get_drive_pars(),
+            pulse_pars_2nd=self.get_ef_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            artificial_detuning=artificial_detuning,
+            cal_points=cal_points, upload=upload,
+            no_cal_points=no_cal_points,
+            last_ge_pulse=last_ge_pulse)
+        MC.set_sweep_function(Echo_2nd_swf)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(self.int_log_classif_det if
+                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
+        if exp_metadata is None:
+            exp_metadata = {}
+        exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
+                             'use_cal_points': cal_points,
+                             'last_ge_pulse': last_ge_pulse,
+                             'data_to_fit': {self.name: 'pf'},
+                             'cal_states_dict': cal_states_dict,
+                             'cal_states_rotations': cal_states_rotations if
+                                self.ro_acq_weight_type() != 'optimal_qutrit'
+                                else None,
+                             'artificial_detuning': artificial_detuning})
+        MC.run(label, exp_metadata=exp_metadata)
+
+        if analyze:
+            tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
     def measure_allxy(self, double_points=True, MC=None, upload=True,
                       analyze=True, close_fig=True):
@@ -2445,7 +2653,7 @@ class QuDev_transmon(Qubit):
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
                            no_fits=False, upload=True, preselection_pulse=True,
                            thresholded=False, RO_comm=3/225e6, RO_slack=150e-9,
-                           RO_shots=50000, qutrit=False):
+                           RO_shots=50000, qutrit=False, update=False):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -2565,11 +2773,14 @@ class QuDev_transmon(Qubit):
                 ssqtro = \
                     Singleshot_Readout_Analysis_Qutrit(label=labels,
                                                        options_dict=options)
-                return ssqtro.proc_data_dict[
-                           'analysis_params']['state_prob_mtx'],  \
-                       ssqtro.proc_data_dict[
+                state_prob_mtx =  ssqtro.proc_data_dict[
+                           'analysis_params']['state_prob_mtx']
+                classifier_params = ssqtro.proc_data_dict[
                            'analysis_params'].get('classifier_params', None)
-
+                if update:
+                    self.ro_acq_classifier_params(classifier_params)
+                    self.ro_acq_state_prob_mtx(state_prob_mtx)
+                return state_prob_mtx, classifier_params
             else:
                 rotate = self.ro_acq_weight_type() in {'SSB', 'DSB'}
                 if thresholded:
@@ -3111,9 +3322,9 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        if (cal_points) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
-                            'or to 6 if for_ef==True.')
+        if cal_points and no_cal_points is None:
+            logging.warning('no_cal_points is None. Defaults to 4 if '
+                            'for_ef==False, or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -3140,7 +3351,7 @@ class QuDev_transmon(Qubit):
 
         if label is None:
             if for_ef:
-                label = 'Rabi_2nd'
+                label = 'Rabi_ef'
             else:
                 label = 'Rabi'
 
@@ -3167,30 +3378,10 @@ class QuDev_transmon(Qubit):
 
         #get pi and pi/2 amplitudes from the analysis results
         if analyze:
-            if for_ef:
-                #TODO: change hardcoding here
-                cal_states_dict = {'$|g\\rangle$':
-                                       {'data_indices': [-6, -5],
-                                        'rotation': None},
-                                   '$|e\\rangle$':
-                                       {'data_indices': [-4, -3],
-                                        'rotation': 0},
-                                   '$|f\\rangle$':
-                                       {'data_indices': [-2, -1],
-                                        'rotation': 1}}
-                rabi_ana = \
-                    tda.RabiAnalysis(qb_names=[self.name],
-                                     options_dict=dict(
-                                         cal_states_dict=cal_states_dict,
-                                         for_ef=True))
-                amp180 = rabi_ana.proc_data_dict['analysis_params_dict'][
-                    self.name]['piPulse']
-            else:
-                rabi_ana = tda.RabiAnalysis(qb_names=[self.name])
-                amp180 = rabi_ana.proc_data_dict['analysis_params_dict'][
-                    self.name]['piPulse']
-
+            rabi_ana = tda.RabiAnalysis(qb_names=[self.name])
             if update:
+                amp180 = rabi_ana.proc_data_dict['analysis_params_dict'][
+                    self.name]['piPulse']
                 if for_ef is False:
                     self.amp180(amp180)
                     self.amp90_scale(0.5)
@@ -3265,9 +3456,9 @@ class QuDev_transmon(Qubit):
             raise ValueError('Some of the values in the times array might be too '
                             'large. The units should be seconds.')
 
-        if (cal_points) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
-                            'or to 6 if for_ef==True.')
+        if cal_points and no_cal_points is None:
+            logging.warning('no_cal_points is None. Defaults to 4 if '
+                            'for_ef==False, or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -3281,7 +3472,7 @@ class QuDev_transmon(Qubit):
 
         if label is None:
             if for_ef:
-                label = 'T1_2nd' + self.msmt_suffix
+                label = 'T1_ef' + self.msmt_suffix
             else:
                 label = 'T1' + self.msmt_suffix
 
@@ -3305,33 +3496,17 @@ class QuDev_transmon(Qubit):
                                     cal_points=cal_points,
                                     no_cal_points=no_cal_points,
                                     last_ge_pulse=last_ge_pulse,
-                                    upload=upload)
+                                    upload=upload, label=label)
 
         else:
             self.measure_T1(times=times, MC=MC,
                             close_fig=close_fig,
                             cal_points=cal_points,
-                            upload=upload)
+                            upload=upload, label=label)
 
         #Extract T1 and T1_stddev from ma.T1_Analysis
         if kw.pop('analyze', True):
-            if for_ef:
-                cal_states_dict = {'$|g\\rangle$':
-                                       {'data_indices': [-6, -5],
-                                        'rotation': None},
-                                   '$|e\\rangle$':
-                                       {'data_indices': [-4, -3],
-                                        'rotation': 0},
-                                   '$|f\\rangle$':
-                                       {'data_indices': [-2, -1],
-                                        'rotation': 1}}
-                T1_ana = tda.T1Analysis(
-                    qb_names=['qb1'], options_dict=dict(
-                        cal_states_dict=cal_states_dict,
-                        for_ef=True))
-            else:
-                T1_ana = tda.T1Analysis(qb_names=[self.name])
-
+            T1_ana = tda.T1Analysis(qb_names=[self.name])
             if update:
                 T1 = T1_ana.proc_data_dict['analysis_params_dict'][
                     self.name]['T1']
@@ -3487,7 +3662,7 @@ class QuDev_transmon(Qubit):
         if np.any(times>1e-3):
             logging.warning('The values in the times array might be too large.')
 
-        if (cal_points is True) and (no_cal_points is None):
+        if cal_points and no_cal_points is None:
             logging.warning('no_cal_points is None. Defaults to 4 if '
                             'for_ef==False, or to 6 if for_ef==True.')
             if for_ef:
@@ -3495,7 +3670,7 @@ class QuDev_transmon(Qubit):
             else:
                 no_cal_points = 4
 
-        if cal_points is False:
+        if not cal_points:
             no_cal_points = 0
 
         if MC is None:
@@ -3503,7 +3678,7 @@ class QuDev_transmon(Qubit):
 
         if label is None:
             if for_ef:
-                label = 'Ramsey_2nd' + self.msmt_suffix
+                label = 'Ramsey_ef' + self.msmt_suffix
             else:
                 label = 'Ramsey' + self.msmt_suffix
 
@@ -3603,38 +3778,15 @@ class QuDev_transmon(Qubit):
                 new_qubit_freq = ramsey_ana.qubit_frequency  # value
                 T2_star = ramsey_ana.T2_star['T2_star']  # dict
 
-            if for_ef:
-                # TODO: change hardcoding here of calpoints
-                cal_states_dict = {'$|g\\rangle$':
-                                       {'data_indices': [-6, -5],
-                                        'rotation': None},
-                                   '$|e\\rangle$':
-                                       {'data_indices': [-4, -3],
-                                        'rotation': 0},
-                                   '$|f\\rangle$':
-                                       {'data_indices': [-2, -1],
-                                        'rotation': 1}}
-                ramsey_ana = tda.RamseyAnalysis(
-                    qb_names=[self.name], options_dict=dict(
-                        fit_gaussian_decay=kw.get('fit_gaussian_decay', True),
-                        cal_states_dict=cal_states_dict, for_ef=True))
-                new_qubit_freq = ramsey_ana.proc_data_dict[
-                    'analysis_params_dict'][self.name]['exp_decay_' + self.name][
-                    'new_qb_freq']
-                T2_star = ramsey_ana.proc_data_dict[
-                    'analysis_params_dict'][self.name]['exp_decay_' + self.name][
-                    'T2_star']
-
             else:
                 ramsey_ana = tda.RamseyAnalysis(
-                    qb_names=[self.name],
-                    options_dict={'fit_gaussian_decay':
-                                   kw.get('fit_gaussian_decay', True)})
+                    qb_names=[self.name], options_dict=dict(
+                        fit_gaussian_decay=kw.get('fit_gaussian_decay', True)))
                 new_qubit_freq = ramsey_ana.proc_data_dict[
-                    'analysis_params_dict'][self.name]['exp_decay_'+self.name][
+                    'analysis_params_dict'][self.name]['exp_decay_' + self.name][
                     'new_qb_freq']
                 T2_star = ramsey_ana.proc_data_dict[
-                    'analysis_params_dict'][self.name]['exp_decay_'+self.name][
+                    'analysis_params_dict'][self.name]['exp_decay_' + self.name][
                     'T2_star']
 
             if update:
@@ -3665,8 +3817,10 @@ class QuDev_transmon(Qubit):
 
     def find_T2_echo(self, times, artificial_detuning=None,
                      upload=True, MC=None, label=None,
-                     cal_points=True, analyze=True,
-                     close_fig=True, update=False, **kw):
+                     cal_points=True, no_cal_points=None,
+                     analyze=True, for_ef=False,
+                     close_fig=True, update=False,
+                     last_ge_pulse=False, **kw):
         """
         Finds the qubit T2 Echo.
         Uses the EchoAnalysis class in timedomain_analysis.py.
@@ -3711,11 +3865,25 @@ class QuDev_transmon(Qubit):
         if np.any(times > 1e-3):
             logging.warning('The values in the times array might be too large.')
 
+        if cal_points and no_cal_points is None:
+            logging.warning('no_cal_points is None. Defaults to 4 if '
+                            'for_ef==False, or to 6 if for_ef==True.')
+            if for_ef:
+                no_cal_points = 6
+            else:
+                no_cal_points = 4
+
+        if not cal_points:
+            no_cal_points = 0
+
         if MC is None:
             MC = self.MC
 
         if label is None:
-            label = 'Echo' + self.msmt_suffix
+            if for_ef:
+                label = 'Echo_ef' + self.msmt_suffix
+            else:
+                label = 'Echo' + self.msmt_suffix
 
         if times is None:
             times_span = kw.get('times_span', 5e-6)
@@ -3733,21 +3901,28 @@ class QuDev_transmon(Qubit):
                                     nr_points)
 
         # perform measurement
-        self.measure_echo(
-            times=times, artificial_detuning=artificial_detuning,
-            MC=MC, cal_points=cal_points,
-            close_fig=close_fig, upload=upload, label=label)
+        if for_ef:
+            self.measure_echo_2nd_exc(times=times,
+                                      artificial_detuning=artificial_detuning,
+                                      label=label, MC=MC, cal_points=cal_points,
+                                      no_cal_points=no_cal_points, upload=upload,
+                                      last_ge_pulse=last_ge_pulse)
+        else:
+            self.measure_echo(
+                times=times, artificial_detuning=artificial_detuning,
+                MC=MC, cal_points=cal_points,
+                close_fig=close_fig, upload=upload, label=label)
 
         if analyze:
             echo_ana = tda.EchoAnalysis(
                 qb_names=[self.name],
-                options_dict={'artificial_detuning': artificial_detuning,
-                              'fit_gaussian_decay':
+                options_dict={
+                    'artificial_detuning': artificial_detuning,
+                    'fit_gaussian_decay':
                                   kw.get('fit_gaussian_decay', True)})
-            T2_echo = echo_ana.proc_data_dict[
-                'analysis_params_dict'][self.name]['T2_echo']
-
             if update:
+                T2_echo = echo_ana.proc_data_dict[
+                    'analysis_params_dict'][self.name]['T2_echo']
                 try:
                     self.T2(T2_echo)
                 except AttributeError as e:
@@ -3847,7 +4022,7 @@ class QuDev_transmon(Qubit):
                             "parameter. "
                             "Set update=True if you want this!")
 
-        if (cal_points) and (no_cal_points is None):
+        if cal_points and no_cal_points is None:
             logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
                             'or to 6 if for_ef==True.')
             if for_ef:
@@ -3863,7 +4038,7 @@ class QuDev_transmon(Qubit):
 
         if label is None:
             if for_ef:
-                label = 'QScale_2nd' + self.msmt_suffix
+                label = 'QScale_ef' + self.msmt_suffix
             else:
                 label = 'QScale' + self.msmt_suffix
 
@@ -3893,28 +4068,10 @@ class QuDev_transmon(Qubit):
         # Perform analysis and extract the optimal qscale parameter
         # Returns the optimal qscale parameter
         if kw.pop('analyze', True):
-            if for_ef:
-                # TODO remove hard coded cal points
-                cal_states_dict = {'$|g\\rangle$':
-                                       {'data_indices': [-6, -5],
-                                        'rotation': None},
-                                   '$|e\\rangle$':
-                                       {'data_indices': [-4, -3],
-                                        'rotation': 0},
-                                   '$|f\\rangle$':
-                                       {'data_indices': [-2, -1],
-                                        'rotation': 1}}
-                qscale_ana = tda.QScaleAnalysis(
-                    qb_names=[self.name], options_dict=dict(
-                        cal_states_dict=cal_states_dict, for_ef=True))
-                qscale = qscale_ana.proc_data_dict['analysis_params_dict'][
-                    self.name]['qscale']
-            else:
-                qscale_ana = tda.QScaleAnalysis(qb_names=[self.name])
-                qscale = qscale_ana.proc_data_dict['analysis_params_dict'][
-                    self.name]['qscale']
-
+            qscale_ana = tda.QScaleAnalysis(qb_names=[self.name])
             if update:
+                qscale = qscale_ana.proc_data_dict['analysis_params_dict'][
+                    self.name]['qscale']
                 if for_ef:
                     self.motzoi_ef(qscale)
                 else:
