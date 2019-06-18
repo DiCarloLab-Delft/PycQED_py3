@@ -30,6 +30,9 @@ Changelog:
 - merged branch 'QCC_testing' into 'feature/cc', changes:
     pulled in changed upload_waveform_realtime from ZI_HDAWG8.py again
 
+20190618 WJV
+- merged branch 'develop' into 'feature/cc', changes:
+    pulled in changed upload_waveform_realtime from ZI_HDAWG8.py again
 
 """
 
@@ -236,7 +239,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
         self.set('awgs_{}_sequencer_program_crc32_hash'.format(awg_nr),
                  hash_val)
 
-    def upload_waveform_realtime(self, w0, w1, awg_nr: int, wf_nr: int =1):
+    def upload_waveform_realtime(self, w0, w1, awg_nr: int, wf_nr: int = 1):
         """
         Warning! This method should be used with care.
         Uploads a waveform to the awg in realtime, note that this get's
@@ -260,32 +263,31 @@ class ZI_HDAWG_core(ZI_base_instrument):
         self._realtime_w1 = w1
 
         # Checked and everything matches
-        #print(self)
-        #print(hex(id(self)))
-        #print(self._dev)
-        #print(hex(id(self._dev)))
+        # print(self)
+        # print(hex(id(self)))
+        # print(self._dev)
+        # print(hex(id(self._dev)))
 
         c = np.vstack((w0, w1)).reshape((-2,), order='F')
         self._dev.seti('awgs/{}/enable'.format(awg_nr), 0)
         self._dev.subs('awgs/{}/ready'.format(awg_nr))
         self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
-        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
+        # self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
         # Try as float32 instead
-        # Using new-style indexed waveform write
-        #self._dev.setv('awgs/{}/waveform/indexed/{}'.format(awg_nr, wf_nr), c.astype(np.float32))
+        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c.astype(np.float32))
 
         # Commented out checking if ready.
         # creates too much time overhead.
-        data = self._dev.poll(0.01)
-        t0 = time.time()
-        while not data:
-            data = self._dev.poll(0.01)
-            if time.time()-t0> self.timeout():
-                raise TimeoutError
-        self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
+        # data = self._dev.poll()
+        # t0 = time.time()
+        # while not data:
+        #     data = self._dev.poll()
+        #     if time.time()-t0> self.timeout():
+        #         raise TimeoutError
+        # self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
         self._dev.seti('awgs/{}/enable'.format(awg_nr), 1)
 
-    ##########################################################################
+##########################################################################
     # 'private' functions, internal to the driver
     ##########################################################################
 

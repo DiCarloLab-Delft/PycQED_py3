@@ -53,6 +53,10 @@ Changelog:
 - merged branch 'QCC_testing' into 'feature/cc', changes:
     upload_waveform_realtime was updated, moved it to ZI_HDAWG_core.py again
 
+20190618 WJV
+- merged branch 'develop' into 'feature/cc', changes:
+    upload_waveform_realtime was updated, moved it to ZI_HDAWG_core.py again
+
 
 """
 

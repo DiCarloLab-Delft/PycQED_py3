@@ -2363,8 +2363,8 @@ class Echo_analysis_V15(TD_Analysis):
     New echo analysis for varying phase pulses. Based on old ramsey analysis.
     Should be replaced asap by a V2-style analysis
 
-    -Luc 
-    """ 
+    -Luc
+    """
 
     def __init__(self, label='echo', phase_sweep_only=False, **kw):
         kw['label'] = label
@@ -4937,31 +4937,31 @@ class Ramsey_Analysis(TD_Analysis):
 
         if isinstance(art_det, list):
             art_det = art_det[0]
+        # print(fit_res.params['tau'])
+        # if textbox:
+        #     textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
+        #                % (self.qubit_freq_spec * 1e-9) +
+        #                '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
+        #                % (self.qubit_frequency * 1e-9,
+        #                   fit_res.params['frequency'].stderr * 1e-9) +
+        #                '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
+        #                % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
+        #                   fit_res.params['frequency'].stderr * 1e-6) +
+        #                '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
+        #                % (fit_res.params['frequency'].value * 1e-6,
+        #                   fit_res.params['frequency'].stderr * 1e-6) +
+        #                '\n$T_2^\star$ = %.6g '
+        #                % (fit_res.params['tau'].value * self.scale) +
+        #                self.units + ' $\pm$ (%.6g) '
+        #                % (fit_res.params['tau'].stderr * self.scale) +
+        #                self.units +
+        #                '\nartificial detuning = %.2g MHz'
+        #                % (art_det * 1e-6))
 
-        if textbox:
-            textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
-                       % (self.qubit_freq_spec * 1e-9) +
-                       '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
-                       % (self.qubit_frequency * 1e-9,
-                          fit_res.params['frequency'].stderr * 1e-9) +
-                       '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
-                       % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
-                          fit_res.params['frequency'].stderr * 1e-6) +
-                       '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
-                       % (fit_res.params['frequency'].value * 1e-6,
-                          fit_res.params['frequency'].stderr * 1e-6) +
-                       '\n$T_2^\star$ = %.6g '
-                       % (fit_res.params['tau'].value * self.scale) +
-                       self.units + ' $\pm$ (%.6g) '
-                       % (fit_res.params['tau'].stderr * self.scale) +
-                       self.units +
-                       '\nartificial detuning = %.2g MHz'
-                       % (art_det * 1e-6))
-
-            fig.text(0.5, 0, textstr, fontsize=self.font_size,
-                     transform=ax.transAxes,
-                     verticalalignment='top',
-                     horizontalalignment='center', bbox=self.box_props)
+        #     fig.text(0.5, 0, textstr, fontsize=self.font_size,
+        #              transform=ax.transAxes,
+        #              verticalalignment='top',
+        #              horizontalalignment='center', bbox=self.box_props)
 
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints - 1],
@@ -6438,6 +6438,71 @@ class Homodyne_Analysis(MeasurementAnalysis):
         return fit_res
 
 
+class Homodyne_Analysis_Mutipeak(MeasurementAnalysis):
+
+    def __init__(self, label='', dip=False, **kw):
+        # Custome power message is used to create a message in resonator measurements
+        # dict must be custom_power_message={'Power': -15, 'Atten': 86, 'res_len':3e-6}
+        # Power in dBm, Atten in dB and resonator length in m
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        self.dip = dip
+        super().__init__(**kw)
+
+    def run_default_analysis(self,
+                             close_file=False,
+                             show=False, **kw):
+        '''
+
+        '''
+        super(self.__class__, self).run_default_analysis(
+            close_file=False, show=show, **kw)
+        self.add_analysis_datagroup_to_file()
+
+        window_len_filter = kw.get('window_len_filter', 11)
+
+        data_x = self.sweep_points
+        data_y = self.measured_values[0]
+        if self.dip:
+            data_y_find = -data_y
+        else:
+            data_y_find = data_y
+
+        self.peaks = a_tools.peak_finder_v2(data_x, data_y_find,
+                                            window_len=window_len_filter, perc=92)
+        self.peak_indices = np.array([list(data_x).index(p) for p in self.peaks])
+        self.peak_vals = data_y[self.peak_indices]
+        self.peak_amps = np.abs(self.peak_vals-np.mean(data_y))
+
+        fig, ax = self.default_ax()
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.measured_values[0],
+                                        fig=fig, ax=ax,
+                                        xlabel=self.sweep_name,
+                                        x_unit=self.sweep_unit[0],
+                                        ylabel=str('S21_mag'),
+                                        y_unit=self.value_units[0],
+                                        save=False)
+        # ensures that amplitude plot starts at zero
+        ax.set_ylim(ymin=0.000)
+
+        ax.plot(self.peaks, self.peak_vals, 'o',
+                        ms=self.marker_size_special)
+
+        textstr = 'Peak positions and heights'
+        for pos, amp in zip(self.peaks, self.peak_amps):
+            textstr += '\n $f=${:.4g} GHz; $A=${:.2g}'.format(pos/1e9,amp)
+
+        fig.text(1, 0.5, textstr, transform=ax.transAxes,
+                 fontsize=self.font_size,
+                 verticalalignment='center',
+                 horizontalalignment='left', bbox=self.box_props)
+
+        self.save_fig(fig, xlabel=self.xlabel, ylabel='peaks', **kw)
+
+        return self.peaks
+
+
 ################
 # VNA analysis #
 ################
@@ -7725,6 +7790,45 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
         if close_file:
             self.finish()
 
+        # For finding correct ro power and dispersive shift
+        f0 = np.zeros(len(self.sweep_points_2D))
+        for u, power in enumerate(self.sweep_points_2D):
+            f0[u] = self.fit_results[str(power)].values['f0']
+        self.f0 = f0
+
+        # Find low power regime
+        # For now, low and high power regimes look at frequency shifts only. 
+        # It could be extended by looking at the amplitude of the dip, such that
+        # fewer data points are necessary
+
+        threshold = 0.25e6
+        f_low = 0
+        P_result = np.max(self.sweep_points_2D)
+        try:
+            for u, f in enumerate(f0):
+                if np.abs(f0[u] - f0[u+1]) < threshold:
+                    f_low = f0[u+1]
+                    P_result = self.sweep_points_2D[u+1]
+                else:
+                    break
+        except IndexError:
+            pass
+
+        # High power regime: just use the value at highest power
+
+        f_high = f0[-1]
+
+        if (f_high < f_low):
+            shift = f_high - f_low
+        else:
+            shift = 0
+            print('f_high: ' + str(f_high))
+            print('f_low:  ' + str(f_low))
+            # raise Exception('High power regime frequency found to be higher than'
+            #                 'low power regime frequency')
+        results = [shift, P_result, f_low, f_high]
+        self.results = results
+
     def fit_hanger_model(self, sweep_values, measured_values):
         HangerModel = fit_mods.SlopedHangerAmplitudeModel
 
@@ -8665,7 +8769,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                              add_title=add_title,
                              xlabel=xlabel, ylabel=ylabel)
 
-        self.peaks_low, self.peaks_high = self.find_peaks()
+        self.peaks_low, self.peaks_high = self.find_peaks(**kw)
         self.f, self.ax = self.make_unfiltered_figure(self.peaks_low, self.peaks_high,
                                                       transpose=transpose, cmap=cmap,
                                                       add_title=add_title,
@@ -8712,7 +8816,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
         peaks = np.zeros((len(self.X), 2))
         for i in range(len(self.X)):
-            p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i])
+            p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i], **kw)
             peaks[i, :] = np.sort(p_dict[:2])
 
         peaks_low = peaks[:, 0]

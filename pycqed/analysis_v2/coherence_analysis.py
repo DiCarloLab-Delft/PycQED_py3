@@ -1572,7 +1572,7 @@ def fit_fixed_Q_factor(freq, tau):
 
 def fit_frequencies(dac, freq,
                     Ec_guess=260e6, Ej_guess=19e9, offset_guess=0,
-                    dac0_guess=0.5):
+                    dac0_guess=None):
     """
     Perform fit against the transmon flux arc model.
 
@@ -1586,11 +1586,13 @@ def fit_frequencies(dac, freq,
     # define the model (from the function) used to fit data
     arch_model = lmfit.Model(arch)
 
+    if dac0_guess is None:
+        dac0_guess = np.max(np.abs(dac))*2
+
     # set some hardcoded guesses
-    arch_model.set_param_hint('Ec', value=Ec_guess, min=100e6, max=350e6)
-    arch_model.set_param_hint('Ej', value=Ej_guess, min=0.1e9, max=30e9)
-    arch_model.set_param_hint(
-        'offset', value=offset_guess, min=-0.05, max=0.05)
+    arch_model.set_param_hint('Ec', value=Ec_guess, min=1e6, max=350e6)
+    arch_model.set_param_hint('Ej', value=Ej_guess, min=0.1e9, max=50e12)
+    arch_model.set_param_hint('offset', value=offset_guess, min=-0.5, max=0.5)
     arch_model.set_param_hint('dac0', value=dac0_guess, min=0)
 
     params = arch_model.make_params()
