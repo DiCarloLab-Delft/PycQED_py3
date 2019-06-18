@@ -278,6 +278,7 @@ class Qubit(Instrument):
            be improved upon). Defaults to None for test resonators;
         4: Sweetspot current obtained from DAC scan of best coupled fluxline;
         5: Frequency shift of a power scan (used to predict qubit freq);
+        6: RO amp (from find_test_resonator)
 
         TODO: Add measure_with_VNA to CCL Transmon object
         """
@@ -319,7 +320,7 @@ class Qubit(Instrument):
 
         self.res_dict = {}
         for i, freq in enumerate(result.peaks):
-            self.res_dict[str(i)] = [freq, 'unknown', {}, None, 0, 0]
+            self.res_dict[str(i)] = [freq, 'unknown', {}, None, 0, 0, 1]
 
         if verbose:
             for resonator, items in self.res_dict.items():
@@ -392,8 +393,8 @@ class Qubit(Instrument):
                 name = 'VNA_Resonator_scan_' + str(round(freq/1e9, 4)) + 'GHz'
                 self.measure_with_VNA(VNA, start_freq, stop_freq, npts)
             else:
-                self.ro_pulse_amp(0.06)
-                self.ro_pulse_amp_CW(0.01)
+                self.ro_pulse_amp(1)
+                self.ro_pulse_amp_CW(1)
                 freqs = np.arange(freq-5e6, freq+5e6, 0.1e6)
                 name = 'Resonator_scan' + self.msmt_suffix
                 self.measure_heterodyne_spectroscopy(freqs=freqs,
@@ -404,7 +405,7 @@ class Qubit(Instrument):
             dip = np.amin(a.data_y)
             offset = a.fit_results.params['A'].value
 
-            if np.abs(dip/offset) > 0.5:
+            if np.abs(dip/offset) > 0.8:
                 print('Removed candidate {} ({:.3f} GHz): Not a resonator'
                       .format(resonator, freq/1e9))
                 delkeys.append(resonator)
@@ -482,11 +483,15 @@ class Qubit(Instrument):
                 if np.abs(shift) > 100e3:
                     state = 'qubit_resonator'
                     self.freq_res(freq)
+                    # amp = 10**(power/20)
+                    # self.ro_pulse_amp(amp)
+                    # self.ro_pulse_amp_CW(amp/3)
                 else:
                     state = 'test_resonator'
                 self.res_dict[resonator][0] = freq
                 self.res_dict[resonator][1] = state
                 self.res_dict[resonator][5] = shift
+                self.res_dict[resonator][6] = 10**(power/20)
         return True
 
     def find_qubit_resonator_fluxline(self, with_VNA=None, verbose=True):
@@ -506,6 +511,8 @@ class Qubit(Instrument):
         dac_values = np.arange(-20e-3, 20e-3, 2e-3)
 
         for resonator, items in self.res_dict.items():
+            self.ro_pulse_amp(items[6])
+            self.ro_pulse_amp_CW(items[6]/3)
             best_amplitude = 0  # For comparing which one is coupled closest
             if items[1] == 'qubit_resonator':
                 freq = items[0]
@@ -547,8 +554,9 @@ class Qubit(Instrument):
                         self.res_dict[resonator][3] = 'Q' + fluxline[4]
                         self.res_dict[resonator][4] = sweetspot_current
 
-                        self.fl_dc_V0(sweetspot_current)
-                        fluxcurrent[fluxline](sweetspot_current)
+                        # self.fl_dc_V0(sweetspot_current)
+                        # fluxcurrent[fluxline](sweetspot_current)
+                        # self.freq_res(items[0])
 
         if verbose:
             for items in self.res_dict.values():
@@ -557,6 +565,19 @@ class Qubit(Instrument):
                                                               items[0]/1e9,
                                                               items[3],
                                                               items[4]*1e3))
+
+
+        for resonator, items in self.res_dict.items():
+            if items[1] == 'qubit_resonator':
+                if self.name == items[3]:
+                    self.freq_res(items[0])
+                    self.ro_freq(items[0])
+                    self.fl_dc_V0(items[4])
+                    self.cfg_dc_flux_ch('FBL_' + items[3][-1])
+                    self.freq_qubit(items[0] - np.abs(
+                            (70e6)**2/(2*items[5])))
+                    fluxcurrent[self.cfg_dc_flux_ch()](self.fl_dc_V0())
+                    
         try:
             device = self.device
             device.res_dict = self.res_dict
