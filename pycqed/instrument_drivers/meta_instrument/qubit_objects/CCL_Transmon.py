@@ -26,7 +26,7 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 import pycqed.measurement.composite_detector_functions as cdf
-
+import pytest
 
 import cma
 from pycqed.measurement.optimization import nelder_mead
@@ -1225,12 +1225,12 @@ class CCLight_Transmon(Qubit):
         if freqs is None:
             freq_center = self.freq_qubit()
             freq_range = 300e6
-            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+            freqs = np.arange(freq_center-1/2*freq_range, freq_center+20e6,
                               0.5e6)
         if dac_values is None:
             if self.fl_dc_V0() is not None:
                 dac_values = np.linspace(self.fl_dc_V0() - 0.5e-3,
-                                         self.fl_dc_V0() + 0.5e-3, 4)
+                                         self.fl_dc_V0() + 0.5e-3, 8)
             else:
                 dac_values = np.linspace(-0.5e-3, 0.5e-3, 4)
 
@@ -1286,6 +1286,23 @@ class CCLight_Transmon(Qubit):
         if set_to_sweetspot:
             self.instr_FluxCtrl.get_instr()[self.cfg_dc_flux_ch()](sweetspot_current)
         
+        # Sanity check: does this peak move with flux?
+        check_vals = [self.calc_current_to_freq(np.min(dac_values)),
+                      self.calc_current_to_freq(self.fl_dc_V0()),
+                      self.calc_freq_to_current(np.max(dac_values))]
+
+        if vals[0] == pytest.approx(vals[1], abs=0.5e6):
+            if vals[0] == pytest.approx(vals[2], abs=0.5e6):
+                if vals[1] == pytest.approx(vals[2], abs=0.5e6):
+                    logging.warning('No qubit shift found with varying flux. '
+                                    'Peak is not a qubit')
+                    return False
+
+        if self.flux_polycoeff()[1] < 1e6 and self.flux_polycoeff()[2] < 1e6:
+            logging.warning('No qubit shift found with varying flux. Peak is '
+                            'not a qubit')
+            return False
+
         return True
 
     def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
