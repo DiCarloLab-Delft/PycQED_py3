@@ -797,8 +797,7 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
       Model.set_param_hint('frequency', value=freq, min=0)
       Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s),
                                                          max=max(f0s))
-      Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2, min=0, 
-                                        max=max(f0s)-min(f0s))
+      Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2, min=0)
       Model.set_param_hint('phase', value=0)
       params = Model.make_params()
       fit_res = Model.fit(data=f0s, t=DAC_values, verbose=False)

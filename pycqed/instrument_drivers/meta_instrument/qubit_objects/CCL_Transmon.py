@@ -1207,7 +1207,7 @@ class CCLight_Transmon(Qubit):
             ro_pow = 10**(power/20)
             self.ro_pulse_amp_CW(ro_pow/3)
             if self.freq_qubit() is None:
-                f_qubit_estimate = self.freq_res() + (65e6)**(2*shift)
+                f_qubit_estimate = self.freq_res() + (65e6)**2/(shift) - 500e6
                 self.freq_qubit(f_qubit_estimate)
 
         return True
@@ -3864,18 +3864,18 @@ class CCLight_Transmon(Qubit):
                           calibrate_function=self.name + '.calibrate_ro_pulse_amp_CW')
 
         # Calibration of instruments and ro
-        # dag.add_node(self.name + ' Calibrations',
-        #                   calibrate_function=cal_True_delayed)
-        # dag.add_node(self.name + ' Mixer Skewness',
-        #                   calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
-        # dag.add_node(self.name + ' Mixer Offset Drive',
-        #                   calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
-        # dag.add_node(self.name + ' Mixer Offset Readout',
-        #                   calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
-        # dag.add_node(self.name + ' Ro/MW pulse timing',
-        #                   calibrate_function=cal_True_delayed)
-        # dag.add_node(self.name + ' Ro Pulse Amplitude',
-        #                   calibrate_function=self.name + '.ro_pulse_amp_CW')
+        dag.add_node(self.name + ' Calibrations',
+                          calibrate_function=cal_True_delayed)
+        dag.add_node(self.name + ' Mixer Skewness',
+                          calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
+        dag.add_node(self.name + ' Mixer Offset Drive',
+                          calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
+        dag.add_node(self.name + ' Mixer Offset Readout',
+                          calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
+        dag.add_node(self.name + ' Ro/MW pulse timing',
+                          calibrate_function=cal_True_delayed)
+        dag.add_node(self.name + ' Ro Pulse Amplitude',
+                          calibrate_function=self.name + '.ro_pulse_amp_CW')
 
         # Qubits calibration
         dag.add_node(self.name + ' Frequency Coarse',

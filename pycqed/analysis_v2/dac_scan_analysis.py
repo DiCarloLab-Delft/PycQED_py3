@@ -835,9 +835,9 @@ class DAC_analysis(ma.TwoD_Analysis):
         if "ylabel" not in kw:
             kw["ylabel"] = self.parameter_names[1]
         if "xunit" not in kw:
-            kw["xunit"] = self.parameter_units[0]
+            kw["xunit"] = 'Hz' #self.parameter_units[0]
         if "yunit" not in kw:
-            kw["yunit"] = self.parameter_units[1]
+            kw["yunit"] = 'A' # self.parameter_units[1]
 
         # subtract mean from each row/column if demanded
         plot_zvals = self.measured_values[0].transpose()
@@ -860,6 +860,10 @@ class DAC_analysis(ma.TwoD_Analysis):
                                 max(self.sweep_points_2D), 101)
 
         fit_plot = self.dac_fit_res['fit_polynomial'](plot_dacs)
+
+        set_xlabel(ax, 'Frequency', 'Hz')
+        # ylabel is value units as we are plotting linecuts
+        set_ylabel(ax, 'FBL_L', 'A')
 
         ax.plot(self.f0s, self.sweep_points_2D, 'ro-')
         ax.plot(fit_plot, plot_dacs, 'b')
