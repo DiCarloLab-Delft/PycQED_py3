@@ -644,7 +644,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             lr = - amp_J2_neg/(amp_J2_pos-amp_J2_neg)
             return lr
 
-    def get_polycoeffs_state(self, state: str, which_gate: str):
+    def get_polycoeffs_state(self, state: str, which_gate: str = 'NE'):
         """
         Args:
             state (str) : string of 2 numbers denoting the state. The numbers
@@ -655,6 +655,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Get's the polynomial coefficients that are used to calculate the
         energy levels of specific states.
         Note that avoided crossings are not taken into account here.
+        N.B. The value of which_gate (and its default) only affect the 
+        other qubits (here noted as MSQ)
 
 
         """
@@ -890,7 +892,28 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             return 1
         return 1/self.get_dac_val_to_amp_scalefactor()
 
+    def calc_amp_to_freq(self, amp: float, state: str = '01', which_gate: str = 'NE'):
+        """
+        Converts pulse amplitude in Volt to energy in Hz for a particular state
+        Args:
+            amp (float) : amplitude in Volt
+            state (str) : string of 2 numbers denoting the state. The numbers
+                correspond to the number of excitations in each qubits.
+                The LSQ (right) corresponds to the qubit being fluxed and
+                under control of this flux lutman.
 
+        N.B. this method assumes that the polycoeffs are with respect to the
+            amplitude in units of V, including rescaling due to the channel
+            amplitude and range settings of the AWG8.
+            See also `self.get_dac_val_to_amp_scalefactor`.
+        N.B. The value of which_gate (and its default) only affect the 
+            other qubit frequencies (here noted as MSQ 10)
+
+                amp_Volts = amp_dac_val * channel_amp * channel_range
+        """
+        polycoeffs = self.get_polycoeffs_state(state=state, which_gate=which_gate)
+
+        return np.polyval(polycoeffs, amp)
     ###########################################################
     #  Waveform generation net-zero phase correction methods  #
     ###########################################################
