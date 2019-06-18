@@ -337,63 +337,12 @@ class TestMultiQubitFluxLutMan:
     #     self.fluxlutman.cfg_distort(False)
     #     self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
 
-    # def test_generate_composite(self):
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     gen_wf = self.fluxlutman._gen_composite_wf('cz_z', time_tuples=[])
-    #     exp_wf = np.zeros(12000)  # 5us *2.4GSps
-    #     np.testing.assert_array_almost_equal(gen_wf, exp_wf)
-    #     flux_tuples = [(0, 'fl_cw_01', {(2, 0)}, 323),
-    #                    (14, 'fl_cw_01', {(2, 0)}, 326),
-    #                    (28, 'fl_cw_01', {(2, 0)}, 329),
-    #                    (50, 'fl_cw_01', {(2, 0)}, 340),
-    #                    (64, 'fl_cw_01', {(2, 0)}, 343),
-    #                    (82, 'fl_cw_01', {(2, 0)}, 350),
-    #                    (98, 'fl_cw_01', {(2, 0)}, 355),
-    #                    (116, 'fl_cw_01', {(2, 0)}, 362),
-    #                    (136, 'fl_cw_01', {(2, 0)}, 371),
-    #                    (155, 'fl_cw_01', {(2, 0)}, 379),
-    #                    (174, 'fl_cw_01', {(2, 0)}, 387)]
-
-    #     gen_wf = self.fluxlutman._gen_composite_wf(
-    #         'cz_z', time_tuples=flux_tuples)
-    #     # not testing for equality to some expected stuff here, prolly better
-
-    # def test_uploading_composite_waveform(self):
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     flux_tuples = [(0, 'fl_cw_01', {(2, 0)}, 323),
-    #                    (14, 'fl_cw_01', {(2, 0)}, 326),
-    #                    (28, 'fl_cw_01', {(2, 0)}, 329),
-    #                    (50, 'fl_cw_01', {(2, 0)}, 340),
-    #                    (64, 'fl_cw_01', {(2, 0)}, 343),
-    #                    (82, 'fl_cw_01', {(2, 0)}, 350),
-    #                    (98, 'fl_cw_01', {(2, 0)}, 355),
-    #                    (116, 'fl_cw_01', {(2, 0)}, 362),
-    #                    (136, 'fl_cw_01', {(2, 0)}, 371),
-    #                    (155, 'fl_cw_01', {(2, 0)}, 379),
-    #                    (174, 'fl_cw_01', {(2, 0)}, 387)]
-
-    #     # Testing several different base waveforms
-    #     for prim_wf in ['cz_z', 'square', 'idle_z']:
-    #         self.fluxlutman.load_composite_waveform_onto_AWG_lookuptable(
-    #             prim_wf, time_tuples=flux_tuples, codeword=3)
-    #         direct_gen_wf = self.fluxlutman._gen_composite_wf(
-    #             prim_wf, time_tuples=flux_tuples)
-    #         wave_dict_wf = self.fluxlutman._wave_dict[
-    #             'comp_{}_cw003'.format(prim_wf)]
-    #         np.testing.assert_array_almost_equal(direct_gen_wf, wave_dict_wf)
-
-    #         uploaded_wf_lutman = self.fluxlutman._wave_dict_dist[
-    #             'comp_{}_cw003'.format(prim_wf)]
-    #         uploaded_wf_instr = self.AWG.wave_ch1_cw003()
-    #         np.testing.assert_array_almost_equal(uploaded_wf_lutman,
-    #                                              uploaded_wf_instr)
-
     # def test_length_ratio(self):
-    #     self.fluxlutman.czd_length_ratio(.5)
+    #     self.fluxlutman.czd_length_ratio_SE(.5)
     #     lr = self.fluxlutman.calc_net_zero_length_ratio()
     #     np.testing.assert_allclose(lr, 0.5)
 
-    #     self.fluxlutman.czd_length_ratio('auto')
+    #     self.fluxlutman.czd_length_ratio_SE('auto')
 
     #     amp_J2_pos = self.fluxlutman.calc_eps_to_amp(
     #         0, state_A='11', state_B='02', positive_branch=True)
@@ -403,31 +352,28 @@ class TestMultiQubitFluxLutMan:
     #     integral = lr*amp_J2_pos + (1-lr)*amp_J2_neg
     #     np.testing.assert_almost_equal(integral, 0)
 
+    def test_czd_signs(self):
+        # Only tests get setting and validator does not test functionality. 
+        self.fluxlutman.czd_double_sided_SE(True)
+        signs  = self.fluxlutman.czd_signs_SE()
+        expected_signs = ['+', '-']
+        assert signs == expected_signs
 
-    # def test_czd_signs(self):
-    #     # Only tests get setting and validator does not test functionality. 
-    #     self.fluxlutman.czd_double_sided(True)
-    #     signs  = self.fluxlutman.czd_signs()
-    #     expected_signs = ['+', '-']
-    #     assert signs == expected_signs
-
-    #     with pytest.raises(Exception):
-    #         self.fluxlutman.czd_signs(['s', 1])
-
-
-    #     self.fluxlutman.czd_signs(['+', 0])
-    #     signs  = self.fluxlutman.czd_signs()
-    #     expected_signs = ['+', 0]
-    #     assert signs == expected_signs
-    #     self.fluxlutman.generate_standard_waveforms()
-
-    #     signs  = self.fluxlutman.czd_signs(['+', '-'])
+        with pytest.raises(Exception):
+            self.fluxlutman.czd_signs_SE(['s', 1])
 
 
+        self.fluxlutman.czd_signs_SE(['+', 0])
+        signs  = self.fluxlutman.czd_signs_SE()
+        expected_signs = ['+', 0]
+        assert signs == expected_signs
+        self.fluxlutman.generate_standard_waveforms()
 
-    # def test_render_wave(self):
-    #     self.fluxlutman.render_wave('cz_z', time_units='lut_index')
-    #     self.fluxlutman.render_wave('cz_z', time_units='s')
+        signs  = self.fluxlutman.czd_signs_SE(['+', '-'])
+
+    def test_render_wave(self):
+        self.fluxlutman.render_wave('cz_SE', time_units='lut_index')
+        self.fluxlutman.render_wave('cz_SE', time_units='s')
 
 
 # class TestLegacyFluxLutMan:
