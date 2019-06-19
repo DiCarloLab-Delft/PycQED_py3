@@ -1201,7 +1201,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         fig = self.plot_fidelity_matrix(
             self.proc_data_dict['analysis_params']['state_prob_mtx'],
             self.levels, title=title, show=show, auto_shot_info=False)
-        self.figs['state_prob_matrix'] = fig
+        self.figs['state_prob_matrix_{}'.format(self.classif_method)] = fig
 
         if self.pre_selection:
             title = self.raw_data_dict['timestamps'][0] + \
@@ -1209,12 +1209,13 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                 "\nTotal # shots:{}".format(
                     self.classif_method,
                     self.proc_data_dict['analysis_params']['n_shots_masked'])
-            
+
             fig = self.plot_fidelity_matrix(
                 self.proc_data_dict['analysis_params'] \
                                    ['state_prob_mtx_masked'],
                 self.levels, title=title, show=show, auto_shot_info=False)
-            self.figs['state_prob_matrix_masked'] = fig
+            fig_key = 'state_prob_matrix_masked_{}'.format(self.classif_method)
+            self.figs[fig_key] = fig
 
 
 class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
