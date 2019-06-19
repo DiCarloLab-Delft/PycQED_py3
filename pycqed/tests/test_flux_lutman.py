@@ -126,13 +126,13 @@ class TestMultiQubitFluxLutMan:
         np.testing.assert_allclose(self.AWG._realtime_w0[0], [.3])
         np.testing.assert_allclose(self.AWG._realtime_w1[0], [.5])
 
-    # def test_plot_level_diagram(self):
-    #     self.AWG.awgs_0_outputs_0_amplitude(.73)
-    #     self.fluxlutman.plot_level_diagram(show=False)
+    def test_plot_level_diagram(self):
+        self.AWG.awgs_0_outputs_0_amplitude(.73)
+        self.fluxlutman.plot_level_diagram(show=False, which_gate='SE')
 
-    # def test_plot_cz_trajectory(self):
-    #     self.fluxlutman.generate_standard_waveforms()
-    #     self.fluxlutman.plot_cz_trajectory(show=False)
+    def test_plot_cz_trajectory(self):
+        self.fluxlutman.generate_standard_waveforms()
+        self.fluxlutman.plot_cz_trajectory(show=False, which_gate='SE')
 
     def test_standard_cz_waveform(self):
         self.fluxlutman.czd_double_sided_SE(False)
@@ -207,9 +207,9 @@ class TestMultiQubitFluxLutMan:
         with pytest.raises(AssertionError):
             np.testing.assert_array_equal(czA, czC)
 
-    # def test_calc_amp_to_freq_unknown_state(self):
-    #     with pytest.raises(ValueError):
-    #         self.fluxlutman.get_polycoeffs_state('22')
+    def test_calc_amp_to_freq_unknown_state(self):
+        with pytest.raises(ValueError):
+            self.fluxlutman.get_polycoeffs_state('22')
 
     def test_calc_amp_to_freq_01(self):
         """
@@ -255,49 +255,61 @@ class TestMultiQubitFluxLutMan:
 
         np.testing.assert_allclose(freq_11, freq_11_expected)
 
-    # def test_calc_transition_freq_inversion(self):
-    #     state = '02'
-    #     amps = np.linspace(.3, 1, 11)
-    #     freqs_02 = self.fluxlutman.calc_amp_to_freq(amp=amps, state=state)
-    #     amps_inv = self.fluxlutman.calc_freq_to_amp(freqs_02, state=state,
-    #                                                 positive_branch=True)
-    #     np.testing.assert_array_almost_equal(amps, amps_inv)
+    def test_calc_transition_freq_inversion(self):
+        state = '02'
+        amps = np.linspace(.3, 1, 11)
+        freqs_02 = self.fluxlutman.calc_amp_to_freq(amp=amps,
+                                                    state=state, which_gate='SE')
+        amps_inv = self.fluxlutman.calc_freq_to_amp(freqs_02,
+                                                    state=state,
+                                                    which_gate='SE',
+                                                    positive_branch=True)
+        np.testing.assert_array_almost_equal(amps, amps_inv)
 
-    #     amps = np.linspace(-.3, -1, 11)
-    #     freqs_02 = self.fluxlutman.calc_amp_to_freq(amp=amps, state=state)
-    #     amps_inv = self.fluxlutman.calc_freq_to_amp(freqs_02, state=state,
-    #                                                 positive_branch=False)
-    #     np.testing.assert_array_almost_equal(amps, amps_inv)
+        amps = np.linspace(-.3, -1, 11)
+        freqs_02 = self.fluxlutman.calc_amp_to_freq(amp=amps,
+                                                    state=state, which_gate='SE')
+        amps_inv = self.fluxlutman.calc_freq_to_amp(freqs_02, state=state,
+                                                    which_gate='SE',
+                                                    positive_branch=False)
+        np.testing.assert_array_almost_equal(amps, amps_inv)
 
-    # def test_calc_amp_to_eps(self):
-    #     state_A = '02'
-    #     state_B = '11'
-    #     amps = np.linspace(-1, 1, 11)
-    #     eps = self.fluxlutman.calc_amp_to_eps(amp=amps, state_A=state_A,
-    #                                           state_B=state_B)
+    def test_calc_amp_to_eps(self):
+        state_A = '02'
+        state_B = '11'
+        amps = np.linspace(-1, 1, 11)
+        eps = self.fluxlutman.calc_amp_to_eps(amp=amps, state_A=state_A,
+                                              state_B=state_B,
+                                              which_gate='SE')
 
-    #     freqs_02 = self.fluxlutman.calc_amp_to_freq(amp=amps, state=state_A)
-    #     freqs_11 = self.fluxlutman.calc_amp_to_freq(amp=amps, state=state_B)
-    #     expected_eps = freqs_11 - freqs_02
-    #     np.testing.assert_array_almost_equal(eps, expected_eps)
+        freqs_02 = self.fluxlutman.calc_amp_to_freq(amp=amps, state=state_A,
+                                                    which_gate='SE')
+        freqs_11 = self.fluxlutman.calc_amp_to_freq(amp=amps, state=state_B,
+                                                    which_gate='SE')
+        expected_eps = freqs_11 - freqs_02
+        np.testing.assert_array_almost_equal(eps, expected_eps)
 
-    # def test_calc_detuning_freq_inversion(self):
-    #     state_A = '02'
-    #     state_B = '11'
+    def test_calc_detuning_freq_inversion(self):
+        state_A = '02'
+        state_B = '11'
 
-    #     amps = np.linspace(.3, 1, 11)
-    #     freqs_02 = self.fluxlutman.calc_amp_to_eps(
-    #         amp=amps, state_A=state_A, state_B=state_B)
-    #     amps_inv = self.fluxlutman.calc_eps_to_amp(
-    #         freqs_02, state_A=state_A, state_B=state_B, positive_branch=True)
-    #     np.testing.assert_array_almost_equal(amps, amps_inv)
+        amps = np.linspace(.3, 1, 11)
+        freqs_02 = self.fluxlutman.calc_amp_to_eps(
+            amp=amps, state_A=state_A, state_B=state_B,
+                                                    which_gate='SE')
+        amps_inv = self.fluxlutman.calc_eps_to_amp(
+            freqs_02, state_A=state_A, state_B=state_B, positive_branch=True,
+                                                    which_gate='SE')
+        np.testing.assert_array_almost_equal(amps, amps_inv)
 
-    #     amps = np.linspace(-.3, -1, 11)
-    #     freqs_02 = self.fluxlutman.calc_amp_to_eps(
-    #         amp=amps, state_A=state_A, state_B=state_B)
-    #     amps_inv = self.fluxlutman.calc_eps_to_amp(
-    #         freqs_02, state_A=state_A, state_B=state_B, positive_branch=False)
-    #     np.testing.assert_array_almost_equal(amps, amps_inv)
+        amps = np.linspace(-.3, -1, 11)
+        freqs_02 = self.fluxlutman.calc_amp_to_eps(
+            amp=amps, state_A=state_A, state_B=state_B,
+                                                    which_gate='SE')
+        amps_inv = self.fluxlutman.calc_eps_to_amp(
+            freqs_02, state_A=state_A, state_B=state_B, positive_branch=False,
+                                                    which_gate='SE')
+        np.testing.assert_array_almost_equal(amps, amps_inv)
 
     def test_custom_wf(self):
         self.fluxlutman.generate_standard_waveforms()

@@ -32,10 +32,10 @@ valid_types = {'idle', 'cz', 'idle_z', 'square', 'custom'}
 
 # # JUST FOR TESTING. DELETE ME AFTER TESTS PASS
 # def clocks_to_s(time, clock_cycle=20e-9):
-#     """
-#     Converts a time in clocks to a time in s
-#     """
-#     return time*clock_cycle
+    """
+    Converts a time in clocks to a time in s
+    """
+    return time*clock_cycle
 
 def flux_lutmap_is_valid(lutmap: dict) -> bool:
     """
@@ -777,6 +777,27 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             max_sample = int(self.custom_wf_length()*self.sampling_rate())
             base_wf[max_sample:] = 0
         return base_wf
+
+
+    def calc_freq_to_amp(self, freq: float, state: str = '01',
+                         which_gate: str = 'NE',
+                         positive_branch=True):
+        """
+        Calculates amplitude in Volt corresponding to the energy of a state
+        in Hz.
+
+        N.B. this method assumes that the polycoeffs are with respect to the
+            amplitude in units of V, including rescaling due to the channel
+            amplitude and range settings of the AWG8.
+            See also `self.get_dac_val_to_amp_scalefactor`.
+
+                amp_Volts = amp_dac_val * channel_amp * channel_range
+        """
+
+        return self.calc_eps_to_amp(eps=freq, state_B=state, state_A='00',
+                                    positive_branch=positive_branch, which_gate=which_gate)
+
+
     """
     UNTOUCHED
     """
@@ -1305,21 +1326,28 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
     #################################
 
     def plot_cz_trajectory(self, axs=None, show=True,
-                           extra_plot_samples: int = 50):
+                           extra_plot_samples: int = 50, which_gate='NE'):
         """
         Plots the cz trajectory in frequency space.
         """
+        cz_length = self.get('cz_length_%s'%which_gate)
+        q_J2 = self.get('q_J2_%s'%which_gate)
+        sampling_rate = self.get('sampling_rate')
+        cz_phase_corr_length = self.get('cz_phase_corr_length_%s'%which_gate)
+
+
+
         if axs is None:
             f, axs = plt.subplots(figsize=(5, 7), nrows=3, sharex=True)
-        nr_plot_samples = int((self.cz_length()+self.cz_phase_corr_length()) *
-                              self.sampling_rate() + extra_plot_samples)
+        nr_plot_samples = int((cz_length+cz_phase_corr_length) *
+                               sampling_rate + extra_plot_samples)
 
-        dac_amps = self._wave_dict['cz_z'][:nr_plot_samples]
+        dac_amps = self._wave_dict['cz_%s'%which_gate][:nr_plot_samples]
         t = np.arange(0, len(dac_amps))*1/self.sampling_rate()
 
         CZ_amp = dac_amps*self.get_dac_val_to_amp_scalefactor()
-        CZ_eps = self.calc_amp_to_eps(CZ_amp, '11', '02')
-        CZ_theta = wfl.eps_to_theta(CZ_eps, self.q_J2())
+        CZ_eps = self.calc_amp_to_eps(CZ_amp, '11', '02', which_gate=which_gate)
+        CZ_theta = wfl.eps_to_theta(CZ_eps, q_J2)
 
         axs[0].plot(t, np.rad2deg(CZ_theta), marker='.')
         axs[0].fill_between(t, np.rad2deg(CZ_theta), color='C0', alpha=.5)
@@ -1342,7 +1370,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return axs
 
-    def plot_level_diagram(self, ax=None, show=True):
+    def plot_level_diagram(self, ax=None, show=True, which_gate='NE'):
         """
         Plots the level diagram as specified by the q_ parameters.
             1. Plotting levels
@@ -1357,36 +1385,36 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         # 1. Plotting levels
         # maximum voltage of AWG in amp mode
         amps = np.linspace(-2.5, 2.5, 101)
-        freqs = self.calc_amp_to_freq(amps, state='01')
+        freqs = self.calc_amp_to_freq(amps, state='01', which_gate=which_gate)
         ax.plot(amps, freqs, label='$f_{01}$')
-        ax.text(0, self.calc_amp_to_freq(0, state='01'), '01', color='C0',
+        ax.text(0, self.calc_amp_to_freq(0, state='01', which_gate=which_gate), '01', color='C0',
                 ha='left', va='bottom', clip_on=True)
 
-        freqs = self.calc_amp_to_freq(amps, state='02')
+        freqs = self.calc_amp_to_freq(amps, state='02', which_gate=which_gate)
         ax.plot(amps, freqs, label='$f_{02}$')
-        ax.text(0, self.calc_amp_to_freq(0, state='02'), '02', color='C1',
+        ax.text(0, self.calc_amp_to_freq(0, state='02', which_gate=which_gate), '02', color='C1',
                 ha='left', va='bottom', clip_on=True)
 
-        freqs = self.calc_amp_to_freq(amps, state='10')
+        freqs = self.calc_amp_to_freq(amps, state='10', which_gate=which_gate)
         ax.plot(amps, freqs, label='$f_{10}$')
-        ax.text(0, self.calc_amp_to_freq(0, state='10'), '10', color='C2',
+        ax.text(0, self.calc_amp_to_freq(0, state='10', which_gate=which_gate), '10', color='C2',
                 ha='left', va='bottom', clip_on=True)
 
-        freqs = self.calc_amp_to_freq(amps, state='11')
+        freqs = self.calc_amp_to_freq(amps, state='11', which_gate=which_gate)
         ax.plot(amps, freqs, label='$f_{11}$')
-        ax.text(0, self.calc_amp_to_freq(0, state='11'), '11', color='C3',
+        ax.text(0, self.calc_amp_to_freq(0, state='11', which_gate=which_gate), '11', color='C3',
                 ha='left', va='bottom', clip_on=True)
 
         # 2. Annotating feature of interest
         ax.axvline(0, 0, 1e10, linestyle='dotted', c='grey')
 
-        amp_J2 = self.calc_eps_to_amp(0, state_A='11', state_B='02')
-        amp_J1 = self.calc_eps_to_amp(0, state_A='10', state_B='01')
+        amp_J2 = self.calc_eps_to_amp(0, state_A='11', state_B='02', which_gate=which_gate)
+        amp_J1 = self.calc_eps_to_amp(0, state_A='10', state_B='01', which_gate=which_gate)
 
         ax.axvline(amp_J2, ls='--', lw=1, c='C4')
         ax.axvline(amp_J1, ls='--', lw=1, c='C6')
 
-        f_11_02 = self.calc_amp_to_freq(amp_J2, state='11')
+        f_11_02 = self.calc_amp_to_freq(amp_J2, state='11', which_gate=which_gate)
         ax.plot([amp_J2], [f_11_02],
                 color='C4', marker='o', label='11-02')
         ax.text(amp_J2, f_11_02,
@@ -1394,7 +1422,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 color='C4',
                 ha='left', va='bottom', clip_on=True)
 
-        f_10_01 = self.calc_amp_to_freq(amp_J1, state='01')
+        f_10_01 = self.calc_amp_to_freq(amp_J1, state='01', which_gate=which_gate)
 
         ax.plot([amp_J1], [f_10_01],
                 color='C5', marker='o', label='10-01')
@@ -1411,7 +1439,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         set_ylabel(ax, 'Frequency', 'Hz')
         ax.set_xlim(-2.5, 2.5)
 
-        ax.set_ylim(0, self.calc_amp_to_freq(0, state='02')*1.1)
+        ax.set_ylim(0, self.calc_amp_to_freq(0, state='02', which_gate=which_gate)*1.1)
 
         # 4. Add a twin x-axis to denote scale in dac amplitude
         dac_val_axis = ax.twiny()
