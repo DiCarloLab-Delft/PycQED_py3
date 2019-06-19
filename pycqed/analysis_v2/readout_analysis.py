@@ -33,6 +33,7 @@ from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.utilities.general import int2base
 
 from matplotlib import gridspec
+from matplotlib.colors import LinearSegmentedColormap as lscmap
 
 
 odict = OrderedDict
