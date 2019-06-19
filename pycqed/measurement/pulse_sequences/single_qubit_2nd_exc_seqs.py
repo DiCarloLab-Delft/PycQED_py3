@@ -23,6 +23,41 @@ def rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     """
     seq_name = 'Rabi_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
+    for i, amp in enumerate(amps):  # seq has to have at least 2 elts
+        pulses_2nd['X180']['amplitude'] = amp
+        pulse_list = [pulses['X180']]+n*[pulses_2nd_temp['X180']]
+
+        if last_ge_pulse:
+            pulse_list += [pulses['X180']]
+
+        pulse_list += [RO_pars]
+
+        seq.append(seg.Segment(pulse_list))
+
+    add_calibration_points(seq, cal_points)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    return seq
+
+def rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
+                     cal_points=True, no_cal_points=4, upload=True, return_seq=False,
+                     post_msmt_delay=3e-6, verbose=False, last_ge_pulse=True):
+    """
+    Rabi sequence for the second excited state.
+    Input pars:
+        amps:            array of pulse amplitudes (V)
+        pulse_pars:      dict containing the pulse parameters
+        pulse_pars_2nd:  dict containing pulse_parameters for 2nd exc. state
+        RO_pars:         dict containing the RO parameters
+        n:               number of pulses (1 is conventional Rabi)
+        post_msmt_delay: extra wait time for resetless compatibility
+    """
+    seq_name = 'Rabi_2nd_exc_sequence'
+    seq = sequence.Sequence(seq_name)
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)

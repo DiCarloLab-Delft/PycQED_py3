@@ -8,8 +8,6 @@ from pycqed.measurement.pulse_sequences.standard_elements import \
     multi_pulse_elt, distort_and_compensate
 import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
-import pycqed.measurement.waveform_control.fluxpulse_predistortion as \
-    fluxpulse_predistortion
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     get_pulse_dict_from_pars
 from pycqed.measurement.gate_set_tomography.gate_set_tomography import \

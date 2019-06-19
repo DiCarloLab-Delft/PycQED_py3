@@ -1,13 +1,7 @@
-from ..waveform_control import pulsar
 from ..waveform_control import pulse
 from ..waveform_control import element
 from ..waveform_control import sequence
-from ..waveform_control.viewer import show_element, show_wf
-from ..waveform_control import pulse_library as pl
-
-from . import standard_elements_cbox as st_elts
 from importlib import reload
-reload(st_elts)
 station = None
 reload(element)
 # You need to explicitly set this before running any functions from this module

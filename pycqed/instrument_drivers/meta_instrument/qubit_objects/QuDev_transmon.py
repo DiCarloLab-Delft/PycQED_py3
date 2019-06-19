@@ -651,9 +651,10 @@ class QuDev_transmon(Qubit):
                                    TwoD=(mode == '2D'))
         
 
-    def measure_rabi(self, amps, analyze=True, active_reset=False,
-             close_fig=True, cal_points=True, no_cal_points=2,
-             upload=True, label=None,  n=1, exp_metadata=None):
+    def measure_rabi(self, amps, analyze=True, close_fig=True, cal_points=True,
+                     no_cal_points=4, upload=True, label=None,  n=1,
+                     preparation_type='wait', post_ro_wait=1e-6, reset_reps=1,
+                     final_reset_pulse=True, exp_metadata=None):
 
         """
         Varies the amplitude of the qubit drive pulse and measures the readout
@@ -704,12 +705,13 @@ class QuDev_transmon(Qubit):
 
         # Specify the sweep function, the sweep points,
         # and the detector function, and run the measurement
-        MC.set_sweep_function(awg_swf.Rabi(pulse_pars=self.get_ge_pars(),
-                                           RO_pars=self.get_ro_pars(), n=n,
-                                           cal_points=cal_points,
-                                           active_reset=active_reset,
-                                           no_cal_points=no_cal_points,
-                                           upload=upload))
+        MC.set_sweep_function(
+            awg_swf.Rabi(qb_name=self.name,
+                         operation_dict=self.get_operation_dict(),
+                         cal_points=cal_points, no_cal_points=no_cal_points,
+                         upload=upload, n=n, preparation_type=preparation_type,
+                         post_ro_wait=post_ro_wait, reset_reps=reset_reps,
+                         final_reset_pulse=final_reset_pulse))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
                                  self.acq_weights_type() == 'optimal_qutrit'
@@ -718,6 +720,10 @@ class QuDev_transmon(Qubit):
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
+                             'preparation_type': preparation_type,
+                             'post_ro_wait': post_ro_wait,
+                             'reset_reps': reset_reps,
+                             'final_reset_pulse': final_reset_pulse,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
                                 self.acq_weights_type() != 'optimal_qutrit'
@@ -747,6 +753,9 @@ class QuDev_transmon(Qubit):
 
         cal_states_dict = None
         cal_states_rotations = None
+
+        sweep_points = cal_points.extend_sweep_points(amps)
+
         if cal_points:
             print("cal points {}".format(no_cal_points))
             step = np.abs(amps[-1]-amps[-2])
@@ -1417,7 +1426,6 @@ class QuDev_transmon(Qubit):
             cal_states_rotations = None
 
         self.prepare(drive='timedomain')
-        
         MC = self.instr_mc.get_instr()
 
         Echo_swf = awg_swf.Echo(
@@ -1444,7 +1452,7 @@ class QuDev_transmon(Qubit):
             tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
     def measure_echo_2nd_exc(self, times=None, artificial_detuning=None,
-                             label=None, MC=None, analyze=True,
+                             label=None, analyze=True,
                              cal_points=True, no_cal_points=6, upload=True,
                              last_ge_pulse=True, exp_metadata=None):
 
@@ -1463,8 +1471,7 @@ class QuDev_transmon(Qubit):
             label = 'Echo_ef' + self.msmt_suffix
 
         self.prepare(drive='timedomain')
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+        MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
         cal_states_rotations = None
@@ -1983,12 +1990,12 @@ class QuDev_transmon(Qubit):
             (self.acq_weights_type, 'SSB'),
             (self.instr_trigger.get_instr().pulse_period, trigger_sep),
         ):
-            self.prepare(suppress='timedomain')
+            self.prepare(drive='timedomain')
             detector = self.int_avg_det_spec
             detector.always_prepare = True
             detector.AWG = self.instr_pulsar.get_instr()
             detector.prepare_function = lambda \
-                alphaparam=self.ge_alpha, skewparam=self.ge_phi_skew: \        
+                alphaparam=self.ge_alpha, skewparam=self.ge_phi_skew: \
                     sq.pulse_list_list_seq([[self.get_acq_pars(), dict(
                             pulse_type='GaussFilteredCosIQPulse',
                             pulse_length=self.acq_length(),
@@ -2045,8 +2052,8 @@ class QuDev_transmon(Qubit):
         if isinstance(std_devs, (list, np.ndarray)):
             if len(std_devs) != 2:
                 log.error('std_devs passed in kwargs of `calibrate_drive_'
-                          'mixer_NN` is of length: {}. '.format(len(std_devs))
-                          'Requires length 2 instead.')
+                          'mixer_NN` is of length: {}. '
+                          'Requires length 2 instead.'.format(len(std_devs)))
 
         MC = self.instr_mc.get_instr()
         _alpha = self.ge_alpha()
@@ -3287,13 +3294,13 @@ class QuDev_transmon(Qubit):
         if for_ef:
             self.measure_echo_2nd_exc(times=times,
                                       artificial_detuning=artificial_detuning,
-                                      label=label, MC=MC, cal_points=cal_points,
+                                      label=label, cal_points=cal_points,
                                       no_cal_points=no_cal_points, upload=upload,
                                       last_ge_pulse=last_ge_pulse)
         else:
             self.measure_echo(
                 times=times, artificial_detuning=artificial_detuning,
-                MC=MC, cal_points=cal_points,
+                cal_points=cal_points,
                 close_fig=close_fig, upload=upload, label=label)
 
         if analyze:

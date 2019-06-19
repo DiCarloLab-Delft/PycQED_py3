@@ -13,8 +13,6 @@ from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
-from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
-import pycqed.measurement.pulse_sequences.standard_elements as st_elts
 import pycqed.measurement.pulse_sequences.calibration_elements as cal_elts
 
 class Detector_Function(object):
