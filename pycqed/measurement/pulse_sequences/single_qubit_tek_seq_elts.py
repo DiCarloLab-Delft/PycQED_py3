@@ -77,6 +77,7 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict,
 
         seg = segment.Segment('segment_{}'.format(i),
                               pulse_list_with_preparation)
+        seq.add(seg)
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)

@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
-import qcodes as qc
+from copy import deepcopy
 
 from qcodes.instrument.parameter import (
     ManualParameter, InstrumentRefParameter)
@@ -9,13 +9,10 @@ from qcodes.utils import validators as vals
 
 from pycqed.analysis_v2.readout_analysis import Singleshot_Readout_Analysis_Qutrit
 from pycqed.measurement import detector_functions as det
-from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
-from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
-from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import timedomain_analysis as tda
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
@@ -28,6 +25,8 @@ from pycqed.measurement import optimization as opti
 from pycqed.measurement import mc_parameter_wrapper
 import pycqed.analysis_v2.spectroscopy_analysis as sa
 from pycqed.utilities import math
+log = logging.getLogger()
+log.addHandler(logging.StreamHandler())
 
 try:
     import pycqed.simulations.readout_mode_simulations_for_CLEAR_pulse \
@@ -1945,7 +1944,14 @@ class QuDev_transmon(Qubit):
             self.ge_Q_channel())]
         MC.set_sweep_functions([chI_par, chQ_par])
         MC.set_adaptive_function_parameters(ad_func_pars)
-        sq.pulse_list_list_seq([[self.get_acq_pars()]])
+        sq.pulse_list_list_seq([[self.get_acq_pars(), dict(
+                            pulse_type='GaussFilteredCosIQPulse',
+                            pulse_length=self.acq_length(),
+                            ref_point='start',
+                            amplitude=0,
+                            I_channel=self.ge_I_channel(),
+                            Q_channel=self.ge_Q_channel(),
+                        )]])
             
         with temporary_value(
             (self.ro_freq, self.ge_freq() - self.ge_mod_freq()),
@@ -1953,9 +1959,9 @@ class QuDev_transmon(Qubit):
             (self.instr_trigger.get_instr().pulse_period, trigger_sep),
         ):
             self.prepare(drive='timedomain')
-            MC.set_detector_function(det.IndexDetector(self.int_avg_det_spec, 
-                                                0))
-            self.instr_pulsar.get_instr().start()
+            MC.set_detector_function(det.IndexDetector(
+                self.int_avg_det_spec, 0))
+            self.instr_pulsar.get_instr().start(exclude=[self.instr_uhf()])
             MC.run(name='drive_carrier_calibration' + self.msmt_suffix,
                 mode='adaptive')
         
@@ -2025,8 +2031,8 @@ class QuDev_transmon(Qubit):
         return alpha, phi
 
     def calibrate_drive_mixer_skewness_NN(
-            self, update=True,make_fig=True, meas_grid=None,n_meas=100,
-            amplitude=0.1,trigger_sep=5e-6, two_rounds=False, 
+            self, update=True,make_fig=True, meas_grid=None, n_meas=100,
+            amplitude=0.1, trigger_sep=5e-6, two_rounds=False,
             estimator='GRNN_neupy', hyper_parameter_dict=None, 
             first_round_limits=(0.6, 1.2, -50, 35), **kwargs):
         if not len(first_round_limits) == 4:
@@ -2045,7 +2051,7 @@ class QuDev_transmon(Qubit):
                                     'learning_steps': 5000,
                                     'cv_n_fold': 5,
                                     'polynomial_dimension': 2}
-        std_devs = kwargs.get('std_devs', [0.3,10.])
+        std_devs = kwargs.get('std_devs', [0.1, 10])
         c = kwargs.pop('second_round_std_scale', 0.4)
         
         # Could make sample size variable (maxiter) for better adapting)
@@ -2058,17 +2064,17 @@ class QuDev_transmon(Qubit):
         MC = self.instr_mc.get_instr()
         _alpha = self.ge_alpha()
         _phi = self.ge_phi_skew()
-        for runs in range(2 if two_rounds else 3):
+        for runs in range(3 if two_rounds else 2):
             if runs == 0:
                 # half as many points from a uniform distribution at first run
-                meas_grid = np.stack([
+                meas_grid = np.array([
                     np.random.uniform(first_round_limits[0], 
                                       first_round_limits[1], n_meas//2),
                     np.random.uniform(first_round_limits[2], 
                                       first_round_limits[3], n_meas//2)])
             else:
                 k = 1. if runs == 1 else c
-                meas_grid = np.stack([
+                meas_grid = np.array([
                     np.random.normal(_alpha, k*std_devs[0], n_meas),
                     np.random.normal(_phi, k*std_devs[1], n_meas)])
 
@@ -2638,8 +2644,9 @@ class QuDev_transmon(Qubit):
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         update=False, close_fig=True, cal_points=True,
                         no_cal_points=None, upload=True, last_ge_pulse=True,
-                        analyze=True, active_reset=False, **kw):
-
+                        analyze=True, preparation_type='wait',
+                        post_ro_wait=1e-6, reset_reps=1,
+                        final_reset_pulse=True, **kw):
         """
             Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
             experiment. Uses the Rabi_Analysis(_new)
@@ -2771,7 +2778,9 @@ class QuDev_transmon(Qubit):
                               label=label,
                               cal_points=cal_points,
                               no_cal_points=no_cal_points,
-                              active_reset=active_reset,
+                              preparation_type=preparation_type,
+                              post_ro_wait=post_ro_wait, reset_reps=reset_reps,
+                              final_reset_pulse=final_reset_pulse,
                               upload=upload)
 
         #get pi and pi/2 amplitudes from the analysis results
