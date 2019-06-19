@@ -9,8 +9,10 @@ import datetime
 import warnings
 from copy import deepcopy
 from collections import OrderedDict as od
-from matplotlib import pyplot as plt
-from matplotlib import colors
+from matplotlib import colors as mcolors
+from matplotlib.colors import LogNorm
+from matplotlib.colors import LinearSegmentedColormap as lscmap
+
 import pandas as pd
 from sklearn.mixture import GaussianMixture as GM
 
@@ -29,7 +31,7 @@ from matplotlib import cm
 from pycqed.analysis import composite_analysis as RA
 from pycqed.measurement import hdf5_data
 
-from matplotlib.colors import LogNorm
+
 from scipy.stats import multivariate_normal
 
 datadir = get_default_datadir()
@@ -2321,6 +2323,15 @@ def get_color_list(max_num, cmap='viridis'):
             logging.warning('Using Vega10 as a fallback, upgrade matplotlib')
             cmap = cm.get_cmap('Vega10')
     return [cmap(i) for i in np.linspace(0.0, 1.0, max_num)]
+
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+    new_cmap = lscmap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name,
+                                            a=minval,
+                                            b=maxval),
+        cmap(np.linspace(minval, maxval, n)))
+    return new_cmap
 
 
 def print_pars_table(n_ts=10, pars=None):
