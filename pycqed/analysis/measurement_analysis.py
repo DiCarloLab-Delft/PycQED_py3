@@ -4938,30 +4938,30 @@ class Ramsey_Analysis(TD_Analysis):
         if isinstance(art_det, list):
             art_det = art_det[0]
         # print(fit_res.params['tau'])
-        # if textbox:
-        #     textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
-        #                % (self.qubit_freq_spec * 1e-9) +
-        #                '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
-        #                % (self.qubit_frequency * 1e-9,
-        #                   fit_res.params['frequency'].stderr * 1e-9) +
-        #                '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
-        #                % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
-        #                   fit_res.params['frequency'].stderr * 1e-6) +
-        #                '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
-        #                % (fit_res.params['frequency'].value * 1e-6,
-        #                   fit_res.params['frequency'].stderr * 1e-6) +
-        #                '\n$T_2^\star$ = %.6g '
-        #                % (fit_res.params['tau'].value * self.scale) +
-        #                self.units + ' $\pm$ (%.6g) '
-        #                % (fit_res.params['tau'].stderr * self.scale) +
-        #                self.units +
-        #                '\nartificial detuning = %.2g MHz'
-        #                % (art_det * 1e-6))
+        if textbox:
+            textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
+                       % (self.qubit_freq_spec * 1e-9) +
+                       '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
+                       % (self.qubit_frequency * 1e-9,
+                          fit_res.params['frequency'].stderr * 1e-9) +
+                       '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
+                       % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
+                          fit_res.params['frequency'].stderr * 1e-6) +
+                       '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
+                       % (fit_res.params['frequency'].value * 1e-6,
+                          fit_res.params['frequency'].stderr * 1e-6) +
+                       '\n$T_2^\star$ = %.6g '
+                       % (fit_res.params['tau'].value * self.scale) +
+                       self.units + ' $\pm$ (%.6g) '
+                       % (fit_res.params['tau'].stderr * self.scale) +
+                       self.units +
+                       '\nartificial detuning = %.2g MHz'
+                       % (art_det * 1e-6))
 
-        #     fig.text(0.5, 0, textstr, fontsize=self.font_size,
-        #              transform=ax.transAxes,
-        #              verticalalignment='top',
-        #              horizontalalignment='center', bbox=self.box_props)
+            fig.text(0.5, 0, textstr, fontsize=self.font_size,
+                     transform=ax.transAxes,
+                     verticalalignment='top',
+                     horizontalalignment='center', bbox=self.box_props)
 
         x = np.linspace(self.sweep_points[0],
                         self.sweep_points[-self.NoCalPoints - 1],
@@ -7797,7 +7797,7 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
         self.f0 = f0
 
         # Find low power regime
-        # For now, low and high power regimes look at frequency shifts only. 
+        # For now, low and high power regimes look at frequency shifts only.
         # It could be extended by looking at the amplitude of the dip, such that
         # fewer data points are necessary
 
