@@ -174,10 +174,11 @@ class MultiElemSegmentTimingSwf(swf.Hard_Sweep):
 
 class Rabi(swf.Hard_Sweep):
 
-    def __init__(self, qb_name, operation_dict,
-                 cal_points=True, no_cal_points=4, upload=True, n=1,
+    def __init__(self, qb_name, operation_dict, cal_points_obj,
+                 cal_points=True, no_cal_points=4,
+                 upload=True, n=1,
                  preparation_type='wait', post_ro_wait=1e-6,
-                 reset_reps=1, final_reset_pulse=True):
+                 reset_reps=1, final_reset_pulse=True, for_ef=False):
         super().__init__()
         self.qb_name = qb_name
         self.operation_dict = operation_dict
@@ -192,6 +193,8 @@ class Rabi(swf.Hard_Sweep):
         self.name = 'Rabi'
         self.parameter_name = 'amplitude'
         self.unit = 'V'
+        self.for_ef = for_ef
+        self.cal_points_obj = cal_points_obj
 
     def prepare(self, **kw):
         if self.upload:
@@ -200,11 +203,13 @@ class Rabi(swf.Hard_Sweep):
                                       operation_dict=self.operation_dict,
                                       cal_points=self.cal_points,
                                       no_cal_points=self.no_cal_points,
+                                      cal_points_obj=self.cal_points_obj,
                                       upload=self.upload, n=self.n,
                                       preparation_type=self.preparation_type,
                                       post_ro_wait=self.post_ro_wait,
                                       reset_reps=self.reset_reps,
-                                      final_reset_pulse=self.final_reset_pulse)
+                                      final_reset_pulse=self.final_reset_pulse,
+                                      for_ef=self.for_ef)
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
 

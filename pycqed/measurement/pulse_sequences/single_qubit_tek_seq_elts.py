@@ -12,6 +12,8 @@ from importlib import reload
 reload(pulse)
 from ..waveform_control import pulse_library
 reload(pulse_library)
+import logging
+log = logging.getLogger(__name__)
 
 def pulse_list_list_seq(pulse_list_list, name='pulse_list_list_sequence', 
                         upload=True):
@@ -22,10 +24,11 @@ def pulse_list_list_seq(pulse_list_list, name='pulse_list_list_sequence',
         ps.Pulsar.get_instance().program_awgs(seq)
     return seq
 
-def rabi_seq_active_reset(amps, qb_name, operation_dict,
+def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points_obj,
                           cal_points=True, no_cal_points=4, upload=True, n=1,
                           preparation_type='wait', post_ro_wait=1e-6,
-                          reset_reps=1, final_reset_pulse=True):
+                          reset_reps=1, final_reset_pulse=True, for_ef=False,
+                          last_ge_pulse=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     Input pars:
@@ -40,43 +43,35 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict,
     '''
 
     seq_name = 'Rabi_sequence'
-    seq = sequence.Sequence(seq_name)
-    X180_pulse = deepcopy(operation_dict['X180 ' + qb_name])
-    for i, amp in enumerate(amps):  # seq has to have at least 2 elts
-        if cal_points and no_cal_points == 4 and \
-                (i == (len(amps)-4) or i == (len(amps)-3)):
-            pulse_list = [operation_dict['I ' + qb_name],
-                          operation_dict['RO ' + qb_name]]
-            pulse_list_with_preparation = add_preparation_pulses(
-                pulse_list, operation_dict, [qb_name],
-                preparation_type=preparation_type, post_ro_wait=post_ro_wait,
-                repetitions=reset_reps, final_reset_pulse=final_reset_pulse)
-        elif cal_points and no_cal_points == 4 and \
-                (i == (len(amps)-2) or i == (len(amps)-1)):
-            pulse_list = [operation_dict['X180 ' + qb_name],
-                          operation_dict['RO ' + qb_name]]
-            pulse_list_with_preparation = add_preparation_pulses(
-                pulse_list, operation_dict, [qb_name],
-                preparation_type=preparation_type, post_ro_wait=post_ro_wait,
-                repetitions=reset_reps, final_reset_pulse=final_reset_pulse)
-        elif cal_points and no_cal_points == 2 and \
-                (i == (len(amps)-2) or i == (len(amps)-1)):
-            pulse_list = [operation_dict['I ' + qb_name],
-                          operation_dict['RO ' + qb_name]]
-            pulse_list_with_preparation = add_preparation_pulses(
-                pulse_list, operation_dict, [qb_name],
-                preparation_type=preparation_type, post_ro_wait=post_ro_wait,
-                repetitions=reset_reps, final_reset_pulse=final_reset_pulse)
-        else:
-            X180_pulse['amplitude'] = amp
-            pulse_list = n*[X180_pulse]+ [operation_dict['RO ' + qb_name]]
-            pulse_list_with_preparation = add_preparation_pulses(
-                pulse_list, operation_dict, [qb_name],
-                preparation_type=preparation_type, post_ro_wait=post_ro_wait,
-                repetitions=reset_reps, final_reset_pulse=final_reset_pulse)
+    prep_params = dict(preparation_type=preparation_type,
+                       post_ro_wait=post_ro_wait,
+                       repetitions=reset_reps,
+                       final_reset_pulse=final_reset_pulse)
 
-        seg = segment.Segment('segment_{}'.format(i),
-                              pulse_list_with_preparation)
+    # add Rabi amplitudes segments
+    rabi_ops = ["X180_ef " + qb_name if for_ef else "X180 " + qb_name] * n
+
+    if for_ef:
+        rabi_ops = ["X180 " + qb_name] + rabi_ops
+        if last_ge_pulse:
+            rabi_ops += ["X180 " + qb_name]
+    rabi_ops += ["RO " + qb_name]
+    rabi_pulses = [operation_dict[op] for op in rabi_ops]
+    for i in range(1 if for_ef else 0, n + 1 if for_ef else n):
+        rabi_pulses[i]["name"] = f"Rabi_{i - 1 if for_ef else i}"
+
+    swept_pulses = \
+        sweep_pulse_params(rabi_pulses,
+                           {f'Rabi_{i}.amplitude': amps for i in range(n)})
+    swept_pulses_with_prep = \
+        [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)
+         for p in swept_pulses]
+    seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
+
+    # add calibration segments
+    cal_segs = cal_points_obj.create_segments(operation_dict, **prep_params)
+    for seg in cal_segs:
+        seq.add(seg)
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
@@ -86,15 +81,16 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict,
 def add_preparation_pulses(pulse_list, operation_dict, qb_names,
                            preparation_type='wait', post_ro_wait=1e-6,
                            repetitions=3, final_reset_pulse=True):
-    '''
+    """
     Prepends to pulse_list the preparation pulses corresponding to preparation
 
     preparation:
         for active reset on |e>: ('active_reset_e', nr_resets)
         for active reset on |e> and |f>: ('active_reset_ef', nr_resets)
         for preselection: ('preselection', nr_readouts)
-    '''
+    """
 
+    # Calculate the length of a ge pulse, assumed the same for all qubits
     ge_pulse = operation_dict['X180 ' + qb_names[0]]
     ge_length = ge_pulse['nr_sigma']*ge_pulse['sigma']
 
@@ -163,6 +159,46 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
         preparation_pulses[0]['pulse_delay'] = -post_ro_wait
 
         return preparation_pulses + pulse_list
+
+def sweep_pulse_params(pulses, params):
+    """
+    Sweeps a list of pulses over specified parameters.
+    Args:
+        pulses (list): All pulses. Pulses which have to be swept over need to
+            have a 'name' key.
+        params (dict):  keys in format <pulse_name>.<pulse_param_name>,
+            values are the sweep values.
+
+    Returns: a list of pulses_lists where each element is to be used
+        for a single segment
+
+    """
+    swept_pulses = []
+    assert len(params.keys()) > 0, "No params to sweep"
+    n_sweep_points = len(list(params.values())[0])
+
+    assert np.all([len(v) == n_sweep_points for v in params.values()]), \
+        "Parameter sweep values are not of all of the same length: {}" \
+        .format({n: len(v) for n, v in params.items()})
+
+    for i in range(n_sweep_points):
+        pulses_cp = deepcopy(pulses)
+
+        for name, sweep_values in params.items():
+            pulse_name, param_name = name.split('.')
+            pulse_indices = [i for i, p in enumerate(pulses)
+                             if p.get('name', False) == pulse_name]
+            if len(pulse_indices) == 0:
+                raise ValueError(f"No pulse with name {pulse_name} found.")
+            if len(pulse_indices) > 1:
+                log.warning(f"Pulse name is not unique. Found "
+                            f"{len(pulse_indices)} with name {pulse_name}")
+            for p_idx in pulse_indices:
+                pulses_cp[p_idx][param_name] = sweep_values[i]
+
+        swept_pulses.append(pulses_cp)
+
+    return swept_pulses
 
 def rabi_seq(amps, pulse_pars, RO_pars, n=1, no_cal_points=2,
              cal_points=True, upload=True, return_seq=False):

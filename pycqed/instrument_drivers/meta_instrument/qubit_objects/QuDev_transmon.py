@@ -2,7 +2,7 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 import qcodes as qc
-
+from copy import deepcopy
 from qcodes.instrument.parameter import (
     ManualParameter, InstrumentRefParameter)
 from qcodes.utils import validators as vals
@@ -13,9 +13,11 @@ from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf2
 from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement.calibration_points import CalibrationPoints as cp
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
+
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import timedomain_analysis as tda
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
@@ -653,6 +655,7 @@ class QuDev_transmon(Qubit):
 
     def measure_rabi(self, amps, analyze=True, close_fig=True, cal_points=True,
                      no_cal_points=4, upload=True, label=None,  n=1,
+                     n_cal_points_per_state=2, cal_states=('g', 'e'),
                      preparation_type='wait', post_ro_wait=1e-6, reset_reps=1,
                      final_reset_pulse=True, exp_metadata=None):
 
@@ -702,12 +705,14 @@ class QuDev_transmon(Qubit):
                 sweep_points = amps
         else:
             sweep_points = amps
-
+        cps = cp.single_qubit(self.name, cal_states,
+                              n_per_state=n_cal_points_per_state)
         # Specify the sweep function, the sweep points,
         # and the detector function, and run the measurement
         MC.set_sweep_function(
             awg_swf.Rabi(qb_name=self.name,
                          operation_dict=self.get_operation_dict(),
+                         cal_points_obj=cps,
                          cal_points=cal_points, no_cal_points=no_cal_points,
                          upload=upload, n=n, preparation_type=preparation_type,
                          post_ro_wait=post_ro_wait, reset_reps=reset_reps,
