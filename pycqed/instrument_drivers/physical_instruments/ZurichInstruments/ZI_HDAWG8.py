@@ -117,6 +117,8 @@ class ZI_HDAWG8(ZI_HDAWG_core):
                     By default uploads to all channels but can be specific to
                     speed up the process.
         FIXME: assumes 'system/awg/channelgrouping' to be '4x2'
+        FIXME: cfg_num_codewords would be better off as a parameter to this function
+        FIXME: idem for cfg_codeword_protocol
         """
         # Type conversion to ensure lists do not produce weird results
         awgs = np.array(awgs)

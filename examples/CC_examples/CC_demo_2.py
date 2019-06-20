@@ -3,6 +3,7 @@
 import os
 import logging
 import sys
+import time
 import numpy as np
 
 from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
@@ -21,17 +22,18 @@ def set_waveforms(awg, waveform_type, sequence_length):
     if waveform_type == 'square':
         for ch in range(8):
             for i in range(sequence_length):
-                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), (np.ones(48) * i / (sequence_length - 1)))
+                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), np.ones(48) * i / (sequence_length - 1))
     elif waveform_type == 'cos':
         for ch in range(8):
             for i in range(sequence_length):
-                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), (np.cos(np.arange(48) / 2) * i / (sequence_length - 1)))
+                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), np.cos(np.arange(48) / 2) * i / (sequence_length - 1))
     else:
         raise KeyError()
 
 
 log = logging.getLogger('pycqed')
 log.setLevel(logging.DEBUG)
+log.debug('started')
 
 ##########################################
 # Constants
@@ -102,7 +104,8 @@ if conf.mw_0 != '':
     set_waveforms(instr.mw_0, 'square', sequence_length)
     instr.mw_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
     instr.mw_0.cfg_codeword_protocol('microwave')
-    #FIXME instr.mw_0.configure_codeword_protocol()
+    #time.sleep(5)
+    #instr.mw_0.configure_codeword_protocol() # from notebook, seems redundant
     instr.mw_0.upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
 

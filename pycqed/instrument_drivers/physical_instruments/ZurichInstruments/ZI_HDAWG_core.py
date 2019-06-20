@@ -96,7 +96,11 @@ class ZI_HDAWG_core(ZI_base_instrument):
         self._dev = zs.ziShellDevice()
         self._dev.connect_server(server, port)
         print("Trying to connect to device {}".format(self._devname))
-        self._dev.connect_device(self._devname, '1GbE')
+        if 1:
+            self._dev.connect_device(self._devname, '1GbE')
+        else: # FIXME
+            log.warning('{}: using USB interface'.format(self._devname))
+            self._dev.connect_device(self._devname, 'USB')
 
         # add qcodes parameters based on JSON parameter file
         # FIXME: we might want to skip/remove/(add  to _params_to_skip_update) entries like AWGS/*/ELF/DATA,
@@ -132,6 +136,11 @@ class ZI_HDAWG_core(ZI_base_instrument):
                  .format(self._devname, serial, options.replace('\n','|'), fw_revision, fpga_revision))
         log.info('{}: DIO interface found in mode {} (0=CMOS, 1=LVDS)'
                  .format(self._devname, self.get('dios_0_interface'))) # NB: mode is persistent across device restarts
+        # FIXME:
+        #log.info('{}: zi_about_fwrevision={}'
+        #         .format(self._devname, self._dev.daq.get('/zi/about/fwrevision', False, 1)))    # getv:error,geti:0
+        # /zi/about/dataserver
+        # /zi/about/revision
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
 
@@ -234,9 +243,23 @@ class ZI_HDAWG_core(ZI_base_instrument):
         """
         Uploads a program string to one of the AWGs of the HDAWG.
         """
-        self._dev.configure_awg_from_string(awg_nr=awg_nr,
-                                            program_string=program_string,
-                                            timeout=timeout)
+        if 0: # FIXME: debugging
+            self._dev.configure_awg_from_string(awg_nr=awg_nr,
+                                                program_string=program_string,
+                                                timeout=timeout)
+        else:
+            try:
+                self._dev.configure_awg_from_string(awg_nr=awg_nr,
+                                                    program_string=program_string,
+                                                    timeout=timeout)
+            except TimeoutError as e:
+                print('*** awgModule/compiler/statusstring ***:')
+                print(self._dev.awgModule.get('awgModule/compiler/statusstring')['compiler']['statusstring'][0])
+                print('*** awgModule/compiler/sourcestring ***:')
+                print(self._dev.awgModule.get('awgModule/compiler/sourcestring')['compiler']['sourcestring'][0])
+                print('*** done ***')
+                raise
+
         # FIXME: side effect: the function above touches '/dio/strobe/slope'
         hash_val = crc32(program_string.encode('utf-8'))
         self.set('awgs_{}_sequencer_program_crc32_hash'.format(awg_nr),
