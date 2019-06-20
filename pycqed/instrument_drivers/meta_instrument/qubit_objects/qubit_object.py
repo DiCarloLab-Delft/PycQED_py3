@@ -582,11 +582,12 @@ class Qubit(Instrument):
             best_amplitude = 0  # For comparing which one is coupled closest
             if items[1] == 'qubit_resonator':
                 freq = items[0]
+                shift = np.abs(items[5])
                 if with_VNA:
                     VNA = self.instr_VNA.get_instr()
                     VNA.start_frequency(freq-20e6)
                     VNA.stop_frequency(freq+20e6)
-                freqs = np.arange(freq-5e6, freq+5e6, 0.1e6)
+                freqs = np.arange(freq - shift - 1e6, freq+2e6, 0.1e6)
                 for fluxline in fluxcurrent.channel_map:
                     t_start = time.strftime('%Y%m%d_%H%M%S')
 
@@ -753,7 +754,7 @@ class Qubit(Instrument):
             freq_RO_par(f_res)
         return f_res
 
-    def find_frequency(self, method='spectroscopy', pulsed=False,
+    def find_frequency(self, method='spectroscopy', spec_mode='pulsed_marked',
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        artificial_periods=4,
                        freqs=None,
@@ -787,8 +788,8 @@ class Qubit(Instrument):
                                   f_qubit_estimate + f_span/2,
                                   f_step)
             # args here should be handed down from the top.
-            self.measure_spectroscopy(freqs, pulsed=pulsed, MC=MC,
-                                      analyze=True, close_fig=close_fig)
+            self.measure_spectroscopy(freqs, mode=spec_mode, MC=MC,
+                                      analyze=False, close_fig=close_fig)
 
             label = 'spec'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(

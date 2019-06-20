@@ -1933,12 +1933,55 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
 
-    def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
+    def measure_spectroscopy(self, freqs, mode='pulsed_marked', MC=None,
                              analyze=True, close_fig=True, label='',
                              prepare_for_continuous_wave=True):
-        if not pulsed:
-            logging.warning('CCL transmon can only perform '
-                            'pulsed spectrocsopy')
+        """
+        Performs a two-tone spectroscopy experiment where one tone is kept 
+        fixed at the resonator readout frequency and another frequency is swept. 
+
+        args: 
+            freqs (array) : Frequency range you want to sweep
+            mode  (string): 'CW' - Continuous wave
+                            'pulsed_marked' - pulsed using trigger input of
+                                              spec source
+                            'pulsed_mixer' - pulsed using AWG and mixer
+
+        This experiment can be performed in three different modes 
+            Continuous wave (CW)
+            Pulsed, marker modulated 
+            Pulsed, mixer modulated 
+
+        The mode argument selects which mode is being used and redirects the 
+        arguments to the appropriate method. 
+        """
+        if mode == 'CW':
+            self.measure_spectroscopy_CW(freqs=freqs, MC=MC,
+                                         analyze=analyze, close_fig=close_fig, 
+                                         label=label,
+                                         prepare_for_continuous_wave=prepare_for_continuous_wave)
+        elif mode == 'pulsed_marked':
+            self.measure_spectroscopy_pulsed_marked(
+                                         freqs=freqs, MC=MC,
+                                         analyze=analyze, close_fig=close_fig, 
+                                         label=label,
+                                         prepare_for_continuous_wave=prepare_for_continuous_wave)
+        elif mode == 'pulsed_mixer':
+            self.measure_spectroscopy_pulsed_mixer(
+                                         freqs=freqs, MC=MC,
+                                         analyze=analyze, close_fig=close_fig, 
+                                         label=label)
+        else:
+            logging.error('Mode {} not recognized'.format(mode))
+
+
+    def measure_spectroscopy_CW(self, freqs, MC=None,
+                                analyze=True, close_fig=True, label='',
+                                prepare_for_continuous_wave=True):
+        """
+        Does a CW spectroscopy experiment by sweeping the frequency of a
+        microwave source
+        """
         UHFQC = self.instr_acquisition.get_instr()
         if prepare_for_continuous_wave:
             self.prepare_for_continuous_wave()
@@ -1959,10 +2002,11 @@ class CCLight_Transmon(Qubit):
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
-        # The spec pulse is a MW pulse that contains no modulation
-
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
+        # Set marker mode off for CW:
+        spec_source.pulsemod_state('Off')
+
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
         if self.cfg_spec_mode():
@@ -1971,7 +2015,7 @@ class CCLight_Transmon(Qubit):
         else:
           self.int_avg_det_single._set_real_imag(False)
           MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='spectroscopy_'+self.msmt_suffix+label)
+        MC.run(name='CW_spectroscopy'+self.msmt_suffix+label)
         # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
@@ -1979,6 +2023,120 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
+    def measure_spectroscopy_pulsed_marked(self, freqs, MC=None,
+                                           analyze=True, close_fig=True, 
+                                           label='',
+                                           prepare_for_continuous_wave=True):
+        """
+        Performs a spectroscopy experiment by triggering the spectroscopy source
+        with a CCLight trigger.
+
+        TODO: set the
+        """
+        UHFQC = self.instr_acquisition.get_instr()
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # Starting specmode if set in config
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+                               ro_amp=self.ro_pulse_amp_CW())
+
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq_v2(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            trigger_idx=0)
+        CCL.eqasm_program(p.filename)
+        # CCL gets started in the int_avg detector
+
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        # Set marker mode off for CW:
+        spec_source.pulsemod_state('On')
+
+        MC.set_sweep_function(spec_source.frequency)
+        MC.set_sweep_points(freqs)
+        if self.cfg_spec_mode():
+          print('Enter loop')
+          MC.set_detector_function(self.UHFQC_spec_det)
+        else:
+          self.int_avg_det_single._set_real_imag(False)
+          MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='pulsed_marker_spectroscopy'+self.msmt_suffix+label)
+        # Stopping specmode
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_off()
+            self._prep_ro_pulse(upload=True)
+        if analyze:
+            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix, 
+                                           close_fig=close_fig,
+                                           qb_name=self.name)
+
+    def measure_spectroscopy_pulsed_mixer(self, freqs, MC=None,
+                                          analyze=True, close_fig=True, 
+                                          label='',
+                                          prepare_for_timedomain=True):
+        """
+        Performs pulsed spectroscopy by modulating a cw pulse with a square
+        which is generated by an AWG. Uses the self.spec_source_2 as spec source
+        (most of the times is the MW_LO that goes into the mixer)
+
+        Is considered as a time domain experiment as it utilizes the AWG
+
+        """
+        UHFQC = self.instr_acquisition.get_instr()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # Starting specmode if set in config
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+                               ro_amp=self.ro_pulse_amp_CW())
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq_v2(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            trigger_idx = 0)
+
+        CCL.eqasm_program(p.filename)
+        # CCL gets started in the int_avg detector
+
+
+        spec_source = self.instr_spec_source_2.get_instr()
+        # spec_source.on()
+        # Set marker mode off for mixer CW:
+
+        MC.set_sweep_function(spec_source.frequency)
+        MC.set_sweep_points(freqs)
+
+        if self.cfg_spec_mode():
+            print('Enter loop')
+            MC.set_detector_function(self.UHFQC_spec_det)
+        else:
+            self.int_avg_det_single._set_real_imag(False)
+            MC.set_detector_function(self.int_avg_det_single)
+
+        # d = self.int_avg_det
+        # MC.set_detector_function(d)
+        MC.run(name='pulsed_mixer_spectroscopy'+self.msmt_suffix+label)
+        # Stopping specmode
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_off()
+            self._prep_ro_pulse(upload=True)
+        if analyze:
+            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix, 
+                                           close_fig=close_fig,
+                                           qb_name=self.name)
 
     def find_bus_frequency(self,freqs,spec_source_bus,bus_power,f01=None,label='',
                         close_fig=True,analyze=True,MC=None,prepare_for_continuous_wave=True):
@@ -2036,7 +2194,9 @@ class CCLight_Transmon(Qubit):
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
         if analyze:
-            ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix, 
+                                           close_fig=close_fig,
+                                           qb_name=self.name)
 
     def bus_frequency_flux_sweep(self,freqs,spec_source_bus,bus_power,dacs,dac_param,f01=None,label='',
                         close_fig=True,analyze=True,MC=None,
@@ -3958,15 +4118,16 @@ class CCLight_Transmon(Qubit):
                      calibrate_function=cal_True_delayed)
 
         dag.add_node(self.name + ' Mixer Skewness',
-                          calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
+                     calibrate_function=cal_True_delayed)
+                          # calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
         dag.add_node(self.name + ' Mixer Offset Drive',
-                          calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
+                     calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
         dag.add_node(self.name + ' Mixer Offset Readout',
-                          calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
+                     calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
         dag.add_node(self.name + ' Ro/MW pulse timing',
-                          calibrate_function=cal_True_delayed)
+                     calibrate_function=cal_True_delayed)
         dag.add_node(self.name + ' Ro Pulse Amplitude',
-                          calibrate_function=self.name + '.ro_pulse_amp_CW')
+                     calibrate_function=self.name + '.ro_pulse_amp_CW')
 
 
         # Qubits calibration

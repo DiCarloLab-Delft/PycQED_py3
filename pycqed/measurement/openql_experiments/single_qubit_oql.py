@@ -91,6 +91,31 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     p = oqh.compile(p)
     return p
 
+def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
+                       platf_cfg: str, trigger_idx: int):
+    """
+    Sequence for pulsed spectroscopy, similar to old version. Difference is that
+    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    wave output on the AWG (currently hardcoded, should be improved)
+    
+    """
+    p = oqh.create_program("pulsed_spec_seq_v2", platf_cfg)
+    k = oqh.create_kernel("main", p)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', [trigger_idx])
+    if trigger_idx != qubit_idx:    
+        k.wait([trigger_idx, qubit_idx], 0)
+        
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
 
 def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
              equator: bool=False, cal_points: bool=True,
