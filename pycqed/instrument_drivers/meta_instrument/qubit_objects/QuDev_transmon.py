@@ -1663,7 +1663,7 @@ class QuDev_transmon(Qubit):
             MC.run(name=name + self.msmt_suffix)
 
     def measure_measurement_induced_dephasing(self, ro_amp_scales, phases=None,
-            cal_points=True, pihalf_spacing=3e-6, upload=True, analyze=True)
+            cal_points=True, pihalf_spacing=3e-6, upload=True, analyze=True):
         if phases is None:
             phases = np.linspace(0, 360, 6, endpoint=False)
 
@@ -1680,10 +1680,18 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(swf.Segment_Sweep())
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('measurement_induced_dephasing' + qubit.msmt_suffix)
+        metadata = dict(
+            ro_amp_scales=ro_amp_scales,
+            phases=phases,
+            pihalf_spacing=pihalf_spacing,
+            cal_points=((-4,-3),(-2,-1)) if cal_points else [],
+            ref_amplitude=self.ro_amp(),
+        )
+        MC.run('measurement_induced_dephasing' + self.msmt_suffix, 
+               exp_metadata=metadata)
 
         if analyze:
-            ma.MeasurementAnalysis()
+            tda.MeasurementInducedDephasingAnalysis(do_fitting=True)
 
 
     def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
