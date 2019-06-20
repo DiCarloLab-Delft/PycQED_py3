@@ -235,8 +235,8 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.mock_freq_res(7.78542e9)
         self.CCL_qubit.mock_freq_test_res(7.9862432e9)
 
-        self.CCL_qubit.res_dict = {'0': [7.785e9, 'unknown', {}, None, 0],
-                                   '1': [7.986e9, 'unknown', {}, None, 0]}
+        self.CCL_qubit.res_dict = {'0': [7.785e9, 'unknown', {}, None, 0, 0, 0],
+                                   '1': [7.986e9, 'unknown', {}, None, 0, 0, 0]}
 
         for resonator in ['0', '1']:
             self.CCL_qubit.find_test_resonators()
@@ -297,12 +297,12 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.ro_freq(self.CCL_qubit.mock_freq_res())
 
         self.CCL_qubit.mock_T1(34.39190e-6)
-        self.CCL_qubit.T1(30e-6)
+        self.CCL_qubit.T1(40e-6)
         self.CCL_qubit.measure_T1()
         self.CCL_qubit.measure_T1()
 
         assert self.CCL_qubit.T1() == pytest.approx(self.CCL_qubit.mock_T1(),
-                                                    abs=3e-6)
+                                                    abs=5e-6)
 
     ###########################################################
     # Test Echo
