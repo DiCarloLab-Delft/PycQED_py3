@@ -1662,21 +1662,28 @@ class QuDev_transmon(Qubit):
             MC.set_detector_function(self.inp_avg_det)
             MC.run(name=name + self.msmt_suffix)
 
-        # if 'on' in cases:
-        #     MC.set_sweep_function(awg_swf.OffOn(
-        #         pulse_pars=self.get_ge_pars(),
-        #         RO_pars=self.get_ro_pars(),
-        #         pulse_comb='OnOn',
-        #         upload=upload))
-        #     MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
-        #                                     endpoint=False))
-        #     MC.set_detector_function(self.inp_avg_det)
-        #     if name_extra is not None:
-        #         MC.run(name='timetrace_on_' + name_extra + self.msmt_suffix)
-        #     else:
-        #         MC.run(name='timetrace_on' + self.msmt_suffix)
-        #     if analyze:
-        #         ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
+    def measure_measurement_induced_dephasing(self, ro_amp_scales, phases=None,
+            cal_points=True, pihalf_spacing=3e-6, upload=True, analyze=True)
+        if phases is None:
+            phases = np.linspace(0, 360, 6, endpoint=False)
+
+        MC = self.instr_mc.get_instr()
+
+        self.prepare(drive='timedomain')
+        
+        mqs.measurement_induced_dephasing_seq([self.name], [self.name], 
+            self.get_operation_dict(), ro_amp_scales, phases, upload=upload,
+            pihalf_spacing=pihalf_spacing, cal_points=cal_points)
+
+        sweep_points = np.arange(len(phases)*len(ro_amp_scales) + 4*cal_points)
+
+        MC.set_sweep_function(swf.Segment_Sweep())
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('measurement_induced_dephasing' + qubit.msmt_suffix)
+
+        if analyze:
+            ma.MeasurementAnalysis()
 
 
     def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
