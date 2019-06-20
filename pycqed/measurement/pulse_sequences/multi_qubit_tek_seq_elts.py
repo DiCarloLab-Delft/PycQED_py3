@@ -958,7 +958,7 @@ def two_qubit_tomo_cphase_cardinal(cardinal_state,
     return seq, el_list
 
 
-def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False, verbose=False,
+def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False,
                    parallel_pulses=False, preselection=False, upload=True,
                    RO_spacing=2000e-9):
     n = len(pulse_pars_list)
@@ -994,7 +994,6 @@ def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False, verbose=Fals
     pulse_combinations = []
 
     for pulse_list in itertools.product(*(n*[['I', 'X180']])):
-        print(pulse_list)
         pulse_comb = (n)*['']
         for i, pulse in enumerate(pulse_list):
             pulse_comb[i] = pulse + ' {}'.format(i)
@@ -1006,10 +1005,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False, verbose=Fals
         pulses += RO_pars_list
         if preselection:
             pulses = pulses + RO_pars_list_presel
-        for pulse in pulses:
-            print(pulse)
-            print('')
-        print('')
+
         seg = segment.Segment('segment_{}'.format(i), pulses)
         seg_list.append(seg)
         seq.add(seg)

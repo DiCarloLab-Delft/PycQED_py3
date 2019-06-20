@@ -104,6 +104,9 @@ class SSB_DRAG_pulse(Pulse):
         gauss_env -= (gauss_env[0] + gauss_env[-1]) / 2.
         deriv_gauss_env -= (deriv_gauss_env[0] + deriv_gauss_env[-1]) / 2.
 
+        print(len(tvals[idx0:idx1]))
+        print(len(gauss_env))
+        print(len(deriv_gauss_env))
         # Note prefactor is multiplied by self.sigma to normalize
         if chan == self.I_channel:
             I_mod, Q_mod = apply_modulation(
@@ -463,7 +466,7 @@ class GaussFilteredCosIQPulse(Pulse):
             wave *= (tvals >= tvals[0])
             wave *= (tvals < tvals[0] + self.pulse_length)
         else:
-            tstart = tvals[0] + self.gaussian_filter_sigma * self.nr_sigma
+            tstart = tvals[0] + 0.5 * self.gaussian_filter_sigma * self.nr_sigma
             tend = tstart + self.pulse_length
             scaling = 1 / np.sqrt(2) / self.gaussian_filter_sigma
             wave = 0.5 * (sp.special.erf(

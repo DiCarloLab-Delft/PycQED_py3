@@ -679,7 +679,6 @@ class QuDev_transmon(Qubit):
 
         # Prepare the physical instruments for a time domain measurement
         self.prepare(drive='timedomain')
-
         MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
@@ -1623,8 +1622,8 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name, TwoD=True)
         return MC
 
-    def measure_transients(self, MC=None, levels=('g', 'e'), upload=True,
-                           analyze=True, **kw):
+    def measure_transients(self, levels=('g', 'e'), upload=True,
+                           analyze=True, acq_length=2.2e-6, **kw):
         """
         If the resulting transients will be used to caclulate the optimal
         weight functions, then it is important that the UHFQC iavg_delay and
@@ -1636,48 +1635,32 @@ class QuDev_transmon(Qubit):
             "Naming levels 'on' and 'off' is now deprecated to ensure clear " \
             "denomination for 3 level readout. Please adapt your code:\n " \
             "'off' --> 'g'\n'on' --> 'e'\n'f' for 3d level detection "
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+
+        MC = self.instr_mc.get_instr()
         name_extra = kw.get('name_extra', None)
-        npoints = self.inp_avg_det.nr_samples
 
-        # initialize instruments
-        self.prepare(drive='timedomain')
+        with temporary_value(self.acq_length, acq_length):
+            self.prepare(drive='timedomain')
+            npoints = self.inp_avg_det.nr_samples
 
-        for level in levels:
-            if level not in ['g', 'e', 'f']:
-                raise ValueError("Unrecognized case: {}. It should be 'g', 'e' "
-                                 "or 'f'.".format(level))
-            base_name = 'timetrace_{}'.format(level)
-            name = base_name + "_" + name_extra if name_extra is not None else base_name
+            for level in levels:
+                if level not in ['g', 'e', 'f']:
+                    raise ValueError("Unrecognized case: {}. It should be 'g', 'e' "
+                                     "or 'f'.".format(level))
+                base_name = 'timetrace_{}'.format(level)
+                name = base_name + "_" + name_extra if name_extra is not None else base_name
 
-            # set sweep function and run measurement
-            MC.set_sweep_function(awg_swf.SingleLevel(
-                pulse_pars=self.get_ge_pars(),
-                pulse_pars_2nd=self.get_ef_pars(),
-                RO_pars=self.get_ro_pars(),
-                level=level,
-                upload=upload))
-            MC.set_sweep_points(np.linspace(0, npoints / 1.8e9, npoints, endpoint=False))
-            MC.set_detector_function(self.inp_avg_det)
-            MC.run(name=name + self.msmt_suffix)
-
-        # if 'on' in cases:
-        #     MC.set_sweep_function(awg_swf.OffOn(
-        #         pulse_pars=self.get_ge_pars(),
-        #         RO_pars=self.get_ro_pars(),
-        #         pulse_comb='OnOn',
-        #         upload=upload))
-        #     MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
-        #                                     endpoint=False))
-        #     MC.set_detector_function(self.inp_avg_det)
-        #     if name_extra is not None:
-        #         MC.run(name='timetrace_on_' + name_extra + self.msmt_suffix)
-        #     else:
-        #         MC.run(name='timetrace_on' + self.msmt_suffix)
-        #     if analyze:
-        #         ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
-
+                # set sweep function and run measurement
+                MC.set_sweep_function(awg_swf.SingleLevel(
+                    pulse_pars=self.get_ge_pars(),
+                    pulse_pars_2nd=self.get_ef_pars(),
+                    RO_pars=self.get_ro_pars(),
+                    level=level,
+                    upload=upload))
+                MC.set_sweep_points(np.linspace(0, npoints / 1.8e9, npoints,
+                                                endpoint=False))
+                MC.set_detector_function(self.inp_avg_det)
+                MC.run(name=name + self.msmt_suffix)
 
     def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
                                     prep_pulses=None, comm_freq=225e6,
@@ -2131,14 +2114,15 @@ class QuDev_transmon(Qubit):
 
         return _alpha, _phi, a
 
-    def find_optimized_weights(self, MC=None, update=True, measure=True,
-                               qutrit=False, **kw):
+    def find_optimized_weights(self, update=True, measure=True,
+                               qutrit=False, acq_length=2.2e-6, **kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
         # I agree (Christian, 07.11.2018 -- around 1 year later)
 
         levels = ('g', 'e', 'f') if qutrit else ('g', 'e')
         if measure:
-            self.measure_transients(MC, analyze=True, levels=levels, **kw)
+            self.measure_transients(analyze=True, levels=levels,
+                                    acq_length=acq_length, **kw)
 
         # create label, measurement analysis and data for each level
         if kw.get("name_extra", False):

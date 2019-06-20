@@ -1,12 +1,14 @@
 import logging
 import numpy as np
 from copy import deepcopy
-from pycqed.measurement.waveform_control.element import calculate_time_correction
+from pycqed.measurement.waveform_control.element import \
+    calculate_time_correction
 from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import pulsar as ps
 from pycqed.measurement.waveform_control import sequence as sequence
 from pycqed.measurement.waveform_control import segment as segment
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.randomized_benchmarking import \
+    randomized_benchmarking as rb
 
 from importlib import reload
 reload(pulse)
@@ -21,6 +23,88 @@ def pulse_list_list_seq(pulse_list_list, name='pulse_list_list_sequence',
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
     return seq
+
+def add_preparation_pulses(pulse_list, operation_dict, qb_names,
+                           preparation_type='wait', post_ro_wait=1e-6,
+                           repetitions=3, final_reset_pulse=True):
+    '''
+    Prepends to pulse_list the preparation pulses corresponding to preparation
+
+    preparation:
+        for active reset on |e>: ('active_reset_e', nr_resets)
+        for active reset on |e> and |f>: ('active_reset_ef', nr_resets)
+        for preselection: ('preselection', nr_readouts)
+    '''
+
+    ge_pulse = operation_dict['X180 ' + qb_names[0]]
+    ge_length = ge_pulse['nr_sigma']*ge_pulse['sigma']
+
+    if preparation_type == 'wait':
+        return pulse_list
+
+    elif 'active_reset' in preparation_type:
+        reset_ro_pulses = []
+        for i, qbn in enumerate(qb_names):
+            reset_ro_pulses.append(deepcopy(operation_dict['RO ' + qbn]))
+            reset_ro_pulses[-1]['ref_point'] = 'start' if i != 0 else 'end'
+
+        if preparation_type == 'active_reset_e':
+            ops_and_codewords = [(['I '], 0), (['X180 '], 1)]
+            ef_length = 0
+        elif preparation_type == 'active_reset_ef':
+            ops_and_codewords = [(['I '], 0), (['X180 '], 1),
+                                 (['X180 ', 'X180_ef '], 2),
+                                 (['X180 ', 'X180_ef '], 3)]
+            ef_pulse = operation_dict['X180_ef ' + qb_names[0]]
+            ef_length = ef_pulse['nr_sigma'] * ef_pulse['sigma']
+        else:
+            raise ValueError(f'Invalid preparation type {preparation_type}')
+
+        reset_pulses = []
+        for i, qbn in enumerate(qb_names):
+            for ops, codeword in ops_and_codewords:
+                for j, op in enumerate(ops):
+                    reset_pulses.append(deepcopy(operation_dict[op + qbn]))
+                    reset_pulses[-1]['codeword'] = codeword
+                    if j == 0:
+                        reset_pulses[-1]['ref_point'] = 'start'
+                        reset_pulses[-1]['pulse_delay'] = post_ro_wait
+
+        prep_pulse_list = []
+        for rep in range(repetitions):
+            ro_list = deepcopy(reset_ro_pulses)
+            for pulse in ro_list:
+                pulse['element_name'] = 'reset_ro_element_{}'.format(rep)
+            if rep == 0:
+                ro_list[0]['ref_pulse'] = 'segment_start'
+                ro_list[0]['pulse_delay'] = -repetitions*(
+                        post_ro_wait + ge_length + ef_length)
+            ro_list[0]['name'] = 'refpulse_reset_element_{}'.format(rep)
+            rp_list = deepcopy(reset_pulses)
+            for j, pulse in enumerate(rp_list):
+                pulse['element_name'] = 'reset_pulse_element_{}'.format(rep)
+                pulse['ref_pulse'] = 'refpulse_reset_element_{}'.format(rep)
+            prep_pulse_list += ro_list
+            prep_pulse_list += rp_list
+
+        if final_reset_pulse:
+            rp_list = deepcopy(reset_pulses)
+            for pulse in rp_list:
+                pulse['element_name'] = f'reset_pulse_element_{repetitions}'
+            pulse_list += rp_list
+
+        return prep_pulse_list + pulse_list
+
+    elif preparation_type == 'preselection':
+        preparation_pulses = []
+        for i, qbn in enumerate(qb_names):
+            preparation_pulses.append(deepcopy(operation_dict['RO ' + qbn]))
+            preparation_pulses[-1]['ref_point'] = 'start'
+            preparation_pulses[-1]['element_name'] = 'preselection_element'
+        preparation_pulses[0]['ref_pulse'] = 'segment_start'
+        preparation_pulses[0]['pulse_delay'] = -post_ro_wait
+
+        return preparation_pulses + pulse_list
 
 def rabi_seq_active_reset(amps, qb_name, operation_dict,
                           cal_points=True, no_cal_points=4, upload=True, n=1,
@@ -69,12 +153,11 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict,
                 repetitions=reset_reps, final_reset_pulse=final_reset_pulse)
         else:
             X180_pulse['amplitude'] = amp
-            pulse_list = n*[X180_pulse]+ [operation_dict['RO ' + qb_name]]
+            pulse_list = n*[X180_pulse] + [operation_dict['RO ' + qb_name]]
             pulse_list_with_preparation = add_preparation_pulses(
                 pulse_list, operation_dict, [qb_name],
                 preparation_type=preparation_type, post_ro_wait=post_ro_wait,
                 repetitions=reset_reps, final_reset_pulse=final_reset_pulse)
-
         seg = segment.Segment('segment_{}'.format(i),
                               pulse_list_with_preparation)
         seq.add(seg)
@@ -83,87 +166,6 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict,
         ps.Pulsar.get_instance().program_awgs(seq)
 
     return seq
-
-def add_preparation_pulses(pulse_list, operation_dict, qb_names,
-                           preparation_type='wait', post_ro_wait=1e-6,
-                           repetitions=3, final_reset_pulse=True):
-    '''
-    Prepends to pulse_list the preparation pulses corresponding to preparation
-
-    preparation:
-        for active reset on |e>: ('active_reset_e', nr_resets)
-        for active reset on |e> and |f>: ('active_reset_ef', nr_resets)
-        for preselection: ('preselection', nr_readouts)
-    '''
-
-    ge_pulse = operation_dict['X180 ' + qb_names[0]]
-    ge_length = ge_pulse['nr_sigma']*ge_pulse['sigma']
-
-    if preparation_type == 'wait':
-        return pulse_list
-
-    elif 'active_reset' in preparation_type:
-        reset_ro_pulses = []
-        for i, qbn in enumerate(qb_names):
-            reset_ro_pulses.append(deepcopy(operation_dict['RO ' + qbn]))
-            reset_ro_pulses[-1]['ref_point'] = 'start' if i != 0 else 'end'
-
-        if preparation_type == 'active_reset_e':
-            ops_and_codewords = [(['I '], 0), (['X180 '], 1)]
-            ef_length = 0
-        elif preparation_type == 'active_reset_ef':
-            ops_and_codewords = [(['I '], 0), (['X180 '], 1),
-                (['X180 ', 'X180_ef '], 2), (['X180 ', 'X180_ef '], 3)]
-            ef_pulse = operation_dict['X180_ef ' + qb_names[0]]
-            ef_length = ef_pulse['nr_sigma'] * ef_pulse['sigma']
-        else:
-            raise ValueError(f'Invalid preparation type {preparation_type}')
-
-        reset_pulses = []
-        for i, qbn in enumerate(qb_names):
-            for ops, codeword in ops_and_codewords:
-                for j, op in enumerate(ops):
-                    reset_pulses.append(deepcopy(operation_dict[op + qbn]))
-                    reset_pulses[-1]['codeword'] = codeword
-                    if j == 0:
-                        reset_pulses[-1]['ref_point'] = 'start'
-                        reset_pulses[-1]['pulse_delay'] = post_ro_wait
-
-        prep_pulse_list = []
-        for rep in range(repetitions):
-            ro_list = deepcopy(reset_ro_pulses)
-            for pulse in ro_list:
-                pulse['element_name'] = 'reset_ro_element_{}'.format(rep)
-            if rep == 0:
-                ro_list[0]['ref_pulse'] = 'segment_start'
-                ro_list[0]['pulse_delay'] = -repetitions*(post_ro_wait +
-                                                          ge_length + ef_length)
-            ro_list[0]['pulse_name'] = 'refpulse_reset_element_{}'.format(rep)
-            rp_list = deepcopy(reset_pulses)
-            for pulse in rp_list:
-                pulse['element_name'] = 'reset_pulse_element_{}'.format(rep)
-                pulse['refpulse'] = 'refpulse_reset_element_{}'.format(rep)
-            prep_pulse_list += ro_list
-            prep_pulse_list += rp_list
-
-        if final_reset_pulse:
-            rp_list = deepcopy(reset_pulses)
-            for pulse in rp_list:
-                pulse['element_name'] = f'reset_pulse_element_{repetitions}'
-            pulse_list += rp_list
-
-        return prep_pulse_list + pulse_list
-
-    elif preparation_type == 'preselection':
-        preparation_pulses = []
-        for i, qbn in enumerate(qb_names):
-            preparation_pulses.append(deepcopy(operation_dict['RO ' + qbn]))
-            preparation_pulses[-1]['ref_point'] = 'start'
-            preparation_pulses[-1]['element_name'] = 'preselection_element'
-        preparation_pulses[0]['ref_pulse'] = 'segment_start'
-        preparation_pulses[0]['pulse_delay'] = -post_ro_wait
-
-        return preparation_pulses + pulse_list
 
 def rabi_seq(amps, pulse_pars, RO_pars, n=1, no_cal_points=2,
              cal_points=True, upload=True, return_seq=False):
@@ -833,7 +835,6 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False,
         pulse_list += [RO_pars]    
     else:
         pulse_list = pulse_combination+[RO_pars]
-    print(pulse_list)
     seg = segment.Segment('segment_{}_level'.format(level), pulse_list)
     seg_list.append(seg)
     seq.add(seg)

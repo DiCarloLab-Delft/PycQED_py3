@@ -496,8 +496,7 @@ class BaseDataAnalysis(object):
         Only model fitting is implemented here. Minimizing fitting should
         be implemented here.
         '''
-        if not hasattr(self, "fit_res"):
-            self.fit_res = {}
+        self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
