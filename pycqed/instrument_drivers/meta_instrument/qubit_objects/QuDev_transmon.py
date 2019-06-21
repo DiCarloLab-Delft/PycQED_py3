@@ -1,23 +1,19 @@
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
-import qcodes as qc
 from copy import deepcopy
+
 from qcodes.instrument.parameter import (
     ManualParameter, InstrumentRefParameter)
 from qcodes.utils import validators as vals
 
 from pycqed.analysis_v2.readout_analysis import Singleshot_Readout_Analysis_Qutrit
 from pycqed.measurement import detector_functions as det
-from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.calibration_points import CalibrationPoints as cp
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
-from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
-from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
-
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import timedomain_analysis as tda
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
@@ -30,6 +26,8 @@ from pycqed.measurement import optimization as opti
 from pycqed.measurement import mc_parameter_wrapper
 import pycqed.analysis_v2.spectroscopy_analysis as sa
 from pycqed.utilities import math
+log = logging.getLogger()
+log.addHandler(logging.StreamHandler())
 
 try:
     import pycqed.simulations.readout_mode_simulations_for_CLEAR_pulse \
@@ -683,7 +681,6 @@ class QuDev_transmon(Qubit):
 
         # Prepare the physical instruments for a time domain measurement
         self.prepare(drive='timedomain')
-
         MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
@@ -1629,8 +1626,8 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name, TwoD=True)
         return MC
 
-    def measure_transients(self, MC=None, levels=('g', 'e'), upload=True,
-                           analyze=True, **kw):
+    def measure_transients(self, levels=('g', 'e'), upload=True,
+                           analyze=True, acq_length=2.2e-6, **kw):
         """
         If the resulting transients will be used to caclulate the optimal
         weight functions, then it is important that the UHFQC iavg_delay and
@@ -1642,48 +1639,32 @@ class QuDev_transmon(Qubit):
             "Naming levels 'on' and 'off' is now deprecated to ensure clear " \
             "denomination for 3 level readout. Please adapt your code:\n " \
             "'off' --> 'g'\n'on' --> 'e'\n'f' for 3d level detection "
-        if MC is None:
-            MC = self.instr_mc.get_instr()
+
+        MC = self.instr_mc.get_instr()
         name_extra = kw.get('name_extra', None)
-        npoints = self.inp_avg_det.nr_samples
 
-        # initialize instruments
-        self.prepare(drive='timedomain')
+        with temporary_value(self.acq_length, acq_length):
+            self.prepare(drive='timedomain')
+            npoints = self.inp_avg_det.nr_samples
 
-        for level in levels:
-            if level not in ['g', 'e', 'f']:
-                raise ValueError("Unrecognized case: {}. It should be 'g', 'e' "
-                                 "or 'f'.".format(level))
-            base_name = 'timetrace_{}'.format(level)
-            name = base_name + "_" + name_extra if name_extra is not None else base_name
+            for level in levels:
+                if level not in ['g', 'e', 'f']:
+                    raise ValueError("Unrecognized case: {}. It should be 'g', 'e' "
+                                     "or 'f'.".format(level))
+                base_name = 'timetrace_{}'.format(level)
+                name = base_name + "_" + name_extra if name_extra is not None else base_name
 
-            # set sweep function and run measurement
-            MC.set_sweep_function(awg_swf.SingleLevel(
-                pulse_pars=self.get_ge_pars(),
-                pulse_pars_2nd=self.get_ef_pars(),
-                RO_pars=self.get_ro_pars(),
-                level=level,
-                upload=upload))
-            MC.set_sweep_points(np.linspace(0, npoints / 1.8e9, npoints, endpoint=False))
-            MC.set_detector_function(self.inp_avg_det)
-            MC.run(name=name + self.msmt_suffix)
-
-        # if 'on' in cases:
-        #     MC.set_sweep_function(awg_swf.OffOn(
-        #         pulse_pars=self.get_ge_pars(),
-        #         RO_pars=self.get_ro_pars(),
-        #         pulse_comb='OnOn',
-        #         upload=upload))
-        #     MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
-        #                                     endpoint=False))
-        #     MC.set_detector_function(self.inp_avg_det)
-        #     if name_extra is not None:
-        #         MC.run(name='timetrace_on_' + name_extra + self.msmt_suffix)
-        #     else:
-        #         MC.run(name='timetrace_on' + self.msmt_suffix)
-        #     if analyze:
-        #         ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
-
+                # set sweep function and run measurement
+                MC.set_sweep_function(awg_swf.SingleLevel(
+                    pulse_pars=self.get_ge_pars(),
+                    pulse_pars_2nd=self.get_ef_pars(),
+                    RO_pars=self.get_ro_pars(),
+                    level=level,
+                    upload=upload))
+                MC.set_sweep_points(np.linspace(0, npoints / 1.8e9, npoints,
+                                                endpoint=False))
+                MC.set_detector_function(self.inp_avg_det)
+                MC.run(name=name + self.msmt_suffix)
 
     def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
                                     prep_pulses=None, comm_freq=225e6,
@@ -1950,7 +1931,14 @@ class QuDev_transmon(Qubit):
             self.ge_Q_channel())]
         MC.set_sweep_functions([chI_par, chQ_par])
         MC.set_adaptive_function_parameters(ad_func_pars)
-        sq.pulse_list_list_seq([[self.get_acq_pars()]])
+        sq.pulse_list_list_seq([[self.get_acq_pars(), dict(
+                            pulse_type='GaussFilteredCosIQPulse',
+                            pulse_length=self.acq_length(),
+                            ref_point='start',
+                            amplitude=0,
+                            I_channel=self.ge_I_channel(),
+                            Q_channel=self.ge_Q_channel(),
+                        )]])
             
         with temporary_value(
             (self.ro_freq, self.ge_freq() - self.ge_mod_freq()),
@@ -1958,9 +1946,9 @@ class QuDev_transmon(Qubit):
             (self.instr_trigger.get_instr().pulse_period, trigger_sep),
         ):
             self.prepare(drive='timedomain')
-            MC.set_detector_function(det.IndexDetector(self.int_avg_det_spec, 
-                                                0))
-            self.instr_pulsar.get_instr().start()
+            MC.set_detector_function(det.IndexDetector(
+                self.int_avg_det_spec, 0))
+            self.instr_pulsar.get_instr().start(exclude=[self.instr_uhf()])
             MC.run(name='drive_carrier_calibration' + self.msmt_suffix,
                 mode='adaptive')
         
@@ -2030,8 +2018,8 @@ class QuDev_transmon(Qubit):
         return alpha, phi
 
     def calibrate_drive_mixer_skewness_NN(
-            self, update=True,make_fig=True, meas_grid=None,n_meas=100,
-            amplitude=0.1,trigger_sep=5e-6, two_rounds=False, 
+            self, update=True,make_fig=True, meas_grid=None, n_meas=100,
+            amplitude=0.1, trigger_sep=5e-6, two_rounds=False,
             estimator='GRNN_neupy', hyper_parameter_dict=None, 
             first_round_limits=(0.6, 1.2, -50, 35), **kwargs):
         if not len(first_round_limits) == 4:
@@ -2050,7 +2038,7 @@ class QuDev_transmon(Qubit):
                                     'learning_steps': 5000,
                                     'cv_n_fold': 5,
                                     'polynomial_dimension': 2}
-        std_devs = kwargs.get('std_devs', [0.3,10.])
+        std_devs = kwargs.get('std_devs', [0.1, 10])
         c = kwargs.pop('second_round_std_scale', 0.4)
         
         # Could make sample size variable (maxiter) for better adapting)
@@ -2063,17 +2051,17 @@ class QuDev_transmon(Qubit):
         MC = self.instr_mc.get_instr()
         _alpha = self.ge_alpha()
         _phi = self.ge_phi_skew()
-        for runs in range(2 if two_rounds else 3):
+        for runs in range(3 if two_rounds else 2):
             if runs == 0:
                 # half as many points from a uniform distribution at first run
-                meas_grid = np.stack([
+                meas_grid = np.array([
                     np.random.uniform(first_round_limits[0], 
                                       first_round_limits[1], n_meas//2),
                     np.random.uniform(first_round_limits[2], 
                                       first_round_limits[3], n_meas//2)])
             else:
                 k = 1. if runs == 1 else c
-                meas_grid = np.stack([
+                meas_grid = np.array([
                     np.random.normal(_alpha, k*std_devs[0], n_meas),
                     np.random.normal(_phi, k*std_devs[1], n_meas)])
 
@@ -2130,14 +2118,15 @@ class QuDev_transmon(Qubit):
 
         return _alpha, _phi, a
 
-    def find_optimized_weights(self, MC=None, update=True, measure=True,
-                               qutrit=False, **kw):
+    def find_optimized_weights(self, update=True, measure=True,
+                               qutrit=False, acq_length=2.2e-6, **kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
         # I agree (Christian, 07.11.2018 -- around 1 year later)
 
         levels = ('g', 'e', 'f') if qutrit else ('g', 'e')
         if measure:
-            self.measure_transients(MC, analyze=True, levels=levels, **kw)
+            self.measure_transients(analyze=True, levels=levels,
+                                    acq_length=acq_length, **kw)
 
         # create label, measurement analysis and data for each level
         if kw.get("name_extra", False):
@@ -2643,8 +2632,9 @@ class QuDev_transmon(Qubit):
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         update=False, close_fig=True, cal_points=True,
                         no_cal_points=None, upload=True, last_ge_pulse=True,
-                        analyze=True, active_reset=False, **kw):
-
+                        analyze=True, preparation_type='wait',
+                        post_ro_wait=1e-6, reset_reps=1,
+                        final_reset_pulse=True, **kw):
         """
             Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
             experiment. Uses the Rabi_Analysis(_new)
@@ -2776,7 +2766,9 @@ class QuDev_transmon(Qubit):
                               label=label,
                               cal_points=cal_points,
                               no_cal_points=no_cal_points,
-                              active_reset=active_reset,
+                              preparation_type=preparation_type,
+                              post_ro_wait=post_ro_wait, reset_reps=reset_reps,
+                              final_reset_pulse=final_reset_pulse,
                               upload=upload)
 
         #get pi and pi/2 amplitudes from the analysis results

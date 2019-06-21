@@ -1,12 +1,14 @@
 import logging
 import numpy as np
 from copy import deepcopy
-from pycqed.measurement.waveform_control.element import calculate_time_correction
+from pycqed.measurement.waveform_control.element import \
+    calculate_time_correction
 from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import pulsar as ps
 from pycqed.measurement.waveform_control import sequence as sequence
 from pycqed.measurement.waveform_control import segment as segment
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.randomized_benchmarking import \
+    randomized_benchmarking as rb
 
 from importlib import reload
 reload(pulse)
@@ -108,7 +110,8 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
             ef_length = 0
         elif preparation_type == 'active_reset_ef':
             ops_and_codewords = [(['I '], 0), (['X180 '], 1),
-                (['X180 ', 'X180_ef '], 2), (['X180 ', 'X180_ef '], 3)]
+                                 (['X180 ', 'X180_ef '], 2),
+                                 (['X180 ', 'X180_ef '], 3)]
             ef_pulse = operation_dict['X180_ef ' + qb_names[0]]
             ef_length = ef_pulse['nr_sigma'] * ef_pulse['sigma']
         else:
@@ -131,13 +134,13 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
                 pulse['element_name'] = 'reset_ro_element_{}'.format(rep)
             if rep == 0:
                 ro_list[0]['ref_pulse'] = 'segment_start'
-                ro_list[0]['pulse_delay'] = -repetitions*(post_ro_wait +
-                                                          ge_length + ef_length)
-            ro_list[0]['pulse_name'] = 'refpulse_reset_element_{}'.format(rep)
+                ro_list[0]['pulse_delay'] = -repetitions*(
+                        post_ro_wait + ge_length + ef_length)
+            ro_list[0]['name'] = 'refpulse_reset_element_{}'.format(rep)
             rp_list = deepcopy(reset_pulses)
-            for pulse in rp_list:
+            for j, pulse in enumerate(rp_list):
                 pulse['element_name'] = 'reset_pulse_element_{}'.format(rep)
-                pulse['refpulse'] = 'refpulse_reset_element_{}'.format(rep)
+                pulse['ref_pulse'] = 'refpulse_reset_element_{}'.format(rep)
             prep_pulse_list += ro_list
             prep_pulse_list += rp_list
 
@@ -868,7 +871,6 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False,
         pulse_list += [RO_pars]    
     else:
         pulse_list = pulse_combination+[RO_pars]
-    print(pulse_list)
     seg = segment.Segment('segment_{}_level'.format(level), pulse_list)
     seg_list.append(seg)
     seq.add(seg)
