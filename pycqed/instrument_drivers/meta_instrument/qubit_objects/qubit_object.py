@@ -622,7 +622,7 @@ class Qubit(Instrument):
                         res_dict[resonator][3] = 'Q' + fluxline[4]
                         res_dict[resonator][4] = sweetspot_current
 
-          if verbose:
+        if verbose:
             for items in res_dict.values():
                 print('{}, f = {:.3f}, linked to {},'
                       ' sweetspot current = {:.3f} mA'.format(items[1],

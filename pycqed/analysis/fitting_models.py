@@ -602,7 +602,9 @@ def avoided_crossing_freq_shift(flux, a, b, g):
     result = frequencies[:, 1]- frequencies[:, 0]
     return result
 
-
+def resonator_flux(f_bare, g, A, f, t, sweetspot_cur):
+    return f_bare - g/(A*np.sqrt(np.abs(np.cos(np.pi*f*(t-sweetspot_cur))))
+                       - f_bare)
 
 ######################
 # Residual functions #
@@ -1167,7 +1169,7 @@ def sum_int(x,y):
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
 CosModel2 = lmfit.Model(CosFunc2)
-
+ResonatorArch = lmfit.Model(resonator_flux)
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)

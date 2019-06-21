@@ -271,7 +271,7 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.T2_star(19e-6)
         self.CCL_qubit.measure_ramsey()
 
-        threshold = 3e-6
+        threshold = 4e-6
         assert self.CCL_qubit.T2_star() == pytest.approx(
                                            self.CCL_qubit.mock_T2_star(),
                                            abs=threshold)
