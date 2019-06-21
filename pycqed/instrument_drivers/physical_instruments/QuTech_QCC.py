@@ -31,7 +31,7 @@ import re
 try:
     # qisa_as can be installed from the qisa-as folder in the ElecPrj_QCC
     # repostiory. Current version is 4.0.0 (Feb 15 2019)
-    from qisa_as import QISA_Driver, qisa_qmap
+    from qcc_qisa_as import QCC_QISA_Driver, qisa_qmap
 except ImportError as e:
     # Do not raise error to be able to use a dummy QCC when no assembler
     # is installed.
@@ -86,7 +86,7 @@ class QCC(SCPI):
         The parser helper objects are initialized in this function.
         """
         self.microcode = QCCMicrocode()
-        self.QISA = QISA_Driver()
+        self.QISA = QCC_QISA_Driver()
 
         """
         QCC only works with version 4.0.0 of the assembler
