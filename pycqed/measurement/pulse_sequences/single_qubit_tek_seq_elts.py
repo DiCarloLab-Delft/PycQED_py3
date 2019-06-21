@@ -58,9 +58,12 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points_obj,
         if last_ge_pulse:
             rabi_ops += ["X180 " + qb_name]
     rabi_ops += ["RO " + qb_name]
-    rabi_pulses = [operation_dict[op] for op in rabi_ops]
-    for i in range(1 if for_ef else 0, n + 1 if for_ef else n):
-        rabi_pulses[i]["name"] = f"Rabi_{i - 1 if for_ef else i}"
+    rabi_pulses = [deepcopy(operation_dict[op]) for op in rabi_ops]
+
+    for i in np.arange(1 if for_ef else 0, n + 1 if for_ef else n):
+        print("Rabi_{}".format(i - 1 if for_ef else i))
+        rabi_pulses[i]["name"] = "Rabi_" + str(i)
+
 
     swept_pulses = \
         sweep_pulse_params(rabi_pulses,
