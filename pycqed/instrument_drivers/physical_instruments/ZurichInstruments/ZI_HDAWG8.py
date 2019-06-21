@@ -206,6 +206,7 @@ class ZI_HDAWG8(ZI_HDAWG_core):
                                                program_string=program,
                                                timeout=self.timeout())
         self.configure_codeword_protocol()
+        # FIXME: check memory usage and issue warning if > 100%
 
     # FIXME: should probably be private as it works in tandem with upload_codeword_program
     def configure_codeword_protocol(self, default_dio_timing: bool=False):

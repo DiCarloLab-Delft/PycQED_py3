@@ -4,6 +4,7 @@ import os
 import logging
 import sys
 import time
+from pathlib import Path
 import numpy as np
 
 from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
@@ -35,6 +36,12 @@ log = logging.getLogger('pycqed')
 log.setLevel(logging.DEBUG)
 log.debug('started')
 
+
+# parameter handling
+sel = 0
+if len(sys.argv)>1:
+    sel = int(sys.argv[1])
+
 ##########################################
 # Constants
 ##########################################
@@ -48,9 +55,40 @@ conf.cc_ip = '192.168.0.241'
 
 qubit_idx = 10
 curdir = os.path.dirname(__file__)
-cfg_openql_platform_fn = os.path.join(curdir, 'demo1_cfg.json')
+cfg_openql_platform_fn = str(Path("../../pycqed/tests/openql/test_cfg_cc.json"))
+print(cfg_openql_platform_fn)
 
+##########################################
+# OpenQL program
+##########################################
 
+if sel==0:  # ALLXY
+    # based on CCL_Transmon.py::measure_allxy()
+    log.debug('compiling allxy')
+    p = sqo.AllXY(qubit_idx=qubit_idx, double_points=True, platf_cfg=cfg_openql_platform_fn)
+    print(p.filename)
+
+if sel==1:  # Ramsey
+    # based on CCL_Transmon.py::measure_ramsey()
+    # funny default is because there is no real time sideband
+    # modulation
+    log.debug('compiling Ramsey')
+    T2_star = 20e-6
+    cfg_cycle_time = 20e-9
+    stepsize = (T2_star * 4 / 61) // (abs(cfg_cycle_time)) \
+               * abs(cfg_cycle_time)
+    times = np.arange(0, T2_star * 4, stepsize)
+    p = sqo.Ramsey(times, qubit_idx=qubit_idx, platf_cfg=cfg_openql_platform_fn)
+    print(p.filename)
+
+if sel==2:  # Rabi
+    # based on CCL_Transmon.py::measure_rabi_channel_amp()
+    log.debug('compiling Rabi')
+    p = sqo.off_on(
+        qubit_idx=qubit_idx, pulse_comb='on',
+        initialize=False,
+        platf_cfg=cfg_openql_platform_fn)
+    print(p.filename)
 
 ##########################################
 # Open physical instruments
@@ -104,8 +142,6 @@ if conf.mw_0 != '':
     set_waveforms(instr.mw_0, 'square', sequence_length)
     instr.mw_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
     instr.mw_0.cfg_codeword_protocol('microwave')
-    #time.sleep(5)
-    #instr.mw_0.configure_codeword_protocol() # from notebook, seems redundant
     instr.mw_0.upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
 
@@ -124,19 +160,13 @@ if conf.flux_0 != '':
     set_waveforms(instr.flux_0, 'square', sequence_length)
     instr.flux_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
     instr.flux_0.cfg_codeword_protocol('flux')
-    #FIXME instr.flux_0.configure_codeword_protocol()
     instr.flux_0.upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
-
-
-
-
 
 
 if 1:
     instr.cc.debug_marker_out(0, instr.cc.UHFQA_TRIG) # UHF-QA trigger
     instr.cc.debug_marker_out(8, instr.cc.HDAWG_TRIG) # HDAWG trigger
-
 
     log.debug('uploading {}'.format(p.filename))
     instr.cc.eqasm_program = p.filename
@@ -147,5 +177,3 @@ if 1:
 
     log.debug('starting CC')
     instr.cc.start()
-
-
