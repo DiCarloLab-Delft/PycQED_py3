@@ -1343,7 +1343,7 @@ class CCLight_Transmon(Qubit):
 
         if update:
             self.fl_dc_V0(sweetspot_current)
-            self.freq_max(self.calculate_current_to_freq(sweetspot_current))
+            self.freq_max(self.calc_current_to_freq(sweetspot_current))
         if set_to_sweetspot:
             self.instr_FluxCtrl.get_instr()[self.cfg_dc_flux_ch()](sweetspot_current)
         
