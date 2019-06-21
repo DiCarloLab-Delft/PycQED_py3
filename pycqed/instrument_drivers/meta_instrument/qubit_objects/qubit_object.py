@@ -344,8 +344,8 @@ class Qubit(Instrument):
         broadened by 1+threshold (default: broadening of 10%)
         """
         if freqs is None:
-            freqs = np.arange(self.freq_qubit() - 50e6,
-                              self.freq_qubit() + 50e6, 1e6)
+            freqs = np.arange(self.freq_qubit() - 10e6,
+                              self.freq_qubit() + 10e6, 0.2e6)
         power = start_power
 
         w0, w = 1e9, 1e9
@@ -425,7 +425,7 @@ class Qubit(Instrument):
             dip = np.amin(a.data_y)
             offset = a.fit_results.params['A'].value
 
-            if np.abs(dip/offset) > 0.8:
+            if np.abs(dip/offset) > 0.6:
                 print('Removed candidate {} ({:.3f} GHz): Not a resonator'
                       .format(resonator, freq/1e9))
                 delkeys.append(resonator)
@@ -618,14 +618,11 @@ class Qubit(Instrument):
                     if amplitude > best_amplitude:
                         best_amplitude = amplitude
                         self.cfg_dc_flux_ch(fluxline)
+                        self.fl_dc_V_per_phi0(fit_res.params['Frequency'].value)
                         res_dict[resonator][3] = 'Q' + fluxline[4]
                         res_dict[resonator][4] = sweetspot_current
 
-                        # self.fl_dc_V0(sweetspot_current)
-                        # fluxcurrent[fluxline](sweetspot_current)
-                        # self.freq_res(items[0])
-
-        if verbose:
+          if verbose:
             for items in res_dict.values():
                 print('{}, f = {:.3f}, linked to {},'
                       ' sweetspot current = {:.3f} mA'.format(items[1],
@@ -770,17 +767,6 @@ class Qubit(Instrument):
         method.
         Frequency prediction is done using
         """
-        try:
-            if not self.done_spectroscopy:
-                self.spec_pow(-20) 
-                f_span = 2e9
-                freqs = np.arange(self.freq_qubit() - f_span/2,
-                                  self.freq_qubit() + f_span/2,
-                                  f_step)
-                self.done_spectroscopy = True
-        except:
-            pass
-
         if method.lower() == 'spectroscopy':
             if freqs is None:
                 f_qubit_estimate = self.calculate_frequency()

@@ -1241,6 +1241,7 @@ class CCLight_Transmon(Qubit):
                     self.freq_qubit(analysis_spec.peaks['peak'])
                 else:
                     self.freq_qubit(analysis_spec.fitted_freq)
+                return True
 
     def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
         if freqs is None:
@@ -1259,11 +1260,14 @@ class CCLight_Transmon(Qubit):
                                                       close_fig=True)
             shift = fit_res.results[0]
             power = fit_res.results[1]
-
+            f_low = fit_res.results[2]
             ro_pow = 10**(power/20)
             self.ro_pulse_amp_CW(ro_pow/3)
+            self.freq_res(f_low)
             if self.freq_qubit() is None:
                 f_qubit_estimate = self.freq_res() + (65e6)**2/(shift) - 500e6
+                logging.info('No qubit frquency found. Updating with RWA to {}'
+                             .format(f_qubit_estimate))
                 self.freq_qubit(f_qubit_estimate)
 
         return True
@@ -1339,6 +1343,7 @@ class CCLight_Transmon(Qubit):
 
         if update:
             self.fl_dc_V0(sweetspot_current)
+            self.freq_max(self.calculate_current_to_freq(sweetspot_current))
         if set_to_sweetspot:
             self.instr_FluxCtrl.get_instr()[self.cfg_dc_flux_ch()](sweetspot_current)
         
@@ -2098,6 +2103,11 @@ class CCLight_Transmon(Qubit):
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
 
+        # Save current value of mw_channel_amp to make this measurement
+        # independent of the value.
+        old_channel_amp = self.mw_channel_amp()
+        self.mw_channel_amp(1)
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         # Snippet here to create and upload the CCL instructions
@@ -2129,6 +2139,8 @@ class CCLight_Transmon(Qubit):
         # d = self.int_avg_det
         # MC.set_detector_function(d)
         MC.run(name='pulsed_mixer_spectroscopy'+self.msmt_suffix+label)
+
+        self.mw_channel_amp(old_channel_amp)
         # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
@@ -4117,18 +4129,18 @@ class CCLight_Transmon(Qubit):
         dag.add_node(self.name + ' Ro/MW pulse timing',
                      calibrate_function=cal_True_delayed)
 
-        dag.add_node(self.name + ' Mixer Skewness',
+        dag.add_node(self.name + ' Mixer Skewness Drive',
                      calibrate_function=cal_True_delayed)
                           # calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
+        dag.add_node(self.name + ' Mixer Skewness Readout',
+                     calibrate_function=cal_True_delayed)
+                          # calibrate_function=self.name + '.calibrate_mixer_skewness_RO')
         dag.add_node(self.name + ' Mixer Offset Drive',
                      calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
         dag.add_node(self.name + ' Mixer Offset Readout',
                      calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
         dag.add_node(self.name + ' Ro/MW pulse timing',
                      calibrate_function=cal_True_delayed)
-        dag.add_node(self.name + ' Ro Pulse Amplitude',
-                     calibrate_function=self.name + '.ro_pulse_amp_CW')
-
 
         # Qubits calibration
         dag.add_node(self.name + ' Frequency Coarse',

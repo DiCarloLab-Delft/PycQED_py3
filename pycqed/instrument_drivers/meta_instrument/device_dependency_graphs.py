@@ -72,16 +72,18 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             # Calibration of instruments and ro
             self.add_node(Qubit.name + ' Calibrations',
                           calibrate_function=cal_True_delayed)
-            self.add_node(Qubit.name + ' Mixer Skewness',
-                          calibrate_function=Qubit.name + '.calibrate_mixer_skewness_drive')
+            self.add_node(Qubit.name + ' Mixer Skewness Drive',
+                          calibrate_function=cal_True_delayed)
+                              # calibrate_function=Qubit.name + '.calibrate_mixer_skewness_drive')
+            self.add_node(Qubit.name + ' Mixer Skewness Readout',
+                          calibrate_function=cal_True_delayed)
+                              # calibrate_function=Qubit.name + '.calibrate_mixer_skewness_RO')
             self.add_node(Qubit.name + ' Mixer Offset Drive',
                           calibrate_function=Qubit.name + '.calibrate_mixer_offsets_drive')
             self.add_node(Qubit.name + ' Mixer Offset Readout',
                           calibrate_function=Qubit.name + '.calibrate_mixer_offsets_RO')
             self.add_node(Qubit.name + ' Ro/MW pulse timing',
                           calibrate_function=cal_True_delayed)
-            self.add_node(Qubit.name + ' Ro Pulse Amplitude',
-                          calibrate_function=Qubit.name + '.ro_pulse_amp_CW')
 
             # Qubits calibration
             self.add_node(Qubit.name + ' Frequency Coarse',
@@ -145,15 +147,13 @@ class octobox_dep_graph(AutoDepGraph_DAG):
 
             # Calibrations
             self.add_edge(Qubit.name + ' Calibrations',
-                          Qubit.name + ' Mixer Skewness')
+                          Qubit.name + ' Mixer Skewness Readout')
+            self.add_edge(Qubit.name + ' Calibrations',
+                          Qubit.name + ' Mixer Skewness Drive')
             self.add_edge(Qubit.name + ' Calibrations',
                           Qubit.name + ' Mixer Offset Drive')
             self.add_edge(Qubit.name + ' Calibrations',
                           Qubit.name + ' Mixer Offset Readout')
-            self.add_edge(Qubit.name + ' Calibrations',
-                          Qubit.name + ' Ro/MW pulse timing')
-            self.add_edge(Qubit.name + ' Calibrations',
-                          Qubit.name + ' Ro Pulse Amplitude')
             self.add_edge(Qubit.name + ' Resonator Power Scan',
                           Qubit.name + ' Calibrations')
 
