@@ -1175,8 +1175,9 @@ class CCLight_Transmon(Qubit):
         VSM = self.instr_VSM.get_instr()
         VSM.set('ch{}_frequency'.format(
             self.mw_vsm_ch_in()), self.freq_qubit())
-        VSM.set('mod{}_ch{}_marker_state'.format(
-            self.spec_vsm_mod_out(), self.spec_vsm_ch_in()), 'off')
+        for mod in range(1,9):
+            VSM.set('mod{}_ch{}_marker_state'.format(
+                mod, self.spec_vsm_ch_in()), 'off')
         VSM.set('mod{}_ch{}_marker_state'.format(
             self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), 'on')
         VSM.set('mod{}_marker_source'.format(
@@ -1226,7 +1227,7 @@ class CCLight_Transmon(Qubit):
 
         return True
 
-    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True, 
+    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True,
                              set_to_sweetspot=True):
         '''
         Should be edited such that it contains reference to different measurement
@@ -1327,7 +1328,7 @@ class CCLight_Transmon(Qubit):
                           all_modules=all_modules)
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
         try:
-            if self.cfg_with_vsm(): 
+            if self.cfg_with_vsm():
                 self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
             else:
                 self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
