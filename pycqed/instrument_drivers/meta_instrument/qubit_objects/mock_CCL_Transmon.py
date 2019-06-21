@@ -276,8 +276,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         if analyze:
             ma2.Basic1DAnalysis()
 
-    def measure_spectroscopy(self, freqs, pulsed=True, MC=None, analyze=True,
-                             close_fig=True, label='',
+    def measure_spectroscopy(self, freqs, mode='pulsed_marked', MC=None,
+                             analyze=True, close_fig=True, label='',
                              prepare_for_continuous_wave=True):
         '''
         Can be made fancier by implementing different types of spectroscopy
