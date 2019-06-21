@@ -618,7 +618,7 @@ class Qubit(Instrument):
                     if amplitude > best_amplitude:
                         best_amplitude = amplitude
                         self.cfg_dc_flux_ch(fluxline)
-                        self.fl_dc_V_per_phi0(fit_res.params['Frequency'].value)
+                        self.fl_dc_V_per_phi0(fit_res.current_to_flux)
                         res_dict[resonator][3] = 'Q' + fluxline[4]
                         res_dict[resonator][4] = sweetspot_current
 
