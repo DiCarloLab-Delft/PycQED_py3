@@ -859,6 +859,116 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
           self.save_fig(fig, figname=savename, **kw)
 
 
+class VNA_DAC_Analysis_v2(VNA_TwoD_Analysis):
+    """
+    This function can be called with timestamp as its only argument. It will fit
+    a cosine to any VNA DAC arc. The fit is stored in dac_fit_res.
+    Use .sweetspotvalue to get a guess for the qubit sweetspot current,
+    and use .current_to_flux to get the current requiired for one flux period
+
+    Has a more sophisticated arch model
+    """
+
+    def __init__(self, timestamp,
+                 options_dict=None,
+                 do_fitting=True,
+                 extract_only=False,
+                 auto=True):
+        super(VNA_TwoD_Analysis, self).__init__(timestamp = timestamp,
+                                                options_dict=options_dict,
+                                                extract_only=extract_only,
+                                                auto=auto,
+                                                do_fitting=do_fitting)
+
+        linecut_fit_result = self.fit_linecuts()
+        self.linecut_fit_result = linecut_fit_result
+        f0s = []
+        for res in self.linecut_fit_result:
+            f0s.append(res.values['f0']*1e9)
+        self.f0s = np.array(f0s)
+        self.run_full_analysis()
+        self.dac_fit_res = self.fit_dac_arc()
+        self.sweet_spot_value = -1*self.dac_fit_res.values['phase']
+        self.current_to_flux = 1/self.dac_fit_res.values['frequency']
+        self.plot_fit_result()
+
+    def fit_dac_arc(self):
+        DAC_values = self.sweep_points_2D
+        f0s = self.f0s
+
+        max_index = np.where(f0s==max(f0s))[0]
+        min_index = np.where(f0s==min(f0s))[0]
+        max_DAC = DAC_values[max_index]
+        min_DAC = DAC_values[min_index]
+
+        freq = 1/(np.abs(max_DAC-min_DAC)*2)
+
+        Model = fit_mods.ResonatorArch
+        Model.set_param_hint('f_bare', value=np.min(f0s), min=0)
+        Model.set_param_hint('g', value=(50e6)**2)
+        Model.set_param_hint('A', value=5e9)
+        Model.set_param_hint('f', value=40)
+        Model.set_param_hint('sweetspot_cur', value=0)
+        params = Model.make_params()
+        fit_res = Model.fit(data=f0s, t=DAC_values, verbose=True)
+
+        return fit_res
+
+    def plot_fit_result(self,normalize=False, plot_linecuts=True,
+                        linecut_log=False, colorplot_log=False,
+                        plot_all=True, save_fig=True,
+                        transpose=False, figsize=None, filtered=False,
+                        subtract_mean_x=False, subtract_mean_y=False,
+                        **kw):
+        fig, ax = plt.subplots(figsize=figsize)
+        self.fig_array.append(fig)
+        self.ax_array.append(ax)
+        # print "unransposed",meas_vals
+        # print "transposed", meas_vals.transpose()
+        self.ax_array.append(ax)
+        savename = 'Heatmap_{}'.format(self.value_names[0])
+        fig_title = '{} {} \n{}'.format(
+            self.timestamp_string, self.measurementstring,
+            self.value_names[0])
+
+        if "xlabel" not in kw:
+            kw["xlabel"] = self.parameter_names[0]
+        if "ylabel" not in kw:
+            kw["ylabel"] = self.parameter_names[1]
+        if "xunit" not in kw:
+            kw["xunit"] = self.parameter_units[0]
+        if "yunit" not in kw:
+            kw["yunit"] = self.parameter_units[1]
+
+        # subtract mean from each row/column if demanded
+        plot_zvals = self.measured_values[0].transpose()
+        if subtract_mean_x:
+            plot_zvals = plot_zvals - np.mean(plot_zvals,axis=1)[:,None]
+        if subtract_mean_y:
+            plot_zvals = plot_zvals - np.mean(plot_zvals,axis=0)[None,:]
+
+        a_tools.color_plot(x=self.sweep_points,
+                           y=self.sweep_points_2D,
+                           z=plot_zvals,
+                           zlabel=self.zlabels[0],
+                           fig=fig, ax=ax,
+                           log=colorplot_log,
+                           transpose=transpose,
+                           normalize=normalize,
+                           **kw)
+
+        plot_dacs = np.linspace(min(self.sweep_points_2D),max(self.sweep_points_2D),101)
+        plot_freqs = fit_mods.CosFunc2(plot_dacs,**self.dac_fit_res.params)
+
+        ax.plot(self.f0s,self.sweep_points_2D,'ro-')
+        ax.plot(plot_freqs,plot_dacs,'b')
+        
+        ax.set_title(fig_title)
+
+        if save_fig:
+            self.save_fig(fig, figname=savename, **kw)
+
+
 class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
     def __init__(self,
                  label='Resonator_scan',
