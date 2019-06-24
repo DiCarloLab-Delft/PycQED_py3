@@ -463,7 +463,7 @@ class GaussFilteredCosIQPulse(Pulse):
             wave *= (tvals >= tvals[0])
             wave *= (tvals < tvals[0] + self.pulse_length)
         else:
-            tstart = tvals[0] + self.gaussian_filter_sigma * self.nr_sigma
+            tstart = tvals[0] + 0.5 * self.gaussian_filter_sigma * self.nr_sigma
             tend = tstart + self.pulse_length
             scaling = 1 / np.sqrt(2) / self.gaussian_filter_sigma
             wave = 0.5 * (sp.special.erf(

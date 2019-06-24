@@ -273,7 +273,6 @@ class UHFQCPulsar:
             string for playing back an element
         """
 
-        wait_wave_str = '\t\twaitWave();\n'
         trigger_str = '\t\twaitDigTrigger(1, 1);\n'
         if name1 is None:
             prefetch_str = '\t\tprefetch({});\n'.format(name2)
@@ -286,7 +285,7 @@ class UHFQCPulsar:
             play_str = '\t\tplayWave({}, {});\n'.format(name1, name2)
         readout_str = '\t\tsetTrigger(WINT_EN+RO_TRIG);\n' if readout else ''
         readout_str += '\t\tsetTrigger(WINT_EN);\n' if readout else ''
-        return wait_wave_str + prefetch_str + trigger_str + \
+        return prefetch_str + trigger_str + \
                play_str + readout_str
 
     def _clock(self, obj, cid=None):

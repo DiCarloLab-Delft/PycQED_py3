@@ -629,33 +629,26 @@ class Segment:
             t_start = min(pulse.algorithm_time(), t_start)
             t_end = max(pulse.algorithm_time() + pulse.length, t_end)
 
-        length = t_end - t_start
+        # make sure that element start is a multiple of element
+        # start granularity
+        # we allow rounding up of the start time by half a sample, otherwise
+        # we round the start time down
+        start_gran = self.pulsar.get(
+            '{}_element_start_granularity'.format(awg))
+        sample_time = 1/self.pulsar.clock(awg=awg)
+        if start_gran is not None:
+            t_start = math.floor((t_start + 0.5*sample_time) / start_gran) \
+                      * start_gran
+
         # make sure that element length is multiple of
         # sample granularity
         gran = self.pulsar.get('{}_granularity'.format(awg))
-        samples = self.time2sample(length, awg=awg)
+        samples = self.time2sample(t_end - t_start, awg=awg)
         if samples % gran != 0:
             samples += gran - samples % gran
 
-        # make sure that element start is a multiple of element
-        # start granularity
-        start_gran = self.pulsar.get(
-            '{}_element_start_granularity'.format(awg))
-
-        if start_gran is not None:
-            t_start_awg = math.floor(t_start / start_gran) * start_gran
-            # add the number of samples the element gets larger when changing
-            # t_start
-            add = self.time2sample(t_start - t_start_awg, awg=awg)
-            if add % gran != 0:
-                add += gran - add % gran
-            samples += add
-
-        else:
-            t_start_awg = t_start
-
-        self.element_start_end[element][awg] = [t_start_awg, samples]
-        return [t_start_awg, samples]
+        self.element_start_end[element][awg] = [t_start, samples]
+        return [t_start, samples]
 
     def waveforms(self, awgs=None, channels=None):
         """

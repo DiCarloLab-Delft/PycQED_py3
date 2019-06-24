@@ -8,6 +8,8 @@ from pycqed.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.measurement.pulse_sequences import calibration_elements as csqs
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mq_sqs
+from pycqed.measurement.waveform_control import pulsar as ps
+
 
 
 class File(swf.Hard_Sweep):
@@ -172,19 +174,27 @@ class MultiElemSegmentTimingSwf(swf.Hard_Sweep):
                 cal_points=self.cal_points,
                 upload=True)
 
+class SegmentHardSweep(swf.Hard_Sweep):
+
+    def __init__(self, sequence, upload=True):
+        super().__init__()
+        self.sequence = sequence
+        self.upload = upload
+
+    def prepare(self, **kw):
+        if self.upload:
+            ps.Pulsar.get_instance().program_awgs(self.sequence)
+
 class Rabi(swf.Hard_Sweep):
 
-    def __init__(self, qb_name, operation_dict, cal_points_obj,
-                 cal_points=True, no_cal_points=4,
-                 upload=True, n=1,
-                 preparation_type='wait', post_ro_wait=1e-6,
+    def __init__(self, qb_name, operation_dict, cal_points,
+                 upload=True, n=1, preparation_type='wait', post_ro_wait=1e-6,
                  reset_reps=1, final_reset_pulse=True, for_ef=False):
         super().__init__()
         self.qb_name = qb_name
         self.operation_dict = operation_dict
         self.n = n
         self.cal_points = cal_points
-        self.no_cal_points = no_cal_points
         self.upload = upload
         self.preparation_type = preparation_type
         self.post_ro_wait = post_ro_wait
@@ -194,21 +204,13 @@ class Rabi(swf.Hard_Sweep):
         self.parameter_name = 'amplitude'
         self.unit = 'V'
         self.for_ef = for_ef
-        self.cal_points_obj = cal_points_obj
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.rabi_seq_active_reset(amps=self.sweep_points,
-                                      qb_name=self.qb_name,
-                                      operation_dict=self.operation_dict,
-                                      cal_points=self.cal_points,
-                                      no_cal_points=self.no_cal_points,
-                                      cal_points_obj=self.cal_points_obj,
-                                      upload=self.upload, n=self.n,
-                                      preparation_type=self.preparation_type,
-                                      post_ro_wait=self.post_ro_wait,
-                                      reset_reps=self.reset_reps,
-                                      final_reset_pulse=self.final_reset_pulse,
+            sqs.rabi_seq_active_reset(amps=self.sweep_points, qb_name=self.qb_name, operation_dict=self.operation_dict,
+                                      cal_points=self.cal_points, upload=self.upload, n=self.n,
+                                      preparation_type=self.preparation_type, post_ro_wait=self.post_ro_wait,
+                                      reset_reps=self.reset_reps, final_reset_pulse=self.final_reset_pulse,
                                       for_ef=self.for_ef)
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
