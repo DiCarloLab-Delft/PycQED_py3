@@ -1172,7 +1172,7 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
                  No_of_fitpoints=10,
                  sweep_points=None,
                  fitting_model='hanger',
-                 pulsed=False,
+                 mode='pulsed_marked',
                  polycoeffs=None,
                  **kw):
         self.nested_MC = nested_MC
@@ -1192,7 +1192,7 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
         self.qubit_init_factor = qubit_init_factor
         self.qubit_stepsize = qubit_stepsize
         self.No_of_fitpoints = No_of_fitpoints
-        self.pulsed = pulsed
+        self.mode = mode
         self.resonator_use_min = resonator_use_min
         self.resonator_use_max = resonator_use_max
         self.sweep_points = sweep_points
@@ -1392,7 +1392,7 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
         self.qubit.measure_spectroscopy(
             freqs=freqs_qub,
             MC=self.nested_MC,
-            pulsed=self.pulsed)
+            mode=self.mode)
         a = ma.Qubit_Spectroscopy_Analysis(label=self.qubit.msmt_suffix)
         # f_qubit, std_err_f_qubit = a.get_frequency_estimate()
         f_qubit = a.fitted_freq

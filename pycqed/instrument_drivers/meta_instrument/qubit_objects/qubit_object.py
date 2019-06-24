@@ -279,8 +279,10 @@ class Qubit(Instrument):
         4: Sweetspot current obtained from DAC scan of best coupled fluxline;
         5: Frequency shift of a power scan (used to predict qubit freq);
         6: RO amp (from find_test_resonator)
+        7
 
         TODO: Add measure_with_VNA to CCL Transmon object
+        TODO: Remove dict and change with resonator object
         """
         if with_VNA is None:
             try:
@@ -629,6 +631,7 @@ class Qubit(Instrument):
                         self.fl_dc_V_per_phi0(fit_res.current_to_flux)
                         res_dict[resonator][3] = 'Q' + fluxline[4]
                         res_dict[resonator][4] = sweetspot_current
+                        res_dict[resonator][7] = fit_res.current_to_flux
 
         if verbose:
             for items in res_dict.values():
@@ -683,6 +686,7 @@ class Qubit(Instrument):
                         qubit.ro_freq(items[0])
                         qubit.fl_dc_V0(items[4])
                         qubit.cfg_dc_flux_ch('FBL_' + items[3][-1])
+                        qubit.fl_dc_V_per_phi0(items[7])
                         if qubit.freq_qubit() is None:
                             qubit.freq_qubit(items[0] - np.abs(
                                         (50e6)**2/(2*items[5])))

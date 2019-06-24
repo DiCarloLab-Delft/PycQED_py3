@@ -1186,7 +1186,7 @@ class CCLight_Transmon(Qubit):
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
     def find_frequency_adaptive(self, f_start=None, f_span=200e6, f_step=1e6,
-                                MC=None, update=True, use_max=True,
+                                MC=None, update=True, use_max=False,
                                 spec_mode='pulsed_marked', verbose=True):
         """
         'Adaptive' measurement for finding the qubit frequency. Will look with
@@ -1209,6 +1209,7 @@ class CCLight_Transmon(Qubit):
         freq_center = f_start
         n = 0
         while not success:
+            success = None
             freq_center += f_span*n*(-1)**n
             n += 1
             if verbose:  # Hardcoded for now
@@ -1235,14 +1236,30 @@ class CCLight_Transmon(Qubit):
             offset = analysis_spec.fit_res.params['offset'].value
             peak_height = np.amax(analysis_spec.data_dist)
 
-            if freq_peak is None:
-                success = False
-            elif peak_height < 4*offset:
-                success = False
-            elif peak_height < 3*np.mean(analysis_spec.data_dist):
-                success = False
-            else:
-                success = True
+            # Check if peak is not another qubit, and if it is move that qubit away
+            for qubit_name in self.device.qubits():
+                qubit = self.device.find_instrument(qubit_name)
+                if qubit.name != self.name:
+                    if np.abs(qubit.freq_qubit()-freq_peak) < 5e6:
+                        if verbose:
+                            logging.warning('Peak found at frequency of {}. '
+                                            'Adjusting currents'
+                                            .format(qubit.name))
+                        fluxcurrent = self.instr_FluxCtrl.get_instr()
+                        old_current = fluxcurrent[qubit.cfg_dc_flux_ch()]()
+                        fluxcurrent[qubit.cfg_dc_flux_ch()](5e-3)
+                        n -= 1
+                        success = False
+
+            if success is None:        
+                if freq_peak is None:
+                    success = False
+                elif peak_height < 4*offset:
+                    success = False
+                elif peak_height < 3*np.mean(analysis_spec.data_dist):
+                    success = False
+                else:                
+                    success = True
 
         self.ro_acq_averages(old_avg)
         if update:
@@ -1378,7 +1395,7 @@ class CCLight_Transmon(Qubit):
         return True
 
     def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
-                                    update=True):
+                                    mode='pulsed_marked', update=True):
         '''
         Finds an estimate of the anharmonicity by doing a spectroscopy around 
         150 MHz below the qubit frequency.
@@ -1398,13 +1415,14 @@ class CCLight_Transmon(Qubit):
             freq_range = 100e6
             freqs = np.arange(freq_center-1/2*freq_range, self.freq_qubit()+1/2*freq_range,
                               0.5e6)
-
-        self.spec_pow(self.spec_pow()+25)
-        self.measure_spectroscopy(freqs=freqs, pulsed=False, analyze=False)
+        old_spec_pow = self.spec_pow()
+        self.spec_pow(self.spec_pow()+10)
+        self.measure_spectroscopy(freqs=freqs, mode=mode, analyze=False)
 
         a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix, 
                                            analyze_ef=True)
-        f02 = 2*a.params['f0_gf_over_2'].value*1e9
+        f02 = 2*a.params['f0_gf_over_2'].value
+        self.spec_pow(old_spec_pow)
         if update:
             self.anharmonicity(f02-2*self.freq_qubit())
             return True
@@ -4016,13 +4034,16 @@ class CCLight_Transmon(Qubit):
 
         if dac_values is None:
             if self.fl_dc_V0() is None:
-                dac_values = np.linspace(-3e-3, 3e-3, 11)
+                dac_values = np.linspace(-5e-3, 5e-3, 11)
             else:
                 dac_values_1 = np.linspace(self.fl_dc_V0(),
                                            self.fl_dc_V0() + 3e-3,
                                            11)
-                dac_values_2 = np.linspace(self.fl_dc_V0(),
-                                           self.fl_dc_V0() - 3e-3,
+                dac_values_2 = np.linspace(self.fl_dc_V0() + 3e-3,
+                                           self.fl_dc_V0() + 5e-3,
+                                           6)
+                dac_values_ = np.linspace(self.fl_dc_V0(),
+                                           self.fl_dc_V0() - 5e-3,
                                            11)
 
         dac_values = np.concatenate([dac_values_1, dac_values_2])
