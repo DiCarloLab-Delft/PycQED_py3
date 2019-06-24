@@ -1,4 +1,6 @@
 import logging
+from pprint import pprint
+
 import numpy as np
 from copy import deepcopy
 from pycqed.measurement.waveform_control.element import \
@@ -26,11 +28,8 @@ def pulse_list_list_seq(pulse_list_list, name='pulse_list_list_sequence',
         ps.Pulsar.get_instance().program_awgs(seq)
     return seq
 
-def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points_obj,
-                          cal_points=True, no_cal_points=4, upload=True, n=1,
-                          preparation_type='wait', post_ro_wait=1e-6,
-                          reset_reps=1, final_reset_pulse=True, for_ef=False,
-                          last_ge_pulse=False):
+def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points, upload=True, n=1, preparation_type='wait',
+                          post_ro_wait=1e-6, reset_reps=1, final_reset_pulse=True, for_ef=False, last_ge_pulse=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     Input pars:
@@ -54,34 +53,32 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points_obj,
     rabi_ops = ["X180_ef " + qb_name if for_ef else "X180 " + qb_name] * n
 
     if for_ef:
-        rabi_ops = ["X180 " + qb_name] + rabi_ops
+        rabi_ops = ["X180 " + qb_name] + rabi_ops # prepend ge pulse
         if last_ge_pulse:
-            rabi_ops += ["X180 " + qb_name]
+            rabi_ops += ["X180 " + qb_name] # append ge pulse
     rabi_ops += ["RO " + qb_name]
     rabi_pulses = [deepcopy(operation_dict[op]) for op in rabi_ops]
 
     for i in np.arange(1 if for_ef else 0, n + 1 if for_ef else n):
-        print("Rabi_{}".format(i - 1 if for_ef else i))
         rabi_pulses[i]["name"] = "Rabi_" + str(i)
 
-
-    swept_pulses = \
-        sweep_pulse_params(rabi_pulses,
-                           {f'Rabi_{i}.amplitude': amps for i in range(n)})
+    swept_pulses = sweep_pulse_params(rabi_pulses,
+                                      {f'Rabi_{i}.amplitude':
+                                           amps[:-len(cal_points.states)]
+                                           for i in range(n)})
     swept_pulses_with_prep = \
         [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)
          for p in swept_pulses]
     seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
 
     # add calibration segments
-    cal_segs = cal_points_obj.create_segments(operation_dict, **prep_params)
-    for seg in cal_segs:
-        seq.add(seg)
+    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
     if upload:
-        ps.Pulsar.get_instance().program_awgs(seq)
+       ps.Pulsar.get_instance().program_awgs(seq)
 
     return seq
+
 
 def add_preparation_pulses(pulse_list, operation_dict, qb_names,
                            preparation_type='wait', post_ro_wait=1e-6,
@@ -197,11 +194,11 @@ def sweep_pulse_params(pulses, params):
             if len(pulse_indices) == 0:
                 raise ValueError(f"No pulse with name {pulse_name} found.")
             if len(pulse_indices) > 1:
-                log.warning(f"Pulse name is not unique. Found "
+                raise ValueError(f"Pulse name is not unique. Found "
                             f"{len(pulse_indices)} with name {pulse_name}")
             for p_idx in pulse_indices:
                 pulses_cp[p_idx][param_name] = sweep_values[i]
-
+                pulses_cp[p_idx].pop("name", 0)
         swept_pulses.append(pulses_cp)
 
     return swept_pulses

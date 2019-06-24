@@ -688,9 +688,10 @@ class QuDev_transmon(Qubit):
         if cal_points:
             step = np.abs(amps[-1]-amps[-2])
             if no_cal_points == 4:
-                sweep_points = np.concatenate(
-                    [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
-                        amps[-1]+4*step]])
+                sweep_points = amps
+                # sweep_points = np.concatenate(
+                #     [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
+                #         amps[-1]+4*step]])
                 cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
                 cal_states_rotations = {'g': 0, 'e': 1}
             elif no_cal_points == 2:
@@ -709,9 +710,8 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(
             awg_swf.Rabi(qb_name=self.name,
                          operation_dict=self.get_operation_dict(),
-                         cal_points_obj=cps,
-                         cal_points=cal_points, no_cal_points=no_cal_points,
-                         upload=upload, n=n, preparation_type=preparation_type,
+                         cal_points=cps, upload=upload, n=n,
+                         preparation_type=preparation_type,
                          post_ro_wait=post_ro_wait, reset_reps=reset_reps,
                          final_reset_pulse=final_reset_pulse))
         MC.set_sweep_points(sweep_points)

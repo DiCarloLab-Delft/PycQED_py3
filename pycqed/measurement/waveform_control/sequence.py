@@ -31,6 +31,10 @@ class Sequence:
                 segment.name))
         self.segments[segment.name] = segment
 
+    def extend(self, segments):
+        for seg in segments:
+            self.add(seg)
+
     def sequence_for_awg(self):
         """
         Returns for an AWG a sequence with the ordered lists containing
