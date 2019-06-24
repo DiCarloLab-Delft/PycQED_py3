@@ -134,12 +134,14 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             ###################################################################
 
             # Resonators
-            self.add_edge(Qubit.name + ' Resonator Frequency',
-                          'Resonators Power Scan')
+            # self.add_edge(Qubit.name + ' Resonator Frequency',
+            #               'Resonators Power Scan')
             self.add_edge(Qubit.name + ' Resonator Frequency',
                           'Resonators Flux Sweep')
+            self.add_edge(Qubit.name + ' Resonator Frequency',
+                          Qubit.name + ' Resonator Power Scan',)
             self.add_edge(Qubit.name + ' Resonator Power Scan',
-                          Qubit.name + ' Resonator Frequency')
+                          'Resonators Flux Sweep')
             self.add_edge(Qubit.name + ' Frequency Coarse',
                           Qubit.name + ' Resonator Power Scan')
             self.add_edge(Qubit.name + ' Frequency Coarse',

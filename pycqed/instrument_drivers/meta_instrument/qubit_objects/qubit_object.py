@@ -336,16 +336,16 @@ class Qubit(Instrument):
 
         return True
 
-    def calibrate_spec_pow(self, freqs=None, start_power=-35, threshold=0.1,
-                           verbose=True):
+    def calibrate_spec_pow(self, freqs=None, start_power=-35, power_step = 5,
+                           threshold=0.1, verbose=True):
         """
         Finds the optimal spectroscopy power for qubit spectroscopy (not pulsed)
         by varying it in steps of 5 dBm, and ending when the peak has power 
         broadened by 1+threshold (default: broadening of 10%)
         """
         if freqs is None:
-            freqs = np.arange(self.freq_qubit() - 10e6,
-                              self.freq_qubit() + 10e6, 0.2e6)
+            freqs = np.arange(self.freq_qubit() - 20e6,
+                              self.freq_qubit() + 20e6, 0.2e6)
         power = start_power
 
         w0, w = 1e9, 1e9
@@ -358,13 +358,20 @@ class Qubit(Instrument):
             a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                                qb_name=self.name)
 
+            freq_peak = a.peaks['peak']
+            if np.abs(freq_peak - self.freq_qubit()) > 5e6:
+                logging.warning('Peak has shifted for some reason. Aborting.')
+                return False
+                
             w = a.params['kappa'].value
-            power += 5
+            power += power_step
+
+
             if w < w0:
                 w0 = w
         if verbose:
             print('setting spectroscopy power to {}'.format(power-5))
-        self.spec_pow(power-5)
+        self.spec_pow(power-power_step)
         return True
 
     def find_resonator_frequency_initial(self, start_freq=7e9, stop_freq=8e9,
@@ -610,6 +617,7 @@ class Qubit(Instrument):
                     fluxcurrent[fluxline](0)
 
                     fit_res = ma2.VNA_DAC_Analysis(timestamp)
+                    amplitude = max(fit_res.f0s) - min(fit_res.f0s)
                     amplitude = fit_res.dac_fit_res.params['amplitude'].value
                     sweetspot_current = fit_res.sweet_spot_value
 
@@ -647,10 +655,21 @@ class Qubit(Instrument):
                     self.ro_freq(items[0])
                     self.fl_dc_V0(items[4])
                     self.cfg_dc_flux_ch('FBL_' + items[3][-1])
-                    self.freq_qubit(items[0] - np.abs(
-                            (70e6)**2/(2*items[5])))
+                    if self.freq_qubit() is None:
+                                self.freq_qubit(items[0] - np.abs(
+                                        (70e6)**2/(2*items[5])))
                     fluxcurrent[self.cfg_dc_flux_ch()](self.fl_dc_V0())
 
+        # Create dict with resonators and qubits, and return False if there
+        # are duplicates
+        res_qubit_combis = {}
+        for resonator, items in res_dict.items():
+            if items[3] not in list(res_qubit_combis.values()):
+                res_qubit_combis[resonator] = items[3]
+            else:
+                logging.warning('Duplicate in resonator - qubit combinations: '
+                                '{}'.format(items[3]))
+                return False
         try:
             device = self.device
             device.res_dict = self.res_dict
@@ -664,8 +683,9 @@ class Qubit(Instrument):
                         qubit.ro_freq(items[0])
                         qubit.fl_dc_V0(items[4])
                         qubit.cfg_dc_flux_ch('FBL_' + items[3][-1])
-                        qubit.freq_qubit(items[0] - np.abs(
-                            (50e6)**2/(2*items[5])))
+                        if qubit.freq_qubit() is None:
+                            qubit.freq_qubit(items[0] - np.abs(
+                                        (50e6)**2/(2*items[5])))
 
         except AttributeError:
             logging.warning('Could not link qubits to resonators: '
@@ -781,12 +801,32 @@ class Qubit(Instrument):
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(
                 label=label, close_fig=True, qb_name=self.name)
 
-            if update:
-                if use_max:
-                    self.freq_qubit(analysis_spec.peaks['peak'])
-                else:
-                    self.freq_qubit(analysis_spec.fitted_freq)
-                # TODO: add updating and fitting
+            # Checks to see if there is a peak:
+            freq_peak = analysis_spec.peaks['peak']
+            offset = analysis_spec.fit_res.params['offset'].value
+            peak_height = np.amax(analysis_spec.data_dist)
+
+            if freq_peak is None:
+                success = False
+            elif peak_height < 3*offset:
+                success = False
+            elif peak_height < 3*np.mean(analysis_spec.data_dist):
+                success = False
+            else:
+                success = True
+
+            if success:
+                if update:
+                    if use_max:
+                        self.freq_qubit(analysis_spec.peaks['peak'])
+                    else:
+                        self.freq_qubit(analysis_spec.fitted_freq)
+                    return True
+                    # TODO: add updating and fitting
+            else:
+                logging.warning('No peak found! Not updating.')
+                return False
+
         elif method.lower() == 'ramsey':
             return self.calibrate_frequency_ramsey(
                 steps=steps, artificial_periods=artificial_periods,
