@@ -76,8 +76,7 @@ def mixer_carrier_cancellation(SH, source, MC,
                     'options': {'maxiter': 300,    # maximum function cals
                                 # Scaling for individual sigma's
                                 'cma_stds': [init_stepsize]*2,
-                                'tolstagnation': 20,  # Stops if no improvement after 20 measurements
-                                'tolfun': -100  # -110 dBm is good enough as minimum
+                                'ftarget': -110
                                 },
                     'minimize': True}
     MC.set_sweep_functions([chI_par, chQ_par])

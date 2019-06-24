@@ -1185,9 +1185,9 @@ class CCLight_Transmon(Qubit):
     ####################################################
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
-    def find_frequency_adaptive(self, f_start=None, f_span=100e6, f_step=1e6,
+    def find_frequency_adaptive(self, f_start=None, f_span=200e6, f_step=1e6,
                                 MC=None, update=True, use_max=True,
-                                verbose=True):
+                                spec_mode='pulsed_marked', verbose=True):
         """
         'Adaptive' measurement for finding the qubit frequency. Will look with
         a range of the current frequency estimate, and if it does not find a
@@ -1200,7 +1200,10 @@ class CCLight_Transmon(Qubit):
         if f_start is None:
             f_start = self.freq_qubit()
 
+        # Set high power and averages to be sure we find the peak.
         self.spec_pow(-20)
+        old_avg = self.ro_acq_averages()
+        self.ro_acq_averages(32768)
         # Repeat measurement while no peak is found:
         success = False
         freq_center = f_start
@@ -1215,7 +1218,8 @@ class CCLight_Transmon(Qubit):
             freqs = np.arange(freq_center - f_span/2,
                               freq_center + f_span/2,
                               f_step)
-            self.measure_spectroscopy(MC=MC, freqs=freqs)
+            self.measure_spectroscopy(MC=MC, freqs=freqs, mode=spec_mode,
+                                      analyze=False)
             label = 'spec'
 
             # Use 'try' because it can give a TypeError when no peak is found
@@ -1224,24 +1228,29 @@ class CCLight_Transmon(Qubit):
                                                                close_fig=True,
                                                                qb_name=self.name)
             except TypeError:
+                logging.warning('TypeError in Adaptive spectroscopy')
                 continue
             # Check for peak and check its height
             freq_peak = analysis_spec.peaks['peak']
             offset = analysis_spec.fit_res.params['offset'].value
-            peak_height = np.amax(analysis_spec.data_dist) - offset
+            peak_height = np.amax(analysis_spec.data_dist)
+
             if freq_peak is None:
                 success = False
-            elif peak_height < 3*offset:
+            elif peak_height < 4*offset:
+                success = False
+            elif peak_height < 3*np.mean(analysis_spec.data_dist):
                 success = False
             else:
                 success = True
 
-            if update:
-                if use_max:
-                    self.freq_qubit(analysis_spec.peaks['peak'])
-                else:
-                    self.freq_qubit(analysis_spec.fitted_freq)
-                return True
+        self.ro_acq_averages(old_avg)
+        if update:
+            if use_max:
+                self.freq_qubit(analysis_spec.peaks['peak'])
+            else:
+                self.freq_qubit(analysis_spec.fitted_freq)
+            return True
 
     def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
         if freqs is None:
@@ -1254,15 +1263,15 @@ class CCLight_Transmon(Qubit):
             powers = np.arange(-40, 0.1, 4)
 
         self.measure_resonator_power(freqs=freqs, powers=powers, analyze=False)
-
+        fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
+                                                  close_fig=True)
         if update:
-            fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
-                                                      close_fig=True)
             shift = fit_res.results[0]
             power = fit_res.results[1]
             f_low = fit_res.results[2]
             ro_pow = 10**(power/20)
             self.ro_pulse_amp_CW(ro_pow/3)
+            self.ro_pulse_amp(ro_pow/3)
             self.freq_res(f_low)
             if self.freq_qubit() is None:
                 f_qubit_estimate = self.freq_res() + (65e6)**2/(shift) - 500e6
@@ -1273,7 +1282,8 @@ class CCLight_Transmon(Qubit):
         return True
 
     def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True, 
-                             set_to_sweetspot=True, method='DAC', fluxChan=None):
+                             set_to_sweetspot=True, method='DAC', fluxChan=None,
+                             spec_mode='pulsed_marked'):
         '''
         Should be edited such that it contains reference to different measurement
         methods (tracking / 2D scan / broad spectroscopy)
@@ -1284,7 +1294,7 @@ class CCLight_Transmon(Qubit):
         '''
         if freqs is None:
             freq_center = self.freq_qubit()
-            freq_range = 300e6
+            freq_range = 100e6
             freqs = np.arange(freq_center-1/2*freq_range, freq_center+20e6,
                               0.5e6)
         if dac_values is None:
@@ -1306,7 +1316,8 @@ class CCLight_Transmon(Qubit):
             self.measure_qubit_frequency_dac_scan(freqs=freqs, 
                                                   dac_values=dac_values,
                                                   fluxChan=fluxChan,
-                                                  analyze=False)
+                                                  analyze=False,
+                                                  mode=spec_mode)
             timestamp = a_tools.get_timestamps_in_range(t_start, 
                                                         label='Qubit_dac_scan'+
                                                               self.msmt_suffix)
@@ -1889,23 +1900,35 @@ class CCLight_Transmon(Qubit):
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
 
     def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
-                                         pulsed=True, MC=None,
+                                         mode='pulsed_marked', MC=None,
                                          analyze=True, fluxChan=None, close_fig=True,
                                          nested_resonator_calibration=False,
                                          resonator_freqs=None):
-        if not pulsed:
-            logging.warning('CCL transmon can only perform '
-                            'pulsed spectrocsopy')
-        self.prepare_for_continuous_wave()
+        if mode == 'pulsed_mixer':
+            old_channel_amp = self.mw_channel_amp()
+            self.mw_channel_amp(1)
+            self.prepare_for_timedomain()
+            self.mw_channel_amp(old_channel_amp)
+        elif mode == 'CW' or mode == 'pulsed_marked':
+            self.prepare_for_continuous_wave()
+        else:
+            logging.error('Mode {} not recognized'.format(mode))
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
-        p = sqo.pulsed_spec_seq(
-            qubit_idx=self.cfg_qubit_nr(),
-            spec_pulse_length=self.spec_pulse_length(),
-            platf_cfg=self.cfg_openql_platform_fn())
+        if mode == 'pulsed_marked':
+            p = sqo.pulsed_spec_seq_marked(
+                qubit_idx=self.cfg_qubit_nr(),
+                spec_pulse_length=self.spec_pulse_length(),
+                platf_cfg=self.cfg_openql_platform_fn(),
+                trigger_idx=0)
+        else:
+            p = sqo.pulsed_spec_seq(
+                qubit_idx=self.cfg_qubit_nr(),
+                spec_pulse_length=self.spec_pulse_length(),
+                platf_cfg=self.cfg_openql_platform_fn())
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
         if 'ivvi' in self.instr_FluxCtrl().lower():
@@ -1922,8 +1945,15 @@ class CCLight_Transmon(Qubit):
             else:
                 dac_par = fluxcontrol.parameters[(fluxChan)]
 
-        spec_source = self.instr_spec_source.get_instr()
-        spec_source.on()
+        if mode == 'pulsed_mixer':
+            spec_source = self.instr_spec_source_2.get_instr()
+            spec_source.on()
+        else:
+            spec_source = self.instr_spec_source.get_instr()
+            spec_source.on()
+            if mode == 'pulsed_marked':
+                spec_source.pulsemod_state('On')
+
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
         if nested_resonator_calibration:
@@ -2051,7 +2081,7 @@ class CCLight_Transmon(Qubit):
 
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
-        p = sqo.pulsed_spec_seq_v2(
+        p = sqo.pulsed_spec_seq_marked(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
@@ -2112,11 +2142,10 @@ class CCLight_Transmon(Qubit):
             self.prepare_for_timedomain()
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
-        p = sqo.pulsed_spec_seq_v2(
+        p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
-            platf_cfg=self.cfg_openql_platform_fn(),
-            trigger_idx = 0)
+            platf_cfg=self.cfg_openql_platform_fn())
 
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
