@@ -840,6 +840,13 @@ class Segment:
         """
         return samples / self.pulsar.clock(**kw)
 
+    def __repr__(self):
+        string_repr = f"---- {self.name} ----\n"
+
+        for i, p in enumerate(self.unresolved_pulses):
+            string_repr += f"{i}: " + repr(p) + "\n"
+        return string_repr
+
 
 class UnresolvedPulse:
     """
@@ -896,3 +903,9 @@ class UnresolvedPulse:
             raise Exception(
                 'Codeword pulse {} does not support basis_rotation!'.format(
                     self.pulse_obj.name))
+
+    def __repr__(self):
+        string_repr = self.pulse_obj.name
+        if self.delay != 0:
+            string_repr += f"\ndelay: {self.delay}"
+        return string_repr

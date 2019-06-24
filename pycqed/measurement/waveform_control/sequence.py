@@ -55,3 +55,9 @@ class Sequence:
                     self.awg_sequence[awg].append([element, segment])
                     if element in seg.acquisition_elements:
                         self.awg_sequence[awg][-1].append('RO')
+
+    def __repr__(self):
+        string_repr = f"####### {self.name} #######\n"
+        for seg_name, seg  in self.segments.items():
+            string_repr += str(seg) + "\n"
+        return string_repr
