@@ -403,7 +403,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             # Test resonator
             f0_test_res = self.mock_freq_test_res()
             A = 0.8*h
-            w = self.mock_res_width()
+            w = self.mock_res_width()/5
             testres_dip = A*(w/2.0)**2 / ((w/2.0)**2 +
                                           ((freqs - f0_test_res))**2)
             new_values -= testres_dip
@@ -602,7 +602,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         freq_res = self.mock_freq_res()
         fluxcurrent = self.instr_FluxCtrl.get_instr()
-        df = 2e6
+        df = 2*self.mock_chi()
 
         mocked_values = []
         for dac_value in dac_values:

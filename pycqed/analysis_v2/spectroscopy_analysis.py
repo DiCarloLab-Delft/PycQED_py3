@@ -805,11 +805,11 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
       return fit_res
 
   def plot_fit_result(self,normalize=False, plot_linecuts=True,
-                               linecut_log=False, colorplot_log=False,
-                               plot_all=True, save_fig=True,
-                               transpose=False, figsize=None, filtered=False,
-                               subtract_mean_x=False, subtract_mean_y=False,
-                               **kw):
+                      linecut_log=False, colorplot_log=False,
+                      plot_all=True, save_fig=True,
+                      transpose=False, figsize=None, filtered=False,
+                      subtract_mean_x=False, subtract_mean_y=False,
+                      **kw): 
       fig, ax = plt.subplots(figsize=figsize)
       self.fig_array.append(fig)
       self.ax_array.append(ax)
@@ -904,12 +904,12 @@ class VNA_DAC_Analysis_v2(VNA_TwoD_Analysis):
         freq = 1/(np.abs(max_DAC-min_DAC)*2)
 
         Model = fit_mods.ResonatorArch
-        Model.set_param_hint('f_bare', value=np.min(f0s), min=0)
-        Model.set_param_hint('g', value=(50e6)**2)
-        Model.set_param_hint('A', value=5e9)
-        Model.set_param_hint('f', value=40)
-        Model.set_param_hint('sweetspot_cur', value=0)
-        params = Model.make_params()
+        # Model.set_param_hint('f_bare', value=min(f0s), min=0)
+        # Model.set_param_hint('g', value=(50e6)**2)
+        # Model.set_param_hint('A', value=5e9)
+        # Model.set_param_hint('f', value=40)
+        # Model.set_param_hint('sweetspot_cur', value=0)
+        # params = Model.make_params()
         fit_res = Model.fit(data=f0s, t=DAC_values, verbose=True)
 
         return fit_res

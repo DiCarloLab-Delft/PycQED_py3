@@ -12,7 +12,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
-
+from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
 
 class Qubit(Instrument):
 
@@ -321,20 +321,24 @@ class Qubit(Instrument):
                 peak_freqs.append(peak)
 
         # Create resonator dictionary in qubit object
-        self.res_dict = {}
+        resonators = []
         for i, freq in enumerate(result.peaks):
-            self.res_dict[str(i)] = [freq, 'unknown', {}, None, 0, 0, 1]
+            resonators.append(resonator(identifier=i, freq=freq))
+            # self.res_dict[str(i)] = [freq, 'unknown', {}, None, 0, 0, 1]
         # Create resonator dictionary in device object (if it exists)
         try:
             device = self.device
-            device.res_dict = self.res_dict
+            device.resonators = resonators
         except AttributeError:
-            logging.warning('Could not update device resonator dictionary: '
-                            'No device found for {}'.format(self.name))
+            logging.warning('Could not update device resonators: No device '
+                            'found for {}. Returning list of resonators.'
+                            .format(self.name))
+            return resonators
 
         if verbose:
-            for resonator, items in self.res_dict.items():
-                print('{}:\t{:.3f} GHz'.format(resonator, items[0]/1e9))
+            for res in resonators:
+                print('{}:\t{:.3f} GHz'.format(res.identifier,
+                                               res.freq))
 
         return True
 
@@ -379,7 +383,7 @@ class Qubit(Instrument):
     def find_resonator_frequency_initial(self, start_freq=7e9, stop_freq=8e9,
                                          npts=50001, use_min=False, MC=None,
                                          update=True, with_VNA=None,
-                                         res_dict=None):
+                                         resonators=None):
         '''
         Zooms in on each resonator defined in res_dict (may be obtained
         from find_resontaros) to see and determines whether it actually is a
@@ -399,22 +403,22 @@ class Qubit(Instrument):
             except:
                 with_VNA = False
 
-        if res_dict is None:
+        if resonators is None:
             try:
-                res_dict = self.device.res_dict
+                resonators = self.device.resonators
             except AttributeError:
                 logging.warning('Could not find device resonator dictionary: '
                                 'No device found for {}. Looking for qubit '
                                 'object dictionary'.format(self.name))
-            try:
-                res_dict = self.res_dict
-            except AttributeError:
-                logging.error('Could not find qubit object dictionary in {}. '
-                              'Specify a dictionary in res_dict'.format(self.name))
+            # try:
+            #     res_dict = self.res_dict
+            # except AttributeError:
+            #     logging.error('Could not find qubit object dictionary in {}. '
+            #                   'Specify a dictionary in res_dict'.format(self.name))
 
         delkeys = []
-        for resonator, items in res_dict.items():
-            freq = items[0]
+        for res in resonators:
+            freq = res.freq
             if with_VNA:
                 VNA = self.instr_VNA.get_instr()
                 start_freq = freq - 10e6
@@ -435,13 +439,13 @@ class Qubit(Instrument):
             offset = a.fit_results.params['A'].value
 
             if np.abs(dip/offset) > 0.6:
-                print('Removed candidate {} ({:.3f} GHz): Not a resonator'
-                      .format(resonator, freq/1e9))
-                delkeys.append(resonator)
+                print('Removed candidate {:.0f} ({:.3f} GHz): Not a resonator'
+                      .format(res.identifier, freq/1e9))
+                delkeys.append(res.identifier)
             elif np.isnan(a.fit_results.params['Qc'].stderr):
-                print('Removed candidate {} ({:.3f} GHz): Not a resonator'
-                      .format(resonator, freq/1e9))
-                delkeys.append(resonator)
+                print('Removed candidate {:.0f} ({:.3f} GHz): Not a resonator'
+                      .format(res.identifier, freq/1e9))
+                delkeys.append(res.identifier)
             else:
                 if use_min:
                     f_res = a.min_frequency
@@ -449,43 +453,26 @@ class Qubit(Instrument):
                     f_res = a.fit_results.params['f0'].value*1e9
 
                 # Check if not a duplicate
-                i = int(resonator)
+                i = res.identifier
                 if i > 0:
-                    prev_freq = res_dict[str(i-1)][0]
+                    prev_freq = resonators[i-1].freq
                     if np.abs(prev_freq - f_res) < 10e6:
-                        delkeys.append(resonator)
-                        print('Removed candidate: ' + resonator + ' (' +
-                              str(round(f_res/1e9, 3)) + ' GHz): Duplicate')
+                        delkeys.append(res.identifier)
+                        print('Removed candidate: {:.0f} ({:.3f} GHz): Duplicate'
+                              .format(res.identifier, res.freq/1e9))
                     else:
-                        res_dict[resonator][0] = f_res
-                        print("Added resonator " + resonator + ' (' +
-                              str(round(f_res/1e9, 3)) + ' GHz)')
+                        resonators[res.identifier].freq = f_res
+                        print("Added resonator {:.0f} ({:.3f} GHz)"
+                              .format(res.identifier, res.freq/1e9))
 
         for delkey in delkeys:
-            res_dict.pop(delkey)
-
-        # Rearrange dictionary to start from 0 again:
-        i = 0
-        newdict = {}
-        for resonator, items in res_dict.items():
-            newdict[str(i)] = items
-            i += 1
-        # Update qubit dictionary
-        self.res_dict = newdict
-
-        # Update device dictionary if exists
-        try:
-            self.device.res_dict = newdict
-        except AttributeError:
-            logging.warning('Could not update device resonator dictionary: '
-                            'No device found for {}'.format(self.name))
-
+            del resonators[delkey]
         return True
 
-    def find_test_resonators(self, with_VNA=None, res_dict=None):
+    def find_test_resonators(self, with_VNA=None, resonators=None):
         """
         Does a power sweep over the resonators to see if they have a qubit
-        attached or not, and changes the state in the res_dict
+        attached or not, and changes the state in the resonator object
         """
         if with_VNA is None:
             try:
@@ -496,67 +483,52 @@ class Qubit(Instrument):
             except:
                 with_VNA = False
 
-        if res_dict is None:
+        if resonators is None:
             try:
-                res_dict = self.device.res_dict
+                resonators = self.device.resonators
             except AttributeError:
-                logging.warning('Could not find device resonator dictionary: '
-                                'No device found for {}. Looking for qubit '
-                                'object dictionary'.format(self.name))
-            try:
-                res_dict = self.res_dict
-            except AttributeError:
-                logging.error('Could not find qubit object dictionary in {}. '
-                              'Specify a dictionary in res_dict'.format(self.name))
+                logging.warning('Could not find device resonators: '
+                                'No device found for {}'.format(self.name))
 
-        for resonator, items in res_dict.items():
-            freq = items[0]
-            state = items[1]
+        for res in resonators:
+            freq = res.freq
 
-            if state == 'unknown':
+            if res.type == 'unknown':
                 if with_VNA:
                     VNA = self.instr_VNA.get_instr()
                     VNA.start_frequency(freq - 20e6)
                     VNA.stop_frequency(freq + 20e6)
-
-                self.measure_resonator_power(freqs=np.arange(freq-5e6,
-                                                             freq+5e6, 0.1e6),
-                                             powers=np.arange(-40, 0.1, 10),
-                                             analyze=False)
+                else:
+                    self.measure_resonator_power(freqs=np.arange(freq-5e6,
+                                                                 freq+5e6,
+                                                                 0.1e6),
+                                                 powers=np.arange(-40, 0.1, 10),
+                                                 analyze=False)
                 # self.measure_VNA_power_sweep()
                 fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
                                                           close_fig=True)
                 shift = fit_res.results[0]
-                freq = fit_res.results[2]
+                freq_low = fit_res.results[2]
+                freq_high = fit_res.results[3]
                 power = fit_res.results[1]
 
                 if np.abs(shift) > 100e3:
-                    state = 'qubit_resonator'
+                    res.type = 'qubit_resonator'
                     self.freq_res(freq)
                     # amp = 10**(power/20)
                     # self.ro_pulse_amp(amp)
                     # self.ro_pulse_amp_CW(amp/3)
                 else:
-                    state = 'test_resonator'
-                res_dict[resonator][0] = freq
-                res_dict[resonator][1] = state
-                res_dict[resonator][5] = shift
-                res_dict[resonator][6] = 10**(power/20)
-        
-        # Update qubit resonator dictionary or create if necessary
-        self.res_dict = res_dict
-        # Try to update device dict if it exists:
-        try:
-            device = self.device
-            device.res_dict = res_dict
-        except AttributeError:
-            logging.warning('Could not update device resonator dictionary: '
-                            'No device found for {}'.format(self.name))
+                    res.type = 'test_resonator'
+                res.freq_low = freq_low
+                res.freq_high = freq_high
+                res.shift = shift
+                res.ro_amp = 10**(power/20)
 
         return True
 
     def find_qubit_resonator_fluxline(self, with_VNA=None, verbose=True,
-                                      res_dict=None):
+                                      resonators=None):
         if with_VNA is None:
             try:
                 if self.instr_VNA.get_instr() == '':
@@ -566,18 +538,14 @@ class Qubit(Instrument):
             except:
                 with_VNA = False
 
-        if res_dict is None:
+        if resonators is None:
             try:
-                res_dict = self.device.res_dict
+                resonators = self.device.resonators
             except AttributeError:
                 logging.warning('Could not find device resonator dictionary: '
                                 'No device found for {}. Looking for qubit '
                                 'object dictionary'.format(self.name))
-            try:
-                res_dict = self.res_dict
-            except AttributeError:
-                logging.error('Could not find qubit object dictionary in {}. '
-                              'Specify a dictionary in res_dict'.format(self.name))
+                return False
 
         fluxcurrent = self.instr_FluxCtrl.get_instr()
         for FBL in fluxcurrent.channel_map:
@@ -585,13 +553,13 @@ class Qubit(Instrument):
 
         dac_values = np.arange(-20e-3, 20e-3, 4e-3)
 
-        for resonator, items in res_dict.items():
-            self.ro_pulse_amp(items[6])
-            self.ro_pulse_amp_CW(items[6]/3)
+        for res in resonators:
+            self.ro_pulse_amp(res.ro_amp)
+            self.ro_pulse_amp_CW(res.ro_amp/3)
             best_amplitude = 0  # For comparing which one is coupled closest
-            if items[1] == 'qubit_resonator':
-                freq = items[0]
-                shift = np.abs(items[5])
+            if res.type == 'qubit_resonator':
+                freq = res.freq_low
+                shift = np.abs(res.shift)
                 if with_VNA:
                     VNA = self.instr_VNA.get_instr()
                     VNA.start_frequency(freq-20e6)
@@ -604,8 +572,8 @@ class Qubit(Instrument):
                                                               dac_values=dac_values,
                                                               fluxChan=fluxline,
                                                               analyze=False)
-                    print('Done flux sweep resonator {} ({} GHz) with {}'.format(
-                          resonator, round(freq/1e9, 3), fluxline))
+                    print('Done flux sweep resonator {:.0f} ({:.3f} GHz) with {}'
+                          .format(res.identifier, res.freq/1e9, fluxline))
 
                     ma.TwoD_Analysis(
                         label='Resonator_dac_scan', normalize=False)
@@ -623,77 +591,69 @@ class Qubit(Instrument):
                     amplitude = fit_res.dac_fit_res.params['amplitude'].value
                     sweetspot_current = fit_res.sweet_spot_value
 
-                    items[2][fluxline] = amplitude
+                    res.fluxlines[fluxline] = amplitude
 
                     if amplitude > best_amplitude:
                         best_amplitude = amplitude
                         self.cfg_dc_flux_ch(fluxline)
                         self.fl_dc_V_per_phi0(fit_res.current_to_flux)
-                        res_dict[resonator][3] = 'Q' + fluxline[4]
-                        res_dict[resonator][4] = sweetspot_current
-                        res_dict[resonator][7] = fit_res.current_to_flux
+
+                        res.qubit = 'Q' + fluxline[-1]
+                        res.sweetspot = sweetspot_current
+                        res.fl_dc_V_per_phi0 = fit_res.current_to_flux
 
         if verbose:
-            for items in res_dict.values():
+            for res in self.device.resonators:
                 print('{}, f = {:.3f}, linked to {},'
-                      ' sweetspot current = {:.3f} mA'.format(items[1],
-                                                              items[0]/1e9,
-                                                              items[3],
-                                                              items[4]*1e3))
 
-        # Update qubit resonator dictionary or create if necessary
-        self.res_dict = res_dict
-        # Try to update device dict if it exists:
-        try:
-            device = self.device
-            device.res_dict = res_dict
-        except AttributeError:
-            logging.warning('Could not update device resonator dictionary: '
-                            'No device found for {}'.format(self.name))
+                      ' sweetspot current = {:.3f} mA'.format(res.type,
+                                                              res.freq_low/1e9,
+                                                              res.qubit,
+                                                              res.sweetspot*1e3))
 
-        for resonator, items in self.res_dict.items():
-            if items[1] == 'qubit_resonator':
-                if self.name == items[3]:
-                    self.freq_res(items[0])
-                    self.ro_freq(items[0])
-                    self.fl_dc_V0(items[4])
-                    self.cfg_dc_flux_ch('FBL_' + items[3][-1])
-                    if self.freq_qubit() is None:
-                                self.freq_qubit(items[0] - np.abs(
-                                        (70e6)**2/(2*items[5])))
+        # Set properties of this qubit (will be overwritten if device is used)
+        for res in resonators:
+            if res.type == 'qubit_resonator':
+                if self.name == res.qubit:
+                    self.freq_res(res.freq_low)
+                    self.ro_freq(res.freq_low)
+                    self.fl_dc_V0(res.sweetspot)
+                    self.cfg_dc_flux_ch('FBL_' + res.qubit[-1])
+                    self.freq_qubit(res.freq_high - np.abs(
+                            (70e6)**2/(2*res.shift)))
                     fluxcurrent[self.cfg_dc_flux_ch()](self.fl_dc_V0())
 
-        # Create dict with resonators and qubits, and return False if there
-        # are duplicates
-        res_qubit_combis = {}
-        for resonator, items in res_dict.items():
-            if items[3] not in list(res_qubit_combis.values()):
-                res_qubit_combis[resonator] = items[3]
-            else:
-                logging.warning('Duplicate in resonator - qubit combinations: '
-                                '{}'.format(items[3]))
-                return False
+        # Set properties for all qubits in device if device exists
+
         try:
             device = self.device
-            device.res_dict = self.res_dict
             for q in device.qubits():
                 if q == 'fakequbit':
                     pass
                 qubit = device.find_instrument(q)
-                for resonator, items in self.res_dict.items():
-                    if qubit.name == items[3]:
-                        qubit.freq_res(items[0])
-                        qubit.ro_freq(items[0])
-                        qubit.fl_dc_V0(items[4])
-                        qubit.cfg_dc_flux_ch('FBL_' + items[3][-1])
-                        qubit.fl_dc_V_per_phi0(items[7])
-                        if qubit.freq_qubit() is None:
-                            qubit.freq_qubit(items[0] - np.abs(
-                                        (50e6)**2/(2*items[5])))
+
+                for res in device.resonators:
+                    if qubit.name == res.qubit:
+                        qubit.freq_res(res.freq_low)
+                        qubit.ro_freq(res.freq_low)
+                        qubit.fl_dc_V0(res.sweetspot)
+                        qubit.cfg_dc_flux_ch('FBL_' + res.qubit[-1])
+                        if qubit.freq_qubit is None:
+                            qubit.freq_qubit(res.freq_low - np.abs(
+                                (70e6)**2/(res.shift))) 
+
+                # for resonator, items in self.res_dict.items():
+                #     if qubit.name == items[3]:
+                #         qubit.freq_res(items[0])
+                #         qubit.ro_freq(items[0])
+                #         qubit.fl_dc_V0(items[4])
+                #         qubit.cfg_dc_flux_ch('FBL_' + items[3][-1])
+                #         qubit.freq_qubit(items[0] - np.abs(
+                #             (50e6)**2/(2*items[5])))
 
         except AttributeError:
-            logging.warning('Could not link qubits to resonators: '
-                            'No device found')
+            logging.warning('Could not link qubits to resonators: \n '
+                            'No device found for {}'.format(self.name))
         return True
 
     def find_resonator_sweetspot(self, freqs=None, dac_values=None,

@@ -19,7 +19,8 @@ from qcodes import station
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQC import dummy_UHFQC
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
-
+from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
+import pycqed.instrument_drivers.meta_instrument.device_object_CCL as do
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
@@ -235,16 +236,21 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.mock_freq_res(7.78542e9)
         self.CCL_qubit.mock_freq_test_res(7.9862432e9)
 
-        self.CCL_qubit.res_dict = {'0': [7.785e9, 'unknown', {}, None, 0, 0, 0],
-                                   '1': [7.986e9, 'unknown', {}, None, 0, 0, 0]}
+        res0 = resonator(identifier=0, freq=7.785e9)
+        res0.type = 'unknown'
+        res1 = resonator(identifier=1, freq=7.986e9)
+        res1.type = 'unknown'
+        device = do.DeviceCCL(name='device')
+        self.CCL_qubit.device = device
+        self.CCL_qubit.device.resonators = [res0, res1]
 
-        for resonator in ['0', '1']:
+        for res in [res0, res1]:
             self.CCL_qubit.find_test_resonators()
 
-            if resonator == '0':
-                assert self.CCL_qubit.res_dict[resonator][1] == 'qubit_resonator'
-            elif resonator == '1':
-                assert self.CCL_qubit.res_dict[resonator][1] == 'test_resonator'
+            if res.identifier == 0:
+                assert res0.type == 'qubit_resonator'
+            elif res.identifier == 1:
+                assert res1.type == 'test_resonator'
 
     ###########################################################
     # Test Ramsey
