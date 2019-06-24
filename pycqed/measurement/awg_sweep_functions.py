@@ -172,8 +172,8 @@ class MultiElemSegmentTimingSwf(swf.Hard_Sweep):
                 cal_points=self.cal_points,
                 upload=True)
 
-class Rabi(swf.Hard_Sweep):
 
+class Rabi(swf.Hard_Sweep):
     def __init__(self, qb_name, operation_dict,
                  cal_points=True, no_cal_points=4, upload=True, n=1,
                  preparation_type='wait', post_ro_wait=1e-6,
