@@ -707,11 +707,10 @@ class QuDev_transmon(Qubit):
                              'post_ro_wait': post_ro_wait,
                              'reset_reps': reset_reps,
                              'final_reset_pulse': final_reset_pulse,
-                             'cal_states_dict': cps.get_indices()[self.name],
-                             'cal_states_rotations':
-                                 cps.get_rotations(last_ge_pulse)[self.name] if
-                                     self.acq_weights_type() != 'optimal_qutrit'
-                                     else None,
+                             'cal_points': cps.qb_names,
+                             'rotate': self.acq_weights_type() !=
+                                       'optimal_qutrit',
+                             'last_ge_pulses': [last_ge_pulse],
                              'data_to_fit': {self.name: 'pf' if for_ef \
                                                 else 'pe'}})
         MC.run(label, exp_metadata=exp_metadata)

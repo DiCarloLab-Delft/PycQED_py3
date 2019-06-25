@@ -179,10 +179,30 @@ class CalibrationPoints:
 
         return CalibrationPoints(qb_names, labels)
 
-    def __repr__(self):
-        return "Calibration:\n    Qubits: {}\n    Labels: {}" \
+    def extend_sweep_points(self, sweep_points, qb_name):
+        """
+        Extends the sweep point array for plotting calibration points after
+        data for a particular qubit
+        Args:
+            sweep_points (array): physical sweep_points
+            qb_name (str): qubit name
+        Returns:
+            sweep_points + calib_fake_sweep points
+        """
+        step = np.abs(sweep_points[-1] - sweep_points[-2])
+        n_cal_pts = len(self.get_states(qb_name))
+        plot_sweep_points = \
+            np.concatenate([sweep_points, [sweep_points[-1] + i * step
+                                           for i in range(1, n_cal_pts + 1)]])
+        return plot_sweep_points
+
+    def __str__(self):
+        return "Calibration:\n    Qubits: {}\n    States: {}" \
             .format(self.qb_names, self.states)
 
-
+    def __repr__(self):
+        return "CalibrationPoints(\n    qb_names={},\n    states={}," \
+               "\n    pulse_label_map={})" \
+            .format(self.qb_names, self.states, self.pulse_label_map)
 
 

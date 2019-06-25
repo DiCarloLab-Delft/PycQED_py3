@@ -1,4 +1,3 @@
-import logging
 import lmfit
 import numpy as np
 from numpy.linalg import inv
@@ -13,10 +12,13 @@ import pycqed.analysis_v2.readout_analysis as roa
 import pycqed.analysis_v2.tomography_qudev as tomo
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from copy import deepcopy
+from pycqed.measurement.calibration_points import CalibrationPoints
+import logging
+log = logging.getLogger(__name__)
 try:
     import qutip as qtp
 except ImportError as e:
-    logging.warning('Could not import qutip, tomography code will not work')
+    log.warning('Could not import qutip, tomography code will not work')
 
 
 class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
@@ -289,12 +291,49 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['meas_results_per_qb_per_ROch'] = \
             meas_results_per_qb_per_ROch
 
-        # create projected_data_dict
-        self.cal_states_dict = self.options_dict.get(
-            'cal_states_dict', self.metadata.get('cal_states_dict', None))
-        self.cal_states_rotations = self.options_dict.get(
-            'cal_states_rotations', self.metadata.get(
-                'cal_states_rotations', None))
+        # temporary fix for appending calibration points to x values but
+        # without breaking sequences not yet using this interface.
+        try:
+            cal_points = \
+                self.options_dict.get('cal_points',
+                                      self.metadata.get('cal_points', None))
+            rotate = self.options_dict.get('rotate',
+                                           self.metadata.get('rotate', False))
+            last_ge_pulses = \
+                self.options_dict.get('last_ge_pulses',
+                                      self.metadata.get('last_ge_pulses',
+                                                        False))
+            assert isinstance(cal_points, dict), \
+                "In new framework cal_points is a dict with states and cal_qb"
+
+            self.cp = CalibrationPoints(**cal_points)
+
+            #for now assuming the same for all qubits.
+            self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
+
+            self.cal_states_rotations = \
+                self.cp.get_rotations(last_ge_pulses, self.qb_names[0]) if \
+                    rotate else None
+            self.raw_data_dict['sweep_points_dict'].update(
+                {qbn: {'sweep_points': self.cp.extend_sweep_points(
+                    self.metadata['sweep_points_dict'][qbn], qbn)}
+                 for qbn in self.qb_names})
+        except:
+            log.warning("Deprecated usage of calibration points and sequences."
+                        " Please adapt your measurement to the new framework. "
+                        "See measure_rabi() for an example of how to adapt the"
+                        " measurement.")
+
+            # create projected_data_dict
+            # TODO: Nathan @ Stef: ideally cal_states_dict should also be
+            #  keyed by qbname to allow  different calibration for different qubits.
+            #  This is already implemented in cp.get_indices() and get_rotations().
+            self.cal_states_dict = self.options_dict.get(
+                'cal_states_dict', self.metadata.get('cal_states_dict', None))
+            self.cal_states_rotations = self.options_dict.get(
+                'cal_states_rotations', self.metadata.get(
+                    'cal_states_rotations', None))
+
         self.data_to_fit = self.options_dict.get(
             'data_to_fit', self.metadata.get('data_to_fit', None))
         if self.cal_states_rotations is not None:
@@ -2429,7 +2468,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
 
 
         if fit_res_1.chisqr > .35:
-            logging.warning('Fit did not converge, varying phase')
+            log.warning('Fit did not converge, varying phase')
             fit_res_lst = []
 
             for phase_estimate in np.linspace(0, 2*np.pi, 10):
@@ -2451,7 +2490,7 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
             fit_res_1 = fit_res_lst[np.argmin(chisqr_lst)]
 
         if fit_res_2.chisqr > .35:
-            logging.warning('Fit did not converge, varying phase')
+            log.warning('Fit did not converge, varying phase')
             fit_res_lst = []
 
             for phase_estimate in np.linspace(0, 2*np.pi, 10):
@@ -3207,14 +3246,14 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
 
         # If phase_fit<1, the piHalf amplitude<0.
         if phase_fit < 1:
-            logging.info('The data could not be fitted correctly. '
+            log.info('The data could not be fitted correctly. '
                          'The fitted phase "%s" <1, which gives '
                          'negative piHalf '
                          'amplitude.' % phase_fit)
 
         stepsize = sweep_points[1] - sweep_points[0]
         if freq_fit > 2 * stepsize:
-            logging.info('The data could not be fitted correctly. The '
+            log.info('The data could not be fitted correctly. The '
                          'frequency "%s" is too high.' % freq_fit)
         n = np.arange(-2, 10)
 
@@ -3767,7 +3806,7 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
             # Warning if Xpi/2Xpi line is not within +/-threshold of 0.5
             if (fitparams0['c'].value > (0.5 + threshold)) or \
                     (fitparams0['c'].value < (0.5 - threshold)):
-                logging.warning('The trace from the X90-X180 pulses is '
+                log.warning('The trace from the X90-X180 pulses is '
                                 'NOT within $\pm${} of the expected value '
                                 'of 0.5.'.format(threshold))
             # Warning if optimal_qscale is not within +/-threshold of 0.5
@@ -3775,7 +3814,7 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                                  fitparams2['intercept'].value
             if (y_optimal_qscale > (0.5 + threshold)) or \
                     (y_optimal_qscale < (0.5 - threshold)):
-                logging.warning('The optimal qscale found gives a population '
+                log.warning('The optimal qscale found gives a population '
                                 'that is NOT within $\pm${} of the expected '
                                 'value of 0.5.'.format(threshold))
 
