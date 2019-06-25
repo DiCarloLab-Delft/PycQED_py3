@@ -23,13 +23,13 @@ from scipy.ndimage.filters import gaussian_filter
 import imp
 import math
 
-try:
-    import pygsti
-except ImportError as e:
-    if str(e).find('pygsti') >= 0:
-        logging.warning('Could not import pygsti')
-    else:
-        raise
+# try:
+#     import pygsti
+# except ImportError as e:
+#     if str(e).find('pygsti') >= 0:
+#         logging.warning('Could not import pygsti')
+#     else:
+#         raise
 
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
@@ -49,14 +49,14 @@ except:
     pass
 from pycqed.analysis import composite_analysis as ca
 
-try:
-    import qutip as qtp
+# try:
+#     import qutip as qtp
 
-except ImportError as e:
-    if str(e).find('qutip') >= 0:
-        logging.warning('Could not import qutip')
-    else:
-        raise
+# except ImportError as e:
+#     if str(e).find('qutip') >= 0:
+#         logging.warning('Could not import qutip')
+#     else:
+#         raise
 
 imp.reload(dm_tools)
 
