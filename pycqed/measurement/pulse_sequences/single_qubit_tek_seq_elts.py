@@ -67,7 +67,7 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points,
     rabi_pulses = [deepcopy(operation_dict[op]) for op in rabi_ops]
 
     for i in np.arange(1 if for_ef else 0, n + 1 if for_ef else n):
-        rabi_pulses[i]["name"] = "Rabi_" + str(i)
+        rabi_pulses[i]["name"] = "Rabi_" + str(i-1 if for_ef else i)
 
     swept_pulses = sweep_pulse_params(rabi_pulses,
                                       {f'Rabi_{i}.amplitude':
@@ -702,6 +702,41 @@ def ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
                               using phase
         cal_points:          whether to use calibration points or not
     '''
+    # seq_name = 'Ramsey_sequence_multiple_detunings'
+    # seq = sequence.Sequence(seq_name)
+    # ps.Pulsar.get_instance().update_channel_settings()
+    # seg_list = []
+    # # First extract values from input, later overwrite when generating
+    # # waveforms
+    # pulses = get_pulse_dict_from_pars(pulse_pars)
+    #
+    # pulse_pars_x2 = deepcopy(pulses['X90'])
+    # pulse_pars_x2['ref_point'] = 'start'
+    # for i, tau in enumerate(times):
+    #     pulse_pars_x2['pulse_delay'] = tau
+    #     art_det = artificial_detunings[i % len(artificial_detunings)]
+    #
+    #     if art_det is not None:
+    #         Dphase = ((tau-times[0]) * art_det * 360) % 360
+    #         pulse_pars_x2['phase'] = Dphase
+    #
+    #     if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+    #          seg = segment.Segment('segment_{}'.format(i), [pulses['I'], RO_pars])
+    #     elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+    #          seg = segment.Segment('segment_{}'.format(i), [pulses['X180'], RO_pars])
+    #     else:
+    #          seg = segment.Segment('segment_{}'.format(i),
+    #                              [pulses['X90'], pulse_pars_x2, RO_pars])
+    #     seg_list.append(seg)
+    #     seq.add(seg)
+    #
+    # if upload:
+    #     ps.Pulsar.get_instance().program_awgs(seq)
+    #
+    # if return_seq:
+    #     return seq, seg_list
+    # else:
+    #     return seq_name
     seq_name = 'Ramsey_sequence_multiple_detunings'
     seq = sequence.Sequence(seq_name)
     ps.Pulsar.get_instance().update_channel_settings()

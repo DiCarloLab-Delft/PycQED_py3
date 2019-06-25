@@ -34,7 +34,7 @@ try:
     import pycqed.simulations.readout_mode_simulations_for_CLEAR_pulse \
         as sim_CLEAR
 except ModuleNotFoundError:
-    logging.warning('"readout_mode_simulations_for_CLEAR_pulse" not imported.')
+    log.warning('"readout_mode_simulations_for_CLEAR_pulse" not imported.')
 
 class QuDev_transmon(Qubit):
     def __init__(self, name, **kw):
@@ -424,7 +424,7 @@ class QuDev_transmon(Qubit):
             pass
         elif weights_type == 'optimal':
             if (self.acq_weights_I() is None or self.acq_weights_Q() is None):
-                logging.warning('Optimal weights are None, not setting '
+                log.warning('Optimal weights are None, not setting '
                                 'integration weights')
                 return
             # When optimal weights are used, only the RO I weight
@@ -441,7 +441,7 @@ class QuDev_transmon(Qubit):
             for w_f in [self.acq_weights_I, self.acq_weights_Q,
                         self.acq_weights_I2, self.acq_weights_Q2]:
                 if w_f() is None:
-                    logging.warning('The optimal weights {} are None. '
+                    log.warning('The optimal weights {} are None. '
                                     '\nNot setting integration weights.'
                                     .format(w_f.name))
                     return
@@ -566,7 +566,7 @@ class QuDev_transmon(Qubit):
         """ Varies the frequency of the microwave source to the resonator and
         measures the transmittance """
         if np.any(freqs < 500e6):
-            logging.warning(('Some of the values in the freqs array might be '
+            log.warning(('Some of the values in the freqs array might be '
                              'too small. The units should be Hz.'))
     
         if label is None:
@@ -607,7 +607,7 @@ class QuDev_transmon(Qubit):
         """ Varies qubit drive frequency and measures the resonator
         transmittance """
         if np.any(freqs < 500e6):
-            logging.warning(('Some of the values in the freqs array might be '
+            log.warning(('Some of the values in the freqs array might be '
                              'too small. The units should be Hz.'))
         if pulsed:
             if label is None:
@@ -653,11 +653,11 @@ class QuDev_transmon(Qubit):
         
 
     def measure_rabi(self, amps, analyze=True, close_fig=True, cal_points=True,
-                     no_cal_points=4, upload=True, label=None,  n=1,
-                     last_ge_pulse=False, n_cal_points_per_state=2,
-                     cal_states=('g', 'e'), for_ef=False, preparation_type='wait',
-                     post_ro_wait=1e-6, reset_reps=1, final_reset_pulse=True,
-                     exp_metadata=None, active_reset=False):
+                     upload=True, label=None, n=1, last_ge_pulse=False,
+                     n_cal_points_per_state=2, cal_states='auto', for_ef=False,
+                     preparation_type='wait', post_ro_wait=1e-6, reset_reps=1,
+                     final_reset_pulse=True, exp_metadata=None,
+                     active_reset=False):
 
         """
         Varies the amplitude of the qubit drive pulse and measures the readout
@@ -688,7 +688,7 @@ class QuDev_transmon(Qubit):
             raise ValueError("Not formatted this kw on this branch")
 
         MC = self.instr_mc.get_instr()
-
+        cal_states = CalibrationPoints.guess_cal_states(cal_states, for_ef)
         cp = CalibrationPoints.single_qubit(self.name, cal_states,
                                             n_per_state=n_cal_points_per_state)
         seq, sweep_points = sq.rabi_seq_active_reset(
@@ -730,7 +730,8 @@ class QuDev_transmon(Qubit):
                              label=None, last_ge_pulse=True,
                              close_fig=True, cal_points=True, no_cal_points=6,
                              upload=True, exp_metadata=None):
-
+        log.warning("This measure function is deprecated, use measure_rabi() "
+                    "with for_ef=True instead.")
         if amps is None:
             raise ValueError("Unspecified amplitudes for measure_rabi")
 
@@ -819,7 +820,7 @@ class QuDev_transmon(Qubit):
         if times is None:
             raise ValueError("Unspecified times for measure_T1")
         if np.any(times>1e-3):
-            logging.warning('The values in the times array might be too large.'
+            log.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
         self.prepare(drive='timedomain')
@@ -870,7 +871,7 @@ class QuDev_transmon(Qubit):
         if times is None:
             raise ValueError("Unspecified times for measure_T1_2nd_exc")
         if np.any(times>1e-3):
-            logging.warning('The values in the times array might be too large.'
+            log.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
         self.prepare(drive='timedomain')
@@ -1071,16 +1072,16 @@ class QuDev_transmon(Qubit):
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detunings is None:
-            logging.warning('Artificial detuning is 0.')
+            log.warning('Artificial detuning is 0.')
         uniques = np.unique(times[range(len(artificial_detunings))])
         if uniques.size>1:
             raise ValueError("The values in the times array are not repeated "
                              "len(artificial_detunings) times.")
         if np.any(np.asarray(np.abs(artificial_detunings))<1e3):
-            logging.warning('The artificial detuning is too small. The units '
+            log.warning('The artificial detuning is too small. The units '
                             'should be Hz.')
         if np.any(times>1e-3):
-            logging.warning('The values in the times array might be too large.'
+            log.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
         self.prepare(drive='timedomain')
@@ -1126,12 +1127,12 @@ class QuDev_transmon(Qubit):
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
-            logging.warning('Artificial detuning is 0.')
+            log.warning('Artificial detuning is 0.')
         if np.abs(artificial_detuning) < 1e3:
-            logging.warning('The artificial detuning is too small. The units'
+            log.warning('The artificial detuning is too small. The units'
                             'should be Hz.')
         if np.any(times > 1e-3):
-            logging.warning('The values in the times array might be too large.'
+            log.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
         self.prepare(drive='timedomain')
@@ -1187,13 +1188,13 @@ class QuDev_transmon(Qubit):
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if np.any(times > 1e-3):
-            logging.warning('The values in the times array might be too large.'
+            log.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
         if artificial_detuning is None:
-            logging.warning('Artificial detuning is 0.')
+            log.warning('Artificial detuning is 0.')
         if np.abs(artificial_detuning) < 1e3:
-            logging.warning('The artificial detuning is too small. The units'
+            log.warning('The artificial detuning is too small. The units'
                             'should be Hz.')
 
         if seq_func is None:
@@ -1251,12 +1252,12 @@ class QuDev_transmon(Qubit):
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
-            logging.warning('Artificial detuning is 0.')
+            log.warning('Artificial detuning is 0.')
         if np.abs(artificial_detuning)<1e3:
-            logging.warning('The artificial detuning is too small. The units'
+            log.warning('The artificial detuning is too small. The units'
                             'should be Hz.')
         if np.any(times>1e-3):
-            logging.warning('The values in the times array might be too large.'
+            log.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
         if label is None:
@@ -1400,12 +1401,12 @@ class QuDev_transmon(Qubit):
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detunings is None:
-            logging.warning('Artificial detunings were not given.')
+            log.warning('Artificial detunings were not given.')
         if np.any(np.asarray(np.abs(artificial_detunings))<1e3):
-            logging.warning('The artificial detuning is too small. The units '
+            log.warning('The artificial detuning is too small. The units '
                             'should be Hz.')
         if np.any(times>1e-3):
-            logging.warning('The values in the times array might be too large.'
+            log.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
         self.prepare(drive='timedomain')
@@ -1517,12 +1518,12 @@ class QuDev_transmon(Qubit):
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
-            logging.warning('Artificial detuning is 0.')
+            log.warning('Artificial detuning is 0.')
         if np.abs(artificial_detuning) < 1e3:
-            logging.warning('The artificial detuning is too small. The units'
+            log.warning('The artificial detuning is too small. The units'
                             'should be Hz.')
         if np.any(times > 1e-3):
-            logging.warning('The values in the times array might be too large.'
+            log.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
         if label is None:
@@ -2625,11 +2626,11 @@ class QuDev_transmon(Qubit):
             the peak frequency(ies).
         """
         if not update:
-            logging.warning("Does not automatically update the qubit "
+            log.warning("Does not automatically update the qubit "
                             "frequency parameter. "
                             "Set update=True if you want this!")
         if np.any(freqs<500e6):
-            logging.warning(('Some of the values in the freqs array might be '
+            log.warning(('Some of the values in the freqs array might be '
                              'too small. The units should be Hz.'))
 
         if freqs is None:
@@ -2637,7 +2638,7 @@ class QuDev_transmon(Qubit):
             f_mean = kw.get('f_mean', self.f_qubit())
             nr_points = kw.get('nr_points', 100)
             if f_mean == 0:
-                logging.warning("find_frequency does not know where to "
+                log.warning("find_frequency does not know where to "
                                 "look for the qubit. Please specify the "
                                 "f_mean or the freqs function parameter.")
                 return 0
@@ -2765,12 +2766,12 @@ class QuDev_transmon(Qubit):
             """
 
         if not update:
-            logging.warning("Does not automatically update the qubit pi and "
+            log.warning("Does not automatically update the qubit pi and "
                             "pi/2 amplitudes. "
                             "Set update=True if you want this!")
 
         if cal_points and no_cal_points is None:
-            logging.warning('no_cal_points is None. Defaults to 4 if '
+            log.warning('no_cal_points is None. Defaults to 4 if '
                             'for_ef==False, or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
@@ -2788,7 +2789,7 @@ class QuDev_transmon(Qubit):
             amps_mean = kw.get('amps_mean', self.ge_amp180())
             nr_points = kw.get('nr_points', 30)
             if amps_mean == 0:
-                logging.warning("find_amplitudes does not know over which "
+                log.warning("find_amplitudes does not know over which "
                                 "amplitudes to do Rabi. Please specify the "
                                 "amps_mean or the amps function parameter.")
                 return 0
@@ -2808,24 +2809,12 @@ class QuDev_transmon(Qubit):
             label += self.msmt_suffix
 
         #Perform Rabi
-        if for_ef:
-            print("cal points {}".format(no_cal_points))
-            self.measure_rabi_2nd_exc(amps=rabi_amps, n=n,
-                                      close_fig=close_fig, label=label,
-                                      cal_points=cal_points,
-                                      last_ge_pulse=last_ge_pulse,
-                                      no_cal_points=no_cal_points,
-                                      upload=upload)
-        else:
-            self.measure_rabi(amps=rabi_amps, n=n,
-                              close_fig=close_fig,
-                              label=label,
-                              cal_points=cal_points,
-                              no_cal_points=no_cal_points,
+        self.measure_rabi(amps=rabi_amps, close_fig=close_fig,
+                              cal_points=cal_points, upload=upload, label=label,
+                              n=n, last_ge_pulse=last_ge_pulse, for_ef=for_ef,
                               preparation_type=preparation_type,
                               post_ro_wait=post_ro_wait, reset_reps=reset_reps,
-                              final_reset_pulse=final_reset_pulse,
-                              upload=upload)
+                              final_reset_pulse=final_reset_pulse)
 
         #get pi and pi/2 amplitudes from the analysis results
         if analyze:
@@ -2901,14 +2890,14 @@ class QuDev_transmon(Qubit):
         """
 
         if not update:
-            logging.warning("Does not automatically update the qubit "
+            log.warning("Does not automatically update the qubit "
                             "T1 parameter. Set update=True if you want this!")
         if np.any(times>1e-3):
             raise ValueError('Some of the values in the times array might be too '
                             'large. The units should be seconds.')
 
         if cal_points and no_cal_points is None:
-            logging.warning('no_cal_points is None. Defaults to 4 if '
+            log.warning('no_cal_points is None. Defaults to 4 if '
                             'for_ef==False, or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
@@ -2931,7 +2920,7 @@ class QuDev_transmon(Qubit):
             times_mean = kw.get('times_mean', 5e-6)
             nr_points = kw.get('nr_points', 50)
             if times_mean == 0:
-                logging.warning("find_T1 does not know how long to wait before"
+                log.warning("find_T1 does not know how long to wait before"
                                 "doing the read out. Please specify the "
                                 "times_mean or the times function parameter.")
                 return 0
@@ -3099,20 +3088,20 @@ class QuDev_transmon(Qubit):
             times_span/2, nr_points).
         """
         if not update:
-            logging.warning("Does not automatically update the qubit frequency "
+            log.warning("Does not automatically update the qubit frequency "
                             "and T2_star parameters. "
                             "Set update=True if you want this!")
         if artificial_detuning == None:
-            logging.warning('Artificial_detuning is None; qubit driven at "%s" '
+            log.warning('Artificial_detuning is None; qubit driven at "%s" '
                             'estimated with '
                             'spectroscopy' %self.f_qubit())
         if np.any(np.asarray(np.abs(artificial_detuning))<1e3):
-            logging.warning('The artificial detuning is too small.')
+            log.warning('The artificial detuning is too small.')
         if np.any(times>1e-3):
-            logging.warning('The values in the times array might be too large.')
+            log.warning('The values in the times array might be too large.')
 
         if cal_points and no_cal_points is None:
-            logging.warning('no_cal_points is None. Defaults to 4 if '
+            log.warning('no_cal_points is None. Defaults to 4 if '
                             'for_ef==False, or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
@@ -3137,7 +3126,7 @@ class QuDev_transmon(Qubit):
             # 2 ARTIFICIAL_DETUNING VALUES
 
             if times is None:
-                logging.warning("find_frequency_T2_ramsey does not know over "
+                log.warning("find_frequency_T2_ramsey does not know over "
                                 "which times to do Ramsey. Please specify the "
                                 "times_mean or the times function parameter.")
 
@@ -3182,7 +3171,7 @@ class QuDev_transmon(Qubit):
                 times_mean = kw.get('times_mean', 2.5e-6)
                 nr_points = kw.get('nr_points', 50)
                 if times_mean == 0:
-                    logging.warning("find_frequency_T2_ramsey does not know "
+                    log.warning("find_frequency_T2_ramsey does not know "
                                     "over which times to do Ramsey. Please "
                                     "specify the times_mean or the times "
                                     "function parameter.")
@@ -3240,23 +3229,23 @@ class QuDev_transmon(Qubit):
                     try:
                         self.ef_freq(new_qubit_freq)
                     except AttributeError as e:
-                        logging.warning('%s. This parameter will not be '
+                        log.warning('%s. This parameter will not be '
                                         'updated.'%e)
                     try:
                         self.T2_star_ef(T2_star)
                     except AttributeError as e:
-                        logging.warning('%s. This parameter will not be '
+                        log.warning('%s. This parameter will not be '
                                         'updated.'%e)
                 else:
                     try:
                         self.ge_freq(new_qubit_freq)
                     except AttributeError as e:
-                        logging.warning('%s. This parameter will not be '
+                        log.warning('%s. This parameter will not be '
                                         'updated.'%e)
                     try:
                         self.T2_star(T2_star)
                     except AttributeError as e:
-                        logging.warning('%s. This parameter will not be '
+                        log.warning('%s. This parameter will not be '
                                         'updated.'%e)
 
 
@@ -3297,20 +3286,20 @@ class QuDev_transmon(Qubit):
             Nothing
         """
         if not update:
-            logging.warning("Does not automatically update the qubit "
+            log.warning("Does not automatically update the qubit "
                             "T2_echo parameter. "
                             "Set update=True if you want this!")
         if artificial_detuning == None:
-            logging.warning('Artificial_detuning is None; applying resonant '
+            log.warning('Artificial_detuning is None; applying resonant '
                             'drive.')
         else:
             if np.any(np.asarray(np.abs(artificial_detuning)) < 1e3):
-                logging.warning('The artificial detuning is too small.')
+                log.warning('The artificial detuning is too small.')
         if np.any(times > 1e-3):
-            logging.warning('The values in the times array might be too large.')
+            log.warning('The values in the times array might be too large.')
 
         if cal_points and no_cal_points is None:
-            logging.warning('no_cal_points is None. Defaults to 4 if '
+            log.warning('no_cal_points is None. Defaults to 4 if '
                             'for_ef==False, or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
@@ -3333,7 +3322,7 @@ class QuDev_transmon(Qubit):
             times_mean = kw.get('times_mean', 2.5e-6)
             nr_points = kw.get('nr_points', 50)
             if times_mean == 0:
-                logging.warning("find_T2_echo does not know "
+                log.warning("find_T2_echo does not know "
                                 "over which times to do Ramsey. Please "
                                 "specify the times_mean or the times "
                                 "function parameter.")
@@ -3369,7 +3358,7 @@ class QuDev_transmon(Qubit):
                 try:
                     self.T2(T2_echo)
                 except AttributeError as e:
-                    logging.warning('%s. This parameter will not be '
+                    log.warning('%s. This parameter will not be '
                                     'updated.'%e)
 
         return
@@ -3461,12 +3450,12 @@ class QuDev_transmon(Qubit):
         '''
 
         if not update:
-            logging.warning("Does not automatically update the qubit qscale "
+            log.warning("Does not automatically update the qubit qscale "
                             "parameter. "
                             "Set update=True if you want this!")
 
         if cal_points and no_cal_points is None:
-            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+            log.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
                             'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
@@ -3483,7 +3472,7 @@ class QuDev_transmon(Qubit):
                 label = 'QScale' + self.msmt_suffix
 
         if qscales is None:
-            logging.warning("find_qscale does not know over which "
+            log.warning("find_qscale does not know over which "
                             "qscale values to sweep. Please specify the "
                             "qscales_mean or the qscales function"
                             " parameter.")
@@ -3524,14 +3513,14 @@ class QuDev_transmon(Qubit):
         parameter. Set update=True if you want this!
         """
         if not update:
-            logging.warning("Does not automatically update the qubit "
+            log.warning("Does not automatically update the qubit "
                             "anharmonicity parameter. "
                             "Set update=True if you want this!")
 
         if self.f_qubit() == 0:
-            logging.warning('f_ge = 0. Run qubit spectroscopy or Ramsey.')
+            log.warning('f_ge = 0. Run qubit spectroscopy or Ramsey.')
         if self.f_ef_qubit() == 0:
-            logging.warning('f_ef = 0. Run qubit spectroscopy or Ramsey.')
+            log.warning('f_ef = 0. Run qubit spectroscopy or Ramsey.')
 
         anharmonicity = self.f_ef_qubit() - self.f_qubit()
 
@@ -3560,7 +3549,7 @@ class QuDev_transmon(Qubit):
                 dimension of Hamiltonian will  be (2*dim+1,2*dim+1)
         """
         if not update:
-            logging.warning("Does not automatically update the qubit EC and EJ "
+            log.warning("Does not automatically update the qubit EC and EJ "
                             "parameters. "
                             "Set update=True if you want this!")
 
@@ -3594,7 +3583,7 @@ class QuDev_transmon(Qubit):
         """
         # FIXME: Make proper analysis class for this (Ants, 04.12.2017)
         if not update:
-            logging.info("Does not automatically update the RO resonator "
+            loginfo("Does not automatically update the RO resonator "
                          "parameters. Set update=True if you want this!")
         if freqs is None:
             if self.f_RO() is not None:
@@ -3607,7 +3596,7 @@ class QuDev_transmon(Qubit):
                 raise ValueError("Unspecified frequencies for find_resonator_"
                                  "frequency and no previous value exists")
         if np.any(freqs < 500e6):
-            logging.warning('Some of the values in the freqs array might be '
+            log.warning('Some of the values in the freqs array might be '
                             'too small. The units should be Hz.')
         if MC is None:
             MC = self.instr_mc.get_instr()
@@ -3650,7 +3639,7 @@ class QuDev_transmon(Qubit):
         else:
             fmax = freqs[np.argmax(np.abs(trace['e'] - trace['g']))]
 
-        logging.info("Optimal RO frequency to distinguish states {}: {} Hz"
+        loginfo("Optimal RO frequency to distinguish states {}: {} Hz"
                      .format(levels, fmax))
 
         if kw.get('analyze', True):
@@ -3704,7 +3693,7 @@ class QuDev_transmon(Qubit):
         if freqs is None:
             raise ValueError("Unspecified frequencies for measure_resonator_spectroscopy")
         if np.any(freqs < 500e6):
-            logging.warning(('Some of the values in the freqs array might be too small. The units should be Hz.'))
+            log.warning(('Some of the values in the freqs array might be too small. The units should be Hz.'))
 
 
         self.prepare(drive='timedomain')
@@ -3801,7 +3790,7 @@ class QuDev_transmon(Qubit):
                 self.instr_pulsar.get_instr().set('{}_delay'.format(channel), new_delay)
                 print('updated delay of channel {}.'.format(channel))
             else:
-                logging.warning('Not updated, since update was disabled.')
+                log.warning('Not updated, since update was disabled.')
             return flux_pulse_timing_ma.fitted_delay
         else:
             return
@@ -3984,19 +3973,19 @@ class QuDev_transmon(Qubit):
 
         if flux_pulse_amp is None:
             flux_pulse_amp = self.flux_pulse_amp()
-            logging.warning('flux_pulse_amp is not specified. Using the value'
+            log.warning('flux_pulse_amp is not specified. Using the value'
                             'in the flux_pulse_amp parameter.')
         if flux_pulse_length is None:
             flux_pulse_length = self.flux_pulse_length()
-            logging.warning('flux_pulse_length is not specified. Using the value'
+            log.warning('flux_pulse_length is not specified. Using the value'
                             'in the flux_pulse_length parameter.')
         if flux_pulse_delay is None:
             flux_pulse_delay = self.flux_pulse_delay()
-            logging.warning('flux_pulse_delay is not specified. Using the value'
+            log.warning('flux_pulse_delay is not specified. Using the value'
                             'in the flux_pulse_delay parameter.')
         if flux_pulse_channel is None:
             flux_pulse_channel = self.flux_pulse_channel()
-            logging.warning('flux_pulse_channel is not specified. Using the value'
+            log.warning('flux_pulse_channel is not specified. Using the value'
                             'in the flux_pulse_channel parameter.')
         if thetas is None:
             thetas = np.linspace(0, 4*np.pi, 16)
@@ -4029,7 +4018,7 @@ class QuDev_transmon(Qubit):
                 try:
                     self.dynamic_phase(dynamic_phase)
                 except Exception:
-                    logging.warning('Could not update '
+                    log.warning('Could not update '
                                     '{}.dynamic_phase().'.format(self.name))
 
             return dynamic_phase
@@ -4075,7 +4064,7 @@ class QuDev_transmon(Qubit):
                                     (amps[i], lengths[i])
         '''
         if len(amps) != len(lengths):
-            logging.warning('amps and lengths must have the same '
+            log.warning('amps and lengths must have the same '
                             'dimension.')
 
         if MC is None:

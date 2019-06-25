@@ -205,4 +205,12 @@ class CalibrationPoints:
                "\n    pulse_label_map={})" \
             .format(self.qb_names, self.states, self.pulse_label_map)
 
+    @staticmethod
+    def guess_cal_states(cal_states, for_ef):
+        if cal_states == "auto":
+            cal_states = ('g', 'e')
+            if for_ef:
+                cal_states += ('f',)
+        return cal_states
+
 

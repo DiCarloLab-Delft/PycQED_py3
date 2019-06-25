@@ -1327,16 +1327,15 @@ class Ramsey_2nd_exc_multiple_detunings(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs2.ramsey_2nd_exc_seq_multiple_detunings(times=self.sweep_points,
-                                    pulse_pars=self.pulse_pars,
-                                    pulse_pars_2nd=self.pulse_pars_2nd,
-                                    RO_pars=self.RO_pars,
-                                    artificial_detunings =
-                                    self.artificial_detunings,
-                                    n=self.n, cal_points=self.cal_points,
-                                    no_cal_points=self.no_cal_points,
-                                    upload=self.upload,
-                                    return_seq=self.return_seq,
-                                    last_ge_pulse=self.last_ge_pulse)
+                                                       pulse_pars=self.pulse_pars,
+                                                       pulse_pars_2nd=self.pulse_pars_2nd,
+                                                       RO_pars=self.RO_pars,
+                                                       n=self.n,
+                                                       cal_points=self.cal_points,
+                                                       artificial_detunings=self.artificial_detunings,
+                                                       upload=self.upload,
+                                                       return_seq=self.return_seq,
+                                                       last_ge_pulse=self.last_ge_pulse)
 
 
 class FluxDetuning(swf.Hard_Sweep):
