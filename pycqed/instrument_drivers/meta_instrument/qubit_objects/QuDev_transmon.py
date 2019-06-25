@@ -682,7 +682,7 @@ class QuDev_transmon(Qubit):
         MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
-        cal_states_rotations = None
+        cal_states_rotations = {}
         if cal_points:
             step = np.abs(amps[-1]-amps[-2])
             if no_cal_points == 4:
@@ -750,7 +750,7 @@ class QuDev_transmon(Qubit):
             MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
-        cal_states_rotations = None
+        cal_states_rotations = {}
 
         sweep_points = cal_points.extend_sweep_points(amps)
 
@@ -777,6 +777,7 @@ class QuDev_transmon(Qubit):
                 cal_states_rotations = {'g': 0}
             else:
                 sweep_points = amps
+                cal_states_rotations = {}
         MC.set_sweep_function(awg_swf.Rabi_2nd_exc(
                         pulse_pars=self.get_ge_pars(),
                         pulse_pars_2nd=self.get_ef_pars(),
@@ -847,7 +848,7 @@ class QuDev_transmon(Qubit):
         else:
             sweep_points = times
             cal_states_dict = None
-            cal_states_rotations = None
+            cal_states_rotations = {}
 
         MC.set_sweep_function(awg_swf.T1(
             pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
@@ -889,7 +890,7 @@ class QuDev_transmon(Qubit):
             MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
-        cal_states_rotations = None
+        cal_states_rotations = {}
         if cal_points:
             step = np.abs(times[-1]-times[-2])
             if no_cal_points == 6:
@@ -970,7 +971,7 @@ class QuDev_transmon(Qubit):
         else:
             sweep_points = qscales
             cal_states_dict = None
-            cal_states_rotations = None
+            cal_states_rotations = {}
 
         MC.set_sweep_function(awg_swf.QScale(
                 pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
@@ -1016,7 +1017,7 @@ class QuDev_transmon(Qubit):
             label = 'QScale_ef'+self.msmt_suffix
 
         cal_states_dict = None
-        cal_states_rotations = None
+        cal_states_rotations = {}
         if cal_points:
             step = np.abs(qscales[-1] - qscales[-4])
             if no_cal_points == 6:
@@ -1158,7 +1159,7 @@ class QuDev_transmon(Qubit):
         else:
             sweep_points = times
             cal_states_dict = None
-            cal_states_rotations = None
+            cal_states_rotations = {}
 
         Rams_swf = awg_swf.Ramsey(
             pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
@@ -1274,7 +1275,7 @@ class QuDev_transmon(Qubit):
             MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
-        cal_states_rotations = None
+        cal_states_rotations = {}
         if cal_points:
             step = np.abs(times[-1]-times[-2])
             if no_cal_points == 6:
@@ -1421,7 +1422,7 @@ class QuDev_transmon(Qubit):
         else:
             sweep_points = times
             cal_states_dict = None
-            cal_states_rotations = None
+            cal_states_rotations = {}
 
         self.prepare(drive='timedomain')
         MC = self.instr_mc.get_instr()
@@ -1472,7 +1473,7 @@ class QuDev_transmon(Qubit):
         MC = self.instr_mc.get_instr()
 
         cal_states_dict = None
-        cal_states_rotations = None
+        cal_states_rotations = {}
         if cal_points:
             step = np.abs(times[-1]-times[-2])
             if no_cal_points == 6:
