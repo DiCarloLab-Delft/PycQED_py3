@@ -1118,7 +1118,6 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             channel_name_map: A dictionary that maps channel ids to channel
                               names. (default {})
         """
-
         if channel_name_map is None:
             channel_name_map = {}
 

@@ -28,11 +28,14 @@ def pulse_list_list_seq(pulse_list_list, name='pulse_list_list_sequence',
         ps.Pulsar.get_instance().program_awgs(seq)
     return seq
 
-def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points, upload=True, n=1, preparation_type='wait',
-                          post_ro_wait=1e-6, reset_reps=1, final_reset_pulse=True, for_ef=False, last_ge_pulse=False):
+def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points,
+                          upload=True, n=1, preparation_type='wait',
+                          post_ro_wait=1e-6, reset_reps=1,
+                          final_reset_pulse=True, for_ef=False,
+                          last_ge_pulse=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
-    Input pars:
+    Args:
         amps:            array of pulse amplitudes (V)
         pulse_pars:      dict containing the pulse parameters
         RO_pars:         dict containing the RO parameters
@@ -41,6 +44,10 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points, upload=True
         post_msmt_delay: extra wait time for resetless compatibility
         cal_points:      whether to use calibration points or not
         upload:          whether to upload sequence to instrument or not
+    Returns:
+        sequence (Sequence): sequence object
+        segment_indices (list): array of range of n_segments including
+            calibration_segments. To be used as sweep_points for the MC.
     '''
 
     seq_name = 'Rabi_sequence'
@@ -64,8 +71,7 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points, upload=True
 
     swept_pulses = sweep_pulse_params(rabi_pulses,
                                       {f'Rabi_{i}.amplitude':
-                                           amps[:-len(cal_points.states)]
-                                           for i in range(n)})
+                                           amps for i in range(n)})
     swept_pulses_with_prep = \
         [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)
          for p in swept_pulses]
@@ -77,7 +83,8 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points, upload=True
     if upload:
        ps.Pulsar.get_instance().program_awgs(seq)
 
-    return seq
+    return seq, np.arange(len(seq.segments))
+
 
 
 def add_preparation_pulses(pulse_list, operation_dict, qb_names,
@@ -597,18 +604,20 @@ def ramsey_seq(times, pulse_pars, RO_pars,
             Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
             pulse_pars_x2['phase'] = Dphase
 
-        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-             seg = segment.Segment('segment_{}'.format(i),
-                                   [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-             seg = segment.Segment('segment_{}'.format(i),
-                                   [pulses['X180'], RO_pars])
-        else:
-             seg = segment.Segment('segment_{}'.format(i),
-                                   [pulses['X90'], pulse_pars_x2, RO_pars])
-
+        # if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+        #      seg = segment.Segment('segment_{}'.format(i),
+        #                            [pulses['I'], RO_pars])
+        # elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+        #      seg = segment.Segment('segment_{}'.format(i),
+        #                            [pulses['X180'], RO_pars])
+        # else:
+        #      seg = segment.Segment('segment_{}'.format(i),
+        #                            [pulses['X90'], pulse_pars_x2, RO_pars])
+        seg = segment.Segment(f'segment_{i}',[pulses['X90'],
+                              pulse_pars_x2, RO_pars])
         seg_list.append(seg)
         seq.add(seg)
+
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 

@@ -157,7 +157,7 @@ class CalibrationPoints:
             rotations[qbn] = {states[i]: i for i in range(len(states))}
         log.info(f"Calibration Points Rotation: {rotations}")
         return rotations
-    
+
     @staticmethod
     def single_qubit(qubit_name, states, n_per_state=2):
         return CalibrationPoints.multi_qubit([qubit_name], states, n_per_state)
