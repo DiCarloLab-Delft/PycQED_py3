@@ -12,7 +12,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf2
 from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement.calibration_points import CalibrationPoints as cp
+from pycqed.measurement.calibration_points import CalibrationPoints
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import timedomain_analysis as tda
@@ -20,6 +20,7 @@ import pycqed.analysis.randomized_benchmarking_analysis as rbma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.utilities.general import temporary_value
+from pycqed.utilities.general import dictionify
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
     import Qubit
 from pycqed.measurement import optimization as opti
@@ -656,7 +657,7 @@ class QuDev_transmon(Qubit):
                      last_ge_pulse=False, n_cal_points_per_state=2,
                      cal_states=('g', 'e'), for_ef=False, preparation_type='wait',
                      post_ro_wait=1e-6, reset_reps=1, final_reset_pulse=True,
-                     exp_metadata=None):
+                     exp_metadata=None, active_reset=False):
 
         """
         Varies the amplitude of the qubit drive pulse and measures the readout
@@ -682,12 +683,16 @@ class QuDev_transmon(Qubit):
 
         # Prepare the physical instruments for a time domain measurement
         self.prepare(drive='timedomain')
+        # temporary:
+        if active_reset:
+            raise ValueError("Not formatted this kw on this branch")
+
         MC = self.instr_mc.get_instr()
 
-        cps = cp.single_qubit(self.name, cal_states,
-                              n_per_state=n_cal_points_per_state)
+        cp = CalibrationPoints.single_qubit(self.name, cal_states,
+                                            n_per_state=n_cal_points_per_state)
         seq, sweep_points = sq.rabi_seq_active_reset(
-            amps=amps, qb_name=self.name, cal_points=cps, n=n, for_ef=for_ef,
+            amps=amps, qb_name=self.name, cal_points=cp, n=n, for_ef=for_ef,
             operation_dict=self.get_operation_dict(), upload=False,
             preparation_type=preparation_type, post_ro_wait=post_ro_wait,
             reset_reps=reset_reps, final_reset_pulse=final_reset_pulse)
@@ -707,12 +712,14 @@ class QuDev_transmon(Qubit):
                              'post_ro_wait': post_ro_wait,
                              'reset_reps': reset_reps,
                              'final_reset_pulse': final_reset_pulse,
-                             'cal_points': cps.qb_names,
+                             'cal_points': repr(cp),
                              'rotate': self.acq_weights_type() !=
                                        'optimal_qutrit',
                              'last_ge_pulses': [last_ge_pulse],
                              'data_to_fit': {self.name: 'pf' if for_ef \
-                                                else 'pe'}})
+                                                else 'pe'},
+                             "sweep_name": "Amplitude",
+                             "sweep_unit": "V"})
         MC.run(label, exp_metadata=exp_metadata)
 
         # Create a MeasurementAnalysis object for this measurement

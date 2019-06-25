@@ -303,22 +303,22 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 self.options_dict.get('last_ge_pulses',
                                       self.metadata.get('last_ge_pulses',
                                                         False))
-            assert isinstance(cal_points, dict), \
-                "In new framework cal_points is a dict with states and cal_qb"
 
-            self.cp = CalibrationPoints(**cal_points)
+            self.cp = eval(cal_points)
 
             #for now assuming the same for all qubits.
             self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
 
             self.cal_states_rotations = \
-                self.cp.get_rotations(last_ge_pulses, self.qb_names[0]) if \
-                    rotate else None
+                self.cp.get_rotations(
+                    last_ge_pulses,
+                    self.qb_names[0])[self.qb_names[0]] if rotate else None
             self.raw_data_dict['sweep_points_dict'].update(
                 {qbn: {'sweep_points': self.cp.extend_sweep_points(
                     self.metadata['sweep_points_dict'][qbn], qbn)}
                  for qbn in self.qb_names})
-        except:
+        except Exception as e:
+            log.error(str(e))
             log.warning("Deprecated usage of calibration points and sequences."
                         " Please adapt your measurement to the new framework. "
                         "See measure_rabi() for an example of how to adapt the"
@@ -665,8 +665,16 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                          self.raw_data_dict['measurementstring'][0] +
                          '\nRaw data ' + qb_name)
             plot_name = 'raw_plot_' + qb_name
-            # get xunit
-            xunit = self.raw_data_dict['xunit'][0]
+            # get xunit and label: temporarily with try catch for old
+            # sequences which do not have unit and label in meta data
+            try:
+                xunit = self.metadata["sweep_unit"]
+                xlabel = self.metadata["sweep_name"]
+            except KeyError:
+                log.warning("Please specify xunit and xlabel as 'sweep_unit' and "
+                            "'sweep_label' in experiment metadata")
+                xunit = self.raw_data_dict['xunit'][0]
+                xlabel = self.raw_data_dict['xlabel'][0]
             if hasattr(xunit, '__iter__'):
                 xunit = xunit[0]
             for ax_id, ro_channel in enumerate(raw_data_dict):
@@ -682,7 +690,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         'yvals': self.raw_data_dict[
                             'sweep_points_2D_dict'][qb_name],
                         'zvals': raw_data_dict[ro_channel].T,
-                        'xlabel': self.raw_data_dict['xlabel'][0],
+                        'xlabel': xlabel,
                         'xunit': xunit,
                         'ylabel': self.raw_data_dict['ylabel'][0],
                         'yunit': yunit,
@@ -698,7 +706,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         'ax_id': ax_id,
                         'plotfn': self.plot_line,
                         'xvals': sweep_points,
-                        'xlabel': self.raw_data_dict['xlabel'][0],
+                        'xlabel': xlabel,
                         'xunit': xunit,
                         'yvals': raw_data_dict[ro_channel],
                         'ylabel': '{} (Vpeak)'.format(ro_channel),
@@ -769,8 +777,15 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             title += '\n' + title_suffix
 
         plot_dict_name = fig_name + '_' + plot_name_suffix
-        # get xunit
-        xunit = self.raw_data_dict['xunit'][0]
+        # get x info (try for old sequences which do not have info in meta
+        try:
+            xunit = self.metadata["sweep_unit"]
+            xlabel = self.metadata["sweep_name"]
+        except KeyError:
+            log.warning("Please specify xunit and xlabel as 'sweep_unit' and "
+                        "'sweep_label' in experiment metadata")
+            xunit = self.raw_data_dict['xunit'][0]
+            xlabel = self.raw_data_dict['xlabel'][0]
         if hasattr(xunit, '__iter__'):
             xunit = xunit[0]
         if self.options_dict.get('TwoD', False):
@@ -784,7 +799,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'yvals': self.raw_data_dict[
                     'sweep_points_2D_dict'][qb_name],
                 'zvals': yvals,
-                'xlabel': self.raw_data_dict['xlabel'][0],
+                'xlabel': xlabel,
                 'xunit': xunit,
                 'ylabel': self.raw_data_dict['ylabel'][0],
                 'yunit': yunit,
@@ -796,7 +811,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'fig_id': fig_name,
                 'plotsize': plotsize,
                 'xvals': xvals,
-                'xlabel': self.raw_data_dict['xlabel'][0],
+                'xlabel': xlabel,
                 'xunit': xunit,
                 'yvals': yvals,
                 'ylabel': data_axis_label,
