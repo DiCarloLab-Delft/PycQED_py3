@@ -1,5 +1,5 @@
 import json
-
+from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_lm as _flux_lutmap
 
 def generate_config(filename: str,
                     mw_pulse_duration: int = 20,
@@ -342,37 +342,21 @@ def generate_config(filename: str,
 
     # N.B. The codewords for CZ pulses need to be further specified.
     # I do not expect this to be correct for now.
-    for ft in flux_tuples:
-        # FIXME add space back in
-        cfg["instructions"]["cz {},{}".format(ft[0], ft[1])] = {
-            "duration": flux_pulse_duration,
-            "latency": fl_latency,
-            "qubits": [ft[0], ft[1]],
-            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-            "disable_optimization": True,
-            "type": "flux",
-            "cc_light_instr_type": "two_qubit_gate",
-            "cc_light_instr": "fl_cw_{:02}".format(1),
-            "cc_light_right_codeword": 1,
-            "cc_light_left_codeword": 1,
-            "cc_light_opcode": 128+1
-        }
-
     for cw_flux in range(8):
-        for ft in flux_tuples:
-            cfg["instructions"]["fl_cw_{:02} {},{}".format(cw_flux,
-                                                           ft[0], ft[1])] = {
+        op_flux = _flux_lutmap[cw_flux]['name']
+        for flux_q in range(17):
+            cfg["instructions"]["sf_{} q{}".format(op_flux.lower(),
+                                                           flux_q)] = {
                 "duration": flux_pulse_duration,
                 "latency": fl_latency,
-                "qubits": [ft[0], ft[1]],
+                "qubits": ['q{}'.format(flux_q)],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": True,
                 "type": "flux",
-                "cc_light_instr_type": "two_qubit_gate",
+                "cc_light_instr_type": "single_qubit_gate",
                 "cc_light_instr": "fl_cw_{:02}".format(cw_flux),
-                "cc_light_right_codeword": cw_flux,
-                "cc_light_left_codeword": cw_flux,
-                "cc_light_opcode": 128+cw_flux
+                "cc_light_codeword": cw_flux,
+                "cc_light_opcode": 64+cw_flux
             }
 
     with open(filename, 'w') as f:
