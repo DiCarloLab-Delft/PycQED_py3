@@ -1120,7 +1120,7 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name)
 
 
-    def measure_ramsey(self, times=None, artificial_detuning=0, label=None, 
+    def measure_ramsey_old(self, times=None, artificial_detuning=0, label=None,
                        analyze=True, close_fig=True, cal_points=True,
                        upload=True, exp_metadata=None):
 
@@ -1324,66 +1324,47 @@ class QuDev_transmon(Qubit):
         if analyze:
             tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
-    def measure_ramsey_2nd_exc_multiple_detunings_v2(self, times,
-                               artificial_detunings=None, label=None,
-                               MC=None, analyze=True, close_fig=True,
-                               cal_points=True, n=1, upload=True,
-                               last_ge_pulse=True, no_cal_points=6,
-                               exp_metadata=None):
-
-        if artificial_detunings is None:
-            log.warning('Artificial detunings were not given.')
-        if np.any(np.asarray(np.abs(artificial_detunings))<1e3):
-            log.warning('The artificial detuning is too small. The units '
-                            'should be Hz.')
-        if np.any(times>1e-3):
-            log.warning('The values in the times array might be too large.'
-                            'The units should be seconds.')
+    def measure_ramsey(self, times, artificial_detunings=0, label=None,
+                       MC=None, analyze=True, close_fig=True,
+                       cal_states="auto", n_cal_points_per_state=2,
+                       n=1, upload=True, last_ge_pulse=True, for_ef=False,
+                       preparation_type='wait', post_ro_wait=1e-6, reset_reps=1,
+                       final_reset_pulse=True, exp_metadata=None,
+                       active_reset=False):
 
         self.prepare(drive='timedomain')
         if MC is None:
             MC = self.instr_mc.get_instr()
 
         if label is None:
-            label = 'Ramsey_mult_det_ef'+self.msmt_suffix
+            label = f'Ramsey{"_ef" if for_ef else ""}'+ self.msmt_suffix
 
-        if cal_points:
-            len_art_det = len(artificial_detunings)
-            step = np.abs(times[-1] - times[-len_art_det-1])
-            if no_cal_points == 6:
-                sweep_points = np.concatenate(
-                    [times, [times[-1] + step, times[-1] + 2*step,
-                             times[-1] + 3*step, times[-1] + 4*step,
-                             times[-1] + 5*step, times[-1] + 6*step]])
-            elif no_cal_points == 4:
-                sweep_points = np.concatenate(
-                    [times, [times[-1] + step, times[-1] + 2*step,
-                             times[-1] + 3*step, times[-1] + 4*step]])
-            elif no_cal_points == 2:
-                sweep_points = np.concatenate(
-                    [times, [times[-1] + step, times[-1] + 2*step]])
-            else:
-                sweep_points = times
-        else:
-            sweep_points = times
+        # create cal points
+        cal_states = CalibrationPoints.guess_cal_states(cal_states, for_ef)
+        cp = CalibrationPoints.single_qubit(self.name, cal_states,
+                                            n_per_state=n_cal_points_per_state)
+        # create sequence
+        seq, sweep_points = sq.ramsey_active_reset(
+            times=times, qb_name=self.name, cal_points=cp, n=n, for_ef=for_ef,
+            operation_dict=self.get_operation_dict(), upload=False,
+            last_ge_pulse=last_ge_pulse,
+            preparation_type=preparation_type, post_ro_wait=post_ro_wait,
+            reset_reps=reset_reps, final_reset_pulse=final_reset_pulse)
 
-        Rams_2nd_swf = awg_swf.Ramsey_2nd_exc_multiple_detunings(
-            pulse_pars=self.get_ge_pars(),
-            pulse_pars_2nd=self.get_ef_pars(),
-            RO_pars=self.get_ro_pars(),
-            artificial_detunings=artificial_detunings,
-            cal_points=cal_points, n=n, upload=upload,
-            no_cal_points=no_cal_points,
-            last_ge_pulse=last_ge_pulse)
-        MC.set_sweep_function(Rams_2nd_swf)
+        MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
+                                                       upload=upload))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+
+        MC.set_detector_function(self.int_avg_classif_det if
+                                 self.acq_weights_type() == 'optimal_qutrit'
+                                 else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
-        exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
-                             'use_cal_points': cal_points,
-                             'num_cal_points': no_cal_points,
-                             'last_ge_pulse': last_ge_pulse,
+        exp_metadata.update({'sweep_points_dict': {self.name: times},
+                             'sweep_name': 'delay',
+                             'sweep_unit': 's',
+                             'cal_points': repr(cp),
+                             'last_ge_pulses': [last_ge_pulse],
                              'artificial_detunings': artificial_detunings})
         MC.run(label, exp_metadata=exp_metadata)
 
@@ -2810,11 +2791,11 @@ class QuDev_transmon(Qubit):
 
         #Perform Rabi
         self.measure_rabi(amps=rabi_amps, close_fig=close_fig,
-                              cal_points=cal_points, upload=upload, label=label,
-                              n=n, last_ge_pulse=last_ge_pulse, for_ef=for_ef,
-                              preparation_type=preparation_type,
-                              post_ro_wait=post_ro_wait, reset_reps=reset_reps,
-                              final_reset_pulse=final_reset_pulse)
+                          cal_points=cal_points, upload=upload, label=label,
+                          n=n, last_ge_pulse=last_ge_pulse, for_ef=for_ef,
+                          preparation_type=preparation_type,
+                          post_ro_wait=post_ro_wait, reset_reps=reset_reps,
+                          final_reset_pulse=final_reset_pulse)
 
         #get pi and pi/2 amplitudes from the analysis results
         if analyze:

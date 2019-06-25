@@ -906,6 +906,9 @@ class UnresolvedPulse:
 
     def __repr__(self):
         string_repr = self.pulse_obj.name
+        string_repr += f"\n   ref_pulse: {self.ref_pulse}"
+        if self.ref_point != 1:
+            string_repr += f"\n   ref_point: {self.ref_point}"
         if self.delay != 0:
-            string_repr += f"\ndelay: {self.delay}"
+            string_repr += f"\n   delay: {self.delay}"
         return string_repr

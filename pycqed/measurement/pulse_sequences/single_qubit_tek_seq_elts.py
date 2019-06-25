@@ -702,41 +702,6 @@ def ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
                               using phase
         cal_points:          whether to use calibration points or not
     '''
-    # seq_name = 'Ramsey_sequence_multiple_detunings'
-    # seq = sequence.Sequence(seq_name)
-    # ps.Pulsar.get_instance().update_channel_settings()
-    # seg_list = []
-    # # First extract values from input, later overwrite when generating
-    # # waveforms
-    # pulses = get_pulse_dict_from_pars(pulse_pars)
-    #
-    # pulse_pars_x2 = deepcopy(pulses['X90'])
-    # pulse_pars_x2['ref_point'] = 'start'
-    # for i, tau in enumerate(times):
-    #     pulse_pars_x2['pulse_delay'] = tau
-    #     art_det = artificial_detunings[i % len(artificial_detunings)]
-    #
-    #     if art_det is not None:
-    #         Dphase = ((tau-times[0]) * art_det * 360) % 360
-    #         pulse_pars_x2['phase'] = Dphase
-    #
-    #     if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-    #          seg = segment.Segment('segment_{}'.format(i), [pulses['I'], RO_pars])
-    #     elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-    #          seg = segment.Segment('segment_{}'.format(i), [pulses['X180'], RO_pars])
-    #     else:
-    #          seg = segment.Segment('segment_{}'.format(i),
-    #                              [pulses['X90'], pulse_pars_x2, RO_pars])
-    #     seg_list.append(seg)
-    #     seq.add(seg)
-    #
-    # if upload:
-    #     ps.Pulsar.get_instance().program_awgs(seq)
-    #
-    # if return_seq:
-    #     return seq, seg_list
-    # else:
-    #     return seq_name
     seq_name = 'Ramsey_sequence_multiple_detunings'
     seq = sequence.Sequence(seq_name)
     ps.Pulsar.get_instance().update_channel_settings()
@@ -773,6 +738,65 @@ def ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
     else:
         return seq_name
 
+
+def ramsey_active_reset(times, qb_name, operation_dict, cal_points, n=1,
+                  artificial_detunings=0, upload=True,
+                  preparation_type='wait', post_ro_wait=1e-6, reset_reps=1,
+                  final_reset_pulse=True, for_ef=False, last_ge_pulse=False):
+    '''
+    Ramsey sequence for the second excited state
+    Input pars:
+        times:           array of delays (s)
+        n:               number of pulses (1 is conventional Ramsey)
+    '''
+    seq_name = 'Ramsey_sequence'
+    prep_params = dict(preparation_type=preparation_type,
+                       post_ro_wait=post_ro_wait,
+                       repetitions=reset_reps,
+                       final_reset_pulse=final_reset_pulse)
+
+    # Operations
+    if for_ef:
+        ramsey_ops = ["X180"] + ["X90_ef"] * 2 * n
+        if last_ge_pulse:
+            ramsey_ops += ["X180"]
+    else:
+        ramsey_ops = ["X90"] * 2 * n
+
+    ramsey_ops += ["RO"]
+    ramsey_ops = add_qb_name(ramsey_ops, qb_name)
+
+    # pulses
+    ramsey_pulses = [deepcopy(operation_dict[op]) for op in ramsey_ops]
+
+    # name and reference swept pulse
+    for i in range(n):
+        idx = (2 if for_ef else 1) + i * 2
+        ramsey_pulses[idx]["name"] = f"Ramsey_x2_{i}"
+        ramsey_pulses[idx]['ref_point'] = 'start'
+
+    # compute dephasing
+    a_d = artificial_detunings if np.ndim(artificial_detunings) == 1 \
+        else [artificial_detunings] * len(times)
+    dephasing = [((t - times[0]) * a_d[i % len(a_d)] * 360) % 360
+                 for i, t in enumerate(times)]
+    # sweep pulses
+    params = {f'Ramsey_x2_{i}.pulse_delay': times for i in range(n)}
+    params.update({f'Ramsey_x2_{i}.phase': dephasing for i in range(n)})
+    swept_pulses = sweep_pulse_params(ramsey_pulses, params)
+
+    #add preparation pulses
+    swept_pulses_with_prep = add_preparation_pulses(swept_pulses, operation_dict,
+                                                    [qb_name], **prep_params)
+    seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
+
+    # add calibration segments
+    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+
+    if upload:
+        ps.Pulsar.get_instance().program_awgs(seq)
+
+    return seq, np.arange(len(seq.segments))
 
 def echo_seq(times, pulse_pars, RO_pars,
              artificial_detuning=None,
@@ -1468,3 +1492,6 @@ def over_under_rotation_seq(qb_name, nr_pi_pulses_array, operation_dict,
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
     return
+
+def add_qb_name(operation_list, qb_name):
+    return [op + f" {qb_name}" for op in operation_list]

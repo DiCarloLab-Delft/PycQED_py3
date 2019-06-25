@@ -321,7 +321,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             log.error(str(e))
             log.warning("Deprecated usage of calibration points and sequences."
                         " Please adapt your measurement to the new framework. "
-                        "See measure_rabi() for an example of how to adapt the"
+                        "See measure_rabi() for an example the new"
                         " measurement.")
 
             # create projected_data_dict

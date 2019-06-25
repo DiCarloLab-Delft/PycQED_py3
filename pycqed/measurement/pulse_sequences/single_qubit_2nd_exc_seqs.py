@@ -1,4 +1,5 @@
 import logging
+log = logging.getLogger(__name__)
 from copy import deepcopy
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
@@ -6,42 +7,6 @@ from ..waveform_control import sequence
 import numpy as np
 
 station = None
-
-
-def rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
-                     cal_points=True, no_cal_points=4, upload=True, return_seq=False,
-                     post_msmt_delay=3e-6, verbose=False, last_ge_pulse=True):
-    """
-    Rabi sequence for the second excited state.
-    Input pars:
-        amps:            array of pulse amplitudes (V)
-        pulse_pars:      dict containing the pulse parameters
-        pulse_pars_2nd:  dict containing pulse_parameters for 2nd exc. state
-        RO_pars:         dict containing the RO parameters
-        n:               number of pulses (1 is conventional Rabi)
-        post_msmt_delay: extra wait time for resetless compatibility
-    """
-    seq_name = 'Rabi_2nd_exc_sequence'
-    seq = sequence.Sequence(seq_name)
-    pulses = get_pulse_dict_from_pars(pulse_pars)
-    pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
-    for i, amp in enumerate(amps):  # seq has to have at least 2 elts
-        pulses_2nd['X180']['amplitude'] = amp
-        pulse_list = [pulses['X180']]+n*[pulses_2nd_temp['X180']]
-
-        if last_ge_pulse:
-            pulse_list += [pulses['X180']]
-
-        pulse_list += [RO_pars]
-
-        seq.append(seg.Segment(pulse_list))
-
-    add_calibration_points(seq, cal_points)
-
-    if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-
-    return seq
 
 def rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
                      cal_points=True, no_cal_points=4, upload=True, return_seq=False,
@@ -286,8 +251,8 @@ def ramsey_2nd_exc_seq_multiple_detunings_v2(times, pulse_pars, pulse_pars_2nd,
     else:
         return seq
 
-def ramsey_2nd_exc_seq_multiple_detunings(times,  qb_name, operation_dict,
-                                          cal_points, n=1, cal_points=True,
+def ramsey_2nd_exc_seq_multiple_detunings(times, qb_name, operation_dict,
+                                          cal_points, n=1,
                                           artificial_detunings=None,
                                           upload=True,
                                           preparation_type='wait',
@@ -310,37 +275,48 @@ def ramsey_2nd_exc_seq_multiple_detunings(times,  qb_name, operation_dict,
     if np.any(np.asarray(artificial_detunings)<1e3):
         logging.warning('The artificial detuning is too small. The units '
                         'should be Hz.')
-
     seq_name = 'Ramsey_2nd_exc_sequence_mult_det'
-    seq = sequence.Sequence(seq_name)
+    prep_params = dict(preparation_type=preparation_type,
+                       post_ro_wait=post_ro_wait,
+                       repetitions=reset_reps,
+                       final_reset_pulse=final_reset_pulse)
     station.pulsar.update_channel_settings()
-    el_list = []
-    pulses = get_pulse_dict_from_pars(pulse_pars)
-    pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
-    for i, tau in enumerate(times):
-        art_det = artificial_detunings[i % len(artificial_detunings)]
 
-        pulse_pars_x2 = deepcopy(pulses_2nd['X90'])
-        pulse_pars_x2['pulse_delay'] = tau
-
-        if art_det is not None:
-            Dphase = ((tau-times[0]) * art_det * 360) % 360
-        pulse_pars_x2['phase'] = Dphase
-
-        pulse_list = ([pulses['X180']]+n*[pulses_2nd['X90'], pulse_pars_x2])
+    # Operations
+    if for_ef:
+        ramsey_ops = ["X180"] + ["X90_ef"] * 2 * n
         if last_ge_pulse:
-            pulse_list += [pulses['X180']]
-        pulse_list += [RO_pars]
+            ramsey_ops += ["X180"]
+    else:
+        ramsey_ops = ["X90"] * 2 * n
 
-        # copy first element and set extra wait
-        pulse_list[0] = deepcopy(pulse_list[0])
-        pulse_list[0]['pulse_delay'] += post_msmt_delay
-        el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.add(seg)
+    ramsey_ops += ["RO"]
+    ramsey_ops = add_qb_name(ramsey_ops, qb_name)
+
+    #pulses
+    ramsey_pulses = [deepcopy(operation_dict[op]) for op in ramsey_ops]
+
+    #name swept pulse:
+    for i in range(n):
+        idx = (2 if for_ef else 1 ) + i * 2
+        ramsey_pulses[idx]["name"] = f"Ramsey_x2_{i}"
+
+    #compute dephasing
+    a_d = artificial_detunings
+    dephasing = [((t-times[0]) * a_d[i % len(a_d)] * 360) % 360
+                 for i, t in enumerate(times)]
+    #sweep pulses
+    params = {f'Ramsey_x2_{i}.tau': times for i in range(n)}
+    params.update({f'Ramsey_x2_{i}.phase': dephasing for i in range(n)})
+
+    swept_pulses = sweep_pulse_params(ramsey_pulses, params)
+    seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
+
+    # add calibration segments
+    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        ps.Pulsar.get_instance().program_awgs(seq)
 
     return seq, np.arange(len(seq.segments))
 
