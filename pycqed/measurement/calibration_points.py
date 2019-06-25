@@ -153,8 +153,8 @@ class CalibrationPoints:
             unique = list(np.unique(states[qbn]))
             unique.sort(key=lambda s: order[s])
             if len(unique) == 3:
-                states = np.delete(unique, 1 if last_ge_pulses[i] else 0)
-            rotations[qbn] = {states[i]: i for i in range(len(states))}
+                unique = np.delete(unique, 1 if last_ge_pulses[i] else 0)
+            rotations[qbn] = {unique[i]: i for i in range(len(unique))}
         log.info(f"Calibration Points Rotation: {rotations}")
         return rotations
 
