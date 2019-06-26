@@ -118,22 +118,7 @@ class QuTechCC(QuTechCC_core, Instrument):
 #                get_cmd=_gen_get_func_1par(self._get_vsm_channel_delay, vsm_ch),
                 )
 
-        # FIXME: num_append_pts does not seem to be actually used in pycQED
-        """
-           "docstring": "This parameter determines the number of append points to the vsm mask signal. The unit is 2.5 ns per point.",
-            "get_cmd": "QUTech:NumAppendPts?",
-            "label": "Number Append Points",
-            "name": "num_append_pts",
-            "set_cmd": "QUTech:NumAppendPts {}",
-            "unit": "2.5 ns per point",
-            "vals": {
-                "range": [
-                    0,
-                    7
-                ],
-                "type": "Non_Neg_Number"
-            }
-        """
+        # FIXME: num_append_pts not implemented, use vsm_fall_delay
 
     ##########################################################################
     # parameter support
