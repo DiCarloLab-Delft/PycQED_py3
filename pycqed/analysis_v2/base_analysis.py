@@ -24,7 +24,11 @@ import json
 import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
+from pycqed.measurement.hdf5_data import read_dict_from_hdf5
 import copy
+import logging
+log = logging.getLogger()
+log.addHandler(logging.StreamHandler())
 
 
 class BaseDataAnalysis(object):
@@ -268,6 +272,73 @@ class BaseDataAnalysis(object):
             raise ValueError(
                 "No timestamps in range! Check the labels and other filters.")
 
+    @staticmethod
+    def get_param_value(group, param_name):
+        '''
+        Returns an attribute "key" of the group "Experimental Data"
+        in the hdf5 datafile.
+        '''
+        s = group.attrs[param_name]
+        # converts byte type to string because of h5py datasaving
+        if type(s) == bytes:
+            s = s.decode('utf-8')
+        # If it is an array of value decodes individual entries
+        if type(s) == np.ndarray:
+            s = [s.decode('utf-8') for s in s]
+        return s
+
+    def get_data_from_timestamp_list(self):
+        raw_data_dict = OrderedDict([(param, []) for param in
+                                     self.params_dict])
+        if 'timestamps' in raw_data_dict:
+            raw_data_dict['timestamps'] = self.timestamps
+        if 'folder' not in raw_data_dict:
+            raw_data_dict['folder'] = []
+
+        for timestamp in self.timestamps:
+            folder = a_tools.get_folder(timestamp)
+            raw_data_dict['folder'].append(folder)
+            h5filepath = a_tools.measurement_filename(
+                a_tools.get_folder(timestamp))
+            data_file = h5py.File(h5filepath, 'r+')
+
+            if 'measurementstring' in self.params_dict:
+                raw_data_dict['measurementstring'].append(
+                    os.path.split(folder)[1][7:])
+            if 'measured_data' in self.params_dict:
+                raw_data_dict['measured_data'].append(
+                    np.array(data_file['Experimental Data']['Data']).T)
+            for save_par, file_par in self.params_dict.items():
+                if len(file_par.split('.')) == 1:
+                    par_name = file_par.split('.')[0]
+                    for group_name in data_file.keys():
+                        if par_name in list(data_file[group_name].attrs):
+                            raw_data_dict[save_par].append(self.get_param_value(
+                                data_file[group_name], par_name))
+                else:
+                    group_name = '/'.join(file_par.split('.')[:-1])
+                    par_name = file_par.split('.')[-1]
+                    if group_name in data_file:
+                        if par_name in list(data_file[group_name].attrs):
+                            raw_data_dict[save_par].append(self.get_param_value(
+                                data_file[group_name], par_name))
+                        elif par_name in list(data_file[group_name].keys()):
+                            raw_data_dict[save_par].append(read_dict_from_hdf5(
+                                {}, data_file[group_name][par_name]))
+
+        for param, value in raw_data_dict.items():
+            if hasattr(raw_data_dict[param], '__iter__'):
+                if len(raw_data_dict[param]) == 0:
+                    raw_data_dict[param] = None
+                elif len(raw_data_dict[param]) == 1:
+                    raw_data_dict[param] = raw_data_dict[param][0]
+
+                if self.numeric_params is not None:
+                    if param in self.numeric_params:
+                        raw_data_dict[param] = \
+                            np.double(raw_data_dict[param])
+        return raw_data_dict
+
     def extract_data(self):
         """
         Extracts the data specified in
@@ -297,16 +368,31 @@ class BaseDataAnalysis(object):
         # one file being used to load data from
         if self.single_timestamp:
             self.timestamps = [self.timestamps[0]]
-        TwoD = self.options_dict.get('TwoD', False)
-        TwoD_tuples = self.options_dict.get('TwoD_tuples', False)
+
         # this should always be extracted as it is used to determine where
         # the file is as required for datasaving
-        self.params_dict['folder'] = 'folder'
-        self.raw_data_dict = a_tools.get_data_from_timestamp_list(
-            self.timestamps, param_names=self.params_dict,
-            ma_type=self.ma_type, TwoD_tuples=TwoD_tuples,
-            TwoD=TwoD, numeric_params=self.numeric_params,
-            filter_no_analysis=self.filter_no_analysis)
+
+        self.params_dict.update(
+            {'xlabel': 'sweep_parameter_names',
+             'xunit': 'sweep_parameter_units',
+             'measurementstring': 'measurementstring',
+             'value_names': 'value_names',
+             'value_units': 'value_units',
+             'measured_data': 'measured_data',
+             'sweep_points': 'sweep_points',
+             'folder': 'folder',
+             'timestamps': 'timestamps',
+             'exp_metadata':
+                 'Experimental Data.Experimental Metadata'})
+        from pprint import pprint
+        pprint(self.params_dict)
+        print('numeric_params', self.numeric_params)
+        self.raw_data_dict = self.get_data_from_timestamp_list()
+        # self.raw_data_dict = a_tools.get_data_from_timestamp_list(
+        #     self.timestamps, param_names=self.params_dict,
+        #     ma_type=self.ma_type, TwoD_tuples=TwoD_tuples,
+        #     TwoD=TwoD, numeric_params=self.numeric_params,
+        #     filter_no_analysis=self.filter_no_analysis)
 
         # Use timestamps to calculate datetimes and add to dictionary
         self.raw_data_dict['datetime'] = [a_tools.datetime_from_timestamp(
@@ -337,19 +423,22 @@ class BaseDataAnalysis(object):
 
         # Converts a multi file 'measured_values' dict to an ordered dict
         # from which values can be easily extracted
-        if ('measured_values' in self.raw_data_dict and
-                'value_names' in self.raw_data_dict and
-                not self.single_timestamp):
-            # the not self.single_timestamp is there for legacy reasons
-            measured_values_dict = OrderedDict()
-            for key in (self.raw_data_dict['value_names'][0]):
-                measured_values_dict[key] = []
-            for dset in self.raw_data_dict['measured_values']:
-                for i, col in enumerate(dset):
-                    measured_values_dict[self.raw_data_dict[
-                        'value_names'][0][i]].append(col)
-            self.raw_data_dict[
-                'measured_values_ord_dict'] = measured_values_dict
+        if 'measured_data' in self.raw_data_dict and \
+                'value_names' in self.raw_data_dict:
+            self.raw_data_dict['measured_values_ord_dict'] = OrderedDict()
+            sweep_points = self.raw_data_dict['measured_data'][
+                           :-len(self.raw_data_dict['value_names'])]
+            if sweep_points.shape[0] > 1:
+                self.raw_data_dict['hard_sweep_points'] = sweep_points[0]
+                self.raw_data_dict['soft_sweep_points'] = sweep_points[1:]
+            else:
+                self.raw_data_dict['hard_sweep_points'] = sweep_points[0]
+
+            data = self.raw_data_dict['measured_data'][
+                   len(self.raw_data_dict['value_names'])-1:]
+            for i, ro_ch in enumerate(self.raw_data_dict['value_names']):
+                self.raw_data_dict[
+                    'measured_values_ord_dict'][ro_ch] = data[i]
 
     def extract_data_json(self):
         file_name = self.t_start

@@ -178,47 +178,42 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                  t_start: str=None, t_stop: str=None,
                  data_file_path: str=None, single_timestamp: bool=False,
                  options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True, params_dict=None):
+                 do_fitting: bool=True, auto=True,
+                 params_dict=None, numeric_params=None, **kwargs):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only,
-                         do_fitting=do_fitting)
+                         do_fitting=do_fitting, **kwargs)
 
         self.qb_names = qb_names
         if self.qb_names is None:
             raise ValueError('Provide the "qb_names."')
 
-        self.params_dict = {'xlabel': 'sweep_name',
-                            'xunit': 'sweep_unit',
-                            'measurementstring': 'measurementstring',
-                            'sweep_points': 'sweep_points',
-                            'value_names': 'value_names',
-                            'value_units': 'value_units',
-                            'measured_values': 'measured_values',
-                            'exp_metadata': 'exp_metadata'}
-        if params_dict is not None:
-            self.params_dict.update(params_dict)
-
-        if not self.options_dict.get('TwoD', False):
-            if self.options_dict.get('TwoD_tuples', False):
-                self.options_dict['TwoD'] = True
-        if self.options_dict.get('TwoD', False):
-            self.params_dict['sweep_points_2D'] = 'sweep_points_2D'
-            self.params_dict['ylabel'] = 'sweep_name_2D'
-            self.params_dict['yunit'] = 'sweep_unit_2D'
-            self.params_dict['zlabels'] = 'zlabels'
+        # if not self.options_dict.get('TwoD', False):
+        #     if self.options_dict.get('TwoD_tuples', False):
+        #         self.options_dict['TwoD'] = True
+        # if self.options_dict.get('TwoD', False):
+        #     self.params_dict['sweep_points_2D'] = 'sweep_points_2D'
+        #     self.params_dict['ylabel'] = 'sweep_name_2D'
+        #     self.params_dict['yunit'] = 'sweep_unit_2D'
+        #     self.params_dict['zlabels'] = 'zlabels'
 
         self.single_timestamp = single_timestamp
-        self.numeric_params = []
+        self.params_dict = params_dict
+        if self.params_dict is None:
+            self.params_dict = {}
+        self.numeric_params = numeric_params
+        if self.numeric_params is None:
+            self.numeric_params = []
 
         if auto:
             self.run_analysis()
 
     def extract_data(self):
         super().extract_data()
-        self.metadata = self.raw_data_dict.get('exp_metadata', [{}])[0]
+        self.metadata = self.raw_data_dict.get('exp_metadata', [{}])
         if self.metadata is None:
             self.metadata = {}
 
@@ -228,11 +223,11 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         if self.channel_map is None:
             value_names = self.raw_data_dict['value_names']
             if hasattr(value_names, '__iter__'):
-                value_names = value_names[0]
-            if 'w' in value_names[0]:
+                value_names = value_names
+            if 'w' in value_names:
                 self.channel_map = a_tools.get_qb_channel_map_from_file(
-                    self.qb_names, ro_type=value_names[0],
-                    file_path=self.raw_data_dict['folder'][0])
+                    self.qb_names, ro_type=value_names,
+                    file_path=self.raw_data_dict['folder'])
             else:
                 self.channel_map = {}
                 for qbn in self.qb_names:
@@ -247,7 +242,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         There are several options possible to specify the normalization
         using the options dict.
             cal_points (tuple) of indices of the calibration points
-
             zero_coord, one_coord
         """
         if 'sweep_points_dict' in self.metadata:
@@ -3174,6 +3168,7 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                 'ef' if 'f' in kwargs.get('options_dict', {}).get(
                     'data_to_fit', {})[qbn] else 'ge')
         kwargs['params_dict'] = params_dict
+        kwargs['numeric_params'] = list(params_dict)
         super().__init__(qb_names, *args, **kwargs)
 
     def prepare_fitting(self):
@@ -3403,22 +3398,19 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                     'colors': 'gray'}
 
                 old_pipulse_val = self.raw_data_dict['amp180_oldfw_'+qbn][0]
-                if old_pipulse_val is None:
+                if old_pipulse_val != old_pipulse_val:
                     old_pipulse_val = self.raw_data_dict['amp180_newfw_'+qbn][0]
-                if old_pipulse_val is None:
+                if old_pipulse_val != old_pipulse_val:
                     old_pipulse_val = 0
-                else:
-                    old_pipulse_val = float(old_pipulse_val)
                 old_pihalfpulse_val = self.raw_data_dict[
                     'amp90scale_oldfw_'+qbn][0]
-                if old_pihalfpulse_val is None:
+                if old_pihalfpulse_val != old_pihalfpulse_val:
                     old_pihalfpulse_val = self.raw_data_dict[
                         'amp90scale_newfw_'+qbn][0]
-                if old_pihalfpulse_val is None:
+                if old_pihalfpulse_val != old_pihalfpulse_val:
                     old_pihalfpulse_val = 0
-                else:
-                    old_pihalfpulse_val = float(old_pihalfpulse_val)
                 old_pihalfpulse_val *= old_pipulse_val
+
                 textstr = ('  $\pi-Amp$ = {:.3f} V'.format(
                     rabi_amplitudes[qbn]['piPulse']) +
                            ' $\pm$ {:.3f} V '.format(
@@ -3451,6 +3443,7 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
                 '_ef' if 'f' in kwargs.get('options_dict', {}).get(
                     'data_to_fit', {})[qbn] else '')
         kwargs['params_dict'] = params_dict
+        kwargs['numeric_params'] = list(params_dict)
         super().__init__(qb_names, *args, **kwargs)
 
     def prepare_fitting(self):
@@ -3514,10 +3507,8 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
                     'legend_pos': 'upper right'}
 
                 old_T1_val = self.raw_data_dict['oldT1_'+qbn][0]
-                if old_T1_val is None:
+                if old_T1_val != old_T1_val:
                     old_T1_val = 0
-                else:
-                    old_T1_val = float(old_T1_val)
                 T1_dict = self.proc_data_dict['analysis_params_dict']
                 textstr = '$T_1$ = {:.2f} $\mu$s'.format(
                             T1_dict[qbn]['T1']*1e6) \
@@ -3547,6 +3538,7 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                 'ef' if 'f' in kwargs.get('options_dict', {}).get(
                     'data_to_fit', {})[qbn] else 'ge')
         kwargs['params_dict'] = params_dict
+        kwargs['numeric_params'] = list(params_dict)
         super().__init__(qb_names, *args, **kwargs)
 
     def prepare_fitting(self):
@@ -3609,12 +3601,10 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                         fit_res.params[par].stderr = 0
 
                 old_qb_freq = self.raw_data_dict['freq_old_'+qbn][0]
-                if old_qb_freq is None:
+                if old_qb_freq != old_qb_freq:
                     old_qb_freq = self.raw_data_dict['freq_new_'+qbn][0]
-                if old_qb_freq is None:
+                if old_qb_freq != old_qb_freq:
                     old_qb_freq = 0
-                else:
-                    old_qb_freq = float(old_qb_freq)
                 self.proc_data_dict['analysis_params_dict'][qbn][key][
                     'old_qb_freq'] = old_qb_freq
                 self.proc_data_dict['analysis_params_dict'][qbn][key][
@@ -3737,6 +3727,7 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                 'ef' if 'f' in kwargs.get('options_dict', {}).get(
                     'data_to_fit', {})[qbn] else 'ge')
         kwargs['params_dict'] = params_dict
+        kwargs['numeric_params'] = list(params_dict)
         super().__init__(qb_names, *args, **kwargs)
 
     def process_data(self):
@@ -3897,13 +3888,11 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                         'legend_pos': 'center left'}
 
                     old_qscale_val = self.raw_data_dict['qscale_oldfw_'+qbn][0]
-                    if old_qscale_val is None:
+                    if old_qscale_val != old_qscale_val:
                         old_qscale_val = self.raw_data_dict[
                             'qscale_newfw_'+qbn][0]
-                    if old_qscale_val is None:
+                    if old_qscale_val != old_qscale_val:
                         old_qscale_val = 0
-                    else:
-                        old_qscale_val = float(old_qscale_val)
                     textstr = 'Qscale = {:.4f} $\pm$ {:.4f}'.format(
                         self.proc_data_dict['analysis_params_dict'][qbn][
                             'qscale'],

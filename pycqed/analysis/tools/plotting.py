@@ -110,7 +110,6 @@ def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
     SI prefixes.
     the value_str is of the type specified in return_type (str) by default.
     """
-    print(unit)
     validtypes = (float, int, np.integer, np.floating)
     if unit in SI_UNITS and isinstance(val, validtypes):
         if val == 0:
@@ -128,7 +127,6 @@ def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
 
     value_str = return_type(val)
     # To ensure right type of return value
-    print(unit)
     if unit is None:
         unit = ''
     return value_str, unit
