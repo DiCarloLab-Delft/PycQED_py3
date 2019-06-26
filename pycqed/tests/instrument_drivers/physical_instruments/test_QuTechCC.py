@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 from os.path import join
 from os import makedirs
 
@@ -45,12 +46,16 @@ class Test_QutechCC(unittest.TestCase):
         cc.debug_marker_out(0, cc.UHFQA_TRIG)
         cc.debug_marker_out(8, cc.HDAWG_TRIG)
 
-        if 0:
-            cc.sequence_program(prog)
-            cc.start()
+        prog = '    stop\n'
+        cc.sequence_program(prog)
 
-        if 0:
-            cc.stop()
+        tmp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+        tmp_file.write(prog)
+        tmp_file_name = tmp_file.name
+        tmp_file.close()  # to allow access to file
+        cc.eqasm_program(tmp_file.name)
+        cc.start()
+        cc.stop()
 
         transport.close()  # to allow access to file
 
