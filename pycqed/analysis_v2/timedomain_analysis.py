@@ -229,7 +229,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         if self.channel_map is None:
             value_names = self.raw_data_dict['value_names']
-            if hasattr(value_names, '__iter__'):
+            if np.ndim(value_names) > 0:
                 value_names = value_names[0]
             if 'w' in value_names[0]:
                 self.channel_map = a_tools.get_qb_channel_map_from_file(
@@ -675,12 +675,12 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             "'sweep_label' in experiment metadata")
                 xunit = self.raw_data_dict['xunit'][0]
                 xlabel = self.raw_data_dict['xlabel'][0]
-            if hasattr(xunit, '__iter__'):
+            if np.ndim(xunit) > 0:
                 xunit = xunit[0]
             for ax_id, ro_channel in enumerate(raw_data_dict):
                 if self.options_dict.get('TwoD', False):
                     yunit = self.raw_data_dict['yunit'][0]
-                    if hasattr(yunit, '__iter__'):
+                    if np.ndim(yunit) > 0:
                         yunit = yunit[0]
                     self.plot_dicts[plot_name + '_' + ro_channel] = {
                         'fig_id': plot_name,
@@ -786,11 +786,11 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         "'sweep_label' in experiment metadata")
             xunit = self.raw_data_dict['xunit'][0]
             xlabel = self.raw_data_dict['xlabel'][0]
-        if hasattr(xunit, '__iter__'):
+        if np.ndim(xunit) > 0:
             xunit = xunit[0]
         if self.options_dict.get('TwoD', False):
             yunit = self.raw_data_dict['yunit'][0]
-            if hasattr(yunit, '__iter__'):
+            if np.ndim(yunit) > 0:
                 yunit = yunit[0]
             self.plot_dicts[plot_dict_name] = {
                 'plotfn': self.plot_colorxy,
@@ -2134,7 +2134,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             fit_type = 'least squares fit'
         meas_string = self.base_analysis. \
             raw_data_dict['measurementstring']
-        if hasattr(meas_string, '__iter__'):
+        if np.ndim(meas_string) > 0:
             if len(meas_string) > 1:
                 meas_string = meas_string[0] + ' to ' + meas_string[-1]
             else:
@@ -3677,8 +3677,15 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                 textstr = ''
                 T2_star_str = ''
 
-                xunit = self.raw_data_dict['xunit'][0]
-                if hasattr(xunit, '__iter__'):
+                try:
+                    xunit = self.metadata["sweep_unit"]
+                    xlabel = self.metadata["sweep_name"]
+                except KeyError:
+                    log.warning("Please specify xunit and xlabel as 'sweep_unit' and "
+                                "'sweep_label' in experiment metadata")
+                    xunit = self.raw_data_dict['xunit'][0]
+                    xlabel = self.raw_data_dict['xlabel'][0]
+                if np.ndim(xunit) > 0:
                     xunit = xunit[0]
 
                 for i, key in enumerate([k + qbn for k in self.fit_keys]):
@@ -3687,7 +3694,7 @@ class RamseyAnalysis(MultiQubit_TimeDomain_Analysis):
                     self.plot_dicts['fit_' + key] = {
                         'fig_id': base_plot_name,
                         'plotfn': self.plot_fit,
-                        'xlabel': self.raw_data_dict['xlabel'][0],
+                        'xlabel': xlabel,
                         'xunit': xunit,
                         'fit_res': fit_res,
                         'setlabel': 'exp decay fit' if i == 0 else
@@ -3872,11 +3879,20 @@ class QScaleAnalysis(MultiQubit_TimeDomain_Analysis):
                     plot_name = 'data' + msmt_label + '_' + qbn
 
                 # plot data
+                try:
+                    xunit = self.metadata["sweep_unit"]
+                    xlabel = self.metadata["sweep_name"]
+                except KeyError:
+                    log.warning("Please specify xunit and xlabel as 'sweep_unit' "
+                                "and 'sweep_label' in experiment metadata")
+                    xunit = self.raw_data_dict['xunit'][0][0]
+                    xlabel = self.raw_data_dict['xlabel'][0]
+
                 self.plot_dicts[plot_name] = {
                     'plotfn': self.plot_line,
                     'xvals': sweep_points,
-                    'xlabel': self.raw_data_dict['xlabel'][0],
-                    'xunit': self.raw_data_dict['xunit'][0][0],
+                    'xlabel': xlabel,
+                    'xunit': xunit,
                     'yvals': data,
                     'ylabel': '{} state population'.format(
                         self.get_latex_prob_label(self.data_to_fit[qbn])),
