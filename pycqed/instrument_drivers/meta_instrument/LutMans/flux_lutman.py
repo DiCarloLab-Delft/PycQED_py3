@@ -29,14 +29,6 @@ _def_lm = {
 
 valid_types = {'idle', 'cz', 'idle_z', 'square', 'custom'}
 
-
-# # JUST FOR TESTING. DELETE ME AFTER TESTS PASS
-# def clocks_to_s(time, clock_cycle=20e-9):
-    """
-    Converts a time in clocks to a time in s
-    """
-    return time*clock_cycle
-
 def flux_lutmap_is_valid(lutmap: dict) -> bool:
     """
     Test if lutmap obeys schema.
