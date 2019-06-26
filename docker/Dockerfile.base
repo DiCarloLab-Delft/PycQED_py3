@@ -47,7 +47,7 @@ RUN pip install --upgrade --no-cache-dir pip && \
         pyserial \
         pytest \
         pyvisa \
-        qutip \
+        "qutip<=4.3.1" \
         qtpy \
         six \
         sip \
