@@ -750,6 +750,7 @@ def ramsey_active_reset(times, qb_name, operation_dict, cal_points, n=1,
         n:               number of pulses (1 is conventional Ramsey)
     '''
     seq_name = 'Ramsey_sequence'
+
     prep_params = dict(preparation_type=preparation_type,
                        post_ro_wait=post_ro_wait,
                        repetitions=reset_reps,
@@ -775,14 +776,14 @@ def ramsey_active_reset(times, qb_name, operation_dict, cal_points, n=1,
         ramsey_pulses[idx]["name"] = f"Ramsey_x2_{i}"
         ramsey_pulses[idx]['ref_point'] = 'start'
 
-    # compute dephasing
+    # compute dphase
     a_d = artificial_detunings if np.ndim(artificial_detunings) == 1 \
-        else [artificial_detunings] * len(times)
-    dephasing = [((t - times[0]) * a_d[i % len(a_d)] * 360) % 360
+        else [artificial_detunings]
+    dphase = [((t - times[0]) * a_d[i % len(a_d)] * 360) % 360
                  for i, t in enumerate(times)]
     # sweep pulses
     params = {f'Ramsey_x2_{i}.pulse_delay': times for i in range(n)}
-    params.update({f'Ramsey_x2_{i}.phase': dephasing for i in range(n)})
+    params.update({f'Ramsey_x2_{i}.phase': dphase for i in range(n)})
     swept_pulses = sweep_pulse_params(ramsey_pulses, params)
 
     #add preparation pulses
@@ -793,6 +794,7 @@ def ramsey_active_reset(times, qb_name, operation_dict, cal_points, n=1,
     # add calibration segments
     seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
+    log.debug(seq)
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 

@@ -251,7 +251,8 @@ def ramsey_2nd_exc_seq_multiple_detunings_v2(times, pulse_pars, pulse_pars_2nd,
     else:
         return seq
 
-def ramsey_2nd_exc_seq_multiple_detunings(times, qb_name, operation_dict,
+
+def ramsey_2nd_exc_seq_multiple_detunings(times,  qb_name, operation_dict,
                                           cal_points, n=1,
                                           artificial_detunings=None,
                                           upload=True,
