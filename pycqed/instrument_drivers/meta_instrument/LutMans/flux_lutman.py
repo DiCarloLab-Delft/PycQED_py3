@@ -10,7 +10,7 @@ from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 try:
     from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
 except ImportError:
-    pass # This is to make the lutman work if no OpenQL is installed.
+    pass  # This is to make the lutman work if no OpenQL is installed.
 from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
@@ -29,6 +29,7 @@ _def_lm = {
 
 valid_types = {'idle', 'cz', 'idle_z', 'square', 'custom'}
 
+
 def flux_lutmap_is_valid(lutmap: dict) -> bool:
     """
     Test if lutmap obeys schema.
@@ -36,7 +37,15 @@ def flux_lutmap_is_valid(lutmap: dict) -> bool:
     Args:
         lutmap
     Return:
-        valid (bool):
+        valid (bool)
+
+    The schema for a lutmap is a dictionary with integer keys.
+    Every item in the dictionary must have the following keys:
+        "name" : str
+        "type" : one of valid_types
+            {'idle', 'cz', 'idle_z', 'square', 'custom'}
+        "which": str, optional used for two qubit flux pulses and one of
+            {"NE", "SE", "SW", "NW"}
     """
     # FIXME: make this part of the validator for the LutMap parameter.
     for key, value in lutmap.items():
@@ -53,19 +62,16 @@ class Base_Flux_LutMan(Base_LutMan):
     """
     The default scheme of this LutMap allows for 4 different 2Q gates.
 
-    NW         NE
-      \       /
-       \     /
-        \   /
-          Q
-        /   \
-       /     \
-      /       \ 
-    SW         SE
-
+    NW     NE
+      \   /
+        Q
+      /   \
+    SW     SE
     """
+
     def render_wave(self, wave_name, show=True, time_units='s',
-                    reload_pulses: bool = True, render_distorted_wave: bool = True,
+                    reload_pulses: bool = True,
+                    render_distorted_wave: bool = True,
                     QtPlot_win=None):
         """
         Renders a waveform
@@ -108,8 +114,9 @@ class Base_Flux_LutMan(Base_LutMan):
 
         return QtPlot_win
 
+
 class HDAWG_Flux_LutMan(Base_Flux_LutMan):
-    
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self._wave_dict_dist = dict()
@@ -122,7 +129,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def generate_standard_waveforms(self):
         """
-        Generates all the standard waveforms and populates self._wave_dict
+        Generate all the standard waveforms and populates self._wave_dict
         """
         self._wave_dict = {}
         # N.B. the  naming convention ._gen_{waveform_name} must be preserved
@@ -132,15 +139,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['park'] = self._gen_park()
         self._wave_dict['custom_wf'] = self._gen_custom_wf()
 
-
         for idx, waveform in self.LutMap().items():
             wave_name = waveform['name']
-            if waveform['type']=='cz' or waveform['type']=='idle_z':
+            if waveform['type'] == 'cz' or waveform['type'] == 'idle_z':
                 which_gate = waveform['which']
-            if waveform['type']=='cz':
-                self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
-            elif waveform['type']=='idle_z':
-                self._wave_dict[wave_name] = self._gen_idle_z(which_gate=which_gate)
+            if waveform['type'] == 'cz':
+                self._wave_dict[wave_name] = self._gen_cz(
+                    which_gate=which_gate)
+            elif waveform['type'] == 'idle_z':
+                self._wave_dict[wave_name] = self._gen_idle_z(
+                    which_gate=which_gate)
 
     def _gen_i(self):
         return np.zeros(int(self.idle_pulse_length()*self.sampling_rate()))
@@ -191,22 +199,21 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            initial_value=6e9,
                            unit='Hz', parameter_class=ManualParameter)
 
-        for this_cz in ['NE','NW','SW','SE']:
-            self.add_parameter('q_freq_10_%s'%this_cz, vals=vals.Numbers(),
+        for this_cz in ['NE', 'NW', 'SW', 'SE']:
+            self.add_parameter('q_freq_10_%s' % this_cz, vals=vals.Numbers(),
                                docstring='Current operating frequency of qubit'
                                ' with which a CZ gate can be performed.',
                                # initial value is chosen to not raise errors
                                initial_value=6e9,
                                unit='Hz', parameter_class=ManualParameter)
-            self.add_parameter('q_J2_%s'%this_cz, vals=vals.Numbers(), unit='Hz',
-                               docstring='effective coupling between the 11 and '
-                               '02 states.',
-                               # initial value is chosen to not raise errors
-                               initial_value=15e6,
-                               parameter_class=ManualParameter)
+            self.add_parameter(
+                'q_J2_%s' % this_cz, vals=vals.Numbers(), unit='Hz',
+                docstring='effective coupling between the 11 and 02 states.',
+                # initial value is chosen to not raise errors
+                initial_value=15e6, parameter_class=ManualParameter)
 
     def _gen_idle_z(self, which_gate):
-        cz_length = self.get('cz_length_%s'%which_gate)
+        cz_length = self.get('cz_length_%s' % which_gate)
         idle_z = self._get_phase_corrected_pulse(
             base_wf=np.zeros(int(cz_length*self.sampling_rate()+1)),
             which_gate=which_gate)
@@ -221,18 +228,18 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            vals=vals.Numbers(0, 100e-6),
                            parameter_class=ManualParameter)
         # CODEWORDS 1-4: CZ
-        for this_cz in ['NE','NW','SW','SE']:
-            self.add_parameter('czd_double_sided_%s'%this_cz,
+        for this_cz in ['NE', 'NW', 'SW', 'SE']:
+            self.add_parameter('czd_double_sided_%s' % this_cz,
                                initial_value=False,
                                vals=vals.Bool(),
                                parameter_class=ManualParameter)
-            self.add_parameter('disable_cz_only_z_%s'%this_cz,
+            self.add_parameter('disable_cz_only_z_%s' % this_cz,
                                initial_value=False,
                                vals=vals.Bool(),
                                parameter_class=ManualParameter)
 
             self.add_parameter(
-                'czd_net_integral_%s'%this_cz,
+                'czd_net_integral_%s' % this_cz,
                 docstring='Used determine what the integral of'
                 ' the CZ waveform should evaluate to. This is realized by adding'
                 ' an offset to the phase correction pulse.\nBy setting this '
@@ -242,34 +249,34 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.MultiType(vals.Numbers(), NP_NANs()),
                 parameter_class=ManualParameter)
 
-            self.add_parameter('cz_phase_corr_length_%s'%this_cz,
+            self.add_parameter('cz_phase_corr_length_%s' % this_cz,
                                unit='s',
                                initial_value=5e-9, vals=vals.Numbers(),
                                parameter_class=ManualParameter)
-            self.add_parameter('cz_phase_corr_amp_%s'%this_cz,
+            self.add_parameter('cz_phase_corr_amp_%s' % this_cz,
                                unit='dac value',
                                initial_value=0,
                                vals=vals.Numbers(),
                                parameter_class=ManualParameter)
-            self.add_parameter('cz_length_%s'%this_cz,
+            self.add_parameter('cz_length_%s' % this_cz,
                                vals=vals.Numbers(),
                                unit='s', initial_value=35e-9,
                                parameter_class=ManualParameter)
-            self.add_parameter('cz_lambda_2_%s'%this_cz,
+            self.add_parameter('cz_lambda_2_%s' % this_cz,
                                vals=vals.Numbers(),
                                initial_value=0,
                                parameter_class=ManualParameter)
-            self.add_parameter('cz_lambda_3_%s'%this_cz,
+            self.add_parameter('cz_lambda_3_%s' % this_cz,
                                vals=vals.Numbers(),
                                initial_value=0,
                                parameter_class=ManualParameter)
-            self.add_parameter('cz_theta_f_%s'%this_cz,
+            self.add_parameter('cz_theta_f_%s' % this_cz,
                                vals=vals.Numbers(),
                                unit='deg',
                                initial_value=80,
                                parameter_class=ManualParameter)
             self.add_parameter(
-                'czd_lambda_2_%s'%this_cz,
+                'czd_lambda_2_%s' % this_cz,
                 docstring='lambda_2 parameter of the negative part of the cz pulse'
                 ' if set to np.nan will default to the value of the main parameter',
                 vals=vals.MultiType(vals.Numbers(), NP_NANs()),
@@ -277,14 +284,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 parameter_class=ManualParameter)
 
             self.add_parameter(
-                'czd_lambda_3_%s'%this_cz,
+                'czd_lambda_3_%s' % this_cz,
                 docstring='lambda_3 parameter of the negative part of the cz pulse'
                 ' if set to np.nan will default to the value of the main parameter',
                 vals=vals.MultiType(vals.Numbers(), NP_NANs()),
                 initial_value=np.nan,
                 parameter_class=ManualParameter)
             self.add_parameter(
-                'czd_theta_f_%s'%this_cz,
+                'czd_theta_f_%s' % this_cz,
                 docstring='theta_f parameter of the negative part of the cz pulse'
                 ' if set to np.nan will default to the value of the main parameter',
                 vals=vals.MultiType(vals.Numbers(), NP_NANs()),
@@ -292,14 +299,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 initial_value=np.nan,
                 parameter_class=ManualParameter)
 
-
-            self.add_parameter('czd_amp_ratio_%s'%this_cz,
+            self.add_parameter('czd_amp_ratio_%s' % this_cz,
                                docstring='Amplitude ratio for double sided CZ gate',
                                initial_value=1,
                                vals=vals.Numbers(),
                                parameter_class=ManualParameter)
 
-            self.add_parameter('czd_amp_offset_%s'%this_cz,
+            self.add_parameter('czd_amp_offset_%s' % this_cz,
                                docstring='used to add an offset to the negative '
                                ' pulse that is used in the net-zero cz gate',
                                initial_value=0,
@@ -307,14 +313,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                vals=vals.Numbers(),
                                parameter_class=ManualParameter)
             self.add_parameter(
-                'czd_signs_%s'%this_cz, initial_value=['+', '-'],
+                'czd_signs_%s' % this_cz, initial_value=['+', '-'],
                 docstring='Used to determine the sign of the two parts of the '
                 'double sided CZ pulse. This should be a list of two elements,'
                 ' where "+" is a positive pulse, "-" a negative amplitude and "0" '
                 'a disabled pulse.',
                 vals=vals.Lists(vals.Enum('+', '-', 0)),
                 parameter_class=ManualParameter)
-            self.add_parameter('czd_length_ratio_%s'%this_cz,
+            self.add_parameter('czd_length_ratio_%s' % this_cz,
                                vals=vals.MultiType(vals.Numbers(0, 1),
                                                    vals.Enum('auto')),
                                initial_value=0.5,
@@ -325,7 +331,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                'automatically determined to ensure the integral '
                                'of the net-zero pulse is close to zero.',
                                parameter_class=ManualParameter)
-
 
         # CODEWORD 6: SQUARE
         self.add_parameter('sq_amp', initial_value=.5,
@@ -373,7 +378,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             parameter_class=ManualParameter,
             vals=vals.Numbers(min_value=0))
 
-
     def _get_phase_corrected_pulse(self, base_wf, which_gate):
         """
         Creates a phase correction pulse using a cosine with an offset
@@ -383,12 +387,11 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             - The net-integral (if net-zero) is set to 'czd_net_integral'
             - The amplitude of the cosine is set to 'cz_phase_corr_amp'
         """
-        is_double_sided = self.get('czd_double_sided_%s'%which_gate)
-        disable_cz_only_z = self.get('disable_cz_only_z_%s'%which_gate)
-        cz_integral = self.get('czd_net_integral_%s'%which_gate)
-        corr_len = self.get('cz_phase_corr_length_%s'%which_gate)
-        corr_amp = self.get('cz_phase_corr_amp_%s'%which_gate)
-
+        is_double_sided = self.get('czd_double_sided_%s' % which_gate)
+        disable_cz_only_z = self.get('disable_cz_only_z_%s' % which_gate)
+        cz_integral = self.get('czd_net_integral_%s' % which_gate)
+        corr_len = self.get('cz_phase_corr_length_%s' % which_gate)
+        corr_amp = self.get('cz_phase_corr_amp_%s' % which_gate)
 
         corr_samples = int(corr_len*self.sampling_rate())
 
@@ -420,9 +423,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         return modified_wf
 
     def _gen_cz(self, which_gate, regenerate_cz=True):
-        gate_str = 'cz_%s'%which_gate
+        gate_str = 'cz_%s' % which_gate
         if regenerate_cz:
-            self._wave_dict[gate_str] = self._gen_adiabatic_pulse(which_gate=which_gate)
+            self._wave_dict[gate_str] = self._gen_adiabatic_pulse(
+                which_gate=which_gate)
 
         # Commented out snippet is old (deprecated ) phase corr 19/6/2018 MAR
         # phase_corr = self._gen_phase_corr(cz_offset_comp=True)
@@ -438,22 +442,21 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         """
         Generates the CZ waveform.
         """
-
         # getting the right parameters for the gate
-        is_double_sided = self.get('czd_double_sided_%s'%which_gate)
-        cz_length = self.get('cz_length_%s'%which_gate)
-        cz_theta_f = self.get('cz_theta_f_%s'%which_gate)
-        cz_lambda_2 = self.get('cz_lambda_2_%s'%which_gate)
-        cz_lambda_3 = self.get('cz_lambda_3_%s'%which_gate)
-        q_J2 = self.get('q_J2_%s'%which_gate)
-        czd_signs = self.get('czd_signs_%s'%which_gate)
+        is_double_sided = self.get('czd_double_sided_%s' % which_gate)
+        cz_length = self.get('cz_length_%s' % which_gate)
+        cz_theta_f = self.get('cz_theta_f_%s' % which_gate)
+        cz_lambda_2 = self.get('cz_lambda_2_%s' % which_gate)
+        cz_lambda_3 = self.get('cz_lambda_3_%s' % which_gate)
+        q_J2 = self.get('q_J2_%s' % which_gate)
+        czd_signs = self.get('czd_signs_%s' % which_gate)
 
-        czd_theta_f = self.get('czd_theta_f_%s'%which_gate)
-        czd_lambda_2 = self.get('czd_lambda_2_%s'%which_gate)
-        czd_lambda_3 = self.get('czd_lambda_3_%s'%which_gate)
+        czd_theta_f = self.get('czd_theta_f_%s' % which_gate)
+        czd_lambda_2 = self.get('czd_lambda_2_%s' % which_gate)
+        czd_lambda_3 = self.get('czd_lambda_3_%s' % which_gate)
 
-        czd_amp_ratio = self.get('czd_amp_ratio_%s'%which_gate)
-        czd_amp_offset = self.get('czd_amp_offset_%s'%which_gate)
+        czd_amp_ratio = self.get('czd_amp_ratio_%s' % which_gate)
+        czd_amp_offset = self.get('czd_amp_offset_%s' % which_gate)
 
         dac_scalefactor = self.get_amp_to_dac_val_scalefactor()
         eps_i = self.calc_amp_to_eps(0, state_A='11',
@@ -481,7 +484,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
             # Simple double sided CZ pulse implemented in most basic form.
             # repeats the same CZ gate twice and sticks it together.
-            length_ratio = self.calc_net_zero_length_ratio(which_gate=which_gate)
+            length_ratio = self.calc_net_zero_length_ratio(
+                which_gate=which_gate)
 
             CZ_theta_A = wfl.martinis_flux_pulse(
                 cz_length*length_ratio, theta_i=theta_i,
@@ -614,14 +618,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def calc_net_zero_length_ratio(self, which_gate: str = 'NE'):
         """
-        Determines the lenght ratio of the net-zero pulses based on the
+        Determine the lenght ratio of the net-zero pulses based on the
         parameter "czd_length_ratio".
 
         If czd_length_ratio is set to auto, uses the interaction amplitudes
         to determine the scaling of lengths. Note that this is a coarse
         approximation.
         """
-        czd_length_ratio = self.get('czd_length_ratio_%s'%which_gate)
+        czd_length_ratio = self.get('czd_length_ratio_%s' % which_gate)
         if czd_length_ratio != 'auto':
             return czd_length_ratio
         else:
@@ -647,7 +651,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Get's the polynomial coefficients that are used to calculate the
         energy levels of specific states.
         Note that avoided crossings are not taken into account here.
-        N.B. The value of which_gate (and its default) only affect the 
+        N.B. The value of which_gate (and its default) only affect the
         other qubits (here noted as MSQ)
 
 
@@ -656,10 +660,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         # depending or whether it fluxes, it is LSQ or MSQ
         # depending on that, we use q_polycoeffs_freq_01_det or q_polycoeffs_freq_NE_det
 
-
-
         polycoeffs = np.zeros(3)
-        freq_10 = self.get('q_freq_10_%s'%which_gate)
+        freq_10 = self.get('q_freq_10_%s' % which_gate)
         if state == '00':
             pass
         elif state == '01':
@@ -770,7 +772,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             base_wf[max_sample:] = 0
         return base_wf
 
-
     def calc_freq_to_amp(self, freq: float, state: str = '01',
                          which_gate: str = 'NE',
                          positive_branch=True):
@@ -789,9 +790,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         return self.calc_eps_to_amp(eps=freq, state_B=state, state_A='00',
                                     positive_branch=positive_branch, which_gate=which_gate)
 
-
     """
-    UNTOUCHED
+    UNTOUCHED during refactor by Ramiro Jun 2019
     """
 
     def _add_cfg_parameters(self):
@@ -919,23 +919,25 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             amplitude in units of V, including rescaling due to the channel
             amplitude and range settings of the AWG8.
             See also `self.get_dac_val_to_amp_scalefactor`.
-        N.B. The value of which_gate (and its default) only affect the 
+        N.B. The value of which_gate (and its default) only affect the
             other qubit frequencies (here noted as MSQ 10)
 
                 amp_Volts = amp_dac_val * channel_amp * channel_range
         """
-        polycoeffs = self.get_polycoeffs_state(state=state, which_gate=which_gate)
+        polycoeffs = self.get_polycoeffs_state(
+            state=state, which_gate=which_gate)
 
         return np.polyval(polycoeffs, amp)
     ###########################################################
     #  Waveform generation net-zero phase correction methods  #
     ###########################################################
+
     def _calc_modified_wf(self, base_wf, a_i, corr_samples):
 
         if not np.isnan(self.czd_net_integral()):
             curr_int = np.sum(base_wf)
             corr_int = self.czd_net_integral()-curr_int
-            #corr_pulse = phase_corr_triangle(
+            # corr_pulse = phase_corr_triangle(
             #    int_val=corr_int, nr_samples=corr_samples)
 
             corr_pulse = phase_corr_square(
@@ -1002,7 +1004,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         return cost_val
 
-
     #################################
     #  Waveform loading methods     #
     #################################
@@ -1019,18 +1020,19 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         waveform = self._wave_dict[waveform_name]
         codeword = self._get_cw_from_wf_name(waveform_name)
-        codeword_str = 'wave_ch{}_cw{:03}'.format(self.cfg_awg_channel(),codeword)
+        codeword_str = 'wave_ch{}_cw{:03}'.format(
+            self.cfg_awg_channel(), codeword)
 
         if self.cfg_append_compensation():
             waveform = self.add_compensation_pulses(waveform)
 
         if self.cfg_distort():
-            # This is where the fixed length waveform is 
+            # This is where the fixed length waveform is
             # set to cfg_max_wf_length
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
         else:
-            # This is where the fixed length waveform is 
+            # This is where the fixed length waveform is
             # set to cfg_max_wf_length
             waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
@@ -1097,7 +1099,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             self.load_waveform_realtime(
                 waveform_name=waveform_name,
                 wf_nr=None, regenerate_waveforms=regenerate_waveforms_realtime)
-        #updating channel amplitude and range
+        # updating channel amplitude and range
         self.cfg_awg_channel_amplitude()
         self.cfg_awg_channel_range()
         self._update_expected_program_hash()
@@ -1131,7 +1133,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         waveform = self._wave_dict_dist[waveform_name]
         codeword = wf_nr
-        self.AWG.get_instr().set('wave_ch{}_cw{:03}'.format(self.cfg_awg_channel(),codeword), waveform)
+        self.AWG.get_instr().set('wave_ch{}_cw{:03}'.format(
+            self.cfg_awg_channel(), codeword), waveform)
 
         if self.instr_partner_lutman() is None:
             logging.warning('no partner lutman specified')
@@ -1198,7 +1201,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         """
         Helper method to ensure waveforms have the desired length
         """
-        length_samples = roundup1024(int(self.sampling_rate()*self.cfg_max_wf_length()))
+        length_samples = roundup1024(
+            int(self.sampling_rate()*self.cfg_max_wf_length()))
         extra_samples = length_samples - len(waveform)
         if extra_samples >= 0:
             y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
@@ -1262,12 +1266,12 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             waveform = self.add_compensation_pulses(waveform)
 
         if self.cfg_distort():
-            # This is where the fixed length waveform is 
+            # This is where the fixed length waveform is
             # set to cfg_max_wf_length
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
         else:
-            # This is where the fixed length waveform is 
+            # This is where the fixed length waveform is
             # set to cfg_max_wf_length
             waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
@@ -1322,23 +1326,22 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         """
         Plots the cz trajectory in frequency space.
         """
-        cz_length = self.get('cz_length_%s'%which_gate)
-        q_J2 = self.get('q_J2_%s'%which_gate)
+        cz_length = self.get('cz_length_%s' % which_gate)
+        q_J2 = self.get('q_J2_%s' % which_gate)
         sampling_rate = self.get('sampling_rate')
-        cz_phase_corr_length = self.get('cz_phase_corr_length_%s'%which_gate)
-
-
+        cz_phase_corr_length = self.get('cz_phase_corr_length_%s' % which_gate)
 
         if axs is None:
             f, axs = plt.subplots(figsize=(5, 7), nrows=3, sharex=True)
         nr_plot_samples = int((cz_length+cz_phase_corr_length) *
-                               sampling_rate + extra_plot_samples)
+                              sampling_rate + extra_plot_samples)
 
-        dac_amps = self._wave_dict['cz_%s'%which_gate][:nr_plot_samples]
+        dac_amps = self._wave_dict['cz_%s' % which_gate][:nr_plot_samples]
         t = np.arange(0, len(dac_amps))*1/self.sampling_rate()
 
         CZ_amp = dac_amps*self.get_dac_val_to_amp_scalefactor()
-        CZ_eps = self.calc_amp_to_eps(CZ_amp, '11', '02', which_gate=which_gate)
+        CZ_eps = self.calc_amp_to_eps(
+            CZ_amp, '11', '02', which_gate=which_gate)
         CZ_theta = wfl.eps_to_theta(CZ_eps, q_J2)
 
         axs[0].plot(t, np.rad2deg(CZ_theta), marker='.')
@@ -1400,13 +1403,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         # 2. Annotating feature of interest
         ax.axvline(0, 0, 1e10, linestyle='dotted', c='grey')
 
-        amp_J2 = self.calc_eps_to_amp(0, state_A='11', state_B='02', which_gate=which_gate)
-        amp_J1 = self.calc_eps_to_amp(0, state_A='10', state_B='01', which_gate=which_gate)
+        amp_J2 = self.calc_eps_to_amp(
+            0, state_A='11', state_B='02', which_gate=which_gate)
+        amp_J1 = self.calc_eps_to_amp(
+            0, state_A='10', state_B='01', which_gate=which_gate)
 
         ax.axvline(amp_J2, ls='--', lw=1, c='C4')
         ax.axvline(amp_J1, ls='--', lw=1, c='C6')
 
-        f_11_02 = self.calc_amp_to_freq(amp_J2, state='11', which_gate=which_gate)
+        f_11_02 = self.calc_amp_to_freq(
+            amp_J2, state='11', which_gate=which_gate)
         ax.plot([amp_J2], [f_11_02],
                 color='C4', marker='o', label='11-02')
         ax.text(amp_J2, f_11_02,
@@ -1414,7 +1420,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 color='C4',
                 ha='left', va='bottom', clip_on=True)
 
-        f_10_01 = self.calc_amp_to_freq(amp_J1, state='01', which_gate=which_gate)
+        f_10_01 = self.calc_amp_to_freq(
+            amp_J1, state='01', which_gate=which_gate)
 
         ax.plot([amp_J1], [f_10_01],
                 color='C5', marker='o', label='10-01')
@@ -1431,7 +1438,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         set_ylabel(ax, 'Frequency', 'Hz')
         ax.set_xlim(-2.5, 2.5)
 
-        ax.set_ylim(0, self.calc_amp_to_freq(0, state='02', which_gate=which_gate)*1.1)
+        ax.set_ylim(0, self.calc_amp_to_freq(
+            0, state='02', which_gate=which_gate)*1.1)
 
         # 4. Add a twin x-axis to denote scale in dac amplitude
         dac_val_axis = ax.twiny()
@@ -1453,8 +1461,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 # Legacy classes below
 #########################################################################
 
+
 class AWG8_Flux_LutMan(Base_Flux_LutMan):
     _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self._wave_dict_dist = dict()
@@ -2316,7 +2326,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if not np.isnan(self.czd_net_integral()):
             curr_int = np.sum(base_wf)
             corr_int = self.czd_net_integral()-curr_int
-            #corr_pulse = phase_corr_triangle(
+            # corr_pulse = phase_corr_triangle(
             #    int_val=corr_int, nr_samples=corr_samples)
 
             corr_pulse = phase_corr_square(
@@ -2442,12 +2452,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             waveform = self.add_compensation_pulses(waveform)
 
         if self.cfg_distort():
-            # This is where the fixed length waveform is 
+            # This is where the fixed length waveform is
             # set to cfg_max_wf_length
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
         else:
-            # This is where the fixed length waveform is 
+            # This is where the fixed length waveform is
             # set to cfg_max_wf_length
             waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
@@ -2513,7 +2523,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             self.load_waveform_realtime(
                 waveform_name=waveform_name,
                 wf_nr=None, regenerate_waveforms=regenerate_waveforms_realtime)
-        #updating channel amplitude and range
+        # updating channel amplitude and range
         self.cfg_awg_channel_amplitude()
         self.cfg_awg_channel_range()
         self._update_expected_program_hash()
@@ -2543,7 +2553,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         Helper method to ensure waveforms have the desired length
         """
-        length_samples = roundup1024(int(self.sampling_rate()*self.cfg_max_wf_length()))
+        length_samples = roundup1024(
+            int(self.sampling_rate()*self.cfg_max_wf_length()))
         extra_samples = length_samples - len(waveform)
         if extra_samples >= 0:
             y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
@@ -2607,12 +2618,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             waveform = self.add_compensation_pulses(waveform)
 
         if self.cfg_distort():
-            # This is where the fixed length waveform is 
+            # This is where the fixed length waveform is
             # set to cfg_max_wf_length
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
         else:
-            # This is where the fixed length waveform is 
+            # This is where the fixed length waveform is
             # set to cfg_max_wf_length
             waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
@@ -2893,8 +2904,8 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
             waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
 
-        # N.B. method identical to AWG8 version with the exception 
-        # of AWG.stop() and AWG.start() 
+        # N.B. method identical to AWG8 version with the exception
+        # of AWG.stop() and AWG.start()
         self.AWG.get_instr().stop()
         self.AWG.get_instr().set(codeword, waveform)
         self.AWG.get_instr().start()
@@ -2907,7 +2918,7 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         Modified to implement also normal kernels.
         """
 
-        # FIXME: this function looks identical to the one in the parent class 
+        # FIXME: this function looks identical to the one in the parent class
         # maybe this should be deleted/cleaned up? -MAR Jan 2019
         k = self.instr_distortion_kernel.get_instr()
 
@@ -2964,7 +2975,6 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
         scalefactor = channel_amp
         return scalefactor
-
 
 
 #########################################################################
@@ -3025,6 +3035,7 @@ def phase_corr_sine_series_half(a_i, nr_samples):
     for i, a in enumerate(a_i):
         s += a*np.sin(((i+1)*x)/2)
     return s
+
 
 def roundup1024(n):
     return int(np.ceil(n/1024)*1024)
