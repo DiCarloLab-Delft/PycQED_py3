@@ -460,6 +460,17 @@ class TestLegacyFluxLutMan:
             except KeyError:
                 pass
 
+    def test_default_lutmap(self):
+        lmap = self.fluxlutman.LutMap()
+        for cw_idx,cw_key in enumerate(self.fluxlutman._def_lm):
+            correct_string = 'wave_ch{}_cw{:03}'.format(
+                self.fluxlutman.cfg_awg_channel(), cw_idx)
+            np.testing.assert_string_equal(lmap[cw_key], correct_string)
+
+        # just because there is a partner_lutman test failing
+        np.testing.assert_string_equal(lmap['square'],  'wave_ch{}_cw002'.format(
+                self.fluxlutman.cfg_awg_channel()))
+
     def test_program_hash_differs_AWG8_flux_lutman(self):
         # set to a random value to ensure different
         self.fluxlutman._awgs_fl_sequencer_program_expected_hash(351340)
@@ -497,7 +508,7 @@ class TestLegacyFluxLutMan:
         self.fluxlutman.sq_amp(.3)
         self.fluxlutman_partner.sq_amp(.5)
         self.k0.reset_kernels()
-        self.fluxlutman.load_waveform_realtime('square')
+        self.fluxlutman.load_waveform_realtime(waveform_name='square')
         np.testing.assert_allclose(self.AWG._realtime_w0[0], [.3])
         np.testing.assert_allclose(self.AWG._realtime_w1[0], [.5])
 

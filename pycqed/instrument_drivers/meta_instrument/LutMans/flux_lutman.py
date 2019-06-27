@@ -1454,11 +1454,11 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 #########################################################################
 
 class AWG8_Flux_LutMan(Base_Flux_LutMan):
-    _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
     def __init__(self, name, **kw):
+        _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
+        self._def_lm = _def_lm
         super().__init__(name, **kw)
         self._wave_dict_dist = dict()
-        self._def_lm = _def_lm
         self.sampling_rate(2.4e9)
         self._add_qubit_parameters()
 
