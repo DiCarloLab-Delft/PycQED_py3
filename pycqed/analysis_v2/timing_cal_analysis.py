@@ -188,7 +188,8 @@ class Timing_Cal_Flux_Fine(ba.BaseDataAnalysis):
                  flux_latency: float=0,
                  mw_pulse_separation: float=100e-9,
                  options_dict: dict=None,
-                 mw_duration: int=20e-9,
+                 mw_duration: float=20e-9,
+                 flux_pulse_duration:float =10e-9, 
                  auto=True):
         if options_dict is None:
             options_dict = dict()
@@ -199,6 +200,7 @@ class Timing_Cal_Flux_Fine(ba.BaseDataAnalysis):
         self.mw_pulse_separation = mw_pulse_separation
         self.options_dict = options_dict
         self.mw_duration = mw_duration
+        self.flux_pulse_duration = flux_pulse_duration
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
                          close_figs=close_figs,
                          options_dict=options_dict)
@@ -263,6 +265,7 @@ class Timing_Cal_Flux_Fine(ba.BaseDataAnalysis):
             'flux_latency': self.flux_latency,
             'ro_latency': self.ro_latency,
             'mw_pulse_separation': self.mw_pulse_separation,
+            'flux_pulse_duration': self.flux_pulse_duration, 
             'ax_id': 'main'}
 
 

@@ -304,6 +304,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  plot_versus_frequency=True,
                  frequency_key='Instrument settings.Q.freq_qubit',
                  fit_qubit_Q_factor=False,
+                 mean_and_std=False
                  ):
         '''
         Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
@@ -366,6 +367,8 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             self.params_dict['qfreq'] = frequency_key
 
         self.numeric_params = []
+
+        self.mean_and_std = mean_and_std
 
         if auto:
             self.run_analysis()
@@ -451,6 +454,23 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             self._prepare_plot(ax_id='time_stability', xvals=self.raw_data_dict['datetime'],
                                yvals=self.raw_data_dict['tau'], yerr=self.raw_data_dict['tau_stderr'],
                                xlabel='Time in Delft', xunit=None)
+            if self.mean_and_std:
+                if 'T1' in self.labels[0]:
+                    measured_param = '$T_1$'
+                elif 'Ramsey' in self.labels[0]:
+                    measured_param = '$T_2^*$'
+                elif 'echo' in self.labels[0]:
+                    measured_param = '$T_2^{echo}$'
+                else:
+                    measured_param = 'Coherence'
+                t_msg = measured_param+' = {:.1f}$\pm${:.1f} $\mu$s'.format(np.mean(self.raw_data_dict['tau'])*1e6,
+                                                   np.std(self.raw_data_dict['tau'])*1e6)
+                self.plot_dicts['mean_and_std'] = {
+                'plotfn': self.plot_text,
+                'text_string': t_msg,
+                'xpos': 0.05, 'ypos': 0.05, 'ax_id': 'time_stability',
+                'horizontalalignment': 'left', 'verticalalignment': 'bottom'}
+
             if self.plot_versus_frequency and self.fit_qubit_Q_factor:
                 plot_dict = {
                     'xlabel': 'Qubit Frequency', 'xunit': 'Hz',
@@ -1552,7 +1572,7 @@ def fit_fixed_Q_factor(freq, tau):
 
 def fit_frequencies(dac, freq,
                     Ec_guess=260e6, Ej_guess=19e9, offset_guess=0,
-                    dac0_guess=0.5):
+                    dac0_guess=None):
     """
     Perform fit against the transmon flux arc model.
 
@@ -1566,11 +1586,13 @@ def fit_frequencies(dac, freq,
     # define the model (from the function) used to fit data
     arch_model = lmfit.Model(arch)
 
+    if dac0_guess is None:
+        dac0_guess = np.max(np.abs(dac))*2
+
     # set some hardcoded guesses
-    arch_model.set_param_hint('Ec', value=Ec_guess, min=100e6, max=350e6)
-    arch_model.set_param_hint('Ej', value=Ej_guess, min=0.1e9, max=30e9)
-    arch_model.set_param_hint(
-        'offset', value=offset_guess, min=-0.05, max=0.05)
+    arch_model.set_param_hint('Ec', value=Ec_guess, min=1e6, max=350e6)
+    arch_model.set_param_hint('Ej', value=Ej_guess, min=0.1e9, max=50e12)
+    arch_model.set_param_hint('offset', value=offset_guess, min=-0.5, max=0.5)
     arch_model.set_param_hint('dac0', value=dac0_guess, min=0)
 
     params = arch_model.make_params()
