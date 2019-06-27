@@ -95,7 +95,15 @@ class CCL(SCPI):
         curdir = os.path.dirname(__file__)
         print(f"Assembler version {self.QISA.getVersion()}")
         if self.QISA.getVersion() == '4.0.0':
-            raise RuntimeError('Cannot init CC-Light driver; proper assembler for CCL (v2.0) is missing from the environment.')
+
+            """
+            Assembler now aditionally requires quantum layout information file
+            """
+            configureinput = os.path.join(curdir, '_CCL', 'quantum_layout_information_7.txt')
+            if not os.path.isfile(configureinput):
+                raise RuntimeError('The QISA Assembler supporting CC-Light and QCC now expects a quantum_layout_information file in the Pycqed physical instruments directory.')
+
+            self.QISA.read(configureinput)
 
         self.QISA.enableScannerTracing(False)
         self.QISA.enableParserTracing(False)
@@ -103,6 +111,10 @@ class CCL(SCPI):
 
         qmap_fn = os.path.join(curdir, '_CCL', 'qisa_opcode.qmap')
         self.qisa_opcode(qmap_fn)
+
+    # FIXME: Introduced by niels@zhinst.com in order to make the code run
+    def getOperationComplete(self):
+        return True
 
     def stop(self, getOperationComplete=True):
         self.run(0),
@@ -430,7 +442,7 @@ class CCL(SCPI):
         # print("binblock size:", len(binBlock))
         # write binblock
         hdr = 'QUTech:UploadInstructions '
-        self.binBlockWrite(binBlock, hdr)
+        self.bin_block_write(binBlock, hdr)
         # print("CCL: Sending instructions to the hardware finished.")
 
         # write to last_loaded_instructions so it can conveniently be read back
@@ -457,7 +469,7 @@ class CCL(SCPI):
 
         # write binblock
         hdr = 'QUTech:UploadMicrocode '
-        self.binBlockWrite(binBlock, hdr)
+        self.bin_block_write(binBlock, hdr)
 
     def _upload_opcode_qmap(self, filename: str):
         success = self.QISA.loadQuantumInstructions(filename)
