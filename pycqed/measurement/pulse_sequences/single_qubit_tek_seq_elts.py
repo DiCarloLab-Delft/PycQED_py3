@@ -806,8 +806,9 @@ def ramsey_active_reset(times, qb_name, operation_dict, cal_points, n=1,
     swept_pulses = sweep_pulse_params(ramsey_pulses, params)
 
     #add preparation pulses
-    swept_pulses_with_prep = add_preparation_pulses(swept_pulses, operation_dict,
-                                                    [qb_name], **prep_params)
+    swept_pulses_with_prep = \
+        [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)
+         for p in swept_pulses]
     seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
 
     # add calibration segments
@@ -1317,7 +1318,6 @@ def qscale_active_reset(qscales, qb_name, operation_dict, cal_points,
                 qscale_ops += ["X180"]
         qscale_ops += ['RO']
         qscale_ops = add_suffix(qscale_ops, " " + qb_name)
-
         # pulses
         qscale_pulses = [deepcopy(operation_dict[op]) for op in qscale_ops]
 
@@ -1331,84 +1331,34 @@ def qscale_active_reset(qscales, qb_name, operation_dict, cal_points,
         swept_pulses = sweep_pulse_params(qscale_pulses, params)
 
         # add preparation pulses
+        idx = 0
+        print(len(swept_pulses))
         swept_pulses_with_prep = \
-            add_preparation_pulses(swept_pulses, operation_dict,
-                                   [qb_name], **prep_params)
+            [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)
+             for p in swept_pulses]
         final_pulses.append(swept_pulses_with_prep)
 
     # intertwine pulses in same order as base_ops
+    # 1. get one list of list from the 3 lists of list
+    f_p = np.array(final_pulses)
+    reordered_pulses = [[X90X180, X90Y180, X90mY180]
+                        for X90X180, X90Y180, X90mY180
+                        in zip(f_p[0],  f_p[1], f_p[2])]
 
-    final_pulses = np.array(final_pulses).transpose().tolist()[0]
-    #return final_pulses, 0
+    # 2. reshape to list of list
+    final_pulses = np.squeeze(np.reshape(reordered_pulses,
+                              (len(qscales), -1))).tolist()
 
     seq = pulse_list_list_seq(final_pulses, seq_name, upload=False)
 
     # add calibration segments
-    # modif_cal_params = {f"{'f_X180_ef' if for_ef else 'e_X180'}*.motzoi":
-    #                     [np.mean(qscales)]}
-    modif_cal_params = dict()
-    seq.extend(cal_points.create_segments(operation_dict,
-                                          pulse_modifs=modif_cal_params,
-                                          **prep_params))
+    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 
     return seq, np.arange(len(seq.segments))
 
-    for i, motzoi in enumerate(qscales):
-        pulse_keys = pulse_combinations[i % 3]
-        for p_name in ['X180', 'Y180', 'X90', 'mY180']:
-            pulses_2nd[p_name]['motzoi'] = motzoi
-        if cal_points and (i == (len(times)-6) or
-                          i == (len(times)-5)):
-           el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(qscales)-4) or
-                                   i == (len(qscales)-3)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
-        elif cal_points and (i == (len(qscales)-2) or
-                                     i == (len(qscales)-1)):
-            # pick motzoi for calpoint in the middle of the range
-            pulses['X180']['motzoi'] = np.mean(qscales)
-            el = multi_pulse_elt(i, station, [pulses_2nd['X180_ef'], RO_pars])
-        if cal_points and no_cal_points == 6 and \
-                (i == (len(qscales)-6) or i == (len(qscales)-5)):
-            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
-        elif cal_points and no_cal_points == 6 and \
-                (i == (len(qscales)-4) or i == (len(qscales)-3)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
-        elif cal_points and no_cal_points == 6 and \
-                (i == (len(qscales)-2) or i == (len(qscales)-1)):
-            pulses_2nd['X180']['motzoi'] = np.mean(qscales)
-            el = multi_pulse_elt(i, station, [pulses['X180'],
-                                              pulses_2nd['X180'],
-                                              RO_pars])
-        elif cal_points and no_cal_points == 4 and \
-                (i == (len(qscales)-4) or i == (len(qscales)-3)):
-            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
-        elif cal_points and no_cal_points == 4 and \
-                (i == (len(qscales)-2) or i == (len(qscales)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
-        elif cal_points and no_cal_points == 2 and \
-                (i == (len(qscales)-2) or i == (len(qscales)-1)):
-            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
-        else:
-            pulse_list = [pulses['X180']]
-            pulse_list += [pulses_2nd[x] for x in pulse_keys]
-            if last_ge_pulse:
-                pulse_list += [pulses['X180']]
-            pulse_list += [RO_pars]
-            el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-
-    if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-
-    if return_seq:
-        return seq, el_list
-    else:
-        return seq_name
 
 def qscale(qscales, pulse_pars, RO_pars,
            cal_points=True, upload=True, return_seq=False):
