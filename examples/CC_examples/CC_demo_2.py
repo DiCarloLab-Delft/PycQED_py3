@@ -8,8 +8,8 @@ import numpy as np
 
 from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import ZI_HDAWG8
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.wouter import ZI_HDAWG8
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.wouter import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
 import pycqed.measurement.openql_experiments.openql_helpers as oqh

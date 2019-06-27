@@ -44,8 +44,8 @@ import ctypes
 from ctypes.wintypes import MAX_PATH
 from zlib import crc32
 
-from . import zishell_NH as zs
-from .ZI_base_instrument import ZI_base_instrument
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import zishell_NH as zs
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument import ZI_base_instrument
 
 log = logging.getLogger(__name__)
 
@@ -313,7 +313,7 @@ class ZI_HDAWG_core(ZI_base_instrument):
         # self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
         self._dev.seti('awgs/{}/enable'.format(awg_nr), 1)
 
-##########################################################################
+    ##########################################################################
     # 'private' functions, internal to the driver
     ##########################################################################
 
