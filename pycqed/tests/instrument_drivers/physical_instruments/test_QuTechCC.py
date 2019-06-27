@@ -1,7 +1,6 @@
 import unittest
 import tempfile
-from os.path import join
-from os import makedirs
+import os
 
 from pycqed.instrument_drivers.physical_instruments.Transport import FileTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
@@ -10,8 +9,8 @@ from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 class Test_QutechCC(unittest.TestCase):
     def test_all(self):
         fn = 'Test_QutechCC_test_all.scpi.txt'
-        test_path = join('test_output',fn)
-        makedirs('test_output', exist_ok=True)
+        test_path = os.path.join('test_output',fn)
+        os.makedirs('test_output', exist_ok=True)
 
         transport = FileTransport(test_path)
         cc = QuTechCC('cc', transport)
@@ -51,9 +50,10 @@ class Test_QutechCC(unittest.TestCase):
 
         tmp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
         tmp_file.write(prog)
-        tmp_file_name = tmp_file.name
         tmp_file.close()  # to allow access to file
         cc.eqasm_program(tmp_file.name)
+        os.unlink(tmp_file.name)
+
         cc.start()
         cc.stop()
 
@@ -61,5 +61,5 @@ class Test_QutechCC(unittest.TestCase):
 
         # check results
         test_output = open(test_path).read()
-        golden = open(join('golden',fn)).read()
+        golden = open(os.path.join('golden',fn)).read()
         self.assertEqual(test_output, golden)
