@@ -1,14 +1,14 @@
-'''
-File:       QuTech_AWG_Module.py
-Author:     Wouter Vlothuizen, TNO/QuTech,
-            edited by Adriaan Rol, Gerco Versloot
-Purpose:    Instrument driver for Qutech QWG
-Usage:
-Notes:      It is possible to view the QWG log using ssh. To do this connect
-            using ssh e.g., "ssh root@192.168.0.10"
-            Logging can be enabled using "tail -f /tmpLog/qwg.log"
-Bugs:
-'''
+"""
+    File:       QuTech_AWG_Module.py
+    Author:     Wouter Vlothuizen, TNO/QuTech,
+                edited by Adriaan Rol, Gerco Versloot
+    Purpose:    Instrument driver for Qutech QWG
+    Usage:
+    Notes:      It is possible to view the QWG log using ssh. To do this:
+                - connect using ssh e.g., "ssh root@192.168.0.10"
+                - view log using "tail -f /var/log/qwg.log"
+    Bugs:
+"""
 
 from .SCPI import SCPI
 
@@ -18,7 +18,6 @@ import json
 from qcodes import validators as vals
 import warnings
 from typing import List
-
 
 from qcodes.instrument.parameter import Parameter
 from qcodes.instrument.parameter import Command
@@ -126,12 +125,10 @@ class QuTech_AWG_Module(SCPI):
                                parameter_class=HandshakeParameter,
                                label=('Transformation matrix channel' +
                                       'pair {}'.format(i)),
-                               get_cmd=self._gen_ch_get_func(
-                self._getMatrix, ch_pair),
-                set_cmd=self._gen_ch_set_func(
-                self._setMatrix, ch_pair),
-                # NB range is not a hardware limit
-                vals=vals.Arrays(-2, 2, shape=(2, 2)))
+                               get_cmd=self._gen_ch_get_func(self._getMatrix, ch_pair),
+                               set_cmd=self._gen_ch_set_func(self._setMatrix, ch_pair),
+                               # NB range is not a hardware limit
+                               vals=vals.Arrays(-2, 2, shape=(2, 2)))
 
         # Triggers parameter
         for i in range(1, self.device_descriptor.numTriggers+1):
@@ -304,7 +301,7 @@ class QuTech_AWG_Module(SCPI):
                                  +'Used for calibration of the DAC. Do not use to set the gain of a channel!\n' \
                                  +'Notes:\n  The gain setting is from 0 to 4095 \n' \
                                  +'    Where 0 is 0 V and 4095 is 3.3V \n' \
-                                 +'Get Return:\n   Setting of the gain in interger (0 - 4095)\n'\
+                                 +'Get Return:\n   Setting of the gain in integer (0 - 4095)\n'\
                                  +'Set parameter:\n   Integer: Gain of the DAC in , min: 0, max: 4095')
 
             self.add_parameter('_dac{}_digital_value'.format(ch),
@@ -451,11 +448,10 @@ class QuTech_AWG_Module(SCPI):
                           call_cmd='QUTEch:OUTPut:SYNCsideband',
                           docstring=doc_sSG)
 
-
     def stop(self):
-        '''
-        Shutsdown output on channels. When stoped will check for errors or overflow
-        '''
+        """
+        Stop output on channels and check for errors or overflow
+        """
         self.write('awgcontrol:stop:immediate')
 
         self.getErrors()
@@ -469,7 +465,7 @@ class QuTech_AWG_Module(SCPI):
             for cw in range(self.device_descriptor.numCodewords):
                 ch = j+1
 
-                parname = 'wave_ch{}_cw{:03}'.format(ch, cw)
+                parname = 'wave_ch{}_cw{:03}'.format(ch, cw)  # NB: parameter naming identical to ZI-HDAWG
                 self.add_parameter(
                     parname,
                     label='Waveform channel {} codeword {:03}'.format(
@@ -493,9 +489,9 @@ class QuTech_AWG_Module(SCPI):
         return self.getWaveformDataFloat(wf_name)
 
     def start(self):
-        '''
+        """
         Activates output on channels with the current settings. When started this function will check for possible warnings
-        '''
+        """
         run_mode = self.run_mode()
         if run_mode == 'NONE':
             raise RuntimeError('No run mode is specified')
@@ -510,12 +506,12 @@ class QuTech_AWG_Module(SCPI):
             warnings.warn(', '.join(warn_msg))
 
     def _setMatrix(self, chPair, mat):
-        '''
+        """
         Args:
             chPair(int): ckannel pair for operation, 1 or 3
 
             matrix(np.matrix): 2x2 matrix for mixer calibration
-        '''
+        """
         # function used internally for the parameters because of formatting
         self.write('qutech:output{:d}:matrix {:f},{:f},{:f},{:f}'.format(
                    chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))
@@ -567,25 +563,25 @@ class QuTech_AWG_Module(SCPI):
         return msg
 
     def getErrors(self):
-        '''
+        """
         The SCPI protocol by default does not return errors. Therefore the user needs
         to ask for errors. This function retrieves all errors and will raise them.
-        '''
-        errNr = self.getSystemErrorCount()
+        """
+        errNr = self.get_system_error_count()
 
         if errNr > 0:
             errMgs = []
             for i in range(errNr):
-                errMgs.append(self.getError())
+                errMgs.append(self.get_error())
             raise RuntimeError(', '.join(errMgs))
 
     def JSON_parser(self, msg):
-        '''
+        """
         Converts the result of a SCPI message to a JSON.
 
         msg: SCPI message where the body is a JSON
         return: JSON object with the data of the SCPI message
-        '''
+        """
         result = str(msg)[1:-1]
         result = result.replace('\"\"', '\"') # SCPI/visa adds additional quotes
         return json.loads(result)
@@ -680,17 +676,17 @@ class QuTech_AWG_Module(SCPI):
     ##########################################################################
 
     def setSeqLength(self, length):
-        '''
+        """
         Args:
             length (int): 0..max. Allocates new, or trims existing sequence
-        '''
+        """
         self.write('sequence:length %d' % length)
 
     def setSeqElemLoopInfiniteOn(self, element):
-        '''
+        """
         Args:
             element(int): 1..length
-        '''
+        """
         self.write('sequence:element%d:loop:infinite on' % element)
 
     ##########################################################################
@@ -700,16 +696,16 @@ class QuTech_AWG_Module(SCPI):
     #     return self.ask_int('wlist:size?')
 
     def _getWlistName(self, idx):
-        '''
+        """
         Args:
             idx(int): 0..size-1
-        '''
+        """
         return self.ask('wlist:name? %d' % idx)
 
     def _getWlist(self):
-        '''
+        """
         NB: takes a few seconds on 5014: our fault or Tek's?
-        '''
+        """
         size = self.WlistSize()
         wlist = []                                  # empty list
         for k in range(size):                       # build list of names
@@ -717,44 +713,44 @@ class QuTech_AWG_Module(SCPI):
         return wlist
 
     def deleteWaveform(self, name):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             'test'
-        '''
+        """
         self.write('wlist:waveform:delete "%s"' % name)
 
     def getWaveformType(self, name):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
 
         Returns:
             'INT' or 'REAL'
-        '''
+        """
         return self.ask('wlist:waveform:type? "%s"' % name)
 
     def getWaveformLength(self, name):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
-        '''
+        """
         return self.ask_int('wlist:waveform:length? "%s"' % name)
 
     def newWaveformReal(self, name, len):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
 
         NB: seems to do nothing (on Tek5014) if waveform already exists
-        '''
+        """
         self.write('wlist:waveform:new "%s",%d,real' % (name, len))
 
     def getWaveformDataFloat(self, name):
-        '''
+        """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             '*Sine100'
@@ -763,9 +759,9 @@ class QuTech_AWG_Module(SCPI):
             waveform  (np.array of float): waveform data
 
         Compatibility: QWG
-        '''
+        """
         self.write('wlist:waveform:data? "%s"' % name)
-        binBlock = self.binBlockRead()
+        binBlock = self.bin_block_read()
         # extract waveform
         if 1:   # high performance
             waveform = np.frombuffer(binBlock, dtype=np.float32)
@@ -811,7 +807,7 @@ class QuTech_AWG_Module(SCPI):
 
         # write binblock
         hdr = 'wlist:waveform:data "{}",'.format(name)
-        self.binBlockWrite(binBlock, hdr)
+        self.bin_block_write(binBlock, hdr)
 
     def createWaveformReal(self, name, waveform):
         """
@@ -889,8 +885,8 @@ class QuTech_AWG_Module(SCPI):
 
     # Tek_AWG functions: menu Setup|Waveform/Sequence
     def loadWaveformOrSequence(self, awgFileName):
-        ''' awgFileName:        name referring to AWG file system
-        '''
+        """ awgFileName:        name referring to AWG file system
+        """
         self.write('source:def:user "%s"' % awgFileName)
         # NB: we only  support default Mass Storage Unit Specifier "Main",
         # which is the internal harddisk
