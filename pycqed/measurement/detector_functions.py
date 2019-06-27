@@ -1908,7 +1908,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             **kw)
         self.correlations = correlations
         self.thresholding = thresholding
-
+        print('DEBUG:')
+        print(self.channels)
         if value_names is None:
             self.value_names = []
             for ch in channels:

@@ -732,19 +732,17 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         super().__init__(name, **kw)
 
         # sacrifices last pulse 'Spec' from std list to have 3 bit (8)
-        self._def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-                        'rXm90',  'rYm90', 'rPhi90']
+        self._def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90', 'rXm90',  'rYm90', 'rPhi90']
         self.set_default_lutmap()
 
-        self._vqe_lm = ['I', 'X180c',  'Y180c', 'X90c',  'Xm90c',
-                        'Y90c',  'Y90c', 'rY180']
+        self._vqe_lm = ['I', 'X180c',  'Y180c', 'X90c',  'Xm90c', 'Y90c',  'Y90c', 'rY180']
 
     def set_VQE_lutmap(self):
         """
         Set's the default lutmap for standard microwave drive pulses.
         """
         vqe_lm = self._vqe_lm
-        LutMap = OrderedDict()
+        LutMap = {}
         for cw_idx, cw_key in enumerate(vqe_lm):
             LutMap[cw_key] = (
                 'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
@@ -761,62 +759,142 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0)
         # parameters related to phase compilation
-        self.add_parameter('phi', unit='rad', vals=vals.Numbers(0, 2*np.pi),
+        self.add_parameter('phi', unit='rad', vals=vals.Numbers(0, 360),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+        # parameters related to timings
+        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0,1e-6),
                            parameter_class=ManualParameter,
                            initial_value=0)
 
     def generate_standard_waveforms(self):
-        # do not apply mixer predistortions until the end
-        old_mixer_setting = self.mixer_apply_predistortion_matrix()
-        self.mixer_apply_predistortion_matrix(False)
-        # generate waveforms for standard mapping
-        super().generate_standard_waveforms()
-        self.mixer_apply_predistortion_matrix(old_mixer_setting)
-
+        self._wave_dict = {}
         if self.cfg_sideband_mode() == 'static':
             f_modulation = self.mw_modulation()
         else:
             f_modulation = 0
+            self.AWG.get_instr().set('ch_pair{}_sideband_frequency'.format(self.channel_I()),
+                           self.mw_modulation())
+            self.AWG.get_instr().syncSidebandGenerators()
 
-        self._wave_dict['X180c'] = self.wf_func(
+        ########################################
+        # STD waveforms
+        ########################################
+        self._wave_dict['I'] = self.wf_func(
+            amp=0, sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=0,
+            motzoi=0, delay=self.pulse_delay())
+        self._wave_dict['rX180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
-            sampling_rate=self.sampling_rate(), phase=self.phi(),
-            motzoi=self.mw_motzoi())
+            sampling_rate=self.sampling_rate(), phase=0,
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
-            motzoi=self.mw_motzoi())
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+        self._wave_dict['rX90'] = self.wf_func(
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=0,
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+        self._wave_dict['rY90'] = self.wf_func(
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90,
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+        self._wave_dict['rXm90'] = self.wf_func(
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=0,
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+        self._wave_dict['rYm90'] = self.wf_func(
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90,
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+
+        self._wave_dict['rPhi180'] = self.wf_func(
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+        self._wave_dict['rPhi90'] = self.wf_func(
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+        self._wave_dict['rPhim90'] = self.wf_func(
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+        self._wave_dict['spec'] = self.spec_func(
+            amp=self.spec_amp(),
+            length=self.spec_length(),
+            sampling_rate=self.sampling_rate(),
+            delay=0,
+            phase=0)
+
+        for i in range(18):
+            angle = i * 20
+            self._wave_dict['r{}_90'.format(angle)] = self.wf_func(
+                amp=self.mw_amp180()*self.mw_amp90_scale(),
+                sigma_length=self.mw_gauss_width(),
+                f_modulation=f_modulation,
+                sampling_rate=self.sampling_rate(), phase=angle,
+                motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+
+        ########################################
+        # compiled waveforms
+        ########################################
+        self._wave_dict['X180c'] = self.wf_func(
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.phi(),
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
+        self._wave_dict['rY180'] = self.wf_func(
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90,
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY180c'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90+self.phi(),
-            motzoi=self.mw_motzoi())
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rX90c'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.phi(),
-            motzoi=self.mw_motzoi())
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY90c'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90+self.phi(),
-            motzoi=self.mw_motzoi())
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rXm90c'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.phi(),
-            motzoi=self.mw_motzoi())
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rYm90c'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90+self.phi(),
-            motzoi=self.mw_motzoi())
+            motzoi=self.mw_motzoi(), delay=self.pulse_delay())
 
         if self.mixer_apply_predistortion_matrix():
             self._wave_dict = self.apply_mixer_predistortion_corrections(
