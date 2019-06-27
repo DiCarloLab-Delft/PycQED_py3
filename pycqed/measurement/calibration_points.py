@@ -7,7 +7,7 @@ import logging
 from pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts import \
     generate_mux_ro_pulse_list
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
-    add_preparation_pulses
+    add_preparation_pulses, sweep_pulse_params
 from pycqed.measurement.waveform_control import segment
 
 log = logging.getLogger(__name__)
@@ -20,18 +20,32 @@ class CalibrationPoints:
         default_map = dict(g=['I '], e=["X180 "], f=['X180 ', "X180_ef "])
         self.pulse_label_map = kwargs.get("pulse_label_map", default_map)
 
-    def create_segments(self, operation_dict, **prep_params):
+    def create_segments(self, operation_dict, pulse_modifs=dict(),
+                        **prep_params):
         segments = []
 
         for i, seg_states in enumerate(self.states):
             pulse_list = []
+
             for j, qbn in enumerate(self.qb_names):
+                unique, counts = np.unique(self.get_states(qbn)[qbn],
+                                           return_counts=True)
+                cal_pt_idx = i % np.squeeze(counts[np.argwhere(unique ==
+                                                               seg_states[j])])
                 for k, pulse_name in enumerate(self.pulse_label_map[seg_states[j]]):
                     pulse = deepcopy(operation_dict[pulse_name + qbn])
+                    pulse['name'] = f"{seg_states[j]}_{pulse_name + qbn}_" \
+                                    f"{cal_pt_idx}"
                     if k == 0:
                         pulse['ref_pulse'] = 'segment_start'
+                    if len(pulse_modifs) > 0:
+                        pulse = sweep_pulse_params([pulse], pulse_modifs)[0][0]
+                        # reset the name as sweep_pulse_params deletes it
+                        pulse['name'] = f"{seg_states[j]}_{pulse_name + qbn}_" \
+                                        f"{cal_pt_idx}"
                     pulse_list.append(pulse)
-                pulse_list = add_preparation_pulses(pulse_list, operation_dict,
+                pulse_list = add_preparation_pulses(pulse_list,
+                                                    operation_dict,
                                                     [qbn], **prep_params)
 
             pulse_list += generate_mux_ro_pulse_list(self.qb_names,
@@ -39,32 +53,6 @@ class CalibrationPoints:
             seg = segment.Segment(f'calibration_{i}', pulse_list)
             segments.append(seg)
         return segments
-    # def create_segments(self, operations_dict, qb_names=None, **prep_params):
-    #     if qb_names is None:
-    #         qb_names = self.qb_names
-    #
-    #     step = np.abs(sweep_points[-1] - sweep_points[-2])
-    #
-    #     if loc == 'end':
-    #         sweep_points = np.concatenate(
-    #             [sweep_points, [sweep_points[-1] + i * step for
-    #                             i in range(1, self.n_cal_points + 1)]])
-    #         start_idx =  \
-    #             -np.flip(np.linspace(self.n_per_state,
-    #                                  len(self.states) * self.n_per_state,
-    #                                  len(self.states)))
-    #         cal_pt_indices = \
-    #             {s: [idx + i for i in range(self.n_per_state)]
-    #                     for s, idx in zip(self.states, start_idx)}
-    #         self.segments.update(cal_pt_indices)
-    #         if self.verbose:
-    #             logging.info("Calibration Points Indices: {}"
-    #                          .format(self.segments))
-    #     else:
-    # #         raise NotImplementedError("Location {} not implemented"
-    # #                                   .format(loc))
-    #
-    #     return sweep_points
 
     def get_states(self, qb_names=None):
         """

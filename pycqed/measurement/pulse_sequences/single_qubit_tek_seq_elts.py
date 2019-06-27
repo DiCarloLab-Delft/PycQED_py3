@@ -86,7 +86,6 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points,
     return seq, np.arange(len(seq.segments))
 
 
-
 def add_preparation_pulses(pulse_list, operation_dict, qb_names,
                            preparation_type='wait', post_ro_wait=1e-6,
                            repetitions=3, final_reset_pulse=True):
@@ -170,6 +169,7 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
 
         return preparation_pulses + pulse_list
 
+
 def sweep_pulse_params(pulses, params):
     """
     Sweeps a list of pulses over specified parameters.
@@ -177,35 +177,55 @@ def sweep_pulse_params(pulses, params):
         pulses (list): All pulses. Pulses which have to be swept over need to
             have a 'name' key.
         params (dict):  keys in format <pulse_name>.<pulse_param_name>,
-            values are the sweep values.
+            values are the sweep values. <pulse_name> can be formatted as
+            exact name or '<pulse_starts_with>*<pulse_endswith>'. In that case
+            all pulses with name starting with <pulse_starts_with> and ending
+            with <pulse_endswith> will be modified. eg. "Rabi_*" will modify
+            Rabi_1, Rabi_2 in [Rabi_1, Rabi_2, Other_Pulse]
 
     Returns: a list of pulses_lists where each element is to be used
         for a single segment
 
     """
+
+    def check_pulse_name(pulse, target_name):
+        """
+        Checks if an asterisk is found in the name, in that case only the first
+        part of the name is compared
+        """
+        target_name_splitted = target_name.split("*")
+        if len(target_name_splitted) == 1:
+            return pulse.get('name', "") == target_name
+        elif len(target_name_splitted) == 2:
+            return pulse.get('name', "").startswith(target_name_splitted[0]) \
+                   and pulse.get('name', "").endswith(target_name_splitted[1])
+        else:
+            raise Exception(f"Only one asterisk in pulse_name is allowed,"
+                            f" more than one in {target_name}")
+
     swept_pulses = []
-    assert len(params.keys()) > 0, "No params to sweep"
+    if len(params.keys()) == 0:
+        log.warning("No params to sweep. Returning unchanged pulses.")
+        return pulses
+
     n_sweep_points = len(list(params.values())[0])
 
     assert np.all([len(v) == n_sweep_points for v in params.values()]), \
         "Parameter sweep values are not of all of the same length: {}" \
-        .format({n: len(v) for n, v in params.items()})
+            .format({n: len(v) for n, v in params.items()})
 
     for i in range(n_sweep_points):
         pulses_cp = deepcopy(pulses)
-
         for name, sweep_values in params.items():
             pulse_name, param_name = name.split('.')
             pulse_indices = [i for i, p in enumerate(pulses)
-                             if p.get('name', False) == pulse_name]
+                             if check_pulse_name(p, pulse_name)]
             if len(pulse_indices) == 0:
-                raise ValueError(f"No pulse with name {pulse_name} found.")
-            if len(pulse_indices) > 1:
-                raise ValueError(f"Pulse name is not unique. Found "
-                            f"{len(pulse_indices)} with name {pulse_name}")
+                log.warning(f"No pulse with name {pulse_name} found in list:"
+                            f"{[p.get('name', 'No Name') for p in pulses]}")
             for p_idx in pulse_indices:
                 pulses_cp[p_idx][param_name] = sweep_values[i]
-                pulses_cp[p_idx].pop("name", 0)
+                pulses_cp[p_idx].pop('name', 0)
         swept_pulses.append(pulses_cp)
 
     return swept_pulses
@@ -604,20 +624,18 @@ def ramsey_seq(times, pulse_pars, RO_pars,
             Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
             pulse_pars_x2['phase'] = Dphase
 
-        # if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-        #      seg = segment.Segment('segment_{}'.format(i),
-        #                            [pulses['I'], RO_pars])
-        # elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-        #      seg = segment.Segment('segment_{}'.format(i),
-        #                            [pulses['X180'], RO_pars])
-        # else:
-        #      seg = segment.Segment('segment_{}'.format(i),
-        #                            [pulses['X90'], pulse_pars_x2, RO_pars])
-        seg = segment.Segment(f'segment_{i}',[pulses['X90'],
-                              pulse_pars_x2, RO_pars])
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+             seg = segment.Segment('segment_{}'.format(i),
+                                   [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+             seg = segment.Segment('segment_{}'.format(i),
+                                   [pulses['X180'], RO_pars])
+        else:
+             seg = segment.Segment('segment_{}'.format(i),
+                                   [pulses['X90'], pulse_pars_x2, RO_pars])
+
         seg_list.append(seg)
         seq.add(seg)
-
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 
@@ -625,6 +643,7 @@ def ramsey_seq(times, pulse_pars, RO_pars,
         return seq, seg_list
     else:
         return seq_name
+
 
 
 def ramsey_seq_VZ(times, pulse_pars, RO_pars,
@@ -765,7 +784,7 @@ def ramsey_active_reset(times, qb_name, operation_dict, cal_points, n=1,
         ramsey_ops = ["X90"] * 2 * n
 
     ramsey_ops += ["RO"]
-    ramsey_ops = add_qb_name(ramsey_ops, qb_name)
+    ramsey_ops = add_suffix(ramsey_ops, " " + qb_name)
 
     # pulses
     ramsey_pulses = [deepcopy(operation_dict[op]) for op in ramsey_ops]
@@ -1259,6 +1278,138 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     else:
         return seq_name
 
+def qscale_active_reset(qscales, qb_name, operation_dict, cal_points,
+                        upload=True, preparation_type='wait', post_ro_wait=1e-6,
+                        reset_reps=1, final_reset_pulse=True, for_ef=False,
+                        last_ge_pulse=False):
+    '''
+    Sequence used for calibrating the QScale factor used in the DRAG pulses.
+    Applies X(pi/2)X(pi), X(pi/2)Y(pi), X(pi/2)Y(-pi) for each value of
+    QScale factor.
+
+    Beware that the elements alternate, in order to perform these 3
+    measurements per QScale factor, the qscales sweep values must be
+    repeated 3 times. This was chosen to be more easily compatible with
+    standard detector functions and sweep pts.
+
+    Input pars:
+        qscales:             array of qscale factors
+        pulse_pars:          dict containing the DRAG pulse parameters
+        RO_pars:             dict containing the RO parameters
+        cal_points:          if True, replaces the last 3*4 segments with
+                             calibration points
+    '''
+    seq_name = f'QScale{"_ef" if for_ef else ""}_sequence'
+    prep_params = dict(preparation_type=preparation_type,
+                       post_ro_wait=post_ro_wait,
+                       repetitions=reset_reps,
+                       final_reset_pulse=final_reset_pulse)
+
+    # Operations
+    qscale_base_ops = [['X90', 'X180'], ['X90', 'Y180'], ['X90', 'mY180']]
+    final_pulses = []
+
+    for i, qscale_ops in enumerate(qscale_base_ops):
+        qscale_ops = add_suffix(qscale_ops, "_ef" if for_ef else "")
+        if for_ef:
+            qscale_ops = ['X180'] + qscale_ops
+            if last_ge_pulse:
+                qscale_ops += ["X180"]
+        qscale_ops += ['RO']
+        qscale_ops = add_suffix(qscale_ops, " " + qb_name)
+
+        # pulses
+        qscale_pulses = [deepcopy(operation_dict[op]) for op in qscale_ops]
+
+        # name and reference swept pulse
+        for i in range(2):
+            idx = (1 if for_ef else 0) + i
+            qscale_pulses[idx]["name"] = f"Qscale_{i}"
+
+        # sweep pulses
+        params = {f"Qscale_*.motzoi": qscales[i::3]}
+        swept_pulses = sweep_pulse_params(qscale_pulses, params)
+
+        # add preparation pulses
+        swept_pulses_with_prep = \
+            add_preparation_pulses(swept_pulses, operation_dict,
+                                   [qb_name], **prep_params)
+        final_pulses.append(swept_pulses_with_prep)
+
+    # intertwine pulses in same order as base_ops
+
+    final_pulses = np.array(final_pulses).transpose().tolist()[0]
+    #return final_pulses, 0
+
+    seq = pulse_list_list_seq(final_pulses, seq_name, upload=False)
+
+    # add calibration segments
+    # modif_cal_params = {f"{'f_X180_ef' if for_ef else 'e_X180'}*.motzoi":
+    #                     [np.mean(qscales)]}
+    modif_cal_params = dict()
+    seq.extend(cal_points.create_segments(operation_dict,
+                                          pulse_modifs=modif_cal_params,
+                                          **prep_params))
+
+    if upload:
+        ps.Pulsar.get_instance().program_awgs(seq)
+
+    return seq, np.arange(len(seq.segments))
+
+    for i, motzoi in enumerate(qscales):
+        pulse_keys = pulse_combinations[i % 3]
+        for p_name in ['X180', 'Y180', 'X90', 'mY180']:
+            pulses_2nd[p_name]['motzoi'] = motzoi
+        if cal_points and (i == (len(times)-6) or
+                          i == (len(times)-5)):
+           el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(qscales)-4) or
+                                   i == (len(qscales)-3)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        elif cal_points and (i == (len(qscales)-2) or
+                                     i == (len(qscales)-1)):
+            # pick motzoi for calpoint in the middle of the range
+            pulses['X180']['motzoi'] = np.mean(qscales)
+            el = multi_pulse_elt(i, station, [pulses_2nd['X180_ef'], RO_pars])
+        if cal_points and no_cal_points == 6 and \
+                (i == (len(qscales)-6) or i == (len(qscales)-5)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(qscales)-4) or i == (len(qscales)-3)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 6 and \
+                (i == (len(qscales)-2) or i == (len(qscales)-1)):
+            pulses_2nd['X180']['motzoi'] = np.mean(qscales)
+            el = multi_pulse_elt(i, station, [pulses['X180'],
+                                              pulses_2nd['X180'],
+                                              RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(qscales)-4) or i == (len(qscales)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 4 and \
+                (i == (len(qscales)-2) or i == (len(qscales)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], pulses_2nd['I'], RO_pars])
+        elif cal_points and no_cal_points == 2 and \
+                (i == (len(qscales)-2) or i == (len(qscales)-1)):
+            el = multi_pulse_elt(i, station, [pulses['I'], pulses_2nd['I'], RO_pars])
+        else:
+            pulse_list = [pulses['X180']]
+            pulse_list += [pulses_2nd[x] for x in pulse_keys]
+            if last_ge_pulse:
+                pulse_list += [pulses['X180']]
+            pulse_list += [RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
 def qscale(qscales, pulse_pars, RO_pars,
            cal_points=True, upload=True, return_seq=False):
     '''
@@ -1495,5 +1646,5 @@ def over_under_rotation_seq(qb_name, nr_pi_pulses_array, operation_dict,
         ps.Pulsar.get_instance().program_awgs(seq)
     return
 
-def add_qb_name(operation_list, qb_name):
-    return [op + f" {qb_name}" for op in operation_list]
+def add_suffix(operation_list, suffix):
+    return [op + suffix for op in operation_list]

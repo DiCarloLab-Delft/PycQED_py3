@@ -911,4 +911,6 @@ class UnresolvedPulse:
             string_repr += f"\n   ref_point: {self.ref_point}"
         if self.delay != 0:
             string_repr += f"\n   delay: {self.delay}"
+        if self.original_phase != 0:
+            string_repr += f"\n   phase: {self.original_phase}"
         return string_repr
