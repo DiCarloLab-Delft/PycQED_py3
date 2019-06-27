@@ -146,8 +146,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            initial_value={'FBL_1': 1, 'FBL_2': 0.01},
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mock_flux_current_overall', unit='A',
-                           initial_value=10e-3,
+        self.add_parameter('mock_fl_dc_V_per_phi0', unit='A',
+                           initial_value=20e-3,
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_cfg_dc_flux_ch',
@@ -302,7 +302,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         for i in self.mock_flux_sensitivity():
             fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
 
-        I0 = self.mock_flux_current_overall()
+        I0 = self.mock_fl_dc_V_per_phi0()
 
         total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
 
@@ -350,7 +350,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
     def measure_resonator_power(self, freqs, powers, MC=None,
                                 analyze: bool = True, close_fig: bool = True,
-                                fluxChan=None):
+                                fluxChan=None, label: str = ''):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -424,7 +424,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_points_2D(powers)
 
         MC.set_detector_function(d)
-        MC.run('Resonator_power_scan'+self.msmt_suffix, mode='2D')
+        MC.run('Resonator_power_scan'+self.msmt_suffix + label, mode='2D')
 
         if analyze:
             # ma.TwoD_Analysis(label='Resonator_power_scan',
@@ -512,7 +512,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
     def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
                                          MC=None, analyze=True, fluxChan=None,
-                                         close_fig=True,
+                                         close_fig=True, mode='pulsed_marked',
                                          nested_resonator_calibration=False,
                                          resonator_freqs=None):
 
@@ -534,7 +534,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             for i in self.mock_flux_sensitivity():
                 fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
 
-            I0 = self.mock_flux_current_overall()
+            I0 = self.mock_fl_dc_V_per_phi0()
 
             total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
 
@@ -612,7 +612,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             for i in self.mock_flux_sensitivity():
                 fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
 
-            I0 = self.mock_flux_current_overall()
+            I0 = self.mock_fl_dc_V_per_phi0()
             total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
 
             h = self.ro_pulse_amp_CW()*10e-3  # Lorentian baseline [V]
@@ -1033,7 +1033,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         for i in self.mock_flux_sensitivity():
             fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
 
-        I0 = self.mock_flux_current_overall()
+        I0 = self.mock_fl_dc_V_per_phi0()
         total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
 
         f_qubit = (np.sqrt(8*self.mock_Ec()*self.mock_Ej() *

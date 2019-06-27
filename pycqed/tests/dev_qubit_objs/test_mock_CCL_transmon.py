@@ -215,7 +215,7 @@ class Test_Mock_CCL(unittest.TestCase):
 
         assert self.CCL_qubit.fl_dc_V0() == pytest.approx(
                                     self.CCL_qubit.mock_sweetspot_current(),
-                                    abs=10e-6)
+                                    abs=30e-6)
 
     ###########################################################
     # Test RO pulse calibration
