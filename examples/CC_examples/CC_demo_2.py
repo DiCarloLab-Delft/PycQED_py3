@@ -154,12 +154,6 @@ rolut = UHFQC_RO_LutMan('rolut', num_res=7)
 if conf.mw_0 != '':
     # define sequence
     sequence_length = 32
-    if 0:
-        staircase_sequence = range(1, sequence_length)
-        expected_sequence = [(0, list(staircase_sequence)), \
-                             (1, list(staircase_sequence)), \
-                             (2, list(reversed(staircase_sequence))), \
-                             (3, list(reversed(staircase_sequence)))]
 
     # configure instrument
     instr.mw_0.load_default_settings()
@@ -171,17 +165,11 @@ if conf.mw_0 != '':
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
     delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
     for awg in range(4):
-        instr.mw_0._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)
+        instr.mw_0._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay) # skew TOGGLE_DS versus rest
 
 if conf.flux_0 != '':
     # define sequence
     sequence_length = 8
-    if 0:
-        staircase_sequence = np.arange(1, sequence_length)
-        expected_sequence = [(0, list(staircase_sequence + 8 * staircase_sequence)), \
-                             (1, list(staircase_sequence + 8 * staircase_sequence)), \
-                             (2, list(staircase_sequence + 8 * staircase_sequence)), \
-                             (3, list(staircase_sequence))]
 
     # configure instrument
     instr.mw_0.load_default_settings()
