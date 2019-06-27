@@ -75,7 +75,8 @@ def mixer_carrier_cancellation(SH, source, MC,
                     'sigma0':1,
                     'options': {'maxiter': 300,    # maximum function cals
                                 # Scaling for individual sigma's
-                                'cma_stds': [init_stepsize]*2
+                                'cma_stds': [init_stepsize]*2,
+                                'ftarget': -110
                                 },
                     'minimize': True}
     MC.set_sweep_functions([chI_par, chQ_par])

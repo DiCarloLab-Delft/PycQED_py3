@@ -4937,7 +4937,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         if isinstance(art_det, list):
             art_det = art_det[0]
-        # print(fit_res.params['tau'])
+            
         if textbox:
             textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
                        % (self.qubit_freq_spec * 1e-9) +
@@ -6810,7 +6810,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             # Quick fix to make it work with pulsed spec which does not
             # return both I,Q and, amp and phase
             # only using the amplitude!!
-            self.data_dist = self.measured_values[0]
+            self.data_dist = self.measured_values[0] - np.min(self.measured_values[0])
 
         # Smooth the data by "filtering"
         data_dist_smooth = a_tools.smooth(self.data_dist,
@@ -7801,21 +7801,21 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
         # It could be extended by looking at the amplitude of the dip, such that
         # fewer data points are necessary
 
-        threshold = 0.25e6
+        threshold = 0.1e6
         f_low = 0
-        P_result = np.max(self.sweep_points_2D)
+        P_result = self.sweep_points_2D[0]
         try:
             for u, f in enumerate(f0):
-                if np.abs(f0[u] - f0[u+1]) < threshold:
+                if np.abs(f0[0] - f0[u+1]) < threshold:
                     f_low = f0[u+1]
-                    P_result = self.sweep_points_2D[u+1]
+                    P_result = self.sweep_points_2D[u]
                 else:
                     break
         except IndexError:
             pass
 
         # High power regime: just use the value at highest power
-
+        f_low = f0[0]
         f_high = f0[-1]
 
         if (f_high < f_low):
@@ -7824,10 +7824,14 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
             shift = 0
             print('f_high: ' + str(f_high))
             print('f_low:  ' + str(f_low))
+            logging.warning('No power shift found. Consider attenuation')
             # raise Exception('High power regime frequency found to be higher than'
             #                 'low power regime frequency')
-        results = [shift, P_result, f_low, f_high]
-        self.results = results
+
+        self.f_low = f_low
+        self.f_high = f_high
+        self.shift = shift
+        self.power = P_result
 
     def fit_hanger_model(self, sweep_values, measured_values):
         HangerModel = fit_mods.SlopedHangerAmplitudeModel

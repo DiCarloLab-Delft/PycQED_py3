@@ -14,7 +14,7 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
-
+import logging
 
 import importlib
 importlib.reload(ba)
@@ -778,7 +778,7 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
         self.f0s = np.array(f0s)
         self.run_full_analysis()
         self.dac_fit_res = self.fit_dac_arc()
-        self.sweet_spot_value = self.dac_fit_res.values['phase']
+        self.sweet_spot_value = -1*self.dac_fit_res.values['phase']
         self.current_to_flux = 1/self.dac_fit_res.values['frequency']
         self.plot_fit_result()
 
@@ -794,45 +794,22 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
       freq = 1/(np.abs(max_DAC-min_DAC)*2)
 
       Model = fit_mods.CosModel2
-      Model.set_param_hint('frequency', value=freq, min=0)#, max = max_freq)
-      Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s), max=max(f0s))
-      Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2, min=0, max=max(f0s)-min(f0s))
-      Model.set_param_hint('phase', value=-max_DAC)#, min = min(DAC_values), max = max(DAC_values))
+      Model.set_param_hint('frequency', value=freq, min=0)
+      Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s),
+                                                         max=max(f0s))
+      Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2, min=0)
+      Model.set_param_hint('phase', value=0)
       params = Model.make_params()
-      fit_res = Model.fit(data=f0s,t=DAC_values, verbose=False)
-
-      print(fit_res.params)
+      fit_res = Model.fit(data=f0s, t=DAC_values, verbose=False)
 
       return fit_res
 
-      # fit_res_list = []
-      # min_freq = 0
-      # max_freq = 4/(max(DAC_values)-min(DAC_values))
-      # test_freqs = np.linspace(min_freq,max_freq,21)
-      # DAC_range = max(DAC_values)-min(DAC_values)
-      # test_phases = np.linspace(min(DAC_values)+0.25*DAC_range,min(DAC_values)+0.75*DAC_range,21)
-      # for freq in test_freqs:
-      #   for phase in test_phases:
-      #     print(phase)
-      #     Model = fit_mods.CosModel2
-      #     Model.set_param_hint('frequency', value=freq,min=0)#, max = max_freq)
-      #     Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s), max=max(f0s))
-      #     Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2,min=0,max=max(f0s)-min(f0s))
-      #     Model.set_param_hint('phase', value=phase)#, min = min(DAC_values), max = max(DAC_values))
-      #     params = Model.make_params()
-      #     fit_res_list.append(Model.fit(data=f0s,t=DAC_values, verbose=False))
-      # chi_sqrs = []
-      # for fit_res in fit_res_list:
-      #   chi_sqrs.append(fit_res.chisqr)
-      # best_fit_index = np.argmin(np.array(chi_sqrs))
-      # return fit_res_list[best_fit_index]
-
   def plot_fit_result(self,normalize=False, plot_linecuts=True,
-                               linecut_log=False, colorplot_log=False,
-                               plot_all=True, save_fig=True,
-                               transpose=False, figsize=None, filtered=False,
-                               subtract_mean_x=False, subtract_mean_y=False,
-                               **kw):
+                      linecut_log=False, colorplot_log=False,
+                      plot_all=True, save_fig=True,
+                      transpose=False, figsize=None, filtered=False,
+                      subtract_mean_x=False, subtract_mean_y=False,
+                      **kw): 
       fig, ax = plt.subplots(figsize=figsize)
       self.fig_array.append(fig)
       self.ax_array.append(ax)
@@ -882,9 +859,119 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
           self.save_fig(fig, figname=savename, **kw)
 
 
-class Initial_VNA_Analysis(ba.BaseDataAnalysis):
+class VNA_DAC_Analysis_v2(VNA_TwoD_Analysis):
+    """
+    This function can be called with timestamp as its only argument. It will fit
+    a cosine to any VNA DAC arc. The fit is stored in dac_fit_res.
+    Use .sweetspotvalue to get a guess for the qubit sweetspot current,
+    and use .current_to_flux to get the current requiired for one flux period
+
+    Has a more sophisticated arch model
+    """
+
+    def __init__(self, timestamp,
+                 options_dict=None,
+                 do_fitting=True,
+                 extract_only=False,
+                 auto=True):
+        super(VNA_TwoD_Analysis, self).__init__(timestamp = timestamp,
+                                                options_dict=options_dict,
+                                                extract_only=extract_only,
+                                                auto=auto,
+                                                do_fitting=do_fitting)
+
+        linecut_fit_result = self.fit_linecuts()
+        self.linecut_fit_result = linecut_fit_result
+        f0s = []
+        for res in self.linecut_fit_result:
+            f0s.append(res.values['f0']*1e9)
+        self.f0s = np.array(f0s)
+        self.run_full_analysis()
+        self.dac_fit_res = self.fit_dac_arc()
+        self.sweet_spot_value = -1*self.dac_fit_res.values['phase']
+        self.current_to_flux = 1/self.dac_fit_res.values['frequency']
+        self.plot_fit_result()
+
+    def fit_dac_arc(self):
+        DAC_values = self.sweep_points_2D
+        f0s = self.f0s
+
+        max_index = np.where(f0s==max(f0s))[0]
+        min_index = np.where(f0s==min(f0s))[0]
+        max_DAC = DAC_values[max_index]
+        min_DAC = DAC_values[min_index]
+
+        freq = 1/(np.abs(max_DAC-min_DAC)*2)
+
+        Model = fit_mods.ResonatorArch
+        # Model.set_param_hint('f_bare', value=min(f0s), min=0)
+        # Model.set_param_hint('g', value=(50e6)**2)
+        # Model.set_param_hint('A', value=5e9)
+        # Model.set_param_hint('f', value=40)
+        # Model.set_param_hint('sweetspot_cur', value=0)
+        # params = Model.make_params()
+        fit_res = Model.fit(data=f0s, t=DAC_values, verbose=True)
+
+        return fit_res
+
+    def plot_fit_result(self,normalize=False, plot_linecuts=True,
+                        linecut_log=False, colorplot_log=False,
+                        plot_all=True, save_fig=True,
+                        transpose=False, figsize=None, filtered=False,
+                        subtract_mean_x=False, subtract_mean_y=False,
+                        **kw):
+        fig, ax = plt.subplots(figsize=figsize)
+        self.fig_array.append(fig)
+        self.ax_array.append(ax)
+        # print "unransposed",meas_vals
+        # print "transposed", meas_vals.transpose()
+        self.ax_array.append(ax)
+        savename = 'Heatmap_{}'.format(self.value_names[0])
+        fig_title = '{} {} \n{}'.format(
+            self.timestamp_string, self.measurementstring,
+            self.value_names[0])
+
+        if "xlabel" not in kw:
+            kw["xlabel"] = self.parameter_names[0]
+        if "ylabel" not in kw:
+            kw["ylabel"] = self.parameter_names[1]
+        if "xunit" not in kw:
+            kw["xunit"] = self.parameter_units[0]
+        if "yunit" not in kw:
+            kw["yunit"] = self.parameter_units[1]
+
+        # subtract mean from each row/column if demanded
+        plot_zvals = self.measured_values[0].transpose()
+        if subtract_mean_x:
+            plot_zvals = plot_zvals - np.mean(plot_zvals,axis=1)[:,None]
+        if subtract_mean_y:
+            plot_zvals = plot_zvals - np.mean(plot_zvals,axis=0)[None,:]
+
+        a_tools.color_plot(x=self.sweep_points,
+                           y=self.sweep_points_2D,
+                           z=plot_zvals,
+                           zlabel=self.zlabels[0],
+                           fig=fig, ax=ax,
+                           log=colorplot_log,
+                           transpose=transpose,
+                           normalize=normalize,
+                           **kw)
+
+        plot_dacs = np.linspace(min(self.sweep_points_2D),max(self.sweep_points_2D),101)
+        plot_freqs = fit_mods.CosFunc2(plot_dacs,**self.dac_fit_res.params)
+
+        ax.plot(self.f0s,self.sweep_points_2D,'ro-')
+        ax.plot(plot_freqs,plot_dacs,'b')
+        
+        ax.set_title(fig_title)
+
+        if save_fig:
+            self.save_fig(fig, figname=savename, **kw)
+
+
+class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
     def __init__(self,
-                 label='Initial_VNA',
+                 label='Resonator_scan',
                  do_fitting=False,
                  extract_only=False):
       super().__init__(label=label,
@@ -907,62 +994,68 @@ class Initial_VNA_Analysis(ba.BaseDataAnalysis):
       freqs = freqs[0]
       data = data[0]
 
+      peak_freqs, peak_heights, data = a_tools.peak_finder_v3(freqs, 
+                                                          data,
+                                                          perc=99, factor=-1,
+                                                          window_len=11)
 
-      peaks = a_tools.peak_finder(freqs, data,
-                                  percentile=85,
-                                  optimize=True)
-
-      dips_idx = [peaks['dips_idx']]
-      dips_idx = np.append(dips_idx, dips_idx[-1])
-
-
-      single_peak_idx = [dips_idx[0]]
-      for i in range(len(dips_idx)-1):
-        ind = dips_idx[i]
-        if np.abs(ind - dips_idx[i+1]) > 25:  # Other peak
-          single_peak_idx.append(dips_idx[i+1])
-
-
-
-      dip_freq = []
-      dip_idx = []
-      for ind in single_peak_idx:
-        ind_min = ind-30
-        ind_max = ind+30
-        # Find index of local minimum:
-        dip_ind = np.where(data == np.amin(data[ind_min:ind_max]))[0][0]
-        dip_freq.append(freqs[dip_ind])
-        dip_idx.append(dip_ind)
+      if len(peak_freqs) == 0:
+        logging.warning('No resonator peaks found!')
+      else:
+        single_peak_freqs = [peak_freqs[0]]
+        for i in range(len(peak_freqs) - 1):
+          if np.abs(peak_freqs[i]-peak_freqs[i+1]) > 5e6:
+            single_peak_freqs.append(peak_freqs[i+1])
 
       # Sometimes duplicates occur. This should remove them
-
       final_freqs = []
-      for freq in dip_freq:
+      for freq in single_peak_freqs:
         if freq not in final_freqs:
           final_freqs.append(freq)
 
-      final_idx = []
-      for idx in dip_idx:
-        if idx not in final_idx:
-          final_idx.append(idx)
+      idx = []
+      for freq in final_freqs:
+        idx.append(np.where(freqs==freq)[0][0])
 
+      # Find local minima:
+      dip_idx = []
+      dip_freqs = []
+      for ind in idx:
+        width = int(round(np.abs(5e6/(freqs[0]-freqs[1]))))
+        min_ind = ind - 20
+        max_ind = ind + 20
+        new_ind = np.where(data == np.amin(data[min_ind:max_ind]))[0][0]
+        dip_idx.append(new_ind)
+        dip_freqs.append(freqs[new_ind])
 
-      self.peaks = final_freqs
-      self.peaks_idx = final_idx
-      self.plot_fit_result()
+      for ind in dip_idx:
+        if np.abs(data[ind]) < 0.5*np.std(data):
+          dip_idx.remove(ind)
+          dip_freqs.remove(freqs[ind])
+
+      self.peaks = dip_freqs
+      self.peaks_idx = dip_idx
+      self.peak_height = []
+      for ind in self.peaks_idx:
+        self.peak_height.append(self.raw_data_dict['amp'][0][ind])
+
+      # Remove duplicates:
+      final_peaks = []
+      for peak in self.peaks:
+          if peak not in final_peaks:
+              final_peaks.append(peak)
+      self.peaks = final_peaks
 
     def plot_fit_result(self, normalize=False,
                         save_fig=True, figsize=None, **kw):
-      peak_height = []
-      for ind in self.peaks_idx:
-        peak_height.append(self.raw_data_dict['amp'][0][ind])
 
       fig, ax = plt.subplots(figsize=figsize)
 
       savename = 'Found Peaks'
 
-      ax.plot(self.raw_data_dict['freq'][0], self.raw_data_dict['amp'][0], marker='o')
-      ax.plot(self.peaks, peak_height, marker='o', linestyle='', color='r')
+      ax.plot(self.raw_data_dict['freq'][0], self.raw_data_dict['amp'][0], 
+              marker='o', color='C0')
+      ax.plot(self.peaks, self.peak_height, marker='o', linestyle='', color='r')
 
       if save_fig:
 
@@ -970,6 +1063,56 @@ class Initial_VNA_Analysis(ba.BaseDataAnalysis):
         fname = filepath + "/" + savename + '.png'
         fig.savefig(fname)
 
+    def prepare_plots(self):
+        plotfn = self.plot_line
+        self.plot_dicts['main'] = {
+            'plotfn': plotfn,
+            'ax_id': 'main',
+            'xvals': self.raw_data_dict['freq'],
+            'yvals': self.raw_data_dict['amp'],
+            'xunit': 'Hz',
+            'yunit': 'V',
+            'xlabel': 'Frequency',
+            'ylabel': 'Amp',
+            'title': 'Wide range resonator scan \n{}'.format(
+                self.raw_data_dict['timestamps'][0]),
+            'linestyle': '-',
+            'marker': 'o',
+            'setlabel': 'data',
+            'color': 'C0'
+        }
+        self.plot_dicts['fit_main'] = {
+            'plotfn': plotfn,
+            'ax_id': 'fit',
+            'xvals': self.raw_data_dict['freq'],
+            'yvals': self.raw_data_dict['amp'],
+            'xunit': 'Hz',
+            'yunit': 'V',
+            'xlabel': 'Frequency',
+            'ylabel': 'Amp',
+            'title': 'Found peaks \n{}'.format(
+                self.raw_data_dict['timestamps'][0]),
+            'linestyle': '-',
+            'marker': 'o',
+            'setlabel': 'data',
+            'color': 'C0'
+        }
+        self.plot_dicts['peaks'] = {
+            'plotfn': plotfn,
+            'ax_id': 'fit',
+            'xvals': self.peaks,
+            'yvals': self.peak_height,
+            'xunit': 'Hz',
+            'yunit': 'V',
+            'xlabel': 'Frequency',
+            'ylabel': 'Amp',
+            'title': 'Found peaks \n{}'.format(
+                self.raw_data_dict['timestamps'][0]),
+            'linestyle': '',
+            'marker': 'o',
+            'setlabel': 'data',
+            'color': 'r',
+        }
 
 class ResonatorSpectroscopy(Spectroscopy):
     def __init__(self, t_start,
@@ -1194,9 +1337,9 @@ class SpecPowAnalysis(ba.BaseDataAnalysis):
   def __init__(self, t_start: str=None, t_stop: str=None,
                label: str='spectroscopy',
                pow_key='Instrument settings.Q.spec_pow',
-               frequency_key='Analysis.Fitted Params HM.f0',
-               width_key='Analysis.Fitted Params HM.kappa',
-               amp_key='Analysis.Fitted Params HM.A',
+               frequency_key='Analysis.Fitted Params HM.f0.value',
+               width_key='Analysis.Fitted Params HM.kappa.value',
+               amp_key='Analysis.Fitted Params HM.A.value',
                do_fitting=True,
                extract_only: bool=False):
 
