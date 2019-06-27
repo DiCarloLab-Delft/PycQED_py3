@@ -53,6 +53,9 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                       calibrate_function=Qubit.name + '.find_test_resonators')
         self.add_node('Resonators Flux Sweep',
                       calibrate_function=Qubit.name + '.find_qubit_resonator_fluxline')
+        self.add_node('Two Qubit ALLXY',
+                      calibrate_function=self.device.name + '.measure_two_qubit_allxy')
+
         self.add_edge('Zoom on resonators', 'Resonators Wide Search')
         self.add_edge('Resonators Power Scan',
                       'Zoom on resonators')
@@ -217,6 +220,11 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           Qubit.name + ' f_12 estimate')
             self.add_edge(Qubit.name + ' Avoided Crossing',
                           Qubit.name + ' DAC Arc Polynomial')
+
+        self.add_edge('Two Qubit ALLXY',
+                      self.device.qubits()[0] + ' ALLXY')
+        self.add_edge('Two Qubit ALLXY',
+                      self.device.qubits()[1] + ' ALLXY')
 
         self.cfg_plot_mode = 'svg'
         self.update_monitor()

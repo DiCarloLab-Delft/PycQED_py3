@@ -1038,7 +1038,13 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
       self.peak_height = []
       for ind in self.peaks_idx:
         self.peak_height.append(self.raw_data_dict['amp'][0][ind])
-      # self.plot_fit_result()
+
+      # Remove duplicates:
+      final_peaks = []
+      for peak in self.peaks:
+          if peak not in final_peaks:
+              final_peaks.append(peak)
+      self.peaks = final_peaks
 
     def plot_fit_result(self, normalize=False,
                         save_fig=True, figsize=None, **kw):

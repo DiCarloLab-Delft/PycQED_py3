@@ -11,6 +11,7 @@ from pycqed.measurement.openql_experiments import pygsti_oql
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.analysis.tools import cryoscope_tools as ct
 from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.utilities.general import gen_sweep_pts
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
@@ -963,7 +964,6 @@ class CCLight_Transmon(Qubit):
             ro_lm.acquisition_delay(self.ro_acq_delay())
             if upload:
                 ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
-
             UHFQC.sigouts_0_offset(self.ro_pulse_mixer_offs_I())
             UHFQC.sigouts_1_offset(self.ro_pulse_mixer_offs_Q())
 
@@ -1206,19 +1206,20 @@ class CCLight_Transmon(Qubit):
         self.ro_acq_averages(32768)
         # Repeat measurement while no peak is found:
         success = False
-        freq_center = f_start
+        f_center = f_start
         n = 0
         while not success:
             success = None
-            freq_center += f_span*n*(-1)**n
+            f_center += f_span*n*(-1)**n
             n += 1
-            if verbose:  # Hardcoded for now
+            if verbose: 
+                cfreq, cunit = plt_tools.SI_val_to_msg_str(f_center, 'Hz', float)
+                sfreq, sunit = plt_tools.SI_val_to_msg_str(f_span, 'Hz', float)
                 print('Doing adaptive spectroscopy around {:.3f} {} with a '
-                      'span of {:.0f} {}.'.format(freq_center/1e9, 'GHz', 
-                                                  f_span/1e6, 'MHz'))
-            freqs = np.arange(freq_center - f_span/2,
-                              freq_center + f_span/2,
-                              f_step)
+                      'span of {:.0f} {}.'.format(cfreq, cunit, sfreq, sunit))
+
+            freqs = np.arange(f_center - f_span/2, f_center + f_span/2, f_step)
+
             self.measure_spectroscopy(MC=MC, freqs=freqs, mode=spec_mode,
                                       analyze=False)
             label = 'spec'
@@ -1270,6 +1271,12 @@ class CCLight_Transmon(Qubit):
             return True
 
     def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
+        """
+        Does a resonator power scan and determines at which power the low power
+        regime is exited. If update=True, will set the readout power to this
+        power.
+        """
+
         if freqs is None:
             freq_center = self.freq_res()
             freq_range = 10e6
@@ -1277,21 +1284,18 @@ class CCLight_Transmon(Qubit):
                               0.1e6)
 
         if powers is None:
-            powers = np.arange(-40, 0.1, 4)
+            powers = np.arange(-40, 0.1, 8)
 
         self.measure_resonator_power(freqs=freqs, powers=powers, analyze=False)
         fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
                                                   close_fig=True)
         if update:
-            shift = fit_res.results[0]
-            power = fit_res.results[1]
-            f_low = fit_res.results[2]
-            ro_pow = 10**(power/20)
+            ro_pow = 10**(fit_res.power/20)
             self.ro_pulse_amp_CW(ro_pow/3)
             self.ro_pulse_amp(ro_pow/3)
-            self.freq_res(f_low)
+            self.freq_res(fit_res.f_low)
             if self.freq_qubit() is None:
-                f_qubit_estimate = self.freq_res() + (65e6)**2/(shift) - 500e6
+                f_qubit_estimate = self.freq_res() + (65e6)**2/(fit_res.shift)
                 logging.info('No qubit frquency found. Updating with RWA to {}'
                              .format(f_qubit_estimate))
                 self.freq_qubit(f_qubit_estimate)
@@ -1781,7 +1785,8 @@ class CCLight_Transmon(Qubit):
     #####################################################
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
-                                        analyze=True, close_fig=True):
+                                        analyze=True, close_fig=True,
+                                        label=''):
         UHFQC = self.instr_acquisition.get_instr()
         self.prepare_for_continuous_wave()
         if MC is None:
@@ -1806,7 +1811,7 @@ class CCLight_Transmon(Qubit):
 
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Resonator_scan'+self.msmt_suffix)
+        MC.run(name='Resonator_scan'+self.msmt_suffix+label)
         # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
@@ -1815,7 +1820,8 @@ class CCLight_Transmon(Qubit):
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
     def measure_resonator_power(self, freqs, powers, MC=None,
-                                analyze: bool=True, close_fig: bool=True):
+                                analyze: bool=True, close_fig: bool=True,
+                                label: str=''):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1841,7 +1847,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points_2D(powers)
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
+        MC.run(name='Resonator_power_scan'+self.msmt_suffix+label, mode='2D')
         if analyze:
             ma.TwoD_Analysis(label='Resonator_power_scan',
                              close_fig=close_fig, normalize=True)
@@ -1881,7 +1887,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
                                              analyze: bool =True, close_fig: bool=True,
-                                             fluxChan=None,):
+                                             fluxChan=None, label=''):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1913,7 +1919,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Resonator_dac_scan'+self.msmt_suffix, mode='2D')
+        MC.run(name='Resonator_dac_scan'+self.msmt_suffix+label, mode='2D')
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
 
@@ -2896,7 +2902,7 @@ class CCLight_Transmon(Qubit):
         self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
-        # real_imag is acutally not polar and as such works for opt weights
+        #  real_imag is acutally not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
