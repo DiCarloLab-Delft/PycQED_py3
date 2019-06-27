@@ -7762,8 +7762,11 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
             logging.warning('No power shift found. Consider attenuation')
             # raise Exception('High power regime frequency found to be higher than'
             #                 'low power regime frequency')
-        results = [shift, P_result, f_low, f_high]
-        self.results = results
+
+        self.f_low = f_low
+        self.f_high = f_high
+        self.shift = shift
+        self.power = P_result
 
     def fit_hanger_model(self, sweep_values, measured_values):
         HangerModel = fit_mods.SlopedHangerAmplitudeModel

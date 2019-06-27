@@ -320,7 +320,7 @@ class DeviceCCL(Instrument):
             UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
             thresholding=self.ro_acq_digitized(),
             AWG=self.instr_CC.get_instr(),
-            channels=[w0, w1], correlations=[(w0, w1)],
+            channels=[w0, w1], correlations=[(w0, w1, 3)],
             nr_averages=self.ro_acq_averages(),
             integration_length=q0.ro_acq_integration_length(),
             single_int_avg=single_int_avg,
