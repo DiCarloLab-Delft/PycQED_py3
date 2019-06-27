@@ -169,6 +169,9 @@ if conf.mw_0 != '':
     instr.mw_0.cfg_codeword_protocol('microwave')
     instr.mw_0.upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
+    delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
+    for awg in range(4):
+        instr.mw_0._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)
 
 if conf.flux_0 != '':
     # define sequence
