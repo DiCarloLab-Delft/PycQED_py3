@@ -3,7 +3,6 @@
 import os
 import logging
 import sys
-import time
 from pathlib import Path
 import numpy as np
 
@@ -13,6 +12,7 @@ from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import ZI_
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
+import pycqed.measurement.openql_experiments.openql_helpers as oqh
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 
@@ -53,7 +53,9 @@ conf.mw_0 = 'dev8079'
 conf.flux_0 = ''
 conf.cc_ip = '192.168.0.241'
 
-qubit_idx = 10
+qubit_idx = 3 # NB: connects to AWG8'mw_0'  in slot 3
+slot_mw_0 = 4
+slot_ro_1 = 1
 curdir = os.path.dirname(__file__)
 cfg_openql_platform_fn = str(Path("../../pycqed/tests/openql/test_cfg_cc.json"))
 print(cfg_openql_platform_fn)
@@ -66,7 +68,7 @@ if sel==0:  # ALLXY
     # based on CCL_Transmon.py::measure_allxy()
     log.debug('compiling allxy')
     p = sqo.AllXY(qubit_idx=qubit_idx, double_points=True, platf_cfg=cfg_openql_platform_fn)
-    print(p.filename)
+    cc_file_name = p.filename
 
 if sel==1:  # Ramsey
     # based on CCL_Transmon.py::measure_ramsey()
@@ -79,7 +81,7 @@ if sel==1:  # Ramsey
                * abs(cfg_cycle_time)
     times = np.arange(0, T2_star * 4, stepsize)
     p = sqo.Ramsey(times, qubit_idx=qubit_idx, platf_cfg=cfg_openql_platform_fn)
-    print(p.filename)
+    cc_file_name = p.filename
 
 if sel==2:  # Rabi
     # based on CCL_Transmon.py::measure_rabi_channel_amp()
@@ -88,7 +90,29 @@ if sel==2:  # Rabi
         qubit_idx=qubit_idx, pulse_comb='on',
         initialize=False,
         platf_cfg=cfg_openql_platform_fn)
-    print(p.filename)
+    cc_file_name = p.filename
+
+if sel==3:  # Quantum staircase
+    # based on CCL_Transmon.py::measure_rabi_channel_amp()
+    log.debug('compiling Quantum staircase')
+
+    p = oqh.create_program('QuantumStaircase', cfg_openql_platform_fn)
+
+    k = oqh.create_kernel("Main", p)
+    # gates with codewords [1:6]
+    k.gate('rx180', [qubit_idx])
+    k.gate('ry180', [qubit_idx])
+    k.gate('rx90', [qubit_idx])
+    k.gate('ry90', [qubit_idx])
+    k.gate('rxm90', [qubit_idx])
+    k.gate('rym90', [qubit_idx])
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    cc_file_name = p.filename
+
+
+log.debug("File for CC = '{}'", cc_file_name)
 
 ##########################################
 # Open physical instruments
@@ -130,11 +154,12 @@ rolut = UHFQC_RO_LutMan('rolut', num_res=7)
 if conf.mw_0 != '':
     # define sequence
     sequence_length = 32
-    staircase_sequence = range(1, sequence_length)
-    expected_sequence = [(0, list(staircase_sequence)), \
-                         (1, list(staircase_sequence)), \
-                         (2, list(reversed(staircase_sequence))), \
-                         (3, list(reversed(staircase_sequence)))]
+    if 0:
+        staircase_sequence = range(1, sequence_length)
+        expected_sequence = [(0, list(staircase_sequence)), \
+                             (1, list(staircase_sequence)), \
+                             (2, list(reversed(staircase_sequence))), \
+                             (3, list(reversed(staircase_sequence)))]
 
     # configure instrument
     instr.mw_0.load_default_settings()
@@ -148,11 +173,12 @@ if conf.mw_0 != '':
 if conf.flux_0 != '':
     # define sequence
     sequence_length = 8
-    staircase_sequence = np.arange(1, sequence_length)
-    expected_sequence = [(0, list(staircase_sequence + 8 * staircase_sequence)), \
-                         (1, list(staircase_sequence + 8 * staircase_sequence)), \
-                         (2, list(staircase_sequence + 8 * staircase_sequence)), \
-                         (3, list(staircase_sequence))]
+    if 0:
+        staircase_sequence = np.arange(1, sequence_length)
+        expected_sequence = [(0, list(staircase_sequence + 8 * staircase_sequence)), \
+                             (1, list(staircase_sequence + 8 * staircase_sequence)), \
+                             (2, list(staircase_sequence + 8 * staircase_sequence)), \
+                             (3, list(staircase_sequence))]
 
     # configure instrument
     instr.mw_0.load_default_settings()
@@ -165,29 +191,26 @@ if conf.flux_0 != '':
 
 
 if 1:
-    instr.cc.debug_marker_out(1, instr.cc.UHFQA_TRIG) # UHF-QA trigger
-    instr.cc.debug_marker_out(8, instr.cc.HDAWG_TRIG) # HDAWG trigger
+    instr.cc.debug_marker_out(slot_ro_1, instr.cc.UHFQA_TRIG) # UHF-QA trigger
+    instr.cc.debug_marker_out(slot_mw_0, instr.cc.HDAWG_TRIG) # HDAWG trigger
 
-    log.debug('uploading {}'.format(p.filename))
+    log.debug("uploading '{}' to CC".format(p.filename))
+    instr.cc.eqasm_program(p.filename)
+
     if 0:
-        instr.cc.eqasm_program(p.filename) # FIXME: fails?
-    else:
-        with open(p.filename, 'r') as f:
-            prog = f.read()
-        instr.cc.sequence_program(prog)
-
-    err_cnt = instr.cc.get_system_error_count()
-    if err_cnt>0:
-        log.warning('CC status after upload')
-    for i in range(err_cnt):
-        print(instr.cc.get_error())
+        err_cnt = instr.cc.get_system_error_count()
+        if err_cnt>0:
+            log.warning('CC status after upload')
+        for i in range(err_cnt):
+            print(instr.cc.get_error())
 
     log.debug('starting CC')
     instr.cc.start()
 
-    err_cnt = instr.cc.get_system_error_count()
-    if err_cnt>0:
-        log.warning('CC status after start')
-    for i in range(err_cnt):
-        print(instr.cc.get_error())
+    if 0:
+        err_cnt = instr.cc.get_system_error_count()
+        if err_cnt>0:
+            log.warning('CC status after start')
+        for i in range(err_cnt):
+            print(instr.cc.get_error())
 

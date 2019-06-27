@@ -120,7 +120,14 @@
             // - <key>/result_bits              future
             // - <key>/data_valid_bits          future
 			"control_modes": {
-				"awg8-mw-vsm": {						  // ZI_HDAWG8.py::cfg_codeword_protocol() == 'microwave'
+				"awg8-mw-vsm-hack": {					  // ZI_HDAWG8.py::cfg_codeword_protocol() == 'microwave'. Old hack to skip DIO[8]
+					"control_bits": [
+						[7,6,5,4,3,2,1,0],                // group 0
+						[16,15,14,13,12,11,10,9]          // group 1
+					],
+					"trigger_bits": [31]
+				},
+				"awg8-mw-vsm": {						  // the way the mode above should have been
 					"control_bits": [
 						[7,6,5,4,3,2,1,0],                // group 0
 						[15,14,13,12,11,10,9,8]           // group 1
@@ -263,7 +270,7 @@
                     ],
                     "ref_signals_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
-                    "ref_control_mode": "awg8-mw-vsm",
+                    "ref_control_mode": "awg8-mw-vsm-hack",
 					"controller": {
 						"name": "cc",	// FIXME
 						"slot": 3,
@@ -278,7 +285,7 @@
                     ],
                     "ref_signals_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
-                    "ref_control_mode": "awg8-mw-vsm",
+                    "ref_control_mode": "awg8-mw-vsm-hack",
 					"controller": {
 						"name": "cc",	// FIXME
 						"slot": 4,
