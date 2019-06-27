@@ -940,8 +940,11 @@ class QuDev_transmon(Qubit):
 
 
     def measure_qscale(self, qscales=None, analyze=True, upload=True,
-                       label=None, cal_points=True, exp_metadata=None):
-
+                       label=None, MC=None, cal_states="auto",
+                       n_cal_points_per_state=2, last_ge_pulse=True,
+                       for_ef=False, preparation_type='wait', post_ro_wait=1e-6,
+                       reset_reps=1, final_reset_pulse=True, exp_metadata=None,
+                       active_reset=False):
         if qscales is None:
             raise ValueError("Unspecified qscale values for measure_qscale")
         uniques = np.unique(qscales[range(3)])
@@ -949,41 +952,44 @@ class QuDev_transmon(Qubit):
             raise ValueError("The values in the qscales array are not repeated "
                              "3 times.")
 
-        self.prepare(drive='timedomain')
-        MC = self.instr_mc.get_instr()
+        if MC is None:
+            MC = self.instr_mc.get_instr()
 
         if label is None:
-            label = 'QScale'+self.msmt_suffix
+            label = f'Ramsey{"_ef" if for_ef else ""}' + self.msmt_suffix
 
-        if cal_points:
-            step = np.abs(qscales[-1] - qscales[-4])
-            sweep_points = np.concatenate(
-                [qscales, [qscales[-1] + step, qscales[-1] + 2*step,
-                    qscales[-1] + 3*step, qscales[-1] + 4*step]])
-            cal_states_dict = {'g': [-4, -3], 'e': [-2, -1]}
-            cal_states_rotations = {'g': 0, 'e': 1}
-        else:
-            sweep_points = qscales
-            cal_states_dict = None
-            cal_states_rotations = None
+        if active_reset:
+            raise NotImplementedError("Not implemented though this interface on "
+                                      "this branch")
+        self.prepare(drive='timedomain')
 
-        MC.set_sweep_function(awg_swf.QScale(
-                pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
-                upload=upload, cal_points=cal_points))
+        # create cal points
+        cal_states = CalibrationPoints.guess_cal_states(cal_states, for_ef)
+        cp = CalibrationPoints.single_qubit(self.name, cal_states,
+                                            n_per_state=n_cal_points_per_state)
+        # create sequence
+        seq, sweep_points = sq.qscale_active_reset(qscales=qscales,
+            qb_name=self.name, cal_points=cp,  for_ef=for_ef,
+            operation_dict=self.get_operation_dict(), upload=False,
+            last_ge_pulse=last_ge_pulse, preparation_type=preparation_type,
+            post_ro_wait=post_ro_wait, reset_reps=reset_reps,
+            final_reset_pulse=final_reset_pulse)
+
+        MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
+                                                       upload=upload))
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_classif_det if
                                  self.acq_weights_type() == 'optimal_qutrit'
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
-        exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
-                             'use_cal_points': cal_points,
-                             'cal_states_dict': cal_states_dict,
-                             'cal_states_rotations': cal_states_rotations if
-                                self.acq_weights_type() != 'optimal_qutrit'
-                                else None,
-                             'data_to_fit': {self.name: 'pe'}
-                             })
+        exp_metadata.update({'sweep_points_dict': {self.name: qscales},
+             'sweep_name': 'Qscale factor',
+             'sweep_unit': [''],
+             'cal_points': repr(cp),
+             'last_ge_pulses': [last_ge_pulse],
+             'rotate': self.acq_weights_type() != 'optimal_qutrit',
+             'data_to_fit': {self.name: 'pf' if for_ef else 'pe'}})
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
@@ -1069,7 +1075,7 @@ class QuDev_transmon(Qubit):
                                           MC=None, analyze=True, close_fig=True,
                                           cal_points=True, upload=True,
                                           exp_metadata=None):
-
+        log.error("This function is deprecated, please use measure_ramsey()")
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detunings is None:
@@ -1124,7 +1130,7 @@ class QuDev_transmon(Qubit):
     def measure_ramsey_old(self, times=None, artificial_detuning=0, label=None,
                        analyze=True, close_fig=True, cal_points=True,
                        upload=True, exp_metadata=None):
-
+        log.error("This function is deprecated, please use measure_ramsey()")
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
@@ -1249,7 +1255,7 @@ class QuDev_transmon(Qubit):
                        MC=None, analyze=True, close_fig=True, cal_points=True,
                        n=1, upload=True, last_ge_pulse=True, no_cal_points=6,
                        exp_metadata=None):
-
+        log.error("This function is deprecated, please use measure_ramsey()")
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
         if artificial_detuning is None:
@@ -3284,7 +3290,10 @@ class QuDev_transmon(Qubit):
 
     def find_qscale(self, qscales, label=None, for_ef=False, update=False,
                     close_fig=True, last_ge_pulse=True, upload=True,
-                    cal_points=True, no_cal_points=None, **kw):
+                    cal_states="auto", n_cal_points_per_state=2,
+                    preparation_type='wait', post_ro_wait=1e-6,
+                    reset_reps=1, final_reset_pulse=True,
+                    active_reset=False, **kw):
 
         '''
         Performs the QScale calibration measurement ( (xX)-(xY)-(xmY) ) and
@@ -3372,22 +3381,8 @@ class QuDev_transmon(Qubit):
                             "parameter. "
                             "Set update=True if you want this!")
 
-        if cal_points and no_cal_points is None:
-            log.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
-                            'or to 6 if for_ef==True.')
-            if for_ef:
-                no_cal_points = 6
-            else:
-                no_cal_points = 4
-
-        if not cal_points:
-            no_cal_points = 0
-
         if label is None:
-            if for_ef:
-                label = 'QScale_ef' + self.msmt_suffix
-            else:
-                label = 'QScale' + self.msmt_suffix
+            label = f'Ramsey{"_ef" if for_ef else ""}' + self.msmt_suffix
 
         if qscales is None:
             log.warning("find_qscale does not know over which "
@@ -3397,15 +3392,15 @@ class QuDev_transmon(Qubit):
         qscales = np.repeat(qscales, 3)
 
         #Perform the qscale calibration measurement
-        if for_ef:
-            # Run measuremet
-            self.measure_qscale_2nd_exc(qscales=qscales, upload=upload,
-                                        close_fig=close_fig, label=label,
-                                        last_ge_pulse=last_ge_pulse,
-                                        cal_points=cal_points,
-                                        no_cal_points=no_cal_points)
-        else:
-            self.measure_qscale(qscales=qscales, upload=upload, label=label)
+        self.measure_qscale(qscales=qscales, upload=upload, label=label,
+                            cal_states=cal_states,
+                            n_cal_points_per_state=n_cal_points_per_state,
+                            last_ge_pulse=last_ge_pulse, for_ef=for_ef,
+                            preparation_type=preparation_type,
+                            post_ro_wait=post_ro_wait,
+                            reset_reps=reset_reps,
+                            final_reset_pulse=final_reset_pulse,
+                            active_reset=active_reset)
 
         # Perform analysis and extract the optimal qscale parameter
         # Returns the optimal qscale parameter
