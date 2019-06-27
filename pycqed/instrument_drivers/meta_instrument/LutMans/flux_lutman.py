@@ -33,6 +33,20 @@ valid_types = {'idle', 'cz', 'idle_z', 'square', 'custom'}
 def flux_lutmap_is_valid(lutmap: dict) -> bool:
     """
     Test if lutmap obeys schema.
+    The default schema of this LutMap allows for 4 different 2Q gates.
+
+    NW     NE
+      \   /
+        Q
+      /   \
+    SW     SE
+
+    First codeword is assigned to idling.
+    Codewords 2-5 are assigned to the two-qubit gates in clockwise order (NE - SE - SW - NW)
+    Then we assign single qubit fluxing operations (parking and square)
+    Last codeword is reserved for custom waveforms defined by the user.
+
+
 
     Args:
         lutmap
