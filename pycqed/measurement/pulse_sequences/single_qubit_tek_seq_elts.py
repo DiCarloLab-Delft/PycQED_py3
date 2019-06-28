@@ -77,7 +77,7 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points,
     if upload:
        ps.Pulsar.get_instance().program_awgs(seq)
 
-    return seq, np.arange(len(seq.segments))
+    return seq, np.arange(len(seq.get_n_readouts()))
 
 
 def add_preparation_pulses(pulse_list, operation_dict, qb_names,
@@ -813,7 +813,7 @@ def ramsey_active_reset(times, qb_name, operation_dict, cal_points, n=1,
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 
-    return seq, np.arange(len(seq.segments))
+    return seq, np.arange(len(seq.get_n_readouts()))
 
 def echo_seq(times, pulse_pars, RO_pars,
              artificial_detuning=None,
@@ -942,7 +942,7 @@ def single_state_active_reset(operation_dict, qb_name,
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 
-    return seq, np.arange(len(seq.segments))
+    return seq, np.arange(len(seq.get_n_readouts()))
 
 def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None, verbose=False,
                      level='e', RO_spacing=300e-9,
@@ -1383,7 +1383,7 @@ def qscale_active_reset(qscales, qb_name, operation_dict, cal_points,
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 
-    return seq, np.arange(len(seq.segments))
+    return seq, np.arange(len(seq.get_n_readouts()))
 
 
 def qscale(qscales, pulse_pars, RO_pars,
