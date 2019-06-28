@@ -230,7 +230,7 @@ class UHFQC(Instrument):
 
         # Configure the codeword protocol
         if self.DIO:
-            self.awgs_0_dio_strobe_index(15) # 15 for QCC, 31 for CCL 
+            self.awgs_0_dio_strobe_index(15) # 15 for QCC, 31 for CCL
             self.awgs_0_dio_strobe_slope(1)  # rising edge
             self.awgs_0_dio_valid_index(16)
             self.awgs_0_dio_valid_polarity(2)  # high polarity
@@ -884,9 +884,9 @@ class UHFQC(Instrument):
         # adding the final part of the sequence including a default wave
         sequence = (sequence +
                     '  default:\n' +
-                    # the default wave should never trigger, noneteless if it does trigger 
-                    # it indicates that 1. the correct codeword can not be triggered and 
-                    # 2. that there are triggers bio received. 
+                    # the default wave should never trigger, noneteless if it does trigger
+                    # it indicates that 1. the correct codeword can not be triggered and
+                    # 2. that there are triggers bio received.
                     '   playWave(ones(36), ones(36));\n' +
                     ' }\n' +
                     ' wait(wait_delay);\n' +
@@ -899,7 +899,7 @@ class UHFQC(Instrument):
         self.awg_string(sequence, timeout=timeout)
 
     def awg_sequence_acquisition_and_DIO_RED_test(
-            self, Iwaves, Qwaves, cases, acquisition_delay, 
+            self, Iwaves, Qwaves, cases, acquisition_delay,
             codewords, timeout=5):
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
@@ -976,9 +976,9 @@ class UHFQC(Instrument):
         # adding the final part of the sequence including a default wave
         sequence = (sequence +
                     '  default:\n' +
-                    # the default wave should never trigger, noneteless if it does trigger 
-                    # it indicates that 1. the correct codeword can not be triggered and 
-                    # 2. that there are triggers bio received. 
+                    # the default wave should never trigger, noneteless if it does trigger
+                    # it indicates that 1. the correct codeword can not be triggered and
+                    # 2. that there are triggers bio received.
                     '   playWave(ones(36), ones(36));\n' +
                     ' }\n' +
                     ' wait(wait_delay);\n' +
@@ -1210,7 +1210,7 @@ repeat (avg_cnt) {{
   var wait_time = 0;
 
   repeat(loop_cnt) {{
-    wait_time = wait_time + 1;   
+    wait_time = wait_time + 1;
     setTrigger(WINT_TRIG + WINT_EN);
     wait(wait_time);
     playWave(w, w, RATE);
