@@ -112,7 +112,7 @@ if sel==3:  # Quantum staircase
     cc_file_name = p.filename
 
 
-log.debug("File for CC = '{}'", cc_file_name)
+log.debug("File for CC = '{}'".format(cc_file_name))
 
 ##########################################
 # Open physical instruments
@@ -163,9 +163,44 @@ if conf.mw_0 != '':
     instr.mw_0.cfg_codeword_protocol('microwave')
     instr.mw_0.upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
-    delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
-    for awg in range(4):
-        instr.mw_0._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay) # skew TOGGLE_DS versus rest
+    if 0:
+        delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
+        for awg in range(4):
+            instr.mw_0._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)  # skew TOGGLE_DS versus rest
+    else:
+        delay = 1  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
+        instr.mw_0._dev.setd('raw/dios/0/delays/*/value', delay)  # new interface?, range [0:15]
+        for awg in range(4):
+            dio_timing_errors = instr.mw_0._dev.geti('awgs/{}/dio/error/timing'.format(awg))
+            log.debug('DIO timing errors on AWG {}: {}'.format(awg,dio_timing_errors))
+
+"""
+    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
+    0       +       0/0/0/0         60
+    1       +       0/0/0/0         60
+    2       +       0/1/1/1         66
+    3       +       1/1/1/1         66
+    4       +       1/0/0/0         73
+    5       +       0/0/0/0         73
+    
+    6       +       0/0/0/0         80
+    7       +       0/0/0/0         80
+    8       +       0/1/1/1         86
+    9       +       1/1/1/1         86
+    10      +       1/0/0/0         93
+    11      +       0/0/0/0         93
+    
+    12      +       0/0/0/0         99
+    13      +       0/0/0/0         99
+    14      +       0/1/1/1        106
+    15      +       1/1/1/1        106
+    
+    Analysis:
+    - delay steps are 3.33 ns each
+    - 15 steps == 50 ns
+    - 6 steps == 20 ns, pattern repeats after that
+    
+"""
 
 if conf.flux_0 != '':
     # define sequence
