@@ -704,14 +704,14 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
 
     # For CCLight
-    # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    # k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
-    # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
 
     # For QCC 
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10 ], 0) #alignment workaround
-    k.gate('fl_cw_{:02}'.format(flux_cw), [10, 8]) 
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10 ], 0) #alignment workaround
+    # k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10 ], 0) #alignment workaround
+    # k.gate('fl_cw_{:02}'.format(flux_cw), [10, 8]) 
+    # k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10 ], 0) #alignment workaround
 
     if buffer_nanoseconds2 > 0:
         k.gate('wait', [qubit_idx], buffer_nanoseconds2)
