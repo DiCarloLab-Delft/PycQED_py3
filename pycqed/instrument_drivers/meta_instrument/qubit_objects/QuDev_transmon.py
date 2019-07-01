@@ -1639,11 +1639,11 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.instr_mc.get_instr()
         name_extra = kw.get('name_extra', None)
-        npoints = self.inp_avg_det.nr_samples
+
 
         # initialize instruments
         self.prepare(drive='timedomain')
-
+        npoints = self.inp_avg_det.nr_samples
         for level in levels:
             if level not in ['g', 'e', 'f']:
                 raise ValueError("Unrecognized case: {}. It should be 'g', 'e' "
