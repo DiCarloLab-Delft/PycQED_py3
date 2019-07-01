@@ -1257,7 +1257,8 @@ class CCLight_Transmon(Qubit):
             # Check if peak is not another qubit, and if it is move that qubit away
             for qubit_name in self.device.qubits():
                 qubit = self.device.find_instrument(qubit_name)
-                if qubit.name != self.name:
+                if qubit.name != self.name and qubit.freq_qubit() is not None:
+
                     if np.abs(qubit.freq_qubit()-freq_peak) < 5e6:
                         if verbose:
                             logging.warning('Peak found at frequency of {}. '
@@ -1269,7 +1270,7 @@ class CCLight_Transmon(Qubit):
                         n -= 1
                         success = False
 
-            if success is None:        
+            if success is None:
                 if freq_peak is None:
                     success = False
                 elif peak_height < 4*offset:
@@ -3459,7 +3460,8 @@ class CCLight_Transmon(Qubit):
                        prepare_for_timedomain=True,
                        analyze=True, close_fig=True, update=True,
                        detector=False,
-                       double_fit=False):
+                       double_fit=False,
+                       test_beating=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -3511,10 +3513,15 @@ class CCLight_Transmon(Qubit):
             a = ma.Ramsey_Analysis(auto=True, close_fig=True,
                                    freq_qubit=freq_qubit,
                                    artificial_detuning=artificial_detuning)
+            if test_beating and a.fit_res.chisqr > 0.4:
+                logging.warning('Found double frequency in Ramsey: large '
+                                'deviation found in single frequency fit.'
+                                'Trying double frequency fit.')
+                double_fit = True
             if update:
                 self.T2_star(a.T2_star['T2_star'])
             if double_fit:
-                b=ma.DoubleFrequency()
+                b = ma.DoubleFrequency()
                 res = {
                 'T2star1': b.tau1,
                 'T2star2': b.tau2,

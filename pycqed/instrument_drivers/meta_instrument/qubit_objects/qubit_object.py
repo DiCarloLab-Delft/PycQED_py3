@@ -578,7 +578,8 @@ class Qubit(Instrument):
                                              analyze=False, label=label)
 
             fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
-                                                      close_fig=True)
+                                                      close_fig=True,
+                                                      use_min=True)
             # Update resonator types
             if np.abs(fit_res.shift) > 100e3:
                 if res.type == 'unknown':
@@ -986,7 +987,8 @@ class Qubit(Instrument):
                                    artificial_periods = 2.5,
                                    stepsize:float =20e-9,
                                    verbose: bool=True, update: bool=True,
-                                   close_fig: bool=True):
+                                   close_fig: bool=True,
+                                   test_beating: bool=True):
         """
         Runs an iterative procudere of ramsey experiments to estimate
         frequency detuning to converge to the qubit frequency up to the limit
@@ -1012,9 +1014,16 @@ class Qubit(Instrument):
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,
                                    close_file=False)
+            if test_beating and a.fit_res.chisqr > 0.4:
+                logging.warning('Found double frequency in Ramsey: large '
+                                'deviation found in single frequency fit.'
+                                'Returning True to continue automation. Retry '
+                                'with test_beating=False to ignore.')
+
+                return True
             fitted_freq = a.fit_res.params['frequency'].value
             measured_detuning = fitted_freq-artificial_detuning
-            cur_freq =  a.qubit_frequency
+            cur_freq = a.qubit_frequency
 
             qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
             qubit_ana_grp.attrs['artificial_detuning'] = \

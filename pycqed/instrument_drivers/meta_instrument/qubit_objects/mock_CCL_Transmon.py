@@ -137,13 +137,13 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            self.mock_chi12() / 2)
 
         self.add_parameter('mock_res_width', label='resonator peak width',
-                           unit='Hz', initial_value=1e6,
+                           unit='Hz', initial_value=0.25e6,
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_flux_sensitivity',
                            label='sensitivity to flux in current',
                            unit='A',
-                           initial_value={'FBL_1': 1, 'FBL_2': 0.01},
+                           initial_value={'FBL_Q1': 1, 'FBL_Q2': 0.01},
                            parameter_class=ManualParameter)
 
         self.add_parameter('mock_fl_dc_V_per_phi0', unit='A',
@@ -152,7 +152,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         self.add_parameter('mock_cfg_dc_flux_ch',
                            label='most closely coupled fluxline',
-                           unit='', initial_value='FBL_1',
+                           unit='', initial_value='FBL_Q1',
                            parameter_class=ManualParameter)
 
         self.add_parameter('noise', label='nominal noise level', unit='V',
@@ -586,7 +586,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                              pulsed=True, MC=None,
                                              analyze=True, close_fig=True,
                                              nested_resonator_calibration=False,
-                                             resonator_freqs=None):
+                                             resonator_freqs=None, label=''):
         '''
         Measures resonator frequency versus flux. Simple model which just
         shifts the Lorentzian peak with a simple cosine by 2 MHz.
@@ -602,7 +602,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         freq_res = self.mock_freq_res()
         fluxcurrent = self.instr_FluxCtrl.get_instr()
-        df = 2*self.mock_chi()
+        df = self.mock_chi()
 
         mocked_values = []
         for dac_value in dac_values:
@@ -618,7 +618,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             h = self.ro_pulse_amp_CW()*10e-3  # Lorentian baseline [V]
             A = 0.8*h   # Height of peak [V]
             w = self.mock_res_width()    # Full width half maximum of peak
-            f0 = freq_res - df*(np.sin(1/2*np.pi*(total_flux)))**2
+            f0 = freq_res - df*(np.cos(np.pi*(total_flux)))**2
             new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
                                              ((freqs - f0))**2)
             new_values += np.random.normal(0,
@@ -638,7 +638,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_points_2D(dac_values)
 
         MC.set_detector_function(d)
-        MC.run('Resonator_dac_scan'+self.msmt_suffix, mode='2D')
+        MC.run('Resonator_dac_scan'+self.msmt_suffix+label, mode='2D')
 
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig,

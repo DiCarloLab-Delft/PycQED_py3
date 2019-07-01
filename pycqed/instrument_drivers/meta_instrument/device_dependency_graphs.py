@@ -53,8 +53,6 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                       calibrate_function=Qubit.name + '.find_test_resonators')
         self.add_node('Resonators Flux Sweep',
                       calibrate_function=Qubit.name + '.find_qubit_resonator_fluxline')
-        self.add_node('Two Qubit ALLXY',
-                      calibrate_function=self.device.name + '.measure_two_qubit_allxy')
 
         self.add_edge('Zoom on resonators', 'Resonators Wide Search')
         self.add_edge('Resonators Power Scan',
@@ -63,6 +61,13 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                       'Zoom on resonators')
         self.add_edge('Resonators Flux Sweep',
                       'Resonators Power Scan')
+
+        # Multi-qubit measurements:
+        self.add_node('{} - {} avoided crossing'.format(Qubit_list[0].name,
+                                                        Qubit_list[1].name),
+                      calibrate_function= Qubit_list[0].name+'.measure_avoided_crossing')
+        self.add_node('Two Qubit ALLXY',
+                      calibrate_function=self.device.name + '.measure_two_qubit_allxy')
 
         # Qubit specific methods
         for Qubit in Qubit_list:
@@ -122,7 +127,7 @@ class octobox_dep_graph(AutoDepGraph_DAG):
 
             # Qubits measurements
             self.add_node(Qubit.name + ' Anharmonicity')
-            self.add_node(Qubit.name + ' Avoided Crossing')
+            # self.add_node(Qubit.name + ' Avoided Crossing')
             self.add_node(Qubit.name + ' T1')
             self.add_node(Qubit.name + ' T1(time)')
             self.add_node(Qubit.name + ' T1(frequency)')
@@ -218,14 +223,21 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           Qubit.name + ' Frequency at Sweetspot')
             self.add_edge(Qubit.name + ' Anharmonicity',
                           Qubit.name + ' f_12 estimate')
-            self.add_edge(Qubit.name + ' Avoided Crossing',
-                          Qubit.name + ' DAC Arc Polynomial')
+            # self.add_edge(Qubit.name + ' Avoided Crossing',
+            #               Qubit.name + ' DAC Arc Polynomial')
+
+
 
         self.add_edge('Two Qubit ALLXY',
                       self.device.qubits()[0] + ' ALLXY')
         self.add_edge('Two Qubit ALLXY',
                       self.device.qubits()[1] + ' ALLXY')
-
+        self.add_edge('{} - {} avoided crossing'.format(Qubit_list[0].name,
+                                                        Qubit_list[1].name),
+                      Qubit_list[0].name + ' DAC Arc Polynomial')
+        self.add_edge('{} - {} avoided crossing'.format(Qubit_list[0].name,
+                                                        Qubit_list[1].name),
+                      Qubit_list[1].name + ' DAC Arc Polynomial')
         self.cfg_plot_mode = 'svg'
         self.update_monitor()
         self.cfg_svg_filename

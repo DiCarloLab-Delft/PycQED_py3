@@ -27,7 +27,9 @@ import qutip as qp
 import qutip.metrics as qpmetrics
 
 from matplotlib.colors import LogNorm
-
+from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabel,
+                                            data_to_table_png,
+                                            SI_prefix_and_scale_factor)
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
 
@@ -1728,7 +1730,9 @@ def current_timemark():
 
 def color_plot(x, y, z, fig=None, ax=None, cax=None,
                show=False, normalize=False, log=False,
-               transpose=False, add_colorbar=True, **kw):
+               transpose=False, add_colorbar=True,
+               xlabel='', ylabel='', zlabel='',
+               x_unit='', y_unit='', z_unit='',  **kw):
     """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
@@ -1812,11 +1816,12 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
 
     title = kw.pop('title', None)
 
-    xlabel = kw.pop('xlabel', None)
-    ylabel = kw.pop('ylabel', None)
-    x_unit = kw.pop('x_unit', None)
-    y_unit = kw.pop('y_unit', None)
-    zlabel = kw.pop('zlabel', None)
+    xlabel = kw.pop('xlabel', xlabel)
+    ylabel = kw.pop('ylabel', ylabel)
+    zlabel = kw.pop('zlabel', zlabel)
+    x_unit = kw.pop('x_unit', x_unit)
+    y_unit = kw.pop('y_unit', y_unit)
+    z_unit = kw.pop('z_unit', z_unit)
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
@@ -1853,7 +1858,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
             cax = ax_divider.append_axes('right', size='5%', pad='2%')
         cbar = plt.colorbar(colormap, cax=cax, orientation='vertical')
         if zlabel is not None:
-            cbar.set_label(zlabel)
+            set_cbarlabel(cbar, zlabel, unit=z_unit)
         return fig, ax, colormap, cbar
     return fig, ax, colormap
 
@@ -1912,15 +1917,17 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
 
 
 def linecut_plot(x, y, z, fig, ax,
-                 xlabel=None,
+                 xlabel=None, x_unit='',
                  y_name='', y_unit='', log=True,
-                 zlabel=None, legend=True,
+                 zlabel=None, z_unit_linecuts='', legend=True,
                  line_offset=0, **kw):
     """
     Plots horizontal linecuts of a 2D plot.
     x and y must be 1D arrays.
     z must be a 2D array with shape(len(x),len(y)).
     """
+    z_unit_linecuts = kw.pop("z_unit_linecuts", z_unit_linecuts)
+
     colormap = plt.cm.get_cmap('RdYlBu')
     ax.set_prop_cycle('color', [colormap(i) for i in np.linspace(
         0, 0.9, len(y))])
@@ -1934,8 +1941,8 @@ def linecut_plot(x, y, z, fig, ax,
     if legend:
         ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
     ax.set_position([0.1, 0.1, 0.5, 0.8])
-    ax.set_ylabel(xlabel)
-    ax.set_ylabel(zlabel)
+    set_xlabel(ax, xlabel, x_unit)
+    set_ylabel(ax, zlabel, z_unit_linecuts)
     return ax
 
 

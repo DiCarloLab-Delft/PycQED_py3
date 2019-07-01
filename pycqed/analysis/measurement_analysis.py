@@ -7406,6 +7406,9 @@ class TwoD_Analysis(MeasurementAnalysis):
         self.ax_array = []
 
         for i, meas_vals in enumerate(self.measured_values):
+            kw["zlabel"] = self.value_names[i]
+            kw["z_unit"] = self.value_units[i]
+
             if filtered:
                 # print(self.measured_values)
                 # print(self.value_names)
@@ -7434,7 +7437,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                                      y_name=self.parameter_names[1],
                                      y_unit=self.parameter_units[1],
                                      log=linecut_log,
-                                     zlabel=self.zlabels[i],
+                                     # zlabel=self.zlabels[i],
                                      fig=fig, ax=ax, **kw)
                 ax.set_title(fig_title)
                 set_xlabel(ax, self.parameter_names[0],
@@ -7464,6 +7467,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                 kw["xlabel"] = self.parameter_names[0]
             if "ylabel" not in kw:
                 kw["ylabel"] = self.parameter_names[1]
+
             if "xunit" not in kw:
                 kw["xunit"] = self.parameter_units[0]
             if "yunit" not in kw:
@@ -7479,7 +7483,7 @@ class TwoD_Analysis(MeasurementAnalysis):
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=plot_zvals,
-                               zlabel=self.zlabels[i],
+                               # zlabel=self.zlabels[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
                                transpose=transpose,
@@ -7690,7 +7694,21 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
             fits[str(power)] = fit_res
         self.fit_results = fits
 
+        xlabel = kw.pop("xlabel", self.sweep_name)
+        ylabel = kw.pop("ylabel", self.sweep_name_2D)
+        x_unit = kw.pop("x_unit", self.sweep_unit)
+        y_unit = kw.pop("y_unit", self.sweep_unit_2D)
+        z_unit_linecuts = self.value_units[0]
+
         for i, meas_vals in enumerate(self.measured_values):
+            if "zlabel" not in kw:
+                kw["zlabel"] = self.value_names[i]
+            if "z_unit" not in kw:
+                if normalize:
+                    kw["z_unit"] = 'normalized'
+                else:
+                    kw["z_unit"] = self.value_units[i]
+
             if (not plot_all) & (i >= 1):
                 break
             # Linecuts are above because normalization changes the values of the
@@ -7714,8 +7732,8 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                     self.sweep_points_2D, Qc, 'green', label='Coupling Q-Factor')
                 ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
                 ax.set_position([0.1, 0.1, 0.5, 0.8])
-                ax.set_ylabel('Quality Factor')
-                ax.set_xlabel('Power [dBm]')
+                set_ylabel(ax, 'Quality Factor')
+                set_xlabel(ax, ylabel, y_unit)
 
                 if save_fig:
                     self.save_fig(
@@ -7733,12 +7751,12 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                     timestamp=self.timestamp_string,
                     measurement=self.measurementstring,
                     val_name=self.zlabels[i])
-                ax.plot(
-                    self.sweep_points_2D, f0, 'blue', label='Cavity Frequency')
+                ax.plot(self.sweep_points_2D, f0, 'blue', marker='o',
+                        label='Cavity Frequency')
                 ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
                 ax.set_position([0.15, 0.1, 0.5, 0.8])
-                ax.set_ylabel('Frequency [GHz]')
-                ax.set_xlabel('Power [dBm]')
+                set_ylabel(ax, xlabel, x_unit)
+                set_xlabel(ax, ylabel, y_unit)
 
                 if save_fig:
                     self.save_fig(
@@ -7756,11 +7774,12 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                                      y=self.sweep_points_2D,
                                      z=self.measured_values[i],
                                      plot_title=fig_title,
-                                     xlabel=self.xlabel,
-                                     y_name=self.sweep_name_2D,
-                                     y_unit=self.sweep_unit_2D,
                                      log=linecut_log,
-                                     zlabel=self.zlabels[i],
+                                     xlabel=xlabel,
+                                     x_unit=x_unit,
+                                     y_name=ylabel,
+                                     y_unit=y_unit,
+                                     z_unit_linecuts=z_unit_linecuts,
                                      fig=fig, ax=ax, **kw)
                 if save_fig:
                     self.save_fig(
@@ -7780,9 +7799,10 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
                                plot_title=fig_title,
-                               xlabel=self.xlabel,
-                               ylabel=self.ylabel,
-                               zlabel=self.zlabels[i],
+                               xlabel=xlabel,
+                               x_unit=x_unit,
+                               ylabel=ylabel,
+                               y_unit=y_unit,
                                fig=fig, ax=ax, **kw)
             if save_fig:
                 self.save_fig(fig, figname=fig_title, **kw)

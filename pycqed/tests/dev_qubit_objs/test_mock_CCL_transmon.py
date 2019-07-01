@@ -43,11 +43,11 @@ class Test_Mock_CCL(unittest.TestCase):
         self.fluxcurrent = flx.virtual_SPI_S4g_FluxCurrent(
                 'fluxcurrent',
                 channel_map={
-                    'FBL_1': (0, 0),
-                    'FBL_2': (0, 1),
+                    'FBL_Q1': (0, 0),
+                    'FBL_Q2': (0, 1),
                 })
-        self.fluxcurrent.FBL_1(0)
-        self.fluxcurrent.FBL_2(0)
+        self.fluxcurrent.FBL_Q1(0)
+        self.fluxcurrent.FBL_Q2(0)
         self.station.add_component(self.fluxcurrent)
 
         self.MW1 = vmw.VirtualMWsource('MW1')
