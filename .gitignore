@@ -141,3 +141,4 @@ data/*
 *.json
 *.dat
 .idea
+*experiments.db

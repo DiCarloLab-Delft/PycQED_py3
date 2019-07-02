@@ -91,6 +91,57 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     p = oqh.compile(p)
     return p
 
+def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
+                           platf_cfg: str, trigger_idx: int):
+    """
+    Sequence for pulsed spectroscopy, similar to old version. Difference is that
+    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    wave output on the AWG (currently hardcoded, should be improved)
+    
+    """
+    p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
+    k = oqh.create_kernel("main", p)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', [trigger_idx])
+    if trigger_idx != qubit_idx:    
+        k.wait([trigger_idx, qubit_idx], 0)
+        
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
+                       platf_cfg: str, trigger_idx: int):
+    """
+    Sequence for pulsed spectroscopy, similar to old version. Difference is that
+    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    wave output on the AWG (currently hardcoded, should be improved)
+    
+    """
+    p = oqh.create_program("pulsed_spec_seq_v2", platf_cfg)
+    k = oqh.create_kernel("main", p)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', [trigger_idx])
+    if trigger_idx != qubit_idx:    
+        k.wait([trigger_idx, qubit_idx], 0)
+        
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
 
 def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
              equator: bool=False, cal_points: bool=True,
@@ -335,6 +386,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     p = oqh.create_program("echo", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
+
         k = oqh.create_kernel("echo_{}".format(i), p)
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
@@ -343,7 +395,14 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.gate('rx180', [qubit_idx])
         k.gate("wait", [qubit_idx], wait_nanoseconds)
-        k.gate('rx90', [qubit_idx])
+        #k.gate('rx90', [qubit_idx])
+        angle = (i*40)%360
+        cw_idx = angle//20 + 9
+        if angle == 0:
+            k.gate('rx90', [qubit_idx])
+        else:
+            k.gate('cw_{:02}'.format(cw_idx), [qubit_idx])
+
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -706,9 +765,12 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         k = oqh.create_kernel('pi_flux_pi', p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         k.gate('fl_cw_02', [2, 0])
+        # k.gate('fl_cw_02', [10, 8])
         if t_nanoseconds > 10:
-            k.gate("wait", [qubit_idx], t_nanoseconds)
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
+            # k.gate("wait", [qubit_idx], t_nanoseconds)
         k.gate('rx90', [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)

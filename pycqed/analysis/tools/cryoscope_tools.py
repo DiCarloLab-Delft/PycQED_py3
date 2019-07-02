@@ -482,7 +482,7 @@ class DacArchAnalysis:
         else:
             raise NotImplementedError()
             # FIXME: proper support for auto nyquist with
-            # a proper nyquist should be extracte
+            # a proper nyquist should be extracted
         return nyquist
 
 

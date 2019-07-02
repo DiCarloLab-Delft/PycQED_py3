@@ -242,6 +242,17 @@ def CosFunc(t, amplitude, frequency, phase, offset):
     '''
     return amplitude * np.cos(2 * np.pi * frequency * t + phase) + offset
 
+def CosFunc2(t, amplitude, frequency, phase, offset):
+    '''
+    parameters:
+        t, time in s
+        amplitude a.u.
+        frequency in Hz (f, not omega!)
+        phase in rad
+        offset a.u.
+    '''
+    return amplitude * np.cos(2 * np.pi * frequency * (t + phase)) + offset
+
 
 def ExpDecayFunc(t, tau, amplitude, offset, n):
     return amplitude * np.exp(-(t / tau) ** n) + offset
@@ -597,7 +608,9 @@ def avoided_crossing_freq_shift(flux, a, b, g):
     result = frequencies[:, 1]- frequencies[:, 0]
     return result
 
-
+def resonator_flux(f_bare, g, A, f, t, sweetspot_cur):
+    return f_bare - g/(A*np.sqrt(np.abs(np.cos(np.pi*f*(t-sweetspot_cur))))
+                       - f_bare)
 
 ######################
 # Residual functions #
@@ -1172,6 +1185,8 @@ def sum_int(x,y):
 # A valid reason to define it here would beexp_dec_guess if you want to add a guess function
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
+CosModel2 = lmfit.Model(CosFunc2)
+ResonatorArch = lmfit.Model(resonator_flux)
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)

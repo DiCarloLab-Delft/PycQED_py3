@@ -12,6 +12,7 @@ from qcodes import Instrument
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from scipy.interpolate import interp1d
 import qutip as qtp
+import cma
 #np.set_printoptions(threshold=np.inf)
 
 
@@ -72,13 +73,13 @@ def f_to_parallelize_new(arglist):
              (adaptive_pars['lambda2_min'], adaptive_pars['lambda2_max'])]})
 
         if noise_parameters_CZ.cluster():
-            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.0f} - waiting {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
-                fluxlutman.cz_length()*1e9, noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='adaptive',exp_metadata=exp_metadata)
 
         else:
             if adaptive_pars['long_name']:
-                dat = MC.run('2D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                dat = MC.run('2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
                 fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='adaptive',exp_metadata=exp_metadata)
             else:
@@ -91,19 +92,51 @@ def f_to_parallelize_new(arglist):
         MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'], 
             adaptive_pars['theta_f_max'],adaptive_pars['n_points']))
         if noise_parameters_CZ.cluster():
-            dat = MC.run('1D simulation_new_cluster2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+            dat = MC.run('1D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
                 fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='1D',exp_metadata=exp_metadata)
 
         else:
             if adaptive_pars['long_name']:
-                dat = MC.run('1D simulation_new_2 double sided {} - length {:.0f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                dat = MC.run('1D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
                 fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='1D',exp_metadata=exp_metadata)
             else:
                 dat = MC.run('1D simulation_new_2', 
                 exp_metadata=exp_metadata, 
                 mode='1D')
+
+    if adaptive_pars['mode']=='cma_optimizer': 
+        MC.set_sweep_functions([fluxlutman.cz_theta_f, fluxlutman.cz_lambda_2])
+        if adaptive_pars['uniform']: 
+            loss_per_triangle= adaptive.learner.learner2D.uniform_loss
+        else: 
+            loss_per_triangle=None
+        MC.set_adaptive_function_parameters(
+            {'adaptive_function': cma.fmin,
+             'x0': adaptive_pars['x0'], 'sigma0': adaptive_pars['sigma0'],
+             # options for the CMA algorithm can be found using
+             # "cma.CMAOptions()"
+             'options': {'maxfevals': adaptive_pars['n_points'],    # maximum function cals
+                         # Scaling for individual sigma's
+                         'cma_stds': [5, 6, 3],
+                         'ftarget': 0.005},     # Target function value
+             })
+
+        if noise_parameters_CZ.cluster():
+            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='adaptive',exp_metadata=exp_metadata)
+
+        else:
+            if adaptive_pars['long_name']:
+                dat = MC.run('2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided(),
+                fluxlutman.cz_length()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                mode='adaptive',exp_metadata=exp_metadata)
+            else:
+                dat = MC.run('2D simulation_new_2', 
+                exp_metadata=exp_metadata, 
+                mode='adaptive')
 
 
 
@@ -318,8 +351,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         super().__init__()
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
-                            'cond_phase02', 'coherent_leakage11', 'offset_difference', 'missing_fraction']
-        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%']
+                            'cond_phase02', 'coherent_leakage11', 'offset_difference', 'missing_fraction', '12_21_population_transfer', '12_03_population_transfer',
+                            'phase_diff_12_02', 'phase_diff_21_20', 'cond_phase12', 'cond_phase21', 'cond_phase03', 'cond_phase20']
+        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%', '%', '%', 'deg', 'deg', 'deg', 'deg', 'deg', 'deg']
 
         self.qois = qois
         if self.qois != 'all': 
@@ -397,22 +431,24 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
-            w_q0, w_q1, alpha_q0 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
+            #w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
+            																										 # not used anymore
 
 
             ## Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
-            #czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,w_q0,w_q1,alpha_q0)
+            #czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,self.fluxlutman,self.noise_parameters_CZ)
 
 
             for i in range(len(U_final_vec)):
                 if U_final_vec[i].type == 'oper':
                     U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
                 U_final_vec[i] = U_final_vec[i] * weights[i]
-            U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting average propagator
+            U_superop_average = sum(U_final_vec)              # computing resulting average propagator
             #print(czf.verify_CPTP(U_superop_average))
 
 
-            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,w_q0=w_q0,w_q1=w_q1,alpha_q0=alpha_q0)
+            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, noise_parameters_CZ=self.noise_parameters_CZ)
+
             if self.noise_parameters_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
                                                                                         # then we optimize the search via higher-order cost function
                 cost_func_val = (-np.log10(1-qoi['avgatefid_compsubspace_pc']))**4
@@ -422,13 +458,18 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             quantities_of_interest = [cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, 
                              qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], 
                              qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100,
-                             qoi['cond_phase02'], qoi['coherent_leakage11']*100, qoi['offset_difference']*100, qoi['missing_fraction']*100]
+                             qoi['cond_phase02'], qoi['coherent_leakage11']*100, qoi['offset_difference']*100, qoi['missing_fraction']*100, 
+                             qoi['population_transfer_12_21']*100,qoi['population_transfer_12_03']*100,
+                             qoi['phase_diff_12_02'], qoi['phase_diff_21_20'], qoi['cond_phase12'], qoi['cond_phase21'], qoi['cond_phase03'], qoi['cond_phase20']]
             qoi_vec=np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
 
 
             ## To study the effect of the coherence of leakage on repeated CZs (simpler than simulating a full RB experiment):
-            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,w_q0,w_q1,alpha_q0)
+            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,self.fluxlutman,self.noise_parameters_CZ)
+
+
+            #czf.plot_spectrum(self.fluxlutman,self.noise_parameters_CZ)
 
 
         qoi_plot = np.array(qoi_plot)
@@ -443,21 +484,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         return_values = [qoi_plot[0,0], qoi_plot[0,1], qoi_plot[0,2], qoi_plot[0,3], \
             qoi_plot[0,4], qoi_plot[0,5], qoi_plot[0,6], \
             qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10], \
-            qoi_plot[0,11], qoi_plot[0,12], qoi_plot[0,13], qoi_plot[0,14]]
+            qoi_plot[0,11], qoi_plot[0,12], qoi_plot[0,13], qoi_plot[0,14], qoi_plot[0,15], qoi_plot[0,16], qoi_plot[0,17], qoi_plot[0,18],
+            qoi_plot[0,19], qoi_plot[0,20], qoi_plot[0,21], qoi_plot[0,22]]
         if self.qois != 'all': 
             return np.array(return_values)[self.qoi_mask]
             
         else: 
-            return return_values 
-
-
-
-
-
-
-
-
-
-
-
-
+            return return_values

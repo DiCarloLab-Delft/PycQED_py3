@@ -41,6 +41,9 @@ reload(gsa)
 import pycqed.analysis_v2.fluxing_analysis as fla
 reload(fla)
 
+import pycqed.analysis_v2.timing_cal_analysis as ta
+reload(ta)
+
 
 from pycqed.analysis_v2.base_analysis import *
 from pycqed.analysis_v2.simple_analysis import (
@@ -68,11 +71,12 @@ from pycqed.analysis_v2.timing_cal_analysis import Timing_Cal_Flux_Coarse, \
     Timing_Cal_Flux_Fine
 
 from pycqed.analysis_v2.coherence_analysis import CoherenceAnalysis, \
-    CoherenceTimesAnalysisSingle, AliasedCoherenceTimesAnalysisSingle
+    CoherenceTimesAnalysisSingle, AliasedCoherenceTimesAnalysisSingle, \
+    CoherenceTimesAnalysis_old, CoherenceAnalysisDataExtractor
 from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, \
-    ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy
+    ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy, VNA_DAC_Analysis
 from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency, \
-    FrequencySusceptibility
+    Susceptibility_to_Flux_Bias, DACarcPolyFit
 from pycqed.analysis_v2.quantum_efficiency_analysis import \
     QuantumEfficiencyAnalysis, DephasingAnalysisSingleScans, \
     DephasingAnalysisSweep, SSROAnalysisSingleScans, SSROAnalysisSweep, \

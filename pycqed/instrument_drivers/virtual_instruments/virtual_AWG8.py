@@ -35,6 +35,7 @@ class VirtualAWG8(Instrument):
         for i in range(8):
             parnames.append('sigouts_{}_offset'.format(i))
             parnames.append('sigouts_{}_on'.format(i))
+            parnames.append('sigouts_{}_delay'.format(i))
             self.add_parameter(
                 'awgs_{}_outputs_{}_amplitude'.format(i//2, i % 2),
                 initial_value=.5, parameter_class=ManualParameter)
@@ -47,9 +48,18 @@ class VirtualAWG8(Instrument):
                                initial_value=0.8,
                                parameter_class=ManualParameter)
             # Adding precompensation pars
+            self.add_parameter('sigouts_{}_precompensation_enable'.format(i),
+                               parameter_class=ManualParameter)
+            self.add_parameter(
+                'sigouts_{}_precompensation_fir_enable'.format(i),
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'sigouts_{}_precompensation_fir_coefficients'.format(i),
+                parameter_class=ManualParameter)
+
             for j in range(8):
                 self.add_parameter('sigouts_{}_precompensation_exponentials'
-                                   '_{}_timecofnstant'.format(i, j),
+                                   '_{}_timeconstant'.format(i, j),
                                    parameter_class=ManualParameter)
                 self.add_parameter('sigouts_{}_precompensation_exponentials'
                                    '_{}_amplitude'.format(i, j),

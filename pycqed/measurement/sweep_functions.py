@@ -1153,10 +1153,25 @@ class FLsweep(Soft_Sweep):
         self.unit = par.unit
         self.name = par.name
 
+
+        AWG = self.lm.AWG.get_instr()
+        awg_unit = self.lm.cfg_awg_channel()//2
+        self.AWG_ready_par = AWG.parameters['awgs_{}_ready'.format(awg_unit)]
+
     def set_parameter(self, val):
         self.par(val)
         self.lm.load_waveform_realtime(self.waveform_name,
                                        regenerate_waveforms=True)
+        t0 = time.time()
+        time.sleep(1.5)
+        while not self.AWG_ready_par(): 
+            print('\rAWG not ready')
+            if (time.time()-t0)>10 :
+                raise TimeoutError
+        return 
+
+
+
 
 
 class FLsweep_QWG(Soft_Sweep):
@@ -1215,3 +1230,46 @@ class Nested_resonator_tracker(Soft_Sweep):
 
 
 
+class tim_flux_latency_sweep(Soft_Sweep):
+    def __init__(self,device):
+        super().__init__()
+        self.dev = device
+        self.name = 'Flux latency'
+        self.parameter_name = 'Flux latency'
+        self.unit = 's'
+
+    def set_parameter(self, val):
+        self.dev.tim_flux_latency_0(val)
+        self.dev.tim_flux_latency_1(val)
+        self.dev.tim_flux_latency_2(val)
+        self.dev.prepare_timing()
+        return val
+
+class tim_ro_latency_sweep(Soft_Sweep):
+    def __init__(self,device):
+        super().__init__()
+        self.dev = device
+        self.name = 'RO latency'
+        self.parameter_name = 'RO latency'
+        self.unit = 's'
+
+    def set_parameter(self, val):
+        self.dev.tim_ro_latency_0(val)
+        self.dev.tim_ro_latency_1(val)
+        self.dev.tim_ro_latency_2(val)
+        self.dev.prepare_timing()
+        return val
+
+class tim_mw_latency_sweep(Soft_Sweep):
+    def __init__(self,device):
+        super().__init__()
+        self.dev = device
+        self.name = 'MW latency'
+        self.parameter_name = 'MW latency'
+        self.unit = 's'
+
+    def set_parameter(self, val):
+        self.dev.tim_mw_latency_0(val)
+        self.dev.tim_mw_latency_1(val)
+        self.dev.prepare_timing()
+        return val

@@ -1,6 +1,7 @@
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
+import numpy as np
 
 
 
@@ -122,6 +123,18 @@ class NoiseParametersCZ(Instrument):
                            label='Repetitions of CZ gate, used for spectral tomo',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=1)
+        self.add_parameter('time_series',
+                           label='',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(), initial_value=False)
+        self.add_parameter('overrotation_sims',
+                           label='instead of constant shift in flux, we use constant rotations around some axis',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(), initial_value=False)
+        self.add_parameter('axis_overrotation',
+                           label='',
+                           parameter_class=ManualParameter,
+                           vals=vals.Arrays(), initial_value=np.array([1,0,0]))
 
 
         

@@ -15,6 +15,7 @@ from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
 from scipy.signal import argrelextrema
+from scipy import optimize
 # to allow backwards compatibility with old a_tools code
 from .tools.data_manipulation import *
 from .tools.plotting import *
@@ -22,8 +23,13 @@ import colorsys as colors
 from matplotlib import cm
 from pycqed.analysis import composite_analysis as RA
 
-from matplotlib.colors import LogNorm
+import qutip as qp
+import qutip.metrics as qpmetrics
 
+from matplotlib.colors import LogNorm
+from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabel,
+                                            data_to_table_png,
+                                            SI_prefix_and_scale_factor)
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
 
@@ -218,10 +224,10 @@ def data_from_time(timestamp, folder=None):
 def measurement_filename(directory=os.getcwd(), file_id=None, ext='hdf5'):
     dirname = os.path.split(directory)[1]
     if file_id is None:
-        if dirname[6:9] == '_X_':
-            fn = dirname[0:7] + dirname[9:] + '.' + ext
-        else:
-            fn = dirname + '.' + ext
+        # if dirname[6:9] == '_X_':
+        #     fn = dirname[0:7] + dirname[9:] + '.' + ext
+        # else:
+        fn = dirname + '.' + ext
     if os.path.exists(os.path.join(directory, fn)):
         return os.path.join(directory, fn)
     else:
@@ -1737,7 +1743,9 @@ def current_timemark():
 
 def color_plot(x, y, z, fig=None, ax=None, cax=None,
                show=False, normalize=False, log=False,
-               transpose=False, add_colorbar=True, **kw):
+               transpose=False, add_colorbar=True,
+               xlabel='', ylabel='', zlabel='',
+               x_unit='', y_unit='', z_unit='',  **kw):
     """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
@@ -1821,11 +1829,12 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
 
     title = kw.pop('title', None)
 
-    xlabel = kw.pop('xlabel', None)
-    ylabel = kw.pop('ylabel', None)
-    x_unit = kw.pop('x_unit', None)
-    y_unit = kw.pop('y_unit', None)
-    zlabel = kw.pop('zlabel', None)
+    xlabel = kw.pop('xlabel', xlabel)
+    ylabel = kw.pop('ylabel', ylabel)
+    zlabel = kw.pop('zlabel', zlabel)
+    x_unit = kw.pop('x_unit', x_unit)
+    y_unit = kw.pop('y_unit', y_unit)
+    z_unit = kw.pop('z_unit', z_unit)
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
@@ -1862,7 +1871,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
             cax = ax_divider.append_axes('right', size='5%', pad='2%')
         cbar = plt.colorbar(colormap, cax=cax, orientation='vertical')
         if zlabel is not None:
-            cbar.set_label(zlabel)
+            set_cbarlabel(cbar, zlabel, unit=z_unit)
         return fig, ax, colormap, cbar
     return fig, ax, colormap
 
@@ -1921,15 +1930,17 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
 
 
 def linecut_plot(x, y, z, fig, ax,
-                 xlabel=None,
+                 xlabel=None, x_unit='',
                  y_name='', y_unit='', log=True,
-                 zlabel=None, legend=True,
+                 zlabel=None, z_unit_linecuts='', legend=True,
                  line_offset=0, **kw):
     """
     Plots horizontal linecuts of a 2D plot.
     x and y must be 1D arrays.
     z must be a 2D array with shape(len(x),len(y)).
     """
+    z_unit_linecuts = kw.pop("z_unit_linecuts", z_unit_linecuts)
+
     colormap = plt.cm.get_cmap('RdYlBu')
     ax.set_prop_cycle('color', [colormap(i) for i in np.linspace(
         0, 0.9, len(y))])
@@ -1943,8 +1954,8 @@ def linecut_plot(x, y, z, fig, ax,
     if legend:
         ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
     ax.set_position([0.1, 0.1, 0.5, 0.8])
-    ax.set_ylabel(xlabel)
-    ax.set_ylabel(zlabel)
+    set_xlabel(ax, xlabel, x_unit)
+    set_ylabel(ax, zlabel, z_unit_linecuts)
     return ax
 
 
@@ -2049,7 +2060,7 @@ def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
         return transitions[:no_transitions]
 
 
-def calculate_transmon_and_resonator_transitions(EC, EJ, f_r, g_01,
+def calculate_transmon_and_resonator_transitions_old(EC, EJ, f_r, g_01,
                                                  dim=None, ng=0, f_01=None,
                                                  f_12=None,
                                                  g_12_approximation=1):
@@ -2090,6 +2101,191 @@ def calculate_transmon_and_resonator_transitions(EC, EJ, f_r, g_01,
 
     return f_01_d, f_12_d, f_r_d, f_01_res_shifted, f_r_qubit_shifted
 
+def calculate_transmon_and_resonator_transitions(Ec, Ej, f_bus, gs, ng=0):
+    """
+    Calculate dressed qubit and bus frequencies based on several physical parameters
+    Input:
+    - Ec: transmon charging energy
+    - Ej: transmon josephson energy
+    - f_bus: the bare bus frequency (float or list of floats)
+    - g: qubit-bus coupling (float or list of floats)
+    Output:
+    - f01_dressed: 01 transition of a dressed qubit
+    - f12_dressed: 12 transition of a dressed qubit
+    - f_bus_transitions: dressed bus transition with qubit in a ground state
+    - photon_splittings: a qubit photon splitting (difference between f01_dressed with
+        and without a photon in this resonator).
+    - f_bus_shifted_transitions: dressed bus transition with qubit in an excited state
+
+    Replacement for the previous calculate_transmon_and_resonator_transitions function,
+    which was assuming only one bus. That one is temporarily kept as
+    'calculate_transmon_and_resonator_transitions_old'. It is verified to produce
+    the same result to 6 decimal places.
+    """
+    if isinstance(f_bus, float) or isinstance(f_bus, int):
+        f_bus = [f_bus]
+    if isinstance(gs, float) or isinstance(gs, int):
+        gs = [gs]
+    
+    # max photons
+    max_ph = 2
+    
+    # number of buses
+    n_bus = len(f_bus)
+
+    # qubit operators
+    (f01, f12), injs = calculate_transmon_transitions(Ec, Ej, asym=0,
+                                                        reduced_flux=0,
+                                                        no_transitions=2,
+                                                        ng=ng, dim=10,
+                                                        return_injs=True)
+    H_q = qp.Qobj(np.diag((0, f01, f01+f12)))
+    H_q = qp.tensor(H_q, *[qp.qeye(max_ph+1)]*n_bus)
+    a_q = qp.Qobj(np.diag((1,np.abs(injs[2, 1]/injs[1, 0])),k=1))
+    a_q = qp.tensor(a_q, *[qp.qeye(max_ph+1)]*n_bus)
+
+
+    # bus operators
+    n_r_list = []
+    a_r_list = []
+
+    a_r_generating_list = [qp.destroy(max_ph+1)] + [qp.qeye(max_ph+1)]*(n_bus-1)
+    for fb, g in zip(f_bus, gs):
+        a_r = qp.tensor(qp.qeye(3), *a_r_generating_list)
+        a_r_list.append(a_r)
+        n_r_list.append(a_r.dag() * a_r)
+        a_r_generating_list = a_r_generating_list[-1:]+a_r_generating_list[:-1]
+
+    # full hamiltonian
+    H = deepcopy(H_q)
+    for fb, g, a_r, n_r in zip(f_bus, gs, a_r_list, n_r_list):
+        H += fb*n_r
+        H += g*(a_q*a_r.dag() + a_q.dag()*a_r)
+
+    # eigenenergies and eigenstates
+    ees, ess = H.eigenstates()
+
+    # define bare qubit states
+    qubit_g = qp.tensor(qp.fock(3,0),*[qp.fock(max_ph+1,0)]*n_bus)
+    qubit_e = qp.tensor(qp.fock(3,1),*[qp.fock(max_ph+1,0)]*n_bus)
+    qubit_f = qp.tensor(qp.fock(3,2),*[qp.fock(max_ph+1,0)]*n_bus)
+
+    # define bare bus states
+    bus_e_list = []
+    bus_e_qubit_e_list = []
+    bus_e_generating_list = [qp.fock(max_ph+1,1)] + [qp.fock(max_ph+1,0)]*(n_bus-1)
+    for fb, g in zip(f_bus, gs):
+        bus_e = qp.tensor(qp.fock(3,0), *bus_e_generating_list)
+        bus_e_list.append(bus_e)
+        bus_e_qubit_e = qp.tensor(qp.fock(3,1), *bus_e_generating_list)
+        bus_e_qubit_e_list.append(bus_e_qubit_e)
+        bus_e_generating_list = bus_e_generating_list[-1:]+bus_e_generating_list[:-1]
+
+    # find states with the largest overlap to specific state
+    def largest_overlap_index(state, ess, ees):
+        max_fid = 0
+        best_index = 0
+        for i,es in enumerate(ess):
+            fid = qpmetrics.fidelity(state,es)**2
+            if fid>max_fid:
+                max_fid = fid
+                best_index = i
+            if max_fid>0.5:
+                break
+        return i, max_fid, ees[i]
+
+    # find states with the largest overlap to specific state
+    def largest_overlap_energy(state, ess, ees):
+        return largest_overlap_index(state, ess, ees)[2]
+
+    # ground state energy
+    E_g = largest_overlap_energy(qubit_g, ess, ees)
+    # excited state energy
+    E_e = largest_overlap_energy(qubit_e, ess, ees)
+    # second_excited state energy
+    E_f = largest_overlap_energy(qubit_f, ess, ees)
+
+    # transitions of dressed states
+    f01_dressed = E_e - E_g
+    f12_dressed = E_f - E_e
+
+    # bus transition with qubit in ground state
+    f_bus_transitions = []
+    # bus transition with qubit in excited state
+    f_bus_shifted_transitions = []
+    # qubit 01 transition with a photon in a bus
+    f01_dressed_shifted = []
+
+    # dressed bus transitions
+    for bus_qubit_g, bus_qubit_e in zip(bus_e_list, bus_e_qubit_e_list):
+        E_b_g = largest_overlap_energy(bus_qubit_g, ess, ees)
+        E_b_e = largest_overlap_energy(bus_qubit_e, ess, ees)
+
+        f_bus_transitions.append(E_b_g-E_g)
+        f_bus_shifted_transitions.append(E_b_e-E_e)
+        f01_dressed_shifted.append(E_b_e - E_b_g)
+    
+    if n_bus == 1:
+        f_bus_transitions = f_bus_transitions[0]
+        f_bus_shifted_transitions = f_bus_shifted_transitions[0]
+        f01_dressed_shifted = f01_dressed_shifted[0]
+    
+    return f01_dressed, f12_dressed, f_bus_transitions, f01_dressed_shifted, f_bus_shifted_transitions
+
+def fit_Ec_Ej_fbus_g(f01, f12, fbus, f01_shifted):
+    '''
+    Use the qubit anharmonicity and photon splitting to calculate
+    Ec, Ej, resonator frequency, and coupling to resonator
+    
+    Input:
+    - f01: qubit frequency
+    - f12: e-f transition frequency
+    - fbus: resonator frequency (bus of RO resonator; dressed i.e. as measured)
+    - f01_shifted: qubit frequency in presence of a single photon in the resonator
+    
+    Output:
+    tuple containing:
+    - Ec: charging energy
+    - Ej: josephson energy
+    - fbus: bare resonator frequency (bus of RO resonator)
+    - g: coupling between qubit and resonator
+    '''
+    
+    # pack measured values into an array
+    measured = np.array([f01, f12, fbus, f01_shifted])
+    
+    # guess initial parameters
+    
+    # Ec is smaller that f01-f12 because of a bus so let's use
+    # f01_shifted-f12 as a guess
+    Ec_guess = f01_shifted - f12
+    # and let's use large Ej/Ec limit for Ej guess
+    Ej_guess = (f01 + Ec_guess) ** 2 / (8 * Ec_guess)
+    # detuning is roughly (fbus-f01) so I use it to guess g and fbus
+    # in a dispersive regime
+    g_guess = np.sqrt(np.abs(fbus-f01) * np.abs(f01-f01_shifted) * 2)
+    fbus_guess = fbus+g_guess**2/(fbus-f01)
+
+    # pack all quesses into an array
+    guesses = np.array([Ec_guess, Ej_guess, fbus_guess, g_guess])
+    
+    # define a penalty function to minimize
+    def penalty_function(params):
+        # calculate frequencies based on parameters
+        calc = np.array(calculate_transmon_and_resonator_transitions(*params))
+        # remove last element which is the bus frequency for qubit in 1 state
+        calc = calc[:-1]
+
+        # calculate difference between calculated and measured frequencies
+        errors = calc - measured
+        return errors**2
+    
+    # optimize
+    out = optimize.leastsq(penalty_function,guesses, full_output=1)
+    
+#     print('Measured frequencies: '+str(measured))
+#     print('Frequencies after fitting: '+str(np.around(calculate_transmon_and_resonator_transitions(*out[0]), decimals=4)[:-1]))
+    return tuple(out[0])
 
 def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
                                          dim=None, ng=0, f_01=None, f_12=None,
@@ -2539,7 +2735,6 @@ def fit_EC_EJ_g_f_res_ng(flux_01, f_01, flux_12, f_12, flux_r, f_r, ng=0,
     as a function of thier respective flux settings by numerical optimization.
     for initial guess it takes the maximum of the inputs
     """
-    from scipy import optimize
     # initial guesses
     g_01_ss_guess = 300e6
     EC_guess = np.max(f_01) - np.max(f_12)
@@ -2605,7 +2800,6 @@ def fit_EC_EJ(f01, f12):
     """
     Calculates EC and EJ from f01 and f12 by numerical optimization.
     """
-    from scipy import optimize
     # initial guesses
     EC0 = f01 - f12
     EJ0 = (f01 + EC0) ** 2 / (8 * EC0)

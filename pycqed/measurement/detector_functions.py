@@ -14,6 +14,8 @@ from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 
+import numpy.fft as fft
+
 
 class Detector_Function(object):
 
@@ -27,6 +29,9 @@ class Detector_Function(object):
         self.value_names = ['val A', 'val B']
         self.value_units = ['arb. units', 'arb. units']
 
+        self.prepare_function = None
+        self.prepare_function_kwargs = None
+
     def set_kw(self, **kw):
         '''
         convert keywords to attributes
@@ -34,8 +39,69 @@ class Detector_Function(object):
         for key in list(kw.keys()):
             exec('self.%s = %s' % (key, kw[key]))
 
+
+    def arm(self):
+        """
+        Ensures acquisition instrument is ready to measure on first trigger.
+        """
+        pass 
+
     def get_values(self):
         pass
+
+    def prepare(self, **kw):
+        if self.prepare_function_kwargs is not None:
+            if self.prepare_function is not None:
+                self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            if self.prepare_function is not None:
+                self.prepare_function()
+
+
+    def set_prepare_function(self, 
+                             prepare_function, 
+                             prepare_function_kwargs:dict=dict()):
+        """
+        Set an optional custom prepare function.
+        
+        prepare_function: function to call during prepare 
+        prepare_function_kwargs: keyword arguments to be passed to the 
+            prepare_function.
+
+        N.B. Note that not all detectors support a prepare function and 
+        the corresponding keywords. 
+        Detectors that do not support this typicaly ignore these attributes. 
+        """
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
+
+
+    def finish(self, **kw):
+        pass
+
+class Mock_Detector(Detector_Function):
+    def __init__(self, value_names=['val'], value_units=['arb. units'],
+                 detector_control='soft',
+                 mock_values=np.zeros([20, 1]),
+                 **kw):
+        self.name = self.__class__.__name__
+        self.set_kw()
+        self.value_names = value_names
+        self.value_units = value_units
+        self.detector_control=detector_control
+        self.mock_values = mock_values
+        self._iteration = 0
+
+    def acquire_data_point(self, **kw):
+        '''
+        Returns something random for testing
+        '''
+        idx = self._iteration % (np.shape(self.mock_values)[0])
+        self._iteration += 1
+        return self.mock_values[idx]
+
+    def get_values(self):
+        return self.mock_values
 
     def prepare(self, **kw):
         pass
@@ -78,10 +144,58 @@ class Multi_Detector(Detector_Function):
         for detector in self.detectors:
             detector.prepare(**kw)
 
+
+    def set_prepare_function(self, 
+                             prepare_function, 
+                             prepare_function_kw:dict=dict(), 
+                             detectors: str='all'):
+        """
+        Set an optional custom prepare function.
+        
+        prepare_function: function to call during prepare 
+        prepare_function_kw: keyword arguments to be passed to the 
+            prepare_function.
+        detectors :  |"all"|"first"|"last"| 
+            sets the prepare function to "all" child detectors, or only 
+            on the "first" or "last" 
+
+        The multi detector passes the arguments to the set_prepare_function 
+        method of all detectors it contains. 
+        """
+        if detectors =="all": 
+            for detector in self.detectors: 
+                detector.set_prepare_function(prepare_function, prepare_function_kw)
+        elif detectors == 'first': 
+            self.detectors[0].set_prepare_function(prepare_function, prepare_function_kw)
+        elif detectors == 'last': 
+            self.detectors[-1].set_prepare_function(prepare_function, prepare_function_kw)
+
+    def set_child_attr(self, attr, value, detectors: str='all'):
+        """
+        Set an attribute of child detectors. 
+
+        attr (str): the attribute to set
+        value   : the value to set the attribute to 
+
+        detectors :  |"all"|"first"|"last"| 
+            sets the attribute on "all" child detectors, or only 
+            on the "first" or "last"  
+        """
+        if detectors =="all": 
+            for detector in self.detectors: 
+                setattr(detector, attr, value)
+        elif detectors == 'first':           
+            setattr(self.detectors[0], attr, value)
+        elif detectors == 'last': 
+            setattr(self.detectors[-1], attr, value)
+
+
     def get_values(self):
         values_list = []
         for detector in self.detectors:
-            new_values = detector.get_values()
+            detector.arm()
+        for detector in self.detectors:
+            new_values = detector.get_values(arm=False)
             values_list.append(new_values)
         values = np.concatenate(values_list)
         return values
@@ -1450,6 +1564,7 @@ class UHFQC_input_average_detector(Hard_Detector):
             self.AWG.stop()
 
 
+
 class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
     '''
     Detector used for acquiring averaged input traces withe the UHFQC.
@@ -1480,6 +1595,27 @@ class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
             ret_data = np.array([amp, phase])
 
         return ret_data
+
+
+class UHFQC_spectroscopy_detector(Soft_Detector):
+    '''
+    Detector used for the spectroscopy mode
+    '''
+    def __init__(self, UHFQC, ro_freq_mod,
+                 AWG=None, channels=(0, 1),
+                 nr_averages=1024, integration_length=4096, **kw):
+        super().__init__()
+        #UHFQC=UHFQC, AWG=AWG, channels=channels,
+                         # nr_averages=nr_averages, nr_samples=nr_samples, **kw
+        self.UHFQC = UHFQC
+        self.ro_freq_mod = ro_freq_mod
+
+    def acquire_data_point(self):
+        RESULT_LENGTH = 1600
+        vals = self.UHFQC.acquisition(samples=RESULT_LENGTH, acquisition_time=0.010, timeout=10)
+        a = max(np.abs(fft.fft(vals[0][1:int(RESULT_LENGTH/2)])))
+        b = max(np.abs(fft.fft(vals[1][1:int(RESULT_LENGTH/2)])))
+        return a+b
 
 
 class UHFQC_integrated_average_detector(Hard_Detector):
@@ -1639,13 +1775,18 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def _get_readout(self):
         return sum([(1 << c) for c in self.channels])
 
-    def get_values(self):
+    def arm(self):
+        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+
+    def get_values(self, arm=True):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+        if arm:
+            self.arm()
+        
         # starting AWG
 
         if self.AWG is not None:
@@ -1767,7 +1908,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             **kw)
         self.correlations = correlations
         self.thresholding = thresholding
-
+        print('DEBUG:')
+        print(self.channels)
         if value_names is None:
             self.value_names = []
             for ch in channels:
@@ -1996,13 +2138,18 @@ class UHFQC_integration_logging_det(Hard_Detector):
     def _get_readout(self):
         return sum([(1 << c) for c in self.channels])
 
-    def get_values(self):
+    def arm(self):
+        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+
+
+    def get_values(self, arm=True):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+        if arm:
+            self.arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()

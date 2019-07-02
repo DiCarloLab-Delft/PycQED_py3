@@ -7,6 +7,7 @@ from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from pycqed.utilities.general import format_value_string
 from copy import deepcopy
 from pycqed.analysis.tools.data_manipulation import \
     populations_using_rate_equations
@@ -150,11 +151,12 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
         states = ['0', '1', '+']
         for state in states:
             fr = self.fit_res['fit {}'.format(state)]
-            N1 = fr.params['N1'].value, fr.params['N1'].stderr
-            N2 = fr.params['N2'].value, fr.params['N2'].stderr
-            fit_msg += ('Prep |{}> : \n\tN_1 = {:.2g} $\pm$ {:.2g}'
-                        '\n\tN_2 = {:.2g} $\pm$ {:.2g}\n').format(
-                state, N1[0], N1[1], N2[0], N2[1])
+
+            fit_msg += 'Prep |{}> :\n\t'
+            fit_msg += format_value_string('$N_1$',
+                                           fr.params['N1'], end_char='\n\t')
+            fit_msg += format_value_string('$N_2$',
+                                           fr.params['N2'], end_char='\n')
 
         self.proc_data_dict['fit_msg'] = fit_msg
 
@@ -456,13 +458,16 @@ class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None,
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True):
+                 do_fitting: bool=True, auto=True,
+                 normalized_probability=False):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
         self.single_timestamp = False
+
+        self.normalized_probability = normalized_probability
 
         self.params_dict = {'xlabel': 'sweep_name',
                             'xvals': 'sweep_points',
@@ -553,8 +558,11 @@ class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
             'title': (self.proc_data_dict['timestamps'][0] + ' \n' +
                       self.proc_data_dict['measurementstring'][0]),
             'do_legend': True,
-            'yrange': (0, 1),
             'legend_pos': 'upper right'}
+
+        if self.normalized_probability:
+            self.plot_dicts['main']['yrange'] =  (0, 1)
+
 
         self.plot_dicts['on'] = {
             'plotfn': self.plot_line,
@@ -892,8 +900,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         if self.cal_points == 'gef':
             # calibration point indices are when ignoring the f-state cal pts
             cal_points = [
-                [[-7, -6], [-5, -4], [-2, -1]],  # oscillating qubits
-                [[-7, -5], [-6, -4], [-3, -1]],  # spec qubit
+                [[-7, -6], [-5, -4], [-2, -1]],  # oscillating qubit
+                [[-7, -5], [-6, -4], [-3, -1]],  # spec qubits
             ]
         elif self.cal_points == 'ge':
             # calibration point indices are when ignoring the f-state cal pts
@@ -978,25 +986,36 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         fr_1 = self.fit_res['cos_fit_on']
 
         phi0 = ufloat(np.rad2deg(fr_0.params['phase'].value),
-                      np.rad2deg(fr_0.params['phase'].stderr))
+                      np.rad2deg(fr_0.params['phase'].stderr if
+                                 fr_0.params['phase'].stderr is not None
+                                 else np.nan))
 
         phi1 = ufloat(np.rad2deg(fr_1.params['phase'].value),
-                      np.rad2deg(fr_1.params['phase'].stderr))
+                      np.rad2deg(fr_1.params['phase'].stderr if
+                                 fr_1.params['phase'].stderr is not None
+                                 else np.nan))
         qoi['phi_0'] = phi0
         qoi['phi_1'] = phi1
-        qoi['phi_cond'] = phi0-phi1
+        qoi['phi_cond'] = (phi0-phi1) % 360
 
         qoi['osc_amp_0'] = ufloat(fr_0.params['amplitude'].value,
-                                  fr_0.params['amplitude'].stderr)
-
+                                  fr_0.params['amplitude'].stderr if
+                                  fr_0.params['amplitude'].stderr is not None
+                                  else np.nan)
         qoi['osc_amp_1'] = ufloat(fr_1.params['amplitude'].value,
-                                  fr_1.params['amplitude'].stderr)
+                                  fr_1.params['amplitude'].stderr if
+                                  fr_1.params['amplitude'].stderr is not None
+                                  else np.nan)
 
         qoi['osc_offs_0'] = ufloat(fr_0.params['offset'].value,
-                                   fr_0.params['offset'].stderr)
+                                   fr_0.params['offset'].stderr if
+                                   fr_0.params['offset'].stderr is not None
+                                   else np.nan)
 
         qoi['osc_offs_1'] = ufloat(fr_1.params['offset'].value,
-                                   fr_1.params['offset'].stderr)
+                                   fr_1.params['offset'].stderr if
+                                   fr_1.params['offset'].stderr is not None
+                                   else np.nan)
 
         qoi['offs_diff'] = qoi['osc_offs_1'] - qoi['osc_offs_0']
 
