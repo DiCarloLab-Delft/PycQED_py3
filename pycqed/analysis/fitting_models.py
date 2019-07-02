@@ -21,8 +21,14 @@ def DoubleExpDampOscFunc(t, tau_1, tau_2,
                          freq_1, freq_2,
                          phase_1, phase_2,
                          amp_1, amp_2, osc_offset):
-    cos_1 = amp_1 * (np.cos(2 * np.pi * freq_1 * t + phase_1)) * np.exp(-(t / tau_1))
-    cos_2 = amp_2 * (np.cos(2 * np.pi * freq_2 * t + phase_2)) * np.exp(-(t / tau_2))
+    if (tau_1>0):
+        cos_1 = amp_1 * (np.cos(2 * np.pi * freq_1 * t + phase_1)) * np.exp(-(t / tau_1))
+    else:
+        cos_1 = np.zeros_like(t)
+    if (tau_2>0):
+        cos_2 = amp_2 * (np.cos(2 * np.pi * freq_2 * t + phase_2)) * np.exp(-(t / tau_2))
+    else:
+        cos_2 = np.zeros_like(t)
     return cos_1 + cos_2 + osc_offset
 
 
@@ -557,30 +563,30 @@ def avoided_crossing_freq_shift(flux, a, b, g):
         [delta_f,  g ]
         [g,        0 ]
 
-    delta_f = a*flux + b 
-    
-    Parameters 
+    delta_f = a*flux + b
+
+    Parameters
     ----------
     flux : array like
-        flux bias values 
+        flux bias values
     a, b : float
-        parameters used to calculate frequency distance (delta) away from 
-        avoided crossing according to 
-            delta_f = a*flux+b 
-    
+        parameters used to calculate frequency distance (delta) away from
+        avoided crossing according to
+            delta_f = a*flux+b
+
     g: float
         Coupling strength strength, beware to relabel your variable if using this
         model to fit J1 or J2.
-    
+
     Returns
-    ------- 
-    frequency_shift : (float) 
-    
-    
-    Note: this model is useful for fitting the frequency shift due to an interaction 
-    in a chevron experiment (after fourier transforming the data). 
+    -------
+    frequency_shift : (float)
+
+
+    Note: this model is useful for fitting the frequency shift due to an interaction
+    in a chevron experiment (after fourier transforming the data).
     """
-    
+
     frequencies = np.zeros([len(flux), 2])
     for kk, fl_i in enumerate(flux):
         f_1 = a*fl_i  +  b
@@ -660,16 +666,27 @@ def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
     max_index = np.argmax(data)
     min_frequency = xvals[min_index]
     max_frequency = xvals[max_index]
-
+    # print(min_frequency)
+    # print(max_frequency)
     amplitude_guess = max(dm_tools.reject_outliers(data))
 
     # Creating parameters and estimations
+
+    #Maybe this is not so good: sharp peaks will definitely be excluded
     S21min = (min(dm_tools.reject_outliers(data)) /
               max(dm_tools.reject_outliers(data)))
+    # print(S21min)
+    # S21min=  (min((data)) /
+    #           max(dm_tools.reject_outliers(data)))
+    # print(min((data)))
+    # print(min(dm_tools.reject_outliers(data)))
+    # print(max((data)))
+    # print(max(dm_tools.reject_outliers(data)))
 
+    # print(S21min)
     Q = f0 / abs(min_frequency - max_frequency)
-
     Qe = abs(Q / abs(1 - S21min))
+
     guess_dict = {'f0': {'value': f0*1e-9,
                          'min': min(xvals)*1e-9,
                          'max': max(xvals)*1e-9},

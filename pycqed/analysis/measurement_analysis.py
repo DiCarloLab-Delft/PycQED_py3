@@ -5844,15 +5844,27 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         if ('hanger' in fitting_model) or ('complex' in fitting_model):
             if kw['custom_power_message'] is None:
-                textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
-                    fit_res.params['f0'].value,
-                    fit_res.params['f0'].stderr) + '\n' \
-                                                   '$Qc$ = %.1f $\pm$ (%.1f)' % (
-                              fit_res.params['Qc'].value,
-                              fit_res.params['Qc'].stderr) + '\n' \
-                                                             '$Qi$ = %.1f $\pm$ (%.1f)' % (
-                              fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
-                          old_vals
+                #TODO: what to do with a wrong fit??
+                if (fit_res.params['f0'].stderr == None):
+                    textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ None' % (
+                        fit_res.params['f0'].value
+                        ) + '\n' \
+                                                       '$Qc$ = %.1f $\pm$ None' % (
+                                  fit_res.params['Qc'].value) + '\n' \
+                                                                 '$Qi$ = %.1f $\pm$ None' % (
+                                  fit_res.params['Qi'].value) + \
+                              old_vals
+
+                else:
+                    textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
+                        fit_res.params['f0'].value,
+                        fit_res.params['f0'].stderr) + '\n' \
+                                                       '$Qc$ = %.1f $\pm$ (%.1f)' % (
+                                  fit_res.params['Qc'].value,
+                                  fit_res.params['Qc'].stderr) + '\n' \
+                                                                 '$Qi$ = %.1f $\pm$ (%.1f)' % (
+                                  fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
+                              old_vals
             else:
                 ###############################################################################
                 # Custom must be a dictionary                                                #
