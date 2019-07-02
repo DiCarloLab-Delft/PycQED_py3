@@ -19,6 +19,24 @@ import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 from qcodes import station
 
 
+# setup logging after all imports
+if 0:
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.debug('started')
+else:
+    log = logging.getLogger('pycqed')
+    #log = logging.getLogger('') # root logger, catches stuff outside of pycqed
+    log.setLevel(logging.DEBUG)
+    if 1:
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        sh = logging.StreamHandler()
+        sh.setLevel(logging.DEBUG)
+        sh.setFormatter(formatter)
+        log.addHandler(sh)
+    log.debug('starting')
+
+
+
 def set_waveforms(awg, waveform_type, sequence_length):
     if waveform_type == 'square':
         for ch in range(8):
@@ -31,13 +49,8 @@ def set_waveforms(awg, waveform_type, sequence_length):
     else:
         raise KeyError()
 
-
-log = logging.getLogger('pycqed')
-log.setLevel(logging.DEBUG)
-log.debug('started')
-
-
 # parameter handling
+log.debug('started')
 sel = 0
 if len(sys.argv)>1:
     sel = int(sys.argv[1])
@@ -151,6 +164,7 @@ rolut = UHFQC_RO_LutMan('rolut', num_res=7)
 #  Configure AWGs
 ##########################################
 if conf.mw_0 != '':
+    log.debug('configuring mw_0')
     # define sequence
     sequence_length = 32
 
@@ -161,6 +175,11 @@ if conf.mw_0 != '':
     instr.mw_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
     instr.mw_0.cfg_codeword_protocol('microwave')
     instr.mw_0.upload_codeword_program()
+    if 1:   # FIXME: should be moved to driver
+        instr.mw_0._dev.setd('raw/dios/0/extclk', 1)  # enable 50 MHz sampling of DIO inputs
+        for awg in range(4):
+            instr.mw_0.set('awgs_{}_dio_strobe_slope'.format(awg), 0)  # disable strobe triggering
+
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
     if 0:
         delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
@@ -174,6 +193,7 @@ if conf.mw_0 != '':
             log.debug('DIO timing errors on AWG {}: {}'.format(awg,dio_timing_errors))
 
 """
+    *Before* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
     delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
     0       +       0/0/0/0         60
     1       +       0/0/0/0         60
@@ -198,10 +218,29 @@ if conf.mw_0 != '':
     - delay steps are 3.33 ns each
     - 15 steps == 50 ns
     - 6 steps == 20 ns, pattern repeats after that
+
+
+    *After* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
+    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
+    0       +       0/0/0/0         66
+    1       +       0/0/0/0         66
+    2       +       0/0/0/0         66
+    
+    3       +       1/0/0/0         86
+    4       +       1/0/0/0         86
+    5       +       0/0/0/0         86
+    6       +       0/0/0/0         86
+    7       +       0/0/0/0         86
+    8       +       0/0/0/0         86
+    
+    9       +       1/0/0/0        106
+    ...
+    
     
 """
 
 if conf.flux_0 != '':
+    log.debug('configuring flux_0')
     # define sequence
     sequence_length = 8
 
@@ -219,6 +258,7 @@ if conf.flux_0 != '':
 ##########################################
 
 if conf.ro_0 != '':
+    log.debug('configuring ro_0')
     instr.mw_0.load_default_settings() # FIXME: also done at init?
     rolut.AWG(instr.mw_0.name)
 
@@ -229,6 +269,7 @@ if conf.ro_0 != '':
 #  Configure CC
 ##########################################
 
+log.debug('configuring CC')
 instr.cc.debug_marker_out(slot_ro_1, instr.cc.UHFQA_TRIG) # UHF-QA trigger
 instr.cc.debug_marker_out(slot_mw_0, instr.cc.HDAWG_TRIG) # HDAWG trigger
 
