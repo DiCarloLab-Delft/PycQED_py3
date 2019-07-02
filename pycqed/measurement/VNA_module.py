@@ -280,7 +280,7 @@ def packing_mmts(file_name, labels, N):
 
     detector_inst = det.Function_Detector_list(
         sweep_function=wrapped_data_importing,
-        result_keys=['Amp', 'phase', 'I', 'Q'],
+        result_keys=['Amp', 'phase', 'I', 'Q' ,'Amp_dB'],
         msmt_kw={'counter': swp_points_counter})
     MC_instr.set_sweep_function(swf.None_Sweep(name='VNA sweep'))
     MC_instr.set_sweep_points(data_points.flatten())

@@ -336,20 +336,34 @@ class VNA_analysis(complex_spectroscopy):
         Q = self.fit_dicts['reso_fit']['fit_res'].params['Q']
         Qe = self.fit_dicts['reso_fit']['fit_res'].params['Qe']
         theta = self.fit_dicts['reso_fit']['fit_res'].params['theta']
+        
+        Qc = 1/np.real(1/(Qe.value*np.exp(1j*theta.value)))
+        Qi = 1/(1/Q.value - 1/Qc)
+        # FIXME: replace if statement with .format_value string which can handle None values as stderr
+        if ((freq.stderr==None)):
+            msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.value/1e6)
+            msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.value/1e3)
+            msg += '\n'
+            msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+            msg += '\n'
+            msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+            msg += '\n'
+            msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
 
-        Qc = 1/np.real(1/(Qe*np.exp(1j*theta)))
-        Qi = 1/(1/Q - 1/Qc)
+            self.proc_data_dict['complex_fit_msg'] = msg
+            # print('Fitting went wrong')
+        else:
+            msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.stderr/1e6)
+            msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.stderr/1e3)
+            msg += '\n'
+            msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+            msg += '\n'
+            msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+            msg += '\n'
+            msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
 
-        msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq/1e6,freq.stderr/1e6)
-        msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q/1e3,Q.stderr/1e3)
-        msg += '\n'
-        msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
-        msg += '\n'
-        msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe/1e3)
-        msg += '\n'
-        msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
+            self.proc_data_dict['complex_fit_msg'] = msg
 
-        self.proc_data_dict['complex_fit_msg'] = msg
 
 
 
