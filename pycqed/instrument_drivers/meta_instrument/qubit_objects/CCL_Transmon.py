@@ -51,6 +51,10 @@ class CCLight_Transmon(Qubit):
         self.connect_message(begin_time=t0)
 
     def add_instrument_ref_parameters(self):
+        self.add_parameter('instr_device',
+                           docstring='Represents sample, contains all qubits '
+                                     'and resonators',
+                           parameter_class=InstrumentRefParameter)
         # MW sources
         self.add_parameter('instr_LO_ro',
                            parameter_class=InstrumentRefParameter)
@@ -1199,6 +1203,35 @@ class CCLight_Transmon(Qubit):
     def prepare_for_fluxing(self, reset=True):
         pass
 
+    def prepare_characterizing(self, exceptions: list=[], verbose=True):
+        """
+        Prepares the qubit for (automatic) characterisation. Will park all
+        other qubits in the device object to their 'anti-sweetspot' (which is a
+        sweetspot as well technically speaking). Afterwards, it will move
+        the qubit to be characterized (self) to its sweetspot.
+
+        Will ignore any qubit whose name (string) is in 'exceptions' 
+        """
+
+        fluxcurrent = self.instr_FluxCtrl.get_instr()
+        device = self.instr_device.get_instr()
+        exceptions.append('fakequbit')
+        # First park all other qubits to anti sweetspot
+        print('Moving other qubits away ...')
+        for qubit_name in device.qubits():
+            if (qubit_name not in exceptions) and (qubit_name != self.name) :
+                qubit = device.find_instrument(qubit_name)
+                channel = qubit.cfg_dc_flux_ch()
+                current = qubit.fl_dc_V0() + qubit.fl_dc_V_per_phi0()/2
+                fluxcurrent[channel](current)
+                if verbose:
+                    print('\t Moving {} to {:.3f} mA'
+                          .format(qubit_name, current/1e-3))
+        # Move self to sweetspot:
+        if verbose:
+            print('Moving {} to {:.3f} mA'.format(self.name, self.fl_dc_V0()/1e-3))
+        fluxcurrent[self.cfg_dc_flux_ch()](self.fl_dc_V0())
+        return True
     ####################################################
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
@@ -1255,8 +1288,8 @@ class CCLight_Transmon(Qubit):
             peak_height = np.amax(analysis_spec.data_dist)
 
             # Check if peak is not another qubit, and if it is move that qubit away
-            for qubit_name in self.device.qubits():
-                qubit = self.device.find_instrument(qubit_name)
+            for qubit_name in self.instr_device.get_instr().qubits():
+                qubit = self.instr_device.get_instr().find_instrument(qubit_name)
                 if qubit.name != self.name and qubit.freq_qubit() is not None:
 
                     if np.abs(qubit.freq_qubit()-freq_peak) < 5e6:
@@ -1298,7 +1331,8 @@ class CCLight_Transmon(Qubit):
         if freqs is None:
             freq_center = self.freq_res()
             freq_range = 10e6
-            freqs = np.arange(freq_center-1/2*freq_range, freq_center+1/2*freq_range,
+            freqs = np.arange(freq_center - freq_range/2, 
+                              freq_center + freq_range/2,
                               0.1e6)
 
         if powers is None:
@@ -1309,8 +1343,8 @@ class CCLight_Transmon(Qubit):
                                                   close_fig=True)
         if update:
             ro_pow = 10**(fit_res.power/20)
-            self.ro_pulse_amp_CW(ro_pow/3)
-            self.ro_pulse_amp(ro_pow/3)
+            self.ro_pulse_amp_CW(ro_pow)
+            self.ro_pulse_amp(ro_pow)
             self.freq_res(fit_res.f_low)
             if self.freq_qubit() is None:
                 f_qubit_estimate = self.freq_res() + (65e6)**2/(fit_res.shift)
@@ -1529,7 +1563,7 @@ class CCLight_Transmon(Qubit):
         return opt_motzoi
 
     def calibrate_mixer_offsets_drive(self, mixer_channels=['G', 'D'],
-                                      update: bool =True)-> bool:
+                                      update: bool =True, ftarget=-110)-> bool:
         '''
         Calibrates the mixer skewness and updates the I and Q offsets in
         the qubit object.
@@ -1582,7 +1616,8 @@ class CCLight_Transmon(Qubit):
                     source=self.instr_LO_mw.get_instr(),
                     MC=self.instr_MC.get_instr(),
                     chI_par=chGI_par, chQ_par=chGQ_par,
-                    label='Mixer_offsets_drive_G'+self.msmt_suffix)
+                    label='Mixer_offsets_drive_G'+self.msmt_suffix,
+                    ftarget=ftarget)
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
@@ -1597,7 +1632,8 @@ class CCLight_Transmon(Qubit):
                     MC=self.instr_MC.get_instr(),
                     chI_par=chDI_par,
                     chQ_par=chDQ_par,
-                    label='Mixer_offsets_drive_D'+self.msmt_suffix)
+                    label='Mixer_offsets_drive_D'+self.msmt_suffix,
+                    ftarget=ftarget)
                 if update:
                     self.mw_mixer_offs_DI(offset_I)
                     self.mw_mixer_offs_DQ(offset_Q)
@@ -1615,7 +1651,8 @@ class CCLight_Transmon(Qubit):
                     source=self.instr_LO_mw.get_instr(),
                     MC=self.instr_MC.get_instr(),
                     chI_par=chI_par,
-                    chQ_par=chQ_par)
+                    chQ_par=chQ_par,
+                    ftarget=ftarget)
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
@@ -1632,7 +1669,8 @@ class CCLight_Transmon(Qubit):
                     source=self.instr_LO_mw.get_instr(),
                     MC=self.instr_MC.get_instr(),
                     chI_par=chGI_par, chQ_par=chGQ_par,
-                    label='Mixer_offsets_drive'+self.msmt_suffix)
+                    label='Mixer_offsets_drive'+self.msmt_suffix,
+                    ftarget=ftarget)
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
@@ -1781,7 +1819,8 @@ class CCLight_Transmon(Qubit):
             LutMan.mixer_alpha(alpha)
             LutMan.mixer_phi(phi)
 
-    def calibrate_mixer_offsets_RO(self, update: bool=True) -> bool:
+    def calibrate_mixer_offsets_RO(self, update: bool=True, 
+                                   ftarget=-110) -> bool:
         '''
         Calibrates the mixer skewness and updates the I and Q offsets in
         the qubit object.
@@ -1792,7 +1831,8 @@ class CCLight_Transmon(Qubit):
         offset_I, offset_Q = mixer_carrier_cancellation(
             SH=self.instr_SH.get_instr(), source=self.instr_LO_ro.get_instr(),
             MC=self.instr_MC.get_instr(),
-            chI_par=chI_par, chQ_par=chQ_par, x0=(0.05, 0.05))
+            chI_par=chI_par, chQ_par=chQ_par, x0=(0.05, 0.05),
+            ftarget=ftarget)
 
         if update:
             self.ro_pulse_mixer_offs_I(offset_I)
@@ -2161,8 +2201,8 @@ class CCLight_Transmon(Qubit):
                                           prepare_for_timedomain=True):
         """
         Performs pulsed spectroscopy by modulating a cw pulse with a square
-        which is generated by an AWG. Uses the self.spec_source_2 as spec source
-        (most of the times is the MW_LO that goes into the mixer)
+        which is generated by an AWG. Uses the self.mw_LO as spec source, as
+        that usually is the LO of the AWG/QWG mixer.
 
         Is considered as a time domain experiment as it utilizes the AWG
 

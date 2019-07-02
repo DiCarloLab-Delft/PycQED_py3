@@ -40,6 +40,7 @@ class octobox_dep_graph(AutoDepGraph_DAG):
         self.create_dep_graph(Qubit_list=qubits)
 
     def create_dep_graph(self, Qubit_list):
+        print('Creating Graph ...')
         Qubit = self.device.find_instrument('fakequbit')
 
         cal_True_delayed = 'autodepgraph.node_functions.calibration_functions.test_calibration_True_delayed'
@@ -82,18 +83,18 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           calibrate_function=cal_True_delayed)
             self.add_node(Qubit.name + ' Mixer Skewness Drive',
                           calibrate_function=cal_True_delayed)
-                              # calibrate_function=Qubit.name + '.calibrate_mixer_skewness_drive')
+                          # calibrate_function=Qubit.name + '.calibrate_mixer_skewness_drive')
             self.add_node(Qubit.name + ' Mixer Skewness Readout',
                           calibrate_function=cal_True_delayed)
-                              # calibrate_function=Qubit.name + '.calibrate_mixer_skewness_RO')
+                          # calibrate_function=Qubit.name + '.calibrate_mixer_skewness_RO')
             self.add_node(Qubit.name + ' Mixer Offset Drive',
                           calibrate_function=Qubit.name + '.calibrate_mixer_offsets_drive')
             self.add_node(Qubit.name + ' Mixer Offset Readout',
                           calibrate_function=Qubit.name + '.calibrate_mixer_offsets_RO')
-            self.add_node(Qubit.name + ' Ro/MW pulse timing',
-                          calibrate_function=cal_True_delayed)
 
             # Qubits calibration
+            self.add_node(Qubit.name + ' Prepare Characterizing',
+                          calibrate_function=Qubit.name + '.prepare_characterizing')
             self.add_node(Qubit.name + ' Frequency Coarse',
                           calibrate_function=Qubit.name + '.find_frequency_adaptive',
                           check_function=Qubit.name + '.check_qubit_spectroscopy',
@@ -115,7 +116,7 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             self.add_node(Qubit.name + ' f_12 estimate',
                           calibrate_function=Qubit.name + '.find_anharmonicity_estimate')
             self.add_node(Qubit.name + ' DAC Arc Polynomial',
-                          calibrate_function=Qubit.name + '.find_flux_arc')
+                          calibrate_function=Qubit.name + '.measure_flux_arc_tracked_spectroscopy')
 
             # Validate qubit calibration
             self.add_node(Qubit.name + ' ALLXY',
@@ -142,14 +143,12 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             ###################################################################
 
             # Resonators
-            # self.add_edge(Qubit.name + ' Resonator Frequency',
-            #               'Resonators Power Scan')
             self.add_edge(Qubit.name + ' Resonator Frequency',
-                          'Resonators Flux Sweep')
+                          Qubit.name + ' Prepare Characterizing')
             self.add_edge(Qubit.name + ' Resonator Frequency',
                           Qubit.name + ' Resonator Power Scan',)
             self.add_edge(Qubit.name + ' Resonator Power Scan',
-                          'Resonators Flux Sweep')
+                          Qubit.name + ' Prepare Characterizing')
             self.add_edge(Qubit.name + ' Frequency Coarse',
                           Qubit.name + ' Resonator Power Scan')
             self.add_edge(Qubit.name + ' Frequency Coarse',
@@ -168,6 +167,8 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           Qubit.name + ' Calibrations')
 
             # Qubit
+            self.add_edge(Qubit.name + ' Prepare Characterizing',
+                          'Resonators Flux Sweep')
             self.add_edge(Qubit.name + ' Spectroscopy Power',
                           Qubit.name + ' Frequency Coarse')
             self.add_edge(Qubit.name + ' Sweetspot',
@@ -244,3 +245,4 @@ class octobox_dep_graph(AutoDepGraph_DAG):
 
         url = self.open_html_viewer()
         print('Dependancy Graph Created. URL = '+url)
+        # self.open_html_viewer()

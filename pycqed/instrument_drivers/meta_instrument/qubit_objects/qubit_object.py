@@ -315,7 +315,7 @@ class Qubit(Instrument):
                 print('{}:\t{:.3f} {}'.format(res.identifier, freq, unit))
 
         try:
-            device = self.device
+            device = self.instr_device.get_instr()
         except AttributeError:
             logging.warning('Could not update device resonators: No device '
                             'found for {}. Returning list of resonators.'
@@ -361,6 +361,7 @@ class Qubit(Instrument):
                 device.missing_resonators = missing_resonators
             print('Will look for missing resonators in next node')
         else:
+            print('Found all expected resonators.')
             for found_res, res in zip(found_resonators, device.resonators):
                 res.freq = found_res.freq
 
@@ -399,7 +400,7 @@ class Qubit(Instrument):
 
         if resonators is None:
             try:
-                device = self.device
+                device = self.instr_device.get_instr()
 
             except AttributeError:
                 logging.warning('Could not find device resonator dictionary: '
@@ -526,7 +527,7 @@ class Qubit(Instrument):
         else:
             for found_res, res in zip(found_resonators, resonators):
                 res.freq = found_res.freq
-            self.device.resonators = resonators
+            self.instr_device.get_instr().resonators = resonators
             return True 
 
     def find_test_resonators(self, with_VNA=None, resonators=None):
@@ -545,11 +546,12 @@ class Qubit(Instrument):
 
         if resonators is None:
             try:
-                device = self.device
+                device = self.instr_device.get_instr()
             except AttributeError:
                 logging.warning('Could not find device resonators: '
                                 'No device found for {}'.format(self.name))
-            resonators = self.device.resonators
+                return False
+            resonators = self.instr_device.get_instr().resonators
 
         for res in device.resonators:
 
@@ -629,7 +631,7 @@ class Qubit(Instrument):
 
         if resonators is None:
             try:
-                device = self.device
+                device = self.instr_device.get_instr()
             except AttributeError:
                 logging.warning('Could not find device resonators: '
                                 'No device found for {}.'.format(self.name))
@@ -684,7 +686,7 @@ class Qubit(Instrument):
                         res.fl_dc_V_per_phi0 = fit_res.current_to_flux
 
         if verbose:
-            for res in self.device.resonators:
+            for res in self.instr_device.get_instr().resonators:
                 if res.type == 'qubit_resonator':
                     freq, unit = plt_tools.SI_val_to_msg_str(res.freq_low,
                                                              'Hz',
@@ -699,7 +701,7 @@ class Qubit(Instrument):
                     print('{}, f = {:.3f} {}'.format(res.type, freq, unit))
 
         # Set properties for all qubits in device if device exists
-        device = self.device
+        device = self.instr_device.get_instr()
         assigned_qubits = []
         for q in device.qubits():
             if q == 'fakequbit':
