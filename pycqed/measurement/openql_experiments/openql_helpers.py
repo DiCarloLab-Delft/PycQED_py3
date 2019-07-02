@@ -75,7 +75,7 @@ def compile(p):
     """
     Wrapper around OpenQL Program.compile() method.
     """
-    if 0:  # FIXME: allow choice
+    if 1:  # FIXME: allow choice, check OpenQL 0.7.0 whether warnings can now be on
         with suppress_stdout():
             p.compile()
     else:  # show warnings

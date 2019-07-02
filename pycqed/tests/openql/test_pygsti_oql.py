@@ -28,3 +28,19 @@ class Test_pygsti_oql(unittest.TestCase):
         programs = two_qubit_gst([2, 0], self.config_fn,
                                  maxL=4, lite_germs=True,
                                  recompile=True)
+
+"""
+    Author:             Wouter Vlothuizen, QuTech
+    Purpose:            pygsti tests for Qutech Central Controller
+    Notes:              requires OpenQL with CC backend support
+"""
+
+# NB: we just hijack the parent class to run the same tests
+class Test_pygsti_oql_CC(Test_pygsti_oql):
+    def setUp(self):
+        curdir = os.path.dirname(__file__)
+        self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
+        output_dir = os.path.join(curdir, 'test_output_cc')
+        ql.set_option('output_dir', output_dir)
+
+

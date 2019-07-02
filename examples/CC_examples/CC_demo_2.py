@@ -48,14 +48,14 @@ if len(sys.argv)>1:
 # instrument info
 conf = lambda:0 # create empty 'struct'
 conf.ro_0 = ''
-#conf.ro_0 = 'dev2209'
+conf.ro_0 = 'dev2295'
 conf.mw_0 = 'dev8079'
 conf.flux_0 = ''
 conf.cc_ip = '192.168.0.241'
 
 qubit_idx = 3 # NB: connects to AWG8'mw_0'  in slot 3
-slot_mw_0 = 4
 slot_ro_1 = 1
+slot_mw_0 = 4
 curdir = os.path.dirname(__file__)
 cfg_openql_platform_fn = str(Path("../../pycqed/tests/openql/test_cfg_cc.json"))
 print(cfg_openql_platform_fn)
@@ -145,7 +145,6 @@ instr.cc.set_status_questionable_frequency_enable(0x7FFF)
 # Open virtual instruments
 ##########################################
 rolut = UHFQC_RO_LutMan('rolut', num_res=7)
-#rolut.AWG(UHFQC.name)
 #station.add_component(rolut)
 
 ##########################################
@@ -215,28 +214,41 @@ if conf.flux_0 != '':
     instr.flux_0.upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
 
+##########################################
+#  Configure UHFQA's
+##########################################
 
-if 1:
-    instr.cc.debug_marker_out(slot_ro_1, instr.cc.UHFQA_TRIG) # UHF-QA trigger
-    instr.cc.debug_marker_out(slot_mw_0, instr.cc.HDAWG_TRIG) # HDAWG trigger
+if conf.ro_0 != '':
+    instr.mw_0.load_default_settings() # FIXME: also done at init?
+    rolut.AWG(instr.mw_0.name)
 
-    log.debug("uploading '{}' to CC".format(p.filename))
-    instr.cc.eqasm_program(p.filename)
 
-    if 0:
-        err_cnt = instr.cc.get_system_error_count()
-        if err_cnt>0:
-            log.warning('CC status after upload')
-        for i in range(err_cnt):
-            print(instr.cc.get_error())
 
-    log.debug('starting CC')
-    instr.cc.start()
 
-    if 0:
-        err_cnt = instr.cc.get_system_error_count()
-        if err_cnt>0:
-            log.warning('CC status after start')
-        for i in range(err_cnt):
-            print(instr.cc.get_error())
+##########################################
+#  Configure CC
+##########################################
+
+instr.cc.debug_marker_out(slot_ro_1, instr.cc.UHFQA_TRIG) # UHF-QA trigger
+instr.cc.debug_marker_out(slot_mw_0, instr.cc.HDAWG_TRIG) # HDAWG trigger
+
+log.debug("uploading '{}' to CC".format(p.filename))
+instr.cc.eqasm_program(p.filename)
+
+if 0:
+    err_cnt = instr.cc.get_system_error_count()
+    if err_cnt>0:
+        log.warning('CC status after upload')
+    for i in range(err_cnt):
+        print(instr.cc.get_error())
+
+log.debug('starting CC')
+instr.cc.start()
+
+if 0:
+    err_cnt = instr.cc.get_system_error_count()
+    if err_cnt>0:
+        log.warning('CC status after start')
+    for i in range(err_cnt):
+        print(instr.cc.get_error())
 
