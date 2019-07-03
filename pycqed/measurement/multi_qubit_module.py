@@ -2504,6 +2504,7 @@ def measure_chevron(qbc, qbt, qbr, sweep_params_dict, cal_points=True,
         sweep_points = np.concatenate(
             [hard_swpts, [hard_swpts[-1]+step,  hard_swpts[-1]+2*step,
                        hard_swpts[-1]+3*step, hard_swpts[-1]+4*step]])
+        sweep_params_dict['hard_sweep_points']['values'] = sweep_points
     else:
         sweep_points = hard_swpts
 
@@ -2535,8 +2536,11 @@ def measure_chevron(qbc, qbt, qbr, sweep_params_dict, cal_points=True,
         soft_param_name]['values'])
     MC.set_detector_function(qbr.int_avg_det)
     MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name))
-    tda.MultiQubit_TimeDomain_Analysis(qb_names=[qbr.name],
-                                       options_dict={'TwoD': True})
+    tda.MultiQubit_TimeDomain_Analysis(
+        qb_names=[qbr.name],
+        options_dict={'TwoD': True,
+                      'cal_states_rotations': {'g': 0, 'e': 1},
+                      'data_to_fit': {'qb2': 'pe'}})
 
 
 def measure_cphase(qbc, qbt, qbr, lengths, amps, alphas=None,
@@ -2810,7 +2814,9 @@ def measure_cphase_nz(qbc, qbt, soft_sweep_params_dict, f_LO,
     if analyze:
         flux_pulse_tdma = tda.CPhaseLeakageAnalysis(
             qb_names=[qbc.name, qbt.name],
-            options_dict={'TwoD_tuples': True, 'plot_all_traces': plot})
+            options_dict={'TwoD_tuples': True, 'plot_all_traces': plot,
+                          'cal_states_rotations': {'g': 0, 'e': 1},
+                          'data_to_fit': {qbc.name: 'pe', qbt.name: 'pe'}})
         cphases = flux_pulse_tdma.proc_data_dict[
             'analysis_params_dict']['cphase']['val']
         population_losses = flux_pulse_tdma.proc_data_dict[

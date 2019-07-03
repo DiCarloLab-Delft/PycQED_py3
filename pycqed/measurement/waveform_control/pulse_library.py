@@ -457,7 +457,17 @@ class BufferedCZPulse(Pulse):
             wave = 0.5*(sp.special.erf((tvals - tstart)*scaling) -
                         sp.special.erf((tvals - tend)*scaling))*amp
         t_rel = tvals - tvals[0]
-        wave *= np.cos(2*np.pi*(self.frequency*t_rel + self.phase / 360.))
+        if self.frequency == 0:
+            wave *= np.cos(2*np.pi * (self.frequency*t_rel + self.phase / 360.))
+        else:
+            phases = np.linspace(0, 360, 500)
+            integrals = np.array([
+                np.sum(wave*np.cos(
+                    2*np.pi*(self.frequency * t_rel + phase / 360.))) for
+                    phase in phases])
+            best_phase = phases[np.argmin(integrals**2)]
+            wave *= np.cos(2*np.pi * (self.frequency*t_rel + best_phase / 360.))
+
         return wave
 
 

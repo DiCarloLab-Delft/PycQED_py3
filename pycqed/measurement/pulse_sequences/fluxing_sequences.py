@@ -1654,17 +1654,11 @@ def dynamic_phase_meas_seq(thetas, qb_name, CZ_pulse_name,
     #     flux_pulse['amplitude'] = amp
     #     elt_name_offset = j*len(thetas)
 
-    # flux_pulse['amplitude'] = flux_pulse_amp
     pulse_list = [operation_dict['X90 ' + qb_name], flux_pulse]
     for i, theta in enumerate(thetas):
         if theta == thetas[-4]:
             # after this point, we do not want the flux pulse
             pulse_list = [operation_dict['X90 ' + qb_name]]
-        #     flux_pulse['amplitude'] = 0
-        #     if 'aux_channels_dict' in flux_pulse:
-        #         for ch in flux_pulse['aux_channels_dict']:
-        #             flux_pulse['aux_channels_dict'][ch] = 0
-
         if cal_points and (theta == thetas[-4] or theta == thetas[-3]):
             el = multi_pulse_elt(i, station,
                                  [operation_dict['I ' + qb_name],
@@ -2146,7 +2140,7 @@ def fluxpulse_scope_sequence(delays, qb, verbose=False,
 
     Timings of sequence
 
-       |          ----------           |X180|  ----------------------------  |RO|
+       |          ----------        |X180|  ----------------------------  |RO|
        |        ---      | --------- fluxpulse ---------- |
                          <-  delay  ->
 
@@ -2453,6 +2447,7 @@ def cphase_nz_seq(phases, flux_params_dict,
     for pipulse in [True, False]:
         if not pipulse:
             X180_control['amplitude'] = 0
+            X180_control_2['amplitude'] = 0
         for i, phase in enumerate(unique_phases):
             el_iter = i if pipulse else len(unique_phases)+i
             if cal_points and num_cal_points == 3 and \
@@ -2495,14 +2490,14 @@ def cphase_nz_seq(phases, flux_params_dict,
                 pulse_list = [X180_control, X90_target]
                 if 'pulse_length' in flux_params_dict:
                     pulse_list += [buffer_pulse]
-                if not pipulse:
-                    X90_target_2['refpoint'] = 'start'
-                    pulse_list += num_cz_gates*[CZ_pulse]
-                    pulse_list += [X180_control_2,
-                                   X90_target_2, RO_pulse]
-                else:
-                    pulse_list += num_cz_gates * [CZ_pulse]
-                    pulse_list += [X90_target_2, RO_pulse]
+                # if pipulse:
+                X90_target_2['refpoint'] = 'start'
+                pulse_list += num_cz_gates*[CZ_pulse]
+                pulse_list += [X180_control_2,
+                               X90_target_2, RO_pulse]
+                # else:
+                #     pulse_list += num_cz_gates * [CZ_pulse]
+                #     pulse_list += [X90_target_2, RO_pulse]
                 el = multi_pulse_elt(el_iter, station, pulse_list)
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)

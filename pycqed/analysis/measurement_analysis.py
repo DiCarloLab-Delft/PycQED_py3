@@ -11273,7 +11273,7 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
                                     print_fit_results=print_fit_results)
 
         # plot
-        ax.plot(thetas, ampls, 'o-', label=dict_label)
+        ax.plot(thetas, ampls, 'o', label=dict_label)
 
         thetas_fine = np.linspace(thetas[0], thetas[-1], len(thetas)*100)
         if fit_res.best_values['amplitude'] > 0:

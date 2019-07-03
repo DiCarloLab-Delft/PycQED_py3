@@ -1413,7 +1413,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         cdict = {'red':   [(v[i], c[i][0], c[i][0]) for i in range(len(v))],
                  'green': [(v[i], c[i][1], c[i][1]) for i in range(len(v))],
                  'blue':  [(v[i], c[i][2], c[i][2]) for i in range(len(v))]}
-        cm = lscmap('customcmap', cdict)
+        cm = mc.LinearSegmentedColormap('customcmap', cdict)
 
         if only_odd:
             ylist = list(range(int(self.n_readouts/2)))

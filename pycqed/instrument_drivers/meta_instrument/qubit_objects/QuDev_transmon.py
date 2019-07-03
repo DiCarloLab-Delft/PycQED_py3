@@ -2418,7 +2418,7 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        std_devs = kwargs.get('std_devs',[0.3,10.])
+        std_devs = kwargs.get('std_devs',[0.3, 10.])
         c = kwargs.pop('second_round_std_scale',0.4)
         #Could make sample size variable (maxiter) for better adapting)
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):

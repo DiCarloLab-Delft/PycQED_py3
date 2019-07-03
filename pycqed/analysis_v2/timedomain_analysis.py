@@ -238,6 +238,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 for qbn in self.qb_names:
                     self.channel_map[qbn] = value_names
 
+        if len(self.channel_map) == 0:
+            raise ValueError('channel_map is empty.')
+
     def process_data(self):
         """
         This takes care of rotating and normalizing the data if required.
@@ -672,8 +675,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             self, fig_name, data, qb_name,
             title_suffix='', plot_cal_points=True,
             plot_name_suffix='', data_label='Data', data_axis_label=''):
-        print(fig_name)
-        print(plot_name_suffix)
         title_suffix = qb_name + title_suffix
         if data_axis_label == '':
             data_axis_label = '{} state population'.format(
@@ -3480,7 +3481,7 @@ class T1Analysis(MultiQubit_TimeDomain_Analysis):
                 old_T1_val = a_tools.get_param_value_from_file(
                     file_path=self.raw_data_dict['folder'][0],
                     instr_name=qbn, param_name='T1{}'.format(
-                        '_ef' if 'f' in self.data_to_fit[qbn] else '_'))
+                        '_ef' if 'f' in self.data_to_fit[qbn] else ''))
                 T1_dict = self.proc_data_dict['analysis_params_dict']
                 textstr = '$T_1$ = {:.2f} $\mu$s'.format(
                             T1_dict[qbn]['T1']*1e6) \
@@ -3971,7 +3972,7 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
                 file_path=self.echo_analysis.raw_data_dict['folder'][0],
                 instr_name=qbn, param_name='T2{}'.format(
                     '_ef' if 'f' in self.echo_analysis.data_to_fit[qbn]
-                    else '_'))
+                    else ''))
             T2_dict = self.proc_data_dict['analysis_params_dict']
             textstr = '$T_2$ echo = {:.2f} $\mu$s'.format(
                 T2_dict[qbn]['T2_echo']*1e6) \
@@ -4214,9 +4215,9 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             lines_errs = np.array([fr.params['c'].stderr for fr in fit_res_objs])
             lines_errs[lines_errs == None] = 0.0
 
-            leakage = np.abs(lines[0::2] - lines[1::2])#/np.abs(lines[1::2])
+            leakage = lines[0::2] - lines[1::2]#/np.abs(lines[1::2])
             x = lines[1::2] - lines[0::2]
-            x_err = np.array(lines_errs[0::2]**2 + lines_errs[1::2]**2,
+            x_err = np.array(np.sqrt(lines_errs[0::2]**2 + lines_errs[1::2]**2),
                              dtype=np.float64)
             y = lines[1::2]
             y_err = lines_errs[1::2]
@@ -4369,7 +4370,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
         # condition do_legend = (row in [0,1]) in the plot dicts above
         if self.num_cal_points > 0:
             self.plot_dicts.update(ref_states_plot_dicts)
-
+        return figure_name
 
     def prepare_plots(self):
         if self.options_dict.get('plot_all_traces', True):
@@ -4377,9 +4378,9 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                 if self.options_dict.get('plot_all_probs', True):
                     for prob_label, data_2d in self.proc_data_dict[
                             'projected_data_dict'][qbn].items():
-                        self.plot_traces(prob_label, data_2d, qbn)
+                        figure_name = self.plot_traces(prob_label, data_2d, qbn)
                 else:
-                    self.plot_traces(
+                    figure_name = self.plot_traces(
                         self.data_to_fit[qbn], self.proc_data_dict[
                             'data_to_fit'][qbn], qbn)
                     
@@ -4394,7 +4395,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                                 self.proc_data_dict['analysis_params_dict'][
                                     'population_loss']['val'][0])
                             self.plot_dicts['text_msg_' + qbn] = {
-                                'fig_id': base_plot_name,
+                                'fig_id': figure_name,
                                 'ypos': -0.2,
                                 'xpos': -0.05,
                                 'horizontalalignment': 'left',
@@ -4406,7 +4407,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                                 self.proc_data_dict['analysis_params_dict'][
                                     'leakage']['val'][0])
                             self.plot_dicts['text_msg_' + qbn] = {
-                                'fig_id': base_plot_name,
+                                'fig_id': figure_name,
                                 'ypos': -0.2,
                                 'xpos': -0.05,
                                 'horizontalalignment': 'left',
