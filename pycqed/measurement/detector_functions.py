@@ -2185,13 +2185,18 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
+    def _get_readout(self):
+        return sum([(1 << c) for c in self.channels])
+
     def get_values(self):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+
+        # resets UHFQC internal readout counters
+        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout',
+                               self._get_readout())
 
         # starting AWG
         if self.AWG is not None:

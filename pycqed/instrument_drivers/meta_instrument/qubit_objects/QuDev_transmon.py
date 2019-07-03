@@ -167,7 +167,8 @@ class QuDev_transmon(Qubit):
                            vals=vals.Ints(0, 1048576),
                            parameter_class=ManualParameter)
         self.add_parameter('acq_length', initial_value=2.2e-6,
-                           vals=vals.Numbers(min_value=1e-8, max_value=2.2e-6),
+                           vals=vals.Numbers(min_value=1e-8,
+                                             max_value=4097/1.2e9),
                            parameter_class=ManualParameter)
         self.add_parameter('acq_IQ_angle', initial_value=0,
                            docstring='The phase of the integration weights '
@@ -308,7 +309,7 @@ class QuDev_transmon(Qubit):
         DEFAULT_PREP_PARAMS = dict(preparation_type='wait',
                                    post_ro_wait=1e-6, reset_reps=1,
                                    final_reset_pulse=True,
-                                   threshold_mapping={0:'g', 1:'e'})
+                                   threshold_mapping={0: 'g', 1: 'e'})
 
         self.add_parameter('preparation_params', parameter_class=ManualParameter,
                             initial_value=DEFAULT_PREP_PARAMS, vals=vals.Dict())
@@ -481,7 +482,7 @@ class QuDev_transmon(Qubit):
             self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
                 self.acq_Q_channel()), -1.0)
         else:
-            tbase = np.arange(0, 4096 / 1.8e9, 1 / 1.8e9)
+            tbase = np.arange(0, 4097 / 1.8e9, 1 / 1.8e9)
             theta = self.acq_IQ_angle()
             cosI = np.array(np.cos(2 * np.pi * f_mod * tbase + theta))
             sinI = np.array(np.sin(2 * np.pi * f_mod * tbase + theta))
@@ -1374,7 +1375,7 @@ class QuDev_transmon(Qubit):
         return MC
 
     def measure_transients(self, states=('g', 'e'), upload=True,
-                           analyze=True, acq_length=2.2e-6,
+                           analyze=True, acq_length=4097/1.8e9,
                            prep_params=None, exp_metadata=None, **kw):
         """
         If the resulting transients will be used to caclulate the optimal
@@ -1871,7 +1872,7 @@ class QuDev_transmon(Qubit):
         return _alpha, _phi, a
 
     def find_optimized_weights(self, update=True, measure=True,
-                               qutrit=False, acq_length=2.2e-6, **kw):
+                               qutrit=False, acq_length=4097/1.8e9, **kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
         # I agree (Christian, 07.11.2018 -- around 1 year later)
 

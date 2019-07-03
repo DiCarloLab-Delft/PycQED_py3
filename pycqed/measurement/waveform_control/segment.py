@@ -906,6 +906,8 @@ class UnresolvedPulse:
 
     def __repr__(self):
         string_repr = self.pulse_obj.name
+        if self.operation_type != None:
+            string_repr += f"\n   operation_type: {self.operation_type}"
         string_repr += f"\n   ref_pulse: {self.ref_pulse}"
         if self.ref_point != 1:
             string_repr += f"\n   ref_point: {self.ref_point}"
