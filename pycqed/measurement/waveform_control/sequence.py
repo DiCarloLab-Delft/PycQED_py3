@@ -32,6 +32,14 @@ class Sequence:
         self.segments[segment.name] = segment
 
     def extend(self, segments):
+        """
+        Extends the sequence given a list of segments
+        Args:
+            segments (list): segments to add to the sequence
+
+        Returns:
+
+        """
         for seg in segments:
             self.add(seg)
 
@@ -56,9 +64,23 @@ class Sequence:
                     if element in seg.acquisition_elements:
                         self.awg_sequence[awg][-1].append('RO')
 
-    def nr_acq_elements(self):
-        return np.sum([len(s.acquisition_elements)
-                           for n, s in self.segments.items()])
+    def n_acq_elements(self, per_segment=False):
+        """
+        Gets the number of acquisition elements in the sequence.
+        Args:
+            per_segment (bool): Whether or not to return the number of
+                acquisition elements per segment. Defaults to False.
+
+        Returns:
+            number of acquisition elements (list (if per_segment) or int)
+
+        """
+        n_readouts = [len(seg.acquisition_elements)
+                      for _, seg in self.segments.items()]
+        if not per_segment:
+            n_readouts = np.sum(n_readouts)
+        return n_readouts
+
 
     def __repr__(self):
         string_repr = f"####### {self.name} #######\n"
