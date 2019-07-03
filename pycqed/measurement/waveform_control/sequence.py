@@ -56,8 +56,13 @@ class Sequence:
                     if element in seg.acquisition_elements:
                         self.awg_sequence[awg][-1].append('RO')
 
+    def nr_acq_elements(self):
+        return np.sum([len(s.acquisition_elements)
+                           for n, s in self.segments.items()])
+
     def __repr__(self):
         string_repr = f"####### {self.name} #######\n"
         for seg_name, seg  in self.segments.items():
             string_repr += str(seg) + "\n"
         return string_repr
+

@@ -212,7 +212,7 @@ def sweep_pulse_params(pulses, params):
     n_sweep_points = len(list(params.values())[0])
 
     assert np.all([len(v) == n_sweep_points for v in params.values()]), \
-        "Parameter sweep values are not of all of the same length: {}" \
+        "Parameter sweep values are not all of the same length: {}" \
             .format({n: len(v) for n, v in params.items()})
 
     for i in range(n_sweep_points):
@@ -1382,7 +1382,7 @@ def qscale_active_reset(qscales, qb_name, operation_dict, cal_points,
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
-
+    log.debug(seq)
     return seq, np.arange(len(seq.segments))
 
 

@@ -183,7 +183,8 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('acq_weights_type', initial_value='SSB',
                            vals=vals.Enum('SSB', 'DSB', 'optimal',
-                                          'square_rot', 'manual'),
+                                          'square_rot', 'manual',
+                                          'optimal_qutrit'),
                            docstring=(
                                'Determines what type of integration weights to '
                                'use: \n\tSSB: Single sideband demodulation\n\t'
@@ -354,7 +355,7 @@ class QuDev_transmon(Qubit):
             integration_length=self.acq_length(),
             result_logging_mode='digitized')
 
-        nr_samples = int(self.acq_length()*
+        nr_samples = int(self.acq_length() *
                          self.instr_uhf.get_instr().clock_freq())
         self.inp_avg_det = det.UHFQC_input_average_detector(
             UHFQC=self.instr_uhf.get_instr(), 
@@ -689,7 +690,7 @@ class QuDev_transmon(Qubit):
             label = 'Rabi-n{}'.format(n) + self.msmt_suffix
 
         if prep_params is None:
-            prep_params = self.prepartion_params()
+            prep_params = self.preparation_params()
         # Prepare the physical instruments for a time domain measurement
         self.prepare(drive='timedomain')
 
@@ -884,6 +885,7 @@ class QuDev_transmon(Qubit):
         if prep_params is None:
             prep_params = self.preparation_params()
             log.debug(f"Preparation Parameters:\n{prep_params}")
+
         MC = self.instr_mc.get_instr()
 
         self.prepare(drive='timedomain')
@@ -1406,7 +1408,8 @@ class QuDev_transmon(Qubit):
                     else base_name
                 seq, _ = sq.single_state_active_reset(
                     operation_dict=self.get_operation_dict(),
-                    qb_name=self.name,state=state, prep_params=prep_params)
+                    qb_name=self.name, state=state, prep_params=prep_params,
+                    upload=False)
                 # set sweep function and run measurement
                 MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
                                                                upload=upload))
@@ -1936,7 +1939,7 @@ class QuDev_transmon(Qubit):
             modulation = np.exp(2j * np.pi * self.ro_mod_freq() * tbase)
             fig, ax = plt.subplots(len(levels) + 1, figsize=(20,20))
             plt.title('optimized weights ' + self.name +
-                      "".join('\n' + m_a[l].timestamp_string for  l in levels))
+                      "".join('\n' + m_a[l].timestamp_string for l in levels))
             for i, l in enumerate(levels):
                 ax[i].plot(tbase / 1e-9, np.real(iq_traces[l] * modulation), '-',
                          label='I_' + l)
@@ -1967,11 +1970,10 @@ class QuDev_transmon(Qubit):
             plt.tight_layout()
             plt.close()
 
-    def find_ssro_fidelity(self, nreps=1, analyze=True, close_fig=True, no_fits=False,
-                           upload=True, preselection_pulse=True, thresholded=False,
-                           RO_comm=3 / 225e6, RO_slack=150e-9, RO_shots=50000,
-                           qutrit=False, update=False, prep_params=None,
-                           exp_metadata=None):
+    def find_ssro_fidelity(self, analyze=True, close_fig=True, no_fits=False,
+                           upload=True, thresholded=False,
+                           RO_comm=3 / 225e6, RO_slack=150e-9,
+                           qutrit=False, update=False, prep_params=None):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -2010,32 +2012,14 @@ class QuDev_transmon(Qubit):
             label += '_thresh'
 
         if prep_params is None:
-            prep_params = deepcopy(self.prepartion_params())
-        if preselection_pulse:
-            prep_params.update(dict(preparation_type='preselection'))
-        prev_shots = self.acq_shots()
-        self.acq_shots(RO_shots)
-        if preselection_pulse:
-            self.acq_shots(4*(self.acq_shots()//4))
-        else:
-            self.acq_shots(2*(self.acq_shots()//2))
+            prep_params = self.preparation_params()
 
         self.prepare(drive='timedomain')
 
-        RO_spacing = self.instr_uhf.get_instr().quex_wint_delay()*2/1.8e9
+        RO_spacing = self.instr_uhf.get_instr().quex_wint_delay()/1.8e9
         RO_spacing += self.acq_length()
         RO_spacing += RO_slack # for slack
         RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
-
-        prev_avg = MC.soft_avg()
-        MC.soft_avg(1)
-
-        mode = '1D'
-        if nreps > 1:
-            label += '_nreps{}'.format(nreps)
-            MC.set_sweep_function_2D(swf.None_Sweep())
-            MC.set_sweep_points_2D(np.arange(nreps))
-            mode = '2D'
 
         if qutrit:
             states = ('g', 'e', 'f')
@@ -2047,29 +2031,25 @@ class QuDev_transmon(Qubit):
                 # set sweep function and run measurement
                 MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
                                                                upload=upload))
-                spoints = np.arange(self.acq_shots())
-                if preselection_pulse:
-                    spoints //= 2
-                #should use spoints here or not?
-                MC.set_sweep_points(np.arange(self.acq_shots()))
-                MC.run(name=label + '_{}'.format(state) + self.msmt_suffix,
-                       mode=mode)
+                MC.set_sweep_points(np.arange(seq.nr_acq_elements()))
+                MC.set_detector_function(self.int_log_det)
+                with temporary_value(MC.soft_avg, 1):
+                    MC.run(name=label + '_{}'.format(state) + self.msmt_suffix)
 
         else:
+            if prep_params['preparation_type'] not in ['preselection', 'wait']:
+                raise NotImplementedError()
+            preselection = prep_params['preparation_type'] == 'preselection'
             MC.set_sweep_function(awg_swf2.n_qubit_off_on(
                 pulse_pars_list=[self.get_ge_pars()],
                 RO_pars_list=[self.get_ro_pars()],
                 upload=upload,
-                preselection=preselection_pulse,
+                preselection=preselection,
                 RO_spacing=RO_spacing))
-            spoints = np.arange(self.acq_shots())
-            if preselection_pulse:
-                spoints //= 2
-            MC.set_sweep_points(np.arange(self.acq_shots()))
-            MC.run(name=label+self.msmt_suffix, mode=mode)
-
-        MC.soft_avg(prev_avg)
-        self.acq_shots(prev_shots)
+            MC.set_sweep_points(np.arange(4 if preselection else 2))
+            MC.set_detector_function(self.int_log_det)
+            with temporary_value(MC.soft_avg, 1):
+                MC.run(name=label + self.msmt_suffix)
 
         if analyze:
             if qutrit:
@@ -2092,11 +2072,12 @@ class QuDev_transmon(Qubit):
                 return state_prob_mtx, classifier_params
             else:
                 rotate = self.acq_weights_type() in {'SSB', 'DSB'}
+                preselection = prep_params['preparation_type'] == 'preselection'
                 if thresholded:
                     channels = self.dig_log_det.value_names
                 else:
                     channels = self.int_log_det.value_names
-                if preselection_pulse:
+                if preselection:
                     nr_samples = 4
                     sample_0 = 0
                     sample_1 = 2
@@ -2109,7 +2090,7 @@ class QuDev_transmon(Qubit):
                                        rotate=rotate, no_fits=no_fits,
                                        channels=channels, nr_samples=nr_samples,
                                        sample_0=sample_0, sample_1=sample_1,
-                                       preselection=preselection_pulse)
+                                       preselection=preselection)
                 if not no_fits:
                     return ana.F_a, ana.F_d, ana.SNR
                 else:
@@ -3051,7 +3032,7 @@ class QuDev_transmon(Qubit):
                             "Set update=True if you want this!")
 
         if label is None:
-            label = f'Ramsey{"_ef" if for_ef else ""}' + self.msmt_suffix
+            label = f'Qscale{"_ef" if for_ef else ""}' + self.msmt_suffix
 
         if qscales is None:
             log.warning("find_qscale does not know over which "
@@ -3181,7 +3162,7 @@ class QuDev_transmon(Qubit):
 
         levels = ('g', 'e', 'f') if qutrit else ('g', 'e')
 
-        self.measure_dispersive_shift(freqs, analyze=False)
+        self.measure_dispersive_shift(freqs, states=levels[1:], analyze=False)
         labels = {l: '{}-spec'.format(l) + self.msmt_suffix for l in levels}
         m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
         trace = {l: m_a[l].measured_values[0] *
@@ -3207,7 +3188,7 @@ class QuDev_transmon(Qubit):
             ax[1].set_xlabel("Freq. [Hz]")
             ax[1].set_ylabel('Distance in IQ plane')
             ax[0].set_title("Current RO_freq: {} Hz\nOptimal Freq: {} Hz".format(
-                self.f_RO(),
+                self.ro_freq(),
                                                                           fmax))
             plt.legend()
 
@@ -3287,7 +3268,7 @@ class QuDev_transmon(Qubit):
             if upload:
                 sq.single_state_active_reset(
                     operation_dict=self.get_operation_dict(),
-                    qb_name=self.qb_name,
+                    qb_name=self.name,
                     state=state, prep_params=prep_params)
 
             MC.set_sweep_function(self.swf_ro_freq_lo()) 

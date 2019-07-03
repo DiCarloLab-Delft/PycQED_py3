@@ -2178,7 +2178,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
 
 
-        self.UHFQC.quex_rl_length(self.nr_shots)
+        self.UHFQC.quex_rl_length(self.nr_shots*len(sweep_points))
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
 
