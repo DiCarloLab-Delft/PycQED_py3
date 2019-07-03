@@ -42,6 +42,7 @@ def split_expList(expList, max_nr_of_instr: int=8000,
         - there is a fixed instruction overhead per kernel (measurement + init)
         - every gate (in the gatestring) consists of a single instruction
     """
+    # FIXME: platform dependency on CClight
     fixed_program_overhad = 12 + 3  # declare registers + infinite loop
     kernel_overhead = 4  # prepz wait and measure
 
