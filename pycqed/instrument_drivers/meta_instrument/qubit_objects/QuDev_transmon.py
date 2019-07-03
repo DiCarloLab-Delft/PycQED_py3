@@ -2031,7 +2031,7 @@ class QuDev_transmon(Qubit):
                 # set sweep function and run measurement
                 MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
                                                                upload=upload))
-                MC.set_sweep_points(np.arange(seq.nr_acq_elements()))
+                MC.set_sweep_points(np.arange(seq.n_acq_elements()))
                 MC.set_detector_function(self.int_log_det)
                 with temporary_value(MC.soft_avg, 1):
                     MC.run(name=label + '_{}'.format(state) + self.msmt_suffix)
