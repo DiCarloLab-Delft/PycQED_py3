@@ -4,7 +4,7 @@
 import logging
 # configure root logger
 root_logger = logging.getLogger('')
-root_formatter = logging.Formatter('%(asctime)s.%(msecs)d %(levelname)s   %(message)s  [%(name)s]', '%Y%m%d %H:%M:%S')
+root_formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(levelname)-7s   %(message)s  [%(name)s]', '%Y%m%d %H:%M:%S')
 root_sh = logging.StreamHandler()
 root_sh.setLevel(logging.DEBUG)
 root_sh.setFormatter(root_formatter)
@@ -26,8 +26,15 @@ import sys
 def print_logger_write(msg):
     if(msg.strip() != ''): # ignore messages with white space only
         lines = msg.split('\n')
+        # try to extract some useful info from string. FIXME: this is flaky
         for line in lines:
-            print_logger.info(line)
+            if 'failed' in line.lower() or 'error' in line.lower():
+                print_logger.error(line)
+            elif 'warning' in line.lower():
+                print_logger.warning(line)
+            else:
+                print_logger.info(line)
+
 sys.stdout.write = print_logger_write
 
 
@@ -161,16 +168,6 @@ if conf.ro_0 != '':
     log.debug('connecting to ro_0')
     instr.ro_0 = ZI_UHFQC.UHFQC('ro_0', device=conf.ro_0)
     #station.add_component(instr.ro_0)
-
-    '''
-    FIXME:
-    20190704 13:38:46.841 INFO Compilation started
-    Detected 1 devices with a total of 1 AWG cores.
-    Compiling source string
-    Compilation successful
-    Uploading ELF file to device dev2295
-    Elf upload failed. in 0.60s [print]
-    '''
 
 log.debug('connecting to CC')
 instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
@@ -313,7 +310,8 @@ if conf.ro_0 != '':
         rolut.sampling_rate(1.8e9)
         rolut.generate_standard_waveforms()
         rolut.pulse_type('M_up_down_down')
-        rolut.resonator_combinations([[0], [2], [3], [5], [6]])  # FIXME: ust match resonator_codeword_bit_mapping
+        #rolut.resonator_combinations([[0], [2], [3], [5], [6]])  # FIXME: must use resonators from resonator_codeword_bit_mapping
+        rolut.resonator_combinations([[0,2,3,5,6]])  # FIXME: must use resonators from resonator_codeword_bit_mapping
         rolut.load_DIO_triggered_sequence_onto_UHFQC()  # upload waveforms and ZIseqC program
 
         instr.ro_0.awgs_0_userregs_0(1024)  # loop_cnt, see UHFQC driver (awg_sequence_acquisition_and_DIO_triggered_pulse)
