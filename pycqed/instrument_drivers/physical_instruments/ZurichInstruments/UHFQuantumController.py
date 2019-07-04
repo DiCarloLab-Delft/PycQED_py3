@@ -235,6 +235,12 @@ class UHFQC(Instrument):
             self.awgs_0_dio_valid_index(16)
             self.awgs_0_dio_valid_polarity(2)  # high polarity
 
+            # NH: FixME: make a proper node for this!
+            # Switch to 50 MHz sampling of DIO inputs (like AWG-8)
+            self._daq.setInt('/' + self._device + '/dios/0/extclk', 2)
+            # Set default delay; don't do this as it cancels any calibration
+            # self._daq.setInt('/' + self._device + '/raw/dios/0/delay', 0)            
+
         # setting the output channels to 50 ohm
         self.sigouts_0_imp50(True)
         self.sigouts_1_imp50(True)

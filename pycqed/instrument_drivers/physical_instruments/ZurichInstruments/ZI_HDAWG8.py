@@ -670,13 +670,20 @@ class ZI_HDAWG8(ZI_base_instrument):
             # Valid polarity is 'high' (hardware value 2),
             # 'low' (hardware value 1), 'no valid needed' (hardware value 0)
             self.set('awgs_{}_dio_valid_polarity'.format(awg_nr), 2)
+            
+            # NH: With the new DIO protocol the strobe is no longer directly used!
+
             # This is the bit index of the strobe signal (toggling signal),
-            self.set('awgs_{}_dio_strobe_index'.format(awg_nr), 30)
+            #self.set('awgs_{}_dio_strobe_index'.format(awg_nr), 30)
 
             # Configure the DIO interface for triggering on the both edges of
             # the strobe/toggle bit signal.
             # 1: rising edge, 2: falling edge or 3: both edges
-            self.set('awgs_{}_dio_strobe_slope'.format(awg_nr), 3)
+            # NH: Disable use of strobe
+            self.set('awgs_{}_dio_strobe_slope'.format(awg_nr), 0)
+
+            # NH: Use 50 MHz triggering
+            self._dev.setd('raw/dios/0/extclk', 1)
 
             # the mask determines how many bits will be used in the protocol
             # e.g., mask 3 will mask the bits with bin(3) = 00000011 using
