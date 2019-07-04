@@ -4,7 +4,7 @@
 import logging
 # configure root logger
 root_logger = logging.getLogger('')
-root_formatter = logging.Formatter('%(asctime)s.%(msecs)d %(levelname)s %(message)s [%(name)s]', '%Y%m%d %H:%M:%S')
+root_formatter = logging.Formatter('%(asctime)s.%(msecs)d %(levelname)s   %(message)s  [%(name)s]', '%Y%m%d %H:%M:%S')
 root_sh = logging.StreamHandler()
 root_sh.setLevel(logging.DEBUG)
 root_sh.setFormatter(root_formatter)
@@ -20,30 +20,15 @@ log = logging.getLogger('demo_2')
 log.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
 log.debug('starting')
 
-# redirect print statements to log
-if 0:  # does not catch prints from ZI
-    import sys
-    print = log.info
-if 1:  # creates multiple lines in one entry, probably lines from ziPython which do not call print
-    import sys
-    sys.stdout.write = print_logger.info
-if 0:
-    print = lambda *tup : log.info(str(" ".join([str(x) for x in tup])))
-if 0:  # does not catch prints from ZI
-    import functools
-    print = functools.partial(print, flush=True)
-if 0:   # shows prints after log
-    _orig_print = print
-    def print(*args, **kwargs):
-        _orig_print(*args, flush=True, **kwargs)
-if 0:
-    # make print unbuffered
-    _orig_print = print
-    def print(*args, **kwargs):
-        _orig_print(*args, flush=True, **kwargs)
-    # and redirect it to logging
-    import sys
-    sys.stdout.write = log.info
+### redirect print statements to log
+# we need some special treatment of ziPython output which does not call the Python print function
+import sys
+def print_logger_write(msg):
+    if(msg.strip() != ''): # ignore messages with white space only
+        lines = msg.split('\n')
+        for line in lines:
+            print_logger.info(line)
+sys.stdout.write = print_logger_write
 
 
 ### imports
@@ -177,6 +162,16 @@ if conf.ro_0 != '':
     instr.ro_0 = ZI_UHFQC.UHFQC('ro_0', device=conf.ro_0)
     #station.add_component(instr.ro_0)
 
+    '''
+    FIXME:
+    20190704 13:38:46.841 INFO Compilation started
+    Detected 1 devices with a total of 1 AWG cores.
+    Compiling source string
+    Compilation successful
+    Uploading ELF file to device dev2295
+    Elf upload failed. in 0.60s [print]
+    '''
+
 log.debug('connecting to CC')
 instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
 instr.cc.reset()
@@ -288,11 +283,40 @@ if conf.flux_0 != '':
 
 if conf.ro_0 != '':
     log.debug('configuring ro_0')
-    instr.mw_0.load_default_settings() # FIXME: also done at init?
-    rolut.AWG(instr.mw_0.name)
+    instr.ro_0.load_default_settings() # FIXME: also done at init?
 
+    # configure UHFQC to generate codeword based readout signals
+    instr.ro_0.quex_rl_length(1)
+    instr.ro_0.quex_wint_length(int(600e-9 * 1.8e9))
 
+    if 1:
+        # generate waveforms and ZIseqC program using rolut
+        amps = [0.1, 0.2, 0.3, 0.4, 0.5]
+        resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]   # FIXME: default Base_RO_LutMan _resonator_codeword_bit_mapping
 
+        for i,res in enumerate(resonator_codeword_bit_mapping):
+            rolut.set('M_amp_R{}'.format(res), amps[i])
+            rolut.set('M_phi_R{}'.format(res), -45)
+
+            rolut.set('M_down_amp0_R{}'.format(res), amps[i] / 2)
+            rolut.set('M_down_amp1_R{}'.format(res), -amps[i] / 2)
+            rolut.set('M_down_phi0_R{}'.format(res), -45 + 180)
+            rolut.set('M_down_phi1_R{}'.format(res), -45)
+
+            rolut.set('M_length_R{}'.format(res), 500e-9)
+            rolut.set('M_down_length0_R{}'.format(res), 200e-9)
+            rolut.set('M_down_length1_R{}'.format(res), 200e-9)
+            rolut.set('M_modulation_R{}'.format(res), 0)
+
+        rolut.acquisition_delay(200e-9)
+        rolut.AWG(instr.ro_0.name)
+        rolut.sampling_rate(1.8e9)
+        rolut.generate_standard_waveforms()
+        rolut.pulse_type('M_up_down_down')
+        rolut.resonator_combinations([[0], [2], [3], [5], [6]])  # FIXME: ust match resonator_codeword_bit_mapping
+        rolut.load_DIO_triggered_sequence_onto_UHFQC()  # upload waveforms and ZIseqC program
+
+        instr.ro_0.awgs_0_userregs_0(1024)  # loop_cnt, see UHFQC driver (awg_sequence_acquisition_and_DIO_triggered_pulse)
 
 ##########################################
 #  Configure CC
