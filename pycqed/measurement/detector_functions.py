@@ -1415,7 +1415,6 @@ class UHFQC_input_average_detector(Hard_Detector):
     def get_values(self):
         self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
 
-        self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
@@ -2191,7 +2190,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+        # self.UHFQC.acquisition_arm()
 
         # starting AWG
         if self.AWG is not None:
