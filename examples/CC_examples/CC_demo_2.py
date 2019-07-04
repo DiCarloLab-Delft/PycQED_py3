@@ -1,8 +1,54 @@
 #!/usr/bin/python
 
-import os
+### setup logging before all imports (before any logging is done as to prevent a default root logger)
 import logging
+# configure root logger
+root_logger = logging.getLogger('')
+root_formatter = logging.Formatter('%(asctime)s.%(msecs)d %(levelname)s %(message)s [%(name)s]', '%Y%m%d %H:%M:%S')
+root_sh = logging.StreamHandler()
+root_sh.setLevel(logging.DEBUG)
+root_sh.setFormatter(root_formatter)
+root_logger.addHandler(root_sh)
+# configure pycqed logger
+pycqed_logger = logging.getLogger('pycqed')
+pycqed_logger.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
+# configure print logger
+print_logger = logging.getLogger('print')
+print_logger.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
+# configure our logger
+log = logging.getLogger('demo_2')
+log.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
+log.debug('starting')
+
+# redirect print statements to log
+if 0:  # does not catch prints from ZI
+    import sys
+    print = log.info
+if 1:  # creates multiple lines in one entry, probably lines from ziPython which do not call print
+    import sys
+    sys.stdout.write = print_logger.info
+if 0:
+    print = lambda *tup : log.info(str(" ".join([str(x) for x in tup])))
+if 0:  # does not catch prints from ZI
+    import functools
+    print = functools.partial(print, flush=True)
+if 0:   # shows prints after log
+    _orig_print = print
+    def print(*args, **kwargs):
+        _orig_print(*args, flush=True, **kwargs)
+if 0:
+    # make print unbuffered
+    _orig_print = print
+    def print(*args, **kwargs):
+        _orig_print(*args, flush=True, **kwargs)
+    # and redirect it to logging
+    import sys
+    sys.stdout.write = log.info
+
+
+### imports
 import sys
+import os
 from pathlib import Path
 import numpy as np
 
@@ -17,23 +63,6 @@ from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 
 from qcodes import station
-
-
-# setup logging after all imports
-if 0:
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-    logging.debug('started')
-else:
-    log = logging.getLogger('pycqed')
-    #log = logging.getLogger('') # root logger, catches stuff outside of pycqed
-    log.setLevel(logging.DEBUG)
-    if 1:
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        sh = logging.StreamHandler()
-        sh.setLevel(logging.DEBUG)
-        sh.setFormatter(formatter)
-        log.addHandler(sh)
-    log.debug('starting')
 
 
 
