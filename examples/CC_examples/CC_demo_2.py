@@ -1,46 +1,12 @@
 #!/usr/bin/python
 
 ### setup logging before all imports (before any logging is done as to prevent a default root logger)
-import logging
-# configure root logger
-root_logger = logging.getLogger('')
-root_formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(levelname)-7s   %(message)s  [%(name)s]', '%Y%m%d %H:%M:%S')
-root_sh = logging.StreamHandler()
-root_sh.setLevel(logging.DEBUG)
-root_sh.setFormatter(root_formatter)
-root_logger.addHandler(root_sh)
-# configure pycqed logger
-pycqed_logger = logging.getLogger('pycqed')
-pycqed_logger.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
-# configure print logger
-print_logger = logging.getLogger('print')
-print_logger.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
-# configure our logger
-log = logging.getLogger('demo_2')
-log.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
-log.debug('starting')
-
-### redirect print statements to log
-# we need some special treatment of ziPython output which does not call the Python print function
-import sys
-def print_logger_write(msg):
-    if(msg.strip() != ''): # ignore messages with white space only
-        lines = msg.split('\n')
-        # try to extract some useful info from string. FIXME: this is flaky
-        for line in lines:
-            if 'failed' in line.lower() or 'error' in line.lower():
-                print_logger.error(line)
-            elif 'warning' in line.lower():
-                print_logger.warning(line)
-            else:
-                print_logger.info(line)
-
-sys.stdout.write = print_logger_write
-
+import CC_logging
 
 ### imports
 import sys
 import os
+import logging
 from pathlib import Path
 import numpy as np
 
@@ -56,17 +22,23 @@ import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 
 from qcodes import station
 
+# configure our logger
+log = logging.getLogger('demo_2')
+log.setLevel(logging.DEBUG)
+log.debug('starting')
 
 
-def set_waveforms(awg, waveform_type, sequence_length):
+def set_waveforms(instr_awg, waveform_type, sequence_length):
     if waveform_type == 'square':
-        for ch in range(8):
-            for i in range(sequence_length):
-                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), np.ones(48) * i / (sequence_length - 1))
+        for i in range(sequence_length):
+            wav = np.ones(48) * i / (sequence_length - 1)
+            for ch in range(8):
+                instr_awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), wav)
     elif waveform_type == 'cos':
-        for ch in range(8):
-            for i in range(sequence_length):
-                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), np.cos(np.arange(48) / 2) * i / (sequence_length - 1))
+        for i in range(sequence_length):
+            wav = np.cos(np.arange(48) / 2) * i / (sequence_length - 1)
+            for ch in range(8):
+                instr_awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), wav)
     else:
         raise KeyError()
 
@@ -170,7 +142,7 @@ if conf.ro_0 != '':
     #station.add_component(instr.ro_0)
 
 log.debug('connecting to CC')
-instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
+instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip, timeout=5.0)) # FIXME: raised timeout until assembly time reduced
 instr.cc.reset()
 instr.cc.clear_status()
 instr.cc.set_status_questionable_frequency_enable(0x7FFF)
@@ -327,20 +299,19 @@ instr.cc.debug_marker_out(slot_mw_0, instr.cc.HDAWG_TRIG) # HDAWG trigger
 log.debug("uploading '{}' to CC".format(p.filename))
 instr.cc.eqasm_program(p.filename)
 
-if 0:
-    err_cnt = instr.cc.get_system_error_count()
-    if err_cnt>0:
-        log.warning('CC status after upload')
-    for i in range(err_cnt):
-        print(instr.cc.get_error())
+log.debug("printing CC errors")
+err_cnt = instr.cc.get_system_error_count()
+if err_cnt>0:
+    log.warning('CC status after upload')
+for i in range(err_cnt):
+    print(instr.cc.get_error())
 
 log.debug('starting CC')
 instr.cc.start()
 
-if 0:
-    err_cnt = instr.cc.get_system_error_count()
-    if err_cnt>0:
-        log.warning('CC status after start')
-    for i in range(err_cnt):
-        print(instr.cc.get_error())
+err_cnt = instr.cc.get_system_error_count()
+if err_cnt>0:
+    log.warning('CC status after start')
+for i in range(err_cnt):
+    print(instr.cc.get_error())
 
