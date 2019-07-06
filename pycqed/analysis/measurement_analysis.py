@@ -8519,12 +8519,23 @@ class DoubleFrequency(TD_Analysis):
         kw['h5mode'] = 'r+'
         super().__init__(**kw)
 
-    def run_default_analysis(self, **kw):
+    def run_default_analysis(self,close_file=False, **kw):
+        super().run_default_analysis(
+            close_file=close_file,
+            close_main_figure=True, save_fig=True, **kw)
+
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
         x = self.sweep_points
-        y = a_tools.normalize_data_v3(self.measured_values[0])
+        #y1 are the correct TwoD normalized points
+        #y2 is the 1D normalized points, so worse fit
+        y1 = self.normalized_data_points
+        y2 = a_tools.normalize_data_v3(self.measured_values[0])
 
+        y=y2
+        #TODO:Include the calibration points
+        #TODO: implement prony's method and see if it's better
+        y[:-4] = y1
         fit_res = self.fit(x[:-4], y[:-4])
         self.fit_res = fit_res
 
@@ -8569,30 +8580,125 @@ class DoubleFrequency(TD_Analysis):
 
     def fit(self, sweep_values, measured_values):
         Double_Cos_Model = fit_mods.DoubleExpDampOscModel
+        dt= sweep_values[2]-sweep_values[1]
+        zero_mean_values = measured_values-np.mean(measured_values)
         fourier_max_pos = a_tools.peak_finder_v2(
             np.arange(1, len(sweep_values) / 2, 1),
-            abs(np.fft.fft(measured_values))[1:len(measured_values) // 2],
+            abs(np.fft.fft(zero_mean_values))[1:len(zero_mean_values) // 2],
             window_len=1, perc=95)
-        if len(fourier_max_pos) == 1:
-            freq_guess = 1. / sweep_values[-1] * \
-                (fourier_max_pos[0] + np.array([-1, 1]))
+        if (len(fourier_max_pos)==0):
+            print('No strong peak found, trying again')
+            fourier_max_pos = a_tools.peak_finder_v2(
+                np.arange(1, len(sweep_values) / 2, 1),
+                abs(np.fft.fft(zero_mean_values))[1:len(zero_mean_values) // 2],
+                window_len=1, perc=75)
+
+        # if fourier_max_pos was one the above statement mocks it. 
+        if len(fourier_max_pos) == 1: #One peak found
+            fmin = 1./sweep_values[-1]*\
+                (fourier_max_pos[0] - 10)
+            fmax = 1./sweep_values[-1]*\
+                (fourier_max_pos[0] + 10)
         else:
-            freq_guess = 1. / sweep_values[-1] * fourier_max_pos
+            fourier_max_pos = fourier_max_pos[0:2]
+            fmin = 1./sweep_values[-1]*\
+                (np.min(fourier_max_pos) - 10)
+            fmax = 1./sweep_values[-1]*\
+                (np.max(fourier_max_pos) + 10)
+        #Do a ZoomFFT
+        if (fmin<0):
+            fmin = 0
+        [chirp_x, chirp_y] = a_tools.zoom_fft(sweep_values,zero_mean_values,
+                                              fmin,fmax)
+        fourier_max_pos = a_tools.peak_finder_v2(
+            np.arange(0,len(chirp_x)),
+            np.abs(chirp_y),
+            window_len=1, perc=85)
+        #Now do Bertocco's algorithm
+        #From [Metrology and Measurement Systems] Frequency and Damping Estimation Methods - An Overview.pdf
+        only_one_peak = False
+        if (len(fourier_max_pos)==1): #If there is still only one peak
+            print('Only one strong frequency found: not a Double Frequency?')
+            only_one_peak = True
+        else:
+            fourier_max_pos = fourier_max_pos[0:2]
+
+        freq_guess = chirp_x[fourier_max_pos]
+        n_shift =min(6,len(chirp_y)-1-max(fourier_max_pos))
+
+        Ratio = chirp_y[fourier_max_pos]/chirp_y[fourier_max_pos+n_shift]
+        Omega_freq = 2*np.pi*dt*freq_guess
+        dOmega_freq = 2*np.pi*dt*(chirp_x[fourier_max_pos + n_shift]-chirp_x[fourier_max_pos])
+        expvalue_res = np.exp(1j*Omega_freq)*(Ratio-1)/(Ratio*np.exp(-1j*dOmega_freq)-1)
+        #    freq_guess= np.imag(np.log(lambda_result))/(2*np.pi*dt)
+        tau_guess= dt/np.real(np.log(expvalue_res))
+        # Now get A and phi from a leastsqrs fit since we know f and tau
+        # See article above for more information
+
+        while (any(np.array(tau_guess)<0) and n_shift>=2):
+            if (n_shift>=3):
+                n_shift -=2
+            else:
+                n_shift -=1
+            Ratio = chirp_y[fourier_max_pos]/chirp_y[fourier_max_pos+n_shift]
+            Omega_freq = 2*np.pi*dt*freq_guess
+            dOmega_freq = 2*np.pi*dt*(chirp_x[fourier_max_pos + n_shift]-chirp_x[fourier_max_pos])
+            expvalue_res = np.exp(1j*Omega_freq)*(Ratio-1)/(Ratio*np.exp(-1j*dOmega_freq)-1)
+            #    freq_guess= np.imag(np.log(lambda_result))/(2*np.pi*dt)
+            tau_guess= dt/np.real(np.log(expvalue_res))
+        if (only_one_peak):
+            expvals = np.array([2j*np.pi*freq_guess[0] - 1/tau_guess[0],-2j*np.pi*freq_guess[0] - 1/tau_guess[0], 0.])
+            E = np.zeros((len(measured_values),3),dtype=complex)
+            for ii in range(len(measured_values)):
+                for jj in range(3):
+                    E[ii,:]=np.exp(expvals*sweep_values[ii])
+            coeff = np.linalg.lstsq(E,measured_values,rcond=None)[0]
+            amp_guess = 2*np.abs(coeff[[0]])
+            phi_guess = np.angle(coeff[[0]])
+        else:
+            expvals = np.array([2j*np.pi*freq_guess[0] - 1/tau_guess[0],-2j*np.pi*freq_guess[0] - 1/tau_guess[0],
+               2j*np.pi*freq_guess[1] - 1/tau_guess[1],-2j*np.pi*freq_guess[1] - 1/tau_guess[1],0.])
+            E = np.zeros((len(measured_values),5),dtype=complex)
+            for ii in range(len(measured_values)):
+                for jj in range(5):
+                    E[ii,:]=np.exp(expvals*sweep_values[ii])
+            coeff = np.linalg.lstsq(E,measured_values,rcond=None)[0]
+            amp_guess = 2*np.abs(coeff[[0,2]])
+            phi_guess = np.angle(coeff[[0,2]])
+        print(tau_guess)
+        print(freq_guess)
+        print(amp_guess)
+        print(phi_guess)
+
         Double_Cos_Model.set_param_hint(
-            'tau_1', value=.3 * sweep_values[-1], vary=True)
-        Double_Cos_Model.set_param_hint(
-            'tau_2', value=.3 * sweep_values[-1], vary=True)
+            'tau_1', value=tau_guess[0], vary=True, min=0, max=6*tau_guess[0])
         Double_Cos_Model.set_param_hint(
             'freq_1', value=freq_guess[0], min=0)
-        Double_Cos_Model.set_param_hint(
-            'freq_2', value=freq_guess[1], min=0)
-        Double_Cos_Model.set_param_hint('phase_1', value=1 * np.pi / 2.)
-        Double_Cos_Model.set_param_hint('phase_2', value=3 * np.pi / 2.)
-        Double_Cos_Model.set_param_hint(
-            'amp_1', value=0.25, min=0.1, max=0.4, vary=True)
-        Double_Cos_Model.set_param_hint(
-            'amp_2', value=0.25, min=0.1, max=0.4, vary=True)
+        Double_Cos_Model.set_param_hint('phase_1', value=phi_guess[0])
         Double_Cos_Model.set_param_hint('osc_offset', value=0.5, min=0, max=1)
+        if (only_one_peak):
+            Double_Cos_Model.set_param_hint(
+                'tau_2', value=0, vary=False, min=0)
+            Double_Cos_Model.set_param_hint(
+                'freq_2', value=0, vary=False)
+            Double_Cos_Model.set_param_hint('phase_2', value=0, vary=False)
+            Double_Cos_Model.set_param_hint(
+                'amp_1', value=amp_guess[0], min=0.05, max=0.8, vary=True)
+            Double_Cos_Model.set_param_hint(
+                'amp_2', value=0, vary=False)
+
+        else:
+            Double_Cos_Model.set_param_hint(
+                'tau_2', value=tau_guess[1], vary=True, min=0, max=6*tau_guess[1])
+            Double_Cos_Model.set_param_hint(
+                'freq_2', value=freq_guess[1], min=0)
+            Double_Cos_Model.set_param_hint('phase_2', value=phi_guess[1])
+
+            Double_Cos_Model.set_param_hint(
+                'amp_1', value=amp_guess[0], min=0.05, max=1.1, vary=True)
+            Double_Cos_Model.set_param_hint(
+                'amp_2', value=amp_guess[1], min=0.05, max=1.1, vary=True)
+
         params = Double_Cos_Model.make_params()
         fit_res = Double_Cos_Model.fit(data=measured_values,
                                        t=sweep_values,
@@ -8626,6 +8732,7 @@ class DoubleFrequency(TD_Analysis):
                     format=plot_format)
             except:
                 fail_counter = True
+                print('Could not save to '+str(self.savename))
         if fail_counter:
             logging.warning('Figure "%s" has not been saved.' % self.savename)
         if close_fig:
@@ -8724,6 +8831,7 @@ class SWAPN_cost(object):
                 figname = (figname + '.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
                 self.folder, figname))
+
             if fig_tight:
                 try:
                     fig.tight_layout()

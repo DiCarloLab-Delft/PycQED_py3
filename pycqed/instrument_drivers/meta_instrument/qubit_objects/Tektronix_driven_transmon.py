@@ -606,7 +606,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
 
     def measure_flipping(self, number_of_flips=2*np.arange(20), equator=True,
                          MC=None, analyze=True, close_fig=True, update=True,
-                         ax='x', angle='180'):
+                         ax='x', angle='180',upload=True):
 
         # prepare for timedomain takes care of rescaling
         self.prepare_for_timedomain()
