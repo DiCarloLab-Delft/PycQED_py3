@@ -326,7 +326,7 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
 
 def hanger_func_complex_SI(f, f0, Q, Qe,
                            A, theta, phi_v, phi_0,
-                           slope =1):
+                           slope=1):
     '''
     This is the complex function for a hanger (lamda/4 resonator).
     See equation 3.1 of the Asaad master thesis.
@@ -356,7 +356,7 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
     propagation_delay_corr = np.exp(1j * (phi_v * f + phi_0))
     hanger_contribution = (1 - Q / Qe * np.exp(1j * theta)/
                                (1 + 2.j * Q * (f  - f0) / f0))
-    S21 = A *  slope_corr * hanger_contribution * propagation_delay_corr
+    S21 = A * slope_corr * hanger_contribution * propagation_delay_corr
 
     return S21
 

@@ -855,8 +855,8 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
                                 max(self.sweep_points_2D), 101)
         plot_freqs = fit_mods.CosFunc2(plot_dacs, **self.dac_fit_res.params)
 
-        ax.plot(self.f0s, self.sweep_points_2D, 'ro-')
-        ax.plot(plot_freqs, plot_dacs, 'b')
+        # ax.plot(self.f0s, self.sweep_points_2D, 'ro-')
+        # ax.plot(plot_freqs, plot_dacs, 'b')
 
         ax.set_title(fig_title)
 

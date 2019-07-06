@@ -6285,8 +6285,11 @@ class Homodyne_Analysis(MeasurementAnalysis):
             print(lmfit.fit_report(fit_res))
 
         ########## Plot results ##########
+        xlabel = kw.get('xlabel', self.xlabel)
+        ylabel = kw.get('ylabel', 'S21_Mag')
 
         fig, ax = self.default_ax()
+
 
         if 'hanger' in fitting_model:
             self.plot_results_vs_sweepparam(x=self.sweep_points,
@@ -6294,9 +6297,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.sweep_name,
                                             x_unit=self.sweep_unit[0],
-                                            ylabel=str('S21_mag'),
+                                            ylabel=ylabel,
                                             y_unit=self.value_units[0],
-                                            save=False)
+                                            save=False,
+                                            **kw)
             # ensures that amplitude plot starts at zero
             ax.set_ylim(ymin=0.000)
 
@@ -6430,7 +6434,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                 plt.show()
 
             # save figure
-            self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
+            self.save_fig(fig, xlabel=self.xlabel, ylabel=ylabel, **kw)
 
         # self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
         if close_file:
@@ -6797,20 +6801,21 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         optimize = kw.pop('optimize', True)
         verbose = kw.get('verbose', False)
 
-        try:
-            data_amp = self.measured_values[0]
-            data_phase = self.measured_values[1]
-            data_real = data_amp * np.cos(np.pi * data_phase / 180)
-            data_imag = data_amp * np.sin(np.pi * data_phase / 180)
-            self.data_dist = a_tools.calculate_distance_ground_state(
-                data_real=data_real,
-                data_imag=data_imag,
-                normalize=False)
-        except:
-            # Quick fix to make it work with pulsed spec which does not
-            # return both I,Q and, amp and phase
-            # only using the amplitude!!
-            self.data_dist = self.measured_values[0] - np.min(self.measured_values[0])
+        # try:
+        #     data_amp = self.measured_values[0]
+        #     data_phase = self.measured_values[1]
+        #     data_real = data_amp * np.cos(np.pi * data_phase / 180)
+        #     data_imag = data_amp * np.sin(np.pi * data_phase / 180)
+        #     self.data_dist = a_tools.calculate_distance_ground_state(
+        #         data_real=data_real,
+        #         data_imag=data_imag,
+        #         normalize=False,
+        #         percentile=60)
+        # except:
+        # Quick fix to make it work with pulsed spec which does not
+        # return both I,Q and, amp and phase
+        # only using the amplitude!!
+        self.data_dist = self.measured_values[0] - np.min(self.measured_values[0])
 
         # Smooth the data by "filtering"
         data_dist_smooth = a_tools.smooth(self.data_dist,
@@ -7406,8 +7411,8 @@ class TwoD_Analysis(MeasurementAnalysis):
         self.ax_array = []
 
         for i, meas_vals in enumerate(self.measured_values):
-            kw["zlabel"] = self.value_names[i]
-            kw["z_unit"] = self.value_units[i]
+            kw["zlabel"] = kw.get("zlabel", self.value_names[i])
+            kw["z_unit"] = kw.get("zlabel", self.value_units[i])
 
             if filtered:
                 # print(self.measured_values)
@@ -7476,9 +7481,9 @@ class TwoD_Analysis(MeasurementAnalysis):
             # subtract mean from each row/column if demanded
             plot_zvals = meas_vals.transpose()
             if subtract_mean_x:
-                plot_zvals = plot_zvals - np.mean(plot_zvals,axis=1)[:,None]
+                plot_zvals = plot_zvals - np.mean(plot_zvals, axis=1)[:, None]
             if subtract_mean_y:
-                plot_zvals = plot_zvals - np.mean(plot_zvals,axis=0)[None,:]
+                plot_zvals = plot_zvals - np.mean(plot_zvals, axis=0)[None, :]
 
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
@@ -7489,7 +7494,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                                transpose=transpose,
                                normalize=normalize,
                                **kw)
-            ax.set_title(fig_title)
+
             # set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
             # set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
 
@@ -7674,8 +7679,9 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
     # super(self.__class__, self).run_default_analysis(close_file=False,
     #     save_fig=False, **kw)
     # close_file = kw.pop('close_file', True)
-    def run_default_analysis(self, normalize=True, plot_Q=True, plot_f0=True, plot_linecuts=True,
-                             linecut_log=True, plot_all=False, save_fig=True,
+    def run_default_analysis(self, normalize=True, plot_Q=True, plot_f0=True,
+                             plot_linecuts=True, linecut_log=True,
+                             plot_all=False, save_fig=True, use_min=False,
                              **kw):
         close_file = kw.pop('close_file', True)
         self.add_analysis_datagroup_to_file()
@@ -7686,12 +7692,20 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
         fits = {}  # Dictionary to store the fit results in. Fit results are a
         # dictionary themselfes -> Dictionary of Dictionaries
 
+        f0 = np.zeros(len(self.sweep_points_2D))
         for u, power in enumerate(self.sweep_points_2D):
             fit_res = self.fit_hanger_model(
                 self.sweep_points, self.measured_values[0][:, u])
             self.save_fitted_parameters(
                 fit_res, var_name='Powersweep' + str(u))
             fits[str(power)] = fit_res
+            if use_min:
+                min_index = np.argmin(self.measured_values[0][:, u])
+                f0[u] = np.min(self.sweep_points[min_index])
+            else:
+                f0[u] = fits[str(power)].values['f0'] 
+            self.f0 = f0
+
         self.fit_results = fits
 
         xlabel = kw.pop("xlabel", self.sweep_name)
@@ -7740,10 +7754,6 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                         fig, figname=fig_title, fig_tight=False, **kw)
 
             if plot_f0:
-                f0 = np.zeros(len(self.sweep_points_2D))
-                for u, power in enumerate(self.sweep_points_2D):
-                    f0[u] = self.fit_results[str(power)].values['f0']
-                self.f0 = f0
                 fig, ax = self.default_ax(figsize=(8, 5))
                 self.fig_array.append(fig)
                 self.ax_array.append(ax)
@@ -7810,19 +7820,9 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
         if close_file:
             self.finish()
 
-        # For finding correct ro power and dispersive shift
-        f0 = np.zeros(len(self.sweep_points_2D))
-        for u, power in enumerate(self.sweep_points_2D):
-            f0[u] = self.fit_results[str(power)].values['f0']
-        self.f0 = f0
-
         # Find low power regime
-        # For now, low and high power regimes look at frequency shifts only.
-        # It could be extended by looking at the amplitude of the dip, such that
-        # fewer data points are necessary
-
-        threshold = 0.1e6
-        f_low = 0
+        threshold = 0.1e6  # Gotta love hardcoded stuff
+        f_low = f0[0]
         P_result = self.sweep_points_2D[0]
         try:
             for u, f in enumerate(f0):
@@ -7835,15 +7835,12 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
             pass
 
         # High power regime: just use the value at highest power
-        f_low = f0[0]
         f_high = f0[-1]
 
         if (f_high < f_low):
             shift = f_high - f_low
         else:
             shift = 0
-            print('f_high: ' + str(f_high))
-            print('f_low:  ' + str(f_low))
             logging.warning('No power shift found. Consider attenuation')
             # raise Exception('High power regime frequency found to be higher than'
             #                 'low power regime frequency')

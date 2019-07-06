@@ -13,7 +13,7 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from autodepgraph import AutoDepGraph_DAG
 import matplotlib.pyplot as plt
-
+from pycqed.analysis import fitting_models as fm
 
 class Mock_CCLight_Transmon(CCLight_Transmon):
 
@@ -29,7 +29,45 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             - prefixed with `mock_`
             - describe "hidden" parameters to mock real experiments.
         """
+        # Qubit resonator
+        self.add_parameter('mock_Qe', parameter_class=ManualParameter,
+                           initial_value=13945)
 
+        self.add_parameter('mock_Q', parameter_class=ManualParameter,
+                           initial_value=8459)
+
+        self.add_parameter('mock_theta', parameter_class=ManualParameter,
+                           initial_value=-0.1)
+
+        self.add_parameter('mock_slope', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        self.add_parameter('mock_phi_v', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        self.add_parameter('mock_phi_0', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        # Test resonator
+        self.add_parameter('mock_test_Qe', parameter_class=ManualParameter,
+                           initial_value=1.8e6)
+
+        self.add_parameter('mock_test_Q', parameter_class=ManualParameter,
+                           initial_value=1e6)
+
+        self.add_parameter('mock_test_theta', parameter_class=ManualParameter,
+                           initial_value=-0.1)
+
+        self.add_parameter('mock_test_slope', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        self.add_parameter('mock_test_phi_v', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        self.add_parameter('mock_test_phi_0', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        # Qubit
         self.add_parameter('mock_Ec', label='charging energy', unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=266.3e6)
@@ -248,7 +286,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         theta = -0.1
         slope = 0
         f = freqs
-        from pycqed.analysis import fitting_models as fm
+
 
         A_res = np.abs((slope * (f / 1.e9 - f0_res) / f0_res) *
                        fm.HangerFuncAmplitude(f, f0_res, Q, Qe, A, theta))
@@ -256,9 +294,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                         fm.HangerFuncAmplitude(f, f0_res, Q_test,
                                                Qe_test, A, theta))
 
-        A_res = abs(A * (1. - Q / Qe * np.exp(1.j * theta) /
+        A_res = np.abs(A * (1. - Q / Qe * np.exp(1.j * theta) /
                          (1. + 2.j * Q * (f / 1.e9 - f0_res) / f0_res)))
-        A_test = abs(A * (1. - Q_test / Qe_test * np.exp(1.j * theta) /
+        A_test = np.abs(A * (1. - Q_test / Qe_test * np.exp(1.j * theta) /
                           (1. + 2.j * Q_test * (f / 1.e9 - f0_test) / f0_test)))
 
         baseline = 0.40
@@ -402,7 +440,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             return a
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None, analyze=True,
-                                        close_fig=True):
+                                        close_fig=True, label=''):
         '''
         For finding resonator frequencies. Uses a lorentzian fit for now, might
         be extended in the future
@@ -451,7 +489,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_function(s)
         MC.set_sweep_points(freqs)
         MC.set_detector_function(d)
-        MC.run('Resonator_scan'+self.msmt_suffix)
+        MC.run('Resonator_scan'+self.msmt_suffix+label)
 
         if analyze:
             ma.Homodyne_Analysis(label='Resonator_scan', close_fig=close_fig)
@@ -996,47 +1034,75 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         pow_shift = self.mock_pow_shift()
 
         h = 10**(power/20)*10e-3   # Lorentzian baseline [V]
+        
         A = 0.8*h                  # Peak height [V]
         w = self.mock_res_width()  # Width of Lorentzian (HWHM) [Hz]
+
+        Q = self.mock_Q()
+        Qe = self.mock_Qe()
+        theta = self.mock_theta()
+        slope = self.mock_slope()
+        phi_v = self.mock_phi_v()
+        phi_0 = self.mock_phi_0()
+
+        Q_test = self.mock_test_Q()
+        Qe_test = self.mock_test_Qe()
+        theta_test = self.mock_test_theta()
+        slope_test = self.mock_test_slope()
+        phi_v_test = self.mock_test_phi_v()
+        phi_0_test = self.mock_test_phi_0()
+
 
         if power <= res_power:
             # Good signal
             f0 = self.calculate_mock_resonator_frequency(excited=excited)
-            res_qubit_dip = -1*A*(w/2)**2 / ((w/2)**2 + (freqs-f0)**2)
+            res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q, Qe, h,
+                                                      theta, phi_v, phi_0,
+                                                      slope=slope)
         elif (power > res_power) and (power < res_power + pow_shift):
             # Noisy regime -> width increases, peak decreases
-            A0 = A
-            n = 6
-            b = A0/10
-            a = (A0-b)/(-1/2*pow_shift)**n
-            A = a*(power - (res_power+1/2*pow_shift))**n + b
+            f0 = self.calculate_mock_resonator_frequency(excited=excited)
+            f0_high = self.mock_freq_res_bare()
 
-            w = 0.5e6 + 0.5e6*np.sin(np.pi*(power - res_power)/pow_shift)
+            f_shift = f0 - f0_high
+            f0 = f0 - (power - res_power)/pow_shift*f_shift
 
-            b = res_power + self.mock_freq_res()*(pow_shift/self.mock_chi())
-            f0 = (b - power)/pow_shift*self.mock_chi()
+            Q_decrease = (1+(power-res_power)/pow_shift)*2
+            
+            QQe = Q/Qe / Q_decrease
 
-            res_qubit_dip = -1*A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
+
+            Q_nonlinear = Q/Q_decrease
+            Qe_nonlinear = Qe/Q_decrease
+            res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q_nonlinear,
+                                                      Qe_nonlinear, h,
+                                                      theta, phi_v, phi_0,
+                                                      slope=slope)
             # Add some extra noise
             for i, value in enumerate(res_qubit_dip):
-                d = np.abs(value - A0)
+                d = np.abs(value - h)
 
-                value += np.random.normal(0, d/5, 1)
+                value += np.random.normal(0, d/10, 1)
                 res_qubit_dip[i] = value
         else:
             # High power regime
             f0 = self.mock_freq_res_bare()
-            res_qubit_dip = -1*A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
+            res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q, Qe, h,
+                                                      theta, phi_v, phi_0,
+                                                      slope=slope)
 
         if self.mock_freq_test_res() is not None:
             f0_test_res = self.mock_freq_test_res()
-            A = 0.8*h
-            w = self.mock_res_width()
-            testres_dip = -1*A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0_test_res))**2)
+            test_res_response = fm.hanger_func_complex_SI(freqs, f0_test_res,
+                                                          Q_test, Qe_test, h,
+                                                          theta_test,
+                                                          phi_v_test,
+                                                          phi_0_test,
+                                                          slope=slope_test)
         else:
-            testres_dip = np.zeros(np.size(freqs))
+            test_res_response = np.ones(np.size(freqs))*h
 
-        response = res_qubit_dip + testres_dip
+        response = np.real(res_qubit_dip - h + test_res_response - h)
         return f0, response
 
     def calculate_mock_resonator_frequency(self, excited=False):

@@ -1235,7 +1235,7 @@ class CCLight_Transmon(Qubit):
     ####################################################
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
-    def find_frequency_adaptive(self, f_start=None, f_span=200e6, f_step=1e6,
+    def find_frequency_adaptive(self, f_start=None, f_span=200e6, f_step=0.25e6,
                                 MC=None, update=True, use_max=False,
                                 spec_mode='pulsed_marked', verbose=True):
         """
@@ -2262,8 +2262,9 @@ class CCLight_Transmon(Qubit):
                                            close_fig=close_fig,
                                            qb_name=self.name)
 
-    def find_bus_frequency(self,freqs,spec_source_bus,bus_power,f01=None,label='',
-                        close_fig=True,analyze=True,MC=None,prepare_for_continuous_wave=True):
+    def find_bus_frequency(self, freqs, spec_source_bus, bus_power, f01=None,
+                           label='', close_fig=True, analyze=True, MC=None, 
+                           prepare_for_continuous_wave=True):
         '''
         Drive the qubit and sit at the spectroscopy peak while the bus is driven with
         bus_spec_source
@@ -2275,8 +2276,8 @@ class CCLight_Transmon(Qubit):
         - f_01: frequency of 01 transition (default: self.freq_qubit())
         '''
 
-        if f01==None:
-          f01 = self.freq_qubit()
+        if f01 is None:
+            f01 = self.freq_qubit()
 
         UHFQC = self.instr_acquisition.get_instr()
         if prepare_for_continuous_wave:

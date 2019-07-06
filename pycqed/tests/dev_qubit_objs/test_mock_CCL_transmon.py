@@ -232,7 +232,7 @@ class Test_Mock_CCL(unittest.TestCase):
     ###########################################################
     def test_find_test_resonators(self):
         self.CCL_qubit.mock_freq_res_bare(7.78542e9)
-        self.CCL_qubit.mock_freq_test_res(7.9862432e9)
+        self.CCL_qubit.mock_freq_test_res(7.9862e9)
 
         res0 = resonator(identifier=0, freq=7.785e9)
         res1 = resonator(identifier=1, freq=7.986e9)

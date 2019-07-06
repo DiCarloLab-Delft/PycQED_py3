@@ -1816,12 +1816,12 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
 
     title = kw.pop('title', None)
 
-    xlabel = kw.pop('xlabel', xlabel)
-    ylabel = kw.pop('ylabel', ylabel)
-    zlabel = kw.pop('zlabel', zlabel)
-    x_unit = kw.pop('x_unit', x_unit)
-    y_unit = kw.pop('y_unit', y_unit)
-    z_unit = kw.pop('z_unit', z_unit)
+    xlabel = kw.get('xlabel', xlabel)
+    ylabel = kw.get('ylabel', ylabel)
+    zlabel = kw.get('zlabel', zlabel)
+    x_unit = kw.get('x_unit', x_unit)
+    y_unit = kw.get('y_unit', y_unit)
+    z_unit = kw.get('z_unit', z_unit)
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
