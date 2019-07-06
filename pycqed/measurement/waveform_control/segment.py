@@ -840,6 +840,67 @@ class Segment:
         """
         return samples / self.pulsar.clock(**kw)
 
+    def plot(self, instruments=None, channels=None,
+             delays=dict(), savefig=False, cmap=None, frameon=True):
+        """
+        Plots a segment. Can only be done if the segment can be resolved.
+
+        :param instruments (list): instruments for which pulses have to be plotted.
+            defaults to all.
+        :param channels (list):  channels to plot. defaults to all.
+        :param delays (dict): keys are instruments, values are additional delays.
+            if passed, the delay is substracted to the time values of this
+            instrument, such that the pulses are plotted at timing when they
+            physically occur.
+        :param savefig: save the plot
+        :param cmap:
+        :param frameon:
+        :return:
+        """
+        import matplotlib.pyplot as plt
+        try:
+            self.resolve_segment()
+            wfs = self.waveforms(awgs=instruments, channels=None)
+            n_instruments = len(wfs)
+            fig, ax = plt.subplots(nrows=n_instruments, sharex=True,
+                                   squeeze=False,
+                                   figsize=(16, n_instruments * 3))
+            if cmap is None:
+                cmap = plt.get_cmap('Paired')
+            for i, instr in enumerate(wfs):
+                # formatting
+                ax[i, 0].set_title(instr)
+                ax[i, 0].spines["top"].set_visible(frameon)
+                ax[i, 0].spines["right"].set_visible(frameon)
+                ax[i, 0].spines["bottom"].set_visible(frameon)
+                ax[i, 0].spines["left"].set_visible(frameon)
+                # plotting
+                for elem_name, v in wfs[instr].items():
+                    for k, wf_per_ch in v.items():
+                        for n_wf, (ch, wf) in enumerate(wf_per_ch.items()):
+                            if channels is None or ch in channels.get(instr, []):
+                                tvals = \
+                                self.tvals([f"{instr}_{ch}"], elem_name[1])[
+                                    f"{instr}_{ch}"] \
+                                - delays.get(instr, 0)
+                                ax[i, 0].plot(tvals * 1e6, wf,
+                                              label=f"{elem_name[1]}_{k}_{ch}",
+                                              linewidth=0.7)
+
+                ax[i, 0].legend(loc=[1.02, 0], prop={'size': 8})
+
+            # formatting
+            ax[-1, 0].set_xlabel('time ($\mu$s)')
+            # start, end = ax[-1,0].get_xlim()
+            # step = (end - start)/20
+            # ax[-1,0].xaxis.set_ticks(np.arange(start, end, 0.25))
+            plt.tight_layout()
+            if savefig:
+                plt.savefig(f'{self.name}.png')
+            plt.show()
+        except Exception as e:
+            log.error(f"Could not plot: {self.name}")
+            raise e
     def __repr__(self):
         string_repr = f"---- {self.name} ----\n"
 
