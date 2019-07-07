@@ -440,14 +440,6 @@ class HDAWG8Pulsar:
     def _program_awg(self, obj, sequence):
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._program_awg(obj, sequence)
-
-        # delete previous cache files
-        obj._delete_chache_files()
-        log.info('Previous AWG8 cache files have been deleted.')
-        # delete old csv files
-        obj._delete_csv_files()
-        log.info('Previous AWG8 csv files have been deleted.')
-
         ch_has_waveforms = {'ch{}{}'.format(i+1,j): False for i in range(8) for j in ['','m']}
 
         for awg_nr in [0, 1, 2, 3]:
@@ -1297,10 +1289,21 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             seg.resolve_segment()
         
         sequence.sequence_for_awg()
-
+        csv_files_deleted = False
         for awg in awgs:
             #returns the instance of the class AWG that is requested
             obj = self.AWG_obj(awg=awg)
+
+            if not csv_files_deleted and \
+                    isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
+                # delete previous cache files
+                obj._delete_chache_files()
+                log.info('Previous AWG8 cache files have been deleted.')
+                # delete old csv files
+                obj._delete_csv_files()
+                log.info('Previous AWG8 csv files have been deleted.')
+                csv_files_deleted = True
+
             #programs the AWG to play the segments in the order as in sequence
             self._program_awg(obj, sequence)
         
