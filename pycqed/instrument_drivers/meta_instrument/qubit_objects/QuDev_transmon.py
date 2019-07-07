@@ -2022,25 +2022,26 @@ class QuDev_transmon(Qubit):
         RO_spacing += RO_slack # for slack
         RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
 
+        if prep_params['preparation_type'] not in ['preselection', 'wait']:
+            raise NotImplementedError()
+        preselection = prep_params['preparation_type'] == 'preselection'
+
         if qutrit:
             states = ('g', 'e', 'f')
             for state in states:
-                seq, _ = sq.single_state_active_reset(
+                seq, swp = sq.single_state_active_reset(
                     operation_dict=self.get_operation_dict(),
                     qb_name=self.name, state=state,
-                    prep_params=prep_params)
+                    prep_params=prep_params, upload=False)
                 # set sweep function and run measurement
                 MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
                                                                upload=upload))
-                MC.set_sweep_points(np.arange(seq.n_acq_elements()))
+                MC.set_sweep_points(swp)
                 MC.set_detector_function(self.int_log_det)
                 with temporary_value(MC.soft_avg, 1):
                     MC.run(name=label + '_{}'.format(state) + self.msmt_suffix)
 
         else:
-            if prep_params['preparation_type'] not in ['preselection', 'wait']:
-                raise NotImplementedError()
-            preselection = prep_params['preparation_type'] == 'preselection'
             MC.set_sweep_function(awg_swf2.n_qubit_off_on(
                 pulse_pars_list=[self.get_ge_pars()],
                 RO_pars_list=[self.get_ro_pars()],
@@ -2058,7 +2059,7 @@ class QuDev_transmon(Qubit):
                 #  avoid logical branching
                 options = \
                     dict(classif_method='threshold' if thresholded else 'gmm',
-                         pre_selection=preselection_pulse)
+                         pre_selection=preselection)
                 labels = ['SSRO_fidelity_{}'.format(l) for l in states]
                 ssqtro = \
                     Singleshot_Readout_Analysis_Qutrit(label=labels,
@@ -2464,7 +2465,7 @@ class QuDev_transmon(Qubit):
             label += self.msmt_suffix
 
         #Perform Rabi
-        self.measure_rabi(amps=rabi_amps, close_fig=close_fig,
+        self.measure_rabi(amps=rabi_amps, close_fig=close_fig, analyze=False,
                           cal_points=cal_points, upload=upload, label=label,
                           n=n, last_ge_pulse=last_ge_pulse, for_ef=for_ef,
                           prep_params=prep_params)
@@ -3163,7 +3164,7 @@ class QuDev_transmon(Qubit):
 
         levels = ('g', 'e', 'f') if qutrit else ('g', 'e')
 
-        self.measure_dispersive_shift(freqs, states=levels[1:], analyze=False)
+        self.measure_dispersive_shift(freqs, states=levels, analyze=False)
         labels = {l: '{}-spec'.format(l) + self.msmt_suffix for l in levels}
         m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
         trace = {l: m_a[l].measured_values[0] *
@@ -3246,7 +3247,7 @@ class QuDev_transmon(Qubit):
 
 
     def measure_dispersive_shift(self, freqs, analyze=True, close_fig=True,
-                                 upload=True, states=('e',), prep_params=None):
+                                 upload=True, states=('g','e'), prep_params=None):
         """ Varies the frequency of the microwave source to the resonator and
         measures the transmittance """
 
@@ -3265,12 +3266,11 @@ class QuDev_transmon(Qubit):
         self.prepare(drive='timedomain')
         MC = self.instr_mc.get_instr()
 
-        for state in ('g',) + states:
-            if upload:
-                sq.single_state_active_reset(
+        for state in states:
+            sq.single_state_active_reset(
                     operation_dict=self.get_operation_dict(),
                     qb_name=self.name,
-                    state=state, prep_params=prep_params)
+                    state=state, prep_params=prep_params, upload=upload)
 
             MC.set_sweep_function(self.swf_ro_freq_lo()) 
             MC.set_sweep_points(freqs)
