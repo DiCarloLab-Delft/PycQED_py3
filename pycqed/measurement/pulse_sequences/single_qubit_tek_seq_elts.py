@@ -28,6 +28,68 @@ def pulse_list_list_seq(pulse_list_list, name='pulse_list_list_sequence',
         ps.Pulsar.get_instance().program_awgs(seq)
     return seq
 
+def prepend_pulses(pulse_list, pulses_to_prepend):
+    """
+    Prepends a list of pulse to a list of pulses with correct referencing.
+    :param pulse_list: initial pulse list
+    :param pulses_to_prepend: pulse to prepend
+    :return:
+        list of pulses where prepended pulses are at the beginning of the
+        returned list
+    """
+    all_pulses = deepcopy(pulse_list)
+    for i, p in enumerate(reversed(pulses_to_prepend)):
+        try:
+            p['ref_pulse'] = all_pulses[0]['name']
+        except KeyError:
+            all_pulses[0]['name'] = 'fist_non_prepended_pulse'
+            p['ref_pulse'] = all_pulses[0]['name']
+        p['name'] = p.get('name',
+                          f'prepended_pulse_{len(pulses_to_prepend) - i - 1}')
+        p['ref_point'] = 'start'
+        p['ref_point_new'] = 'end'
+        all_pulses = [p] + all_pulses
+    return all_pulses
+
+def one_qubit_reset(qb_name, operation_dict, prep_params=dict(), upload=True,
+                    states=('g','e',)):
+    """
+
+    :param qb_name:
+    :param states (tuple): ('g','e',) for active reset e, ('g','f',) for active
+    reset f and ('g', 'e', 'f') for both.
+
+    :return:
+    """
+
+    seq_name = '{}_reset_x{}_sequence'.format(qb_name,
+                                              prep_params.get('reset_reps',
+                                                              '_default_n_reps'))
+
+
+    pulses = [deepcopy(operation_dict['RO ' + qb_name])]
+    reset_and_last_ro_pulses = \
+        add_preparation_pulses(pulses, operation_dict, [qb_name], **prep_params)
+    swept_pulses = []
+
+    state_ops = dict(g=['I '], e=['X180 '], f=['X180 ', 'X180_ef '])
+    for s in states:
+        pulses = deepcopy(reset_and_last_ro_pulses)
+        state_pulses = [deepcopy(operation_dict[op + qb_name]) for op in
+                       state_ops[s]]
+        # reference end of state pulse to start of first reset pulse,
+        # to effectively prepend the state pulse
+        segment_pulses = prepend_pulses(pulses, state_pulses)
+        swept_pulses.append(segment_pulses)
+
+    seq = pulse_list_list_seq(swept_pulses, seq_name, upload=False)
+    log.debug(seq)
+
+    if upload:
+        ps.Pulsar.get_instance().program_awgs(seq)
+
+    return seq, np.arange(seq.n_acq_elements())
+
 def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points,
                           upload=True, n=1, for_ef=False,
                           last_ge_pulse=False, prep_params=dict()):
@@ -97,7 +159,7 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
     # Calculate the length of a ge pulse, assumed the same for all qubits
     ge_pulse = operation_dict['X180 ' + qb_names[0]]
     ge_length = ge_pulse['nr_sigma']*ge_pulse['sigma']
-    state_ops = dict(g=["I "], e=["X180 "], f=["X180 ", "X180_ef "])
+    state_ops = dict(g=["I "], e=["X180 "], f=["X180_ef ", "X180 "])
     if preparation_type == 'wait':
         return pulse_list
 
@@ -143,7 +205,7 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
             if rep == 0:
                 ro_list[0]['ref_pulse'] = 'segment_start'
                 ro_list[0]['pulse_delay'] = -reset_reps * (
-                        post_ro_wait + ge_length + ef_length)
+                        post_ro_wait + ge_length + ef_length )
             ro_list[0]['name'] = 'refpulse_reset_element_{}'.format(rep)
             rp_list = deepcopy(reset_pulses)
             for j, pulse in enumerate(rp_list):

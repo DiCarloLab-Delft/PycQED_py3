@@ -16,6 +16,9 @@ import pycqed.measurement.awg_sweep_functions_multi_qubit as awg_swf2
 import pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts as mqs
 import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 import pycqed.measurement.detector_functions as det
+from pycqed.measurement.calibration_points import CalibrationPoints
+from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
+    one_qubit_reset
 from pycqed.measurement.waveform_control import pulsar as ps
 import pycqed.measurement.composite_detector_functions as cdet
 import pycqed.analysis.measurement_analysis as ma
@@ -692,59 +695,44 @@ def measure_multiplexed_readout(qubits, nreps=1, liveplot=False,
             use_preselection=preselection
         ))
 
-def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
-                         shots=5000,
-                         MC=None, upload=True, sequence='reset_g'):
-    """possible sequences: 'reset_g', 'reset_e', 'idle', 'flip'"""
-    for qb in qubits:
-        if MC is None:
-            MC = qb.MC
-        else:
-            break
-    exp_metadata = {'reset_cycle_time': reset_cycle_time,
-                    'nr_resets': nr_resets,
+
+def measure_active_reset(qubits, nreps=1, shots=5000,
+                         qutrit=False,  upload=True):
+    MC = qubits[0].instr_mc.get_instr()
+
+    exp_metadata = {'reset_cycle_time':
+                        qubits[0].preparation_params()['post_ro_wait'],
+                    'nr_resets': qubits[0].preparation_params()['reset_reps'],
                     'shots': shots}
-    # FIX MULTIPLEXED READOUT!!!!!
-    # operation_dict = {
-    #     'RO': get_multiplexed_readout_pulse_dictionary(qubits)}
-    operation_dict = {
-        'RO': qubits[0].get_RO_pars()}
+
+    operation_dict = {}
     qb_names = []
     for qb in qubits:
         qb_names.append(qb.name)
         operation_dict.update(qb.get_operation_dict())
 
-    sf = awg_swf2.n_qubit_reset(
-        qubit_names=qb_names,
-        operation_dict=operation_dict,
-        reset_cycle_time=reset_cycle_time,
-        #sequence=sequence,
-        nr_resets=nr_resets,
-        upload=upload)
 
-    m = 2 ** (len(qubits))
-    m *= (nr_resets + 1)
-    # shots = 4094 - 4094 % m
-    shots *= m
+    seq, swp = one_qubit_reset(qb_names[0], operation_dict,
+                               qubits[0].preparation_params(), upload=False,
+                               states='gef' if qutrit else 'ge')
     df = get_multiplexed_readout_detector_functions(qubits,
              nr_shots=shots)['int_log_det']
-
     prev_avg = MC.soft_avg()
     MC.soft_avg(1)
 
     for qb in qubits:
-        qb.prepare_for_timedomain()
+        qb.prepare(drive='timedomain')
 
-    f_LO = qubits[0].f_RO() - qubits[0].f_RO_mod()
-    multiplexed_pulse(qubits, f_LO)
-
-    MC.set_sweep_function(sf)
-    MC.set_sweep_points(np.arange(shots))
+    MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq, upload=upload))
+    MC.set_sweep_points(swp)
     MC.set_sweep_function_2D(swf.None_Sweep())
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
 
-    MC.run_2D(name='active_reset_x{}_{}'.format(nr_resets, ','.join(qb_names)),
+    label = 'active_reset_{}_x{}_{}'.format('ef' if qutrit else 'e',
+        qubits[0].preparation_params()['reset_reps'], ','.join(qb_names))
+
+    MC.run_2D(name=label,
               exp_metadata=exp_metadata)
 
     MC.soft_avg(prev_avg)
