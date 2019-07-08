@@ -426,7 +426,7 @@
     999999995904.0
   ],
   [
-    "sigouts/0/amplitudes/3",
+    "sigouts/0/amplitudes/0",
     "float",
     -0.75,
     0.75
@@ -438,7 +438,7 @@
     1.0
   ],
   [
-    "sigouts/0/enables/3",
+    "sigouts/0/enables/0",
     "bool",
     0,
     1.0
@@ -468,7 +468,7 @@
     0.75
   ],
   [
-    "sigouts/1/amplitudes/7",
+    "sigouts/1/amplitudes/1",
     "float",
     -0.75,
     0.75
@@ -480,7 +480,7 @@
     1.0
   ],
   [
-    "sigouts/1/enables/7",
+    "sigouts/1/enables/1",
     "bool",
     0,
     1.0
