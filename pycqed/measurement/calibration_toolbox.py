@@ -75,7 +75,7 @@ def mixer_carrier_cancellation(SH, source, MC,
                     'sigma0':1,
                     'options': {'maxiter': 300,    # maximum function cals
                                 # Scaling for individual sigma's
-                                'ftarget': -110,
+                                'ftarget': -110, # This is the noise level of SH
                                 'cma_stds': [init_stepsize]*2
                                 },
                     'minimize': True}

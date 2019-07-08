@@ -481,28 +481,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._realtime_w0 = w0
         self._realtime_w1 = w1
 
-        print('wf_nr', wf_nr)
-        print('w0', len(w0))
-        print('w1', len(w1))
-
-        # Checked and everything matches
-        #print(self)
-        #print(hex(id(self)))
-        #print(self._dev)
-        #print(hex(id(self._dev)))
-
         # Changed by NielsH (niels@zhinst.com)
-        #c = np.vstack((w0, w1)).reshape((-2,), order='F')
-        #self._dev.seti('awgs/{}/enable'.format(awg_nr), 0)
-        #self._dev.subs('awgs/{}/ready'.format(awg_nr))
-        #self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
-        
-        ##self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
-        ## Try as float32 instead
-        #self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c.astype(np.float32))
-
-        #self._dev.seti('awgs/{}/enable'.format(awg_nr), 0)
-        #time.sleep(1)
 
         # New dynamic waveform upload
         c = self._awg_waveform(w0, w1)
@@ -670,8 +649,6 @@ class ZI_HDAWG8(ZI_base_instrument):
             # Valid polarity is 'high' (hardware value 2),
             # 'low' (hardware value 1), 'no valid needed' (hardware value 0)
             self.set('awgs_{}_dio_valid_polarity'.format(awg_nr), 2)
-            
-            # NH: With the new DIO protocol the strobe is no longer directly used!
 
             # This is the bit index of the strobe signal (toggling signal),
             #self.set('awgs_{}_dio_strobe_index'.format(awg_nr), 30)
