@@ -435,12 +435,12 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('mw_vsm_G_amp',
                            label='VSM amp Gaussian component',
-                           vals=vals.Numbers(0.1, 2.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_D_amp',
                            label='VSM amp Derivative component',
-                           vals=vals.Numbers(0.1, 2.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_G_phase',
@@ -2099,7 +2099,11 @@ class CCLight_Transmon(Qubit):
                                 prepare_for_continuous_wave=True):
         """
         Does a CW spectroscopy experiment by sweeping the frequency of a
-        microwave source
+        microwave source.
+
+        Relevant qubit parameters:
+        - instr_spec_source: instrument used to apply CW excitation
+        - spec_pow: power of the MW excitation at the output of the spec_source (dBm)
         """
         UHFQC = self.instr_acquisition.get_instr()
         if prepare_for_continuous_wave:
@@ -2495,7 +2499,19 @@ class CCLight_Transmon(Qubit):
             label='Two_tone',  f01=.5*freqs_01[-1]+.5*freqs_01[0], f12=.5*freqs_12[-1]+.5*freqs_12[0])
 
     def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10, 10, 1), MC=None, spec_source_2=None):
+        """
+        Measures photon splitting of the qubit due to photons in the bus resonators.
+        Specifically it is a CW qubit pectroscopy with the second  variable-power CW tone
+        applied at frequency f_bus.
 
+        Input parameters:
+        - f_bus: bus frequency at which variable-power CW tone is applied
+        - freqs_01: range of frequencies of the CW qubit MW drive. If not specified
+            range -60 MHz to +5 MHz around freq_qubit fill be used.
+        - powers: sweeped powers of the bus CW drive.
+        - spec_source_2: sepcifies instrument used to apply bus MW drive. By default
+            instr_spec_source_2 is used.
+        """
         if freqs_01 is None:
             freqs_01 = np.arange(self.freq_qubit()-60e6,
                                  self.freq_qubit()+5e6, 0.7e6)
@@ -2866,6 +2882,18 @@ class CCLight_Transmon(Qubit):
 
     def measure_dispersive_shift_pulsed(self, freqs, MC=None, analyze: bool=True,
                                         prepare: bool=True):
+        """
+        Measures the RO resonator spectroscopy with the qubit in ground and excited state.
+        Specifically, performs two experiments. Applies sequence:
+        - initialize qubit in ground state (wait)
+        - (only in the second experiment) apply a (previously tuned up) pi pulse
+        - apply readout pulse and measure
+        This sequence is repeated while sweeping ro_freq.
+
+        Input parameters:
+        - freqs: sweeped range of ro_freq
+        """
+
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2958,7 +2986,14 @@ class CCLight_Transmon(Qubit):
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
         """
-        Perform a Rabi experiment.
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Input parameters:
+        - amps: range of amplitudes to sweep. If cfg_with_vsm()==True pulse amplitude
+            is adjusted by sweeping the attenuation of the relevant gaussian VSM channel,
+            in max range (0.1 to 1.0).
+            If cfg_with_vsm()==False adjusts the channel amplitude of the AWG in range (0 to 1).
         """
         if self.cfg_with_vsm():
             self.measure_rabi_vsm(MC, amps,
@@ -2972,6 +3007,15 @@ class CCLight_Transmon(Qubit):
     def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.1, 1.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True, all_modules=False):
+       """
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Input parameters:
+        - amps: range of amplitudes to sweep. Pulse amplitude is adjusted by sweeping
+            the attenuation of the relevant gaussian VSM channel,
+            in max range (0.1 to 1.0).
+        """
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -3019,6 +3063,14 @@ class CCLight_Transmon(Qubit):
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
                                  analyze=True, close_fig=True, real_imag=True,
                                  prepare_for_timedomain=True):
+        """
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Input parameters:
+        - amps: range of amplitudes to sweep. Amplitude is adjusted via the channel
+            amplitude of the AWG, in max range (0 to 1).
+        """
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         using_QWG = (MW_LutMan.AWG.get_instr(
         ).__class__.__name__ == 'QuTech_AWG_Module')
@@ -3725,6 +3777,25 @@ class CCLight_Transmon(Qubit):
     def measure_flipping(self, number_of_flips=np.arange(0, 40, 2), equator=True,
                          MC=None, analyze=True, close_fig=True, update=False,
                          ax='x', angle='180'):
+        """
+        Measurement for fine-tuning of the pi and pi/2 pulse amplitudes. Executes sequence
+        pi (repeated N-times) - pi/2 - measure
+        with variable number N. In this way the error in the amplitude of the MW pi pulse
+        accumulate allowing for fine tuning. Alternatively N repetitions of the pi pulse
+        can be replaced by 2N repetitions of the pi/2-pulse
+
+        Input parameters:
+        - number_of_flips: number of pi pulses to apply. It is recommended to use only even numbers,
+            since then the expected signal has a sine shape. Otherwise it has -1^N * sin shape
+            which will not be correctly analyzed.
+        - equator specify whether to apply the final pi/2 pulse. Setting to False makes the sequence
+            first-order insensitive to pi-pulse amplitude errors.
+        - ax: axis arour which the pi pulses are to be performed. Possible values 'x' or 'y'
+        - angle: specifies whether to apply pi or pi/2 pulses. Possible values: '180' or '90'
+        - update: specifies whether to update parameter controlling MW pulse amplitude.
+            This parameter is mw_vsm_G_amp in VSM case or mw_channel_amp in no-VSM case.
+            Update is performed only if change by more than 0.2% (0.36 deg) is needed.
+        """
 
         if MC is None:
             MC = self.instr_MC.get_instr()
