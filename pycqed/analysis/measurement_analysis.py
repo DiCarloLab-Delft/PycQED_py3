@@ -7103,12 +7103,15 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             except (TypeError, KeyError, ValueError):
                 logging.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
-                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
-                            self.fit_res.params['f0'].value * scale,
-                            self.fit_res.params['f0'].stderr / 1e6,
-                            self.fit_res.params['kappa'].value / 1e6,
-                            self.fit_res.params['kappa'].stderr / 1e6)
+                try: #Dirty fix, should already be fine in Develop
+                    label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                            '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                                self.fit_res.params['f0'].value * scale,
+                                self.fit_res.params['f0'].stderr / 1e6,
+                                self.fit_res.params['kappa'].value / 1e6,
+                                self.fit_res.params['kappa'].stderr / 1e6)
+                except:
+                    label = None
 
         fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,
                       fontsize=self.font_size, verticalalignment='top',
