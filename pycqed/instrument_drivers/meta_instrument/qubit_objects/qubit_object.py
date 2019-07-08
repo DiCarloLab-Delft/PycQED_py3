@@ -194,24 +194,52 @@ class Qubit(Instrument):
         raise NotImplementedError()
 
     def measure_ramsey(self):
+        """
+        Ramsey measurement used to measure the inhomogenuous dephasing time T2* as well as
+        the qubit frequency. The measurement consists of the pi/2 pulses with a variable delay
+        time between. The MW LO can be intentionally detuned from the qubit frequency.
+        Consequently the measurement yields decaying oscillations which is easier to fit
+        accurately than the monotonuous decay.
+
+        Args:
+            times: array of delay times between the two pi/2 pulses
+            artificial_detuning: intentional detuing from the known qubit frequency
+        """
         raise NotImplementedError()
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True):
+        """
+        Performs the Hahn echo measurement to estimate dephasing time of the qubit decouplied
+        from the majority of the low frequency noise. The sequence of the experiment is
+        pi/2 - wait/2 - pi - wait/2 - pi/2
+        with variable (identical) delay times between pulses. The final pi/2 pulse is performed
+        around variable axis. Consequently the measurement yields decaying oscillatioins instead
+        of monotunous decay, which enables to more easily spot potential problems with the applied
+        microwave pulses.
+
+        Args:
+            times: list of total waiting time between two pi/2 pulses. Half of the delay
+                is inserted before, and half after the central pi pule.      
+        """
         raise NotImplementedError()
 
     def measure_allxy(self, MC=None, analyze: bool=True,
                       close_fig: bool=True,
                       prepare_for_timedomain: bool=True):
         """
-        Performs an AllXY experiment.
+        Performs an AllXY experiment. AllXY experiment consists of 21 pairs of
+        MW control pulses folowed by the qubit measurement. In the ideal case the result of 
+        this measurement should be a staircase, and specific errors in the MW gate tuenup
+        result in characteristic deviations from the ideal shape.
+        For detailed description of the AllXY measurement and symptomes of different errors
+        see PhD thesis by Matthed Reed (2013, Schoelkopf lab), pp. 124.
+        https://rsl.yale.edu/sites/default/files/files/RSL_Theses/reed.pdf
+
         Args:
             MC        : instance of the MeasurementControl
             analyze   : perform analysis
             close_fig : close the figure in plotting
-
-        returns:
-            T1 (float) the measured value
         """
         raise NotImplementedError()
 
@@ -806,14 +834,20 @@ class Qubit(Instrument):
                                  freqs=None,
                                  MC=None, close_fig=True):
         '''
-        params
-        use_min: 'True' uses the frequency at minimum amplitude. 'False' uses
-        the fit result
-        update: update the internal parameters with this fit
-        Finds the resonator frequency by performing a heterodyne experiment
-        if freqs == None it will determine a default range dependent on the
-        last known frequency of the resonator.
+        Performs heterodyne spectroscopy to identify the frequecy of the (readout)
+        resonator frequency.
+
+        Args:
+            use_min: 'True' uses the frequency at minimum amplitude. 'False' uses
+                the fit result
+            update: update the internal parameters with this fit
+                Finds the resonator frequency by performing a heterodyne experiment
+                if freqs == None it will determine a default range dependent on the
+                last known frequency of the resonator.
+            freqs: list of frequencies to sweep. By default set to +-5 MHz around
+                the last recorded frequency, with 100 kHz step
         '''
+
         # This snippet exists to be backwards compatible 9/2017.
         try:
             freq_res_par = self.freq_res
@@ -857,7 +891,31 @@ class Qubit(Instrument):
         """
         Finds the qubit frequency using either the spectroscopy or the Ramsey
         method.
-        Frequency prediction is done using
+
+        In case method=='spectroscopy' this routine runs measure_spectroscopy and performs
+        analysis looking for peaks in the spectrum.
+
+        In case metgod=='ramsey' this routine performs series of ramsey measurements
+        for increasing range of the delay times. Using short ramsey sequence with relatively
+        large artificial detuning yields robust measurement of the qubit frequency, and increasing
+        the relay times allows for more precise frequency measurement.
+
+        Args:
+            method: specifies whether to perform spectroscopy ('spectroscopy') or series of
+                ramsey measurements ('ramsey') to find the qubit frequency.
+            spec_mode: specifies the mode of the spectroscopy measurements (currently only implemented
+                by Timo for CCL_Transmon). Possivle values: 'CW', 'pulsed_marked', 'pulsed_mixer'
+            steps: maximum delay between pi/2 pulses (in microseconds) in a subsequent ramsey measurements.
+                The find_frequency routine is terminated when all steps are performed or if
+                the fitted T2* significantly exceeds the maximum delay
+            artificial_periods: specifies the automatic choice of the artificial detuning in the ramsey
+                measurements, in such a way that ramsey measurement should show 4 full oscillations.
+            freqs: list of sweeped frequencies in case of spectroscopy measurement
+            f_span: span of sweeped frequencies around the currently recorded qubit frequency in
+                the spectroscopy measurement
+            f_step: increment of frequency between data points in spectroscopy measurement
+            update: boolean indicating whether to update the qubit frequency in the qubit object
+                according to the result of the measurement
         """
         if method.lower() == 'spectroscopy':
             if freqs is None:

@@ -2577,6 +2577,17 @@ class CCLight_Transmon(Qubit):
                      shots_per_meas: int=4092,
                      cal_residual_excitation: bool=False,
                      disable_metadata: bool=False):
+        '''
+        Performs a number of single shot measurements with qubit in ground and excited state
+        to extract the SNR and readout fidelities.
+
+        Args:
+            nr_shots: total number of measurements in qubit ground and excited state
+            cases: currently unused
+            update_threshold: bool indicating whether to update a threshold according
+                to which the shot is classified as ground or excited state.
+            ...
+        '''
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
         # docstring from parent class
@@ -2952,6 +2963,16 @@ class CCLight_Transmon(Qubit):
                                   measure_transients_CCL_switched: bool=False,
                                   prepare: bool=True,
                                   )->bool:
+        '''
+        Measures readout transients for the qubit in ground and excited state to indicate
+        at what times the transients differ. Based on the transients calculates weights
+        that are used to  weigh measuremet traces to maximize the SNR.
+
+        Args:
+            verify: indicates whether to run measure_ssro at the end of the routine
+                to find the new SNR and readout fidelities with optimized weights
+            update: specifies whether to update the weights in the qubit object
+        '''
         if MC is None:
             MC = self.instr_MC.get_instr()
 
