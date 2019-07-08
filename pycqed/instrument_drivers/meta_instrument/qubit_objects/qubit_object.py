@@ -285,17 +285,7 @@ class Qubit(Instrument):
                 with_VNA = False
 
         if with_VNA:
-            VNA = self.instr_VNA.get_instr()
-            VNA.start_frequency(start_freq)
-            VNA.stop_frequency(stop_freq)
-            VNA.power(VNA_power)
-            VNA.bandwidth(bandwidth)
-            npts = int((stop_freq-start_freq)/f_step)
-            VNA.npts(npts)
-            VNA.timeout(timeout)
-            name = 'Initial_VNA'
-            self.measure_with_VNA(VNA, name=name)
-            result = ma2.sa.Initial_Resonator_Scan_Analysis(label=name)
+            raise NotImplementedError
         else:
             self.ro_pulse_amp(1)
             self.ro_pulse_amp_CW(1)
@@ -315,14 +305,30 @@ class Qubit(Instrument):
                 print('{}:\t{:.3f} {}'.format(res.identifier, freq, unit))
 
         try:
-            device = self.device
+            device = self.instr_device.get_instr()
         except AttributeError:
             logging.warning('Could not update device resonators: No device '
                             'found for {}. Returning list of resonators.'
                             .format(self.name))
             return found_resonators
 
-        device.found_resonators = found_resonators
+        # Try to find a resonator list:
+        if not hasattr(device, 'expected_resonators'):
+            device.found_resonators = found_resonators
+            logging.warning('No resonators specified for this device')
+            device.expected_resonators = []
+            return True
+        else:
+            if device.expected_resonators:
+                print('Expected resonators:')
+                for res in device.expected_resonators:
+                    freq, unit = plt_tools.SI_val_to_msg_str(res.freq, 'Hz',
+                                                             float)
+                    print('{}:\t{:.3f} {}'.format(res.identifier, freq, unit))
+            else:
+                logging.warning('No resonators specified for this device')
+                return True
+
 
         if len(found_resonators) > len(device.resonators):
             logging.warning('More resonators found than expected. Checking for '
@@ -361,6 +367,7 @@ class Qubit(Instrument):
                 device.missing_resonators = missing_resonators
             print('Will look for missing resonators in next node')
         else:
+            print('Found all expected resonators.')
             for found_res, res in zip(found_resonators, device.resonators):
                 res.freq = found_res.freq
 
@@ -399,87 +406,124 @@ class Qubit(Instrument):
 
         if resonators is None:
             try:
-                device = self.device
+                device = self.instr_device.get_instr()
 
             except AttributeError:
                 logging.warning('Could not find device resonator dictionary: '
                                 'No device found for {}.'.format(self.name))
                 return False
-            resonators = device.resonators
-            found_resonators = device.found_resonators
-        # First check if number of resonators matches prediction, else try to
-        # find and remove duplicates
-        if len(device.found_resonators) == len(device.resonators):
+
+        expected_resonators = device.expected_resonators
+        found_resonators = device.found_resonators
+
+        # Check if any resonators are expected:
+        if expected_resonators:
+            if len(found_resonators) == len(expected_resonators):
+                print('Found all expected resonators.')
+                for found_res, res in zip(found_resonators, expected_resonators):
+                    res.freq = found_res.freq
+                return True
+
+            elif len(found_resonators) > len(expected_resonators):
+                logging.warning('More resonators found than expected. '
+                                'Checking each candidate at high resolution.')
+                new_res = self.measure_individual_resonators(with_VNA=with_VNA)
+
+                if len(new_res) == len(expected_resonators):
+                    return True
+                elif len(new_res) > len(expected_resonators):
+                    logging.warning('Not all false positives removed. '
+                                    'Retrying ...')
+                    return False
+
+            elif len(found_resonators) < len(expected_resonators):
+                num_missing = len(device.resonators) - len(found_resonators)
+                logging.warning('Missing {} resonator(s). Checking which are '
+                                'missing ...'.format(num_missing))
+
+                # Find missing resonators
+                if look_for_missing:
+                    raise NotImplementedError
+                else:
+                    return True
+        else:
+            print('Scanning all found resonators')
+            new_res = self.measure_individual_resonators(with_VNA=with_VNA)
+            device.resonators = new_res
             return True
 
-        elif len(device.found_resonators) > len(device.resonators):
-            result = self.find_additional_resonators(device.resonators, 
-                                                     found_resonators,
-                                                     with_VNA=with_VNA)
-            return result
 
-        else:
-            if not look_for_missing:
-                for res in resonators:
-                    if res.type == 'missing':
-                        res.type = 'broken'
-            else:
-                for i, res in enumerate(device.resonators):
-                    if res.type == 'missing':
-                        f_step = 50e3
-                        f_span = 100e6
-                        f_center = (device.resonators[i+1].freq -
-                                    device.res_spacing[i])
-                        freqs = np.arange(f_center - f_span/2,
-                                          f_center + f_span/2,
-                                          f_step)
+        # # First check if number of resonators matches prediction, else try to
+        # # find and remove duplicates
+        # if len(device.found_resonators) == len(device.resonators):
+        #     return True
 
-                        self.measure_heterodyne_spectroscopy(freqs=freqs,
-                                                             analyze=False)
+        # elif len(device.found_resonators) > len(device.resonators):
+        #     result = self.find_additional_resonators(device.resonators, 
+        #                                              found_resonators,
+        #                                              with_VNA=with_VNA)
+        #     return result
 
-                        a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
-                        dip = np.amin(a.data_y)
-                        offset = a.fit_results.params['A'].value
+        # else:
+        #     if not look_for_missing:
+        #         for res in resonators:
+        #             if res.type == 'missing':
+        #                 res.type = 'broken'
+        #     else:
+        #         for i, res in enumerate(device.resonators):
+        #             if res.type == 'missing':
+        #                 f_step = 50e3
+        #                 f_span = 100e6
+        #                 f_center = (device.resonators[i+1].freq -
+        #                             device.expected_spacing[i])
+        #                 freqs = np.arange(f_center - f_span/2,
+        #                                   f_center + f_span/2,
+        #                                   f_step)
 
-                        if (np.abs(dip/offset) > 0.6 or 
-                            np.isnan(a.fit_results.params['Qc'].stderr)):
-                            freq, unit = plt_tools.SI_val_to_msg_str(f_center,
-                                                                     'Hz',
-                                                                     float)
-                            print('No resonator found where {} ({:.3f} {}}) is '
-                                  'expected'.format(res.identifier, freq, unit))
-                            res.type = 'broken'
-                        else:
-                            res.type = 'unknown'
-                            if use_min:
-                                res.freq = a.min_frequency
-                            else:
-                                res.freq = a.fit_results.params['f0'].value*1e9
-        return True
+        #                 self.measure_heterodyne_spectroscopy(freqs=freqs,
+        #                                                      analyze=False)
+        #                 name = 'Resonator'
+        #                 a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
+        #                 dip = np.amin(a.data_y)
+        #                 offset = a.fit_results.params['A'].value
 
-    def find_additional_resonators(self, resonators, found_resonators, with_VNA):
+        #                 if (np.abs(dip/offset) > 0.6 or 
+        #                     np.isnan(a.fit_results.params['Qc'].stderr)):
+        #                     freq, unit = plt_tools.SI_val_to_msg_str(f_center,
+        #                                                              'Hz',
+        #                                                              float)
+        #                     print('No resonator found where {} ({:.3f} {}}) is '
+        #                           'expected'.format(res.identifier, freq, unit))
+        #                     res.type = 'broken'
+        #                 else:
+        #                     res.type = 'unknown'
+        #                     if use_min:
+        #                         res.freq = a.min_frequency
+        #                     else:
+        #                         res.freq = a.fit_results.params['f0'].value*1e9
+        # return True
+
+    def measure_individual_resonators(self, with_VNA=False, use_min=False):
         """
         Specifically designed for use in automation, not recommended to use by
         hand!
         Finds which peaks were wrongly assigend as a resonator in the resonator
         wide search
         """
-        wrong_res_idx = []
+        device = self.instr_device.get_instr()
+        found_resonators = device.found_resonators
+
+        new_resonators = []
         for i, res in enumerate(found_resonators):
             freq = res.freq
             str_freq, unit = plt_tools.SI_val_to_msg_str(freq, 'Hz', float)
             if with_VNA:
-                VNA = self.instr_VNA.get_instr()
-                start_freq = freq - 10e6
-                stop_freq = freq + 10e6
-
-                name = 'VNA_Resonator_scan_{:.3f}_{}'.format(str_freq, unit)
-                self.measure_with_VNA(VNA, start_freq, stop_freq, npts)
+                raise NotImplementedError
             else:
                 self.ro_pulse_amp(1)
                 self.ro_pulse_amp_CW(1)
-                freqs = np.arange(freq - 5e6, freq + 5e6, 0.1e6)
-                label = '{:.3f}_{}'.format(str_freq, unit)
+                freqs = np.arange(freq - 5e6, freq + 5e6, 50e3)
+                label = '_{:.3f}_{}'.format(str_freq, unit)
                 name = 'Resonator_scan' + self.msmt_suffix + label
                 self.measure_heterodyne_spectroscopy(freqs=freqs,
                                                      analyze=False,
@@ -490,13 +534,12 @@ class Qubit(Instrument):
             dip = np.amin(a.data_y)
             offset = a.fit_results.params['A'].value
 
-            if (np.abs(dip/offset) > 0.6 or
-                np.isnan(a.fit_results.params['Qc'].stderr)):
-
+            if (np.abs(dip/offset) > 0.6): # or
+               # np.isnan(a.fit_results.params['Qc'].stderr)):
 
                 print('Removed candidate {} ({:.3f} {}): Not a resonator'
                       .format(res.identifier, str_freq, unit))
-                wrong_res_idx.append(res.identifier)
+
             else:
                 if use_min:
                     f_res = a.min_frequency
@@ -505,29 +548,22 @@ class Qubit(Instrument):
 
                 # Check if not a duplicate
                 if i > 0:
-                    prev_freq = resonators[i-1].freq
+                    prev_freq = found_resonators[i-1].freq
                     if np.abs(prev_freq - f_res) < 10e6:
-                        wrong_res_idx.append(i)
                         print('Removed candidate: {} ({:.3f} {}): Duplicate'
                               .format(res.identifier, str_freq, unit))
                     else:
-                        resonators[i].freq = f_res
+                        found_resonators[i].freq = f_res
                         print("Added resonator {} ({:.3f} {})"
                               .format(res.identifier, str_freq, unit))
+                        new_resonators.append(res)
 
-        for idx in wrong_res_idx:
-            del found_resonators[idx]
-        if len(found_resonators) > len(resonators):
-            logging.warning('Still too many resonators')
-            return False
-        elif len(found_resonators) < len(resonators):
-            logging.warning('Removed too many resonators!')
-            return False
-        else:
-            for found_res, res in zip(found_resonators, resonators):
-                res.freq = found_res.freq
-            self.device.resonators = resonators
-            return True 
+                else:
+                    found_resonators[i].freq = f_res
+                    print("Added resonator {} ({:.3f} {})"
+                          .format(res.identifier, str_freq, unit))
+                    new_resonators.append(res)
+        return new_resonators
 
     def find_test_resonators(self, with_VNA=None, resonators=None):
         """
@@ -545,11 +581,12 @@ class Qubit(Instrument):
 
         if resonators is None:
             try:
-                device = self.device
+                device = self.instr_device.get_instr()
             except AttributeError:
                 logging.warning('Could not find device resonators: '
                                 'No device found for {}'.format(self.name))
-            resonators = self.device.resonators
+                return False
+            resonators = self.instr_device.get_instr().resonators
 
         for res in device.resonators:
 
@@ -560,7 +597,7 @@ class Qubit(Instrument):
                 f_step = 25e3
             else:
                 powers = np.arange(-40, 0.1, 10)
-                f_step = 100e3
+                f_step = 25e3
 
             if with_VNA:
                 VNA = self.instr_VNA.get_instr()
@@ -578,9 +615,10 @@ class Qubit(Instrument):
                                              analyze=False, label=label)
 
             fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
-                                                      close_fig=True)
+                                                      close_fig=True,
+                                                      use_min=True)
             # Update resonator types
-            if np.abs(fit_res.shift) > 100e3:
+            if np.abs(fit_res.shift) > 300e3:
                 if res.type == 'unknown':
                     res.type = 'qubit_resonator'
                 elif res.type == 'qubit_resonator':
@@ -628,7 +666,7 @@ class Qubit(Instrument):
 
         if resonators is None:
             try:
-                device = self.device
+                device = self.instr_device.get_instr()
             except AttributeError:
                 logging.warning('Could not find device resonators: '
                                 'No device found for {}.'.format(self.name))
@@ -636,7 +674,7 @@ class Qubit(Instrument):
             resonators = device.resonators
 
         if dac_values is None:
-            dac_values = np.arange(-20e-3, 20e-3, 4e-3)
+            dac_values = np.arange(-20e-3, 20e-3, 1e-3)
 
         fluxcurrent = self.instr_FluxCtrl.get_instr()
         for FBL in fluxcurrent.channel_map:
@@ -683,7 +721,7 @@ class Qubit(Instrument):
                         res.fl_dc_V_per_phi0 = fit_res.current_to_flux
 
         if verbose:
-            for res in self.device.resonators:
+            for res in self.instr_device.get_instr().resonators:
                 if res.type == 'qubit_resonator':
                     freq, unit = plt_tools.SI_val_to_msg_str(res.freq_low,
                                                              'Hz',
@@ -698,7 +736,7 @@ class Qubit(Instrument):
                     print('{}, f = {:.3f} {}'.format(res.type, freq, unit))
 
         # Set properties for all qubits in device if device exists
-        device = self.device
+        device = self.instr_device.get_instr()
         assigned_qubits = []
         for q in device.qubits():
             if q == 'fakequbit':
@@ -708,7 +746,7 @@ class Qubit(Instrument):
             for res in device.resonators:
                 if qubit.name == res.qubit:
                     if qubit.name in assigned_qubits:
-                        logging.warning('Multiple resonators found for {}.'
+                        logging.warning('Multiple resonators found for {}. '
                                         'Aborting'.format(qubit.name))
                         return False
                     assigned_qubits.append(qubit.name)
@@ -768,6 +806,10 @@ class Qubit(Instrument):
                                  freqs=None,
                                  MC=None, close_fig=True):
         '''
+        params
+        use_min: 'True' uses the frequency at minimum amplitude. 'False' uses
+        the fit result
+        update: update the internal parameters with this fit
         Finds the resonator frequency by performing a heterodyne experiment
         if freqs == None it will determine a default range dependent on the
         last known frequency of the resonator.
@@ -986,7 +1028,8 @@ class Qubit(Instrument):
                                    artificial_periods = 2.5,
                                    stepsize:float =20e-9,
                                    verbose: bool=True, update: bool=True,
-                                   close_fig: bool=True):
+                                   close_fig: bool=True,
+                                   test_beating: bool=True):
         """
         Runs an iterative procudere of ramsey experiments to estimate
         frequency detuning to converge to the qubit frequency up to the limit
@@ -1012,9 +1055,16 @@ class Qubit(Instrument):
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,
                                    close_file=False)
+            if test_beating and a.fit_res.chisqr > 0.4:
+                logging.warning('Found double frequency in Ramsey: large '
+                                'deviation found in single frequency fit.'
+                                'Returning True to continue automation. Retry '
+                                'with test_beating=False to ignore.')
+
+                return True
             fitted_freq = a.fit_res.params['frequency'].value
             measured_detuning = fitted_freq-artificial_detuning
-            cur_freq =  a.qubit_frequency
+            cur_freq = a.qubit_frequency
 
             qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
             qubit_ana_grp.attrs['artificial_detuning'] = \

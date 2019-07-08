@@ -676,22 +676,24 @@ class DAC_analysis(ma.TwoD_Analysis):
                  options_dict=None,
                  do_fitting=True,
                  extract_only=False,
-                 auto=True):
+                 auto=True,
+                 **kw):
         super(ma.TwoD_Analysis, self).__init__(timestamp=timestamp,
                                                options_dict=options_dict,
                                                extract_only=extract_only,
                                                auto=auto,
-                                               do_fitting=do_fitting)
+                                               do_fitting=do_fitting,
+                                               **kw)
         linecut_fit_result = self.fit_linecuts()
         self.linecut_fit_result = linecut_fit_result
         f0s = []
         for res in self.linecut_fit_result:
             f0s.append(res.values['f0'])
         self.f0s = np.array(f0s)
-        self.run_full_analysis()
+        self.run_full_analysis(**kw)
         self.dac_fit_res = self.fit_dac_arc()
         self.sweet_spot_value = self.dac_fit_res['sweetspot_dac']
-        self.plot_fit_result()
+        self.plot_fit_result(**kw)
 
     def fit_linecuts(self):
         linecut_mag = np.array(self.measured_values)[0].T
@@ -834,10 +836,14 @@ class DAC_analysis(ma.TwoD_Analysis):
             kw["xlabel"] = self.parameter_names[0]
         if "ylabel" not in kw:
             kw["ylabel"] = self.parameter_names[1]
-        if "xunit" not in kw:
-            kw["xunit"] = 'Hz' #self.parameter_units[0]
-        if "yunit" not in kw:
-            kw["yunit"] = 'A' # self.parameter_units[1]
+        if "zlabel" not in kw:
+            kw["zlabel"] = self.value_names[0]
+        if "x_unit" not in kw:
+            kw["x_unit"] = self.parameter_units[0]
+        if "y_unit" not in kw:
+            kw["y_unit"] = self.parameter_units[1]
+        if "z_unit" not in kw:
+            kw["z_unit"] = self.value_units[0]
 
         # subtract mean from each row/column if demanded
         plot_zvals = self.measured_values[0].transpose()
@@ -849,7 +855,7 @@ class DAC_analysis(ma.TwoD_Analysis):
         a_tools.color_plot(x=self.sweep_points,
                            y=self.sweep_points_2D,
                            z=plot_zvals,
-                           zlabel=self.zlabels[0],
+                           # zlabel=self.zlabels[0],
                            fig=fig, ax=ax,
                            log=colorplot_log,
                            transpose=transpose,
@@ -861,9 +867,8 @@ class DAC_analysis(ma.TwoD_Analysis):
 
         fit_plot = self.dac_fit_res['fit_polynomial'](plot_dacs)
 
-        set_xlabel(ax, 'Frequency', 'Hz')
-        # ylabel is value units as we are plotting linecuts
-        set_ylabel(ax, 'FBL_L', 'A')
+        # set_xlabel(ax, kw["xlabel"], kw["x_unit"])
+        # set_ylabel(ax, kw["ylabel"], kw["y_unit"])
 
         ax.plot(self.f0s, self.sweep_points_2D, 'ro-')
         ax.plot(fit_plot, plot_dacs, 'b')
@@ -923,7 +928,7 @@ class DAC_analysis(ma.TwoD_Analysis):
                                      y_name=self.parameter_names[1],
                                      y_unit=self.parameter_units[1],
                                      log=linecut_log,
-                                     zlabel=self.zlabels[i],
+                                     # zlabel=self.zlabels[i],
                                      fig=fig, ax=ax, **kw)
                 ax.set_title(fig_title)
                 set_xlabel(ax, self.parameter_names[0],
@@ -951,10 +956,14 @@ class DAC_analysis(ma.TwoD_Analysis):
                 kw["xlabel"] = self.parameter_names[0]
             if "ylabel" not in kw:
                 kw["ylabel"] = self.parameter_names[1]
-            if "xunit" not in kw:
-                kw["xunit"] = self.parameter_units[0]
-            if "yunit" not in kw:
-                kw["yunit"] = self.parameter_units[1]
+            if "zlabel" not in kw:
+                kw["zlabel"] = self.value_names[0]
+            if "x_unit" not in kw:
+                kw["x_unit"] = self.parameter_units[0]
+            if "y_unit" not in kw:
+                kw["y_unit"] = self.parameter_units[1]
+            if "z_unit" not in kw:
+                kw["z_unit"] = self.value_units[0]
 
             # subtract mean from each row/column if demanded
             plot_zvals = meas_vals.transpose()
@@ -966,11 +975,15 @@ class DAC_analysis(ma.TwoD_Analysis):
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=plot_zvals,
-                               zlabel=self.zlabels[i],
+                               # zlabel=self.sweept_val[i],u
                                fig=fig, ax=ax,
                                log=colorplot_log,
                                transpose=transpose,
                                normalize=normalize,
                                **kw)
             ax.set_title(fig_title)
-            
+            set_xlabel(ax, kw["xlabel"], kw["x_unit"])
+            set_ylabel(ax, kw["ylabel"], kw["y_unit"])
+            if save_fig:
+                self.save_fig(fig, figname=savename,
+                              fig_tight=False, **kw)
