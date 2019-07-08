@@ -683,7 +683,7 @@ class Qubit(Instrument):
         for res in resonators:
             if res.type == 'qubit_resonator':
                 self.ro_pulse_amp(res.ro_amp)
-                self.ro_pulse_amp_CW(res.ro_amp/3)
+                self.ro_pulse_amp_CW(res.ro_amp)
                 best_amplitude = 0  # For comparing which one is coupled closest
 
                 if with_VNA:
@@ -907,7 +907,7 @@ class Qubit(Instrument):
         return analysis_spec.fitted_freq
 
     def calibrate_spec_pow(self, freqs=None, start_power=-35, power_step = 5,
-                           threshold=0.1, verbose=True):
+                           threshold=0.5, verbose=True):
         """
         Finds the optimal spectroscopy power for qubit spectroscopy (not pulsed)
         by varying it in steps of 5 dBm, and ending when the peak has power 

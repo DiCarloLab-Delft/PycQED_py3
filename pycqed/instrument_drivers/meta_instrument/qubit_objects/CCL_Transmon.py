@@ -1369,7 +1369,7 @@ class CCLight_Transmon(Qubit):
         if freqs is None:
             freq_center = self.freq_qubit()
             freq_range = 100e6
-            freqs = np.arange(freq_center-1/2*freq_range, freq_center+20e6,
+            freqs = np.arange(freq_center - freq_range, freq_center + 5e6,
                               0.5e6)
         if dac_values is None:
             if self.fl_dc_V0() is not None:

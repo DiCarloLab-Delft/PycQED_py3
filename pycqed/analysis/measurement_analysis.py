@@ -6801,21 +6801,21 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         optimize = kw.pop('optimize', True)
         verbose = kw.get('verbose', False)
 
-        # try:
-        #     data_amp = self.measured_values[0]
-        #     data_phase = self.measured_values[1]
-        #     data_real = data_amp * np.cos(np.pi * data_phase / 180)
-        #     data_imag = data_amp * np.sin(np.pi * data_phase / 180)
-        #     self.data_dist = a_tools.calculate_distance_ground_state(
-        #         data_real=data_real,
-        #         data_imag=data_imag,
-        #         normalize=False,
-        #         percentile=60)
-        # except:
-        # Quick fix to make it work with pulsed spec which does not
-        # return both I,Q and, amp and phase
-        # only using the amplitude!!
-        self.data_dist = self.measured_values[0] - np.min(self.measured_values[0])
+        try:
+            data_amp = self.measured_values[0]
+            data_phase = self.measured_values[1]
+            data_real = data_amp * np.cos(np.pi * data_phase / 180)
+            data_imag = data_amp * np.sin(np.pi * data_phase / 180)
+            self.data_dist = a_tools.calculate_distance_ground_state(
+                data_real=data_real,
+                data_imag=data_imag,
+                normalize=False,
+                percentile=60)
+        except:
+            # Quick fix to make it work with pulsed spec which does not
+            # return both I,Q and, amp and phase
+            # only using the amplitude!!
+            self.data_dist = self.measured_values[0] - np.min(self.measured_values[0])
 
         # Smooth the data by "filtering"
         data_dist_smooth = a_tools.smooth(self.data_dist,
