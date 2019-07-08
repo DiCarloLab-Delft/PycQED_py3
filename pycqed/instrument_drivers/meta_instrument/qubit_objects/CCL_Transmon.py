@@ -90,8 +90,8 @@ class CCLight_Transmon(Qubit):
                 'Instrument used to control flux can either be an IVVI rack '
                 'or a meta instrument such as the Flux control.'),
             parameter_class=InstrumentRefParameter)
-        
-        self.add_parameter('instr_VNA', 
+
+        self.add_parameter('instr_VNA',
                            docstring='Vector Network Analyzer',
                            parameter_class=InstrumentRefParameter,
                            initial_value=None)
@@ -435,12 +435,12 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('mw_vsm_G_amp',
                            label='VSM amp Gaussian component',
-                           vals=vals.Numbers(0.1, 2.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_D_amp',
                            label='VSM amp Derivative component',
-                           vals=vals.Numbers(0.1, 2.0),
+                           vals=vals.Numbers(0.1, 1.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_G_phase',
@@ -481,7 +481,7 @@ class CCLight_Transmon(Qubit):
         return self._mw_fine_delay
 
     def _set_flux_fine_delay(self,val):
-        if self.instr_LutMan_Flux() is not None: 
+        if self.instr_LutMan_Flux() is not None:
             lutman = self.find_instrument(self.instr_LutMan_Flux())
             AWG = lutman.find_instrument(lutman.AWG())
             using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
@@ -490,7 +490,7 @@ class CCLight_Transmon(Qubit):
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
                 # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
-        else: 
+        else:
             logging.warning('No Flux LutMan specified, could not set flux timing fine')
         self._flux_fine_delay = val
 
@@ -750,6 +750,10 @@ class CCLight_Transmon(Qubit):
             # and this requires two channels to rotate the signal properly.
             raise ValueError('Readout "{}" '.format(self.ro_acq_weight_type())
                              + 'weight type must be "SSB" or "DSB"')
+
+        if self.cfg_with_vsm():
+            self._prep_cw_configure_VSM()
+
         self.prepare_readout(CW=True)
         self._prep_cw_spec()
         # source is turned on in measure spec when needed
@@ -820,10 +824,10 @@ class CCLight_Transmon(Qubit):
 
             if self.ro_acq_rotated_SSB_when_optimal() and abs(self.ro_acq_threshold())>32:
                 threshold = 32
-                # working around the limitation of threshold in UHFQC 
-                # which cannot be >abs(32). 
+                # working around the limitation of threshold in UHFQC
+                # which cannot be >abs(32).
                 # See also self._prep_ro_integration_weights scaling the weights
-            else: 
+            else:
                 threshold = self.ro_acq_threshold()
 
             self.instr_acquisition.get_instr().set(
@@ -1010,11 +1014,11 @@ class CCLight_Transmon(Qubit):
                                     ' not setting integration weights')
                 elif self.ro_acq_rotated_SSB_when_optimal():
                     #this allows bypasing the optimal weights for poor SNR qubits
-                    # working around the limitation of threshold in UHFQC 
+                    # working around the limitation of threshold in UHFQC
                     # which cannot be >abs(32)
-                    if self.ro_acq_digitized() and abs(self.ro_acq_threshold())>32: 
+                    if self.ro_acq_digitized() and abs(self.ro_acq_threshold())>32:
                         scaling_factor = 32/self.ro_acq_threshold()
-                    else: 
+                    else:
                         scaling_factor = 1
 
                     UHFQC.prepare_SSB_weight_and_rotation(
@@ -1200,6 +1204,17 @@ class CCLight_Transmon(Qubit):
             'vsm_channel_delay{}'.format(self.cfg_qubit_nr()),
             self.mw_vsm_delay())
 
+    def _prep_cw_configure_VSM(self):
+        # Configure VSM
+        VSM = self.instr_VSM.get_instr()
+        for mod in range(1,9):
+            VSM.set('mod{}_ch{}_marker_state'.format(
+                mod, self.mw_vsm_ch_in()), 'off')
+        VSM.set('mod{}_ch{}_marker_state'.format(
+            self.mw_vsm_mod_out(), self.spec_vsm_ch_in()), 'on')
+        VSM.set('mod{}_marker_source'.format(
+            self.mw_vsm_mod_out()), self.mw_vsm_marker_source())
+
     def prepare_for_fluxing(self, reset=True):
         pass
 
@@ -1262,7 +1277,7 @@ class CCLight_Transmon(Qubit):
             success = None
             f_center += f_span*n*(-1)**n
             n += 1
-            if verbose: 
+            if verbose:
                 cfreq, cunit = plt_tools.SI_val_to_msg_str(f_center, 'Hz', float)
                 sfreq, sunit = plt_tools.SI_val_to_msg_str(f_span, 'Hz', float)
                 print('Doing adaptive spectroscopy around {:.3f} {} with a '
@@ -1310,7 +1325,7 @@ class CCLight_Transmon(Qubit):
                     success = False
                 elif peak_height < 3*np.mean(analysis_spec.data_dist):
                     success = False
-                else:                
+                else:
                     success = True
 
         self.ro_acq_averages(old_avg)
@@ -1354,14 +1369,14 @@ class CCLight_Transmon(Qubit):
 
         return True
 
-    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True, 
+    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True,
                              set_to_sweetspot=True, method='DAC', fluxChan=None,
                              spec_mode='pulsed_marked'):
 
         '''
         Should be edited such that it contains reference to different measurement
         methods (tracking / 2D scan / broad spectroscopy)
-  
+
         method = 'DAC' - uses ordinary 2D DAC scan
                  'tracked - uses tracked spectroscopy (not really implemented)'
         TODO: If spectroscopy does not yield a peak, it should discard it
@@ -1387,12 +1402,12 @@ class CCLight_Transmon(Qubit):
 
         if method == 'DAC':
             t_start = time.strftime('%Y%m%d_%H%M%S')
-            self.measure_qubit_frequency_dac_scan(freqs=freqs, 
+            self.measure_qubit_frequency_dac_scan(freqs=freqs,
                                                   dac_values=dac_values,
                                                   fluxChan=fluxChan,
                                                   analyze=False,
                                                   mode=spec_mode)
-            timestamp = a_tools.get_timestamps_in_range(t_start, 
+            timestamp = a_tools.get_timestamps_in_range(t_start,
                                                         label='Qubit_dac_scan'+
                                                               self.msmt_suffix)
             timestamp = timestamp[0]
@@ -1454,10 +1469,10 @@ class CCLight_Transmon(Qubit):
     def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
                                     mode='pulsed_marked', update=True):
         '''
-        Finds an estimate of the anharmonicity by doing a spectroscopy around 
+        Finds an estimate of the anharmonicity by doing a spectroscopy around
         150 MHz below the qubit frequency.
 
-        TODO: if spec_pow is too low/high, it should adjust it to approx the 
+        TODO: if spec_pow is too low/high, it should adjust it to approx the
               ideal spec_pow + 25 dBm
         '''
 
@@ -1476,7 +1491,7 @@ class CCLight_Transmon(Qubit):
         self.spec_pow(self.spec_pow()+10)
         self.measure_spectroscopy(freqs=freqs, mode=mode, analyze=False)
 
-        a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix, 
+        a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            analyze_ef=True)
         f02 = 2*a.params['f0_gf_over_2'].value
         self.spec_pow(old_spec_pow)
@@ -1986,6 +2001,7 @@ class CCLight_Transmon(Qubit):
                                          mode='pulsed_marked', MC=None,
                                          analyze=True, fluxChan=None, close_fig=True,
                                          nested_resonator_calibration=False,
+                                         nested_resonator_calibration_use_min=False,
                                          resonator_freqs=None):
         if mode == 'pulsed_mixer':
             old_channel_amp = self.mw_channel_amp()
@@ -2042,7 +2058,7 @@ class CCLight_Transmon(Qubit):
         if nested_resonator_calibration:
             dac_par = swf.Nested_resonator_tracker(qubit=self,
                                                    nested_MC=self.instr_nested_MC.get_instr(), freqs=resonator_freqs,
-                                                   par=dac_par)
+                                                   par=dac_par, use_min = nested_resonator_calibration_use_min)
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)
@@ -2055,42 +2071,44 @@ class CCLight_Transmon(Qubit):
                              analyze=True, close_fig=True, label='',
                              prepare_for_continuous_wave=True):
         """
-        Performs a two-tone spectroscopy experiment where one tone is kept 
-        fixed at the resonator readout frequency and another frequency is swept. 
+        Performs a two-tone spectroscopy experiment where one tone is kept
+        fixed at the resonator readout frequency and another frequency is swept.
 
-        args: 
+        args:
             freqs (array) : Frequency range you want to sweep
             mode  (string): 'CW' - Continuous wave
                             'pulsed_marked' - pulsed using trigger input of
                                               spec source
                             'pulsed_mixer' - pulsed using AWG and mixer
 
-        This experiment can be performed in three different modes 
+        This experiment can be performed in three different modes
             Continuous wave (CW)
-            Pulsed, marker modulated 
-            Pulsed, mixer modulated 
+            Pulsed, marker modulated
+            Pulsed, mixer modulated
 
-        The mode argument selects which mode is being used and redirects the 
-        arguments to the appropriate method. 
+        The mode argument selects which mode is being used and redirects the
+        arguments to the appropriate method.
         """
         if mode == 'CW':
             self.measure_spectroscopy_CW(freqs=freqs, MC=MC,
-                                         analyze=analyze, close_fig=close_fig, 
+                                         analyze=analyze, close_fig=close_fig,
                                          label=label,
                                          prepare_for_continuous_wave=prepare_for_continuous_wave)
         elif mode == 'pulsed_marked':
             self.measure_spectroscopy_pulsed_marked(
                                          freqs=freqs, MC=MC,
-                                         analyze=analyze, close_fig=close_fig, 
+                                         analyze=analyze, close_fig=close_fig,
                                          label=label,
                                          prepare_for_continuous_wave=prepare_for_continuous_wave)
         elif mode == 'pulsed_mixer':
             self.measure_spectroscopy_pulsed_mixer(
                                          freqs=freqs, MC=MC,
-                                         analyze=analyze, close_fig=close_fig, 
-                                         label=label)
+                                         analyze=analyze, close_fig=close_fig,
+                                         label=label,
+                                         prepare_for_timedomain=prepare_for_continuous_wave)
         else:
-            logging.error('Mode {} not recognized'.format(mode))
+            logging.error('Mode {} not recognized. Available modes: "CW", \
+                          "pulsed_marked", "pulsed_mixer"'.format(mode))
 
 
     def measure_spectroscopy_CW(self, freqs, MC=None,
@@ -2098,7 +2116,11 @@ class CCLight_Transmon(Qubit):
                                 prepare_for_continuous_wave=True):
         """
         Does a CW spectroscopy experiment by sweeping the frequency of a
-        microwave source
+        microwave source.
+
+        Relevant qubit parameters:
+        - instr_spec_source: instrument used to apply CW excitation
+        - spec_pow: power of the MW excitation at the output of the spec_source (dBm)
         """
         UHFQC = self.instr_acquisition.get_instr()
         if prepare_for_continuous_wave:
@@ -2142,7 +2164,7 @@ class CCLight_Transmon(Qubit):
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
     def measure_spectroscopy_pulsed_marked(self, freqs, MC=None,
-                                           analyze=True, close_fig=True, 
+                                           analyze=True, close_fig=True,
                                            label='',
                                            prepare_for_continuous_wave=True):
         """
@@ -2191,12 +2213,12 @@ class CCLight_Transmon(Qubit):
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
         if analyze:
-            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix, 
+            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            close_fig=close_fig,
                                            qb_name=self.name)
 
     def measure_spectroscopy_pulsed_mixer(self, freqs, MC=None,
-                                          analyze=True, close_fig=True, 
+                                          analyze=True, close_fig=True,
                                           label='',
                                           prepare_for_timedomain=True):
         """
@@ -2258,7 +2280,7 @@ class CCLight_Transmon(Qubit):
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
         if analyze:
-            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix, 
+            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            close_fig=close_fig,
                                            qb_name=self.name)
 
@@ -2319,7 +2341,7 @@ class CCLight_Transmon(Qubit):
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
         if analyze:
-            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix, 
+            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            close_fig=close_fig,
                                            qb_name=self.name)
 
@@ -2494,7 +2516,19 @@ class CCLight_Transmon(Qubit):
             label='Two_tone',  f01=.5*freqs_01[-1]+.5*freqs_01[0], f12=.5*freqs_12[-1]+.5*freqs_12[0])
 
     def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10, 10, 1), MC=None, spec_source_2=None):
+        """
+        Measures photon splitting of the qubit due to photons in the bus resonators.
+        Specifically it is a CW qubit pectroscopy with the second  variable-power CW tone
+        applied at frequency f_bus.
 
+        Input parameters:
+        - f_bus: bus frequency at which variable-power CW tone is applied
+        - freqs_01: range of frequencies of the CW qubit MW drive. If not specified
+            range -60 MHz to +5 MHz around freq_qubit fill be used.
+        - powers: sweeped powers of the bus CW drive.
+        - spec_source_2: sepcifies instrument used to apply bus MW drive. By default
+            instr_spec_source_2 is used.
+        """
         if freqs_01 is None:
             freqs_01 = np.arange(self.freq_qubit()-60e6,
                                  self.freq_qubit()+5e6, 0.7e6)
@@ -2865,6 +2899,18 @@ class CCLight_Transmon(Qubit):
 
     def measure_dispersive_shift_pulsed(self, freqs, MC=None, analyze: bool=True,
                                         prepare: bool=True):
+        """
+        Measures the RO resonator spectroscopy with the qubit in ground and excited state.
+        Specifically, performs two experiments. Applies sequence:
+        - initialize qubit in ground state (wait)
+        - (only in the second experiment) apply a (previously tuned up) pi pulse
+        - apply readout pulse and measure
+        This sequence is repeated while sweeping ro_freq.
+
+        Input parameters:
+        - freqs: sweeped range of ro_freq
+        """
+
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2895,7 +2941,8 @@ class CCLight_Transmon(Qubit):
                     label=self.msmt_suffix, close_fig=True)
                 # fit converts to Hz
                 f_res.append(a.fit_results.params['f0'].value*1e9)
-        print('dispersive shift is {} MHz'.format((f_res[1]-f_res[0])*1e-6))
+        if analyze:
+            print('dispersive shift is {} MHz'.format((f_res[1]-f_res[0])*1e-6))
 
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
@@ -2957,7 +3004,14 @@ class CCLight_Transmon(Qubit):
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
         """
-        Perform a Rabi experiment.
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Input parameters:
+        - amps: range of amplitudes to sweep. If cfg_with_vsm()==True pulse amplitude
+            is adjusted by sweeping the attenuation of the relevant gaussian VSM channel,
+            in max range (0.1 to 1.0).
+            If cfg_with_vsm()==False adjusts the channel amplitude of the AWG in range (0 to 1).
         """
         if self.cfg_with_vsm():
             self.measure_rabi_vsm(MC, amps,
@@ -2971,6 +3025,15 @@ class CCLight_Transmon(Qubit):
     def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.1, 1.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True, all_modules=False):
+       """
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Input parameters:
+        - amps: range of amplitudes to sweep. Pulse amplitude is adjusted by sweeping
+            the attenuation of the relevant gaussian VSM channel,
+            in max range (0.1 to 1.0).
+        """
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -3018,6 +3081,14 @@ class CCLight_Transmon(Qubit):
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
                                  analyze=True, close_fig=True, real_imag=True,
                                  prepare_for_timedomain=True):
+        """
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Input parameters:
+        - amps: range of amplitudes to sweep. Amplitude is adjusted via the channel
+            amplitude of the AWG, in max range (0 to 1).
+        """
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         using_QWG = (MW_LutMan.AWG.get_instr(
         ).__class__.__name__ == 'QuTech_AWG_Module')
@@ -3724,6 +3795,25 @@ class CCLight_Transmon(Qubit):
     def measure_flipping(self, number_of_flips=np.arange(0, 40, 2), equator=True,
                          MC=None, analyze=True, close_fig=True, update=False,
                          ax='x', angle='180'):
+        """
+        Measurement for fine-tuning of the pi and pi/2 pulse amplitudes. Executes sequence
+        pi (repeated N-times) - pi/2 - measure
+        with variable number N. In this way the error in the amplitude of the MW pi pulse
+        accumulate allowing for fine tuning. Alternatively N repetitions of the pi pulse
+        can be replaced by 2N repetitions of the pi/2-pulse
+
+        Input parameters:
+        - number_of_flips: number of pi pulses to apply. It is recommended to use only even numbers,
+            since then the expected signal has a sine shape. Otherwise it has -1^N * sin shape
+            which will not be correctly analyzed.
+        - equator specify whether to apply the final pi/2 pulse. Setting to False makes the sequence
+            first-order insensitive to pi-pulse amplitude errors.
+        - ax: axis arour which the pi pulses are to be performed. Possible values 'x' or 'y'
+        - angle: specifies whether to apply pi or pi/2 pulses. Possible values: '180' or '90'
+        - update: specifies whether to update parameter controlling MW pulse amplitude.
+            This parameter is mw_vsm_G_amp in VSM case or mw_channel_amp in no-VSM case.
+            Update is performed only if change by more than 0.2% (0.36 deg) is needed.
+        """
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -4202,10 +4292,10 @@ class CCLight_Transmon(Qubit):
 
         Uses both the peak finder and the lorentzian fit to determine the
         outcome of the check:
-        - Peak finder: if no peak is found, there is only noise. Will 
+        - Peak finder: if no peak is found, there is only noise. Will
                        definitely need recalibration.
         - Fitting: if a peak is found, will do normal spectroscopy fitting
-                   and determine deviation from what it thinks the qubit 
+                   and determine deviation from what it thinks the qubit
                    frequency is
         """
         if freqs is None:
@@ -4217,7 +4307,7 @@ class CCLight_Transmon(Qubit):
         self.measure_spectroscopy(MC=MC, freqs=freqs)
 
         label = 'spec'
-        a = ma.Qubit_Spectroscopy_Analysis(label=label, close_fig=True, 
+        a = ma.Qubit_Spectroscopy_Analysis(label=label, close_fig=True,
                                            qb_name=self.name)
 
         freq_peak = a.peaks['peak']

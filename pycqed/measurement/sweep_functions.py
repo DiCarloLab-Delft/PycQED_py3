@@ -1210,7 +1210,7 @@ class Nested_resonator_tracker(Soft_Sweep):
     """
     For resonator tr.
     """
-    def __init__(self, qubit, nested_MC, par, freqs=None, **kw):
+    def __init__(self, qubit, nested_MC, par, use_min = False, freqs=None, **kw):
         super().__init__(**kw)
         self.qubit = qubit
         self.freqs = freqs
@@ -1219,10 +1219,11 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
+        self.use_min = use_min
 
     def set_parameter(self, val):
         self.par(val)
-        self.qubit.find_resonator_frequency(freqs=self.freqs, MC=self.nested_MC)
+        self.qubit.find_resonator_frequency(freqs=self.freqs, MC=self.nested_MC,use_min = self.use_min)
         self.qubit._prep_ro_sources()
         spec_source = self.qubit.instr_spec_source.get_instr()
         spec_source.on()

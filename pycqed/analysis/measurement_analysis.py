@@ -4937,8 +4937,9 @@ class Ramsey_Analysis(TD_Analysis):
 
         if isinstance(art_det, list):
             art_det = art_det[0]
-            
+
         if textbox:
+            #TODO: this crashes the analysis when stderr == None
             textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
                        % (self.qubit_freq_spec * 1e-9) +
                        '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
@@ -7103,12 +7104,15 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             except (TypeError, KeyError, ValueError):
                 logging.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
-                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
-                            self.fit_res.params['f0'].value * scale,
-                            self.fit_res.params['f0'].stderr / 1e6,
-                            self.fit_res.params['kappa'].value / 1e6,
-                            self.fit_res.params['kappa'].stderr / 1e6)
+                try: #Dirty fix, should already be fine in Develop
+                    label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                            '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                                self.fit_res.params['f0'].value * scale,
+                                self.fit_res.params['f0'].stderr / 1e6,
+                                self.fit_res.params['kappa'].value / 1e6,
+                                self.fit_res.params['kappa'].stderr / 1e6)
+                except:
+                    label = None
 
         fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,
                       fontsize=self.font_size, verticalalignment='top',
@@ -8593,7 +8597,7 @@ class DoubleFrequency(TD_Analysis):
                 abs(np.fft.fft(zero_mean_values))[1:len(zero_mean_values) // 2],
                 window_len=1, perc=75)
 
-        # if fourier_max_pos was one the above statement mocks it. 
+        # if fourier_max_pos was one the above statement mocks it.
         if len(fourier_max_pos) == 1: #One peak found
             fmin = 1./sweep_values[-1]*\
                 (fourier_max_pos[0] - 10)
