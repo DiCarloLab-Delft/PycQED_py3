@@ -21,8 +21,14 @@ def DoubleExpDampOscFunc(t, tau_1, tau_2,
                          freq_1, freq_2,
                          phase_1, phase_2,
                          amp_1, amp_2, osc_offset):
-    cos_1 = amp_1 * (np.cos(2 * np.pi * freq_1 * t + phase_1)) * np.exp(-(t / tau_1))
-    cos_2 = amp_2 * (np.cos(2 * np.pi * freq_2 * t + phase_2)) * np.exp(-(t / tau_2))
+    if (tau_1>0):
+        cos_1 = amp_1 * (np.cos(2 * np.pi * freq_1 * t + phase_1)) * np.exp(-(t / tau_1))
+    else:
+        cos_1 = np.zeros_like(t)
+    if (tau_2>0):
+        cos_2 = amp_2 * (np.cos(2 * np.pi * freq_2 * t + phase_2)) * np.exp(-(t / tau_2))
+    else:
+        cos_2 = np.zeros_like(t)
     return cos_1 + cos_2 + osc_offset
 
 
@@ -326,7 +332,7 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
 
 def hanger_func_complex_SI(f, f0, Q, Qe,
                            A, theta, phi_v, phi_0,
-                           slope =1):
+                           slope=1):
     '''
     This is the complex function for a hanger (lamda/4 resonator).
     See equation 3.1 of the Asaad master thesis.
@@ -356,7 +362,7 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
     propagation_delay_corr = np.exp(1j * (phi_v * f + phi_0))
     hanger_contribution = (1 - Q / Qe * np.exp(1j * theta)/
                                (1 + 2.j * Q * (f  - f0) / f0))
-    S21 = A *  slope_corr * hanger_contribution * propagation_delay_corr
+    S21 = A * slope_corr * hanger_contribution * propagation_delay_corr
 
     return S21
 
@@ -568,30 +574,30 @@ def avoided_crossing_freq_shift(flux, a, b, g):
         [delta_f,  g ]
         [g,        0 ]
 
-    delta_f = a*flux + b 
-    
-    Parameters 
+    delta_f = a*flux + b
+
+    Parameters
     ----------
     flux : array like
-        flux bias values 
+        flux bias values
     a, b : float
-        parameters used to calculate frequency distance (delta) away from 
-        avoided crossing according to 
-            delta_f = a*flux+b 
-    
+        parameters used to calculate frequency distance (delta) away from
+        avoided crossing according to
+            delta_f = a*flux+b
+
     g: float
         Coupling strength strength, beware to relabel your variable if using this
         model to fit J1 or J2.
-    
+
     Returns
-    ------- 
-    frequency_shift : (float) 
-    
-    
-    Note: this model is useful for fitting the frequency shift due to an interaction 
-    in a chevron experiment (after fourier transforming the data). 
+    -------
+    frequency_shift : (float)
+
+
+    Note: this model is useful for fitting the frequency shift due to an interaction
+    in a chevron experiment (after fourier transforming the data).
     """
-    
+
     frequencies = np.zeros([len(flux), 2])
     for kk, fl_i in enumerate(flux):
         f_1 = a*fl_i  +  b
@@ -602,7 +608,9 @@ def avoided_crossing_freq_shift(flux, a, b, g):
     result = frequencies[:, 1]- frequencies[:, 0]
     return result
 
-
+def resonator_flux(f_bare, g, A, f, t, sweetspot_cur):
+    return f_bare - g/(A*np.sqrt(np.abs(np.cos(np.pi*f*(t-sweetspot_cur))))
+                       - f_bare)
 
 ######################
 # Residual functions #
@@ -671,16 +679,27 @@ def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
     max_index = np.argmax(data)
     min_frequency = xvals[min_index]
     max_frequency = xvals[max_index]
-
+    # print(min_frequency)
+    # print(max_frequency)
     amplitude_guess = max(dm_tools.reject_outliers(data))
 
     # Creating parameters and estimations
+
+    #Maybe this is not so good: sharp peaks will definitely be excluded
     S21min = (min(dm_tools.reject_outliers(data)) /
               max(dm_tools.reject_outliers(data)))
+    # print(S21min)
+    # S21min=  (min((data)) /
+    #           max(dm_tools.reject_outliers(data)))
+    # print(min((data)))
+    # print(min(dm_tools.reject_outliers(data)))
+    # print(max((data)))
+    # print(max(dm_tools.reject_outliers(data)))
 
+    # print(S21min)
     Q = f0 / abs(min_frequency - max_frequency)
-
     Qe = abs(Q / abs(1 - S21min))
+
     guess_dict = {'f0': {'value': f0*1e-9,
                          'min': min(xvals)*1e-9,
                          'max': max(xvals)*1e-9},
@@ -1167,7 +1186,7 @@ def sum_int(x,y):
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
 CosModel2 = lmfit.Model(CosFunc2)
-
+ResonatorArch = lmfit.Model(resonator_flux)
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)

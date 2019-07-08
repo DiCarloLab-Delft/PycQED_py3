@@ -399,6 +399,7 @@ class DeviceCCL(Instrument):
 
         w0 = q0.ro_acq_weight_chI()
         w1 = q1.ro_acq_weight_chI()
+
         if q0.instr_acquisition.get_instr()==q1.instr_acquisition.get_instr():
             d = det.UHFQC_correlation_detector(
                 UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
@@ -414,6 +415,7 @@ class DeviceCCL(Instrument):
                              'Corr ({}, {})'.format(qubits[0], qubits[1])]
         else:
             d=self.get_int_avg_det(qubits=qubits)
+
         return d
 
     def get_int_logging_detector(self, qubits,
