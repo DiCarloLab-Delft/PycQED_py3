@@ -1,8 +1,46 @@
 #!/usr/bin/python
 
-import os
+### setup logging before all imports (before any logging is done as to prevent a default root logger)
 import logging
+# configure root logger
+root_logger = logging.getLogger('')
+root_formatter = logging.Formatter('%(asctime)s.%(msecs)03d %(levelname)-7s   %(message)s  [%(name)s]', '%Y%m%d %H:%M:%S')
+root_sh = logging.StreamHandler()
+root_sh.setLevel(logging.DEBUG)
+root_sh.setFormatter(root_formatter)
+root_logger.addHandler(root_sh)
+# configure pycqed logger
+pycqed_logger = logging.getLogger('pycqed')
+pycqed_logger.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
+# configure print logger
+print_logger = logging.getLogger('print')
+print_logger.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
+# configure our logger
+log = logging.getLogger('demo_2')
+log.setLevel(logging.DEBUG)  # FIXME: needed to get output, but why
+log.debug('starting')
+
+### redirect print statements to log
+# we need some special treatment of ziPython output which does not call the Python print function
 import sys
+def print_logger_write(msg):
+    if(msg.strip() != ''): # ignore messages with white space only
+        lines = msg.split('\n')
+        # try to extract some useful info from string. FIXME: this is flaky
+        for line in lines:
+            if 'failed' in line.lower() or 'error' in line.lower():
+                print_logger.error(line)
+            elif 'warning' in line.lower():
+                print_logger.warning(line)
+            else:
+                print_logger.info(line)
+
+sys.stdout.write = print_logger_write
+
+
+### imports
+import sys
+import os
 from pathlib import Path
 import numpy as np
 
@@ -19,6 +57,7 @@ import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 from qcodes import station
 
 
+
 def set_waveforms(awg, waveform_type, sequence_length):
     if waveform_type == 'square':
         for ch in range(8):
@@ -31,13 +70,8 @@ def set_waveforms(awg, waveform_type, sequence_length):
     else:
         raise KeyError()
 
-
-log = logging.getLogger('pycqed')
-log.setLevel(logging.DEBUG)
-log.debug('started')
-
-
 # parameter handling
+log.debug('started')
 sel = 0
 if len(sys.argv)>1:
     sel = int(sys.argv[1])
@@ -151,6 +185,7 @@ rolut = UHFQC_RO_LutMan('rolut', num_res=7)
 #  Configure AWGs
 ##########################################
 if conf.mw_0 != '':
+    log.debug('configuring mw_0')
     # define sequence
     sequence_length = 32
 
@@ -161,6 +196,11 @@ if conf.mw_0 != '':
     instr.mw_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
     instr.mw_0.cfg_codeword_protocol('microwave')
     instr.mw_0.upload_codeword_program()
+    if 1:   # FIXME: should be moved to driver
+        instr.mw_0._dev.setd('raw/dios/0/extclk', 1)  # enable 50 MHz sampling of DIO inputs
+        for awg in range(4):
+            instr.mw_0.set('awgs_{}_dio_strobe_slope'.format(awg), 0)  # disable strobe triggering
+
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
     if 0:
         delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
@@ -174,6 +214,7 @@ if conf.mw_0 != '':
             log.debug('DIO timing errors on AWG {}: {}'.format(awg,dio_timing_errors))
 
 """
+    *Before* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
     delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
     0       +       0/0/0/0         60
     1       +       0/0/0/0         60
@@ -198,10 +239,29 @@ if conf.mw_0 != '':
     - delay steps are 3.33 ns each
     - 15 steps == 50 ns
     - 6 steps == 20 ns, pattern repeats after that
+
+
+    *After* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
+    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
+    0       +       0/0/0/0         66
+    1       +       0/0/0/0         66
+    2       +       0/0/0/0         66
+    
+    3       +       1/0/0/0         86
+    4       +       1/0/0/0         86
+    5       +       0/0/0/0         86
+    6       +       0/0/0/0         86
+    7       +       0/0/0/0         86
+    8       +       0/0/0/0         86
+    
+    9       +       1/0/0/0        106
+    ...
+    
     
 """
 
 if conf.flux_0 != '':
+    log.debug('configuring flux_0')
     # define sequence
     sequence_length = 8
 
@@ -219,16 +279,48 @@ if conf.flux_0 != '':
 ##########################################
 
 if conf.ro_0 != '':
-    instr.mw_0.load_default_settings() # FIXME: also done at init?
-    rolut.AWG(instr.mw_0.name)
+    log.debug('configuring ro_0')
+    instr.ro_0.load_default_settings() # FIXME: also done at init?
 
+    # configure UHFQC to generate codeword based readout signals
+    instr.ro_0.quex_rl_length(1)
+    instr.ro_0.quex_wint_length(int(600e-9 * 1.8e9))
 
+    if 1:
+        # generate waveforms and ZIseqC program using rolut
+        amps = [0.1, 0.2, 0.3, 0.4, 0.5]
+        resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]   # FIXME: default Base_RO_LutMan _resonator_codeword_bit_mapping
 
+        for i,res in enumerate(resonator_codeword_bit_mapping):
+            rolut.set('M_amp_R{}'.format(res), amps[i])
+            rolut.set('M_phi_R{}'.format(res), -45)
+
+            rolut.set('M_down_amp0_R{}'.format(res), amps[i] / 2)
+            rolut.set('M_down_amp1_R{}'.format(res), -amps[i] / 2)
+            rolut.set('M_down_phi0_R{}'.format(res), -45 + 180)
+            rolut.set('M_down_phi1_R{}'.format(res), -45)
+
+            rolut.set('M_length_R{}'.format(res), 500e-9)
+            rolut.set('M_down_length0_R{}'.format(res), 200e-9)
+            rolut.set('M_down_length1_R{}'.format(res), 200e-9)
+            rolut.set('M_modulation_R{}'.format(res), 0)
+
+        rolut.acquisition_delay(200e-9)
+        rolut.AWG(instr.ro_0.name)
+        rolut.sampling_rate(1.8e9)
+        rolut.generate_standard_waveforms()
+        rolut.pulse_type('M_up_down_down')
+        #rolut.resonator_combinations([[0], [2], [3], [5], [6]])  # FIXME: must use resonators from resonator_codeword_bit_mapping
+        rolut.resonator_combinations([[0,2,3,5,6]])  # FIXME: must use resonators from resonator_codeword_bit_mapping
+        rolut.load_DIO_triggered_sequence_onto_UHFQC()  # upload waveforms and ZIseqC program
+
+        instr.ro_0.awgs_0_userregs_0(1024)  # loop_cnt, see UHFQC driver (awg_sequence_acquisition_and_DIO_triggered_pulse)
 
 ##########################################
 #  Configure CC
 ##########################################
 
+log.debug('configuring CC')
 instr.cc.debug_marker_out(slot_ro_1, instr.cc.UHFQA_TRIG) # UHF-QA trigger
 instr.cc.debug_marker_out(slot_mw_0, instr.cc.HDAWG_TRIG) # HDAWG trigger
 
