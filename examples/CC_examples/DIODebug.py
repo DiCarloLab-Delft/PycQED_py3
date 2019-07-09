@@ -17,8 +17,20 @@ log.setLevel(logging.DEBUG)
 log.debug('starting')
 
 
-def print_var(name: str):
-    print('{} = {}'.format(name, instr.get(name)))
+def print_var(name: str, val_format: str=''):
+    fmt = '{{}} = {{{}}}'.format(val_format) # e.g. '{} = {}' or '{} = {:#08X}'
+    print(fmt.format(name, instr.get(name)))
+
+
+# from http://localhost:8888/notebooks/Electronics_Design/AWG8_V4_DIO_Calibration.ipynb
+def get_awg_dio_data(dev, awg):
+    data = dev.getv('awgs/' + str(awg) + '/dio/data')
+    ts = len(data) * [0]
+    cw = len(data) * [0]
+    for n, d in enumerate(data):
+        ts[n] = d >> 10
+        cw[n] = (d & ((1 << 10) - 1))
+    return (ts, cw)
 
 
 # parameter handling
@@ -40,18 +52,24 @@ if 1:   # HDAWG
     # take a snapshot of the DIO interface
     # NB: the DIO timing is applied before the snapshot is taken
     # FIXME: looking at single awg
-    dio_data = instr.awgs_1_dio_data()  # get the snapshot data. Time resolution =  XX ns, #samples = 1024
-    ZI_tools.print_timing_diagram_simple(dio_data, dio_lines, 64)
+    if 1:
+        #dio_data = instr.awgs_1_dio_data()  # get the snapshot data. Time resolution =  XX ns, #samples = 1024
+        data = instr._dev.getv('raw/dios/0/data') # FIXME: no node for that
+        ZI_tools.print_timing_diagram_simple(data, dio_lines, 64)
+
+    if 0:
+        ts, cws = get_awg_dio_data(instr._dev, 0)
+        ZI_tools.print_timing_diagram_simple(cws, dio_lines, 64)
 
     for awg in [0, 1, 2, 3]:
         print_var('awgs_{}_dio_error_timing'.format(awg))
         print_var('awgs_{}_dio_error_width'.format(awg))
-        print_var('awgs_{}_dio_value'.format(awg))
-        print_var('awgs_{}_dio_highbits'.format(awg))
-        print_var('awgs_{}_dio_lowbits'.format(awg))
+        print_var('awgs_{}_dio_value'.format(awg), ':#08X')
+        print_var('awgs_{}_dio_highbits'.format(awg), ':#08X')
+        print_var('awgs_{}_dio_lowbits'.format(awg), ':#08X')
 
         print_var('awgs_{}_dio_mask_shift'.format(awg))
-        print_var('awgs_{}_dio_mask_value'.format(awg))
+        print_var('awgs_{}_dio_mask_value'.format(awg), ':#08X')
         print_var('awgs_{}_dio_state'.format(awg))
         print_var('awgs_{}_dio_strobe_index'.format(awg))
         print_var('awgs_{}_dio_strobe_slope'.format(awg))
