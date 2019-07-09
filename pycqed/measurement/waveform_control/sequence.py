@@ -20,8 +20,8 @@ class Sequence:
     """
 
     def __init__(self, name):
-        self.pulsar = ps.Pulsar.get_instance()
         self.name = name
+        self.pulsar = ps.Pulsar.get_instance()
         self.segments = odict()
         self.awg_sequence = {}
 

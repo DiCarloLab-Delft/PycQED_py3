@@ -45,7 +45,11 @@ class Segment:
             self.add(pulse_pars)
 
     def add(self, pulse_pars):
-
+        """
+        Checks if all entries of the passed pulse_pars dictionary are valid
+        and sets default values where necessary. After that an UnresolvedPulse
+        is instantiated.
+        """
         pars_copy = deepcopy(pulse_pars)
 
         # Makes sure that pulse name is unique
@@ -56,7 +60,8 @@ class Segment:
                 len(self.unresolved_pulses))
         self._pulse_names.add(pars_copy['name'])
 
-        # Makes sure that element name is unique within sequence of segments
+        # Makes sure that element name is unique within sequence of 
+        # segments by appending the segment name to the element name
         # and that RO pulses have their own elements if no element_name
         # was provided
         i = len(self.acquisition_elements) + 1
@@ -82,7 +87,7 @@ class Segment:
         if new_pulse.ref_pulse == 'previous_pulse':
             if self.previous_pulse != None:
                 new_pulse.ref_pulse = self.previous_pulse.pulse_obj.name
-            # if the frist pulse added to the segment has no ref_pulse
+            # if the first pulse added to the segment has no ref_pulse
             # it is reference to segment_start by default
             elif self.previous_pulse == None and \
                  len(self.unresolved_pulses) == 0:
@@ -117,8 +122,8 @@ class Segment:
               the UnresolvedPulse
             * saves the resolved pulse in the elements ordered dictionary by 
               ascending element start time and the pulses in each element by 
-              ascenging _t0
-            * orderes the UnresolvedPulses list by ascending _t0
+              ascending _t0
+            * orderes the unresolved_pulses list by ascending pulse middle
         """
 
         visited_pulses = []
@@ -129,7 +134,6 @@ class Segment:
 
         # add pulses that refer to segment start
         for pulse in pulses['segment_start']:
-
             if pulse.pulse_obj.name in pulses:
                 ref_points.append((pulse.pulse_obj.name, pulse))
 
@@ -141,6 +145,7 @@ class Segment:
         if len(visited_pulses) == 0:
             raise ValueError('No pulse references to the segment start!')
 
+        # add remaining pulses
         while len(ref_points) > 0:
             new_ref_points = []
             for (name, pulse) in ref_points:
@@ -162,7 +167,7 @@ class Segment:
             ref_points = new_ref_points
 
         if len(visited_pulses) != len(self.unresolved_pulses):
-            raise Exception('Not all pulses have been added!')
+            raise Exception('Not all pulses have been resolved!')
 
         # adds the resolved pulses to the elements OrderedDictionary
         for (t0, i, p) in sorted(visited_pulses):
@@ -186,11 +191,16 @@ class Segment:
         self.unresolved_pulses = ordered_unres_pulses
 
     def add_charge_compensation(self):
-        t_end = -float('inf')
+        """
+        Adds charge compensation pulse to channels with pulsar parameter
+        charge_buildup_compensation.
+        """
 
+        t_end = -float('inf')
         pulse_area = {}
         compensation_chan = set()
 
+        # Find channels where charge compensation should be applied
         for c in self.pulsar.channels:
             if self.pulsar.get('{}_type'.format(c)) != 'analog':
                 continue
@@ -208,16 +218,18 @@ class Segment:
                 chan = set(self.pulsar.find_awg_channels(awg))
                 awg_channels = awg_channels.union(chan)
 
+            # Calculate the tvals dictionary for the element
             tvals = self.tvals(compensation_chan & awg_channels, element)
 
             for pulse in self.elements[element]:
+                # Find the end of the last pulse of the segment
                 t_end = max(t_end, pulse.algorithm_time() + pulse.length)
 
                 for c in pulse.channels:
-                    awg = self.pulsar.get('{}_awg'.format(c))
-                    element_start_time = self.get_element_start(element, awg)
                     if c not in compensation_chan:
                         continue
+                    awg = self.pulsar.get('{}_awg'.format(c))
+                    element_start_time = self.get_element_start(element, awg)
                     pulse_start = self.time2sample(
                         pulse.element_time(element_start_time), channel=c)
                     pulse_end = self.time2sample(
@@ -227,6 +239,9 @@ class Segment:
                     if c in pulse_area:
                         pulse_area[c][0] += pulse.pulse_area(
                             c, tvals[c][pulse_start:pulse_end])
+                        # Overwrite this entry for all elements. The last 
+                        # element on that channel will be the one that 
+                        # is saved.
                         pulse_area[c][1] = element
                     else:
                         pulse_area[c] = [
@@ -236,8 +251,8 @@ class Segment:
 
         # Add all compensation pulses to the last element after the last pulse
         # of the segment and for each element with a compensation pulse save
-        # the pusle with the greates length to determine the new length of the
-        # element
+        # the pulse with the greatest length to determine the new length 
+        # of the element
         i = 1
         comp_i = 1
         comp_dict = {}
@@ -286,6 +301,7 @@ class Segment:
                 last_element, c, name='compensation_pulse_{}'.format(i), **kw)
             i += 1
 
+            # Set the pulse to start after the last pulse of the sequence
             pulse.algorithm_time(t_end)
 
             # Save the length of the longer pulse in longest_pulse dictionary
@@ -316,26 +332,6 @@ class Segment:
                 pulses[pulse.ref_pulse].append(pulse)
 
         return pulses
-
-    def gen_awg_dict(self):
-        """
-        Returns a dictionary with element names as keys and a set of used
-        AWGs for each element as value.
-        """
-
-        if self.elements == odict():
-            self.resolve_timing()
-
-        awg_dict = {}
-
-        for element in self.elements:
-            awg_dict[element] = set()
-
-            for pulse in self.elements[element]:
-                for channel in pulse.channels:
-                    awg_dict[element].add(self.pulsar.get(channel + '_awg'))
-
-        return awg_dict
 
     def gen_elements_on_awg(self):
         """
@@ -430,6 +426,7 @@ class Segment:
             trigger_el_set = set()
 
             for element in self.elements_on_awg[awg]:
+                # Calculate the trigger pulse time
                 [el_start, _] = self.element_start_length(element, awg)
 
                 trigger_pulse_time = el_start - \
@@ -472,6 +469,7 @@ class Segment:
 
                     trig_pulse.algorithm_time(trigger_pulse_time)
 
+                    # Add trigger element and pulse to seg.elements
                     if trig_pulse.element_name in self.elements:
                         self.elements[trig_pulse.element_name].append(
                             trig_pulse)
@@ -492,7 +490,8 @@ class Segment:
                     trigger_el_set = trigger_el_set | set(
                         trigger_elements.items())
 
-            # for all trigger elements update the start and length
+            # For all trigger elements update the start and length
+            # after having added the trigger pulses
             for (awg, el) in trigger_el_set:
                 self.element_start_length(el, awg)
 
@@ -599,7 +598,8 @@ class Segment:
         """
         The phase of a basis rotation is acquired by an basis pulse, if the 
         middle of the basis rotation pulse happens before the middle of the 
-        basis pulse.
+        basis pulse. Using that self.unresolved_pulses was sorted by 
+        self.resolve_timing() the acquired phases can be calculated.
         """
         qubit_phases = {}
 
@@ -624,6 +624,7 @@ class Segment:
         if element not in self.element_start_end:
             self.element_start_end[element] = {}
 
+        # find element start, end and length
         t_start = float('inf')
         t_end = -float('inf')
 
@@ -641,6 +642,7 @@ class Segment:
         if start_gran is not None:
             t_start = math.floor((t_start + 0.5*sample_time) / start_gran) \
                       * start_gran
+
 
         # make sure that element length is multiple of
         # sample granularity
@@ -680,6 +682,7 @@ class Segment:
         awg_wfs = {}
 
         for awg in awgs:
+            # only procede for AWGs with waveforms
             if awg not in self.elements_on_awg:
                 continue
             awg_wfs[awg] = {}
@@ -693,7 +696,6 @@ class Segment:
                 awg_wfs[awg][(i, element)] = {}
                 tvals = self.tvals(channel_list, element)
                 wfs = {}
-                element_start_time = self.get_element_start(element, awg)
                 for pulse in self.elements[element]:
                     # checks whether pulse is played on AWG
                     pulse_channels = set(pulse.channels) & set(channel_list)
@@ -715,6 +717,7 @@ class Segment:
                                 wfs[pulse.codeword][channel] = np.zeros(
                                     len(tvals[channel]))
 
+                    # calculate the pulse tvals
                     chan_tvals = {}
                     pulse_start = self.time2sample(
                         pulse.element_time(element_start_time), awg=awg)
@@ -724,9 +727,11 @@ class Segment:
                     for channel in pulse_channels:
                         chan_tvals[channel] = tvals[channel].copy(
                         )[pulse_start:pulse_end]
-
+                    
+                    # calculate pulse waveforms
                     pulse_wfs = pulse.get_wfs(chan_tvals)
 
+                    # insert the waveforms at the correct position in wfs
                     for channel in pulse_channels:
                         wfs[pulse.codeword][channel][
                             pulse_start:pulse_end] += pulse_wfs[channel]
@@ -772,6 +777,7 @@ class Segment:
                                                       iir_filters[1], wf)
                         wfs[codeword][c] = wf
 
+                # truncation and normalization
                 for codeword in wfs:
                     for c in wfs[codeword]:
                         # truncate all values that are out of bounds and
@@ -798,6 +804,7 @@ class Segment:
                             wfs[codeword][c][wfs[codeword][c] > 0] = 1
                             wfs[codeword][c][wfs[codeword][c] <= 0] = 0
 
+                # save the waveforms in the dictionary
                 for codeword in wfs:
                     awg_wfs[awg][(i, element)][codeword] = {}
                     for channel in wfs[codeword]:
