@@ -3,10 +3,8 @@
 ### setup logging before all imports (before any logging is done as to prevent a default root logger)
 import CC_logging
 
-import os
 import logging
 import sys
-import numpy as np
 
 from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
@@ -157,15 +155,27 @@ if sel==0:
     ]
 
 # generate program
+center_x = 16
+center_y = 16
+scale_x = 0.5
+scale_y = 1.0
+scales = [100] #[100, 50, 0]:   #range(-100,100,50):
 prog = 'start:\n'
-for c in coords:
-    val = (c[1]<<9) + (c[0]) + (1<<31)
-    prog += '        seq_out {},1\n'.format(val)
+for scale in scales:
+    prog += ' move 50000,R0\n'
+    prog += 'loop{}:\n'.format(scale+100)
+    scale_x = scale/100
+    for coord in coords:
+        x = round((coord[0]-center_x)*scale_x + center_x)
+        y = round((coord[1]-center_y)*scale_y + center_y)
+        val = (1<<31) + (y<<9) + (x)
+        prog += '        seq_out {},1\n'.format(val)
+    prog += ' loop R0,@loop{}\n'.format(scale+100)
 prog += '        jmp @start\n'
 
 
 log.debug('connecting to CC')
-cc = QuTechCC('cc', IPTransport(ip))
+cc = QuTechCC('cc', IPTransport(ip, timeout=5.0)) # FIXME: raised timeout until assembly time reduced
 cc.reset()
 cc.clear_status()
 cc.set_status_questionable_frequency_enable(0x7FFF)

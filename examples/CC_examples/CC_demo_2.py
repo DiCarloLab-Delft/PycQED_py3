@@ -55,7 +55,8 @@ if len(sys.argv)>1:
 conf = lambda:0 # create empty 'struct'
 conf.ro_0 = ''
 conf.ro_0 = 'dev2295'
-conf.mw_0 = 'dev8079'
+#conf.mw_0 = 'dev8079'
+conf.mw_0 = 'dev8078'
 conf.flux_0 = ''
 conf.cc_ip = '192.168.0.241'
 
@@ -165,6 +166,9 @@ if conf.mw_0 != '':
     instr.mw_0.load_default_settings()
     instr.mw_0.assure_ext_clock()
     set_waveforms(instr.mw_0, 'square', sequence_length)
+    if 0: # FIXME
+        log.warning('setting DIO interface to CMOS')
+        instr.mw_0.set('dios_0_interface', 1)
     instr.mw_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
     instr.mw_0.cfg_codeword_protocol('microwave')
     instr.mw_0.upload_codeword_program()
@@ -179,14 +183,31 @@ if conf.mw_0 != '':
         for awg in range(4):
             instr.mw_0._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)  # skew TOGGLE_DS versus rest
     else:
-        delay = 1  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
+        delay = 0  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
         instr.mw_0._dev.setd('raw/dios/0/delays/*/value', delay)  # new interface?, range [0:15]
         for awg in range(4):
             dio_timing_errors = instr.mw_0._dev.geti('awgs/{}/dio/error/timing'.format(awg))
             log.debug('DIO timing errors on AWG {}: {}'.format(awg,dio_timing_errors))
 
 """
-    *Before* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
+    dev8079 *After* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
+    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
+    0       +       0/0/0/0         66
+    1       +       0/0/0/0         66
+    2       +       0/0/0/0         66
+    
+    3       +       1/0/0/0         86
+    4       +       1/0/0/0         86
+    5       +       0/0/0/0         86
+    6       +       0/0/0/0         86
+    7       +       0/0/0/0         86
+    8       +       0/0/0/0         86
+    
+    9       +       1/0/0/0        106
+
+
+
+    dev8079 *Before* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
     delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
     0       +       0/0/0/0         60
     1       +       0/0/0/0         60
@@ -211,22 +232,6 @@ if conf.mw_0 != '':
     - delay steps are 3.33 ns each
     - 15 steps == 50 ns
     - 6 steps == 20 ns, pattern repeats after that
-
-
-    *After* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
-    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
-    0       +       0/0/0/0         66
-    1       +       0/0/0/0         66
-    2       +       0/0/0/0         66
-    
-    3       +       1/0/0/0         86
-    4       +       1/0/0/0         86
-    5       +       0/0/0/0         86
-    6       +       0/0/0/0         86
-    7       +       0/0/0/0         86
-    8       +       0/0/0/0         86
-    
-    9       +       1/0/0/0        106
     ...
     
     
