@@ -13,7 +13,7 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from autodepgraph import AutoDepGraph_DAG
 import matplotlib.pyplot as plt
-
+from pycqed.analysis import fitting_models as fm
 
 class Mock_CCLight_Transmon(CCLight_Transmon):
 
@@ -29,19 +29,61 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             - prefixed with `mock_`
             - describe "hidden" parameters to mock real experiments.
         """
+        # Qubit resonator
+        self.add_parameter('mock_Qe', parameter_class=ManualParameter,
+                           initial_value=13945)
 
+        self.add_parameter('mock_Q', parameter_class=ManualParameter,
+                           initial_value=8459)
+
+        self.add_parameter('mock_theta', parameter_class=ManualParameter,
+                           initial_value=-0.1)
+
+        self.add_parameter('mock_slope', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        self.add_parameter('mock_phi_v', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        self.add_parameter('mock_phi_0', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        # Test resonator
+        self.add_parameter('mock_test_Qe', parameter_class=ManualParameter,
+                           initial_value=1.8e6)
+
+        self.add_parameter('mock_test_Q', parameter_class=ManualParameter,
+                           initial_value=1e6)
+
+        self.add_parameter('mock_test_theta', parameter_class=ManualParameter,
+                           initial_value=-0.1)
+
+        self.add_parameter('mock_test_slope', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        self.add_parameter('mock_test_phi_v', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        self.add_parameter('mock_test_phi_0', parameter_class=ManualParameter,
+                           initial_value=0)
+
+        # Qubit
         self.add_parameter('mock_Ec', label='charging energy', unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=266.3e6)
 
-        self.add_parameter('mock_Ej', label='josephson energy', unit='Hz',
+        self.add_parameter('mock_Ej1', label='josephson energy', unit='Hz',
                            parameter_class=ManualParameter,
-                           initial_value=17.76e9)
+                           initial_value=8.647e9)
 
+        self.add_parameter('mock_Ej2', label='josephson energy', unit='Hz',
+                           parameter_class=ManualParameter,
+                           initial_value=8.943e9)
+        
         self.add_parameter('mock_freq_qubit_bare', label='qubit frequency',
                            unit='Hz',
                            initial_value=(np.sqrt(8*self.mock_Ec() *
-                                                  self.mock_Ej()) -
+                                                  (self.mock_Ej1()+self.mock_Ej2())) -
                                           self.mock_Ec()),
                            parameter_class=ManualParameter)
 
@@ -59,10 +101,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            unit='Hz', parameter_class=ManualParameter,
                            initial_value=0.048739)
 
-        self.add_parameter('mock_sweetspot_current',
-                           label='magnitude of sweetspot current',
-                           unit='A', parameter_class=ManualParameter,
-                           initial_value=-0.642342156e-3)
+        # self.add_parameter('mock_sweetspot_current',
+        #                    label='magnitude of sweetspot current',
+        #                    unit='A', parameter_class=ManualParameter,
+        #                    initial_value=-0.642342156e-3)
 
         self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude',
                            unit='V', initial_value=0.41235468,
@@ -137,22 +179,22 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            self.mock_chi12() / 2)
 
         self.add_parameter('mock_res_width', label='resonator peak width',
-                           unit='Hz', initial_value=1e6,
+                           unit='Hz', initial_value=0.25e6,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mock_flux_sensitivity',
-                           label='sensitivity to flux in current',
-                           unit='A',
-                           initial_value={'FBL_1': 1, 'FBL_2': 0.01},
+        self.add_parameter('mock_fl_dc_V_per_phi0', unit='A/Wb',
+                           initial_value={'FBL_Q1': 20e-3,
+                                          'FBL_Q2': 2},
                            parameter_class=ManualParameter)
-
-        self.add_parameter('mock_fl_dc_V_per_phi0', unit='A',
-                           initial_value=20e-3,
-                           parameter_class=ManualParameter)
+        
+        self.add_parameter('mock_sweetspot_phi_over_phi0',
+                           label='magnitude of sweetspot current',
+                           unit='-', parameter_class=ManualParameter,
+                           initial_value=0.02)
 
         self.add_parameter('mock_cfg_dc_flux_ch',
                            label='most closely coupled fluxline',
-                           unit='', initial_value='FBL_1',
+                           unit='', initial_value='FBL_Q1',
                            parameter_class=ManualParameter)
 
         self.add_parameter('noise', label='nominal noise level', unit='V',
@@ -244,7 +286,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         theta = -0.1
         slope = 0
         f = freqs
-        from pycqed.analysis import fitting_models as fm
+
 
         A_res = np.abs((slope * (f / 1.e9 - f0_res) / f0_res) *
                        fm.HangerFuncAmplitude(f, f0_res, Q, Qe, A, theta))
@@ -252,9 +294,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                         fm.HangerFuncAmplitude(f, f0_res, Q_test,
                                                Qe_test, A, theta))
 
-        A_res = abs(A * (1. - Q / Qe * np.exp(1.j * theta) /
+        A_res = np.abs(A * (1. - Q / Qe * np.exp(1.j * theta) /
                          (1. + 2.j * Q * (f / 1.e9 - f0_res) / f0_res)))
-        A_test = abs(A * (1. - Q_test / Qe_test * np.exp(1.j * theta) /
+        A_test = np.abs(A * (1. - Q_test / Qe_test * np.exp(1.j * theta) /
                           (1. + 2.j * Q_test * (f / 1.e9 - f0_test) / f0_test)))
 
         baseline = 0.40
@@ -291,20 +333,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         s = swf.None_Sweep(name='Homodyne Frequency',
                            parameter_name='Frequency',
                            unit='Hz')
+
         h = self.measurement_signal(excited=False)  # Lorentian baseline [V]
         A0 = self.measurement_signal(excited=True) - h  # Peak height
-
-        fluxcurrent = self.instr_FluxCtrl.get_instr()
-
-        # Calculate Phi/Phi_0 by summing all currents and giving them weights
-        # to match how close they are to the qubit.
-        fluxbias = 0
-        for i in self.mock_flux_sensitivity():
-            fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
-
-        I0 = self.mock_fl_dc_V_per_phi0()
-
-        total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
 
         # Height of peak [V]
         K_power = 1/np.sqrt(1+15**(-(self.spec_pow()-self.mock_spec_pow())/7))
@@ -318,7 +349,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
              wbase)
 
         f0 = self.calculate_mock_qubit_frequency()
-
+        
         peak_01 = A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
         # 1-2 transition:
         if self.spec_amp() > self.mock_12_spec_amp() and self.spec_pow() >= -10:
@@ -360,55 +391,30 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         s2 = swf.None_Sweep(name='Readout Power', parameter_name='Power',
                             unit='dBm')
 
-        res_power = 20*np.log10(self.mock_ro_pulse_amp_CW())
-        pow_shift = 20
         mocked_values = []
+        try:
+            device = self.instr_device.get_instr()
+            qubit_names = device.qubits()
+            # Create linecuts:
+            for power in powers:
+                h = 10**(power/20)*10e-3
+                new_values = h
+                for name in qubit_names:
+                    if name != 'fakequbit':
+                        qubit = device.find_instrument(name)
+                        f0, response = qubit.calculate_mock_resonator_response(
+                                                power, freqs)
+                        new_values += response
 
-        for power in powers:
-            h = 10**(power/20)*10e-3  # Lorentian baseline [V]
-            A = 0.8*h   # Height of peak [V]
-            w = self.mock_res_width()
-            if power <= res_power:
-                # Good signal
-                f0 = self.mock_freq_res()
-                new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
-                                                 ((freqs - f0))**2)
-            elif (power > res_power) and (power < res_power + pow_shift):
-                # no signal at all -> width increases, peak decreases
-                A0 = A
-                n = 6
-                b = A0/10
-                a = (A0-b)/(-1/2*pow_shift)**n
-                A = a*(power - (res_power+1/2*pow_shift))**n + b
-
-                w = 0.5e6
-                w = 0.5e6 + 0.5e6*np.sin(np.pi*(power - res_power)/pow_shift)
-
-                b = res_power+self.mock_freq_res()*(pow_shift/self.mock_chi())
-                f0 = (power-b)/pow_shift*self.mock_chi12()/2
-
-                new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
-                                                 ((freqs - f0))**2)
-                # Add some extra noise
-                for i, value in enumerate(new_values):
-                    d = np.abs(value - A0)
-
-                    value += np.random.normal(0, d/5, 1)
-                    new_values[i] = value
-            else:
-                # High power regime
-                f0 = self.mock_freq_res() + self.mock_chi()
-                new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
-                                                 ((freqs - f0))**2)
-            # Test resonator
-            f0_test_res = self.mock_freq_test_res()
-            A = 0.8*h
-            w = self.mock_res_width()/5
-            testres_dip = A*(w/2.0)**2 / ((w/2.0)**2 +
-                                          ((freqs - f0_test_res))**2)
-            new_values -= testres_dip
-
-            mocked_values = np.concatenate([mocked_values, new_values])
+                mocked_values = np.concatenate([mocked_values, new_values])
+        except AttributeError:
+            logging.warning('No device found! Using this mock only for for '
+                            'resonator frequencies')
+            for power in powers:
+                h = 10**(power/20)*10e-3
+                new_values = h + self.calculate_mock_resonator_response(power,
+                                                                        freqs)
+                mocked_values = np.concatenate([mocked_values, new_values])
 
         mocked_values += np.random.normal(0,
                                           self.noise()/np.sqrt(self.ro_acq_averages()), np.size(mocked_values))
@@ -434,7 +440,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             return a
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None, analyze=True,
-                                        close_fig=True):
+                                        close_fig=True, label=''):
         '''
         For finding resonator frequencies. Uses a lorentzian fit for now, might
         be extended in the future
@@ -449,54 +455,32 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            unit='Hz')
 
         # Mock Values, matches resonator power scan:
-        res_power = 20*np.log10(self.mock_ro_pulse_amp_CW())
-        pow_shift = self.mock_pow_shift()
-
+        # Find all resonator frequencies:
         power = 20*np.log10(self.ro_pulse_amp_CW())
-        h = 10**(power/20)*10e-3  # Lorentian baseline [V]
-        A = 0.8*h   # Height of peak [V]
-        w = self.mock_res_width()
+        dips = []
+        try:
+            device = self.instr_device.get_instr()
+            qubit_names = device.qubits()
+            for name in qubit_names:
+                if name != 'fakequbit':
+                    qubit = device.find_instrument(name)
+                    freq, dip = qubit.calculate_mock_resonator_response(power,
+                                                                        freqs)
+                    dips.append(dip)
+        except AttributeError:
+            logging.warning('No device found! Using this mock only for for '
+                            'resonator frequencies')
+            freq, dips = self.calculate_mock_resonator_response(power,
+                                                                freqs)
 
-        if power <= res_power:
-            # Good signal
-            f0 = self.mock_freq_res()
-            mocked_values = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
+        h = 10**(power/20)*10e-3
 
-        elif (power > res_power) and (power < res_power + pow_shift):
-            # no signal at all -> width increases, peak decreases
-            A0 = A
-            n = 6
-            b = A0/10
-            a = (A0-b)/(-1/2*pow_shift)**n
-            A = a*(power - (res_power+1/2*pow_shift))**n + b
-
-            w = 0.5e6 + 0.5e6*np.sin(np.pi*(power - res_power)/pow_shift)
-
-            b = res_power + self.mock_freq_res()*(pow_shift/self.mock_chi())
-            f0 = (b - power)/pow_shift*self.mock_chi()
-
-            mocked_values = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
-            # Add some extra noise
-            for i, value in enumerate(mocked_values):
-                d = np.abs(value - A0)
-
-                value += np.random.normal(0, d/5, 1)
-                mocked_values[i] = value
-        else:
-            # High power regime
-            f0 = self.mock_freq_res() + self.mock_chi()
-            mocked_values = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
-
-        # TEST RESONATOR:
-        f0_test_res = self.mock_freq_test_res()
-        A = 0.8*h
-        w = self.mock_res_width()
-        testres_dip = A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0_test_res))**2)
-
-        mocked_values -= testres_dip
-
+        mocked_values = h
+        for dip in dips:
+            mocked_values += dip
         mocked_values += np.random.normal(0,
-                                          self.noise()/np.sqrt(self.ro_acq_averages()), np.size(mocked_values))
+                                          self.noise()/np.sqrt(self.ro_acq_averages()),
+                                          np.size(mocked_values))
 
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
                               detector_control='soft',
@@ -505,7 +489,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_function(s)
         MC.set_sweep_points(freqs)
         MC.set_detector_function(d)
-        MC.run('Resonator_scan'+self.msmt_suffix)
+        MC.run('Resonator_scan'+self.msmt_suffix+label)
 
         if analyze:
             ma.Homodyne_Analysis(label='Resonator_scan', close_fig=close_fig)
@@ -530,13 +514,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         for dac_value in dac_values:
             fluxcurrent[fluxChan](dac_value)
 
-            fluxbias = 0
-            for i in self.mock_flux_sensitivity():
-                fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
-
-            I0 = self.mock_fl_dc_V_per_phi0()
-
-            total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
+            total_flux = self.calculate_mock_flux()
 
             h = self.measurement_signal(excited=False)
             A0 = self.measurement_signal(excited=True) - h
@@ -586,7 +564,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                              pulsed=True, MC=None,
                                              analyze=True, close_fig=True,
                                              nested_resonator_calibration=False,
-                                             resonator_freqs=None):
+                                             resonator_freqs=None, label=''):
         '''
         Measures resonator frequency versus flux. Simple model which just
         shifts the Lorentzian peak with a simple cosine by 2 MHz.
@@ -600,31 +578,41 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         s2 = swf.None_Sweep(name='Flux', parameter_name=fluxChan,
                             unit='A')
 
-        freq_res = self.mock_freq_res()
         fluxcurrent = self.instr_FluxCtrl.get_instr()
-        df = 2*self.mock_chi()
+        power = 20*np.log10(self.ro_pulse_amp_CW())
 
         mocked_values = []
-        for dac_value in dac_values:
-            fluxcurrent[fluxChan](dac_value)
 
-            fluxbias = 0
-            for i in self.mock_flux_sensitivity():
-                fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
+        try:
+            device = self.instr_device.get_instr()
+            qubit_names = device.qubits()
+            # Create linecuts:
+            for dac_value in dac_values:
+                fluxcurrent[fluxChan](dac_value)
+                h = 10**(power/20)*10e-3
+                new_values = h
+                for name in qubit_names:
+                    if name != 'fakequbit':
+                        qubit = device.find_instrument(name)
+                        f0, response = qubit.calculate_mock_resonator_response(
+                                                power, freqs)
+                        new_values += response
 
-            I0 = self.mock_fl_dc_V_per_phi0()
-            total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
+                mocked_values = np.concatenate([mocked_values, new_values])
 
-            h = self.ro_pulse_amp_CW()*10e-3  # Lorentian baseline [V]
-            A = 0.8*h   # Height of peak [V]
-            w = self.mock_res_width()    # Full width half maximum of peak
-            f0 = freq_res - df*(np.sin(1/2*np.pi*(total_flux)))**2
-            new_values = h - A*(w/2.0)**2 / ((w/2.0)**2 +
-                                             ((freqs - f0))**2)
-            new_values += np.random.normal(0,
-                                           self.noise()/np.sqrt(self.ro_acq_averages()), np.size(new_values))
+        except AttributeError:
+            logging.warning('No device found! Using this mock only for for '
+                            'resonator frequencies')
+            for dac_value in dac_values:
+                fluxcurrent[fluxChan](dac_value)
+                h = 10**(power/20)*10e-3
+                new_values = h + self.calculate_mock_resonator_response(power,
+                                                                        freqs)
+                mocked_values = np.concatenate([mocked_values, new_values])
 
-            mocked_values = np.concatenate([mocked_values, new_values])
+        mocked_values += np.random.normal(0,
+                                          self.noise()/np.sqrt(self.ro_acq_averages()),
+                                           np.size(mocked_values))
         mocked_values = np.abs(mocked_values)
 
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
@@ -638,7 +626,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         MC.set_sweep_points_2D(dac_values)
 
         MC.set_detector_function(d)
-        MC.run('Resonator_dac_scan'+self.msmt_suffix, mode='2D')
+        MC.run('Resonator_dac_scan'+self.msmt_suffix+label, mode='2D')
 
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig,
@@ -934,44 +922,16 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         state, which results in a 2 chi shift of the resonator
         '''
         power = 20*np.log10(self.ro_pulse_amp_CW())
-        # Low power regime power
-        res_power = 20*np.log10(self.mock_ro_pulse_amp_CW())
-        pow_shift = self.mock_pow_shift()
-
         f_ro = self.ro_freq()
-
         h = 10**(power/20)*10e-3  # Lorentian baseline [V]
-        A = 0.8*h   # Height of peak [V]
-        w = self.mock_res_width()
 
-        # Determine if in high / low power regime:
-        if power <= res_power:
-            f0 = self.mock_freq_res()
-            if excited:
-                f0 = self.mock_freq_res() + 2*self.mock_chi()
-
-            signal = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((f_ro - f0))**2)
-        elif (power > res_power) and (power < res_power + pow_shift):
-            # Messy regime between low and high power
-            A0 = A
-            n = 6
-            b = A0/10
-            a = (A0-b)/(-1/2*pow_shift)**n
-            A = a*(power - (res_power+1/2*pow_shift))**n + b
-
-            w = 0.5e6 + 0.5e6*np.sin(np.pi*(power - res_power)/pow_shift)
-
-            b = res_power + self.mock_freq_res()*(pow_shift/self.mock_chi())
-            f0 = (b - power)/pow_shift*self.mock_chi()
-
-            signal = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((f_ro - f0))**2)
-            signal += np.random.normal(0, A0/10, 1)
-        else:
-            f0 = self.mock_freq_res() + 2*self.mock_chi()
-            signal = h - A*(w/2.0)**2 / ((w/2.0)**2 + ((f_ro - f0))**2)
+        f0, dip = self.calculate_mock_resonator_response(power, f_ro,
+                                                         excited=excited)
+        signal = h + dip
 
         if type(signal) is list:
             signal = signal[0]
+
         return signal
 
     def values_to_IQ(self, mocked_values, theta=15):
@@ -1021,6 +981,23 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # rhs_RWA = 1./(w_q-w_r)
         return np.sqrt(np.abs(shift/rhs))/(2*np.pi)
 
+    def calculate_mock_flux(self):
+        """
+        Calculates total flux through SQUID loop by a weighted sum of all
+        contributions from all FBLs, and subtracting the sweetspot flux. 
+        """
+
+        fluxcurrent = self.instr_FluxCtrl.get_instr()
+        flux = 0
+        for FBL in fluxcurrent.channel_map:
+            current = fluxcurrent[FBL]()
+
+            flux += current/self.mock_fl_dc_V_per_phi0()[FBL]
+
+        flux -= self.mock_sweetspot_phi_over_phi0()
+
+        return flux
+
     def calculate_mock_qubit_frequency(self):
         '''
         Cleaner way of calculating the qubit frequency, depending on:
@@ -1028,20 +1005,125 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         - Ec, EJ
         - Chi01
         '''
-        fluxcurrent = self.instr_FluxCtrl.get_instr()
-        fluxbias = 0
-        for i in self.mock_flux_sensitivity():
-            fluxbias += fluxcurrent[i]()*self.mock_flux_sensitivity()[i]
+        phi_over_phi0 = self.calculate_mock_flux()
+        if self.mock_Ej1() > self.mock_Ej2():
+            alpha = self.mock_Ej1()/self.mock_Ej2()
+        else:
+            alpha = self.mock_Ej2()/self.mock_Ej1()
+        d = (alpha-1)/(alpha+1)
+        Ej_sum = self.mock_Ej1() + self.mock_Ej2()
 
-        I0 = self.mock_fl_dc_V_per_phi0()
-        total_flux = (fluxbias - self.mock_sweetspot_current()) / I0
+        Ej_eff = np.abs(Ej_sum*np.cos(np.pi*phi_over_phi0) *
+                        np.sqrt(1 + d**2 * (np.tan(np.pi*phi_over_phi0))**2))
 
-        f_qubit = (np.sqrt(8*self.mock_Ec()*self.mock_Ej() *
-                           np.abs(np.cos(np.pi*total_flux))) -
+        f_qubit = (np.sqrt(8*self.mock_Ec()*Ej_eff) -
                    self.mock_Ec() + self.mock_chi01())
 
         return f_qubit
 
+    def calculate_mock_resonator_response(self, power, freqs, excited=False):
+        """
+        Cleaner way of calculating resonator frequency, depending on power etc.
+        Makes it easier to use a mock device with multiple resonators
+        Returns resonant frequency and Lorentzian as a combination of both the
+        test and qubit resonators
+
+        TODO: Make hanger instead of Lorentzian
+        """
+        res_power = 20*np.log10(self.mock_ro_pulse_amp_CW())
+        pow_shift = self.mock_pow_shift()
+
+        h = 10**(power/20)*10e-3   # Lorentzian baseline [V]
+        
+        A = 0.8*h                  # Peak height [V]
+        w = self.mock_res_width()  # Width of Lorentzian (HWHM) [Hz]
+
+        Q = self.mock_Q()
+        Qe = self.mock_Qe()
+        theta = self.mock_theta()
+        slope = self.mock_slope()
+        phi_v = self.mock_phi_v()
+        phi_0 = self.mock_phi_0()
+
+        Q_test = self.mock_test_Q()
+        Qe_test = self.mock_test_Qe()
+        theta_test = self.mock_test_theta()
+        slope_test = self.mock_test_slope()
+        phi_v_test = self.mock_test_phi_v()
+        phi_0_test = self.mock_test_phi_0()
+
+
+        if power <= res_power:
+            # Good signal
+            f0 = self.calculate_mock_resonator_frequency(excited=excited)
+            res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q, Qe, h,
+                                                      theta, phi_v, phi_0,
+                                                      slope=slope)
+        elif (power > res_power) and (power < res_power + pow_shift):
+            # Noisy regime -> width increases, peak decreases
+            f0 = self.calculate_mock_resonator_frequency(excited=excited)
+            f0_high = self.mock_freq_res_bare()
+
+            f_shift = f0 - f0_high
+            f0 = f0 - (power - res_power)/pow_shift*f_shift
+
+            Q_decrease = (1+(power-res_power)/pow_shift)*2
+            
+            QQe = Q/Qe / Q_decrease
+
+
+            Q_nonlinear = Q/Q_decrease
+            Qe_nonlinear = Qe/Q_decrease
+            res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q_nonlinear,
+                                                      Qe_nonlinear, h,
+                                                      theta, phi_v, phi_0,
+                                                      slope=slope)
+            # Add some extra noise
+            for i, value in enumerate(res_qubit_dip):
+                d = np.abs(value - h)
+
+                value += np.random.normal(0, d/10, 1)
+                res_qubit_dip[i] = value
+        else:
+            # High power regime
+            f0 = self.mock_freq_res_bare()
+            res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q, Qe, h,
+                                                      theta, phi_v, phi_0,
+                                                      slope=slope)
+
+        if self.mock_freq_test_res() is not None:
+            f0_test_res = self.mock_freq_test_res()
+            test_res_response = fm.hanger_func_complex_SI(freqs, f0_test_res,
+                                                          Q_test, Qe_test, h,
+                                                          theta_test,
+                                                          phi_v_test,
+                                                          phi_0_test,
+                                                          slope=slope_test)
+        else:
+            test_res_response = np.ones(np.size(freqs))*h
+
+        response = np.real(res_qubit_dip - h + test_res_response - h)
+        return f0, response
+
+    def calculate_mock_resonator_frequency(self, excited=False):
+        """
+        Calculates the resonator frequency depeding on flux etc.
+        """
+        freq_qubit_12 = self.calculate_mock_qubit_frequency() + self.mock_Ec()
+        freq_qubit = self.calculate_mock_qubit_frequency()
+        chi01 = self.mock_coupling01()**2 / (freq_qubit - 
+                                             self.mock_freq_res_bare())
+
+        chi12 = self.mock_coupling12()**2 / (freq_qubit_12 - 
+                                             self.mock_freq_res_bare())
+        if excited:
+            chi = chi01 - chi12/2
+        else:
+            chi = 0
+
+        f0 = self.mock_freq_res_bare() - chi12/2 - 2*chi
+
+        return f0
     ###########################################################################
     # AutoDepGraph
     ###########################################################################

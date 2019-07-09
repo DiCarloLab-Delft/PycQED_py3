@@ -440,7 +440,6 @@ class MeasurementControl(Instrument):
         self.last_sweep_pts = x
 
         datasetshape = self.dset.shape
-        # self.iteration = datasetshape[0] + 1
 
         vals = self.detector_function.acquire_data_point()
         start_idx, stop_idx = self.get_datawriting_indices_update_ctr(vals)
