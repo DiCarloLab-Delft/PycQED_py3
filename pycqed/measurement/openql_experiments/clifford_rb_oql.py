@@ -49,7 +49,9 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                 11520 -> Size of the complete two qubit Cl group
 
         initialize:     if True initializes qubits to 0, disable for restless
-            tuning
+                        tuning
+        interleaving_cliffords: list of integers which specifies which cliffords
+                        to interleave the sequence with (for interleaved RB)
         program_name:           some string that can be used as a label.
         cal_points:     bool whether to replace the last two elements with
                         calibration points, set to False if you want
