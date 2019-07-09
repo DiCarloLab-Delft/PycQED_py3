@@ -1506,7 +1506,9 @@ class CCLight_Transmon(Qubit):
                                             MC=None, update=True,
                                             all_modules=False):
         """
-        Calibrates the pulse amplitude using a single rabi oscillation
+        Calibrates the pulse amplitude using a single rabi oscillation.
+        Depending on self.cfg_with_vsm uses VSM or AWG channel amplitude
+        to sweep the amplitude of the pi pulse
         """
         if amps is None:
             if self.cfg_with_vsm():
@@ -1552,7 +1554,10 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_motzoi(self, MC=None, verbose=True, update=True, motzois=None):
         """
-        Calibrates the motzoi VSM amplitude prameter
+        Calibrates the DRAG coeffcieint value, named motzoi (after Felix Motzoi)
+        for legacy reasons.
+
+        For details see docstring of measure_motzoi method.
         """
         using_VSM = self.cfg_with_vsm()
         if using_VSM and motzois is None:
@@ -1703,7 +1708,8 @@ class CCLight_Transmon(Qubit):
         Args:
             MC : instance of Measurement Control
             mixer_channels: list of strings indicating what channels to
-                calibrate
+                calibrate. In VSM case 'G' and/or 'D' can be specified.
+                In no-VSM case mixer_channels is alway set to ['G'].
             update: if True updates values in the qubit object.
         return:
             success (bool) : returns True if succesful. Currently always
@@ -1861,6 +1867,17 @@ class CCLight_Transmon(Qubit):
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True,
                                         label=''):
+        '''
+        Measures a transmission through the feedline as a function of frequency.
+        Usually used to find and characterize the resonators in routines such as
+        find_resonators or find_resonator_frequency.
+
+        Args:
+            freqs: list of frequencies to sweep over
+            analyze: boolean indicating whether to perform a hanger model
+                fit to the data
+            label: suffix to append to the measurement label
+        '''
         UHFQC = self.instr_acquisition.get_instr()
         self.prepare_for_continuous_wave()
         if MC is None:
@@ -1896,6 +1913,17 @@ class CCLight_Transmon(Qubit):
     def measure_resonator_power(self, freqs, powers, MC=None,
                                 analyze: bool=True, close_fig: bool=True,
                                 label: str=''):
+        '''
+        Mesures the readout resonator with UHFQC as a function of the pulse power.
+        The pulse power is controlled by changing the amplitude of the UHFQC-generated
+        waveform.
+
+        Args:
+            freqs: list of freqencies to sweep over
+            powers: powers of the readout pulse to sweep over. The power is adjusted
+                by changing the amplitude of the UHFQC output channels. Thereby
+                the range of powers is limited by the dynamic range of mixers.
+        '''
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1928,6 +1956,21 @@ class CCLight_Transmon(Qubit):
 
     def measure_photon_number_splitting(self, freqs, powers, MC=None,
                                         analyze: bool=True, close_fig: bool=True):
+        '''
+        Mesures the CW qubit spectrosopy as a function of the RO pulse power
+        to find a photon splitting.
+        
+        Refs:
+        Schuster Nature 445, 515–518 (2007)
+            (note that in the paper RO resonator has lower frequency than the qubit)
+
+        Args:
+            freqs: list of freqencies to sweep over
+            powers: powers of the readout pulse to sweep over. The power is adjusted
+                by changing the amplitude of the UHFQC output channels. Thereby
+                the range of powers is limited by the dynamic range of mixers.
+        '''
+
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1962,6 +2005,22 @@ class CCLight_Transmon(Qubit):
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
                                              analyze: bool =True, close_fig: bool=True,
                                              fluxChan=None, label=''):
+        '''
+        Performs the resonator spectroscopy as a function of the current applied
+        to the flux bias line.
+
+        Args:
+            freqs: list of freqencies to sweep over
+            dac_values: list of the DAC values (current values) to sweep over
+            fluxChan: channel of the instrument controlling the flux to sweep. By default
+                the channel used is specified by self.cfg_dc_flux_ch.
+            analyze: indicates whether to generate colormaps of the measured data
+            label: suffix to append to the measurement label
+
+        Relevant qubit parameters:
+            instr_FluxCtrl: instrument controlling the current bias
+            fluxChan: chanel of the flux control instrument corresponding to the qubit
+        '''
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2003,6 +2062,29 @@ class CCLight_Transmon(Qubit):
                                          nested_resonator_calibration=False,
                                          nested_resonator_calibration_use_min=False,
                                          resonator_freqs=None):
+        '''
+        Performs the qubit spectroscopy while changing the current applied
+        to the flux bias line.
+
+        Args:
+            freqs: MW drive frequencies to sweep over
+            dac_values: values of the current to sweep over
+            mode: specifies the spectroscopy mode (cf. measure_spectroscopy method)
+            fluxChan: Fluxchannel that is varied. Defaults to self.cfg_dc_flux_ch
+            nested_resonator_calibration: specifies whether to track the RO resonator
+                frequency (which itself is flux-dependent)
+            nested_resonator_calibration_use_min: specifies whether to use the resonance
+                minimum in the nested routine
+            resonator_freqs: manual specifications of the frequencies over in which to
+                search for RO resonator in the nested routine
+            analyze: indicates whether to generate colormaps of the measured data
+            label: suffix to append to the measurement label
+
+        Relevant qubit parameters:
+            instr_FluxCtrl: instrument controlling the current bias
+            fluxChan: chanel of the flux control instrument corresponding to the qubit
+        '''
+
         if mode == 'pulsed_mixer':
             old_channel_amp = self.mw_channel_amp()
             self.mw_channel_amp(1)
@@ -2080,6 +2162,9 @@ class CCLight_Transmon(Qubit):
                             'pulsed_marked' - pulsed using trigger input of
                                               spec source
                             'pulsed_mixer' - pulsed using AWG and mixer
+            analyze: indicates whether to look for the peak in the data
+                and perform a fit
+            label: suffix to append to the measurement label
 
         This experiment can be performed in three different modes
             Continuous wave (CW)
@@ -2227,7 +2312,14 @@ class CCLight_Transmon(Qubit):
         that usually is the LO of the AWG/QWG mixer.
 
         Is considered as a time domain experiment as it utilizes the AWG
-
+        
+        Relevant parameters:
+            - spec_pow: power of the LO fed into the mixer
+            - spec_amp: amplitude of the square waveform used to generate
+                microwave tone
+            - spec_pulse_length: length of the spectroscopy pulse. The length is
+                controlled by the qisa file, which indicates how many 20 ns long
+                square pulses should be triggered back-to-back
         """
         UHFQC = self.instr_acquisition.get_instr()
         if MC is None:
@@ -2291,11 +2383,16 @@ class CCLight_Transmon(Qubit):
         Drive the qubit and sit at the spectroscopy peak while the bus is driven with
         bus_spec_source
 
-        Input parameters:
-        - freqs: list of frequencies of the second drive tone (at bus frequency)
-        - spec_source_bus =: rf source used for the second spectroscopy tone
-        - bus_power: power of the second spectroscopy tone
-        - f_01: frequency of 01 transition (default: self.freq_qubit())
+        Args:
+            freqs: list of frequencies of the second drive tone (at bus frequency)
+            spec_source_bus =: rf source used for the second spectroscopy tone
+            bus_power: power of the second spectroscopy tone
+            f_01: frequency of 01 transition (default: self.freq_qubit())
+            analyze: indicates whether to look for peas in the data and perform a fit
+            label: suffix to append to the measurement label
+            prepare_for_continuous_wave: indicates whether to regenerate a waveform
+                generating a readout tone and set all the instruments according
+                to the parameters stored in the qubit object
         '''
 
         if f01 is None:
@@ -2358,13 +2455,18 @@ class CCLight_Transmon(Qubit):
         - set spec_power of the first tone high (say, +15 dB relative to value optimal
                 for sharp spectroscopy). This makes you less sensitive to flux crosstalk.
 
-        Input parameters:
-        - freqs: list of frequencies of the second drive tone (at bus frequency)
-        - spec_source_bus =: rf source used for the second spectroscopy tone
-        - bus_power: power of the second spectroscopy tone
-        - dacs: valuses of current bias to measure
-        - dac_param: parameter corresponding to the sweeped current bias
-        - f_01: frequency of 01 transition (default: self.freq_qubit())
+        Args:
+            freqs: list of frequencies of the second drive tone (at bus frequency)
+            spec_source_bus =: rf source used for the second spectroscopy tone
+            bus_power: power of the second spectroscopy tone
+            dacs: valuses of current bias to measure
+            dac_param: parameter corresponding to the sweeped current bias
+            f_01: frequency of 01 transition (default: self.freq_qubit())
+            analyze: indicates whether to look for peas in the data and perform a fit
+            label: suffix to append to the measurement label
+            prepare_for_continuous_wave: indicates whether to regenerate a waveform
+                generating a readout tone and set all the instruments according
+                to the parameters stored in the qubit object
         '''
         if f01==None:
             f01 = self.freq_qubit()
@@ -2422,10 +2524,26 @@ class CCLight_Transmon(Qubit):
                               f_12_power=None,
                               MC=None, spec_source_2=None):
         """
-        Measures anharmonicity of the transmon using three-tone spectroscopy.
+        Measures the qubit spectroscopy as a function of frequency of the two
+        driving tones. The qubit transitions are observed when frequency of one
+        drive matches the qubit frequency, or when sum of frequencies matches
+        energy difference between ground and second excited state. Consequently
+        frequency of 01 and 12  transitions can be extracted simultaneously
+        yoielding anharmonicity measurement.
 
         Typically a good guess for the 12 transition frequencies is
         f01 + alpha where alpha is the anharmonicity and typically ~ -300 MHz
+
+        Args:
+            freqs_01: frequencies of the first qubit drive
+            freqs_12: frequencies of the second qubit drive
+            f_01_power: power of the first qubit drive. By default the power
+                is set to self.spec_pow
+            f_12_power: power of the second qubit drive. By default the power
+                is set to self.spec_pow. Likely it needs to be increased
+                by 10-20 dB to yield meaningful result
+            spec_source_2: instrument used to apply second MW drive.
+                By default instrument specified by self.instr_spec_source_2 is used
         """
         f_anharmonicity = np.mean(freqs_01) - np.mean(freqs_12)
         if f_01_power == None:
@@ -2513,21 +2631,27 @@ class CCLight_Transmon(Qubit):
         spec_source.off()
         spec_source_2.off()
         ma.Three_Tone_Spectroscopy_Analysis(
-            label='Two_tone',  f01=.5*freqs_01[-1]+.5*freqs_01[0], f12=.5*freqs_12[-1]+.5*freqs_12[0])
+            label='Two_tone',  f01=.5*freqs_01[-1]+.5*freqs_01[0],
+            f12=.5*freqs_12[-1]+.5*freqs_12[0])
 
-    def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10, 10, 1), MC=None, spec_source_2=None):
+    def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None,
+                powers=np.arange(-10, 10, 1), MC=None, spec_source_2=None):
         """
         Measures photon splitting of the qubit due to photons in the bus resonators.
         Specifically it is a CW qubit pectroscopy with the second  variable-power CW tone
         applied at frequency f_bus.
+        
+        Refs:
+        Schuster Nature 445, 515–518 (2007)
+            (note that in the paper RO resonator has lower frequency than the qubit)
 
-        Input parameters:
-        - f_bus: bus frequency at which variable-power CW tone is applied
-        - freqs_01: range of frequencies of the CW qubit MW drive. If not specified
+        Args:
+            f_bus: bus frequency at which variable-power CW tone is applied
+            freqs_01: range of frequencies of the CW qubit MW drive. If not specified
             range -60 MHz to +5 MHz around freq_qubit fill be used.
-        - powers: sweeped powers of the bus CW drive.
-        - spec_source_2: sepcifies instrument used to apply bus MW drive. By default
-            instr_spec_source_2 is used.
+            powers: sweeped powers of the bus CW drive.
+            spec_source_2: sepcifies instrument used to apply bus MW drive. By default
+                instr_spec_source_2 is used.
         """
         if freqs_01 is None:
             freqs_01 = np.arange(self.freq_qubit()-60e6,
@@ -2582,10 +2706,16 @@ class CCLight_Transmon(Qubit):
         to extract the SNR and readout fidelities.
 
         Args:
+            analyze: should the analysis be executed?
             nr_shots: total number of measurements in qubit ground and excited state
             cases: currently unused
             update_threshold: bool indicating whether to update a threshold according
                 to which the shot is classified as ground or excited state.
+            prepare: should the prepare_for_timedomain be executed?
+            SNR_detector: the function will return a dictionary suitable, making this function
+                easier to use as a detector in the nested measurement
+            shots_per_meas: number of single shot measurements per single
+                acquisition with UHFQC
             ...
         '''
         old_RO_digit = self.ro_acq_digitized()
@@ -2679,6 +2809,17 @@ class CCLight_Transmon(Qubit):
 
     def measure_SSRO_frequency_amplitude_sweep(self, freqs=None, amps_rel=np.linspace(0, 1, 11),
                                                nr_shots=4092*4, nested_MC=None, analyze=True):
+        '''
+        Measures SNR and readout fidelities as a function of the readout pulse amplitude
+        and frequency. Resonator depletion pulses are automatically scaled.
+        Weights are not optimized - routine is intended to be used with SSB weights.
+
+        Args:
+            freqs: list of readout freqencies to loop over
+            amps_rel: list of readout pulse amplitudes to loop over. Value of 1 indicates
+                amplitude currently specified in the qubit object.
+            nr_shots: total number of measurements in qubit ground and excited state
+        '''
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
         if freqs is None:
@@ -2725,6 +2866,17 @@ class CCLight_Transmon(Qubit):
 
     def measure_SSRO_frequency_power_sweep_TWPA(self, pump_source,freqs, powers,
                                                nr_shots=4092*4, nested_MC=None, analyze=True):
+        '''
+        Measures the SNR and readout fidelities as a function of the TWPA
+            pump frequency and power.
+
+        Args:
+            pump_source: object controlling the MW source serving as TWPA pump
+            freqs: list of TWPA pump frequencies to sweep over
+            powers: list of TWPA pump powers to sweep over
+            nr_shots: number of single-shot measurements used to estimate SNR
+                and redout fidelities
+        '''
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
@@ -2762,7 +2914,18 @@ class CCLight_Transmon(Qubit):
 
 
     def measure_SSRO_pulse_length_sweep(self, lengths=np.arange(100e-9, 1501e-9, 100e-9),
-                                        nr_shots=4092*4, nested_MC=None, analyze=True, label_suffix: str=''):
+                                        nr_shots=4092*4, nested_MC=None, analyze=True,
+                                        label_suffix: str=''):
+        '''
+        Measures the SNR and readout fidelities as a function of the duration
+            of the readout pulse. For each pulse duration transients are
+            measured and optimal weights calculated.
+
+        Args:
+            lengths: durations of the readout pulse for which SNR is measured
+            nr_shots: number of single-shot measurements used to estimate SNR
+                and redout fidelities
+        '''
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
         self.ro_acq_digitized(False)
@@ -3033,6 +3196,10 @@ class CCLight_Transmon(Qubit):
             is adjusted by sweeping the attenuation of the relevant gaussian VSM channel,
             in max range (0.1 to 1.0).
             If cfg_with_vsm()==False adjusts the channel amplitude of the AWG in range (0 to 1).
+
+        Relevant parameters:
+            - mw_amp180: amplitude of the waveform corresponding to pi pulse (from 0 to 1)
+            - mw_channel_amp: AWG channel amplitude (digitally scaling the waveform; form 0 to 1)
         """
         if self.cfg_with_vsm():
             self.measure_rabi_vsm(MC, amps,
@@ -3165,7 +3332,10 @@ class CCLight_Transmon(Qubit):
             nr_cliffords: int=80, nr_seeds: int=200,
             verbose: bool = True, update: bool=True,
             prepare_for_timedomain: bool=True):
-
+            '''
+            Refs:
+                Rol PR Applied 7, 041001 (2017)
+            '''
         return self.calibrate_mw_gates_rb(
             MC=None,
             parameter_list=parameter_list,
@@ -3365,6 +3535,11 @@ class CCLight_Transmon(Qubit):
         depletion pulse.
         It uses the averaged transients for ground and excited state for its
         cost function.
+        
+        Refs:
+        Bultnik PR Applied 6, 034008 (2016)
+
+        Args:
         two_par:    if readout is performed at the symmetry point and in the
                     linear regime two parameters will suffice. Othen, four
                     paramters do not converge.
@@ -3460,13 +3635,14 @@ class CCLight_Transmon(Qubit):
                                sequence_type='echo', prepare: bool=True,
                                feedback=False,
                                depletion_time=None, net_gate='pi'):
-        # docstring from parent class
-        # this performs a multiround experiment, the repetition rate is defined
-        # by the ro_duration which can be changed by regenerating the
-        # configuration file.
-        # The analysis counts single errors. The definition of an error is
-        # adapted automatically by choosing feedback or the net_gate.
-        # it requires high SNR single shot readout and a calibrated threshold
+        '''
+        This performs a multiround experiment, the repetition rate is defined
+        by the ro_duration which can be changed by regenerating the
+        configuration file.
+        The analysis counts single errors. The definition of an error is
+        adapted automatically by choosing feedback or the net_gate.
+        it requires high SNR single shot readout and a calibrated threshold.
+        '''
         self.ro_acq_digitized(True)
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3681,6 +3857,10 @@ class CCLight_Transmon(Qubit):
                                        target_qubit_excited=False,
                                        extra_echo=False):
         # docstring from parent class
+
+        # Refs:
+        # Schuster Phys. Rev. Lett. 94, 123602 (2005)
+        # Gambetta PRA 74, 042318 (2006)
         if MC is None:
             MC = self.instr_MC.get_instr()
         if cross_target_qubits is None:
@@ -3895,6 +4075,29 @@ class CCLight_Transmon(Qubit):
     def measure_motzoi(self, motzoi_amps=None,
                        prepare_for_timedomain: bool=True,
                        MC=None, analyze=True, close_fig=True):
+        '''
+        Sweeps the amplitude of the DRAG coefficients looking for leakage reduction
+        and optimal correction for the phase error due to stark shift resulting
+        from transition to higher qubit states. In this measurement the two-pulse
+        sequence are applied:
+        X180-Y90 and Y180-X90 and the amplitude of the gaussian-derivative component
+        of the MW pulse is sweeped. When the DRAG coefficient is adjusted correctly
+        the two sequences yield the same result.
+
+        Refs:
+        Motzoi PRL 103, 110501 (2009)
+        Chow PRA 82, 040305(R) (2010)
+        Lucero PRA 82, 042339 (2010)
+
+        Args:
+            motzoi_amps: DRAG coefficients to sweep over. In VSM case the amplitude
+                is adjusted by varying attenuation of the derivative channel for the
+                relevant module. In no-VSM the DRAG parameter is adjusted by reloading
+                of the waveform on the AWG.
+        Returns:
+            value of the DRAG parameter for which the two sequences yield the same result
+            error is mimimized.
+        '''
         using_VSM = self.cfg_with_vsm()
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         AWG = MW_LutMan.AWG.get_instr()
@@ -3963,6 +4166,18 @@ class CCLight_Transmon(Qubit):
         """
         Measures randomized benchmarking decay including second excited state
         population.
+        
+        Refs:
+        Knill PRA 77, 012307 (2008)
+        Wood PRA 97, 032306 (2018)
+
+        Args:
+            nr_cliffords: list of lengths of the clifford gate sequences
+            nr_seeds: number of random sequences for each sequence length
+            recompile: indicate whether to regenerate the sequences of clifford gates.
+                By default it checks whether the needed sequences were already
+                generated since the most recent change of OpenQL file
+                specified in self.cfg_openql_platform_fn
 
         For this it:
             - stores single shots using SSB weights (int. logging)

@@ -229,9 +229,11 @@ class Qubit(Instrument):
                       prepare_for_timedomain: bool=True):
         """
         Performs an AllXY experiment. AllXY experiment consists of 21 pairs of
-        MW control pulses folowed by the qubit measurement. In the ideal case the result of 
+        MW control pulses folowed by the qubit measurement (in this routine
+        each pair is repeated twice). In the ideal case the result of 
         this measurement should be a staircase, and specific errors in the MW gate tuenup
         result in characteristic deviations from the ideal shape.
+        
         For detailed description of the AllXY measurement and symptomes of different errors
         see PhD thesis by Matthed Reed (2013, Schoelkopf lab), pp. 124.
         https://rsl.yale.edu/sites/default/files/files/RSL_Theses/reed.pdf
