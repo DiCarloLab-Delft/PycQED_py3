@@ -555,6 +555,8 @@ class Segment:
             el_list = []
             i = 0
             for el in self.elements_on_awg[awg]:
+                if el not in self.element_start_end:
+                    self.element_start_length(el, awg)
                 el_list.append([self.element_start_end[el][awg][0], i, el])
                 i += 1
 
@@ -650,7 +652,8 @@ class Segment:
         self.element_start_end[element][awg] = [t_start, samples]
         return [t_start, samples]
 
-    def waveforms(self, awgs=None, channels=None):
+    def waveforms(self, awgs=None, elements=None, channels=None, 
+                        codewords=None):
         """
         After all the pulses have been added, the timing resolved and the 
         trigger pulses added, the waveforms of the segment can be compiled.
@@ -667,10 +670,12 @@ class Segment:
             ...
             }
         """
-        if awgs == None:
-            awgs = self.elements_on_awg
-        if channels == None:
+        if awgs is None:
+            awgs = set(self.elements_on_awg)
+        if channels is None:
             channels = set(self.pulsar.channels)
+        if elements is None:
+            elements = set(self.elements)
 
         awg_wfs = {}
 
@@ -682,7 +687,9 @@ class Segment:
             if channel_list == set():
                 continue
             channel_list = list(channel_list)
-            for (i, element) in enumerate(self.elements_on_awg[awg]):
+            for i, element in enumerate(self.elements_on_awg[awg]):
+                if element not in elements:
+                    continue
                 awg_wfs[awg][(i, element)] = {}
                 tvals = self.tvals(channel_list, element)
                 wfs = {}
@@ -691,6 +698,9 @@ class Segment:
                     # checks whether pulse is played on AWG
                     pulse_channels = set(pulse.channels) & set(channel_list)
                     if pulse_channels == set():
+                        continue
+                    if codewords is not None and \
+                            pulse.codeword not in codewords:
                         continue
 
                     # fills wfs with zeros for used channels
@@ -796,6 +806,29 @@ class Segment:
                                 wfs[codeword][channel])
 
         return awg_wfs
+    
+    def get_element_codewords(self, element, awg=None):
+        codewords = set()
+        if awg is not None:
+            channels = set(self.pulsar.find_awg_channels(awg))
+        for pulse in self.elements[element]:
+            if awg is not None and len(set(pulse.channels) & channels) == 0:
+                continue
+            codewords.add(pulse.codeword)
+        return codewords
+
+    def get_element_channels(self, element, awg=None):
+        channels = set()
+        if awg is not None:
+            awg_channels = set(self.pulsar.find_awg_channels(awg))
+        for pulse in self.elements[element]:
+            if awg is not None:
+                channels |= set(pulse.channels) & awg_channels
+            channels |= set(pulse.channels)
+        return channels
+
+    def calculate_hash(self, element, codeword, channel):
+        return (self.name, element, codeword, channel)
 
     def tvals(self, channel_list, element):
         """
@@ -878,7 +911,8 @@ class Segment:
                 for elem_name, v in wfs[instr].items():
                     for k, wf_per_ch in v.items():
                         for n_wf, (ch, wf) in enumerate(wf_per_ch.items()):
-                            if channels is None or ch in channels.get(instr, []):
+                            if channels is None or \
+                                    ch in channels.get(instr, []):
                                 tvals = \
                                 self.tvals([f"{instr}_{ch}"], elem_name[1])[
                                     f"{instr}_{ch}"] \
