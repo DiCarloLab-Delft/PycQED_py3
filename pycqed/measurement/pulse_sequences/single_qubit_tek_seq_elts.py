@@ -160,9 +160,12 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
     ge_pulse = operation_dict['X180 ' + qb_names[0]]
     ge_length = ge_pulse['nr_sigma']*ge_pulse['sigma']
     state_ops = dict(g=["I "], e=["X180 "], f=["X180_ef ", "X180 "])
+
+    if 'ref_pulse' not in pulse_list[0]:
+        pulse_list[0]['ref_pulse'] = 'segment_start'
+
     if preparation_type == 'wait':
         return pulse_list
-
     elif 'active_reset' in preparation_type:
         reset_ro_pulses = []
         for i, qbn in enumerate(qb_names):
@@ -205,7 +208,7 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
             if rep == 0:
                 ro_list[0]['ref_pulse'] = 'segment_start'
                 ro_list[0]['pulse_delay'] = -reset_reps * (
-                        post_ro_wait + ge_length + ef_length )
+                        post_ro_wait + ge_length + ef_length)
             ro_list[0]['name'] = 'refpulse_reset_element_{}'.format(rep)
             rp_list = deepcopy(reset_pulses)
             for j, pulse in enumerate(rp_list):

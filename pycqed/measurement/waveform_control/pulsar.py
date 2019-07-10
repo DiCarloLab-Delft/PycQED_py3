@@ -172,7 +172,8 @@ class UHFQCPulsar:
                  "  RO_TRIG=WINT_TRIG;\n" \
                  "}\n\n"
             
-        main_loop = "repeat (loop_cnt) {\n"
+        # main_loop = "repeat (loop_cnt) {\n"
+        main_loop = "for (var i = loop_cnt; i > 0; i -= 1) {\n"
 
         footer = "}\n" \
                  "wait(1000);\n" \
@@ -1230,7 +1231,9 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         awgs_with_waveforms = self.awgs_with_waveforms()
         used_awgs = set(self.active_awgs()) & awgs_with_waveforms
         
-        
+        for awg in used_awgs:
+            self._stop_awg(awg)
+
         if self.master_awg() is None:
             for awg in used_awgs:
                 if awg not in exclude:
@@ -1284,29 +1287,24 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
 
         # resolves timing and generates trigger elements for all segments 
         for segment in sequence.segments:
-            seg = sequence.segments[segment]
+            sequence.segments[segment].resolve_segment()
 
-            seg.resolve_segment()
-        
         sequence.sequence_for_awg()
-        csv_files_deleted = False
         for awg in awgs:
-            #returns the instance of the class AWG that is requested
             obj = self.AWG_obj(awg=awg)
-
-            if not csv_files_deleted and \
-                    isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
+            if isinstance(obj, ZI_HDAWG8):
                 # delete previous cache files
                 obj._delete_chache_files()
                 log.info('Previous AWG8 cache files have been deleted.')
                 # delete old csv files
                 obj._delete_csv_files()
                 log.info('Previous AWG8 csv files have been deleted.')
-                csv_files_deleted = True
+                break
 
-            #programs the AWG to play the segments in the order as in sequence
-            self._program_awg(obj, sequence)
-        
+        for awg in awgs:
+            self._program_awg(self.AWG_obj(awg=awg), sequence)
+
+        # sequence.sequence_for_awg()
         self.AWGs_prequeried(False)
 
     def old_program_awgs(self, sequence, *elements, AWGs='all', channels='all',

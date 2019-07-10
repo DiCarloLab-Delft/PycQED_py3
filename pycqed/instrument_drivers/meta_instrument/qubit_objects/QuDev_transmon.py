@@ -708,9 +708,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
                                                        upload=upload))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weights_type() == 'optimal_qutrit'
-                                 else self.int_avg_det)
+        MC.set_detector_function(self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: amps},
