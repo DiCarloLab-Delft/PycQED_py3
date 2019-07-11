@@ -219,8 +219,8 @@ class dummy_UHFQC(Instrument):
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
         # these signals on the output here.
-        self.sigouts_0_enables_3(0)
-        self.sigouts_1_enables_7(0)
+        self.sigouts_0_enables_0(0)
+        self.sigouts_1_enables_1(0)
 
     def _gen_set_func(self, dev_set_type, cmd_str):
         def set_func(val):
