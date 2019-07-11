@@ -45,6 +45,7 @@ class DeviceCCL(Instrument):
     """
     Device object for systems controlled using the
     CCLight (CCL), QuMa based CC (QCC) or Distributed CC (CC).
+    FIXME: class name is outdated
     """
 
     def __init__(self, name, **kw):
@@ -228,7 +229,7 @@ class DeviceCCL(Instrument):
                        'flux_2': 8,
                        }
         elif isinstance(cc, QuTechCC):
-            # NB: we number from 0 juast as QuTechCC, because slots are numbered from 0
+            # NB: we number from 0 in accordance with QuTechCC driver (which adheres to hardware slot numbering)
             # NB: slot 5 contains VSM interface
             dio_map = {'ro_0': 0,
                        'ro_1': 1,
