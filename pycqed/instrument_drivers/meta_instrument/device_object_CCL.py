@@ -2,22 +2,27 @@ import numpy as np
 import time
 import logging
 import adaptive
+import networkx as nx
+import datetime
 from collections import OrderedDict
+from collections import defaultdict
+from importlib import reload
+
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter, Parameter
+
 from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis import tomography as tomo
 from pycqed.analysis_v2 import measurement_analysis as ma2
-import networkx as nx
-import datetime
 from pycqed.utilities.general import check_keyboard_interrupt
-from importlib import reload
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
+from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
@@ -35,15 +40,11 @@ except ImportError:
     cl_oql = None
     oqh = None
 
-from pycqed.analysis import tomography as tomo
-
-from collections import defaultdict
-
 
 class DeviceCCL(Instrument):
     """
     Device object for systems controlled using the
-    CCLight (CCL) or QuMa based CC (QCC).
+    CCLight (CCL), QuMa based CC (QCC) or Distributed CC (CC).
     """
 
     def __init__(self, name, **kw):
@@ -208,19 +209,32 @@ class DeviceCCL(Instrument):
                            get_cmd=self._get_dio_map)
 
     def _get_dio_map(self):
-        CC = self.instr_CC.get_instr()
-        if isinstance(CC, CCL):
+        # FIXME: assumes single mapping for instrument
+        cc = self.instr_CC.get_instr()
+        if isinstance(cc, CCL):
             dio_map = {'ro_0': 1,
                        'ro_1': 2,
                        'flux_0': 3,
                        'mw_0': 4,
                        'mw_1': 5}
-        elif isinstance(CC, QCC):
+        elif isinstance(cc, QCC):
             dio_map = {'ro_0': 1,
                        'ro_1': 2,
                        'ro_2': 3,
                        'mw_0': 4,
                        'mw_1': 5,
+                       'flux_0': 6,
+                       'flux_1': 7,
+                       'flux_2': 8,
+                       }
+        elif isinstance(cc, QuTechCC):
+            # NB: we number from 0 juast as QuTechCC, because slots are numbered from 0
+            # NB: slot 5 contains VSM interface
+            dio_map = {'ro_0': 0,
+                       'ro_1': 1,
+                       'ro_2': 2,
+                       'mw_0': 3,
+                       'mw_1': 4,
                        'flux_0': 6,
                        'flux_1': 7,
                        'flux_2': 8,
@@ -251,7 +265,7 @@ class DeviceCCL(Instrument):
 
         N.B. latencies are set in multiples of 20ns in the DIO. 
         Latencies shorter than 20ns are set as channel delays in the AWGs. 
-        These are set globablly. If individual (per channel) setting of latency
+        These are set globally. If individual (per channel) setting of latency
         is required in the future, we can add this. 
 
         """
@@ -299,7 +313,7 @@ class DeviceCCL(Instrument):
                 if AWG_name is not None: 
                     AWG = self.find_instrument(AWG_name)
                     # All channels are set globally from the device object. 
-                    for i in range(8): # assumes the AWG is an HDAWG 
+                    for i in range(8): # FIXME: assumes the AWG is an HDAWG
                         AWG.set('sigouts_{}_delay'.format(i), lat_fine)       
 
 
@@ -424,7 +438,7 @@ class DeviceCCL(Instrument):
             self._get_ro_channels_and_labels(qubits)
         int_log_dets=[]
         for j, acq_instrument in enumerate(np.unique(acq_instruments)):
-            #selecting the readout channesl for  each acq instrument
+            #selecting the readout channels for  each acq instrument
             indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
             if j == 0: 
@@ -554,7 +568,7 @@ class DeviceCCL(Instrument):
             indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
             if j == 0: 
-                CC=self.instr_CC.get_instr()
+                CC = self.instr_CC.get_instr()
             else: 
                 CC = None
 
@@ -661,11 +675,11 @@ class DeviceCCL(Instrument):
         turn on the required channels again.
         """
 
-        # turn all channels on all VSMnS off
+        # turn all channels on all VSMs off
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
             VSM = qb.instr_VSM.get_instr()
-            # VSM.set_all_switches_to('OFF')
+            # VSM.set_all_switches_to('OFF')  # FIXME: commented out
 
         # turn the desired channels on
         for qb_name in self.qubits():
@@ -674,6 +688,7 @@ class DeviceCCL(Instrument):
             # Configure VSM
             # N.B. This configure VSM block is geared specifically to the
             # Duplexer/BlueBox VSM
+            # FIXME: code below commented out
             # VSM = qb.instr_VSM.get_instr()
             # Gin = qb.mw_vsm_ch_in()
             # Din = qb.mw_vsm_ch_in()
@@ -1162,7 +1177,7 @@ class DeviceCCL(Instrument):
         - the cc light to has the readout time configured equal to the
             measurement and depletion time + 60 ns buffer
 
-        fixme: not sure if the weight function assignment is working correctly.
+        FIXME: not sure if the weight function assignment is working correctly.
 
         the qubit objects will use SSB for the dephasing measurements.
         '''
@@ -1690,7 +1705,7 @@ class DeviceCCL(Instrument):
         It is defined as a private method as it should not be used
         independently.
         """
-        # FXIME passing as a list is a hack to work around Function detector
+        # FIXME passing as a list is a hack to work around Function detector
         counter_par = counter_par[0]
         gate_separation_par = gate_separation_par[0]
 
@@ -2207,7 +2222,7 @@ class DeviceCCL(Instrument):
 
         if calibrate_optimal_weights:
             # Important that this happens before calibrating the weights
-            # 5 is the number of channels in the UHFQC
+            # 5 is the number of channels in the UHFQC. FIXME: depends
             for i in range(5):
                 UHFQC.set('quex_trans_offset_weightfunction_{}'.format(i), 0)
 

@@ -15,8 +15,6 @@ from .Transport import Transport
 
 from qcodes.utils import validators as vals
 from qcodes import Instrument
-from qcodes.instrument.parameter import ManualParameter
-from qcodes.instrument.parameter import Parameter
 
 log = logging.getLogger(__name__)
 
@@ -28,7 +26,7 @@ class QuTechCC(QuTechCC_core, Instrument):
                  num_ccio: int=9,
                  ccio_slot_driving_vsm: int=5) -> None:
         super().__init__(name, transport) # calls QuTechCC_core
-        super(Instrument, QuTechCC).__init__(self, name) # calls Instrument
+        Instrument.__init__(self, name) # calls Instrument
 
         # user constants
         self._num_ccio = num_ccio  # the number of CCIO modules used

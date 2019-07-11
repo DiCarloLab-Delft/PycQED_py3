@@ -191,16 +191,16 @@ class SCPIBase:
 
     # bits for STATus:OPERation
     # FIXME: add the function
-    STAT_OPER_CALIBRATING       = 0x0001       # The instrument is currently performing a calibration
-    STAT_OPER_SETTLING          = 0x0002          # The instrument is waiting for signals it controls to stabilize enough to begin measurements
-    STAT_OPER_RANGING           = 0x0004           # The instrument is currently changing its range
-    STAT_OPER_SWEEPING          = 0x0008          # A sweep is in progress
-    STAT_OPER_MEASURING         = 0x0010       # The instrument is actively measuring
-    STAT_OPER_WAIT_TRIG         = 0x0020        # The instrument is in a “wait for trigger” state of the trigger model
-    STAT_OPER_WAIT_ARM          = 0x0040         # The instrument is in a “wait for arm” state of the trigger model
-    STAT_OPER_CORRECTING        = 0x0080      # The instrument is currently performing a correction
-    STAT_OPER_INSTR_SUMMARY     = 0x2000  # One of n multiple logical instruments is reporting OPERational status
-    STAT_OPER_PROG_RUNNING      = 0x4000  # A user-defined program is currently in the run state
+    STAT_OPER_CALIBRATING       = 0x0001    # The instrument is currently performing a calibration
+    STAT_OPER_SETTLING          = 0x0002    # The instrument is waiting for signals it controls to stabilize enough to begin measurements
+    STAT_OPER_RANGING           = 0x0004    # The instrument is currently changing its range
+    STAT_OPER_SWEEPING          = 0x0008    # A sweep is in progress
+    STAT_OPER_MEASURING         = 0x0010    # The instrument is actively measuring
+    STAT_OPER_WAIT_TRIG         = 0x0020    # The instrument is in a “wait for trigger” state of the trigger model
+    STAT_OPER_WAIT_ARM          = 0x0040    # The instrument is in a “wait for arm” state of the trigger model
+    STAT_OPER_CORRECTING        = 0x0080    # The instrument is currently performing a correction
+    STAT_OPER_INSTR_SUMMARY     = 0x2000    # One of n multiple logical instruments is reporting OPERational status
+    STAT_OPER_PROG_RUNNING      = 0x4000    # A user-defined program is currently in the run state
 
     # bits for STATus:QUEStionable
     # FIXME: add the function

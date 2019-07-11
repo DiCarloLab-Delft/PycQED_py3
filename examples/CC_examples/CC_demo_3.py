@@ -159,10 +159,11 @@ center_x = 16
 center_y = 16
 scale_x = 0.5
 scale_y = 1.0
-scales = [100] #[100, 50, 0]:   #range(-100,100,50):
+scales = [100]
+scales = [100, 50, 0]   #range(-100,100,50):
 prog = 'start:\n'
 for scale in scales:
-    prog += ' move 50000,R0\n'
+    prog += ' move 500000,R0\n'
     prog += 'loop{}:\n'.format(scale+100)
     scale_x = scale/100
     for coord in coords:
