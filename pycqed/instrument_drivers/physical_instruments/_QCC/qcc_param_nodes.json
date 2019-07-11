@@ -189,6 +189,69 @@
             }
         },
         {
+            "docstring": "This parameter modifies the reset register of the QEC decoder submodule. Valid input: 1 = reset, 0 = idle",
+            "get_cmd": "QUTech:QecCtrlReset?",
+            "label": "Reset QEC Decoder",
+            "name": "qec_submodule_control_reset",
+            "set_cmd": "QUTech:QecCtrlReset {}",
+            "vals": {
+                "type": "Bool"
+            }
+        },
+        {
+            "docstring": "This parameter modifies the enable register of the processor. Valid input: 1 = reset, 0 = idle",
+            "get_cmd": "QUTech:QecCtrlEnable?",
+            "label": "Enable QEC Decoder",
+            "name": "qec_submodule_control_enable",
+            "set_cmd": "QUTech:QecCtrlEnable {}",
+            "vals": {
+                "type": "Bool"
+            }
+        },
+        {
+            "docstring": "This parameter modifies the initial values of ancilla qubit states for QEC. Decimal-encoded binary value representing one-hot encoding of ancilla qubit states.",
+            "get_cmd": "QUTech:QecCtrlInitAQB?",
+            "label": "Initialize QEC Decoder Ancillas",
+            "name": "qec_submodule_init_aqb",
+            "set_cmd": "QUTech:QecCtrlInitAQB {}",
+            "vals": {
+                "range": [
+                    0,
+                    255
+                ],
+                "type": "Non_Neg_Number"
+            }
+        },
+        {
+            "docstring": "This parameter modifies the data qubit readout type. Valid input: 0 = Z, 1 = X",
+            "get_cmd": "QUTech:QecCtrlDQbXZN?",
+            "label": "Data qubit readout type",
+            "name": "qec_submodule_dqb_xzn",
+            "set_cmd": "QUTech:QecCtrlDQbXZN {}",
+            "vals": {
+                "type": "Bool"
+            }
+        },
+        {
+            "docstring": "This parameter determines all the outputs resulting from the QEC submodule.",
+            "get_cmd": "QUTech:QecOutput?",
+            "label": "QEC result readout",
+            "name": "qec_submodule_output",
+            "vals": {
+                "type": "QECDataType"
+            }
+        },
+        {
+            "docstring": "This parameter switches operation of QCC between VSM and NO-VSM modes for microwave control.",
+            "get_cmd": "QUTech:NoVSM?",
+            "label": "No-VSM mode selector",
+            "name": "no_vsm",
+            "set_cmd": "QUTech:NoVSM {}",
+            "vals": {
+                "type": "Bool"
+            }
+        },
+        {
             "docstring": "It sets/gets the delay for VSM channel 0. Acceptable range is [0,127]. The unit is 2.5 ns.",
             "get_cmd": "QUTech:VSMChannelDelay0?",
             "label": "VSM Channel 0 delay",
@@ -460,11 +523,11 @@
         }
     ],
     "version": {
-        "Embedded Software Build Time": "20190306-17:31:20",
-        "Embedded Software Version": "0.1.0",
-        "Firmware": "0.1.0",
+        "Embedded Software Build Time": "20190709-14:25:01",
+        "Embedded Software Version": "0.2.0",
+        "Firmware": "0.2.0",
         "Firmware Build Time": "24/10/2016-13:27:47",
-        "Kernel Module Build Time": "20190306-17:31:38",
+        "Kernel Module Build Time": "20190709-14:25:10",
         "Kernel Module Version": "0.0.1",
         "Model": " QCC",
         "Serial": "QCC1",

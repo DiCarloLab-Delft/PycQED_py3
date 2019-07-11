@@ -243,6 +243,7 @@ def generate_config(filename: str,
         },
     }
 
+    # Create a prepare Z operation for all 17 qubits
     for q in qubits:
         cfg["instructions"]["prepz {}".format(q)] = {
             "duration": init_duration,
@@ -257,6 +258,7 @@ def generate_config(filename: str,
             "cc_light_opcode": 2
         }
 
+    # Create a measurement operation for all 17 qubits
     for q in qubits:
         cfg["instructions"]["measure {}".format(q)] = {
             "duration": ro_duration,
@@ -271,6 +273,9 @@ def generate_config(filename: str,
             "cc_light_opcode": 4
         }
 
+    # Prepare, for all 17 qubits, the 11 different mw combinations defined below
+    # 'i {}', 'rx180 {}', 'ry180 {}', 'rx90 {}', 'ry90 {}','rxm90 {}', 'rym90 {}', 'rphi90 {}',
+    # 'spec {}', 'rx12 {}', 'square {}'
     for CW in range(len(lut_map)):
         for q in qubits:
             cfg["instructions"][lut_map[CW].format(q)] = {
@@ -284,7 +289,8 @@ def generate_config(filename: str,
                 "cc_light_instr": "cw_{:02}".format(CW),
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
-
+    # Additionaly, prepare also 2*17*32 associated with codewords similar to above, but conditioned\
+    # on either HW COND 1 (do if last meas == 1) or HW COND 2 (do if last meas == 0)
             cfg["instructions"]['c1'+lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": mw_latency,
@@ -297,7 +303,6 @@ def generate_config(filename: str,
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 32+8+CW,
                 "cc_light_cond": 1}  # 1 means : do if last meas. == 1
-
 
             cfg["instructions"]['c0'+lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
@@ -312,7 +317,7 @@ def generate_config(filename: str,
                 "cc_light_opcode": 32+16+CW,
                 "cc_light_cond": 2}  # 2 means : do if last meas. == 0
 
-
+    # Prepare, for all 17 qubits, 32 simple codewords to be triggered.
     for CW in range(32):
         for q in qubits:
             cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
@@ -327,6 +332,7 @@ def generate_config(filename: str,
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
 
+    # Microwave compensate introction definition
     for q in qubits:
         cfg["instructions"]["compensate {}".format(q)] = {
             "duration": mw_pulse_duration,
@@ -340,8 +346,7 @@ def generate_config(filename: str,
             "cc_light_codeword": 0,
             "cc_light_opcode": 8+0}
 
-    # N.B. The codewords for CZ pulses need to be further specified.
-    # I do not expect this to be correct for now.
+    # Flux operation definition
     for cw_flux in range(8):
         op_flux = _flux_lutmap[cw_flux]['name']
         for flux_q in range(17):
@@ -356,7 +361,7 @@ def generate_config(filename: str,
                 "cc_light_instr_type": "single_qubit_gate",
                 "cc_light_instr": "fl_cw_{:02}".format(cw_flux),
                 "cc_light_codeword": cw_flux,
-                "cc_light_opcode": 64+cw_flux
+                "cc_light_opcode": 128+cw_flux
             }
 
     with open(filename, 'w') as f:
