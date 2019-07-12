@@ -235,7 +235,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
              ['ry90', 'ry90']]
 
     # this should be implicit
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    # FIXME: remove try-except, when we depend hard on >=openql-0.6
     try:
         p.set_sweep_points(np.arange(len(allXY), dtype=float))
     except TypeError:
@@ -248,7 +248,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}".format(i+j//2), p)
+            k = oqh.create_kernel("AllXY_{}".format(i+j//2), p) # FIXME: generates 2 identical kernel names if js=2. This does work, but is still undesirable
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])

@@ -3,7 +3,7 @@ File:               CC_transmon.py
 Author:             Adriaan Rol
 Purpose:            Multiple qubit objects for CC controlled transmons
 Usage:
-Notes:
+Notes:              uses Cbox, not CC as the name suggests
 Bugs:
 '''
 import time
@@ -2894,8 +2894,8 @@ class QWG_driven_transmon(CBox_v3_driven_transmon):
 
         self.QWG.start()
         # Check for errors at the end
-        for i in range(self.QWG.getSystemErrorCount()):
-            logging.warning(self.QWG.getError())
+        for i in range(self.QWG.get_system_error_count()):
+            logging.warning(self.QWG.get_error())
         t1 = time.time()
         logging.info('Initializing QWG took {:.2f}'.format(t1-t0))
 

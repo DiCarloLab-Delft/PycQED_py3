@@ -1,6 +1,6 @@
 """
 This file reads in a pygsti dataset file and converts it to a valid
-OpenQL sequence.
+OpenQL sequence. FIXME: copy/paste error
 """
 
 from os.path import join
@@ -108,7 +108,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
     p = oqh.create_program(program_name, platf_cfg)
 
     # attribute get's added to program to help finding the output files
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    p.filename = join(p.output_dir, p.name + '.qisa')  # FIXME: platform dependency
 
     if not oqh.check_recompilation_needed(
             program_fn=p.filename, platf_cfg=platf_cfg, recompile=recompile):
@@ -145,7 +145,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                     net_cl_seq = rb.calculate_net_clifford(cl_seq, Cl)
                     cl_seq_decomposed = []
                     for cl in cl_seq:
-                        # hacking in exception for benchmarking only CZ
+                        # FIXME: hacking in exception for benchmarking only CZ
                         # (not as a member of CNOT group)
                         if cl == -4368:
                             cl_seq_decomposed.append([('CZ', ['q0', 'q1'])])
@@ -168,20 +168,20 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                 if isinstance(q, str):
                                     k.gate(g, [qubit_map[q]])
                                 elif isinstance(q, list):
-                                    # This is a hack because we cannot
+                                    # FIXME: This is a hack because we cannot
                                     # properly trigger CZ gates.
                                     # k.gate("wait",  list(qubit_map.values()), 0)
                                     # k.gate(flux_codeword, [2, 0]) #hardcoded sandwhiched with wait 0's for alignment
                                     # k.gate("wait",  list(qubit_map.values()), 0)
 
                                     k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
-                                    k.gate(flux_codeword, [10, 8]) # Hack for QCC
+                                    k.gate(flux_codeword, [10, 8]) # FIXME: Hack for QCC
 
                                     k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
 
 
 
-                        # This hack is required to align multiplexed RO in openQL..
+                        # FIXME: This hack is required to align multiplexed RO in openQL..
                         k.gate("wait",  list(qubit_map.values()), 0)
                         for qubit_idx in qubit_map.values():
                             k.measure(qubit_idx)
@@ -195,7 +195,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                             for qubit_idx in qubit_map.values():
                                 k.prepz(qubit_idx)
 
-                        # Gate seqs is a hack for failing openql scheduling
+                        # FIXME: Gate seqs is a hack for failing openql scheduling
                         gate_seqs = [[], []]
                         for gsi, q_idx in enumerate(qubits):
                             cl_seq = rb.randomized_benchmarking_sequence(
@@ -207,7 +207,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                 # for g, q in gates:
                                 #     k.gate(g, q_idx)
 
-                                # THIS is a hack because of OpenQL
+                                # FIXME: THIS is a hack because of OpenQL
                                 # scheduling issues #157
 
                                 gate_seqs[gsi] += gates
@@ -224,7 +224,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                 except IndexError as e:
                                     pass
                         # end of #157 HACK
-                        # This hack is required to align multiplexed RO in openQL..
+                        # FIXME: This hack is required to align multiplexed RO in openQL..
                         k.gate("wait",  list(qubit_map.values()), 0)
                         for qubit_idx in qubit_map.values():
                             k.measure(qubit_idx)
