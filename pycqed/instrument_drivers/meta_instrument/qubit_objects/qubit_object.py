@@ -17,7 +17,7 @@ from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
 
 class Qubit(Instrument):
 
-    '''
+    """
     Abstract base class for the qubit object.
     Contains a template for all methods a qubit (should) has.
     N.B. This is not intended to be initialized.
@@ -93,7 +93,7 @@ class Qubit(Instrument):
             or calibrate?
         - Should the pulse-parameters be grouped here in some convenient way?
             (e.g. parameter prefixes)
-    '''
+    """
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
@@ -170,14 +170,22 @@ class Qubit(Instrument):
         """
         Performs a T1 experiment.
         Args:
-            times:      array of times to measure at, if None will define a
-                        suitable range based on the last known T1
-            MC:         instance of the MeasurementControl
-            close_fig:  close the figure in plotting
-            update :    update self.T1 with the measured value
+            times (array):
+                array of times to measure at, if None will define a
+                suitable range based on the last known T1
+
+            MC (MeasurementControl):
+                instance of the MeasurementControl
+
+            close_fig (bool):
+                close the figure in plotting
+
+            update (bool):
+                update self.T1 with the measured value
 
         returns:
-            T1 (float) the measured value
+            T1 (float):
+                the measured value
         """
 
         # Note: I made all functions lowercase but for T1 it just looks too
@@ -202,8 +210,11 @@ class Qubit(Instrument):
         accurately than the monotonuous decay.
 
         Args:
-            times: array of delay times between the two pi/2 pulses
-            artificial_detuning: intentional detuing from the known qubit frequency
+            times (array):
+                array of delay times between the two pi/2 pulses
+
+            artificial_detuning (float):
+                intentional detuing from the known qubit frequency
         """
         raise NotImplementedError()
 
@@ -219,7 +230,8 @@ class Qubit(Instrument):
         microwave pulses.
 
         Args:
-            times: list of total waiting time between two pi/2 pulses. Half of the delay
+            times (array):
+                list of total waiting time between two pi/2 pulses. Half of the delay
                 is inserted before, and half after the central pi pule.      
         """
         raise NotImplementedError()
@@ -239,9 +251,14 @@ class Qubit(Instrument):
         https://rsl.yale.edu/sites/default/files/files/RSL_Theses/reed.pdf
 
         Args:
-            MC        : instance of the MeasurementControl
-            analyze   : perform analysis
-            close_fig : close the figure in plotting
+            MC (MeasurementControl):
+                instance of the MeasurementControl
+
+            analyze (bool):
+                perform analysis
+
+            close_fig (bool):
+                close the figure in plotting
         """
         raise NotImplementedError()
 
@@ -268,7 +285,7 @@ class Qubit(Instrument):
                            prepare: bool=True, depletion_analysis: bool=True,
                            depletion_analysis_plot: bool=True,
                            depletion_optimization_window=None):
-        '''
+        """
         Measure transients for the cases specified.
         Args:
             MC      (instr): measurement control
@@ -278,10 +295,11 @@ class Qubit(Instrument):
                 to preparing the qubit in the 0 or 1 state respectively.
             prepare (bool) : if True runs prepare for timedomain before
                 measuring the transients
+
         Returns:
             list of numpy arrays containing the transients for the cases
             specified.
-        '''
+        """
         if prepare:
             self.prepare_for_timedomain()
         raise NotImplementedError()
@@ -407,7 +425,7 @@ class Qubit(Instrument):
                                          npts=50001, use_min=False, MC=None,
                                          update=True, with_VNA=None,
                                          resonators=None, look_for_missing=True):
-        '''
+        """
         DISCLAIMER: designed for automation routines, seperate usage not
         adviced.
 
@@ -424,7 +442,7 @@ class Qubit(Instrument):
         at the spacing and expected spacing of the resonators, predict the
         frequency of the missing resonator and perform a high resolution scan
         to try and find it.
-        '''
+        """
         if with_VNA is None:
             try:
                 if self.instr_VNA.get_instr() == '':
@@ -792,14 +810,14 @@ class Qubit(Instrument):
 
     def find_resonator_sweetspot(self, freqs=None, dac_values=None,
                                  fluxChan=None, update=True):
-        '''
+        """
         Finds the resonator sweetspot current.
         TODO: - measure all FBL-resonator combinations
         TODO: - implement way of distinguishing which fluxline is most coupled
         TODO: - create method that moves qubits away from sweetspot when they
                 are not being measured (should not move them to some other
                 qubit frequency of course)
-        '''
+        """
         if freqs is None:
             freq_center = self.freq_res()
             freq_range = 20e6
@@ -835,20 +853,25 @@ class Qubit(Instrument):
                                  update=True,
                                  freqs=None,
                                  MC=None, close_fig=True):
-        '''
+        """
         Performs heterodyne spectroscopy to identify the frequecy of the (readout)
         resonator frequency.
 
         Args:
-            use_min: 'True' uses the frequency at minimum amplitude. 'False' uses
+            use_min (bool):
+                'True' uses the frequency at minimum amplitude. 'False' uses
                 the fit result
-            update: update the internal parameters with this fit
+
+            update (bool):
+                update the internal parameters with this fit
                 Finds the resonator frequency by performing a heterodyne experiment
                 if freqs == None it will determine a default range dependent on the
                 last known frequency of the resonator.
-            freqs: list of frequencies to sweep. By default set to +-5 MHz around
+
+            freqs (array):
+                list of frequencies to sweep. By default set to +-5 MHz around
                 the last recorded frequency, with 100 kHz step
-        '''
+        """
 
         # This snippet exists to be backwards compatible 9/2017.
         try:
@@ -904,20 +927,35 @@ class Qubit(Instrument):
         the relay times allows for more precise frequency measurement.
 
         Args:
-            method: specifies whether to perform spectroscopy ('spectroscopy') or series of
+            method (str {'spectroscopy', 'ramsey'}):
+                specifies whether to perform spectroscopy ('spectroscopy') or series of
                 ramsey measurements ('ramsey') to find the qubit frequency.
-            spec_mode: specifies the mode of the spectroscopy measurements (currently only implemented
+
+            spec_mode (str {'CW', 'pulsed_marked', 'pulsed_mixer'}):
+                specifies the mode of the spectroscopy measurements (currently only implemented
                 by Timo for CCL_Transmon). Possivle values: 'CW', 'pulsed_marked', 'pulsed_mixer'
-            steps: maximum delay between pi/2 pulses (in microseconds) in a subsequent ramsey measurements.
+
+            steps (array):
+                maximum delay between pi/2 pulses (in microseconds) in a subsequent ramsey measurements.
                 The find_frequency routine is terminated when all steps are performed or if
                 the fitted T2* significantly exceeds the maximum delay
-            artificial_periods: specifies the automatic choice of the artificial detuning in the ramsey
+
+            artificial_periods (float):
+                specifies the automatic choice of the artificial detuning in the ramsey
                 measurements, in such a way that ramsey measurement should show 4 full oscillations.
-            freqs: list of sweeped frequencies in case of spectroscopy measurement
-            f_span: span of sweeped frequencies around the currently recorded qubit frequency in
+
+            freqs (array):
+                list of sweeped frequencies in case of spectroscopy measurement
+
+            f_span (float):
+                span of sweeped frequencies around the currently recorded qubit frequency in
                 the spectroscopy measurement
-            f_step: increment of frequency between data points in spectroscopy measurement
-            update: boolean indicating whether to update the qubit frequency in the qubit object
+
+            f_step (flaot):
+                increment of frequency between data points in spectroscopy measurement
+
+            update (bool):
+                boolean indicating whether to update the qubit frequency in the qubit object
                 according to the result of the measurement
         """
         if method.lower() == 'spectroscopy':
@@ -1096,11 +1134,17 @@ class Qubit(Instrument):
         Runs an iterative procudere of ramsey experiments to estimate
         frequency detuning to converge to the qubit frequency up to the limit
         set by T2*.
+        
+        Args:
+            steps (array):
+                multiples of the initial stepsize on which to run the
 
-        steps:
-            multiples of the initial stepsize on which to run the
-        stepsize:
-            smalles stepsize in ns for which to run ramsey experiments.
+            artificial_periods (float):
+                intended number of periods in theramsey measurement, used to adjust
+                the artificial detuning
+
+            stepsize (float):
+                smalles stepsize in ns for which to run ramsey experiments.
         """
         cur_freq = self.freq_qubit()
         # Steps don't double to be more robust against aliasing
@@ -1150,20 +1194,25 @@ class Qubit(Instrument):
         return cur_freq
 
     def calculate_frequency(self, calc_method=None, V_per_phi0=None, V=None):
-        '''
+        """
         Calculates an estimate for the qubit frequency.
         Arguments are optional and parameters of the object are used if not
         specified.
+
         Args:
-            calc_method : can be "latest" or "flux" uses last known frequency
-                    or calculates using the cosine arc model as specified
-                    in fit_mods.Qubit_dac_to_freq
+            calc_method (str {'latest', 'flux'}):
+                can be "latest" or "flux" uses last known frequency
+                or calculates using the cosine arc model as specified
+                in fit_mods.Qubit_dac_to_freq
                 corresponding par. : cfg_qubit_freq_calc_method
 
-            V_per_phi0 : dac flux coefficient, converts volts to Flux.
-                    Set to 1 to reduce the model to pure flux.
+            V_per_phi0 (float):
+                dac flux coefficient, converts volts to Flux.
+                Set to 1 to reduce the model to pure flux.
                 corresponding par. : fl_dc_V_per_phi
-            V  : dac value used when calculating frequency
+
+            V (flat):
+                dac value used when calculating frequency
                 corresponding par. : fl_dc_V
 
         Calculates the f01 transition frequency using the cosine arc model.
@@ -1174,7 +1223,7 @@ class Qubit(Instrument):
         Parameters of the qubit object are used unless specified.
         Flux can be specified both in terms of dac voltage or flux but not
         both.
-        '''
+        """
         if self.cfg_qubit_freq_calc_method() == 'latest':
             qubit_freq_est = self.freq_qubit()
 
@@ -1195,10 +1244,10 @@ class Qubit(Instrument):
         return qubit_freq_est
 
     def calibrate_mixer_offsets_drive(self, update: bool=True)-> bool:
-        '''
+        """
         Calibrates the mixer skewness and updates the I and Q offsets in
         the qubit object.
-        '''
+        """
         raise NotImplementedError()
 
         return True
@@ -1289,10 +1338,10 @@ class Qubit(Instrument):
 
 class Transmon(Qubit):
 
-    '''
+    """
     circuit-QED Transmon as used in DiCarlo Lab.
     Adds transmon specific parameters as well
-    '''
+    """
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
@@ -1397,14 +1446,14 @@ class Transmon(Qubit):
     def calculate_frequency(self,
                             dac_voltage=None,
                             flux=None):
-        '''
+        """
         Calculates the f01 transition frequency from the cosine arc model.
         (function available in fit_mods. Qubit_dac_to_freq)
 
         Parameters of the qubit object are used unless specified.
         Flux can be specified both in terms of dac voltage or flux but not
         both.
-        '''
+        """
 
         if dac_voltage is not None and flux is not None:
             raise ValueError('Specify either dac voltage or flux but not both')
@@ -1657,18 +1706,23 @@ class Transmon(Qubit):
                              N_steps=[3, 7, 13, 17], max_n=18,
                              close_fig=True, verbose=False,
                              MC=None, update=True, take_fit_I=False):
-        '''
+        """
         Finds the pulse-amplitude using a Rabi experiment.
         Fine tunes by doing a Rabi around the optimum with an odd
         multiple of pulses.
 
         Args:
-            amps: (array or float) amplitudes of the first Rabi if an array,
+            amps (array or float):
+                amplitudes of the first Rabi if an array,
                 if a float is specified it will be treated as an estimate
                 for the amplitude to be found.
-            N_steps: (list of int) number of pulses used in the fine tuning
-            max_n: (int) break of if N> max_n
-        '''
+                
+            N_steps (list of int):
+                number of pulses used in the fine tuning
+
+            max_n (int):
+                break of if N> max_n
+        """
         if MC is None:
             MC = self.MC.get_instr()
         if np.size(amps) != 1:
@@ -1731,7 +1785,7 @@ class Transmon(Qubit):
                            N_steps=[5, 9], max_n=100,
                            close_fig=True, verbose=False,
                            MC=None, update=True, take_fit_I=False):
-        '''
+        """
         Finds the scaling factor of pi/2 pulses w.r.t pi pulses using a rabi
         type with each pi pulse replaced by 2 pi/2 pulses.
 
@@ -1740,7 +1794,7 @@ class Transmon(Qubit):
 
         This experiment is only useful after carefully calibrating the pi pulse
         using flipping sequences.
-        '''
+        """
         if MC is None:
             MC = self.MC
         if np.size(scales) != 1:

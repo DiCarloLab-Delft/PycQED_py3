@@ -567,7 +567,28 @@ class Susceptibility_to_Flux_Bias(sa.Basic2DInterpolatedAnalysis):
 
 
 class DACarcPolyFit(ba.BaseDataAnalysis):
-          # todo docstring
+    '''
+    Uses a series of spectroscopy measurements at different flux biases
+    to perform a polynomial fit and find approximate dependence f(\Phi).
+
+    Args:
+        t_start (str):
+            timestamp of the first measurement
+
+        t_start (str):
+            timestamp of the last measurement
+
+        dac_key (str):
+            key pointing to the parameter that stores the current
+            applied to the flux bias line
+        
+        frequency_key (str):
+            key pointing to the parameter that stores the fitted
+            qubit frequency
+
+        degree (int): order of the polynomial to be fitted
+
+    '''
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = 'spectroscopy',
                  options_dict: dict = None, extract_only: bool = False,
@@ -575,19 +596,7 @@ class DACarcPolyFit(ba.BaseDataAnalysis):
                  frequency_key='Analysis.Fitted Params HM.f0.value',
                  do_fitting=True, degree=2
                  ):
-        '''
-        Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
 
-        :param t_start: start time of scan as a string of format YYYYMMDD_HHmmss
-        :param t_stop: end time of scan as a string of format YYYYMMDD_HHmmss
-        :param label: the label that was used to name the measurements (only necessary if non-relevant measurements are in the time range)
-        :param options_dict: Available options are the ones from the base_analysis and:
-                                - (todo)
-        :param extract_only: Should we also do the plots?
-        :param do_fitting: Should the run_fitting method be executed?
-        :param dac_key: key for the dac current values, e.g. 'Instrument settings.fluxcurrent.Q'
-        :param frequency_key: key for the dac current values, e.g. 'Instrument settings.Q.freq_qubit'
-        '''
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
