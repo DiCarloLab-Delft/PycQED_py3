@@ -55,8 +55,8 @@ if len(sys.argv)>1:
 conf = lambda:0 # create empty 'struct'
 conf.ro_0 = ''
 conf.ro_0 = 'dev2295'
-#conf.mw_0 = 'dev8079'
-conf.mw_0 = 'dev8078'
+conf.mw_0 = 'dev8079'
+#conf.mw_0 = 'dev8078'
 conf.flux_0 = ''
 conf.cc_ip = '192.168.0.241'
 
@@ -143,7 +143,7 @@ if conf.ro_0 != '':
     #station.add_component(instr.ro_0)
 
 log.debug('connecting to CC')
-instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip, timeout=5.0)) # FIXME: raised timeout until assembly time reduced
+instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
 instr.cc.reset()
 instr.cc.clear_status()
 instr.cc.set_status_questionable_frequency_enable(0x7FFF)

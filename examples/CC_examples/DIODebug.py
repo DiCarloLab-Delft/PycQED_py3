@@ -50,14 +50,14 @@ if 1:   # HDAWG
     dio_lines = range(31, -1, -1)
 
     # take a snapshot of the DIO interface
-    # NB: the DIO timing is applied before the snapshot is taken
-    # FIXME: looking at single awg
     if 1:
-        #dio_data = instr.awgs_1_dio_data()  # get the snapshot data. Time resolution =  XX ns, #samples = 1024
+        # get the snapshot data. Time resolution =  3.33 ns, #samples = 1024
+        # FIXME: is this still true: NB: the DIO timing is applied before the snapshot is taken
         data = instr._dev.getv('raw/dios/0/data') # FIXME: no node for that
         ZI_tools.print_timing_diagram_simple(data, dio_lines, 64)
 
     if 0:
+        # FIXME: looking at single awg
         ts, cws = get_awg_dio_data(instr._dev, 0)
         ZI_tools.print_timing_diagram_simple(cws, dio_lines, 64)
 
