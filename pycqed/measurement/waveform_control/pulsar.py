@@ -277,7 +277,8 @@ class HDAWG8Pulsar:
                            initial_value=8/(2.4e9),
                            parameter_class=ManualParameter)
         self.add_parameter('{}_min_length'.format(awg.name),
-                           get_cmd=lambda: 16 /(2.4e9))
+                           initial_value=16 /(2.4e9),
+                           parameter_class=ManualParameter)
         self.add_parameter('{}_inter_element_deadtime'.format(awg.name),
                            # get_cmd=lambda: 80 / 2.4e9)
                            get_cmd=lambda: 8 / (2.4e9))
@@ -1038,7 +1039,9 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         awgs_with_waveforms = self.awgs_with_waveforms()
         used_awgs = set(self.active_awgs()) & awgs_with_waveforms
         
-        
+        for awg in used_awgs:
+            self._stop_awg(awg)
+
         if self.master_awg() is None:
             for awg in used_awgs:
                 if awg not in exclude:

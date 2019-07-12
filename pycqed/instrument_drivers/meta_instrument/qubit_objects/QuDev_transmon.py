@@ -708,17 +708,15 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
                                                        upload=upload))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weights_type() == 'optimal_qutrit'
-                                 else self.int_avg_det)
+        MC.set_detector_function(self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: amps},
                              'use_cal_points': cal_points,
                              'preparation_params': prep_params,
                              'cal_points': repr(cp),
-                             'rotate': self.acq_weights_type() !=
-                                       'optimal_qutrit',
+                             'rotate': cal_points,#self.acq_weights_type() !=
+                                       # 'optimal_qutrit',
                              'last_ge_pulses': [last_ge_pulse],
                              'data_to_fit': {self.name: 'pf' if for_ef \
                                                 else 'pe'},
@@ -2026,6 +2024,11 @@ class QuDev_transmon(Qubit):
             raise NotImplementedError()
         preselection = prep_params['preparation_type'] == 'preselection'
 
+        if thresholded:
+            det_func = self.dig_log_det
+        else:
+            det_func = self.int_log_det
+
         if qutrit:
             states = ('g', 'e', 'f')
             for state in states:
@@ -2037,7 +2040,7 @@ class QuDev_transmon(Qubit):
                 MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
                                                                upload=upload))
                 MC.set_sweep_points(swp)
-                MC.set_detector_function(self.int_log_det)
+                MC.set_detector_function(det_func)
                 with temporary_value(MC.soft_avg, 1):
                     MC.run(name=label + '_{}'.format(state) + self.msmt_suffix)
 
@@ -2049,7 +2052,7 @@ class QuDev_transmon(Qubit):
                 preselection=preselection,
                 RO_spacing=RO_spacing))
             MC.set_sweep_points(np.arange(4 if preselection else 2))
-            MC.set_detector_function(self.int_log_det)
+            MC.set_detector_function(det_func)
             with temporary_value(MC.soft_avg, 1):
                 MC.run(name=label + self.msmt_suffix)
 
@@ -2060,7 +2063,8 @@ class QuDev_transmon(Qubit):
                 options = \
                     dict(classif_method='threshold' if thresholded else 'gmm',
                          pre_selection=preselection)
-                labels = ['SSRO_fidelity_{}'.format(l) for l in states]
+                # options = 'gmm'
+                labels = [label+'_{}'.format(l) for l in states]
                 ssqtro = \
                     Singleshot_Readout_Analysis_Qutrit(label=labels,
                                                        options_dict=options)
@@ -2075,10 +2079,7 @@ class QuDev_transmon(Qubit):
             else:
                 rotate = self.acq_weights_type() in {'SSB', 'DSB'}
                 preselection = prep_params['preparation_type'] == 'preselection'
-                if thresholded:
-                    channels = self.dig_log_det.value_names
-                else:
-                    channels = self.int_log_det.value_names
+                channels = det_func.value_names
                 if preselection:
                     nr_samples = 4
                     sample_0 = 0

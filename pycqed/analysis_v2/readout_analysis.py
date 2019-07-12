@@ -1145,7 +1145,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
 
     @staticmethod
     def plot_clf_boundaries(X, clf, ax=None, cmap=None):
-        def make_meshgrid(x, y, h=.005, margin=None):
+        def make_meshgrid(x, y, h=None, margin=None):
             if margin is None:
                 deltax = x.max() - x.min()
                 deltay = y.max() - y.min()
@@ -1155,8 +1155,10 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                 margin_x, margin_y = margin, margin
             x_min, x_max = x.min() - margin_x, x.max() + margin_x
             y_min, y_max = y.min() - margin_y, y.max() + margin_y
-            xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min,
-                                                                       y_max, h))
+            if h is None:
+                h = 0.01*(x_max - x_min)
+            xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                                 np.arange(y_min, y_max, h))
             return xx, yy
 
         def plot_contours(ax, clf, xx, yy, **params):
