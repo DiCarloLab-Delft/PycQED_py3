@@ -252,32 +252,30 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
             zero_coord, one_coord
         """
-        data_filer = self.options_dict.get('data_filer', lambda x: x)
+        data_filter = self.options_dict.get('data_filter', lambda x: x)
         if 'sweep_points_dict' in self.metadata:
             # assumed to be of the form {qbn1: swpts_array1, qbn2: swpts_array2}
             self.raw_data_dict['sweep_points_dict'] = \
-                {qbn: {'sweep_points': data_filer(
+                {qbn: {'sweep_points': data_filter(
                     self.metadata['sweep_points_dict'][qbn])}
                  for qbn in self.qb_names}
         else:
             self.raw_data_dict['sweep_points_dict'] = \
-                {qbn: {'sweep_points': data_filer(
+                {qbn: {'sweep_points': data_filter(
                     self.raw_data_dict['sweep_points'][0])}
                  for qbn in self.qb_names}
 
         measured_RO_channels = list(self.raw_data_dict[
                                         'measured_values_ord_dict'])
-        print(measured_RO_channels)
         meas_results_per_qb_per_ROch = {}
         for qb_name, RO_channels in self.channel_map.items():
             meas_results_per_qb_per_ROch[qb_name] = {}
-            print(qb_name, RO_channels)
             if isinstance(RO_channels, str):
                 meas_ROs_per_qb = [RO_ch for RO_ch in measured_RO_channels
                                    if RO_channels in RO_ch]
                 for meas_RO in meas_ROs_per_qb:
                     meas_results_per_qb_per_ROch[qb_name][meas_RO] = \
-                        data_filer(self.raw_data_dict[
+                        data_filter(self.raw_data_dict[
                             'measured_values_ord_dict'][meas_RO][0])
 
             elif isinstance(RO_channels, list):
@@ -286,7 +284,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                       if qb_RO_ch in RO_ch]
                     for meas_RO in meas_ROs_per_qb:
                         meas_results_per_qb_per_ROch[qb_name][meas_RO] = \
-                            data_filer(self.raw_data_dict[
+                            data_filter(self.raw_data_dict[
                                 'measured_values_ord_dict'][meas_RO][0])
             else:
                 raise TypeError('The RO channels for {} must either be a list '
@@ -417,9 +415,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         self.num_cal_points = np.array(list(
             self.cal_states_dict.values())).flatten().size
-        print(self.num_cal_points)
-        print(self.cal_states_dict)
-        print(self.cal_states_dict_for_rotation)
 
     def cal_states_analysis(self):
         self.get_cal_data_points()

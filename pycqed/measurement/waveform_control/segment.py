@@ -647,7 +647,12 @@ class Segment:
         if samples % gran != 0:
             samples += gran - samples % gran
 
+        for pulse in self.elements[element]:
+            if pulse.codeword != 'no_codeword':
+                samples = 2048
+
         self.element_start_end[element][awg] = [t_start, samples]
+
         return [t_start, samples]
 
     def waveforms(self, awgs=None, channels=None):

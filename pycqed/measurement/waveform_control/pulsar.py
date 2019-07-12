@@ -313,7 +313,8 @@ class HDAWG8Pulsar:
                            initial_value=8/(2.4e9),
                            parameter_class=ManualParameter)
         self.add_parameter('{}_min_length'.format(awg.name),
-                           get_cmd=lambda: 16 /(2.4e9))
+                           initial_value=16 /(2.4e9),
+                           parameter_class=ManualParameter)
         self.add_parameter('{}_inter_element_deadtime'.format(awg.name),
                            # get_cmd=lambda: 80 / 2.4e9)
                            get_cmd=lambda: 8 / (2.4e9))

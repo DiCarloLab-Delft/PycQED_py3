@@ -145,6 +145,7 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points,
 
 def add_preparation_pulses(pulse_list, operation_dict, qb_names,
                            preparation_type='wait', post_ro_wait=1e-6,
+                           ro_separation=1.5e-6,
                            reset_reps=3, final_reset_pulse=True,
                            threshold_mapping={0: 'g', 1: 'e'}):
     """
@@ -199,17 +200,33 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
                     if j == 0:
                         reset_pulses[-1]['ref_point'] = 'start'
                         reset_pulses[-1]['pulse_delay'] = post_ro_wait
+                    else:
+                        reset_pulses[-1]['ref_point'] = 'start'
+                        pulse_length = 0
+                        for jj in range(1, j+1):
+                            if 'pulse_length' in reset_pulses[-1-jj]:
+                                pulse_length += reset_pulses[-1-jj]['pulse_length']
+                            else:
+                                pulse_length += reset_pulses[-1-jj]['sigma'] * \
+                                               reset_pulses[-1-jj]['nr_sigma']
+                        reset_pulses[-1]['pulse_delay'] = post_ro_wait+pulse_length
 
         prep_pulse_list = []
         for rep in range(reset_reps):
             ro_list = deepcopy(reset_ro_pulses)
+            ro_list[0]['name'] = 'refpulse_reset_element_{}'.format(rep)
+
             for pulse in ro_list:
                 pulse['element_name'] = 'reset_ro_element_{}'.format(rep)
             if rep == 0:
                 ro_list[0]['ref_pulse'] = 'segment_start'
-                ro_list[0]['pulse_delay'] = -reset_reps * (
-                        post_ro_wait + ge_length + ef_length)
-            ro_list[0]['name'] = 'refpulse_reset_element_{}'.format(rep)
+                ro_list[0]['pulse_delay'] = -reset_reps * ro_separation
+            else:
+                ro_list[0]['ref_pulse'] = 'refpulse_reset_element_{}'.format(
+                    rep-1)
+                ro_list[0]['pulse_delay'] = ro_separation
+                ro_list[0]['ref_point'] = 'start'
+
             rp_list = deepcopy(reset_pulses)
             for j, pulse in enumerate(rp_list):
                 pulse['element_name'] = 'reset_pulse_element_{}'.format(rep)
@@ -232,7 +249,7 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
             preparation_pulses[-1]['ref_point'] = 'start'
             preparation_pulses[-1]['element_name'] = 'preselection_element'
         preparation_pulses[0]['ref_pulse'] = 'segment_start'
-        preparation_pulses[0]['pulse_delay'] = -post_ro_wait
+        preparation_pulses[0]['pulse_delay'] = -ro_separation
 
         return preparation_pulses + pulse_list
 
