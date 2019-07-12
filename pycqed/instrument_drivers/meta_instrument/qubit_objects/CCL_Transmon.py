@@ -3213,7 +3213,7 @@ class CCLight_Transmon(Qubit):
     def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.1, 1.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True, all_modules=False):
-       """
+        """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
         while the drive frequency and pulse duration is kept fixed
 
@@ -3332,10 +3332,10 @@ class CCLight_Transmon(Qubit):
             nr_cliffords: int=80, nr_seeds: int=200,
             verbose: bool = True, update: bool=True,
             prepare_for_timedomain: bool=True):
-            '''
-            Refs:
-                Rol PR Applied 7, 041001 (2017)
-            '''
+        '''
+        Refs:
+            Rol PR Applied 7, 041001 (2017)
+        '''
         return self.calibrate_mw_gates_rb(
             MC=None,
             parameter_list=parameter_list,
@@ -3781,8 +3781,8 @@ class CCLight_Transmon(Qubit):
         if times is None:
             # funny default is because there is no real time sideband
             # modulation
-            stepsize = (self.T2_star()*4/61)//(abs(self.cfg_cycle_time())) \
-                * abs(self.cfg_cycle_time())
+            stepsize = max((self.T2_star()*4/61)//(abs(self.cfg_cycle_time())) \
+                * abs(self.cfg_cycle_time()),40e-9)
             times = np.arange(0, self.T2_star()*4, stepsize)
 
         if artificial_detuning is None:
@@ -3949,8 +3949,8 @@ class CCLight_Transmon(Qubit):
         if times is None:
             # funny default is because there is no real time sideband
             # modulation
-            stepsize = (self.T2_echo()*2/61)//(abs(self.cfg_cycle_time())) \
-                * abs(self.cfg_cycle_time())
+            stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time())) \
+                * abs(self.cfg_cycle_time()),20e-9)
             times = np.arange(0, self.T2_echo()*4, stepsize*2)
 
         # append the calibration points, times are for location in plot
