@@ -1225,7 +1225,7 @@ class CCLight_Transmon(Qubit):
         sweetspot as well technically speaking). Afterwards, it will move
         the qubit to be characterized (self) to its sweetspot.
 
-        Will ignore any qubit whose name (string) is in 'exceptions' 
+        Will ignore any qubit whose name (string) is in 'exceptions'
         """
 
         fluxcurrent = self.instr_FluxCtrl.get_instr()
@@ -1346,7 +1346,7 @@ class CCLight_Transmon(Qubit):
         if freqs is None:
             freq_center = self.freq_res()
             freq_range = 10e6
-            freqs = np.arange(freq_center - freq_range/2, 
+            freqs = np.arange(freq_center - freq_range/2,
                               freq_center + freq_range/2,
                               0.1e6)
 
@@ -1869,12 +1869,12 @@ class CCLight_Transmon(Qubit):
             LutMan.mixer_alpha(alpha)
             LutMan.mixer_phi(phi)
 
-    def calibrate_mixer_offsets_RO(self, update: bool=True, 
+    def calibrate_mixer_offsets_RO(self, update: bool=True,
                                    ftarget=-110) -> bool:
         """
         Calibrates the mixer offset and updates the I and Q offsets in
         the qubit object.
-        
+
         Args:
             update (bool):
                 if True updates values in the qubit object.
@@ -2009,7 +2009,7 @@ class CCLight_Transmon(Qubit):
         """
         Mesures the CW qubit spectrosopy as a function of the RO pulse power
         to find a photon splitting.
-        
+
         Refs:
         Schuster Nature 445, 515–518 (2007)
             (note that in the paper RO resonator has lower frequency than the qubit)
@@ -2403,7 +2403,7 @@ class CCLight_Transmon(Qubit):
         that usually is the LO of the AWG/QWG mixer.
 
         Is considered as a time domain experiment as it utilizes the AWG
-        
+
         Relevant parameters:
             spec_pow (float):
                 power of the LO fed into the mixer
@@ -2473,7 +2473,7 @@ class CCLight_Transmon(Qubit):
                                            qb_name=self.name)
 
     def find_bus_frequency(self, freqs, spec_source_bus, bus_power, f01=None,
-                           label='', close_fig=True, analyze=True, MC=None, 
+                           label='', close_fig=True, analyze=True, MC=None,
                            prepare_for_continuous_wave=True):
         """
         Drive the qubit and sit at the spectroscopy peak while the bus is driven with
@@ -2482,7 +2482,7 @@ class CCLight_Transmon(Qubit):
         Args:
             freqs (array):
                 list of frequencies of the second drive tone (at bus frequency)
-            
+
             spec_source_bus (RohdeSchwarz_SGS100A):
                 rf source used for the second spectroscopy tone
 
@@ -2766,7 +2766,7 @@ class CCLight_Transmon(Qubit):
         Measures photon splitting of the qubit due to photons in the bus resonators.
         Specifically it is a CW qubit pectroscopy with the second  variable-power CW tone
         applied at frequency f_bus.
-        
+
         Refs:
         Schuster Nature 445, 515–518 (2007)
             (note that in the paper RO resonator has lower frequency than the qubit)
@@ -2859,7 +2859,7 @@ class CCLight_Transmon(Qubit):
         """
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
-        
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -3376,7 +3376,7 @@ class CCLight_Transmon(Qubit):
     def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.1, 1.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True, all_modules=False):
-       """
+        """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
         while the drive frequency and pulse duration is kept fixed
 
@@ -3498,10 +3498,10 @@ class CCLight_Transmon(Qubit):
             nr_cliffords: int=80, nr_seeds: int=200,
             verbose: bool = True, update: bool=True,
             prepare_for_timedomain: bool=True):
-            """
-            Refs:
-                Rol PR Applied 7, 041001 (2017)
-            """
+        """
+        Refs:
+            Rol PR Applied 7, 041001 (2017)
+        """
         return self.calibrate_mw_gates_rb(
             MC=None,
             parameter_list=parameter_list,
@@ -3701,7 +3701,7 @@ class CCLight_Transmon(Qubit):
         depletion pulse.
         It uses the averaged transients for ground and excited state for its
         cost function.
-        
+
         Refs:
         Bultnik PR Applied 6, 034008 (2016)
 
@@ -4352,7 +4352,7 @@ class CCLight_Transmon(Qubit):
             - performs RB both with and without an extra pi-pulse
             - Includes calibration poitns for 0, 1, and 2 (g,e, and f)
             - analysis extracts fidelity and leakage/seepage
-        
+
         Refs:
         Knill PRA 77, 012307 (2008)
         Wood PRA 97, 032306 (2018)
@@ -5198,7 +5198,7 @@ class CCLight_Transmon(Qubit):
     def calc_current_to_freq(self, curr: float):
         """
         Converts DC current to requency in Hz for a qubit
-        
+
         Args:
             curr (float):
                 current in A
@@ -5211,7 +5211,7 @@ class CCLight_Transmon(Qubit):
         """
         Find the amplitude that corresponds to a given frequency, by
         numerically inverting the fit.
-        
+
         Args:
             freq (float, array):
                 The frequency or set of frequencies.
