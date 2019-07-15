@@ -174,6 +174,7 @@ class MultiElemSegmentTimingSwf(swf.Hard_Sweep):
                 cal_points=self.cal_points,
                 upload=True)
 
+
 class SegmentHardSweep(swf.Hard_Sweep):
 
     def __init__(self, sequence, upload=True):
@@ -184,6 +185,44 @@ class SegmentHardSweep(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             ps.Pulsar.get_instance().program_awgs(self.sequence)
+
+
+class InstrumentSoftSweep(swf.Soft_Sweep):
+
+    def __init__(self, instrument, param_name, param_unit,
+                 process_sweep_point_func=lambda x: x):
+        super().__init__()
+        self.name = 'Instrument soft sweep'
+        self.instr = instrument
+        self.parameter_name = param_name
+        self.unit = param_unit
+        self.process_sweep_point_func = process_sweep_point_func
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        proc_val = self.process_sweep_point_func(val)
+        self.instr.set(self.parameter_name, proc_val)
+
+
+class SegmentSoftSweep(swf.Soft_Sweep):
+
+    def __init__(self, hard_sweep_func, sequence_list,
+                 param_name, param_unit, upload=True):
+        super().__init__()
+        self.name = 'Segment soft sweep'
+        self.hard_sweep = hard_sweep_func
+        self.sequence_list = sequence_list
+        self.parameter_name = param_name
+        self.unit = param_unit
+        self.upload = upload
+
+    def set_parameter(self, val, **kw):
+        self.hard_sweep.upload = self.upload
+        self.hard_sweep.sequence = self.sequence_list[val]
+        self.hard_sweep.prepare()
+
 
 class Rabi(swf.Hard_Sweep):
 

@@ -344,10 +344,10 @@ class NZBufferedCZPulse(Pulse):
 
 
 class NZMartinisGellarPulse(Pulse):
-    def __init__(self, channel, wave_generation_func,
+    def __init__(self, channel, element_name, wave_generation_func,
                  aux_channels_dict=None,
                  name='NZMartinisGellarPulse', **kw):
-        super().__init__(name)
+        super().__init__(name, element_name)
 
         self.channel = channel
         self.aux_channels_dict = aux_channels_dict
