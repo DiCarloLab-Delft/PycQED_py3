@@ -180,7 +180,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                  t_start: str=None, t_stop: str=None,
                  data_file_path: str=None, single_timestamp: bool=False,
                  options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True, params_dict=None):
+                 do_fitting: bool=True, auto=True,
+                 params_dict=None, numeric_params=None):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          data_file_path=data_file_path,
@@ -213,7 +214,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             self.params_dict['zlabels'] = 'zlabels'
 
         self.single_timestamp = single_timestamp
-        self.numeric_params = []
+        if numeric_params is None:
+            numeric_params = []
+        self.numeric_params = numeric_params
 
         if auto:
             self.run_analysis()
@@ -314,10 +317,11 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 self.cp.get_rotations(
                     last_ge_pulses,
                     self.qb_names[0])[self.qb_names[0]] if rotate else None
-            self.raw_data_dict['sweep_points_dict'].update(
+            sweep_points_w_calpts = \
                 {qbn: {'sweep_points': self.cp.extend_sweep_points(
-                    self.metadata['sweep_points_dict'][qbn], qbn)}
-                 for qbn in self.qb_names})
+                    self.raw_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'], qbn)} for qbn in self.qb_names}
+            self.raw_data_dict['sweep_points_dict'] = sweep_points_w_calpts
         except Exception as e:
             log.error(str(e))
             log.warning("Deprecated usage of calibration points and sequences."
@@ -3369,7 +3373,7 @@ class RabiAnalysis(MultiQubit_TimeDomain_Analysis):
                 self.plot_dicts['fit_' + qbn] = {
                     'fig_id': base_plot_name,
                     'plotfn': self.plot_fit,
-                    'fit_res': fit_res ,
+                    'fit_res': fit_res,
                     'setlabel': 'cosine fit',
                     'color': 'r',
                     'do_legend': True,
@@ -4483,7 +4487,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
         # condition do_legend = (row in [0,1]) in the plot dicts above
         if self.num_cal_points > 0:
             self.plot_dicts.update(ref_states_plot_dicts)
-
+        return figure_name
 
     def prepare_plots(self):
         if self.options_dict.get('plot_all_traces', True):
@@ -4491,9 +4495,9 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                 if self.options_dict.get('plot_all_probs', True):
                     for prob_label, data_2d in self.proc_data_dict[
                             'projected_data_dict'][qbn].items():
-                        self.plot_traces(prob_label, data_2d, qbn)
+                        figure_name = self.plot_traces(prob_label, data_2d, qbn)
                 else:
-                    self.plot_traces(
+                    figure_name = self.plot_traces(
                         self.data_to_fit[qbn], self.proc_data_dict[
                             'data_to_fit'][qbn], qbn)
                     
@@ -4508,7 +4512,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                                 self.proc_data_dict['analysis_params_dict'][
                                     'population_loss']['val'][0])
                             self.plot_dicts['text_msg_' + qbn] = {
-                                'fig_id': base_plot_name,
+                                'fig_id': figure_name,
                                 'ypos': -0.2,
                                 'xpos': -0.05,
                                 'horizontalalignment': 'left',
@@ -4520,7 +4524,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                                 self.proc_data_dict['analysis_params_dict'][
                                     'leakage']['val'][0])
                             self.plot_dicts['text_msg_' + qbn] = {
-                                'fig_id': base_plot_name,
+                                'fig_id': figure_name,
                                 'ypos': -0.2,
                                 'xpos': -0.05,
                                 'horizontalalignment': 'left',
@@ -4566,3 +4570,81 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                             'xmax': np.max(unique_swpts2d[idx]),
                             'colors': 'gray'}
 
+
+class CZDynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def process_data(self):
+        super().process_data()
+        self.data_with_fp = OrderedDict()
+        self.data_no_fp = OrderedDict()
+        for qbn in self.qb_names:
+            all_data = self.proc_data_dict['data_to_fit'][qbn]
+            if self.num_cal_points != 0:
+                all_data = all_data[:-self.num_cal_points]
+            self.data_with_fp[qbn] = all_data[0: len(all_data)//2]
+            self.data_no_fp[qbn] = all_data[len(all_data)//2:]
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        for qbn in self.qb_names:
+            sweep_points = np.unique(
+                self.raw_data_dict['sweep_points_dict'][qbn][
+                    'msmt_sweep_points'])
+            for i, data in enumerate([self.data_with_fp[qbn],
+                                      self.data_no_fp[qbn]]):
+                cos_mod = lmfit.Model(fit_mods.CosFunc)
+                guess_pars = fit_mods.Cos_guess(
+                    model=cos_mod,
+                    t=sweep_points,
+                    data=data)
+                guess_pars['amplitude'].vary = True
+                guess_pars['offset'].vary = True
+                guess_pars['frequency'].value = 1/(2*np.pi)
+                guess_pars['frequency'].vary = False
+                guess_pars['phase'].vary = True
+
+                key = 'cos_fit_{}_{}'.format(qbn, 'wfp' if i == 0 else 'nofp')
+                self.fit_dicts[key] = {
+                    'fit_fn': fit_mods.CosFunc,
+                    'fit_xvals': {'t': sweep_points},
+                    'fit_yvals': {'data': data},
+                    'guess_pars': guess_pars}
+
+    def analyze_fit_results(self):
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+        for qbn in self.qb_names:
+            self.proc_data_dict['analysis_params_dict'][qbn][
+                'dynamic_phase'] = \
+                (self.fit_dicts[f'cos_fit_{qbn}_wfp'][
+                     'fit_res'].best_values['phase'] -
+                 self.fit_dicts[f'cos_fit_{qbn}_ref_measure'][
+                     'fit_res'].best_values['phase'])*180/np.pi
+        self.save_processed_data(key='analysis_params_dict')
+
+    def prepare_plots(self):
+        super().prepare_plots()
+
+        for qbn in self.qb_names:
+            for i, data in enumerate([self.data_with_fp[qbn],
+                                      self.data_no_fp[qbn]]):
+                base_plot_name = 'Dynamic_phase_' + qbn
+                self.prepare_projected_data_plot(
+                    fig_name=base_plot_name,
+                    data=data,
+                    plot_name_suffix=qbn+'fit',
+                    qb_name=qbn)
+                if self.do_fitting:
+                    fit_res = self.fit_dicts['cos_fit_' + qbn]['fit_res']
+                    self.plot_dicts['fit_' + qbn] = {
+                        'fig_id': base_plot_name,
+                        'plotfn': self.plot_fit,
+                        'fit_res': fit_res ,
+                        'setlabel': 'cosine fit',
+                        'color': 'r',
+                        'do_legend': True,
+                        'legend_ncol': 2,
+                        'legend_bbox_to_anchor': (1, -0.15),
+                        'legend_pos': 'upper right'}

@@ -260,7 +260,7 @@ class BufferedCZPulse(Pulse):
 
 
 class NZBufferedCZPulse(Pulse):
-    def __init__(self, channel, aux_channels_dict=None,
+    def __init__(self, channel, element_name, aux_channels_dict=None,
                  name='NZ buffered CZ pulse', **kw):
         super().__init__(name)
 
@@ -286,6 +286,7 @@ class NZBufferedCZPulse(Pulse):
         # created by add_CZ_pulse in QuDev_transmon.py
         self.frequency = kw.pop('frequency', 0)
         self.phase = kw.pop('phase', 0.)
+        self.codeword = kw.pop('codeword', 'no_codeword')
 
     def __call__(self, **kw):
         self.amplitude = kw.pop('amplitude', self.amplitude)
@@ -373,6 +374,7 @@ class NZMartinisGellarPulse(Pulse):
         self.loop_asym = kw.pop('loop_asym', 0)
         self.dphi_dV= kw.pop('dphi_dV', 0)
         self.lambda_2 = kw.pop('lambda_2', 0)
+        self.codeword = kw.pop('codeword', 'no_codeword')
 
     def __call__(self, **kw):
         self.theta_f = kw.pop('theta_f', self.theta_f)

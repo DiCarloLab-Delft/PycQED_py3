@@ -105,7 +105,7 @@ class Sequence:
 
     def __repr__(self):
         string_repr = f"####### {self.name} #######\n"
-        for seg_name, seg  in self.segments.items():
+        for seg_name, seg in self.segments.items():
             string_repr += str(seg) + "\n"
         return string_repr
 
