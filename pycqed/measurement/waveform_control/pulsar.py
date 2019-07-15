@@ -1084,12 +1084,13 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         # Stores the last uploaded sequence for easy access and plotting
         self.last_sequence = sequence
 
-        # initializes the set of AWGs with waveforms
-        self._awgs_with_waveforms = set()
-
         if awgs == 'all':
             awgs = self.active_awgs()
-        
+
+        # initializes the set of AWGs with waveforms
+        self._awgs_with_waveforms -= awgs
+
+
         # prequery all AWG clock values and AWG amplitudes
         self.AWGs_prequeried(True)
 

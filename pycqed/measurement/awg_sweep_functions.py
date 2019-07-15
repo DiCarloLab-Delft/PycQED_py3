@@ -177,14 +177,15 @@ class MultiElemSegmentTimingSwf(swf.Hard_Sweep):
 
 class SegmentHardSweep(swf.Hard_Sweep):
 
-    def __init__(self, sequence, upload=True):
+    def __init__(self, sequence, upload=True, awgs_to_upload='all'):
         super().__init__()
         self.sequence = sequence
         self.upload = upload
 
-    def prepare(self, **kw):
+    def prepare(self, awgs_to_upload='all', **kw):
         if self.upload:
-            ps.Pulsar.get_instance().program_awgs(self.sequence)
+            ps.Pulsar.get_instance().program_awgs(self.sequence,
+                                                  awgs=awgs_to_upload)
 
 
 class InstrumentSoftSweep(swf.Soft_Sweep):
@@ -209,19 +210,27 @@ class InstrumentSoftSweep(swf.Soft_Sweep):
 class SegmentSoftSweep(swf.Soft_Sweep):
 
     def __init__(self, hard_sweep_func, sequence_list,
-                 param_name, param_unit, upload=True):
+                 param_name='None', param_unit='',
+                 channels_to_upload='all', upload_first=False):
         super().__init__()
         self.name = 'Segment soft sweep'
         self.hard_sweep = hard_sweep_func
         self.sequence_list = sequence_list
         self.parameter_name = param_name
         self.unit = param_unit
-        self.upload = upload
+        if channels_to_upload == 'all':
+            self.awgs_to_upload = 'all'
+        else:
+            pulsar = ps.Pulsar.get_instance()
+            self.awgs_to_upload = list(set([pulsar.get('f{ch}_awg')
+                                            for ch in channels_to_upload]))
+        self.upload_next = upload_first
 
     def set_parameter(self, val, **kw):
-        self.hard_sweep.upload = self.upload
         self.hard_sweep.sequence = self.sequence_list[val]
-        self.hard_sweep.prepare()
+        if self.upload_next:
+            self.hard_sweep.prepare(awgs_to_upload=self.awgs_to_upload)
+        self.upload_next = True
 
 
 class Rabi(swf.Hard_Sweep):
@@ -3296,7 +3305,7 @@ class CZ_bleed_through_phase_hard_sweep(swf.Hard_Sweep):
 
     def prepare(self, upload_all=True, **kw):
         if self.upload:
-            fsqs.CZ_bleed_through_phase_seq(
+            fsqs.cz_bleed_through_phase_seq(
                 phases=self.sweep_points,
                 qb_name=self.qb_name,
                 CZ_pulse_name=self.CZ_pulse_name,

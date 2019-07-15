@@ -716,8 +716,7 @@ class QuDev_transmon(Qubit):
                              'use_cal_points': cal_points,
                              'preparation_params': prep_params,
                              'cal_points': repr(cp),
-                             'rotate': cal_points,#self.acq_weights_type() !=
-                                       # 'optimal_qutrit',
+                             'rotate': cal_points,
                              'last_ge_pulses': [last_ge_pulse],
                              'data_to_fit': {self.name: 'pf' if for_ef \
                                                 else 'pe'},
@@ -3753,9 +3752,9 @@ class QuDev_transmon(Qubit):
         self.prepare(drive='timedomain')
 
         if cal_points:
-            cal_states = CalibrationPoints.guess_cal_states(cal_states, for_ef=False)
-            cp = CalibrationPoints.single_qubit(self.name, cal_states,
-                                                n_per_state=n_cal_points_per_state)
+            cal_states = CalibrationPoints.guess_cal_states(cal_states)
+            cp = CalibrationPoints.single_qubit(
+                self.name, cal_states, n_per_state=n_cal_points_per_state)
         else:
             cp = None
         if prep_params is None:
@@ -3764,8 +3763,8 @@ class QuDev_transmon(Qubit):
             fsqs.fluxpulse_scope_sequence(
                 delays=delays, freqs=freqs, qb_name=self.name,
                 operation_dict=self.get_operation_dict(),
-                cz_pulse_name=cz_pulse_name, spacing_ge_ro=spacing_ge_ro,
-                cal_points=cp, prep_params=prep_params, upload=False)
+                cz_pulse_name=cz_pulse_name, cal_points=cp,
+                prep_params=prep_params, upload=False)
         MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq,
                                                        upload=upload))
         MC.set_sweep_points(sweep_points)
