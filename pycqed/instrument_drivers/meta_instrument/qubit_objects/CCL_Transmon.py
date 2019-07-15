@@ -1218,7 +1218,7 @@ class CCLight_Transmon(Qubit):
     def prepare_for_fluxing(self, reset=True):
         pass
 
-    def prepare_characterizing(self, exceptions: list=[], verbose=True):
+    def prepare_characterizing(self, exceptions: list = [], verbose=True):
         """
         Prepares the qubit for (automatic) characterisation. Will park all
         other qubits in the device object to their 'anti-sweetspot' (which is a
@@ -1234,7 +1234,7 @@ class CCLight_Transmon(Qubit):
         # First park all other qubits to anti sweetspot
         print('Moving other qubits away ...')
         for qubit_name in device.qubits():
-            if (qubit_name not in exceptions) and (qubit_name != self.name) :
+            if (qubit_name not in exceptions) and (qubit_name != self.name):
                 qubit = device.find_instrument(qubit_name)
                 channel = qubit.cfg_dc_flux_ch()
                 current = qubit.fl_dc_V0() + qubit.fl_dc_V_per_phi0()/2
