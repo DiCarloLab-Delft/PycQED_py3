@@ -3,6 +3,7 @@
 # Modified by Ants Remm 5/2017
 # Modified by Michael Kerschbaum 5/2019
 import os
+import shutil
 import ctypes
 import numpy as np
 import logging
@@ -186,10 +187,13 @@ class UHFQCPulsar:
         if not self._zi_waves_cleared:
             _zi_clear_waves()
             self._zi_waves_cleared = True
+
+
+
         waves_to_upload = {h: waveforms[h]
                                for codewords in awg_sequence.values() 
-                                   if codewords is not None 
-                               for cw, chids in awg_sequence.items() 
+                                   if codewords is not None
+                               for cw, chids in codewords.items()
                                    if cw != 'metadata'
                                for h in chids.values()}
         _zi_write_waves(waves_to_upload)
@@ -1117,15 +1121,15 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             loop: Boolean flag, whether the segments should be looped over.
                   Default is `True`.
         """
-        fail = None
-        try:
-            super()._program_awg(obj, awg_sequence, waveforms)
-        except AttributeError as e:
-            fail = e
-        if fail is not None:
-            raise TypeError('Unsupported AWG instrument: {} of type {}. '
-                            .format(obj.name, type(obj)) + str(fail))
-        # super()._program_awg(obj, awg_sequence, waveforms)
+        # fail = None
+        # try:
+        #     super()._program_awg(obj, awg_sequence, waveforms)
+        # except AttributeError as e:
+        #     fail = e
+        # if fail is not None:
+        #     raise TypeError('Unsupported AWG instrument: {} of type {}. '
+        #                     .format(obj.name, type(obj)) + str(fail))
+        super()._program_awg(obj, awg_sequence, waveforms)
 
     def _start_awg(self, awg):
         obj = self.AWG_obj(awg=awg)
@@ -1314,8 +1318,10 @@ def _zi_wave_dir():
 def _zi_clear_waves():
     wave_dir = _zi_wave_dir()
     for f in os.listdir(wave_dir):
-        if f.endswith(".csv") or f.endswith('.cache'):
+        if f.endswith(".csv"):
             os.remove(os.path.join(wave_dir, f))
+        elif f.endswith('.cache'):
+            shutil.rmtree(os.path.join(wave_dir, f))
 
 def _zi_write_waves(waveforms):
     wave_dir = _zi_wave_dir()

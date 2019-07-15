@@ -126,6 +126,8 @@ class Segment:
             * orderes the unresolved_pulses list by ascending pulse middle
         """
 
+        self.elements = odict()
+
         visited_pulses = []
         ref_points = []
         i = 0
@@ -701,6 +703,7 @@ class Segment:
                 awg_wfs[awg][(i, element)] = {}
                 tvals = self.tvals(channel_list, element)
                 wfs = {}
+                element_start_time = self.get_element_start(element, awg)
                 for pulse in self.elements[element]:
                     # checks whether pulse is played on AWG
                     pulse_channels = set(pulse.channels) & set(channel_list)
@@ -740,6 +743,8 @@ class Segment:
                     for channel in pulse_channels:
                         wfs[pulse.codeword][channel][
                             pulse_start:pulse_end] += pulse_wfs[channel]
+                        print(np.max(pulse_wfs[channel]))
+
 
                 # for codewords: add the pulses that do not have a codeword to
                 # all codewords
@@ -753,6 +758,7 @@ class Segment:
                                 else:
                                     wfs[codeword][channel] = wfs[
                                         'no_codeword'][channel]
+
 
                 # do predistortion
                 for codeword in wfs:
@@ -781,6 +787,7 @@ class Segment:
                             wf = flux_dist.filter_iir(iir_filters[0],
                                                       iir_filters[1], wf)
                         wfs[codeword][c] = wf
+                        print(np.max(wf))
 
                 # truncation and normalization
                 for codeword in wfs:
@@ -806,8 +813,8 @@ class Segment:
                             wfs[codeword][c] = wfs[codeword][c] / amp
                         # marker channels have to be 1 or 0
                         elif self.pulsar.get('{}_type'.format(c)) == 'marker':
-                            wfs[codeword][c][wfs[codeword][c] > 0] = 1
-                            wfs[codeword][c][wfs[codeword][c] <= 0] = 0
+                            wfs[codeword][c] = (wfs[codeword][c] > 0)\
+                                .astype(np.int)
 
                 # save the waveforms in the dictionary
                 for codeword in wfs:
