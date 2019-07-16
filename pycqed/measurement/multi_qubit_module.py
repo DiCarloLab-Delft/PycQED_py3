@@ -145,49 +145,6 @@ def multiplexed_pulse(readouts, f_LO, upload=True):
         UC_LO.frequency(f_LO)
 
 
-def get_multiplexed_readout_pulse_dictionary(qubits):
-    """Takes the readout pulse parameters from the first qubit in `qubits`"""
-    maxlen = 0
-    basis_rotation = {}
-    for qb in qubits:
-        if qb.ro_length() > maxlen:
-            maxlen = qb.ro_length()
-        for qbn, rot in qb.ro_basis_rotation().items():
-            basis_rotation[qbn] = basis_rotation.get(qbn, 0) + rot
-
-    mux_ro_pulse = deepcopy(qubits[0].get_operation_dict()[
-                                'RO ' + qubits[0].name])
-    mux_ro_pulse['amplitude'] = 0.0
-    mux_ro_pulse['phase'] = 0.0
-    mux_ro_pulse['pulse_length'] = maxlen
-    mux_ro_pulse['basis_rotation'] = basis_rotation
-    mux_ro_pulse['target_qubit'] = ','.join([qb.name for qb in qubits])
-    return mux_ro_pulse
-
-
-def get_multiplexed_readout_pulse_dictionary_pulsar(qubits):
-    """Takes the readout pulse parameters from the first qubit in `qubits`"""
-    maxlen = 0
-    basis_rotation = {}
-    for qb in qubits:
-        if qb.RO_pulse_length() > maxlen:
-            maxlen = qb.RO_pulse_length()
-        for qbn, rot in qb.ro_pulse_basis_rotation().items():
-            basis_rotation[qbn] = basis_rotation.get(qbn, 0) + rot
-
-    return {'RO_pulse_marker_channel': qubits[0].RO_acq_marker_channel(),
-            'acq_marker_channel': qubits[0].RO_acq_marker_channel(),
-            'acq_marker_delay': qubits[0].RO_acq_marker_delay(),
-            'amplitude': 0.0,
-            'length': maxlen,
-            'operation_type': 'RO',
-            'phase': 0,
-            'pulse_delay': qubits[0].RO_pulse_delay(),
-            'pulse_type': 'Multiplexed_UHFQC_pulse',
-            'basis_rotation': basis_rotation,
-            'target_qubit': ','.join([qb.name for qb in qubits])}
-
-
 def get_operation_dict(qubits):
     operation_dict = dict()
     for qb in qubits:
@@ -1693,7 +1650,7 @@ def measure_chevron(qbc, qbt, qbr, hard_sweep_params, soft_sweep_params,
     if len(list(soft_sweep_params)) > 1:
         log.warning('There is more than one soft sweep parameter.')
     if label is None:
-        'Chevron_{}{}'.format(qbc.name, qbt.name)
+        label = 'Chevron_{}{}'.format(qbc.name, qbt.name)
     MC = qbc.instr_mc.get_instr()
     for qb in [qbc, qbt, qbr]:
         qb.prepare(drive='timedomain')
@@ -1740,7 +1697,7 @@ def measure_chevron(qbc, qbt, qbr, hard_sweep_params, soft_sweep_params,
                          'data_to_fit': {qbr.name: 'pe'},
                          'hard_sweep_params': hard_sweep_params,
                          'soft_sweep_params': soft_sweep_params})
-    MC.run_2D(label, exp_metadata)
+    MC.run_2D(name=label, exp_metadata=exp_metadata)
 
     if analyze:
         tda.MultiQubit_TimeDomain_Analysis(qb_names=[qbr.name],
@@ -1933,8 +1890,6 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
         print(f'max_flux_length = {max_flux_length*1e9:.2f} ns, set by user')
 
     operation_dict = get_operation_dict([qbc, qbt])
-    operation_dict['RO mux'] = get_multiplexed_readout_pulse_dictionary(
-        [qbc, qbt])
     sequences, hard_sweep_points, soft_sweep_points = \
         fsqs.cphase_seqs(
             hard_sweep_dict=hard_sweep_params,
@@ -1962,7 +1917,7 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
 
     det_name = 'int_avg{}_det'.format('_classif' if classified else '')
     det_func = get_multiplexed_readout_detector_functions(
-        [qbc, qbt], nr_averages=max(qb.RO_acq_averages() for qb in [qbc, qbt]),
+        [qbc, qbt], nr_averages=max(qb.acq_averages() for qb in [qbc, qbt]),
         UHFQC=UHFQC, pulsar=pulsar)[det_name]
     MC.set_detector_function(det_func)
 

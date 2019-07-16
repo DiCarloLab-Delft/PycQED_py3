@@ -687,7 +687,6 @@ class Segment:
             elements = set(self.elements)
 
         awg_wfs = {}
-
         for awg in awgs:
             # only procede for AWGs with waveforms
             if awg not in self.elements_on_awg:
@@ -743,7 +742,6 @@ class Segment:
                     for channel in pulse_channels:
                         wfs[pulse.codeword][channel][
                             pulse_start:pulse_end] += pulse_wfs[channel]
-                        print(np.max(pulse_wfs[channel]))
 
 
                 # for codewords: add the pulses that do not have a codeword to
@@ -787,7 +785,6 @@ class Segment:
                             wf = flux_dist.filter_iir(iir_filters[0],
                                                       iir_filters[1], wf)
                         wfs[codeword][c] = wf
-                        print(np.max(wf))
 
                 # truncation and normalization
                 for codeword in wfs:

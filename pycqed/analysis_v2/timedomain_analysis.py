@@ -259,8 +259,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         if 'sweep_points_dict' in self.metadata:
             # assumed to be of the form {qbn1: swpts_array1, qbn2: swpts_array2}
             self.raw_data_dict['sweep_points_dict'] = \
-                {qbn: {'sweep_points': data_filter(
-                    self.metadata['sweep_points_dict'][qbn])}
+                {qbn: {'sweep_points': self.metadata['sweep_points_dict'][qbn]}
                  for qbn in self.qb_names}
         else:
             self.raw_data_dict['sweep_points_dict'] = \
@@ -321,7 +320,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 {qbn: {'sweep_points': self.cp.extend_sweep_points(
                     self.raw_data_dict['sweep_points_dict'][qbn][
                         'sweep_points'], qbn)} for qbn in self.qb_names}
-            self.raw_data_dict['sweep_points_dict'] = sweep_points_w_calpts
+            self.raw_data_dict['sweep_points_dict'].update(sweep_points_w_calpts)
         except Exception as e:
             log.error(str(e))
             log.warning("Deprecated usage of calibration points and sequences."

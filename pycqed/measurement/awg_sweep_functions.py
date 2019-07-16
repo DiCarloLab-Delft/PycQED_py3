@@ -224,8 +224,8 @@ class SegmentSoftSweep(swf.Soft_Sweep):
             self.awgs_to_upload = 'all'
         else:
             pulsar = ps.Pulsar.get_instance()
-            self.awgs_to_upload = list(set([pulsar.get('f{ch}_awg')
-                                            for ch in channels_to_upload]))
+            self.awgs_to_upload = set([pulsar.get(f'{ch}_awg')
+                                            for ch in channels_to_upload])
         self.upload_next = upload_first
 
     def set_parameter(self, val, **kw):

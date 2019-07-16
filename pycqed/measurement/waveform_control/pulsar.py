@@ -457,41 +457,58 @@ class HDAWG8Pulsar:
                 
                 nr_cw = len(set(awg_sequence[element].keys()) - \
                             {'no_codeword'})
+
                 if nr_cw == 1:
                     log.warning(
                         f'Only one codeword has been set for {element}')
-                
-                for cw in awg_sequence[element]:
-                    if nr_cw != 0 and cw == 'no_codeword':
-                        # 'no_codeword' element not processed for codeword
-                        # elements
-                        continue
-
-                    chid_to_hash = awg_sequence[element][cw]
-
-                    wave = tuple(chid_to_hash.get(ch, None) 
-                        for ch in [ch1id, ch1mid, ch2id, ch2mid])
-
-                    wave_definitions += _zi_wave_definition(wave, 
+                elif nr_cw == 0:
+                    chid_to_hash = awg_sequence[element]['no_codeword']
+                    wave = tuple(chid_to_hash.get(ch, None)
+                                 for ch in [ch1id, ch1mid, ch2id, ch2mid])
+                    wave_definitions += _zi_wave_definition(wave,
                                                             defined_waves)
-                    
-                    if cw != 'no_codeword':
+                    playback_strings += _zi_playback_string(
+                        'hdawg', wave)
+
+                    ch_has_waveforms[ch1id] |= wave[0] is not None
+                    ch_has_waveforms[ch1mid] |= wave[1] is not None
+                    ch_has_waveforms[ch2id] |= wave[2] is not None
+                    ch_has_waveforms[ch2mid] |= wave[3] is not None
+
+                else:
+                    for cw in awg_sequence[element]:
+                        if cw == 'no_codeword':
+                            # 'no_codeword' element not processed for codeword
+                            # elements
+                            continue
+
+                        chid_to_hash = awg_sequence[element][cw]
+                        wave = tuple(chid_to_hash.get(ch, None)
+                                     for ch in [ch1id, ch1mid, ch2id, ch2mid])
+                        wave_definitions += _zi_wave_definition(wave,
+                                                                defined_waves)
                         w1, w2 = _zi_waves_to_wavenames(wave)
                         if cw not in codeword_table:
                             codeword_table_defs += \
                                 _zi_codeword_table_entry(cw, wave)
                             codeword_table[cw] = (w1, w2)
                         elif codeword_table[cw] != (w1, w2):
-                            log.warning('Same codeword used for different '
-                                        'waveforms. Using first waveform. '
-                                        f'Ignoring element {element}.')
+                            pass
+                            # Uncomment once hash function is properly implemented
+                            # log.warning('Same codeword used for different '
+                            #             'waveforms. Using first waveform. '
+                            #             f'Ignoring element {element}.')
+
+                        ch_has_waveforms[ch1id] |= wave[0] is not None
+                        ch_has_waveforms[ch1mid] |= wave[1] is not None
+                        ch_has_waveforms[ch2id] |= wave[2] is not None
+                        ch_has_waveforms[ch2mid] |= wave[3] is not None
+
                     playback_strings += _zi_playback_string(
                         'hdawg', wave, codeword=(cw != 'no_codeword'))
 
-                ch_has_waveforms[ch1id]  |= wave[0] is not None
-                ch_has_waveforms[ch1mid] |= wave[1] is not None
-                ch_has_waveforms[ch2id]  |= wave[2] is not None
-                ch_has_waveforms[ch2mid] |= wave[3] is not None
+                # should be fixed I think, ugly copy paste though. I try
+
                 
             if not any([ch_has_waveforms[ch] 
                     for ch in [ch1id, ch1mid, ch2id, ch2mid]]):
@@ -1269,7 +1286,7 @@ def _zi_playback_string(device, wave, acq=False, codeword=False):
         playback_string.append('setTrigger(WINT_EN);')
     return playback_string
 
-def _zi_codeword_entry(codeword, wave):
+def _zi_codeword_table_entry(codeword, wave):
     w1, w2 = _zi_waves_to_wavenames(wave)
     if w1 is None and w2 is not None:
         # This hack is needed due to a bug on the HDAWG. 

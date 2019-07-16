@@ -10,7 +10,8 @@ from pycqed.measurement.waveform_control import pulsar as ps
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     sweep_pulse_params, add_preparation_pulses, pulse_list_list_seq
-
+from pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts import \
+    generate_mux_ro_pulse_list
 
 from importlib import reload
 reload(pulse)
@@ -488,6 +489,7 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
     initial_rotations = [deepcopy(operation_dict['X180 ' + qbc_name]),
                          deepcopy(operation_dict['X90s ' + qbt_name])]
     initial_rotations[0]['name'] = 'cphase_init_pi_qbc'
+    initial_rotations[1]['name'] = 'cphase_init_pihalf_qbt'
     for rot_pulses in initial_rotations:
         rot_pulses['element_name'] = 'cphase_initial_rots_el'
 
@@ -501,6 +503,8 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
     final_rotations[1]['name'] = 'cphase_final_pihalf_qbt'
     for rot_pulses in final_rotations:
         rot_pulses['element_name'] = 'cphase_final_rots_el'
+
+    # set pulse delay of final_rotations[0] to max_flux_length
     if max_flux_length is None:
         if 'pulse_length' in soft_sweep_dict:
             max_flux_length = max(soft_sweep_dict['pulse_length']['values'])
@@ -508,14 +512,22 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
                   f'from sweep points.')
         else:
             max_flux_length = flux_pulse['pulse_length']
-            print(f'max_pulse_length = {max_flux_length*1e9:.2f}, '
+            print(f'max_pulse_length = {max_flux_length*1e9:.2f} ns, '
                   f'from pulse dict.')
-    final_rotations[0]['ref_pulse'] = 'cphase_init_pi_qbc'
-    final_rotations[0]['pulse_delay'] = \
-        max_flux_length + flux_pulse.get('buffer_length_start', 0) + \
+    # add buffers to this delay
+    delay = max_flux_length + flux_pulse.get('buffer_length_start', 0) + \
         flux_pulse.get('buffer_length_end', 0)
+    # # ensure the delay is commensurate with 16/2.4e9
+    # comm_const = (16/2.4e9)
+    # if delay % comm_const > 1e-15:
+    #     delay = comm_const * (delay // comm_const + 1)
+    #     print(f'delay adjusted to {delay*1e9:.2f} ns '
+    #           f'to fulfill commensurability conditions with 16/2.4e9.')
+    final_rotations[0]['ref_pulse'] = 'cphase_init_pi_qbc'
+    final_rotations[0]['pulse_delay'] = delay
 
-    ro_pulse = deepcopy(operation_dict['RO mux'])
+    ro_pulses = generate_mux_ro_pulse_list([qbc_name, qbt_name],
+                                            operation_dict)
 
     hsl = len(list(hard_sweep_dict.values())[0]['values'])
     params = {'cphase_init_pi_qbc.amplitude': np.concatenate(
@@ -529,7 +541,7 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
     for i in range(ssl):
         flux_p = deepcopy(flux_pulse)
         flux_p.update({k: v['values'][i] for k, v in soft_sweep_dict.items()})
-        pulses = initial_rotations + [flux_p] + final_rotations + [ro_pulse]
+        pulses = initial_rotations + [flux_p] + final_rotations + ro_pulses
         swept_pulses = sweep_pulse_params(pulses, params)
         swept_pulses_with_prep = \
             [add_preparation_pulses(p, operation_dict, [qbc_name, qbt_name],
