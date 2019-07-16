@@ -1947,7 +1947,6 @@ def sliding_flux_pulses_seq(
     q1 = qubits[-2]
 
     for i, angle in enumerate(angles):
-
         cw_idx = angle//20 + 9
 
         k.prepz(q0)
@@ -1961,7 +1960,7 @@ def sliding_flux_pulses_seq(
         elif ramsey_axis == 'y':
             k.gate('ry90', [q0])
         else:
-            raise ValueError('ramsey_axis must be "x" ot "y"')
+            raise ValueError('ramsey_axis must be "x" or "y"')
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)  # alignment workaround
         k.gate(flux_codeword_b, [2, 0]) # edge hardcoded because of openql
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)  # alignment workaround
@@ -1979,6 +1978,7 @@ def sliding_flux_pulses_seq(
         # k.gate('wait', [q0, q1], 0)
         # hardcoded barrier because of openQL #104
         k.gate('wait', [2, 0], 0)
+
     p.add_kernel(k)
 
     if add_cal_points:

@@ -238,7 +238,7 @@ class Base_MW_LutMan(Base_LutMan):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        if isinstance(waveform_name, int):
+        if isinstance(waveform_name, int):  # FIXME: type mismatch with function parameter, misleading name
             cw_idx = waveform_name
         else:
             raise DeprecationWarning
@@ -455,7 +455,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 awgs = [self.channel_GI()//2, self.channel_DI()//2]
             else:
                 awgs = [self.channel_I()//2]
-            # Add if statemetn based on the hash here
+            # FIXME: Add if statement based on the hash here
             self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 
         for waveform_key in self.LutMap().keys():
@@ -567,7 +567,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                            initial_value=0)
 
     def generate_standard_waveforms(self):
-
         wave_dict = super(AWG8_MW_LutMan, self).generate_standard_waveforms()
         wave_dict['square'] = wf.mod_square_VSM(
             amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),

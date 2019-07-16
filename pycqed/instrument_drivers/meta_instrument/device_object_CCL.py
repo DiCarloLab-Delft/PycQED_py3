@@ -399,6 +399,7 @@ class DeviceCCL(Instrument):
 
         w0 = q0.ro_acq_weight_chI()
         w1 = q1.ro_acq_weight_chI()
+
         if q0.instr_acquisition.get_instr()==q1.instr_acquisition.get_instr():
             d = det.UHFQC_correlation_detector(
                 UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
@@ -414,6 +415,7 @@ class DeviceCCL(Instrument):
                              'Corr ({}, {})'.format(qubits[0], qubits[1])]
         else:
             d=self.get_int_avg_det(qubits=qubits)
+
         return d
 
     def get_int_logging_detector(self, qubits,
@@ -694,7 +696,7 @@ class DeviceCCL(Instrument):
         Prepare setup for a timedomain experiment:
 
         Args:
-            qubits: list of str
+            qubits (list of str):
                 list of qubit names that have to be prepared
         """
         self.prepare_readout(qubits=qubits)
@@ -727,7 +729,41 @@ class DeviceCCL(Instrument):
                                         extract_only=False):
         """
         Measures the "conventional cost function" for the CZ gate that
-        is a conditional oscillation.
+        is a conditional oscillation. In this experiment the conditional phase
+        in the two-qubit Cphase gate is measured using Ramsey-lie sequence.
+        Specifically qubit q0 is prepared in the superposition, while q1 is in 0 or 1 state.
+        Next the flux pulse is applied. Finally pi/2 afterrotation around various axes
+        is applied to q0, and q1 is flipped back (if neccessary) to 0 state.
+        Plotting the probabilities of the zero state for each qubit as a function of
+        the afterrotation axis angle, and comparing case of q1 in 0 or 1 state, enables to
+        measure the conditional phase and estimale the leakage of the Cphase gate.
+
+        Refs:
+        Rol arXiv:1903.02492, Suppl. Sec. D
+
+        Args:
+            q0 (str):
+                target qubit name (i.e. the qubit in the superposition state)
+
+            q1 (str):
+                control qubit name (i.e. the qubit remaining in 0 or 1 state)
+
+            prepare_for_timedomain (bool):
+                should the insruments be reconfigured for time domain measurement
+
+            CZ_disabled (bool):
+                execute the experiment with no flux pulse applied
+
+            wait_time_ns (int):
+                additional waiting time (in ns) after the flux pulse, before
+                the final afterrotations
+
+            flux_codeword (str):
+                codeword corrpinding to Cphase gate
+
+            nr_of_repeated_gates (int):
+                number of times the flux pulse is to be executed
+                to amplify the small tuneup errors (c.f. measure_flipping)
         """
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
@@ -826,6 +862,25 @@ class DeviceCCL(Instrument):
                                     analyze=True, close_fig=True,
                                     prepare_for_timedomain=True, MC=None,
                                     label=''):
+        '''
+        Prepares and performs a tomography of the one of the bell states, indicated
+        by its index.
+
+        Args:
+            bell_state (int):
+                index of prepared bell state
+                0 -> |Phi_m>=|00>-|11>
+                1 -> |Phi_p>=|00>+|11>
+                2 -> |Psi_m>=|01>-|10>
+                3 -> |Psi_p>=|01>+|10>
+
+            q0, q1 (str):
+                names of the target qubits
+
+            wait_after_flux (float):
+                wait time (in seconds) after the flux pulse and
+                after-rotation before tomographic rotations
+        '''
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0, q1])
@@ -862,7 +917,28 @@ class DeviceCCL(Instrument):
                                 replace_q1_pulses_X180: bool=False,
                                 analyze: bool=True, close_fig: bool=True,
                                 prepare_for_timedomain: bool=True, MC=None):
+        '''
+        Perform AllXY measurement simultaneously of two qubits (c.f. measure_allxy
+        method of the Qubit class). Order in which the mw pulses are executed
+        can be varied.
+        
+        For detailed description of the (single qubit) AllXY measurement
+        and symptomes of different errors see PhD thesis
+        by Matthed Reed (2013, Schoelkopf lab), pp. 124.
+        https://rsl.yale.edu/sites/default/files/files/RSL_Theses/reed.pdf
 
+        Args:
+            q0 (str):
+                first quibit to perform allxy measurement on
+
+            q1 (str):
+                second quibit to perform allxy measurement on
+
+            sequence_type (str) : Describes the timing/order of the pulses.
+                options are: sequential | interleaved | simultaneous | sandwiched
+                           q0|q0|q1|q1   q0|q1|q0|q1     q01|q01       q1|q0|q0|q1
+                describes the order of the AllXY pulses
+        '''
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0, q1])
         if MC is None:
@@ -1057,8 +1133,6 @@ class DeviceCCL(Instrument):
                                      times=np.linspace(0, 10e-6, 26),
                                      analyze: bool=True, close_fig: bool=True,
                                      prepare_for_timedomain: bool=True, MC=None):
-
-        # FIXME: this is not done yet, needs testing and finishing -Filip July 2018
 
         assert q0 in self.qubits()
         assert q1 in self.qubits()
@@ -1263,14 +1337,53 @@ class DeviceCCL(Instrument):
                         target_qubit_sequence: str='ramsey',
                         waveform_name='square'):
         """
-        Measure a chevron by flux pulsing q0.
-        q0 is put in an excited at the beginning of the sequence and pulsed
-        back at the end.
-        The spectator qubit (q_spec) performs a ramsey experiment over
-        the flux pulse.
-        target_qubit_sequence selects whether target qubit should run ramsey
-        squence ('ramsey'), stay in ground state ('ground'), or be flipped
-        to the excited state ('excited')
+        Measure a chevron patter of esulting from swapping of the excitations
+        of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
+        close to the interaction zone using (usually) a rectangular pulse.
+        Meanwhile q1 is prepared in 0, 1 or superposition state. If it is in 0
+        state flipping between 01-10 can be observed. It if is in 1 state flipping
+        between 11-20 as well as 11-02 show up. In superpostion everything is visible.
+
+        Args:
+            q0 (str):
+                flux-pulsed qubit (prepared in 1 state at the beginning)
+
+            q_spec (str):
+                stationary qubit (in 0, 1 or superposition)
+
+            amps (array):
+                amplitudes of the applied flux pulse controlled via the amplitude
+                of the correspnding AWG channel
+
+            lengths (array):
+                durations of the applied flux pulses
+
+            adaptive_sampling (bool):
+                indicates whether to adaptivelly probe
+                values of ampitude and duration, with points more dense where
+                the data has more fine features
+
+            adaptive_sampling_pts (int):
+                number of points to measur in the adaptive_sampling mode
+
+            prepare_for_timedomain (bool):
+                should all instruments be reconfigured to
+                time domain measurements
+
+            target_qubit_sequence (str {"ground", "extited", "ramsey"}):
+                specifies whether the spectator qubit should be
+                prepared in the 0 state ('ground'), 1 state ('extited') or
+                in superposition ('ramsey')
+
+        Circuit:
+            q0    -x180-flux-x180-RO-
+            qspec --x90-----------RO- (target_qubit_sequence='ramsey')
+
+            q0    -x180-flux-x180-RO-
+            qspec -x180-----------RO- (target_qubit_sequence='excited')
+
+            q0    -x180-flux-x180-RO-
+            qspec ----------------RO- (target_qubit_sequence='ground')
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1357,9 +1470,28 @@ class DeviceCCL(Instrument):
                                  target_qubit_sequence: str='excited',
                                  chunk_size: int=None,):
         """
-        Measure a ramsey on q0 while setting the q_spec
-        to excited state ('excited'), ground state ('ground') or
-        superposition ('ramsey')
+        Measure a ramsey on q0 while setting the q_spec to excited state ('excited'),
+        ground state ('ground') or superposition ('ramsey'). Suitable to measure
+        large values of residual ZZ coupling.
+
+        Args:
+            q0 (str):
+                qubit on which ramsey measurement is performed
+
+            q1 (str):
+                spectator qubit prepared in 0, 1 or superposition state
+
+            times (array):
+                durations of the ramsey sequence
+
+            prepare_for_timedomain (bool):
+                should all instruments be reconfigured to
+                time domain measurements
+
+            target_qubit_sequence (str {"ground", "extited", "ramsey"}):
+                specifies whether the spectator qubit should be
+                prepared in the 0 state ('ground'), 1 state ('extited') or
+                in superposition ('ramsey')
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1474,7 +1606,13 @@ class DeviceCCL(Instrument):
                        MC=None,  label='timing_{}_{}',
                        prepare_for_timedomain: bool=True):
         """
-        Measure timing diagram. 
+        Measure the ramsey-like sequence with the 40 ns flux pulses played between
+        the two pi/2. While playing this sequence the delay of flux and microwave pulses
+        is varied (relative to the readout pulse), looking for configuration in which
+        the pulses arrive at the sample in the desired order.
+
+        After measuting the pattern use ma2.Timing_Cal_Flux_Fine with manually
+        chosen parameters to match the drawn line to the measured patern.
         
         Args:
             q0  (str)     :
@@ -1648,6 +1786,25 @@ class DeviceCCL(Instrument):
         Performs a sliding pulses experiment in order to determine how
         the phase picked up by a flux pulse depends on preceding flux
         pulses.
+
+        Args:
+            qubits (list):
+                two-element list of qubits. Only the second of the qubits
+                listed matters. First needs to be provided for compatibility
+                with OpenQl.
+
+            times (array):
+                delays between the two flux pulses to sweep over
+
+            flux_cw (str):
+                codeword specifying which of the flux pulses to execute
+
+            disable_initial_pulse (bool):
+                allows to execute the reference measurement without
+                the first of the flux pulses
+
+            label (str):
+                suffix to append to the measurement label
         """
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
@@ -1746,6 +1903,47 @@ class DeviceCCL(Instrument):
             interleaving_cliffords=[None], label='TwoQubit_RB_{}seeds_icl{}_{}_{}',
             recompile: bool ='as needed', cal_points=True,
             flux_codeword='fl_cw_01'):
+
+        '''
+        Measures two qubit randomized benchmarking, including
+        the leakage estimate.
+
+        Refs:
+        Knill PRA 77, 012307 (2008)
+        Wood PRA 97, 032306 (2018)
+
+        Args:
+            qubits (list):
+                pair of the qubit names on which to perform RB
+
+            nr_cliffords (array):
+                lengths of the clifford sequences to perform
+
+            nr_seeds (int):
+                number of different clifford sequences of each length
+
+            interleaving_cliffords (list):
+                list of integers (or None) which specifies which cliffords
+                to interleave the sequence with (for interleaved RB)
+                For indices of Clifford group elements go to
+                two_qubit_clifford_group.py
+
+            label (str):
+                string for formatting the measurement name
+
+            recompile (bool, str {'as needed'}):
+                indicate whether to regenerate the sequences of clifford gates.
+                By default it checks whether the needed sequences were already
+                generated since the most recent change of OpenQL file
+                specified in self.cfg_openql_platform_fn
+            
+            cal_points (bool):
+                should aclibration point (qubits in 0 and 1 states)
+                be included in the measurement
+
+            flux_codeword (str):
+                flux codeword corresponding to the Cphase gate
+        '''
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
@@ -1877,6 +2075,47 @@ class DeviceCCL(Instrument):
                                    15., 20., 25.]), nr_seeds=100,
             interleaving_cliffords=[None], label='TwoQubit_purityB_{}seeds_{}_{}',
             recompile: bool ='as needed', cal_points=True):
+        '''
+        Measures two qubit purity (aka unitarity) benchmarking.
+        It is a modified RB routine which measures the length of
+        the Bloch vector at the end of the sequence of cliffords
+        to verify the putity of the final state. In this way it is
+        not sensitive to systematic errors in the gates allowing
+        to estimate whether the RB gate fidelity is limited by
+        incoherent errors or inaccurate tuning.
+
+        Refs:
+        Joel Wallman, New J. Phys. 17, 113020 (2015)
+
+        Args:
+            qubits (list):
+                pair of the qubit names on which to perform RB
+
+            nr_cliffords (array):
+                lengths of the clifford sequences to perform
+
+            nr_seeds (int):
+                number of different clifford sequences of each length
+
+            interleaving_cliffords (list):
+                list of integers (or None) which specifies which cliffords
+                to interleave the sequence with (for interleaved RB)
+                For indices of Clifford group elements go to
+                two_qubit_clifford_group.py
+
+            label (str):
+                string for formatting the measurement name
+
+            recompile (bool, str {'as needed'}):
+                indicate whether to regenerate the sequences of clifford gates.
+                By default it checks whether the needed sequences were already
+                generated since the most recent change of OpenQL file
+                specified in self.cfg_openql_platform_fn
+            
+            cal_points (bool):
+                should aclibration point (qubits in 0 and 1 states)
+                be included in the measurement
+        '''
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
@@ -1986,6 +2225,9 @@ class DeviceCCL(Instrument):
             flux_codeword='fl_cw_01',
             recompile: bool ='as needed',
             ch_idxs=np.array([1, 2])):
+        # Refs:
+        # Helsen arXiv:1806.02048v1
+        # Xue PRX 9, 021011 (2019)
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
@@ -2076,9 +2318,38 @@ class DeviceCCL(Instrument):
             interleaving_cliffords=[None], label='TwoQubit_sim_RB_{}seeds_{}_{}',
             recompile: bool ='as needed', cal_points=True):
         """
-        Performs simultaneous RB on two qubits.
+        Performs simultaneous single qubit RB on two qubits.
         The data of this experiment should be compared to the results of single
-        qubit RB
+        qubit RB to reveal differences due to crosstalk and residual coupling
+
+        Args:
+            qubits (list):
+                pair of the qubit names on which to perform RB
+
+            nr_cliffords (array):
+                lengths of the clifford sequences to perform
+
+            nr_seeds (int):
+                number of different clifford sequences of each length
+
+            interleaving_cliffords (list):
+                list of integers (or None) which specifies which cliffords
+                to interleave the sequence with (for interleaved RB)
+                For indices of Clifford group elements go to
+                two_qubit_clifford_group.py
+
+            label (str):
+                string for formatting the measurement name
+
+            recompile (bool, str {'as needed'}):
+                indicate whether to regenerate the sequences of clifford gates.
+                By default it checks whether the needed sequences were already
+                generated since the most recent change of OpenQL file
+                specified in self.cfg_openql_platform_fn
+            
+            cal_points (bool):
+                should aclibration point (qubits in 0 and 1 states)
+                be included in the measurement
         """
 
         # Settings that have to be preserved, change is required for

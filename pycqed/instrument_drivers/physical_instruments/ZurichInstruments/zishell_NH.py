@@ -252,10 +252,16 @@ class ziShellEnvironment:
 
         # Handle absolute path
         if path[0] == '/':
-            self.daq.vectorWrite(path, value)
+            if 'setVector' in dir(self.daq):
+                self.daq.setVector(path, value)
+            else:
+                self.daq.vectorWrite(path, value)
         else:
             for device in self.devices:
-                self.daq.vectorWrite('/' + device + '/' + path, value)
+                if 'setVector' in dir(self.daq):
+                    self.daq.setVector('/' + device + '/' + path, value)
+                else:
+                    self.daq.vectorWrite('/' + device + '/' + path, value)
 
     def geti(self, paths, deep=True):
         if not self.daq:
@@ -842,7 +848,7 @@ class ziShellDevice:
             '/' + self.device + '/features/options')).split('\n') if len(s)])
         return rv
 
-    def setd(self, path, value, sync=False):
+    def setd(self, path, value, synchronous=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -850,17 +856,17 @@ class ziShellDevice:
 
         # Handle absolute path
         if path[0] == '/':
-            if sync:
+            if synchronous:
                 self.daq.syncSetDouble(path, value)
             else:
                 self.daq.setDouble(path, value)
         else:
-            if sync:
+            if synchronous:
                 self.daq.syncSetDouble('/' + self.device + '/' + path, value)
             else:
                 self.daq.setDouble('/' + self.device + '/' + path, value)
 
-    def seti(self, path, value, sync=False):
+    def seti(self, path, value, synchronous=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -868,12 +874,12 @@ class ziShellDevice:
 
         # Handle absolute path
         if path[0] == '/':
-            if sync:
+            if synchronous:
                 self.daq.syncSetInt(path, value)
             else:
                 self.daq.setInt(path, value)
         else:
-            if sync:
+            if synchronous:
                 self.daq.syncSetInt('/' + self.device + '/' + path, value)
             else:
                 self.daq.setInt('/' + self.device + '/' + path, value)

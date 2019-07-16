@@ -11,11 +11,13 @@ from pycqed.utilities.general import gen_sweep_pts
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis import fitting_models as fit_mods
-
+from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis.tools import plotting as plt_tools
+from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
 
 class Qubit(Instrument):
 
-    '''
+    """
     Abstract base class for the qubit object.
     Contains a template for all methods a qubit (should) has.
     N.B. This is not intended to be initialized.
@@ -91,7 +93,7 @@ class Qubit(Instrument):
             or calibrate?
         - Should the pulse-parameters be grouped here in some convenient way?
             (e.g. parameter prefixes)
-    '''
+    """
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
@@ -168,14 +170,22 @@ class Qubit(Instrument):
         """
         Performs a T1 experiment.
         Args:
-            times:      array of times to measure at, if None will define a
-                        suitable range based on the last known T1
-            MC:         instance of the MeasurementControl
-            close_fig:  close the figure in plotting
-            update :    update self.T1 with the measured value
+            times (array):
+                array of times to measure at, if None will define a
+                suitable range based on the last known T1
+
+            MC (MeasurementControl):
+                instance of the MeasurementControl
+
+            close_fig (bool):
+                close the figure in plotting
+
+            update (bool):
+                update self.T1 with the measured value
 
         returns:
-            T1 (float) the measured value
+            T1 (float):
+                the measured value
         """
 
         # Note: I made all functions lowercase but for T1 it just looks too
@@ -192,24 +202,63 @@ class Qubit(Instrument):
         raise NotImplementedError()
 
     def measure_ramsey(self):
+        """
+        Ramsey measurement used to measure the inhomogenuous dephasing time T2* as well as
+        the qubit frequency. The measurement consists of the pi/2 pulses with a variable delay
+        time between. The MW LO can be intentionally detuned from the qubit frequency.
+        Consequently the measurement yields decaying oscillations which is easier to fit
+        accurately than the monotonuous decay.
+
+        Args:
+            times (array):
+                array of delay times between the two pi/2 pulses
+
+            artificial_detuning (float):
+                intentional detuing from the known qubit frequency
+        """
         raise NotImplementedError()
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True):
+        """
+        Performs the Hahn echo measurement to estimate dephasing time of the qubit decouplied
+        from the majority of the low frequency noise. The sequence of the experiment is
+        pi/2 - wait/2 - pi - wait/2 - pi/2
+        with variable (identical) delay times between pulses. The final pi/2 pulse is performed
+        around variable axis. Consequently the measurement yields decaying oscillatioins instead
+        of monotunous decay, which enables to more easily spot potential problems with the applied
+        microwave pulses.
+
+        Args:
+            times (array):
+                list of total waiting time between two pi/2 pulses. Half of the delay
+                is inserted before, and half after the central pi pule.      
+        """
         raise NotImplementedError()
 
     def measure_allxy(self, MC=None, analyze: bool=True,
                       close_fig: bool=True,
                       prepare_for_timedomain: bool=True):
         """
-        Performs an AllXY experiment.
-        Args:
-            MC        : instance of the MeasurementControl
-            analyze   : perform analysis
-            close_fig : close the figure in plotting
+        Performs an AllXY experiment. AllXY experiment consists of 21 pairs of
+        MW control pulses folowed by the qubit measurement (in this routine
+        each pair is repeated twice). In the ideal case the result of 
+        this measurement should be a staircase, and specific errors in the MW gate tuenup
+        result in characteristic deviations from the ideal shape.
+        
+        For detailed description of the AllXY measurement and symptomes of different errors
+        see PhD thesis by Matthed Reed (2013, Schoelkopf lab), pp. 124.
+        https://rsl.yale.edu/sites/default/files/files/RSL_Theses/reed.pdf
 
-        returns:
-            T1 (float) the measured value
+        Args:
+            MC (MeasurementControl):
+                instance of the MeasurementControl
+
+            analyze (bool):
+                perform analysis
+
+            close_fig (bool):
+                close the figure in plotting
         """
         raise NotImplementedError()
 
@@ -236,7 +285,7 @@ class Qubit(Instrument):
                            prepare: bool=True, depletion_analysis: bool=True,
                            depletion_analysis_plot: bool=True,
                            depletion_optimization_window=None):
-        '''
+        """
         Measure transients for the cases specified.
         Args:
             MC      (instr): measurement control
@@ -246,10 +295,11 @@ class Qubit(Instrument):
                 to preparing the qubit in the 0 or 1 state respectively.
             prepare (bool) : if True runs prepare for timedomain before
                 measuring the transients
+
         Returns:
             list of numpy arrays containing the transients for the cases
             specified.
-        '''
+        """
         if prepare:
             self.prepare_for_timedomain()
         raise NotImplementedError()
@@ -258,15 +308,571 @@ class Qubit(Instrument):
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
 
+    def find_resonators(self, start_freq=7.3e9, stop_freq=7.8e9, VNA_power=-40,
+                        bandwidth=200, timeout=200, f_step=250e3, with_VNA=None,
+                        verbose=True):
+        """
+        Performs a wide range scan to find all resonator dips. Will use VNA if
+        one is connected and linked to the qubit object, or if specified via
+        'with_VNA'.
+
+        Will not do any checks, but rather saves the resonators in the device.
+        In the next step (find_resonator_frequency_initial), we will take a look
+        whether we have found all resonators and give a warning if not.
+
+        TODO: Add measure_with_VNA to CCL Transmon object
+        """
+        if with_VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    with_VNA = False
+                else:
+                    with_VNA = True
+
+            except:
+                with_VNA = False
+
+        if with_VNA:
+            raise NotImplementedError
+        else:
+            self.ro_pulse_amp(1)
+            self.ro_pulse_amp_CW(1)
+            freqs = np.arange(start_freq, stop_freq + f_step, f_step)
+            self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
+            result = ma2.sa.Initial_Resonator_Scan_Analysis()
+
+        # Create resonator list
+        found_resonators = []
+        for i, freq in enumerate(result.peaks):
+            found_resonators.append(resonator(identifier=i, freq=freq))
+
+        if verbose:
+            print('Found resonators:')
+            for res in found_resonators:
+                freq, unit = plt_tools.SI_val_to_msg_str(res.freq, 'Hz', float)
+                print('{}:\t{:.3f} {}'.format(res.identifier, freq, unit))
+
+        try:
+            device = self.instr_device.get_instr()
+        except AttributeError:
+            logging.warning('Could not update device resonators: No device '
+                            'found for {}. Returning list of resonators.'
+                            .format(self.name))
+            return found_resonators
+
+        # Try to find a resonator list:
+        if not hasattr(device, 'expected_resonators'):
+            device.found_resonators = found_resonators
+            logging.warning('No resonators specified for this device')
+            device.expected_resonators = []
+            return True
+        else:
+            if device.expected_resonators:
+                print('Expected resonators:')
+                for res in device.expected_resonators:
+                    freq, unit = plt_tools.SI_val_to_msg_str(res.freq, 'Hz',
+                                                             float)
+                    print('{}:\t{:.3f} {}'.format(res.identifier, freq, unit))
+            else:
+                logging.warning('No resonators specified for this device')
+                return True
+
+
+        if len(found_resonators) > len(device.resonators):
+            logging.warning('More resonators found than expected. Checking for '
+                            'duplicates in next node')
+
+        elif len(found_resonators) < len(device.resonators):
+            num_missing = len(device.resonators) - len(found_resonators)
+            logging.warning('Missing {} resonator(s). Checking which are '
+                            'missing ...'.format(num_missing))
+            deltas = []
+            for i, found_res in enumerate(found_resonators):
+                deltas.append(found_res.freq - device.resonators[i].freq)
+
+            expected_freqs = []
+            for res in device.resonators:
+                expected_freqs.append(res.freq)
+
+            expected_spacing = np.diff(expected_freqs)
+            device.expected_spacing = expected_spacing
+            found_spacing = np.diff(result.peaks)
+
+            missing_idx = []
+            res_idx = 0
+            for i in range(len(found_spacing)):
+                if np.abs(found_spacing[i] - expected_spacing[res_idx]) > 25e6:
+                    missing_idx.append(i+1)
+                    res_idx += 1
+                res_idx += 1
+
+            missing_resonators = [device.resonators[ind] for ind in missing_idx]
+
+            print('Missing resonators:')
+            for missing_res in missing_resonators:
+                print(missing_res.identifier)
+                missing_res.type = 'missing'
+                device.missing_resonators = missing_resonators
+            print('Will look for missing resonators in next node')
+        else:
+            print('Found all expected resonators.')
+            for found_res, res in zip(found_resonators, device.resonators):
+                res.freq = found_res.freq
+
+        return True
+
+    def find_resonator_frequency_initial(self, start_freq=7e9, stop_freq=8e9,
+                                         npts=50001, use_min=False, MC=None,
+                                         update=True, with_VNA=None,
+                                         resonators=None, look_for_missing=True):
+        """
+        DISCLAIMER: designed for automation routines, seperate usage not
+        adviced.
+
+        First checks whether the number of found resonators from a wide scan
+        matches the number of expected resonators as specified in the device
+        object.
+        If it matches, will skip this step no usefull information will be
+        obtained besides the frequency, which is already known.
+
+        If there are too many, it will do a resonator scan for each one and
+        check whether they are resonators or not.
+
+        If there aree too few, it will try to find the missing ones by looking
+        at the spacing and expected spacing of the resonators, predict the
+        frequency of the missing resonator and perform a high resolution scan
+        to try and find it.
+        """
+        if with_VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    with_VNA = False
+                else:
+                    with_VNA = True
+            except:
+                with_VNA = False
+
+        if resonators is None:
+            try:
+                device = self.instr_device.get_instr()
+
+            except AttributeError:
+                logging.warning('Could not find device resonator dictionary: '
+                                'No device found for {}.'.format(self.name))
+                return False
+
+        expected_resonators = device.expected_resonators
+        found_resonators = device.found_resonators
+
+        # Check if any resonators are expected:
+        if expected_resonators:
+            if len(found_resonators) == len(expected_resonators):
+                print('Found all expected resonators.')
+                for found_res, res in zip(found_resonators, expected_resonators):
+                    res.freq = found_res.freq
+                return True
+
+            elif len(found_resonators) > len(expected_resonators):
+                logging.warning('More resonators found than expected. '
+                                'Checking each candidate at high resolution.')
+                new_res = self.measure_individual_resonators(with_VNA=with_VNA)
+
+                if len(new_res) == len(expected_resonators):
+                    return True
+                elif len(new_res) > len(expected_resonators):
+                    logging.warning('Not all false positives removed. '
+                                    'Retrying ...')
+                    return False
+
+            elif len(found_resonators) < len(expected_resonators):
+                num_missing = len(device.resonators) - len(found_resonators)
+                logging.warning('Missing {} resonator(s). Checking which are '
+                                'missing ...'.format(num_missing))
+
+                # Find missing resonators
+                if look_for_missing:
+                    raise NotImplementedError
+                else:
+                    return True
+        else:
+            print('Scanning all found resonators')
+            new_res = self.measure_individual_resonators(with_VNA=with_VNA)
+            device.resonators = new_res
+            return True
+
+
+        # # First check if number of resonators matches prediction, else try to
+        # # find and remove duplicates
+        # if len(device.found_resonators) == len(device.resonators):
+        #     return True
+
+        # elif len(device.found_resonators) > len(device.resonators):
+        #     result = self.find_additional_resonators(device.resonators, 
+        #                                              found_resonators,
+        #                                              with_VNA=with_VNA)
+        #     return result
+
+        # else:
+        #     if not look_for_missing:
+        #         for res in resonators:
+        #             if res.type == 'missing':
+        #                 res.type = 'broken'
+        #     else:
+        #         for i, res in enumerate(device.resonators):
+        #             if res.type == 'missing':
+        #                 f_step = 50e3
+        #                 f_span = 100e6
+        #                 f_center = (device.resonators[i+1].freq -
+        #                             device.expected_spacing[i])
+        #                 freqs = np.arange(f_center - f_span/2,
+        #                                   f_center + f_span/2,
+        #                                   f_step)
+
+        #                 self.measure_heterodyne_spectroscopy(freqs=freqs,
+        #                                                      analyze=False)
+        #                 name = 'Resonator'
+        #                 a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
+        #                 dip = np.amin(a.data_y)
+        #                 offset = a.fit_results.params['A'].value
+
+        #                 if (np.abs(dip/offset) > 0.6 or 
+        #                     np.isnan(a.fit_results.params['Qc'].stderr)):
+        #                     freq, unit = plt_tools.SI_val_to_msg_str(f_center,
+        #                                                              'Hz',
+        #                                                              float)
+        #                     print('No resonator found where {} ({:.3f} {}}) is '
+        #                           'expected'.format(res.identifier, freq, unit))
+        #                     res.type = 'broken'
+        #                 else:
+        #                     res.type = 'unknown'
+        #                     if use_min:
+        #                         res.freq = a.min_frequency
+        #                     else:
+        #                         res.freq = a.fit_results.params['f0'].value*1e9
+        # return True
+
+    def measure_individual_resonators(self, with_VNA=False, use_min=False):
+        """
+        Specifically designed for use in automation, not recommended to use by
+        hand!
+        Finds which peaks were wrongly assigend as a resonator in the resonator
+        wide search
+        """
+        device = self.instr_device.get_instr()
+        found_resonators = device.found_resonators
+
+        new_resonators = []
+        for i, res in enumerate(found_resonators):
+            freq = res.freq
+            str_freq, unit = plt_tools.SI_val_to_msg_str(freq, 'Hz', float)
+            if with_VNA:
+                raise NotImplementedError
+            else:
+                self.ro_pulse_amp(1)
+                self.ro_pulse_amp_CW(1)
+                freqs = np.arange(freq - 5e6, freq + 5e6, 50e3)
+                label = '_{:.3f}_{}'.format(str_freq, unit)
+                name = 'Resonator_scan' + self.msmt_suffix + label
+                self.measure_heterodyne_spectroscopy(freqs=freqs,
+                                                     analyze=False,
+                                                     label=label)
+
+            a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
+
+            dip = np.amin(a.data_y)
+            offset = a.fit_results.params['A'].value
+
+            if (np.abs(dip/offset) > 0.6): # or
+               # np.isnan(a.fit_results.params['Qc'].stderr)):
+
+                print('Removed candidate {} ({:.3f} {}): Not a resonator'
+                      .format(res.identifier, str_freq, unit))
+
+            else:
+                if use_min:
+                    f_res = a.min_frequency
+                else:
+                    f_res = a.fit_results.params['f0'].value*1e9
+
+                # Check if not a duplicate
+                if i > 0:
+                    prev_freq = found_resonators[i-1].freq
+                    if np.abs(prev_freq - f_res) < 10e6:
+                        print('Removed candidate: {} ({:.3f} {}): Duplicate'
+                              .format(res.identifier, str_freq, unit))
+                    else:
+                        found_resonators[i].freq = f_res
+                        print("Added resonator {} ({:.3f} {})"
+                              .format(res.identifier, str_freq, unit))
+                        new_resonators.append(res)
+
+                else:
+                    found_resonators[i].freq = f_res
+                    print("Added resonator {} ({:.3f} {})"
+                          .format(res.identifier, str_freq, unit))
+                    new_resonators.append(res)
+        return new_resonators
+
+    def find_test_resonators(self, with_VNA=None, resonators=None):
+        """
+        Does a power sweep over the resonators to see if they have a qubit
+        attached or not, and changes the state in the resonator object
+        """
+        if with_VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    with_VNA = False
+                else:
+                    with_VNA = True
+            except:
+                with_VNA = False
+
+        if resonators is None:
+            try:
+                device = self.instr_device.get_instr()
+            except AttributeError:
+                logging.warning('Could not find device resonators: '
+                                'No device found for {}'.format(self.name))
+                return False
+            resonators = self.instr_device.get_instr().resonators
+
+        for res in device.resonators:
+
+            freq = res.freq
+            label = '_resonator_{}'.format(res.identifier)
+            if res.type == 'test_resonator':
+                powers = np.linspace(-20, 0.1, 3)
+                f_step = 25e3
+            else:
+                powers = np.arange(-40, 0.1, 10)
+                f_step = 25e3
+
+            if with_VNA:
+                VNA = self.instr_VNA.get_instr()
+                VNA.start_frequency(freq - 20e6)
+                VNA.stop_frequency(freq + 20e6)
+                self.measure_VNA_power_sweep()  # not implemented yet
+            else:
+                if res.type == 'test_resonator':
+                    logging.warning('Heterodyne spectroscopy insufficient for '
+                                    'test resonators. Skipping')
+                    res.freq_low = res.freq
+                    continue
+                freqs = np.arange(freq - 2e6, freq + 5e6, f_step)
+                self.measure_resonator_power(freqs=freqs, powers=powers,
+                                             analyze=False, label=label)
+
+            fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
+                                                      close_fig=True,
+                                                      use_min=True)
+            # Update resonator types
+            if np.abs(fit_res.shift) > 300e3:
+                if res.type == 'unknown':
+                    res.type = 'qubit_resonator'
+                elif res.type == 'qubit_resonator':
+                    print('Resonator {}: confirmed resonator shift.'
+                          .format(res.identifier))
+                else:
+                    logging.warning('No resonator power shift found for '
+                                    'resonator {}. Consider adding/removing '
+                                    'attenuation.'.format(res.identifier))
+            else:
+                if res.type == 'unknown':
+                    res.type = 'test_resonator'
+                elif res.type == 'test_resonator':
+                    print('Resonator {}: confirmed test resonator'
+                          .format(res.identifier))
+                    res.freq_low = res.freq
+                else:
+                    logging.warning('Resonator shift found for test resonator '
+                                    '{}. Apperently not a test resonator.'
+                                    .format(res.identifier))
+
+            # Update resonator attributes
+            res.freq_low = fit_res.f_low
+            res.freq_high = fit_res.f_high
+            res.shift = fit_res.shift
+            res.ro_amp = 10**(fit_res.power/20)
+
+        return True
+
+    def find_qubit_resonator_fluxline(self, with_VNA=None, dac_values=None,
+                                      verbose=True, resonators=None):
+        """
+        --- WARNING: UPDATING PARAMETERS ONLY WORKS WITH DEVICE OBJECT! ---
+
+        Does a resonator DAC scan with all qubit resonators and all fluxlines.
+        """
+        if with_VNA is None:
+            try:
+                if self.instr_VNA.get_instr() == '':
+                    with_VNA = False
+                else:
+                    with_VNA = True
+            except:
+                with_VNA = False
+
+        if resonators is None:
+            try:
+                device = self.instr_device.get_instr()
+            except AttributeError:
+                logging.warning('Could not find device resonators: '
+                                'No device found for {}.'.format(self.name))
+                return False
+            resonators = device.resonators
+
+        if dac_values is None:
+            dac_values = np.arange(-20e-3, 20e-3, 1e-3)
+
+        fluxcurrent = self.instr_FluxCtrl.get_instr()
+        for FBL in fluxcurrent.channel_map:
+            fluxcurrent[FBL](0)
+
+        for res in resonators:
+            if res.type == 'qubit_resonator':
+                self.ro_pulse_amp(res.ro_amp)
+                self.ro_pulse_amp_CW(res.ro_amp)
+                best_amplitude = 0  # For comparing which one is coupled closest
+
+                if with_VNA:
+                    VNA = self.instr_VNA.get_instr()
+                    VNA.start_frequency(res.freq_low - 10e6)
+                    VNA.stop_frequency(res.freq_low + 10e6)
+
+                freqs = np.arange(res.freq_low - np.abs(res.shift) - 1e6, 
+                                  res.freq_low + 2e6,
+                                  0.1e6)
+                for fluxline in fluxcurrent.channel_map:
+                    label = '_resonator_{}_{}'.format(res.identifier, fluxline)
+                    t_start = time.strftime('%Y%m%d_%H%M%S')
+
+                    self.measure_resonator_frequency_dac_scan(freqs=freqs,
+                                                              dac_values=dac_values,
+                                                              fluxChan=fluxline,
+                                                              analyze=False,
+                                                              label=label)
+                    fluxcurrent[fluxline](0)
+                    str_freq, unit = plt_tools.SI_val_to_msg_str(res.freq, 'Hz',
+                                                                 float)
+                    print('Finished flux sweep resonator {} ({:.3f} {}) with {}'
+                          .format(res.identifier, str_freq, unit, fluxline))
+                    timestamp = a_tools.get_timestamps_in_range(t_start,
+                                                                label=self.msmt_suffix)[0]
+
+                    fit_res = ma2.VNA_DAC_Analysis(timestamp)
+
+                    amplitude = fit_res.dac_fit_res.params['amplitude'].value
+                    if amplitude > best_amplitude:
+                        best_amplitude = amplitude
+                        res.qubit = fluxline.split('_', 1)[-1]
+                        res.sweetspot = fit_res.sweet_spot_value
+                        res.fl_dc_V_per_phi0 = fit_res.current_to_flux
+
+        if verbose:
+            for res in self.instr_device.get_instr().resonators:
+                if res.type == 'qubit_resonator':
+                    freq, unit = plt_tools.SI_val_to_msg_str(res.freq_low,
+                                                             'Hz',
+                                                             float)
+                    print('{}, f = {:.3f} {}, linked to {},'
+                          ' sweetspot current = {:.3f} mA'
+                          .format(res.type, freq, unit, res.qubit, res.sweetspot*1e3))
+                else:
+                    freq, unit = plt_tools.SI_val_to_msg_str(res.freq,
+                                                             'Hz',
+                                                             float)
+                    print('{}, f = {:.3f} {}'.format(res.type, freq, unit))
+
+        # Set properties for all qubits in device if device exists
+        device = self.instr_device.get_instr()
+        assigned_qubits = []
+        for q in device.qubits():
+            if q == 'fakequbit':
+                pass
+            qubit = device.find_instrument(q)
+
+            for res in device.resonators:
+                if qubit.name == res.qubit:
+                    if qubit.name in assigned_qubits:
+                        logging.warning('Multiple resonators found for {}. '
+                                        'Aborting'.format(qubit.name))
+                        return False
+                    assigned_qubits.append(qubit.name)
+                    qubit.freq_res(res.freq_low)
+                    qubit.ro_freq(res.freq_low)
+                    qubit.fl_dc_V0(res.sweetspot)
+                    qubit.fl_dc_V_per_phi0(res.fl_dc_V_per_phi0)
+                    qubit.cfg_dc_flux_ch('FBL_' + res.qubit)
+                    if qubit.freq_qubit() is None:
+                        qubit.freq_qubit(res.freq_low - 
+                                         np.abs((70e6)**2/(res.shift))) 
+        return True
+
+    def find_resonator_sweetspot(self, freqs=None, dac_values=None,
+                                 fluxChan=None, update=True):
+        """
+        Finds the resonator sweetspot current.
+        TODO: - measure all FBL-resonator combinations
+        TODO: - implement way of distinguishing which fluxline is most coupled
+        TODO: - create method that moves qubits away from sweetspot when they
+                are not being measured (should not move them to some other
+                qubit frequency of course)
+        """
+        if freqs is None:
+            freq_center = self.freq_res()
+            freq_range = 20e6
+            freqs = np.arange(freq_center - freq_range/2,
+                              freq_center + freq_range/2, 0.5e6)
+
+        if dac_values is None:
+            dac_values = np.linspace(-10e-3, 10e-3, 101)
+
+        if fluxChan is None:
+            if self.cfg_dc_flux_ch() == 1:  # Initial value
+                fluxChan = 'FBL_1'
+            else:
+                fluxChan = self.cfg_dc_flux_ch()
+
+        t_start = time.strftime('%Y%m%d_%H%M%S')
+        self.measure_resonator_frequency_dac_scan(freqs=freqs,
+                                                  dac_values=dac_values,
+                                                  fluxChan=fluxChan,
+                                                  analyze=False)
+        if update:
+
+            import pycqed.analysis_v2.spectroscopy_analysis as sa
+            fit_res = sa.VNA_DAC_Analysis(timestamp=t_start)
+            sweetspot_current = fit_res.sweet_spot_value
+            self.fl_dc_V0(sweetspot_current)
+            fluxcurrent = self.instr_FluxCtrl.get_instr()
+            fluxcurrent[self.cfg_dc_flux_ch()](sweetspot_current)
+
+        return True
+
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
                                  freqs=None,
                                  MC=None, close_fig=True):
-        '''
-        Finds the resonator frequency by performing a heterodyne experiment
-        if freqs == None it will determine a default range dependent on the
-        last known frequency of the resonator.
-        '''
+        """
+        Performs heterodyne spectroscopy to identify the frequecy of the (readout)
+        resonator frequency.
+
+        Args:
+            use_min (bool):
+                'True' uses the frequency at minimum amplitude. 'False' uses
+                the fit result
+
+            update (bool):
+                update the internal parameters with this fit
+                Finds the resonator frequency by performing a heterodyne experiment
+                if freqs == None it will determine a default range dependent on the
+                last known frequency of the resonator.
+
+            freqs (array):
+                list of frequencies to sweep. By default set to +-5 MHz around
+                the last recorded frequency, with 100 kHz step
+        """
+
         # This snippet exists to be backwards compatible 9/2017.
         try:
             freq_res_par = self.freq_res
@@ -296,7 +902,7 @@ class Qubit(Instrument):
             freq_RO_par(f_res)
         return f_res
 
-    def find_frequency(self, method='spectroscopy', pulsed=False,
+    def find_frequency(self, method='spectroscopy', spec_mode='pulsed_marked',
                        steps=[1, 3, 10, 30, 100, 300, 1000],
                        artificial_periods=4,
                        freqs=None,
@@ -306,13 +912,52 @@ class Qubit(Instrument):
                        verbose=True,
                        update=True,
                        close_fig=True,
-                       MC=None):
+                       MC=None,
+                       label = ''):
         """
         Finds the qubit frequency using either the spectroscopy or the Ramsey
         method.
-        Frequency prediction is done using
-        """
 
+        In case method=='spectroscopy' this routine runs measure_spectroscopy and performs
+        analysis looking for peaks in the spectrum.
+
+        In case metgod=='ramsey' this routine performs series of ramsey measurements
+        for increasing range of the delay times. Using short ramsey sequence with relatively
+        large artificial detuning yields robust measurement of the qubit frequency, and increasing
+        the relay times allows for more precise frequency measurement.
+
+        Args:
+            method (str {'spectroscopy', 'ramsey'}):
+                specifies whether to perform spectroscopy ('spectroscopy') or series of
+                ramsey measurements ('ramsey') to find the qubit frequency.
+
+            spec_mode (str {'CW', 'pulsed_marked', 'pulsed_mixer'}):
+                specifies the mode of the spectroscopy measurements (currently only implemented
+                by Timo for CCL_Transmon). Possivle values: 'CW', 'pulsed_marked', 'pulsed_mixer'
+
+            steps (array):
+                maximum delay between pi/2 pulses (in microseconds) in a subsequent ramsey measurements.
+                The find_frequency routine is terminated when all steps are performed or if
+                the fitted T2* significantly exceeds the maximum delay
+
+            artificial_periods (float):
+                specifies the automatic choice of the artificial detuning in the ramsey
+                measurements, in such a way that ramsey measurement should show 4 full oscillations.
+
+            freqs (array):
+                list of sweeped frequencies in case of spectroscopy measurement
+
+            f_span (float):
+                span of sweeped frequencies around the currently recorded qubit frequency in
+                the spectroscopy measurement
+
+            f_step (flaot):
+                increment of frequency between data points in spectroscopy measurement
+
+            update (bool):
+                boolean indicating whether to update the qubit frequency in the qubit object
+                according to the result of the measurement
+        """
         if method.lower() == 'spectroscopy':
             if freqs is None:
                 f_qubit_estimate = self.calculate_frequency()
@@ -320,25 +965,84 @@ class Qubit(Instrument):
                                   f_qubit_estimate + f_span/2,
                                   f_step)
             # args here should be handed down from the top.
-            self.measure_spectroscopy(freqs, pulsed=pulsed, MC=MC,
-                                      analyze=True, close_fig=close_fig)
+            self.measure_spectroscopy(freqs, mode=spec_mode, MC=MC,
+                                      analyze=False, label = label,
+                                      close_fig=close_fig)
 
             label = 'spec'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(
-                label=label, close_fig=True)
+                label=label, close_fig=True, qb_name=self.name)
 
-            if update:
-                if use_max:
-                    self.freq_qubit(analysis_spec.peaks['peak'])
-                else:
-                    self.freq_qubit(analysis_spec.fitted_freq)
-                # TODO: add updating and fitting
+            # Checks to see if there is a peak:
+            freq_peak = analysis_spec.peaks['peak']
+            offset = analysis_spec.fit_res.params['offset'].value
+            peak_height = np.amax(analysis_spec.data_dist)
+
+            if freq_peak is None:
+                success = False
+            elif peak_height < 3*offset:
+                success = False
+            elif peak_height < 3*np.mean(analysis_spec.data_dist):
+                success = False
+            else:
+                success = True
+
+            if success:
+                if update:
+                    if use_max:
+                        self.freq_qubit(analysis_spec.peaks['peak'])
+                    else:
+                        self.freq_qubit(analysis_spec.fitted_freq)
+                    return True
+                    # TODO: add updating and fitting
+            else:
+                logging.warning('No peak found! Not updating.')
+                return False
+
         elif method.lower() == 'ramsey':
             return self.calibrate_frequency_ramsey(
                 steps=steps, artificial_periods=artificial_periods,
                 verbose=verbose, update=update,
                 close_fig=close_fig)
         return analysis_spec.fitted_freq
+
+    def calibrate_spec_pow(self, freqs=None, start_power=-35, power_step = 5,
+                           threshold=0.5, verbose=True):
+        """
+        Finds the optimal spectroscopy power for qubit spectroscopy (not pulsed)
+        by varying it in steps of 5 dBm, and ending when the peak has power 
+        broadened by 1+threshold (default: broadening of 10%)
+        """
+        if freqs is None:
+            freqs = np.arange(self.freq_qubit() - 20e6,
+                              self.freq_qubit() + 20e6, 0.2e6)
+        power = start_power
+
+        w0, w = 1e9, 1e9
+
+        while w < (1 + threshold) * w0:
+            self.spec_pow(power)
+            self.measure_spectroscopy(freqs=freqs, analyze=False,
+                                      label='spec_pow_' + str(power) + '_dBm')
+
+            a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
+                                               qb_name=self.name)
+
+            freq_peak = a.peaks['peak']
+            if np.abs(freq_peak - self.freq_qubit()) > 5e6:
+                logging.warning('Peak has shifted for some reason. Aborting.')
+                return False
+                
+            w = a.params['kappa'].value
+            power += power_step
+
+
+            if w < w0:
+                w0 = w
+        if verbose:
+            print('setting spectroscopy power to {}'.format(power-5))
+        self.spec_pow(power-power_step)
+        return True
 
     def calibrate_motzoi(self, MC=None, verbose=True, update=True):
         motzois = gen_sweep_pts(center=0, span=1, num=31)
@@ -424,16 +1128,23 @@ class Qubit(Instrument):
                                    artificial_periods = 2.5,
                                    stepsize:float =20e-9,
                                    verbose: bool=True, update: bool=True,
-                                   close_fig: bool=True):
+                                   close_fig: bool=True,
+                                   test_beating: bool=True):
         """
         Runs an iterative procudere of ramsey experiments to estimate
         frequency detuning to converge to the qubit frequency up to the limit
         set by T2*.
+        
+        Args:
+            steps (array):
+                multiples of the initial stepsize on which to run the
 
-        steps:
-            multiples of the initial stepsize on which to run the
-        stepsize:
-            smalles stepsize in ns for which to run ramsey experiments.
+            artificial_periods (float):
+                intended number of periods in theramsey measurement, used to adjust
+                the artificial detuning
+
+            stepsize (float):
+                smalles stepsize in ns for which to run ramsey experiments.
         """
         cur_freq = self.freq_qubit()
         # Steps don't double to be more robust against aliasing
@@ -450,9 +1161,16 @@ class Qubit(Instrument):
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,
                                    close_file=False)
+            if test_beating and a.fit_res.chisqr > 0.4:
+                logging.warning('Found double frequency in Ramsey: large '
+                                'deviation found in single frequency fit.'
+                                'Returning True to continue automation. Retry '
+                                'with test_beating=False to ignore.')
+
+                return True
             fitted_freq = a.fit_res.params['frequency'].value
             measured_detuning = fitted_freq-artificial_detuning
-            cur_freq =  a.qubit_frequency
+            cur_freq = a.qubit_frequency
 
             qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
             qubit_ana_grp.attrs['artificial_detuning'] = \
@@ -476,20 +1194,25 @@ class Qubit(Instrument):
         return cur_freq
 
     def calculate_frequency(self, calc_method=None, V_per_phi0=None, V=None):
-        '''
+        """
         Calculates an estimate for the qubit frequency.
         Arguments are optional and parameters of the object are used if not
         specified.
+
         Args:
-            calc_method : can be "latest" or "flux" uses last known frequency
-                    or calculates using the cosine arc model as specified
-                    in fit_mods.Qubit_dac_to_freq
+            calc_method (str {'latest', 'flux'}):
+                can be "latest" or "flux" uses last known frequency
+                or calculates using the cosine arc model as specified
+                in fit_mods.Qubit_dac_to_freq
                 corresponding par. : cfg_qubit_freq_calc_method
 
-            V_per_phi0 : dac flux coefficient, converts volts to Flux.
-                    Set to 1 to reduce the model to pure flux.
+            V_per_phi0 (float):
+                dac flux coefficient, converts volts to Flux.
+                Set to 1 to reduce the model to pure flux.
                 corresponding par. : fl_dc_V_per_phi
-            V  : dac value used when calculating frequency
+
+            V (flat):
+                dac value used when calculating frequency
                 corresponding par. : fl_dc_V
 
         Calculates the f01 transition frequency using the cosine arc model.
@@ -500,7 +1223,7 @@ class Qubit(Instrument):
         Parameters of the qubit object are used unless specified.
         Flux can be specified both in terms of dac voltage or flux but not
         both.
-        '''
+        """
         if self.cfg_qubit_freq_calc_method() == 'latest':
             qubit_freq_est = self.freq_qubit()
 
@@ -521,10 +1244,10 @@ class Qubit(Instrument):
         return qubit_freq_est
 
     def calibrate_mixer_offsets_drive(self, update: bool=True)-> bool:
-        '''
+        """
         Calibrates the mixer skewness and updates the I and Q offsets in
         the qubit object.
-        '''
+        """
         raise NotImplementedError()
 
         return True
@@ -615,10 +1338,10 @@ class Qubit(Instrument):
 
 class Transmon(Qubit):
 
-    '''
+    """
     circuit-QED Transmon as used in DiCarlo Lab.
     Adds transmon specific parameters as well
-    '''
+    """
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
@@ -723,14 +1446,14 @@ class Transmon(Qubit):
     def calculate_frequency(self,
                             dac_voltage=None,
                             flux=None):
-        '''
+        """
         Calculates the f01 transition frequency from the cosine arc model.
         (function available in fit_mods. Qubit_dac_to_freq)
 
         Parameters of the qubit object are used unless specified.
         Flux can be specified both in terms of dac voltage or flux but not
         both.
-        '''
+        """
 
         if dac_voltage is not None and flux is not None:
             raise ValueError('Specify either dac voltage or flux but not both')
@@ -860,7 +1583,7 @@ class Transmon(Qubit):
             else:
                 label = 'spectroscopy'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(
-                label=label, close_fig=True)
+                label=label, close_fig=True, qb_name=self.name)
 
             if update:
                 if use_max:
@@ -983,18 +1706,23 @@ class Transmon(Qubit):
                              N_steps=[3, 7, 13, 17], max_n=18,
                              close_fig=True, verbose=False,
                              MC=None, update=True, take_fit_I=False):
-        '''
+        """
         Finds the pulse-amplitude using a Rabi experiment.
         Fine tunes by doing a Rabi around the optimum with an odd
         multiple of pulses.
 
         Args:
-            amps: (array or float) amplitudes of the first Rabi if an array,
+            amps (array or float):
+                amplitudes of the first Rabi if an array,
                 if a float is specified it will be treated as an estimate
                 for the amplitude to be found.
-            N_steps: (list of int) number of pulses used in the fine tuning
-            max_n: (int) break of if N> max_n
-        '''
+                
+            N_steps (list of int):
+                number of pulses used in the fine tuning
+
+            max_n (int):
+                break of if N> max_n
+        """
         if MC is None:
             MC = self.MC.get_instr()
         if np.size(amps) != 1:
@@ -1057,7 +1785,7 @@ class Transmon(Qubit):
                            N_steps=[5, 9], max_n=100,
                            close_fig=True, verbose=False,
                            MC=None, update=True, take_fit_I=False):
-        '''
+        """
         Finds the scaling factor of pi/2 pulses w.r.t pi pulses using a rabi
         type with each pi pulse replaced by 2 pi/2 pulses.
 
@@ -1066,7 +1794,7 @@ class Transmon(Qubit):
 
         This experiment is only useful after carefully calibrating the pi pulse
         using flipping sequences.
-        '''
+        """
         if MC is None:
             MC = self.MC
         if np.size(scales) != 1:

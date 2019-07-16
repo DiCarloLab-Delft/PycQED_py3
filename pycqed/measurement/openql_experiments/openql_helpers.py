@@ -1,4 +1,5 @@
 import re
+import logging
 import numpy as np
 from os.path import join, dirname
 from pycqed.utilities.general import suppress_stdout
@@ -44,6 +45,18 @@ def create_program(pname: str, platf_cfg: str, nregisters: int=0):
     p.output_dir = ql.get_option('output_dir')
     p.nqubits = platf.get_qubit_number()
     p.nregisters = nregisters
+
+    # detect OpenQL backend ('eqasm_compiler') used
+    p.eqasm_compiler = ''
+    with open(platf_cfg) as f:
+        for line in f:
+            if 'eqasm_compiler' in line:
+                m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
+                p.eqasm_compiler = m.group(1)
+                break
+    if p.eqasm_compiler == '':
+        logging.error("key 'eqasm_compiler' not found in file '{}'".format(platf_cfg))
+
     return p
 
 
@@ -62,11 +75,20 @@ def compile(p):
     """
     Wrapper around OpenQL Program.compile() method.
     """
-    with suppress_stdout():
+    if 1:  # FIXME: allow choice, check OpenQL 0.7.0 whether warnings can now be on
+        with suppress_stdout():
+            p.compile()
+    else:  # show warnings
+        ql.set_option('log_level', 'LOG_WARNING')
         p.compile()
-    # attribute is added to program to help finding the output files
 
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    # determine extension of generated file
+    if p.eqasm_compiler=='eqasm_backend_cc':
+        ext = '.vq1asm' # CC
+    else:
+        ext = '.qisa' # CC-light, QCC
+    # attribute is added to program to help finding the output files
+    p.filename = join(p.output_dir, p.name + ext)
     return p
 
 
@@ -471,6 +493,7 @@ def plot_time_tuples_split(time_tuples, ax=None, time_unit='s',
 # File modifications
 #############################################################################
 
+# FIXME: platform dependent (CC-light)
 def flux_pulse_replacement(qisa_fn: str):
     """
     args:
@@ -528,6 +551,7 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
     """
     determines if compilation of a file is needed based on it's timestamp
     and an optional recompile option.
+    FIXME: program_fn is platform dependent, because it includes extension
 
     The behaviour of this function depends on the recompile argument.
 

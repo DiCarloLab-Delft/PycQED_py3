@@ -138,6 +138,29 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
             plot_versus_frequency=True,
             frequency_key='Instrument settings.' + qubit + '.freq_qubit')
 
+        a = ca.CoherenceTimesAnalysisSingle(t_start='20190702_160000',t_stop='20190702_235900',
+                                label='T1_D1',
+                                dac_key='Instrument settings.fluxcurrent.FBL_D1',
+                                frequency_key='Instrument settings.D1.freq_qubit',
+                                fit_T1_vs_freq=True,
+                                options_dict={'guess_mode_frequency': [6.5e9,7.1e9]})
+
+        self.assertAlmostEqual(a.fit_res['Q_qubit'],
+                               669405.3002364064, places=-2)
+        self.assertAlmostEqual(a.fit_res['fres1'],
+                               6478982350.367288, places=-4)
+        self.assertAlmostEqual(a.fit_res['gres1'],
+                               15719845.798823722, places=-3)
+        self.assertAlmostEqual(a.fit_res['kappares1'],
+                               777397213.3098346, places=-4)
+        self.assertAlmostEqual(a.fit_res['fres2'],
+                               7105933947.128368, places=-4)
+        self.assertAlmostEqual(a.fit_res['gres2'],
+                               15860920.61850709, places=-3)
+        self.assertAlmostEqual(a.fit_res['kappares2'],
+                               452876320.52273417, places=-4)
+
+
     def test_CoherenceTimesAnalysis_old(self):
         a = ca.CoherenceTimesAnalysis_old(
             t_start='20181002_190542', t_stop='20181002_203700',

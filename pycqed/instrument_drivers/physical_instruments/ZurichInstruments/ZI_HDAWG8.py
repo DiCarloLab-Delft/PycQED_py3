@@ -424,6 +424,40 @@ class ZI_HDAWG8(ZI_base_instrument):
         t1 = time.time()
         print('Set all zeros waveforms in {:.1f} s'.format(t1-t0))
 
+    def _awg_waveform(self,chan0=None, chan1=None, marker=None):
+        '''Convert NumPy vectors of samples to a single uint16 waveform that can be used for dynamically updating a waveform in the HDAWG or UHF-QC instruments.'''
+        chan0_uint  = None
+        chan1_uint  = None
+        marker_uint = None
+        mode = 0;
+        
+        if chan0 is not None:
+            chan0_uint = np.array((np.power(2, 15)-1)*chan0, dtype=np.uint16)
+            mode += 1
+        if chan1 is not None:
+            chan1_uint = np.array((np.power(2, 15)-1)*chan1, dtype=np.uint16)
+            mode += 2 
+        if marker is not None:
+            marker_uint = np.array(marker, dtype=np.uint16)
+            mode += 4
+        
+        if mode == 1:
+            return chan0_uint
+        elif mode == 2:
+            return chan1_uint
+        elif mode == 3:
+            return np.vstack((chan0_uint, chan1_uint)).reshape((-2,),order='F')
+        elif mode == 4:
+            return marker_uint
+        elif mode == 5:
+            return np.vstack((chan0_uint, marker_uint)).reshape((-2,),order='F')
+        elif mode == 6:
+            return np.vstack((chan1_uint, marker_uint)).reshape((-2,),order='F')
+        elif mode == 7:
+            return np.vstack((chan0_uint, chan1_uint, marker_uint)).reshape((-2,),order='F')
+        else:
+            return []
+
     def upload_waveform_realtime(self, w0, w1, awg_nr: int, wf_nr: int =1):
         """
         Warning! This method should be used with care.
@@ -447,19 +481,14 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._realtime_w0 = w0
         self._realtime_w1 = w1
 
-        # Checked and everything matches
-        #print(self)
-        #print(hex(id(self)))
-        #print(self._dev)
-        #print(hex(id(self._dev)))
+        # Changed by NielsH (niels@zhinst.com)
 
-        c = np.vstack((w0, w1)).reshape((-2,), order='F')
-        self._dev.seti('awgs/{}/enable'.format(awg_nr), 0)
-        self._dev.subs('awgs/{}/ready'.format(awg_nr))
-        self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
-        #self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
-        # Try as float32 instead
-        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c.astype(np.float32))
+        # New dynamic waveform upload
+        c = self._awg_waveform(w0, w1)
+        try:
+            self._dev.daq.setVector('/' + self._devname + '/awgs/{}/waveform/waves/{}'.format(awg_nr, wf_nr), c)
+        except:
+            pass
 
         # Commented out checking if ready. 
         # creates too much time overhead.
@@ -471,7 +500,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         #         raise TimeoutError
         # self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
         self._dev.seti('awgs/{}/enable'.format(awg_nr), 1)
-
+        self._dev.sync()
 
 
 
@@ -620,13 +649,18 @@ class ZI_HDAWG8(ZI_base_instrument):
             # Valid polarity is 'high' (hardware value 2),
             # 'low' (hardware value 1), 'no valid needed' (hardware value 0)
             self.set('awgs_{}_dio_valid_polarity'.format(awg_nr), 2)
+
             # This is the bit index of the strobe signal (toggling signal),
-            self.set('awgs_{}_dio_strobe_index'.format(awg_nr), 30)
+            #self.set('awgs_{}_dio_strobe_index'.format(awg_nr), 30)
 
             # Configure the DIO interface for triggering on the both edges of
             # the strobe/toggle bit signal.
             # 1: rising edge, 2: falling edge or 3: both edges
-            self.set('awgs_{}_dio_strobe_slope'.format(awg_nr), 3)
+            # NH: Disable use of strobe
+            self.set('awgs_{}_dio_strobe_slope'.format(awg_nr), 0)
+
+            # NH: Use 50 MHz triggering
+            self._dev.setd('raw/dios/0/extclk', 1)
 
             # the mask determines how many bits will be used in the protocol
             # e.g., mask 3 will mask the bits with bin(3) = 00000011 using

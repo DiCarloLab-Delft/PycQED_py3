@@ -91,6 +91,57 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     p = oqh.compile(p)
     return p
 
+def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
+                           platf_cfg: str, trigger_idx: int):
+    """
+    Sequence for pulsed spectroscopy, similar to old version. Difference is that
+    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    wave output on the AWG (currently hardcoded, should be improved)
+    
+    """
+    p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
+    k = oqh.create_kernel("main", p)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', [trigger_idx])
+    if trigger_idx != qubit_idx:    
+        k.wait([trigger_idx, qubit_idx], 0)
+        
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
+                       platf_cfg: str, trigger_idx: int):
+    """
+    Sequence for pulsed spectroscopy, similar to old version. Difference is that
+    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    wave output on the AWG (currently hardcoded, should be improved)
+    
+    """
+    p = oqh.create_program("pulsed_spec_seq_v2", platf_cfg)
+    k = oqh.create_kernel("main", p)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', [trigger_idx])
+    if trigger_idx != qubit_idx:    
+        k.wait([trigger_idx, qubit_idx], 0)
+        
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
 
 def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
              equator: bool=False, cal_points: bool=True,
@@ -184,7 +235,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
              ['ry90', 'ry90']]
 
     # this should be implicit
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    # FIXME: remove try-except, when we depend hard on >=openql-0.6
     try:
         p.set_sweep_points(np.arange(len(allXY), dtype=float))
     except TypeError:
@@ -197,7 +248,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}".format(i+j//2), p)
+            k = oqh.create_kernel("AllXY_{}".format(i+j//2), p) # FIXME: generates 2 identical kernel names if js=2. This does work, but is still undesirable
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])

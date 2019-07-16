@@ -44,7 +44,7 @@ class Detector_Function(object):
         """
         Ensures acquisition instrument is ready to measure on first trigger.
         """
-        pass 
+        pass
 
     def get_values(self):
         pass
@@ -58,19 +58,19 @@ class Detector_Function(object):
                 self.prepare_function()
 
 
-    def set_prepare_function(self, 
-                             prepare_function, 
+    def set_prepare_function(self,
+                             prepare_function,
                              prepare_function_kwargs:dict=dict()):
         """
         Set an optional custom prepare function.
-        
-        prepare_function: function to call during prepare 
-        prepare_function_kwargs: keyword arguments to be passed to the 
+
+        prepare_function: function to call during prepare
+        prepare_function_kwargs: keyword arguments to be passed to the
             prepare_function.
 
-        N.B. Note that not all detectors support a prepare function and 
-        the corresponding keywords. 
-        Detectors that do not support this typicaly ignore these attributes. 
+        N.B. Note that not all detectors support a prepare function and
+        the corresponding keywords.
+        Detectors that do not support this typicaly ignore these attributes.
         """
         self.prepare_function = prepare_function
         self.prepare_function_kwargs = prepare_function_kwargs
@@ -145,48 +145,48 @@ class Multi_Detector(Detector_Function):
             detector.prepare(**kw)
 
 
-    def set_prepare_function(self, 
-                             prepare_function, 
-                             prepare_function_kw:dict=dict(), 
+    def set_prepare_function(self,
+                             prepare_function,
+                             prepare_function_kw:dict=dict(),
                              detectors: str='all'):
         """
         Set an optional custom prepare function.
-        
-        prepare_function: function to call during prepare 
-        prepare_function_kw: keyword arguments to be passed to the 
-            prepare_function.
-        detectors :  |"all"|"first"|"last"| 
-            sets the prepare function to "all" child detectors, or only 
-            on the "first" or "last" 
 
-        The multi detector passes the arguments to the set_prepare_function 
-        method of all detectors it contains. 
+        prepare_function: function to call during prepare
+        prepare_function_kw: keyword arguments to be passed to the
+            prepare_function.
+        detectors :  |"all"|"first"|"last"|
+            sets the prepare function to "all" child detectors, or only
+            on the "first" or "last"
+
+        The multi detector passes the arguments to the set_prepare_function
+        method of all detectors it contains.
         """
-        if detectors =="all": 
-            for detector in self.detectors: 
+        if detectors =="all":
+            for detector in self.detectors:
                 detector.set_prepare_function(prepare_function, prepare_function_kw)
-        elif detectors == 'first': 
+        elif detectors == 'first':
             self.detectors[0].set_prepare_function(prepare_function, prepare_function_kw)
-        elif detectors == 'last': 
+        elif detectors == 'last':
             self.detectors[-1].set_prepare_function(prepare_function, prepare_function_kw)
 
     def set_child_attr(self, attr, value, detectors: str='all'):
         """
-        Set an attribute of child detectors. 
+        Set an attribute of child detectors.
 
         attr (str): the attribute to set
-        value   : the value to set the attribute to 
+        value   : the value to set the attribute to
 
-        detectors :  |"all"|"first"|"last"| 
-            sets the attribute on "all" child detectors, or only 
-            on the "first" or "last"  
+        detectors :  |"all"|"first"|"last"|
+            sets the attribute on "all" child detectors, or only
+            on the "first" or "last"
         """
-        if detectors =="all": 
-            for detector in self.detectors: 
+        if detectors =="all":
+            for detector in self.detectors:
                 setattr(detector, attr, value)
-        elif detectors == 'first':           
+        elif detectors == 'first':
             setattr(self.detectors[0], attr, value)
-        elif detectors == 'last': 
+        elif detectors == 'last':
             setattr(self.detectors[-1], attr, value)
 
 
@@ -1786,9 +1786,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.stop()
         if arm:
             self.arm()
-        
-        # starting AWG
 
+        # starting AWG
         if self.AWG is not None:
             self.AWG.start()
 
@@ -1811,6 +1810,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data = np.reshape(data.T,
                           (-1, no_virtual_channels, len(self.channels))).T
         data = data.reshape((len(self.value_names), -1))
+
         return data
 
     def convert_to_polar(self, data):
@@ -1908,7 +1908,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             **kw)
         self.correlations = correlations
         self.thresholding = thresholding
-
+        print('DEBUG:')
+        print(self.channels)
         if value_names is None:
             self.value_names = []
             for ch in channels:
