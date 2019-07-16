@@ -2001,7 +2001,9 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
                              'cal_points': repr(cp),
                              'rotate': cal_points,
                              'data_to_fit': {qb.name: 'pe'},
-                             'hard_sweep_params': hard_sweep_params})
+                             'hard_sweep_params': hard_sweep_params,
+                             'leakage_qbname': qbc.name,
+                             'cphase_qbname': qbt.name})
         MC.run_2D(label, exp_metadata)
 
         if analyze:
