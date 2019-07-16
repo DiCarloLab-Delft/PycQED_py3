@@ -170,15 +170,9 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                 elif isinstance(q, list):
                                     # FIXME: This is a hack because we cannot
                                     # properly trigger CZ gates.
-                                    # k.gate("wait",  list(qubit_map.values()), 0)
-                                    # k.gate(flux_codeword, [2, 0]) #hardcoded sandwhiched with wait 0's for alignment
-                                    # k.gate("wait",  list(qubit_map.values()), 0)
-
-                                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
-                                    k.gate(flux_codeword, [10, 8]) # FIXME: Hack for QCC
-
-                                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 10], 0) #alignment workaround
-
+                                    k.gate("wait",  list(qubit_map.values()), 0)
+                                    k.gate(flux_codeword, [2, 0]) #hardcoded sandwhiched with wait 0's for alignment
+                                    k.gate("wait",  list(qubit_map.values()), 0)
 
 
                         # FIXME: This hack is required to align multiplexed RO in openQL..
