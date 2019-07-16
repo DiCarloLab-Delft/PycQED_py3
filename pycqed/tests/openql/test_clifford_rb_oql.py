@@ -57,16 +57,20 @@ class Test_char_rb_oql(unittest.TestCase):
 """
 
 # NB: we just hijack the parent class to run the same tests
-class Test_cliff_rb_oql_CC(Test_cliff_rb_oql):
-    def setUp(self):
-        curdir = os.path.dirname(__file__)
-        self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-        output_dir = os.path.join(curdir, 'test_output_cc')
-        ql.set_option('output_dir', output_dir)
 
-class Test_char_rb_oql_CC(Test_char_rb_oql):
-    def setUp(self):
-        curdir = os.path.dirname(__file__)
-        self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-        output_dir = os.path.join(curdir, 'test_output_cc')
-        ql.set_option('output_dir', output_dir)
+# FIXME: This only works with Wouters custom OpenQL.
+# Need a better check for this
+
+# class Test_cliff_rb_oql_CC(Test_cliff_rb_oql):
+#     def setUp(self):
+#         curdir = os.path.dirname(__file__)
+#         self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
+#         output_dir = os.path.join(curdir, 'test_output_cc')
+#         ql.set_option('output_dir', output_dir)
+
+# class Test_char_rb_oql_CC(Test_char_rb_oql):
+#     def setUp(self):
+#         curdir = os.path.dirname(__file__)
+#         self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
+#         output_dir = os.path.join(curdir, 'test_output_cc')
+#         ql.set_option('output_dir', output_dir)
