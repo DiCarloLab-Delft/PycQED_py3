@@ -1937,8 +1937,7 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
     if analyze:
         flux_pulse_tdma = tda.CPhaseLeakageAnalysis(
             qb_names=[qbc.name, qbt.name],
-            options_dict={'TwoD_tuples': True,
-                          'plot_all_traces': plot_all_traces})
+            options_dict={'TwoD': True, 'plot_all_traces': plot_all_traces})
         cphases = flux_pulse_tdma.proc_data_dict[
             'analysis_params_dict']['cphase']['val']
         population_losses = flux_pulse_tdma.proc_data_dict[

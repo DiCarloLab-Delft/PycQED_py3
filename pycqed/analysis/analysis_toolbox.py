@@ -336,14 +336,14 @@ def get_qb_channel_map_from_file(qb_names, file_path,
     channel_map = {}
 
     if len(ro_type) != 0:
-        if 'raw' in ro_type:
+        if 'raw' in ro_type[0]:
             ro_type = 'raw w'
-        elif 'digitized' in ro_type:
+        elif 'digitized' in ro_type[0]:
             ro_type = 'digitized w'
-        elif 'lin_trans' in ro_type:
+        elif 'lin_trans' in ro_type[0]:
             ro_type = 'lin_trans w'
         else:
-            input_ro_type = ro_type
+            input_ro_type = ro_type[0]
             ro_type = 'w'
             logging.warning('Readout type "{}" does not have standard '
                             'format.'.format(input_ro_type))
@@ -833,11 +833,12 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         # Remove all hidden folders to prevent errors
         all_measdirs = [d for d in all_measdirs if not d.startswith('.')]
 
-        if exact_label_match:
-            all_measdirs = [x for x in all_measdirs if label in x]
-        else:
-            for each_label in label:
-                all_measdirs = [x for x in all_measdirs if each_label in x]
+        if np.all([l is not None for l in label]):
+            if exact_label_match:
+                all_measdirs = [x for x in all_measdirs if label in x]
+            else:
+                for each_label in label:
+                    all_measdirs = [x for x in all_measdirs if each_label in x]
         if (date.date() - datetime_start.date()).days == 0:
             # Check if newer than starting timestamp
             timemark_start = timemark_from_datetime(datetime_start)

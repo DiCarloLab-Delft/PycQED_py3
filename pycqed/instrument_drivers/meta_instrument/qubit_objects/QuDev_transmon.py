@@ -909,6 +909,7 @@ class QuDev_transmon(Qubit):
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: qscales},
              'sweep_name': 'Qscale factor',
+             'sweep_unit': '',
              'cal_points': repr(cp),
              'last_ge_pulses': [last_ge_pulse],
              'rotate': self.acq_weights_type() != 'optimal_qutrit',
