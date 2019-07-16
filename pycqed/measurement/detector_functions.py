@@ -1415,7 +1415,6 @@ class UHFQC_input_average_detector(Hard_Detector):
     def get_values(self):
         self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
 
-        self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
@@ -1641,11 +1640,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout', 
                                 self._get_readout())
         
-        # self.UHFQC.acquisition_arm()
-
-        # print('acquisition is arm... Waiting to start AWGs')
-        # time.sleep(5)
-
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
@@ -1834,7 +1828,7 @@ class UHFQC_SSRO_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+        # self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
@@ -2178,20 +2172,25 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
 
 
-        self.UHFQC.quex_rl_length(self.nr_shots)
+        self.UHFQC.quex_rl_length(self.nr_shots*len(sweep_points))
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
 
         self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
+    def _get_readout(self):
+        return sum([(1 << c) for c in self.channels])
+
     def get_values(self):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+
+        # resets UHFQC internal readout counters
+        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout',
+                               self._get_readout())
 
         # starting AWG
         if self.AWG is not None:
@@ -2312,9 +2311,8 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
         self.nr_sweep_points = len(sweep_points)
         # The averaging-count is used to specify how many times the AWG program
         # should run
-        print(int(self.nr_shots*self.nr_sweep_points))
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(int(self.nr_shots*self.nr_sweep_points))
+        self.UHFQC.awgs_0_userregs_0(int(self.nr_shots))
         # The AWG program uses userregs/0 to define the number of iterations
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
@@ -2333,7 +2331,6 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
 
         # starting AWG
         if self.AWG is not None:
@@ -2533,7 +2530,7 @@ class UHFQC_statistics_logging_det(Soft_Detector):
             # resets UHFQC internal sl counters ?
             self.UHFQC.quex_sl_readout(0)
 
-            self.UHFQC.acquisition_arm()
+            # self.UHFQC.acquisition_arm()
             # starting AWG
             if self.AWG is not None and i == 0:
                 self.AWG.start()

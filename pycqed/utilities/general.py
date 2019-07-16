@@ -664,6 +664,32 @@ def get_required_upload_information(pulses : list, station):
 
     return required_channels, required_AWGs
 
+def dictionify(obj, only=None, exclude=None):
+    """
+    Takes an arbitrary object and returns a dict with all variables/internal
+    states of the object (i.e. not functions)
+    Args:
+        obj: object
+        only (list): take only specific attributes
+        exclude (list): exclude specific attributes
+
+    Returns: dict form of the object
+
+    """
+    obj_dict = vars(obj)
+    if only is not None:
+        assert np.ndim(only) == 1, "'only' must be of type list or array " \
+                                   "of attributes to include"
+        for k in obj_dict:
+            if k not in only:
+                obj_dict.pop(k)
+    if exclude is not None:
+        assert np.ndim(exclude) == 1, "'exclude' must be a list or array of" \
+                                      " attributes to exclude"
+        for k in obj_dict:
+            if k in exclude:
+                obj_dict.pop(k)
+    return obj_dict
 
 class NumpyJsonEncoder(json.JSONEncoder):
     '''

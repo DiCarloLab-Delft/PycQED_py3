@@ -812,6 +812,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         self.proc_data_dict['analysis_params'] = OrderedDict()
         self.proc_data_dict['analysis_params']['mu'] = deepcopy(mu)
         self.proc_data_dict['data'] = dict(X=deepcopy(X), prep_states=prep_states)
+        self.proc_data_dict['keyed_data'] = deepcopy(data)
 
         assert np.ndim(X) == 2, "Data must be a two D array. " \
                                 "Received shape {}, ndim {}"\
@@ -950,7 +951,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
             tree.fit(X, prep_state)
             pred_states = tree.predict(X)
             params["thresholds"], params["mapping"] = \
-                self._extract_tree_info(tree)
+                self._extract_tree_info(tree, self.levels)
             self.clf_ = tree
             if len(params["thresholds"]) == 1:
                 msg = "Best 2 thresholds to separate this data lie on axis {}" \
@@ -1033,11 +1034,13 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
 
 
     @staticmethod
-    def _extract_tree_info(tree_clf):
-        thresholds, mapping = dict(), dict()
+    def _extract_tree_info(tree_clf, class_names=None):
         tree_ = tree_clf.tree_
         feature_name = [np.arange(tree_.n_features)[i]
                         for i in tree_.feature]
+        if class_names is None:
+            class_names = np.arange(len(tree_.value[0]))
+        thresholds, mapping = dict(), dict()
 
         def recurse(node, thresholds_final, loc, mapping):
             if tree_.feature[node] != -2:
@@ -1050,10 +1053,28 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                 recurse(tree_.children_right[node], thresholds_final,
                         loc + [1], mapping)
             else:
-                mapping[str(tuple(loc))] = np.argmax(tree_.value[node])
+                mapping[tuple(loc)] = class_names[np.argmax(tree_.value[node])]
 
         recurse(0, thresholds, [], mapping)
+
+        #translate keys to codeword index format
+        mapping = {Singleshot_Readout_Analysis_Qutrit._to_codeword_idx(k): v
+                   for k, v in mapping.items()}
+
         return thresholds, mapping
+
+    @staticmethod
+    def _to_codeword_idx(tuple):
+        """
+        Maps a binary tuple (in ascending axis order) to codeword index.
+        eg. for 4 tuples:
+        (0, 1) | (1, 1)          2 | 3
+        ---------------    -->   -----
+        (0, 0) | (1, 0)          0 | 1
+        :param tuple:
+        :return:
+        """
+        return np.sum([i * 2**n for n, i in enumerate(tuple)])
 
     @staticmethod
     def plot_scatter_and_marginal_hist(data, y_true=None, plot_fitting=False,
@@ -1124,7 +1145,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
 
     @staticmethod
     def plot_clf_boundaries(X, clf, ax=None, cmap=None):
-        def make_meshgrid(x, y, h=.005, margin=None):
+        def make_meshgrid(x, y, h=None, margin=None):
             if margin is None:
                 deltax = x.max() - x.min()
                 deltay = y.max() - y.min()
@@ -1134,8 +1155,10 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                 margin_x, margin_y = margin, margin
             x_min, x_max = x.min() - margin_x, x.max() + margin_x
             y_min, y_max = y.min() - margin_y, y.max() + margin_y
-            xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min,
-                                                                       y_max, h))
+            if h is None:
+                h = 0.01*(x_max - x_min)
+            xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                                 np.arange(y_min, y_max, h))
             return xx, yy
 
         def plot_contours(ax, clf, xx, yy, **params):

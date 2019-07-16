@@ -162,10 +162,14 @@ def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
         The sequence object and the element list if return_seq is True. Else
         return the sequence name.
     """
-    if cal_points is True: cal_points = ((-4, -3), (-2, -1))
-    elif cal_points is False or cal_points is None: cal_points = ((), ())
-    if prep_pulses is None: prep_pulses = []
-    if comm_freq: RO_separation -= RO_separation % (-1/comm_freq)
+    if cal_points:
+        cal_points = ((-4, -3), (-2, -1))
+    elif not cal_points or cal_points is None:
+        cal_points = ((), ())
+    if prep_pulses is None:
+        prep_pulses = []
+    if comm_freq:
+        RO_separation -= RO_separation % (-1/comm_freq)
 
     seq_name = 'readout_pulse_scope_sequence'
     seq = sequence.Sequence(seq_name)

@@ -1,4 +1,5 @@
 import logging
+log = logging.getLogger(__name__)
 import itertools
 import numpy as np
 from copy import deepcopy
@@ -9,7 +10,7 @@ from pycqed.measurement.pulse_sequences.standard_elements import \
 import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
-    get_pulse_dict_from_pars
+    get_pulse_dict_from_pars, add_preparation_pulses, pulse_list_list_seq
 from pycqed.measurement.gate_set_tomography.gate_set_tomography import \
     create_experiment_list_pyGSTi_qudev as get_exp_list
 from pycqed.measurement.waveform_control import pulsar as ps
@@ -1462,8 +1463,35 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
     # return seq, seq_pulse_list
     return seq, el_list
 
+def n_qubit_reset(qubit_names, operation_dict, cal_points,
+                  prep_params=dict(),
+                  upload=True):
+    """
 
-def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
+    Timing constraints:
+        The reset_cycle_time and the readout fixed point should be commensurate
+        with the UHFQC trigger grid and the granularity of the AWGs.
+
+        When the -ro_acq_marker_delay of the readout pulse is larger than
+        the drive pulse length, then it is important that its length is a
+        multiple of the granularity of the AWG.
+    """
+
+    seq_name = '{}_reset_x{}_sequence'.format(','.join(qubit_names),
+                                              prep_params.get('reset_reps',
+                                                              '_default_n_reps'))
+    seq = sequence.Sequence(seq_name)
+
+    # add calibration segments
+    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+
+    log.debug(seq)
+    if upload:
+        ps.Pulsar.get_instance().program_awgs(seq)
+
+    return seq, np.arange(seq.n_acq_elements())
+
+def n_qubit_reset_old(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
                   return_seq=False, verbose=False, codeword_indices=None,
                   upload=True):
     """

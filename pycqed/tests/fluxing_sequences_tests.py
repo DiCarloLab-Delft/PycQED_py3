@@ -6,7 +6,7 @@ import sys
 # assumes pycqed already imported, not a safe import
 # will work in a better way after we pip install pycqed
 sys.path.append(r'D:\GitHubRepos\PycQED_py3')
-from measurement.waveform_control.pulsar import Pulsar
+from pycqed.measurement.waveform_control.pulsar import Pulsar
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control.pulse import SquarePulse
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
