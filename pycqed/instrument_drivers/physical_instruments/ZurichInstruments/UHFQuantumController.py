@@ -1331,8 +1331,8 @@ setTrigger(0);
         self.quex_deskew_0_col_1(0)
         self.quex_deskew_1_col_1(1)
         # switching off the modulation tone
-        self.sigouts_0_enables_3(0)
-        self.sigouts_1_enables_7(0)
+        self.sigouts_0_enables_0(0) # Changed for last firmware update 20190715
+        self.sigouts_1_enables_1(0) # Changed for last firmware update 20190715
 
 
 class ziShellError(Exception):
