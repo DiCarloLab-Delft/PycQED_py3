@@ -912,7 +912,8 @@ class Qubit(Instrument):
                        verbose=True,
                        update=True,
                        close_fig=True,
-                       MC=None):
+                       MC=None,
+                       label = ''):
         """
         Finds the qubit frequency using either the spectroscopy or the Ramsey
         method.
@@ -965,7 +966,8 @@ class Qubit(Instrument):
                                   f_step)
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, mode=spec_mode, MC=MC,
-                                      analyze=False, close_fig=close_fig)
+                                      analyze=False, label = label,
+                                      close_fig=close_fig)
 
             label = 'spec'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(

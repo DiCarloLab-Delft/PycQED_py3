@@ -3502,6 +3502,7 @@ class CCLight_Transmon(Qubit):
         Refs:
             Rol PR Applied 7, 041001 (2017)
         """
+
         return self.calibrate_mw_gates_rb(
             MC=None,
             parameter_list=parameter_list,
@@ -3948,8 +3949,8 @@ class CCLight_Transmon(Qubit):
         if times is None:
             # funny default is because there is no real time sideband
             # modulation
-            stepsize = (self.T2_star()*4/61)//(abs(self.cfg_cycle_time())) \
-                * abs(self.cfg_cycle_time())
+            stepsize = max((self.T2_star()*4/61)//(abs(self.cfg_cycle_time())) \
+                * abs(self.cfg_cycle_time()),40e-9)
             times = np.arange(0, self.T2_star()*4, stepsize)
 
         if artificial_detuning is None:
@@ -4116,8 +4117,8 @@ class CCLight_Transmon(Qubit):
         if times is None:
             # funny default is because there is no real time sideband
             # modulation
-            stepsize = (self.T2_echo()*2/61)//(abs(self.cfg_cycle_time())) \
-                * abs(self.cfg_cycle_time())
+            stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time())) \
+                * abs(self.cfg_cycle_time()),20e-9)
             times = np.arange(0, self.T2_echo()*4, stepsize*2)
 
         # append the calibration points, times are for location in plot

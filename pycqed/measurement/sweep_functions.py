@@ -1162,12 +1162,6 @@ class FLsweep(Soft_Sweep):
         self.par(val)
         self.lm.load_waveform_realtime(self.waveform_name,
                                        regenerate_waveforms=True)
-        t0 = time.time()
-        time.sleep(1.5)
-        while not self.AWG_ready_par(): 
-            print('\rAWG not ready')
-            if (time.time()-t0)>10 :
-                raise TimeoutError
         return 
 
 
