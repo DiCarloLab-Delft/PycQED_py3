@@ -64,9 +64,9 @@ class LinDistortionKernel(Instrument):
         raise ValueError('No empty filter')
 
 
-    def get_number_of_realtime_filters(self): 
-        rt_exp_models = 0 
-        rt_fir_models = 0 
+    def get_number_of_realtime_filters(self):
+        rt_exp_models = 0
+        rt_fir_models = 0
         rt_bounce_models = 0
         for filt_id in range(self._num_models):
 
@@ -74,16 +74,16 @@ class LinDistortionKernel(Instrument):
             if filt != {}:
                 model = filt['model']
                 params = filt['params']
-                if (filt['model'] == 'FIR') and filt['real-time']: 
-                    rt_fir_models+=1 
-                elif (filt['model'] == 'exponential') and filt['real-time']:
-                    rt_exp_models += 1 
-                elif (filt['model'] == 'bounce') and filt['real-time']:
+                if (filt['model'] == 'FIR') and (filt['real-time'] is True):
+                    rt_fir_models+=1
+                elif (filt['model'] == 'exponential') and (filt['real-time'] is True):
+                    rt_exp_models += 1
+                elif (filt['model'] == 'bounce') and (filt['real-time'] is True):
                     rt_bounce_models+=1
-        return {'rt_exp_models': rt_exp_models, 'rt_fir_models': rt_fir_models, 
-                'rt_bounce_models':rt_bounce_models}
+        return {'rt_exp_models': rt_exp_models, 'rt_fir_models': rt_fir_models,
+                'rt_bounce_models': rt_bounce_models}
 
-    def set_realtime_distortions_zero(self):
+    def set_unused_realtime_distortions_zero(self):
         """
         Turns off all unused real-time distortion filters by setting their
         amplitude to zero. This method of disabling is used so as not to
@@ -98,25 +98,26 @@ class LinDistortionKernel(Instrument):
                 'Could not set realtime distortions to 0, AWG not found')
             return
 
+        # Returns a dict with filter type and number of that type
         nr_filts = self.get_number_of_realtime_filters()
-
-
+        print("nr_filts")
+        print(nr_filts)
         # set exp_filters to 0
         for i in range(max_exp_filters):
-            if i>= nr_filts['rt_exp_models']:
+            if i >= nr_filts['rt_exp_models']:
                 AWG.set(
                     'sigouts_{}_precompensation_exponentials_{}_amplitude'.format(
                         self.cfg_awg_channel()-1, i), 0)
 
 
         # set bounce filters to 0
-        if nr_filts['rt_bounce_models'] == 0: 
+        if nr_filts['rt_bounce_models'] == 0:
             AWG.set(
                 'sigouts_{}_precompensation_bounces_{}_enable'.format(
                     self.cfg_awg_channel()-1, 0), 0)
 
         # Reset
-        if nr_filts['rt_fir_models'] == 0: 
+        if nr_filts['rt_fir_models'] == 0:
             impulse_resp = np.zeros(40)
             impulse_resp[0] = 1
             AWG.set('sigouts_{}_precompensation_fir_coefficients'.format(
@@ -156,7 +157,7 @@ class LinDistortionKernel(Instrument):
             y_sig = waveform
 
         # Specific real-time filters are turned on below
-        self.set_realtime_distortions_zero()
+        self.set_unused_realtime_distortions_zero()
         nr_real_time_exp_models = 0
         nr_real_time_hp_models = 0
         nr_real_time_bounce_models = 0
