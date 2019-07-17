@@ -7,6 +7,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
 
 class Test_QutechCC(unittest.TestCase):
+    @unittest.expectedFailure#'golden test file is not commited to git')
     def test_all(self):
         fn = 'Test_QutechCC_test_all.scpi.txt'
         test_path = os.path.join('test_output',fn)
