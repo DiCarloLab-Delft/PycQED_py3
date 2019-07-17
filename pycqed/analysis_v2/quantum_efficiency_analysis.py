@@ -525,7 +525,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
             return scale * np.exp(-(x) ** 2 / (2 * sigma ** 2))
 
         gmodel = lmfit.models.Model(gaussian)
-        gmodel.set_param_hint('sigma', value=0.5, min=0, max=10)
+        gmodel.set_param_hint('sigma', value=0.5, min=0, max=100)
         gmodel.set_param_hint('scale', value=np.max(coherence))  # , min=0.1, max=100)
         gpara = gmodel.make_params()
 
@@ -544,12 +544,12 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
         cexp = '-1/(2*%.5f*s**2)'%((sigma**2),)
 
         def square(x, s, b):
-            return ((x * s) ** 2 + b) % 360
+            return ((s*(x**2) + b)+self.wrap_phase %360)-self.wrap_phase
 
         def minimizer_function_vec(params, x, data):
             s = params['s']
             b = params['b']
-            return np.abs(((square(x, s, b)-data+180)%360)-180)
+            return np.abs(((square(x, s, b)-data)))
 
         def minimizer_function(params, x, data):
             return np.sum(minimizer_function_vec(params, x, data))
@@ -563,14 +563,14 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
 
         def fit_phase(amps, phase):
             params = lmfit.Parameters()
-            params.add('s', value=3/sigma, min=0.01, max=200, vary=True)
+            params.add('s', value=3/sigma, min=-200, max=200, vary=True)
             i = max(int(round(len(phase)/10)), 1)
             fit_offset = self.options_dict.get('fit_phase_offset', False)
             dpo = self.options_dict.get('default_phase_offset', 180)
+            self.phase_sign = self.options_dict.get('phase_sign', 1)
             phase_guess = np.mean(phase[0:i]) if fit_offset else dpo
-
-            params.add('b', value=phase_guess, min=0, max=360, vary=True)
-            params.add('c', expr=cexp)
+            params.add('b', value=phase_guess, min=-360, max=360, vary=True)
+            params.add('c', expr=cexp, vary=True)
             mini = lmfit.Minimizer(minimizer_function, params=params, fcn_args=(amps, phase))
             res = mini.minimize(method='differential_evolution')
 
@@ -578,8 +578,8 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
                 return res, res
 
             params2 = lmfit.Parameters()
-            params2.add('s', value=res.params['s'].value, min=0.01, max=200, vary=False)
-            params2.add('b', value=res.params['b'].value, min=0, max=360, vary=True)
+            params2.add('s', value=res.params['s'].value, min=0.01, max=200, vary=True)
+            params2.add('b', value=res.params['b'].value, min=-360, max=360, vary=True)
             params2.add('c', expr=cexp)
             mini2 = lmfit.Minimizer(minimizer_function, params=params2, fcn_args=(amps, phase))
             res2 = mini2.minimize(method='differential_evolution')
@@ -599,6 +599,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
         self.proc_data_dict['coherence_phase_fit'] = {'amps': fit_amps,
                                                       'phase': fit_phase,
                                                       'phase_guess' : guess_phase}
+
 
     def prepare_plots(self):
         t = self.timestamps[0]
@@ -620,8 +621,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
         'dirty hack to rescale y-axis in the plots'
         b=self.fit_res['coherence_fit']
         scale_amp=b.best_values['scale']
-                
-
+            
 
         self.plot_dicts['amp_vs_dephasing_fit'] = {
             'plotfn': self.plot_fit,
@@ -640,7 +640,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
             'setlabel': 'coherence fit',
             'color': 'red',
         }
-        fit_text = 'Fit Result:\n$y=(x \cdot s)^2 + \\varphi$\n'
+        fit_text = 'Fit Result:\n$y=s \cdot x^2 + \\varphi$\n'
         fit_text += '$s=%.2f$, '%(phase_fit_params['s'].value) #, phase_fit_params['s'].stderr
         fit_text += '$\\varphi=%.1f$\n'%(phase_fit_params['b'].value) #, phase_fit_params['b'].stderr
         fit_text += '$\Rightarrow c=%.5f$'%(phase_fit_params['c'].value)
@@ -798,7 +798,9 @@ class DephasingAnalysisSweep(DephasingAnalysis):
         data_file.get_naming_and_values()
         self.raw_data_dict['scaling_amp'] = data_file.sweep_points
         self.raw_data_dict['dephasing'] = np.array(data_file.measured_values[0], dtype=float)
-        self.raw_data_dict['phase'] = np.array(data_file.measured_values[1], dtype=float)
+        self.wrap_phase=self.options_dict.get('wrap_phase',0)
+        phase_raw=np.array(data_file.measured_values[1], dtype=float)
+        self.raw_data_dict['phase'] = (phase_raw+self.wrap_phase)%360-self.wrap_phase
         self.raw_data_dict['folder'] = data_file.folder
 
 

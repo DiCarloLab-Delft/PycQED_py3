@@ -8,18 +8,34 @@ import copy as copy
 
 class Base_RO_LutMan(Base_LutMan):
 
-    def __init__(self, name, num_res=2, feedline_number: int=0, **kw):
+    def __init__(self, name, num_res=2, feedline_number: int=0, 
+                feedline_map='S7', **kw):
         if num_res > 9:
             raise ValueError('At most 9 resonators can be read out.')
         self._num_res = num_res
         self._feedline_number = feedline_number
-        if self._feedline_number == 0:
-            self._resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]
-        elif self._feedline_number == 1:
-            self._resonator_codeword_bit_mapping = [1, 4]
-        else:
-            raise NotImplementedError(
-              'hardcoded for feedline 0 and 1 of Surface-7')
+        if feedline_map == 'S7': 
+          if self._feedline_number == 0:
+              self._resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]
+          elif self._feedline_number == 1:
+              self._resonator_codeword_bit_mapping = [1, 4]
+          else:
+              raise NotImplementedError(
+                'hardcoded for feedline 0 and 1 of Surface-7')
+        elif feedline_map == 'S17': 
+
+            if self._feedline_number == 0:
+                self._resonator_codeword_bit_mapping = [13, 16]
+            elif self._feedline_number == 1:
+                self._resonator_codeword_bit_mapping = [1, 4, 5, 7, 8, 10, 11, 14, 15]
+            elif self._feedline_number == 2: 
+                self._resonator_codeword_bit_mapping = [0, 2, 3, 6, 9, 12]                
+            else:
+                raise NotImplementedError('hardcoded for feedline 0 and 1 of Surface-7') # FIXME: copy/paste error
+
+        else: 
+            raise ValueError('Feedline map not in {"S7", "S17"}.')
+          
         #capping the resonator bit mapping in case a limited number of resonators is used
         self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[:self._num_res]
         super().__init__(name, **kw)
@@ -285,7 +301,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         Load a single pulse to the lookuptable, it uses the lut_mapping to
             determine which lookuptable to load to.
 
-        hardcode_case_0 is a workaround as long as it's not clear how
+        FIXME: hardcode_case_0 is a workaround as long as it's not clear how
         to make the qisa assembler output the codeword mask on DIO.
         The first element of self.resonator_combinations is linked
         to codeword 0, the others are not uploaded.

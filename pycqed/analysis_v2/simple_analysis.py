@@ -83,7 +83,7 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
             else:
                 xvals = self.raw_data_dict['xvals']
 
-            if len(np.shape(yvals)) == 1:
+            if (len(np.shape(yvals))==1) or (np.shape(yvals)[0]==1):
                 do_legend = False
             else:
                 do_legend = True

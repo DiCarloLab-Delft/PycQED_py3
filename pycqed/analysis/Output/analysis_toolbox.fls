@@ -1,0 +1,6 @@
+PWD /Users/nbultink/GithubRepos/PycQED_py3/pycqed/analysis
+INPUT /usr/local/texlive/2015/texmf.cnf
+INPUT /usr/local/texlive/2015/texmf-dist/web2c/texmf.cnf
+INPUT /usr/local/texlive/2015/texmf-var/web2c/pdftex/pdflatex.fmt
+INPUT /Users/nbultink/GithubRepos/PycQED_py3/pycqed/analysis/analysis_toolbox.py
+OUTPUT /Users/nbultink/GithubRepos/PycQED_py3/pycqed/analysis/Output/analysis_toolbox.log

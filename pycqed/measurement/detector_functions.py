@@ -14,6 +14,8 @@ from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 
+import numpy.fft as fft
+
 
 class Detector_Function(object):
 
@@ -27,6 +29,9 @@ class Detector_Function(object):
         self.value_names = ['val A', 'val B']
         self.value_units = ['arb. units', 'arb. units']
 
+        self.prepare_function = None
+        self.prepare_function_kwargs = None
+
     def set_kw(self, **kw):
         '''
         convert keywords to attributes
@@ -34,8 +39,67 @@ class Detector_Function(object):
         for key in list(kw.keys()):
             exec('self.%s = %s' % (key, kw[key]))
 
+    def arm(self):
+        """
+        Ensures acquisition instrument is ready to measure on first trigger.
+        """
+        pass
+
     def get_values(self):
         pass
+
+    def prepare(self, **kw):
+        if self.prepare_function_kwargs is not None:
+            if self.prepare_function is not None:
+                self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            if self.prepare_function is not None:
+                self.prepare_function()
+
+    def set_prepare_function(self,
+                             prepare_function,
+                             prepare_function_kwargs: dict=dict()):
+        """
+        Set an optional custom prepare function.
+
+        prepare_function: function to call during prepare
+        prepare_function_kwargs: keyword arguments to be passed to the
+            prepare_function.
+
+        N.B. Note that not all detectors support a prepare function and
+        the corresponding keywords.
+        Detectors that do not support this typicaly ignore these attributes.
+        """
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
+
+    def finish(self, **kw):
+        pass
+
+
+class Mock_Detector(Detector_Function):
+    def __init__(self, value_names=['val'], value_units=['arb. units'],
+                 detector_control='soft',
+                 mock_values=np.zeros([20, 1]),
+                 **kw):
+        self.name = self.__class__.__name__
+        self.set_kw()
+        self.value_names = value_names
+        self.value_units = value_units
+        self.detector_control = detector_control
+        self.mock_values = mock_values
+        self._iteration = 0
+
+    def acquire_data_point(self, **kw):
+        '''
+        Returns something random for testing
+        '''
+        idx = self._iteration % (np.shape(self.mock_values)[0])
+        self._iteration += 1
+        return self.mock_values[idx]
+
+    def get_values(self):
+        return self.mock_values
 
     def prepare(self, **kw):
         pass
@@ -78,8 +142,57 @@ class Multi_Detector(Detector_Function):
         for detector in self.detectors:
             detector.prepare(**kw)
 
+    def set_prepare_function(self,
+                             prepare_function,
+                             prepare_function_kw: dict=dict(),
+                             detectors: str='all'):
+        """
+        Set an optional custom prepare function.
+
+        prepare_function: function to call during prepare
+        prepare_function_kw: keyword arguments to be passed to the
+            prepare_function.
+        detectors :  |"all"|"first"|"last"|
+            sets the prepare function to "all" child detectors, or only
+            on the "first" or "last"
+
+        The multi detector passes the arguments to the set_prepare_function
+        method of all detectors it contains.
+        """
+        if detectors == "all":
+            for detector in self.detectors:
+                detector.set_prepare_function(
+                    prepare_function, prepare_function_kw)
+        elif detectors == 'first':
+            self.detectors[0].set_prepare_function(
+                prepare_function, prepare_function_kw)
+        elif detectors == 'last':
+            self.detectors[-1].set_prepare_function(
+                prepare_function, prepare_function_kw)
+
+    def set_child_attr(self, attr, value, detectors: str='all'):
+        """
+        Set an attribute of child detectors.
+
+        attr (str): the attribute to set
+        value   : the value to set the attribute to
+
+        detectors :  |"all"|"first"|"last"|
+            sets the attribute on "all" child detectors, or only
+            on the "first" or "last"
+        """
+        if detectors == "all":
+            for detector in self.detectors:
+                setattr(detector, attr, value)
+        elif detectors == 'first':
+            setattr(self.detectors[0], attr, value)
+        elif detectors == 'last':
+            setattr(self.detectors[-1], attr, value)
+
     def get_values(self):
         values_list = []
+        for detector in self.detectors:
+            detector.arm()
         for detector in self.detectors:
             new_values = detector.get_values()
             values_list.append(new_values)
@@ -100,6 +213,24 @@ class Multi_Detector(Detector_Function):
     def finish(self):
         for detector in self.detectors:
             detector.finish()
+
+
+class Multi_Detector_UHF(Detector_Function):
+    """
+    Special multi detector
+    """
+
+    def get_values(self):
+        values_list = []
+        for detector in self.detectors:
+            detector.arm()
+        for detector in self.detectors:
+            new_values = detector.get_values(arm=False)
+            values_list.append(new_values)
+        values = np.concatenate(values_list)
+        return values
+
+
 
 ###############################################################################
 ###############################################################################
@@ -323,9 +454,9 @@ class ZNB_VNA_detector(Hard_Detector):
         super(ZNB_VNA_detector, self).__init__()
         self.VNA = VNA
         self.value_names = ['ampl', 'phase',
-                            'real', 'imag', ]
+                            'real', 'imag', 'ampl_dB']
         self.value_units = ['', 'radians',
-                            '', '']
+                            '', '', 'dB']
 
     def get_values(self):
         '''
@@ -343,10 +474,10 @@ class ZNB_VNA_detector(Hard_Detector):
 
         complex_data = np.add(real_data, 1j*imag_data)
         ampl_linear = np.abs(complex_data)
-        # ampl_dB = 20*np.log10(ampl_linear)
+        ampl_dB = 20*np.log10(ampl_linear)
         phase_radians = np.arctan2(imag_data, real_data)
 
-        return ampl_linear, phase_radians, real_data, imag_data
+        return ampl_linear, phase_radians, real_data, imag_data, ampl_dB
 
 
 # Detectors for QuTech Control box modes
@@ -1005,7 +1136,7 @@ class Heterodyne_probe(Soft_Detector):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
-        self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
+        self.value_names = ['S21', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
         self.value_units = ['V', 'deg']
         self.first = True
         self.last_frequency = 0.
@@ -1059,7 +1190,7 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
-        self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
+        self.value_names = ['S21', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
         self.value_units = ['mV', 'deg']  # , 'a.u.', 'a.u.']
         self.first = True
         self.last_frequency = 0.
@@ -1138,7 +1269,6 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         if self.prepare_function is not None:
             self.prepare_function(**self.prepare_function_kwargs)
 
-
     def finish(self, **kw):
         self.SH.abort()
 
@@ -1146,7 +1276,7 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
 class Signal_Hound_sweeped_frequency(Hard_Detector):
 
     def __init__(self, signal_hound, Navg=1, delay=0.1,
-                  **kw):
+                 **kw):
         super().__init__()
         self.name = 'SignalHound_fixed_frequency'
         self.value_names = ['Power']
@@ -1156,7 +1286,7 @@ class Signal_Hound_sweeped_frequency(Hard_Detector):
         self.Navg = Navg
 
     def acquire_data_point(self, **kw):
-        frequency=self.swp.pop()
+        frequency = self.swp.pop()
         self.SH.set('frequency', frequency)
         self.SH.prepare_for_measurement()
         time.sleep(self.delay)
@@ -1165,10 +1295,9 @@ class Signal_Hound_sweeped_frequency(Hard_Detector):
     def get_values(self):
         return([self.acquire_data_point()])
 
-
     def prepare(self, sweep_points):
-        self.swp=list(sweep_points)
-        #self.SH.prepare_for_measurement()
+        self.swp = list(sweep_points)
+        # self.SH.prepare_for_measurement()
 
     def finish(self, **kw):
         self.SH.abort()
@@ -1418,7 +1547,8 @@ class UHFQC_input_average_detector(Hard_Detector):
         return sum([(1 << c) for c in self.channels])
 
     def get_values(self):
-        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
+        # resets UHFQC internal readout counters
+        self.UHFQC.quex_rl_readout(self._get_readout())
 
         self.UHFQC.acquisition_arm()
         # starting AWG
@@ -1480,6 +1610,29 @@ class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
             ret_data = np.array([amp, phase])
 
         return ret_data
+
+
+class UHFQC_spectroscopy_detector(Soft_Detector):
+    '''
+    Detector used for the spectroscopy mode
+    '''
+
+    def __init__(self, UHFQC, ro_freq_mod,
+                 AWG=None, channels=(0, 1),
+                 nr_averages=1024, integration_length=4096, **kw):
+        super().__init__()
+        #UHFQC=UHFQC, AWG=AWG, channels=channels,
+        # nr_averages=nr_averages, nr_samples=nr_samples, **kw
+        self.UHFQC = UHFQC
+        self.ro_freq_mod = ro_freq_mod
+
+    def acquire_data_point(self):
+        RESULT_LENGTH = 1600
+        vals = self.UHFQC.acquisition(
+            samples=RESULT_LENGTH, acquisition_time=0.010, timeout=10)
+        a = max(np.abs(fft.fft(vals[0][1:int(RESULT_LENGTH/2)])))
+        b = max(np.abs(fft.fft(vals[1][1:int(RESULT_LENGTH/2)])))
+        return a+b
 
 
 class UHFQC_integrated_average_detector(Hard_Detector):
@@ -1628,7 +1781,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.real_imag = real_imag
 
         if not self.real_imag:
-            if len(self.channels)%2 != 0:
+            if len(self.channels) % 2 != 0:
                 raise ValueError('Length of "{}" is not even'.format(
                                  self.channels))
             for i in range(len(self.channels)//2):
@@ -1639,15 +1792,20 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def _get_readout(self):
         return sum([(1 << c) for c in self.channels])
 
-    def get_values(self):
+    def arm(self):
+        # resets UHFQC internal readout counters
+        self.UHFQC.quex_rl_readout(self._get_readout())
+        self.UHFQC.acquisition_arm()
+
+    def get_values(self, arm=True):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
-        # starting AWG
+        if arm:
+            self.arm()
 
+        # starting AWG
         if self.AWG is not None:
             self.AWG.start()
 
@@ -1670,6 +1828,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data = np.reshape(data.T,
                           (-1, no_virtual_channels, len(self.channels))).T
         data = data.reshape((len(self.value_names), -1))
+
         return data
 
     def convert_to_polar(self, data):
@@ -1677,7 +1836,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         Convert data to polar coordinates,
         assuming that the channels in ascencing are used as pairs of I, Q
         """
-        if len(data)%2 != 0:
+        if len(data) % 2 != 0:
             raise ValueError('Expect even number of channels for rotation. Got {}'.format(
                              len(data)))
         for i in range(len(data)//2):
@@ -1767,7 +1926,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             **kw)
         self.correlations = correlations
         self.thresholding = thresholding
-
+        print('DEBUG:')
+        print(self.channels)
         if value_names is None:
             self.value_names = []
             for ch in channels:
@@ -1896,7 +2056,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
+        # resets UHFQC internal readout counters
+        self.UHFQC.quex_rl_readout(self._get_readout())
         self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
@@ -1996,13 +2157,18 @@ class UHFQC_integration_logging_det(Hard_Detector):
     def _get_readout(self):
         return sum([(1 << c) for c in self.channels])
 
-    def get_values(self):
+    def arm(self):
+        # resets UHFQC internal readout counters
+        self.UHFQC.quex_rl_readout(self._get_readout())
+        self.UHFQC.acquisition_arm()
+
+    def get_values(self, arm=True):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
-        self.UHFQC.acquisition_arm()
+        if arm:
+            self.arm()
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()
@@ -2033,11 +2199,10 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots+1) # The AWG program uses
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots+1)  # The AWG program uses
         # userregs/0 to define the number of iterations
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
-
 
         self.UHFQC.quex_rl_length(self.nr_shots)
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
@@ -2583,3 +2748,36 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
+
+class Function_Detector_list(Soft_Detector):
+    """
+    Defines a detector function that wraps around an user-defined function.
+    Inputs are:
+        sweep_function, function that is going to be wrapped around
+        result_keys, keys of the dictionary returned by the function
+        value_names, names of the elements returned by the function
+        value_units, units of the elements returned by the function
+        msmt_kw, kw arguments for the function
+    The input function sweep_function must return a dictionary.
+    The contents(keys) of this dictionary are going to be the measured
+    values to be plotted and stored by PycQED
+    """
+
+    def __init__(self, sweep_function, result_keys, value_names=None,
+                 value_unit=None, msmt_kw=None, **kw):
+        logging.warning("Deprecation warning. Function_Detector_list "
+                        "is deprecated, use Function_Detector")
+        super(Function_Detector_list, self).__init__()
+        self.sweep_function = sweep_function
+        self.result_keys = result_keys
+        self.value_names = value_names
+        self.value_units = value_unit
+        self.msmt_kw = msmt_kw or {}
+        if self.value_names is None:
+            self.value_names = result_keys
+        if self.value_units is None:
+            self.value_units = [""] * len(result_keys)
+
+    def acquire_data_point(self, **kw):
+        return self.sweep_function(**self.msmt_kw)

@@ -89,6 +89,13 @@ class MeasurementControl(Instrument):
                            initial_value=True)
 
         self.add_parameter(
+            'on_progress_callback', vals=vals.Callable(),
+            docstring='A callback to communicate progress. This should be a '
+            'Callable accepting ints between 0 and 100 indicating percdone.',
+            parameter_class=ManualParameter,
+            initial_value=None)
+
+        self.add_parameter(
             'cfg_clipping_mode', vals=vals.Bool(),
             docstring='Clipping mode, when True ignores ValueErrors  when '
             'setting parameters. This can be useful when running optimizations',
@@ -283,8 +290,10 @@ class MeasurementControl(Instrument):
             self.adaptive_function = fmin_powell
         if issubclass(self.adaptive_function, BaseLearner):
             Learner = self.adaptive_function
-            self.learner = Learner(self.optimization_function,
-                                   bounds=self.af_pars['bounds'])
+            self.learner = Learner(
+                self.optimization_function,
+                loss_per_triangle=self.af_pars.get('loss_per_triangle'),
+                bounds=self.af_pars['bounds'])
             # N.B. the runner that is used is not an `adaptive.Runner` object
             # rather it is the `adaptive.runner.simple` function. This
             # ensures that everything runs in a single process, as is
@@ -431,7 +440,6 @@ class MeasurementControl(Instrument):
         self.last_sweep_pts = x
 
         datasetshape = self.dset.shape
-        # self.iteration = datasetshape[0] + 1
 
         vals = self.detector_function.acquire_data_point()
         start_idx, stop_idx = self.get_datawriting_indices_update_ctr(vals)
@@ -1373,7 +1381,8 @@ class MeasurementControl(Instrument):
                     t_left=round((100.-percdone)/(percdone) *
                                  elapsed_time, 1) if
                     percdone != 0 else '')
-
+            if self.on_progress_callback() is not None:
+                self.on_progress_callback()(percdone)
             if percdone != 100:
                 end_char = ''
             else:

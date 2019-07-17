@@ -1,10 +1,15 @@
 # Dictionaries used in setup.
 
+# The commands necessary to get your mac address:
+# Start a command line with iPython
+# from uuid import getnode
+# getnode()       <- this is the number you need
+# In order to double-check with hex mac-address of ipconfig \all, run this:
+# mac_address = ("".join(c + "-" if i % 2 else c for i, c in \
+#                                     enumerate(hex(uuid.getnode())[2:].zfill(12)))[:-1]).upper()
 mac_dict = {'203178706891063': 'CDickel_Desktop',
             '203308017140376': 'Adriaans_Macbook',
-            # '54976059179008': 'Adriaans_Macbook',
             '963460802314': 'La_Ferrari',
-            '46390847648': 'TUD277449',
             '215977245841658': 'La_Maserati_JrJr',
             '215977245830009': 'La_Vespa',
             '13795386264098': 'Serwans_Laptop',
@@ -24,23 +29,30 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '26830024075025': 'Qudev_testbench',
             '88623634748008':'LaAprilia_1',
             '215977245830009': 'LaVespa',
+            '79497677591501':'PaganiMeas',
             }
 
-data_dir_dict = {'Aprilia_Jr': r'\\TUD278336',
-                 'CDickel_Desktop': r'D:\Experiments/ExperimentName/Data',
-                 'Sjoerd_laptop': r'D:\data',
-                 'Malay_Laptop': r'D:\Tomo datasets',
-                 'Adriaans_Macbook': (r'/Users/Adriaan/Dropbox/PhD-Delft/Data'),
-                 'Niels_macbook': r'/Users/nbultink/temp_data',
-                 'La_Ferrari':  r'D:\Experiments/1511_RabiSims2/Data',
-                 'TUD277449': r'D:\Experiments/1801_QECVQE/Data',
-                 'La_Maserati_Jr': r'D:\\Experiments\\1610_QcodesTests\\Data',
-                 'La_Maserati_JrJr': r'D:\\Experiments\\1709_M18\\data',
-                 'La_Vespa': r'D:\\Experiments\\161111_LaVespa_Intel_HR\\Data',
-                 'Xiang_PC': r'D:\\data\\IntelDemo',
-                 'Serwans_Laptop': r'W:/tnw/NS/qt/Serwan/MuxMon/',
-                 'La_Ducati': r'D:\Experiments/Simultaneous_Driving/Data',
-                 'La_Ducati_Jr': r'D:\Experiments/1611_Starmon/Data',
+data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
+                 'CDickel_Desktop': 'D:\Experiments/ExperimentName/Data',
+                 'Sjoerd_laptop': 'D:\data',
+                 'Malay_Laptop':'D:\Tomo datasets',
+                 'Adriaans_Macbook': ('/Users/Adriaan/Documents/Testing/Data'),
+                 'Niels_macbook': '/Users/nbultink/temp_data',
+                 'La_Ferrari':  'D:\Experiments/1511_RabiSims2/Data',
+                 'TUD277449': 'D:\Experiments/1710_FlipchipS7/Data',
+                 'La_Maserati_Jr': 'D:\\Experiments\\1610_QcodesTests\\Data',
+                 'La_Maserati_JrJr': 'D:\\Experiments\\1810_Purcell_3Q_O4_3_and_O2_1\\data',
+                 'La_Vespa': 'D:\\Experiments\\161111_LaVespa_Intel_HR\\Data',
+                 'Xiang_PC': 'D:\\data\\IntelDemo',
+                 'Serwans_Laptop': 'W:/tnw/NS/qt/Serwan/MuxMon/',
+                 # 'La_Ducati': 'D:\\Experiments\\1704_NWv74_Magnet\\Data',
+                 # 'La_Ducati': 'F:\\Experiments\\1805_NW_Cheesymon_P4\\Data',
+                 'La_Ducati': 'D:\\Experiments\\1907_Cheesymon_v6_F4\\Data',
+                # 'La_Ducati': 'D:\\Experiments\\1810_Cheesymon_py3_C3\\Data',
+
+                 # 'La_Ducati': 'D:\\Experiments\\1905_Cheesymon_py3_D1\\Data',
+
+                 'La_Ducati_Jr': 'D:\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'Simulation_PC': r'D:\Experiments/testSingleShotFidelityAnalysis/Data',
                  # 'Ramiro_Desktop': r'D:\\PhD_RS\\data_local',
                  'Ramiro_Desktop': r'\\TUD277449\Experiments\1801_QECVQE\Data',
@@ -50,8 +62,10 @@ data_dir_dict = {'Aprilia_Jr': r'\\TUD278336',
                  'Nathans_Laptop': r'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
                  'Bart_Laptop': r'C:\Experiments/NumericalOptimization/Data',
                  'Qudev_testbench' : r'E:\Control software\data',
+                 'Luthi_Desktop': r'\\TUD277620\\Experiments\\1805_NW_Cheesymon_P4\\Data',
+                 'Thijs_laptop' : 'C:\\Users\\Thijs\\Documents\\TUDelft\\PhD\\Data',
+                 'Thijs_Desktop': r'\\TUD277620\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'LaVespa': r'D:\Experiments\18031_Intel_resonators',
-                 'LaAprilia_1' : r'D:\Experiments\1802_IntelS7Airbridges',
-                 'La_Ducati' : r'D:\Experiments\1808_Cheesymon_NK_A1\Data'
-                 #'LaAprilia_1' : r'D:\Experiments\1802_Argon\Data'
+                 'LaAprilia_1' : r'D:\\Experiments\\1812_CZsims\\data',
+                 'PaganiMeas':r'D:\\Experiments\\1903_S7_VIO_W29_C4\\data',
                  }

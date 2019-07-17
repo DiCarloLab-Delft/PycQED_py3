@@ -91,6 +91,57 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     p = oqh.compile(p)
     return p
 
+def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
+                           platf_cfg: str, trigger_idx: int):
+    """
+    Sequence for pulsed spectroscopy, similar to old version. Difference is that
+    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    wave output on the AWG (currently hardcoded, should be improved)
+    
+    """
+    p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
+    k = oqh.create_kernel("main", p)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', [trigger_idx])
+    if trigger_idx != qubit_idx:    
+        k.wait([trigger_idx, qubit_idx], 0)
+        
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
+                       platf_cfg: str, trigger_idx: int):
+    """
+    Sequence for pulsed spectroscopy, similar to old version. Difference is that
+    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    wave output on the AWG (currently hardcoded, should be improved)
+    
+    """
+    p = oqh.create_program("pulsed_spec_seq_v2", platf_cfg)
+    k = oqh.create_kernel("main", p)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', [trigger_idx])
+    if trigger_idx != qubit_idx:    
+        k.wait([trigger_idx, qubit_idx], 0)
+        
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
 
 def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
              equator: bool=False, cal_points: bool=True,
@@ -184,7 +235,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
              ['ry90', 'ry90']]
 
     # this should be implicit
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    # FIXME: remove try-except, when we depend hard on >=openql-0.6
     try:
         p.set_sweep_points(np.arange(len(allXY), dtype=float))
     except TypeError:
@@ -197,7 +248,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}".format(i+j/2), p)
+            k = oqh.create_kernel("AllXY_{}".format(i+j//2), p) # FIXME: generates 2 identical kernel names if js=2. This does work, but is still undesirable
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
@@ -335,6 +386,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     p = oqh.create_program("echo", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
+
         k = oqh.create_kernel("echo_{}".format(i), p)
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
@@ -343,7 +395,14 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.gate('rx180', [qubit_idx])
         k.gate("wait", [qubit_idx], wait_nanoseconds)
-        k.gate('rx90', [qubit_idx])
+        #k.gate('rx90', [qubit_idx])
+        angle = (i*40)%360
+        cw_idx = angle//20 + 9
+        if angle == 0:
+            k.gate('rx90', [qubit_idx])
+        else:
+            k.gate('cw_{:02}'.format(cw_idx), [qubit_idx])
+
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -542,12 +601,12 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
+        #k.gate('i', [qubit_idx])
         k.gate('rx180', [qubit_idx])
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
         k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
+        #k.gate('i', [qubit_idx])
         if net_gate == 'pi':
             k.gate('rxm90', [qubit_idx])
         elif net_gate == 'i':
@@ -556,6 +615,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
             raise ValueError('net_gate ({})should be "i" or "pi"'.format(
                 net_gate))
         if feedback:
+            k.gate("wait", [qubit_idx], 20)
             k.gate('C1rx180', [qubit_idx])
     elif sequence_type == 'pi':
         if net_gate == 'pi':
@@ -566,6 +626,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
             raise ValueError('net_gate ({})should be "i" or "pi"'.format(
                 net_gate))
         if feedback:
+            k.gate("wait", [qubit_idx], 20)
             k.gate('C1rx180', [qubit_idx])
     else:
         raise ValueError('sequence_type ({})should be "echo" or "pi"'.format(
@@ -701,12 +762,15 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         times = times[:-4]
     for t in times:
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi-flux-pi', p)
+        k = oqh.create_kernel('pi_flux_pi', p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         k.gate('fl_cw_02', [2, 0])
+        # k.gate('fl_cw_02', [10, 8])
         if t_nanoseconds > 10:
-            k.gate("wait", [qubit_idx], t_nanoseconds)
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
+            # k.gate("wait", [qubit_idx], t_nanoseconds)
         k.gate('rx90', [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -844,7 +908,7 @@ def ef_rabi_seq(q0: int,
         # cw_idx corresponds to special hardcoded pulses in the lutman
         cw_idx = i + 9
 
-        k = oqh.create_kernel("ef_A{}".format(amp), p)
+        k = oqh.create_kernel("ef_A{}".format(int(abs(1000*amp))), p)
         k.prepz(q0)
         k.gate('rx180', [q0])
         k.gate('cw_{:02}'.format(cw_idx), [q0])

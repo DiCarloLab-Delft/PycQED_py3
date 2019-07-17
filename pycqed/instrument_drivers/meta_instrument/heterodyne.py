@@ -61,6 +61,10 @@ class HeterodyneInstrument(Instrument):
                            label='Single sideband demodulation',
                            parameter_class=ManualParameter,
                            initial_value=single_sideband_demod)
+        self.add_parameter('external_trigger', vals=vals.Bool(),
+                           label='wait for external trigger',
+                           parameter_class=ManualParameter,
+                           initial_value=False)
         self.add_parameter('acquisition_instr', vals=vals.Strings(),
                            label='Acquisition instrument',
                            set_cmd=self._set_acquisition_instr,
@@ -113,7 +117,7 @@ class HeterodyneInstrument(Instrument):
                 self._awg_seq_filename = \
                     st_seqs.generate_and_upload_marker_sequence(
                         5e-9, self.trigger_separation(), RF_mod=False,
-                        acq_marker_channels=self.acq_marker_channels())
+                        acq_marker_channels=self.acq_marker_channels(), trigger_wait=self.external_trigger())
                 self._awg_seq_parameters_changed = False
 
         # Preparing the acquisition instruments
@@ -159,7 +163,7 @@ class HeterodyneInstrument(Instrument):
                 IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
 
         if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
-            self._acquisition_instr.awg_sequence_acquisition()
+            # self._acquisition_instr.awg_sequence_acquisition() # Dirty hack to get UHFLI to cooperate
             self._UHFQC_awg_parameters_changed = False
 
         # this sets the result to integration and rotation outcome
@@ -254,7 +258,7 @@ class HeterodyneInstrument(Instrument):
             self.prepare()
 
         dataset = self._acquisition_instr.acquisition_poll(
-            samples=1, acquisition_time=0.001, timeout=10)
+            samples=1, acquisition_time=0.001)
         dat = (self.scale_factor_UHFQC*dataset[0][0] +
                self.scale_factor_UHFQC*1j*dataset[1][0])
         return dat
@@ -404,6 +408,7 @@ class HeterodyneInstrument(Instrument):
     def finish(self):
         if 'UHFQC' in self.acquisition_instr():
             self._acquisition_instr.acquisition_finalize()
+        self.off()
 
     def get_demod_array(self):
         return self.cosI, self.sinI

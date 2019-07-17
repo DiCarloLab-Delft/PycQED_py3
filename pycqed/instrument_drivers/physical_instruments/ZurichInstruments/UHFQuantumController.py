@@ -71,7 +71,7 @@ class UHFQC(Instrument):
         self._d_file_name = os.path.join(
             dir_path, 'zi_parameter_files', 'd_node_pars.txt')
 
-        init = True
+        init = True # gets set to False if param files cannot be loaded
         try:
             f = open(self._s_file_name).read()
             s_node_pars = json.loads(f)
@@ -178,7 +178,7 @@ class UHFQC(Instrument):
         print('Initialized UHFQC', self._device,
               'in %.2fs' % (t1-t0))
 
-    def load_default_settings(self):
+    def load_default_settings(self, upload_sequence=True):
         # standard configurations adapted from Haendbaek's notebook
         # Run this block to do some standard configuration
 
@@ -192,7 +192,10 @@ class UHFQC(Instrument):
 
         # Load an AWG program (from Zurich
         # Instruments/LabOne/WebServer/awg/src)
-        self.awg_sequence_acquisition()
+
+        if upload_sequence:
+            self.awg_sequence_acquisition()
+
 
         # Turn on both outputs
         self.sigouts_0_on(1)
@@ -227,10 +230,16 @@ class UHFQC(Instrument):
 
         # Configure the codeword protocol
         if self.DIO:
-            self.awgs_0_dio_strobe_index(31)
+            self.awgs_0_dio_strobe_index(15) # 15 for QCC, 31 for CCL
             self.awgs_0_dio_strobe_slope(1)  # rising edge
             self.awgs_0_dio_valid_index(16)
             self.awgs_0_dio_valid_polarity(2)  # high polarity
+
+            # NH: FixME: make a proper node for this!
+            # Switch to 50 MHz sampling of DIO inputs (like AWG-8)
+            self._daq.setInt('/' + self._device + '/dios/0/extclk', 2)
+            # Set default delay; don't do this as it cancels any calibration
+            # self._daq.setInt('/' + self._device + '/raw/dios/0/delay', 0)            
 
         # setting the output channels to 50 ohm
         self.sigouts_0_imp50(True)
@@ -278,8 +287,8 @@ class UHFQC(Instrument):
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
         # these signals on the output here.
-        self.sigouts_0_enables_3(0)
-        self.sigouts_1_enables_7(0)
+        self.sigouts_0_enables_0(0)
+        self.sigouts_1_enables_1(0)
 
     def _gen_set_func(self, dev_set_type, cmd_str):
         def set_func(val):
@@ -328,7 +337,7 @@ class UHFQC(Instrument):
         if not self._awgModule:
             raise(ziShellModuleError())
 
-        self._awgModule.set('awgModule/index', awg_nr)
+        #self._awgModule.set('awgModule/index', awg_nr) 20180329 dirty hack by Niels  Bultink, this command is failing in python 3.5, firmware 5.2
         self._awgModule.set('awgModule/compiler/sourcestring', program_string)
 
         t0 = time.time()
@@ -364,8 +373,8 @@ class UHFQC(Instrument):
             # for i, line in enumerate(program_string.splitlines()):
             #     print(i+1, '\t', line)
             # print('\n')
-            #raise ziShellCompilationError(comp_msg)
-            #print("Possible error:", comp)
+            # raise ziShellCompilationError(comp_msg)
+            # print("Possible error:", comp)
             pass
         # If succesful the comipilation success message is printed
         t1 = time.time()
@@ -523,7 +532,7 @@ class UHFQC(Instrument):
                         data[n] = np.concatenate((data[n], v['vector']))
                         if len(data[n]) >= samples:
                             gotem[n] = True
-                
+
                 #if p in dataset:
                 #    for v in dataset[p]:
                 #        if n in data:
@@ -689,28 +698,36 @@ class UHFQC(Instrument):
 
     def prepare_SSB_weight_and_rotation(self, IF,
                                         weight_function_I=0,
-                                        weight_function_Q=1):
+                                        weight_function_Q=1,
+                                        rotation_angle=0,
+                                        length=4096/1.8e9,
+                                        scaling_factor=1):
         """
         Sets defualt integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
         """
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        print(len(tbase))
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+        cosI = np.array(np.cos(2*np.pi*IF*tbase+rotation_angle))
+        sinI = np.array(np.sin(2*np.pi*IF*tbase+rotation_angle))
+        if length<4096/1.8e9:
+            max_sample=int(length*1.8e9)
+            #setting the samples beyond the length to 0
+            cosI[max_sample:]=0
+            sinI[max_sample:]=0
         self.set('quex_wint_weights_{}_real'.format(weight_function_I),
                  np.array(cosI))
         self.set('quex_wint_weights_{}_imag'.format(weight_function_I),
                  np.array(sinI))
-        self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
-                 np.array(sinI))
-        self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
-                 np.array(cosI))
-        self.set('quex_rot_{}_real'.format(weight_function_I), 1.0)
-        self.set('quex_rot_{}_imag'.format(weight_function_I), 1.0)
-        self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
-        self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
+        self.set('quex_rot_{}_real'.format(weight_function_I), 1.0*scaling_factor)
+        self.set('quex_rot_{}_imag'.format(weight_function_I), 1.0*scaling_factor)
+        if weight_function_Q!=None:
+            self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
+                     np.array(sinI))
+            self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
+                     np.array(cosI))
+            self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0*scaling_factor)
+            self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0*scaling_factor)
 
     def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
@@ -733,16 +750,16 @@ class UHFQC(Instrument):
         else:
             return '/' + self._device + '/' + path
 
-    def seti(self, path, value, async=False):
-        if async:
+    def seti(self, path, value, asynchronous=False):
+        if asynchronous:
             func = self._daq.asyncSetInt
         else:
             func = self._daq.setInt
 
         func(self._make_full_path(path), int(value))
 
-    def setd(self, path, value, async=False):
-        if async:
+    def setd(self, path, value, asynchronous=False):
+        if asynchronous:
             func = self._daq.asyncSetDouble
         else:
             func = self._daq.setDouble
@@ -800,9 +817,15 @@ class UHFQC(Instrument):
     def setv(self, path, value):
         # Handle absolute path
         if path[0] == '/':
-            self._daq.vectorWrite(path, value)
+            if 'setVector' in dir(self._daq):
+                self._daq.setVector(path, value)
+            else:
+                self._daq.vectorWrite(path, value)
         else:
-            self._daq.vectorWrite('/' + self._device + '/' + path, value)
+            if 'setVector' in dir(self._daq):
+                self._daq.setVector(path, value)
+            else:            
+                self._daq.vectorWrite('/' + self._device + '/' + path, value)
 
     # sequencer functions
     def awg_sequence_acquisition_and_DIO_triggered_pulse(
@@ -873,6 +896,9 @@ class UHFQC(Instrument):
         # adding the final part of the sequence including a default wave
         sequence = (sequence +
                     '  default:\n' +
+                    # the default wave should never trigger, noneteless if it does trigger
+                    # it indicates that 1. the correct codeword can not be triggered and
+                    # 2. that there are triggers bio received.
                     '   playWave(ones(36), ones(36));\n' +
                     ' }\n' +
                     ' wait(wait_delay);\n' +
@@ -883,6 +909,101 @@ class UHFQC(Instrument):
                     'wait(300);\n' +
                     'setTrigger(0);\n')
         self.awg_string(sequence, timeout=timeout)
+
+    def awg_sequence_acquisition_and_DIO_RED_test(
+            self, Iwaves, Qwaves, cases, acquisition_delay,
+            codewords, timeout=5):
+        # setting the acquisition delay samples
+        delay_samples = int(acquisition_delay*1.8e9/8)
+        # setting the delay in the instrument
+        self.awgs_0_userregs_2(delay_samples)
+
+        sequence = (
+            'const TRIGGER1  = 0x000001;\n' +
+            'const WINT_TRIG = 0x000010;\n' +
+            'const IAVG_TRIG = 0x000020;\n' +
+            'const WINT_EN   = 0x1ff0000;\n' +
+            'const DIO_VALID = 0x00010000;\n' +
+            'setTrigger(WINT_EN);\n' +
+            'var loop_cnt = getUserReg(0);\n' +
+            'var wait_delay = getUserReg(2);\n' +
+            'var RO_TRIG;\n' +
+            'if(getUserReg(1)){\n' +
+            ' RO_TRIG=IAVG_TRIG;\n' +
+            '}else{\n' +
+            ' RO_TRIG=WINT_TRIG;\n' +
+            '}\n' +
+            'var trigvalid = 0;\n' +
+            'var dio_in = 0;\n' +
+            'var cw = 0;\n' +
+            'cvar i;\n'+
+            'const length = {};\n'.format(len(codewords))
+            )
+
+
+        codewordstring = self.array_to_combined_vector_string(
+                codewords, "codewords")
+
+        sequence = sequence + codewordstring
+
+        # loop to generate the wave list
+        for i in range(len(Iwaves)):
+            Iwave = Iwaves[i]
+            Qwave = Qwaves[i]
+            if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
+                raise KeyError(
+                    "exceeding AWG range for I channel, all values should be within +/-1")
+            elif np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
+                raise KeyError(
+                    "exceeding AWG range for Q channel, all values should be within +/-1")
+            elif len(Iwave) > 16384:
+                raise KeyError(
+                    "exceeding max AWG wave lenght of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+            elif len(Qwave) > 16384:
+                raise KeyError(
+                    "exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
+            wave_I_string = self.array_to_combined_vector_string(
+                Iwave, "Iwave{}".format(i))
+            wave_Q_string = self.array_to_combined_vector_string(
+                Qwave, "Qwave{}".format(i))
+            sequence = sequence+wave_I_string+wave_Q_string
+        # starting the loop and switch statement
+        sequence = sequence+(
+            'for (i = 0; i < length; i = i + 1) {\n' +
+            ' waitDIOTrigger();\n' +
+            ' var dio = getDIOTriggered();\n' +
+            # now hardcoded for 7 bits (cc-light)
+            ' cw = (dio >> 17) & 0x1f;\n' +
+            '  switch(cw) {\n')
+        # adding the case statements
+        for i in range(len(Iwaves)):
+            # generating the case statement string
+            case = '  case {}:\n'.format(int(cases[i]))
+            case_play = '   playWave(Iwave{}, Qwave{});\n'.format(i, i)
+            # adding the individual case statements to the sequence
+            # FIXME: this is a hack to work around missing timing in OpenQL
+            # Oct 2017
+            sequence = sequence + case+case_play
+
+        # adding the final part of the sequence including a default wave
+        sequence = (sequence +
+                    '  default:\n' +
+                    # the default wave should never trigger, noneteless if it does trigger
+                    # it indicates that 1. the correct codeword can not be triggered and
+                    # 2. that there are triggers bio received.
+                    '   playWave(ones(36), ones(36));\n' +
+                    ' }\n' +
+                    ' wait(wait_delay);\n' +
+                    ' var codeword =  codewords[i];\n'+
+                    ' setDIO(codeword);\n'+
+                    ' setTrigger(WINT_EN + RO_TRIG);\n' +
+                    ' setTrigger(WINT_EN);\n' +
+                    #' waitWave();\n'+ #removing this waitwave for now
+                    '}\n' +
+                    'wait(300);\n' +
+                    'setTrigger(0);\n')
+        self.awg_string(sequence, timeout=timeout)
+
 
     def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay, dig_trigger=True):
         if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
@@ -986,7 +1107,7 @@ repeat(loop_cnt) {
 \tsetTrigger(WINT_EN +RO_TRIG);
 \twait(5);
 \tsetTrigger(WINT_EN);
-\twait(300);
+//\twait(300);
 }
 wait(1000);
 setTrigger(0);"""
@@ -1026,51 +1147,174 @@ setTrigger(0);"""
                     'quex_trans_{}_col_{}_real'.format(j, i))
         return matrix
 
+#     def spec_mode_on(self, acq_length=1/1500, IF=20e6, ro_amp=0.1):
+#         awg_code = """
+# const TRIGGER1  = 0x000001;
+# const WINT_TRIG = 0x000010;
+# const IAVG_TRIG = 0x000020;
+# const WINT_EN   = 0x1f0000;
+# setTrigger(WINT_EN);
+# var loop_cnt = getUserReg(0);
+
+# const Fsample = 1.8e9;
+# const triggerdelay = {}; //seconds
+
+# repeat(loop_cnt) {{
+# setTrigger(WINT_EN + WINT_TRIG + TRIGGER1);
+# wait(5);
+# setTrigger(WINT_EN);
+# wait(triggerdelay*Fsample/8 - 5);
+# }}
+# wait(1000);
+# setTrigger(0);
+#         """.format(acq_length)
+#         # setting the internal oscillator to the IF
+#         self.oscs_0_freq(IF)
+#         # setting the integration path to use the oscillator instead of
+#         # integration functions
+#         self.quex_wint_mode(1)
+#         # just below the
+#         self.quex_wint_length(int(acq_length*0.99*1.8e9))
+#         # uploading the sequence
+#         self.awg_string(awg_code)
+#         # setting the integration rotation to single sideband
+#         self.quex_rot_0_real(1)
+#         self.quex_rot_0_imag(1)
+#         self.quex_rot_1_real(1)
+#         self.quex_rot_1_imag(-1)
+#         # setting the mixer deskewing to identity
+#         self.quex_deskew_0_col_0(1)
+#         self.quex_deskew_1_col_0(0)
+#         self.quex_deskew_0_col_1(0)
+#         self.quex_deskew_1_col_1(1)
+
+#         self.sigouts_0_enables_3(1)
+#         self.sigouts_1_enables_7(1)
+#         # setting
+#         self.sigouts_1_amplitudes_7(ro_amp)  # magic scale factor
+#         self.sigouts_0_amplitudes_3(ro_amp)
+
+
     def spec_mode_on(self, acq_length=1/1500, IF=20e6, ro_amp=0.1):
+        RESULT_LENGTH = 1600
+        WINT_LENGTH = pow(2, 14)
+        LOG2_RL_AVGCNT = 2
+        CHANNELS = set([0, 1])
         awg_code = """
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
 const WINT_EN   = 0x1f0000;
+
+const RATE = 0;
+const FS = 1.8e9*pow(2, -RATE);
+const F_RES = 1.6e6;
+const LENGTH = 1.0e-6;
+const N = floor(LENGTH*FS);
+
+wave w = blackman(16, 1, 0.2);
+
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
+var avg_cnt = getUserReg(1);
 
-const Fsample = 1.8e9;
-const triggerdelay = {}; //seconds
+repeat (avg_cnt) {{
+  var wait_time = 0;
 
-repeat(loop_cnt) {{
-setTrigger(WINT_EN + WINT_TRIG + TRIGGER1);
-wait(5);
-setTrigger(WINT_EN);
-wait(triggerdelay*Fsample/8 - 5);
+  repeat(loop_cnt) {{
+    wait_time = wait_time + 1;
+    setTrigger(WINT_TRIG + WINT_EN);
+    wait(wait_time);
+    playWave(w, w, RATE);
+    waitWave();
+    wait({});
+    setTrigger(WINT_EN);
+  }}
 }}
-wait(1000);
 setTrigger(0);
-        """.format(acq_length)
+        """.format(WINT_LENGTH/8)
+
+
+        # Also added by us
+        self.awgs_0_outputs_0_mode(1)
+        self.awgs_0_outputs_1_mode(1)
         # setting the internal oscillator to the IF
         self.oscs_0_freq(IF)
-        # setting the integration path to use the oscillator instead of integration functions
+
+        self.sigouts_0_on(1)
+        self.sigouts_1_on(1)
+
+        # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
+        self.dios_0_mode(2)
+        # Drive DIO bits 31 to 16
+        self.dios_0_drive(0xc)
+
+
+        self.quex_deskew_0_col_0(1.0)
+        self.quex_deskew_0_col_1(0.0)
+        self.quex_deskew_1_col_0(0.0)
+        self.quex_deskew_1_col_1(1.0)
+        self.quex_wint_length(WINT_LENGTH)
+        self.quex_wint_delay(0)
+
+        # setting the integration path to use the oscillator instead of
+        # integration functions
         self.quex_wint_mode(1)
         # just below the
-        self.quex_wint_length(int(acq_length*0.99*1.8e9))
-        # uploading the sequence
-        self.awg_string(awg_code)
-        # setting the integration rotation to single sideband
-        self.quex_rot_0_real(1)
-        self.quex_rot_0_imag(1)
-        self.quex_rot_1_real(1)
-        self.quex_rot_1_imag(-1)
-        # setting the mixer deskewing to identity
-        self.quex_deskew_0_col_0(1)
-        self.quex_deskew_1_col_0(0)
-        self.quex_deskew_0_col_1(0)
-        self.quex_deskew_1_col_1(1)
+        # self.quex_wint_length(int(acq_length*0.99*1.8e9))
+        # the awg string was here previously
 
-        self.sigouts_0_enables_3(1)
-        self.sigouts_1_enables_7(1)
-        # setting
-        self.sigouts_1_amplitudes_7(ro_amp)  # magic scale factor
-        self.sigouts_0_amplitudes_3(ro_amp)
+        # setting the integration rotation to single sideband
+        # self.quex_rot_0_real(1)
+        # self.quex_rot_0_imag(1)
+        # self.quex_rot_1_real(1)
+        # self.quex_rot_1_imag(-1)
+
+        # Copy from the manual
+        self.quex_rot_0_real(1.0)
+        self.quex_rot_0_imag(0.0)
+        self.quex_rot_1_real(0.0)
+        self.quex_rot_1_imag(1.0)
+
+
+        for i in range(0, 5):
+            for j in range(0, 5):
+                if i == j:
+                    getattr(self, 'quex_trans_{0}_col_{1}_real'.format(i,j))(1.0)
+                else:
+                    getattr(self, 'quex_trans_{0}_col_{1}_real'.format(i,j))(0.0)
+
+        # Configure some thresholds
+        for i in range(0, 5):
+            getattr(self, 'quex_thres_{}_level'.format(i))(0.01)
+
+        # Also adder by us
+        self.quex_rl_length(RESULT_LENGTH)
+        self.quex_rl_avgcnt(LOG2_RL_AVGCNT)
+        self.quex_rl_source(0)
+        self.quex_rl_readout(1)
+        self.quex_sl_length(RESULT_LENGTH)
+        self.quex_sl_readout(0)
+
+
+        # # setting the mixer deskewing to identity
+        # self.quex_deskew_0_col_0(1)
+        # self.quex_deskew_1_col_0(0)
+        # self.quex_deskew_0_col_1(0)
+        # self.quex_deskew_1_col_1(1)
+
+        # self.sigouts_0_enables_3(1)
+        # self.sigouts_1_enables_7(1)
+        # # setting
+        # self.sigouts_1_amplitudes_7(ro_amp)  # magic scale factor
+        # self.sigouts_0_amplitudes_3(ro_amp)
+        # uploading the sequence
+        # Stuff we are adding for now
+        self.awgs_0_userregs_0(RESULT_LENGTH)
+        self.awgs_0_userregs_1(pow(2, LOG2_RL_AVGCNT))
+        self.awg_string(awg_code)
+
+
 
     def spec_mode_off(self):
         # Resetting To regular Mode
@@ -1087,8 +1331,8 @@ setTrigger(0);
         self.quex_deskew_0_col_1(0)
         self.quex_deskew_1_col_1(1)
         # switching off the modulation tone
-        self.sigouts_0_enables_3(0)
-        self.sigouts_1_enables_7(0)
+        self.sigouts_0_enables_0(0) # Changed for last firmware update 20190715
+        self.sigouts_1_enables_1(0) # Changed for last firmware update 20190715
 
 
 class ziShellError(Exception):

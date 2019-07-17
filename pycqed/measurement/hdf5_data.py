@@ -15,6 +15,8 @@ import time
 import h5py
 import numpy as np
 import logging
+from uncertainties import UFloat
+# from pycqed.utilities.general import RepresentsInt
 
 
 class DateTimeGenerator:
@@ -159,9 +161,17 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             entry_point.attrs[key] = 'NoneType:__None__'
 
         elif isinstance(item, dict):
-            entry_point.create_group(key)
+            # converting key to string is to make int dictionary keys work
+            entry_point.create_group(str(key))
             write_dict_to_hdf5(data_dict=item,
-                               entry_point=entry_point[key])
+                               entry_point=entry_point[str(key)])
+        elif isinstance(item, UFloat):
+            entry_point.create_group(str(key))
+            new_item = {'nominal_value': item.nominal_value,
+                        'std_dev': item.std_dev}
+            write_dict_to_hdf5(data_dict=new_item,
+                               entry_point=entry_point[str(key)])
+
         elif isinstance(item, (list, tuple)):
             if len(item) > 0:
                 elt_type = type(item[0])
@@ -233,6 +243,8 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
     """
     # if 'list_type' not in h5_group.attrs:
     for key, item in h5_group.items():
+        if RepresentsInt(key):
+            key = int(key)
         if isinstance(item, h5py.Group):
             data_dict[key] = {}
             data_dict[key] = read_dict_from_hdf5(data_dict[key],
@@ -275,3 +287,11 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
             raise NotImplementedError('cannot read "list_type":"{}"'.format(
                 h5_group.attrs['list_type']))
     return data_dict
+
+
+def RepresentsInt(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False

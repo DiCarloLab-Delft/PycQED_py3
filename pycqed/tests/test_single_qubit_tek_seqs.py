@@ -82,14 +82,14 @@ class Test_SingleQubitTek(unittest.TestCase):
         for i, el in enumerate(el_list):
             t_RO = el.effective_pulse_start_time('RO_tone-0', 'ch1')
             t_ROm = el.effective_pulse_start_time('Acq-trigger-0', 'ch1')
-            self.assertAlmostEqual(t_RO, t_ROm, places=10)
+            self.assertAlmostEqual(t_RO, t_ROm, places=6)
             # test if fix point put pulses at the right spot.
             self.assertAlmostEqual(t_RO, np.round(t_RO / 1e-6) * 1e-6)
             # Check pulse delay
             if i < (len(times)-4):
                 t0 = el.effective_pulse_start_time('SSB_DRAG_pulse_0-0', 'ch1')
                 t1 = el.effective_pulse_start_time('SSB_DRAG_pulse_1-0', 'ch1')
-                self.assertAlmostEqual(t1-t0, times[i], places=10)
+                self.assertAlmostEqual(t1-t0, times[i]+ self.pulse_pars['nr_sigma']*self.pulse_pars['sigma'], places=10)
                 p0 = el.pulses['SSB_DRAG_pulse_0-0']
                 self.assertEqual(p0.phase, 0)
                 p1 = el.pulses['SSB_DRAG_pulse_1-0']
@@ -135,11 +135,13 @@ class Test_SingleQubitTek(unittest.TestCase):
                             'SSB_DRAG_pulse_0-0', 'ch1')
                         t1 = el.effective_pulse_start_time(
                             'SSB_DRAG_pulse_1-0', 'ch1')
-                        self.assertAlmostEqual(t1-t0, times[i], places=10)
+                        self.assertAlmostEqual(t1-t0
+                                               ,times[i]+ self.pulse_pars['nr_sigma']*self.pulse_pars['sigma']
+                                               , places=10)
                         p0 = el.pulses['SSB_DRAG_pulse_0-0']
                         self.assertEqual(p0.phase, 0)
                         p1 = el.pulses['SSB_DRAG_pulse_1-0']
-                        exp_phase = (360*f_detuning*(t1-t0)) % 360
+                        exp_phase = (360*f_detuning*(t1-t0-self.pulse_pars['nr_sigma']*self.pulse_pars['sigma'])) % 360
                         if exp_phase == 360:
                             exp_phase = 0
                         self.assertAlmostEqual(p1.phase, exp_phase, places=3)

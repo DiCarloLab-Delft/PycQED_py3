@@ -15,6 +15,7 @@ from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_UHFQC
 from pycqed.measurement.calibration_toolbox import mixer_skewness_calibration_5014
@@ -117,10 +118,10 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
         self.add_parameter('pulse_I_offset', initial_value=0.0,
-                           vals=vals.Numbers(min_value=-0.1, max_value=0.1),
+                           vals=vals.Numbers(min_value=-0.12, max_value=0.12),
                            parameter_class=ManualParameter)
         self.add_parameter('pulse_Q_offset', initial_value=0.0,
-                           vals=vals.Numbers(min_value=-0.1, max_value=0.1),
+                           vals=vals.Numbers(min_value=-0.12, max_value=0.12),
                            parameter_class=ManualParameter)
         # readout parameters for time domain
         self.add_parameter('RO_acq_averages', initial_value=1024,
@@ -277,12 +278,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.heterodyne_instr.get_instr().RF.power(self.RO_power_cw())
         self.heterodyne_instr.get_instr().RF_power(self.RO_power_cw())
         self.heterodyne_instr.get_instr().nr_averages(self.RO_acq_averages())
-        # Turning of TD source
+        # Turning off TD source
         if self.td_source.get_instr() is not None:
             self.td_source.get_instr().off()
 
         # Updating Spec source
-        if self.cw_source() is not 'None':
+        if self.cw_source() is not None:
             self.cw_source.get_instr().power(self.spec_pow())
             self.cw_source.get_instr().frequency(self.f_qubit())
             self.cw_source.get_instr().off()
@@ -347,12 +348,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.AWG.get_instr().set(self.pulse_Q_channel.get()+'_offset',
                                  self.pulse_Q_offset.get())
 
-        if self.RO_pulse_type() is 'MW_IQmod_pulse_tek':
+        if self.RO_pulse_type() == 'MW_IQmod_pulse_tek':
             self.AWG.get_instr().set(self.RO_I_channel.get()+'_offset',
                                      self.RO_I_offset.get())
             self.AWG.get_instr().set(self.RO_Q_channel.get()+'_offset',
                                      self.RO_Q_offset.get())
-        elif self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
+        elif self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
                 self.RO_I_channel(), self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
@@ -362,7 +363,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             # self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
             #     f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
             # RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
-        elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
+        elif self.RO_pulse_type.get() == 'Gated_MW_RO_pulse':
             self.RF_RO_source.get_instr().pulsemod_state('On')
             self.RF_RO_source.get_instr().frequency(self.f_RO.get())
             self.RF_RO_source.get_instr().power(self.RO_pulse_power.get())
@@ -500,7 +501,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                                     close_fig=close_fig,
                                                     update=update,
                                                     upload=force_load)
-
+        probe = det.Heterodyne_probe(self.heterodyne_instr.get_instr(),
+            trigger_separation=5e-6 + self.RO_acq_integration_length(),
+            RO_length=self.RO_acq_integration_length())
+        probe.prepare()
+        phase = probe.acquire_data_point()[1]
+        self.RF_RO_source.get_instr().phase(
+                        (self.RF_RO_source.get_instr().phase()-phase)%360)
         MC.set_sweep_function(pw.wrap_par_to_swf(
                               self.cw_source.get_instr().frequency, retrieve_value=True))
         MC.set_sweep_points(freqs)
@@ -535,12 +542,17 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.cw_source.get_instr().power.set(self.spec_pow_pulsed.get())
         self.cw_source.get_instr().on()
 
+        # Bugfix: need to suppress auto-reload of the sequence, else the pulsed
+        # spec sequence gets overwritten
+        auto_seq_loading = self.heterodyne_instr.get_instr().auto_seq_loading()
+        self.heterodyne_instr.get_instr().auto_seq_loading(False)
+
         if MC is None:
             MC = self.MC.get_instr()
 
         spec_pars, RO_pars = self.get_spec_pars()
         # Upload the AWG sequence
-        sq.Pulsed_spec_seq(spec_pars, RO_pars)
+        sq.Pulsed_spec_seq(spec_pars = spec_pars, RO_pars = RO_pars)
 
         self.AWG.get_instr().start()
         if return_detector:
@@ -553,6 +565,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             MC.set_detector_function(
                 det.Heterodyne_probe(self.heterodyne_instr.get_instr()))
             MC.run(name='pulsed-spec'+self.msmt_suffix)
+            self.heterodyne_instr.get_instr().auto_seq_loading(auto_seq_loading)
             if analyze or update:
                 ma_obj = ma.Qubit_Spectroscopy_Analysis(
                     auto=True, label='pulsed', close_fig=close_fig)
@@ -590,6 +603,32 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         if analyze:
             ma.Rabi_Analysis(auto=True, close_fig=close_fig)
 
+
+    def measure_flipping(self, number_of_flips=2*np.arange(20), equator=True,
+                         MC=None, analyze=True, close_fig=True, update=True,
+                         ax='x', angle='180',upload=True):
+
+        # prepare for timedomain takes care of rescaling
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        nf = np.array(number_of_flips)
+        dn = nf[1] - nf[0]
+        nf = np.concatenate([nf,
+                             (nf[-1]+1*dn,
+                                 nf[-1]+2*dn,
+                              nf[-1]+3*dn,
+                              nf[-1]+4*dn)])
+
+        MC.set_sweep_function(awg_swf.Flipping(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars, upload=upload))
+        MC.set_sweep_points(nf)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('flipping_'+self.msmt_suffix)
+        if analyze:
+            ma2.FlippingAnalysis(options_dict={'scan_label':'flipping'})
+
     def measure_rabi_amp90(self,
                            scales=np.linspace(-0.7, 0.7, 31), n=1,
                            MC=None, analyze=True, close_fig=True,
@@ -621,10 +660,56 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             a = ma.T1_Analysis(auto=True, close_fig=close_fig)
             return a.T1
 
+    def measure_T1_qp(self, times, N_pi_pulses=2,
+                      N_pi_pulse_delay=100e-9, MC=None, analyze=True,
+                      upload=True, close_fig=True):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        times = np.concatenate([times,
+                               (times[-1]+times[1],
+                                times[-1]+times[2],
+                                times[-1]+times[3],
+                                times[-1]+times[4])])
+        MC.set_sweep_function(awg_swf.T1_qp(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            N_pi_pulses=N_pi_pulses, N_pi_pulse_delay=N_pi_pulse_delay,
+             upload=upload))
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('T1_qp_N_'+str(N_pi_pulses)+'_tau_pi_'+str(N_pi_pulse_delay)+'_'+self.msmt_suffix)
+        if analyze:
+            a = ma.T1_Analysis(auto=True, close_fig=close_fig)
+            return a.T1
+    def measure_T1_2pi_qp(self, times, N_2pi_pulses=2,
+                      N_2pi_pulse_delay=100e-9, MC=None, analyze=True,
+                      upload=True, close_fig=True):
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        times = np.concatenate([times,
+                               (times[-1]+times[1],
+                                times[-1]+times[2],
+                                times[-1]+times[3],
+                                times[-1]+times[4])])
+        MC.set_sweep_function(awg_swf.T1_2pi_qp(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            N_2pi_pulses=N_2pi_pulses, N_2pi_pulse_delay=N_2pi_pulse_delay,
+             upload=upload))
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('T1_2pi_qp_N_'+str(N_2pi_pulses)+'_tau_2pi_'+str(N_2pi_pulse_delay)+'_'+self.msmt_suffix)
+        if analyze:
+            a = ma.T1_Analysis(auto=True, close_fig=close_fig)
+            return a.T1
+
+
     def measure_ramsey(self, times, artificial_detuning=0,
                        f_qubit=None, label='',
                        MC=None, analyze=True, close_fig=True, verbose=True,
-                       upload=True):
+                       upload=True, analyze_double_freq = False):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
@@ -642,14 +727,21 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         MC.run('Ramsey'+label+self.msmt_suffix)
 
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig)
-            if verbose:
-                fitted_freq = a.fit_res.params['frequency'].value
-                print('Artificial detuning: {:.2e}'.format(
-                      artificial_detuning))
-                print('Fitted detuning: {:.2e}'.format(fitted_freq))
-                print('Actual detuning:{:.2e}'.format(
-                      fitted_freq-artificial_detuning))
+            if analyze_double_freq == False:
+                a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig)
+                if verbose:
+                    fitted_freq = a.fit_res.params['frequency'].value
+                    print('Artificial detuning: {:.2e}'.format(
+                        artificial_detuning))
+                    print('Fitted detuning: {:.2e}'.format(fitted_freq))
+                    print('Actual detuning:{:.2e}'.format(
+                        fitted_freq-artificial_detuning))
+            else:
+                a = ma.DoubleFrequency(auto=True, close_fig=close_fig)
+                #Implement 'verbose' later, this is fine fow now
+                if verbose:
+                    print("Verbose output")
+                    # fitted_freq = a.fit_res.params[]
 
     def measure_echo(self, times, label='', MC=None,
                      artificial_detuning=None, upload=True,
@@ -669,6 +761,34 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         if analyze:
             a = ma.Ramsey_Analysis(
                 auto=True, close_fig=close_fig, label='Echo')
+            return a
+
+    def measure_CPMG(self, times, CPMG_order=4, label='', MC=None,
+                     artificial_detuning=None, upload=True,
+                     analyze=True, close_fig=True, verbose=True):
+        '''
+        Runs the CPMG sequence, consisting of a starting x90, then CPMG_order
+            times Y180 pulses, and a (artificially detuning) finishing x90 pulse
+        times specify the times between the centers of starting and
+            finishing pulses. Ensure that minimal time does not lead
+            to pulse overlap
+        '''
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        CPMG_swf = awg_swf.CPMG(
+            pulse_pars=self.pulse_pars, RO_pars=self.RO_pars,
+            CPMG_order=CPMG_order,
+            artificial_detuning=artificial_detuning, upload=upload)
+        MC.set_sweep_function(CPMG_swf)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run('CPMG_'+str(CPMG_order)+label+self.msmt_suffix)
+
+        if analyze:
+            a = ma.Ramsey_Analysis(
+                auto=True, close_fig=close_fig, label='CPMG')
             return a
 
     def measure_allxy(self, double_points=True,
@@ -714,7 +834,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      MC=None,
                      analyze=True,
                      close_fig=True,
-                     verbose=True, optimized_weights=False, SSB=False,
+                     verbose=True, optimized_weights=False, SSB=True,
                      one_weight_function_UHFQC=False,
                      multiplier=1, nr_shots=4095):
         self.prepare_for_timedomain()
@@ -1068,6 +1188,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'nr_sigma': 4,
             'motzoi': self.motzoi.get(),
             'mod_frequency': self.f_pulse_mod.get(),
+            'f_pulse_mod': self.f_pulse_mod.get(),
             'pulse_delay': self.pulse_delay.get(),
             'phi_skew': self.phi_skew.get(),
             'alpha': self.alpha.get(),
@@ -1083,7 +1204,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             'amplitude': self.RO_amp.get(),
             'length': self.RO_pulse_length.get(),
             'pulse_delay': self.RO_pulse_delay.get(),
-            'mod_frequency': self.f_RO_mod.get(),
+            'f_RO_mod': self.f_RO_mod.get(),
             'acq_marker_delay': self.RO_acq_marker_delay.get(),
             'acq_marker_channel': self.RO_acq_marker_channel.get(),
             'phase': 0,
@@ -1100,9 +1221,10 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      'amplitude': 1,
                      'operation_type': 'MW',
                      'target_qubit': self.name,
-                     'channel': self.spec_pulse_marker_channel.get()}
+                     'channel': self.spec_pulse_marker_channel.get(),
+                     'f_pulse_mod': self.f_pulse_mod.get()}
 
-        RO_pars['pulse_delay'] += spec_pars['length']
+        # RO_pars['pulse_delay'] += spec_pars['length'] Why is this here??
         spec_pars['pulse_delay'] = (RO_pars['length'] +
                                     self.spec_pulse_depletion_time.get())
         return spec_pars, RO_pars

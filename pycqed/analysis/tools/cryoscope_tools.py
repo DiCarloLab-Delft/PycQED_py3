@@ -5,6 +5,7 @@ Dec 2017
 Edited by Adriaan Rol
 """
 import logging
+from copy import copy
 from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
@@ -176,6 +177,8 @@ class CryoscopeAnalyzer:
             ax = plt.gca()
         ax.set_title(title)
 
+        # If window size is longer than data this plot will throw an exception
+        window_size = np.min([window_size, len(self.norm_data)])
         f, t, Zxx = ss.stft(self.norm_data, fs=self.sampling_rate,
                             nperseg=window_size,
                             noverlap=0.95 * window_size, return_onesided=False)
@@ -396,15 +399,8 @@ class DacArchAnalysis:
             self.freqs.append(fit[0])
 
         self.freqs = np.array(self.freqs)
-        if nyquist_calc == 'auto':
-            self.nyquist = np.cumsum(self.freqs[1:] < self.freqs[:-1])
-            self.nyquist = np.hstack(([0], self.nyquist))
-        elif nyquist_calc == 'disabled':
-            self.nyquist = np.zeros(len(self.freqs))
-        else:
-            raise NotImplementedError()
-            # FIXME: proper support for auto nyquist with
-            # a proper nyquist should be extracte
+
+        self.nyquist = self._calc_nyquist(nyquist_calc)
 
         self.freqs = self.freqs + self.nyquist * self.sampling_rate
 
@@ -470,36 +466,25 @@ class DacArchAnalysis:
 
         raise ValueError("`kind` not understood")
 
-    # def _freq_to_amp_root_parabola(self, freq, positive_branch=True):
-    #     """
-    #     Converts freq in Hz to amplitude.
+    def _calc_nyquist(self, nyquist_calc):
+        """
+        calculates nyquist orders based on frequencies
+        """
+        if nyquist_calc == 'auto':
+            # Ignoring invalid for the nan comparison
+            with np.errstate(invalid='ignore'):
+                freqs = copy(self.freqs)
+                freqs[self.exclusion_indices] = np.nan
+                nyquist = np.cumsum(freqs[1:] < freqs[:-1])
+                nyquist = np.hstack(([0], nyquist))
+        elif nyquist_calc == 'disabled':
+            nyquist = np.zeros(len(self.freqs))
+        else:
+            raise NotImplementedError()
+            # FIXME: proper support for auto nyquist with
+            # a proper nyquist should be extracted
+        return nyquist
 
-    #     Requires "poly_fit" to be set to the polynomial values
-    #     extracted from the cryoscope flux arc.
-
-    #     Assumes a parabola to find the roots but should also work for a higher
-    #     order polynomial, except that it will pick the wrong branch.
-
-    #     N.B. this method assumes that the polycoeffs are with respect to the
-    #         amplitude in units of V.
-    #     """
-
-    #     # recursive allows dealing with an array of freqs
-    #     if isinstance(freq, (list, np.ndarray)):
-    #         return np.array([self._freq_to_amp_root_parabola(
-    #             f, positive_branch=positive_branch) for f in freq])
-
-    #     p = np.poly1d(self.poly_fit)
-    #     sols = (p-freq).roots
-
-    #     # sols returns 2 solutions (for a 2nd order polynomial)
-    #     if positive_branch:
-    #         sol = np.max(sols)
-    #     else:
-    #         sol = np.min(sols)
-
-    #     # imaginary part is ignored, instead sticking to closest real value
-    #     return np.real(sol)
 
     def _freq_to_amp_root(self, freq):
         """

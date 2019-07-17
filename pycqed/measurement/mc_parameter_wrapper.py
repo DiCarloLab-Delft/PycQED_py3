@@ -30,12 +30,9 @@ def wrap_par_to_swf(parameter, retrieve_value=False):
     sweep_function.get = parameter.get
     return sweep_function
 
-
-def wrap_vector_par_to_swf(parameter, index):
+def wrap_pars_to_swf(parameters, retrieve_value=False):
     '''
      - only soft sweep_functions
-    Wraps a vector parameter so that one can sweep over a component of a
-    vector.
     '''
     sweep_function = swf.Sweep_function()
     sweep_function.sweep_control = 'soft'
@@ -51,7 +48,15 @@ def wrap_vector_par_to_swf(parameter, index):
 
     sweep_function.prepare = pass_function
     sweep_function.finish = pass_function
-    sweep_function.set_parameter = wrapped_set
+    def set_par(val):
+        for par in parameters:
+            par.set(val)
+            if retrieve_value:
+                par.get()
+
+    sweep_function.set_parameter = set_par
+
+
     return sweep_function
 
 

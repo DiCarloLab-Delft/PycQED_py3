@@ -16,7 +16,9 @@ import logging
 gatemap = {'i': 'i',
            'x': 'rx90',
            'y': 'ry90',
-           'cphase': 'fl_cw_01'}
+           # 'cphase': 'fl_cw_01',
+            'cphase': 'fl_cw_03',
+           }
 
 
 def openql_program_from_pygsti_expList(expList, program_name: str,
@@ -27,7 +29,7 @@ def openql_program_from_pygsti_expList(expList, program_name: str,
 
     p = oqh.create_program(program_name, platf_cfg)
     # N.B. program name added before compilation as it is used in a check
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    p.filename = join(p.output_dir, p.name + '.qisa')  # FIXME: platform dependency on CClight
     if oqh.check_recompilation_needed(p.filename, platf_cfg, recompile):
 
         for i, gatestring in enumerate(expList):

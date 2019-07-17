@@ -9,7 +9,8 @@ import numpy as np
 import logging
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
-from pycqed.analysis_v2 import randomized_benchmarking_analysis as rb
+from pycqed.analysis.tools.data_manipulation import \
+    populations_using_rate_equations
 
 
 class efT1_analysis(ba.BaseDataAnalysis):
@@ -97,7 +98,7 @@ class efT1_analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['SI'][val_name] = SI
             self.proc_data_dict['SX'][val_name] = SX
 
-            P0, P1, P2, M_inv = rb.populations_using_rate_equations(
+            P0, P1, P2, M_inv = populations_using_rate_equations(
                 SI, SX, V0, V1, V2)
             self.proc_data_dict['P0'][val_name] = P0
             self.proc_data_dict['P1'][val_name] = P1

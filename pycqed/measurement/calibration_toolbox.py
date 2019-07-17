@@ -39,7 +39,8 @@ def mixer_carrier_cancellation(SH, source, MC,
                                SH_ref_level: float=-40,
                                init_stepsize: float=0.1,
                                x0=(0.0, 0.0),
-                               label: str='Offset_calibration'):
+                               label: str='Offset_calibration',
+                               ftarget=-110):
     """
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is a generic version.
@@ -54,6 +55,7 @@ def mixer_carrier_cancellation(SH, source, MC,
         SH_ref_level (float) : Signal hound reference level
         init_stepsize (float): initial stepsize for Nelder mead algorithm
         x0           (tuple) : starting point for optimization
+        ftarget      (float) : termination value
     """
 
     source.on()
@@ -73,9 +75,10 @@ def mixer_carrier_cancellation(SH, source, MC,
     ad_func_pars = {'adaptive_function': cma.fmin,
                     'x0': x0,
                     'sigma0':1,
-                    'options': {'maxiter': 500,    # maximum function cals
+                    'options': {'maxiter': 300,    # maximum function cals
                                 # Scaling for individual sigma's
-                                'cma_stds': [init_stepsize]*2
+                                'cma_stds': [init_stepsize]*2,
+                                'ftarget': ftarget
                                 },
                     'minimize': True}
     MC.set_sweep_functions([chI_par, chQ_par])

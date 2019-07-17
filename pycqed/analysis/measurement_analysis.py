@@ -19,6 +19,7 @@ from scipy.interpolate import interp1d
 import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.utilities.general import SafeFormatter, format_value_string
+from scipy.ndimage.filters import gaussian_filter
 import imp
 import math
 
@@ -360,6 +361,7 @@ class MeasurementAnalysis(object):
             '\n' + '*' * 80 + '\n\n'
 
         fit_grp.attrs.create(name='chisqr', data=fit_res.chisqr)
+        fit_grp.attrs.create(name='redchi', data=fit_res.redchi)
         fit_grp.attrs.create(name='var_name', data=var_name.encode('utf-8'))
         if fit_res.covar is not None:
             if 'covar' in list(fit_grp.keys()):
@@ -1589,7 +1591,7 @@ class Rabi_Analysis(TD_Analysis):
         separate_fits     (default=False)
             if True, runs the original Rabi analysis routine which fits the
             I and Q points separately
-        NoCalPoints       (default=4)
+        NoCalPoints       (default=0)
             Number of calibration points
         for_ef            (default=False)
             analyze for EF transition
@@ -1682,7 +1684,7 @@ class Rabi_Analysis(TD_Analysis):
             # Set up fit parameters and perform fit
             cos_mod.set_param_hint('amplitude',
                                    value=amp_guess,
-                                   vary=False)
+                                   vary=True)
             cos_mod.set_param_hint('phase',
                                    value=0,
                                    vary=False)
@@ -2114,6 +2116,151 @@ class Rabi_Analysis(TD_Analysis):
         return amp180
 
 
+class Flipping_Analysis(TD_Analysis):
+
+    def __init__(self, label='Flipping', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super().__init__(**kw)
+
+
+    def run_default_analysis(self, close_file=True, show_guess=False, **kw):
+        # Returns the drive scaling factor.
+        show = kw.pop('show', False)
+        self.add_analysis_datagroup_to_file()
+        self.get_naming_and_values()
+        fig1, fig2, ax, axarray = self.setup_figures_and_axes()
+
+        norm = self.normalize_data_to_calibration_points(
+            self.measured_values[0], self.NoCalPoints)
+        self.normalized_values = norm[0]
+        self.normalized_data_points = norm[1]
+        self.normalized_cal_vals = norm[2]
+        self.fit_Flipping()
+
+        # self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
+        self.plot_results(fig1, ax, show_guess=show_guess,
+                          ylabel=r'$F$ $|1 \rangle$')
+
+        for i, name in enumerate(self.value_names):
+            if len(self.value_names) == 4:
+                if i < 2:
+                    ax2 = axarray[0, i]
+                else:
+                    ax2 = axarray[1, i-2]
+            else:
+                ax2 = axarray[i]
+
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=fig2, ax=ax2,
+                                            xlabel=self.xlabel,
+                                            ylabel=self.ylabels[i],
+                                            save=False)
+
+        if show:
+            plt.show()
+        self.save_fig(fig1, figname=self.measurementstring+'_Flipping_fit', **kw)
+        self.save_fig(fig2, figname=self.measurementstring, **kw)
+        if close_file:
+            self.data_file.close()
+        return self.drive_scaling_factor
+
+    def plot_results(self, fig, ax, ylabel,show_guess=False):
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.normalized_values,
+                                        fig=fig, ax=ax,
+                                        xlabel=r'No. Pulses',
+                                        ylabel=ylabel,
+                                        save=False)
+        if show_guess:
+            y_init = fit_mods.ExpDampOscFunc(self.sweep_points,
+                **self.fit_res.init_values)
+            ax.plot(self.sweep_points, y_init, 'k--')
+
+        ax.plot(self.fit_plot_points_x, self.fit_plot_points_y, 'r-')
+
+    def fit_Flipping(self, **kw):
+        # Split it up in two cases, one where we have oscillations,
+        # one where we are already quite close
+        data = self.normalized_data_points
+        sweep_points = self.sweep_points[:-self.NoCalPoints]
+        w = np.abs(np.fft.fft(data)[1:len(data)//2])
+        if np.argmax(w)==0:
+            # This is the case where we don't have oscilaltions.
+            # We fit a parabola to it.
+            def quadratic_fit_data():
+                M = np.array([sweep_points**2, sweep_points, [1]*len(sweep_points)])
+                Minv = np.linalg.pinv(M)
+                [a, b, c] = np.dot(data, Minv)
+                fit_data = (a*sweep_points**2 + b*sweep_points + c)
+                return fit_data, (a, b, c)
+            self.fit_results_quadratic = quadratic_fit_data()
+            slope = self.fit_results_quadratic[1][1]
+            amplitude = np.average(self.normalized_cal_vals) / 2
+            drive_detuning = slope / (2 * np.pi * abs(amplitude))
+            self.drive_scaling_factor = 1. / (1. + drive_detuning)
+            self.fit_plot_points_x = sweep_points
+            self.fit_plot_points_y = self.fit_results_quadratic[0]
+        else:
+            # This is the case where we have oscilaltions.
+            # We fit a decaying cos to it.
+            def fit_dec_cos_mod(negative_amplitude=False):
+                model = fit_mods.CosModel
+                params = model.guess(model, data=data,
+                                     t=sweep_points)
+                new_mod = fit_mods.ExpDampOscModel
+                if negative_amplitude:
+                    new_mod.set_param_hint('amplitude',
+                                    value=-1*np.abs(params['amplitude'].value),
+                                    min=-1, max=0)
+                else:
+                    new_mod.set_param_hint('amplitude',
+                                    value=np.abs(params['amplitude'].value),
+                                    min=0, max=1)
+                new_mod.set_param_hint('frequency',
+                                    value=params['frequency'].value,
+                                    min=0.2/sweep_points[-1],
+                                    max=10./sweep_points[-1])
+                new_mod.set_param_hint('phase',
+                                    value=-np.pi/2, vary=False)
+                new_mod.set_param_hint('oscillation_offset',
+                                    value=0)
+                new_mod.set_param_hint('exponential_offset',
+                                    value=params['offset'].value)
+                new_mod.set_param_hint('n',
+                                    value=1, vary=False)
+                new_mod.set_param_hint('tau',
+                                    value=sweep_points[-1],
+                                    min=sweep_points[1],
+                                    max=sweep_points[-1]*10)
+                new_params = new_mod.make_params()
+                return new_mod.fit(data=data,
+                                    t=sweep_points, params=new_params)
+            pos_amp_fit = fit_dec_cos_mod(negative_amplitude=False)
+            neg_amp_fit = fit_dec_cos_mod(negative_amplitude=True)
+
+            if pos_amp_fit.chisqr>neg_amp_fit.chisqr:
+                self.fit_res = neg_amp_fit
+            else:
+                self.fit_res = pos_amp_fit
+
+            self.fit_plot_points_x = np.linspace(sweep_points[0],
+                                                 sweep_points[-1],200)
+            self.fit_plot_points_y = fit_mods.ExpDampOscFunc(
+                t=self.fit_plot_points_x,
+                amplitude=self.fit_res.values['amplitude'],
+                frequency=self.fit_res.values['frequency'],
+                phase=self.fit_res.values['phase'],
+                oscillation_offset=self.fit_res.values['oscillation_offset'],
+                exponential_offset=self.fit_res.values['exponential_offset'],
+                n=self.fit_res.values['n'],
+                tau=self.fit_res.values['tau'])
+            self.drive_detuning = self.fit_res.values['frequency']*\
+                np.sign(self.fit_res.values['amplitude'])
+            self.drive_scaling_factor = 1. / (1. + self.drive_detuning)
+
+
 class TD_UHFQC(TD_Analysis):
 
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
@@ -2141,8 +2288,7 @@ class TD_UHFQC(TD_Analysis):
 
 
 class Echo_analysis(TD_Analysis):
-
-    def __init__(self, vary_n=False, **kw):
+    def __init__(self,vary_n=False,**kw):
         self.vary_n = vary_n
         super(Echo_analysis, self).__init__(**kw)
 
@@ -2211,6 +2357,463 @@ class Echo_analysis(TD_Analysis):
                      fontsize=11, verticalalignment='top',
                      bbox=self.box_props)
         self.save_fig(self.fig, fig_tight=True, **kw)
+
+class Echo_analysis_V15(TD_Analysis):
+    """
+    New echo analysis for varying phase pulses. Based on old ramsey analysis.
+    Should be replaced asap by a V2-style analysis
+
+    -Luc
+    """
+
+    def __init__(self, label='echo', phase_sweep_only=False, **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        self.phase_sweep_only = phase_sweep_only
+        self.artificial_detuning = kw.pop('artificial_detuning', 0)
+        if self.artificial_detuning == 0:
+            logging.warning('Artificial detuning is unknown. Defaults to %s MHz. '
+                            'New qubit frequency might be incorrect.'
+                            % self.artificial_detuning)
+
+        # The routines for 2 art_dets does not use the self.fig and self.ax
+        # created in TD_Analysis for make_fig==False for TD_Analysis but
+        # still want make_fig to decide whether two_art_dets_analysis should
+        # make a figure
+        self.make_fig_two_dets = kw.get('make_fig', True)
+        if (type(self.artificial_detuning) is list) and \
+                (len(self.artificial_detuning) > 1):
+            kw['make_fig'] = False
+
+        super().__init__(**kw)
+
+    def fit_Echo(self, x, y, **kw):
+        self.add_analysis_datagroup_to_file()
+        print_fit_results = kw.pop('print_fit_results',False)
+        damped_osc_mod = lmfit.Model(fit_mods.ExpDampOscFunc)
+        average = np.mean(y)
+
+        ft_of_data = np.fft.fft(y)
+        index_of_fourier_maximum = np.argmax(np.abs(
+            ft_of_data[1:len(ft_of_data) // 2])) + 1
+        max_echo_delay = x[-1] - x[0]
+
+        fft_axis_scaling = 1 / (max_echo_delay)
+        freq_est = fft_axis_scaling * index_of_fourier_maximum
+        est_number_of_periods = index_of_fourier_maximum
+        if self.phase_sweep_only:
+            damped_osc_mod.set_param_hint('frequency',
+                                          value=1/360,
+                                          vary=False)
+            damped_osc_mod.set_param_hint('phase',
+                                          value=0, vary=True)
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=0.5*(max(self.normalized_data_points)-min(self.normalized_data_points)),
+                                          min=0.0, max=4.0)
+            fixed_tau=1e9
+            damped_osc_mod.set_param_hint('tau',
+                                          value=fixed_tau,
+                                          vary=False)
+        else:
+            if ((average > 0.7*max(y)) or
+                    (est_number_of_periods < 2) or
+                    est_number_of_periods > len(ft_of_data)/2.):
+                print('the trace is too short to find multiple periods')
+
+                if print_fit_results:
+                    print('Setting frequency to 0 and ' +
+                          'fitting with decaying exponential.')
+                damped_osc_mod.set_param_hint('frequency',
+                                              value=freq_est,
+                                              vary=False)
+                damped_osc_mod.set_param_hint('phase',
+                                              value=0,
+                                              vary=False)
+            else:
+                damped_osc_mod.set_param_hint('frequency',
+                                              value=freq_est,
+                                              vary=True,
+                                              min=(1/(100 *x[-1])),
+                                              max=(20/x[-1]))
+
+            if (np.average(y[:4]) >
+                    np.average(y[4:8])):
+                phase_estimate = 0
+            else:
+                phase_estimate = np.pi
+            damped_osc_mod.set_param_hint('phase',
+                                              value=phase_estimate, vary=True)
+
+            amplitude_guess = 1
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=amplitude_guess,
+                                          min=0.4,
+                                          max=4.0)
+            damped_osc_mod.set_param_hint('tau',
+                                          value=x[1]*10,
+                                          min=x[1],
+                                          max=x[1]*1000)
+        damped_osc_mod.set_param_hint('exponential_offset',
+                                      value=0.5,
+                                      min=0.4,
+                                      max=4.0)
+        damped_osc_mod.set_param_hint('oscillation_offset',
+                                      value=0,
+                                      vary=False)
+        damped_osc_mod.set_param_hint('n',
+                                      value=1,
+                                      vary=False)
+        self.params = damped_osc_mod.make_params()
+
+        fit_res = damped_osc_mod.fit(data=y,
+                                     t=x,
+                                     params=self.params)
+        if self.phase_sweep_only:
+            chi_sqr_bound = 0
+        else:
+            chi_sqr_bound = 0.35
+
+        if fit_res.chisqr > chi_sqr_bound:
+            logging.warning('Fit did not converge, varying phase')
+            fit_res_lst = []
+
+            for phase_estimate in np.linspace(0, 2 * np.pi, 8):
+                damped_osc_mod.set_param_hint('phase',
+                                              value=phase_estimate)
+                self.params = damped_osc_mod.make_params()
+                fit_res_lst += [damped_osc_mod.fit(
+                    data=y,
+                    t=x,
+                    params=self.params)]
+
+            chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
+            fit_res = fit_res_lst[np.argmin(chisqr_lst)]
+        self.fit_results.append(fit_res)
+
+        if print_fit_results:
+            print(fit_res.fit_report())
+        return fit_res
+
+    def plot_results(self, fit_res, show_guess=False, art_det=0,
+                     fig=None, ax=None, textbox=True):
+
+        self.units = SI_prefix_and_scale_factor(val=max(abs(ax.get_xticks())),
+                                                unit=self.sweep_unit[0])[1]  # list
+
+        if isinstance(art_det, list):
+            art_det = art_det[0]
+
+        if textbox:
+            textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
+                       % (self.qubit_freq_spec * 1e-9) +
+                       '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
+                       % (self.qubit_frequency * 1e-9,
+                          fit_res.params['frequency'].stderr * 1e-9) +
+                       '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
+                       % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
+                          fit_res.params['frequency'].stderr * 1e-6) +
+                       '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
+                       % (fit_res.params['frequency'].value * 1e-6,
+                          fit_res.params['frequency'].stderr * 1e-6) +
+                       '\n$T_2$ = %.6g '
+                       % (fit_res.params['tau'].value * self.scale) +
+                       self.units + ' $\pm$ (%.6g) '
+                       % (fit_res.params['tau'].stderr * self.scale) +
+                       self.units +
+                       '\nartificial detuning = %.2g MHz'
+                       % (art_det * 1e-6))
+
+            fig.text(0.5, 0, textstr, fontsize=self.font_size,
+                     transform=ax.transAxes,
+                     verticalalignment='top',
+                     horizontalalignment='center', bbox=self.box_props)
+
+        x = np.linspace(self.sweep_points[0],
+                        self.sweep_points[-self.NoCalPoints - 1],
+                        len(self.sweep_points) * 100)
+
+        if show_guess:
+            y_init = fit_mods.ExpDampOscFunc(x, **fit_res.init_values)
+            ax.plot(x, y_init, 'k--', linewidth=self.line_width)
+
+        best_vals = fit_res.best_values
+        y = fit_mods.ExpDampOscFunc(
+            x, tau=best_vals['tau'],
+            n=best_vals['n'],
+            frequency=best_vals['frequency'],
+            phase=best_vals['phase'],
+            amplitude=best_vals['amplitude'],
+            oscillation_offset=best_vals['oscillation_offset'],
+            exponential_offset=best_vals['exponential_offset'])
+        ax.plot(x, y, 'r-', linewidth=self.line_width)
+
+    def run_default_analysis(self, print_fit_results=False,
+                             close_file=False, **kw):
+
+        super().run_default_analysis(
+            close_file=close_file,
+            close_main_figure=True, save_fig=False, **kw)
+
+        verbose = kw.get('verbose', False)
+        # Get old values for qubit frequency
+        instr_set = self.data_file['Instrument settings']
+        try:
+            if self.for_ef:
+                self.qubit_freq_spec = \
+                    float(instr_set[self.qb_name].attrs['f_ef_qubit'])
+            elif 'freq_qubit' in kw.keys():
+                self.qubit_freq_spec = kw['freq_qubit']
+            else:
+                try:
+                    self.qubit_freq_spec = \
+                        float(instr_set[self.qb_name].attrs['f_qubit'])
+                except KeyError:
+                    self.qubit_freq_spec = \
+                        float(instr_set[self.qb_name].attrs['freq_qubit'])
+
+        except (TypeError, KeyError, ValueError):
+            logging.warning('qb_name is unknown. Setting previously measured '
+                            'value of the qubit frequency to 0. New qubit '
+                            'frequency might be incorrect.')
+            self.qubit_freq_spec = 0
+
+        self.scale = 1e6
+
+        # artificial detuning with one value can be passed as either an int or
+        # a list with one elements
+        if (type(self.artificial_detuning) is list) and \
+                (len(self.artificial_detuning) > 1):
+            if verbose:
+                print('Performing Ramsey Analysis for 2 artificial detunings.')
+            self.two_art_dets_analysis(**kw)
+        else:
+            if type(self.artificial_detuning) is list:
+                self.artificial_detuning = self.artificial_detuning[0]
+            if verbose:
+                print('Performing Ramsey Analysis for 1 artificial detuning.')
+            self.one_art_det_analysis(**kw)
+
+        self.save_computed_parameters(self.T2,
+                                      var_name=self.value_names[0])
+
+        # Print the T2 values on screen
+        unit = self.parameter_units[0][-1]
+        if kw.pop('print_parameters', False):
+            print('New qubit frequency = {:.7f} (GHz)'.format(
+                self.qubit_frequency * 1e-9) +
+                  '\t\tqubit frequency stderr = {:.7f} (MHz)'.format(
+                      self.ramsey_freq['freq_stderr'] * 1e-6) +
+                  '\nT2* = {:.5f} '.format(
+                      self.T2['T2'] * self.scale) + '(' + 'μ' + unit + ')' +
+                  '\t\tT2* stderr = {:.5f} '.format(
+                      self.T2['T2_stderr'] * self.scale) +
+                  '(' + 'μ' + unit + ')')
+        if close_file:
+            self.data_file.close()
+
+        return self.fit_res
+
+    def one_art_det_analysis(self, **kw):
+
+        # Perform fit and save fitted parameters
+        self.fit_res = self.fit_Echo(x=self.sweep_points[:-self.NoCalPoints],
+                                       y=self.normalized_data_points, **kw)
+        self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
+        self.get_measured_freq(fit_res=self.fit_res, **kw)
+
+        # Calculate new qubit frequency
+        self.qubit_frequency = self.qubit_freq_spec + self.artificial_detuning \
+                               - self.echo_freq['freq']
+
+        # Extract T2 and save it
+        self.get_measured_T2(fit_res=self.fit_res, **kw)
+        # the call above defines self.T2 as a dict; units are seconds
+
+        self.total_detuning = self.fit_res.params['frequency'].value
+        self.detuning_stderr = self.fit_res.params['frequency'].stderr
+        self.detuning = self.total_detuning - self.artificial_detuning
+
+        if self.make_fig:
+            # Plot results
+            show_guess = kw.pop('show_guess', False)
+            show = kw.pop('show', False)
+            self.plot_results(self.fit_res, show_guess=show_guess,
+                              art_det=self.artificial_detuning,
+                              fig=self.fig, ax=self.ax)
+
+            # dispaly figure
+            if show:
+                plt.show()
+
+            # save figure
+            self.save_fig(self.fig, figname=self.measurementstring + '_Echo_fit',
+                          **kw)
+
+    def two_art_dets_analysis(self, **kw):
+
+        # Extract the data for each echo
+        len_art_det = len(self.artificial_detuning)
+        sweep_pts_1 = self.sweep_points[0:-self.NoCalPoints:len_art_det]
+        sweep_pts_2 = self.sweep_points[1:-self.NoCalPoints:len_art_det]
+        echo_data_1 = self.normalized_values[0:-self.NoCalPoints:len_art_det]
+        echo_data_2 = self.normalized_values[1:-self.NoCalPoints:len_art_det]
+
+        # Perform fit
+        fit_res_1 = self.fit_Echo(x=sweep_pts_1,
+                                    y=echo_data_1, **kw)
+        fit_res_2 = self.fit_Echo(x=sweep_pts_2,
+                                    y=echo_data_2, **kw)
+
+        self.save_fitted_parameters(fit_res_1, var_name=(self.value_names[0] +
+                                                         ' ' + str(self.artificial_detuning[0] * 1e-6) + ' MHz'))
+        self.save_fitted_parameters(fit_res_2, var_name=(self.value_names[0] +
+                                                         ' ' + str(self.artificial_detuning[1] * 1e-6) + ' MHz'))
+
+        echo_freq_dict_1 = self.get_measured_freq(fit_res=fit_res_1, **kw)
+        echo_freq_1 = echo_freq_dict_1['freq']
+        echo_freq_dict_2 = self.get_measured_freq(fit_res=fit_res_2, **kw)
+        echo_freq_2 = echo_freq_dict_2['freq']
+
+        # Calculate possible detunings from real qubit frequency
+        self.new_qb_freqs = {
+            '0': self.qubit_freq_spec + self.artificial_detuning[0] + echo_freq_1,
+            '1': self.qubit_freq_spec + self.artificial_detuning[0] - echo_freq_1,
+            '2': self.qubit_freq_spec + self.artificial_detuning[1] + echo_freq_2,
+            '3': self.qubit_freq_spec + self.artificial_detuning[1] - echo_freq_2}
+
+        print('The 4 possible cases for the new qubit frequency give:')
+        pprint(self.new_qb_freqs)
+
+        # Find which ones match
+        self.diff = {}
+        self.diff.update({'0': self.new_qb_freqs['0'] - self.new_qb_freqs['2']})
+        self.diff.update({'1': self.new_qb_freqs['1'] - self.new_qb_freqs['3']})
+        self.diff.update({'2': self.new_qb_freqs['1'] - self.new_qb_freqs['2']})
+        self.diff.update({'3': self.new_qb_freqs['0'] - self.new_qb_freqs['3']})
+        self.correct_key = np.argmin(np.abs(list(self.diff.values())))
+        # Get new qubit frequency
+        self.qubit_frequency = self.new_qb_freqs[str(self.correct_key)]
+
+        if self.correct_key < 2:
+            # art_det 1 was correct direction
+            # print('Artificial detuning {:.1f} MHz gave the best results.'.format(
+            #     self.artificial_detuning[0]*1e-6))
+            self.fit_res = fit_res_1
+            self.echo_data = echo_data_1
+            self.sweep_pts = sweep_pts_1
+            self.good_echo_freq = echo_freq_1
+            qb_stderr = echo_freq_dict_1['freq_stderr']
+
+        else:
+            # art_det 2 was correct direction
+            # print('Artificial detuning {:.1f} MHz gave the best results.'.format(
+            #     self.artificial_detuning[1]*1e-6))
+            self.fit_res = fit_res_2
+            self.echo_data = echo_data_2
+            self.sweep_pts = sweep_pts_2
+            self.good_echo_freq = echo_freq_2
+            qb_stderr = echo_freq_dict_2['freq_stderr']
+
+        # Extract T2 and save it
+        self.get_measured_T2(fit_res=self.fit_res, **kw)  # defines self.T2 as a dict;
+        # units are seconds
+
+        ################
+        # Plot results #
+        ################
+        if self.make_fig_two_dets:
+            show_guess = kw.pop('show_guess', False)
+            show = kw.pop('show', False)
+
+            if self.for_ef:
+                ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
+            else:
+                ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+            if self.no_of_columns == 2:
+                figsize = (3.375, 2.25 * len_art_det)
+            else:
+                figsize = (7, 4 * len_art_det)
+            self.fig, self.axs = plt.subplots(len_art_det, 1,
+                                              figsize=figsize,
+                                              dpi=self.dpi)
+
+            fit_res_array = [fit_res_1, fit_res_2]
+            echo_data_dict = {'0': echo_data_1,
+                                '1': echo_data_2}
+
+            for i in range(len_art_det):
+                ax = self.axs[i]
+                self.plot_results_vs_sweepparam(x=self.sweep_pts,
+                                                y=echo_data_dict[str(i)],
+                                                fig=self.fig, ax=ax,
+                                                xlabel=self.sweep_name,
+                                                x_unit=self.sweep_unit[0],
+                                                ylabel=ylabel,
+                                                marker='o-',
+                                                save=False)
+                self.plot_results(fit_res_array[i], show_guess=show_guess,
+                                  art_det=self.artificial_detuning[i],
+                                  fig=self.fig, ax=ax, textbox=False)
+
+                textstr = ('artificial detuning = %.2g MHz'
+                           % (self.artificial_detuning[i] * 1e-6) +
+                           '\n$f_{Echo}$ = %.5g $ MHz \pm$ (%.5g) MHz'
+                           % (fit_res_array[i].params['frequency'].value * 1e-6,
+                              fit_res_array[i].params['frequency'].stderr * 1e6) +
+                           '\n$T_2$ = %.3g '
+                           % (fit_res_array[i].params['tau'].value * self.scale) +
+                           self.units + ' $\pm$ (%.3g) '
+                           % (fit_res_array[i].params['tau'].stderr * self.scale) +
+                           self.units)
+                ax.annotate(textstr, xy=(0.99, 0.98), xycoords='axes fraction',
+                            fontsize=self.font_size, bbox=self.box_props,
+                            horizontalalignment='right', verticalalignment='top')
+
+                if i == (len_art_det - 1):
+                    textstr_main = ('$f_{qubit \_ old}$ = %.5g GHz'
+                                    % (self.qubit_freq_spec * 1e-9) +
+                                    '\n$f_{qubit \_ new}$ = %.5g $ GHz \pm$ (%.5g) GHz'
+                                    % (self.qubit_frequency * 1e-9,
+                                       qb_stderr * 1e-9) +
+                                    '\n$T_2$ = %.3g '
+                                    % (self.T2['T2'] * self.scale) +
+                                    self.units + ' $\pm$ (%.3g) '
+                                    % (self.T2['T2_stderr'] * self.scale) +
+                                    self.units)
+
+                    self.fig.text(0.5, 0, textstr_main, fontsize=self.font_size,
+                                  transform=self.axs[i].transAxes,
+                                  verticalalignment='top',
+                                  horizontalalignment='center', bbox=self.box_props)
+
+            # dispaly figure
+            if show:
+                plt.show()
+
+            # save figure
+            self.save_fig(self.fig, figname=self.measurementstring + '_Echo_fit',
+                          **kw)
+
+    def get_measured_freq(self, fit_res, **kw):
+        freq = fit_res.params['frequency'].value
+        freq_stderr = fit_res.params['frequency'].stderr
+
+        self.echo_freq = {'freq': freq, 'freq_stderr': freq_stderr}
+
+        return self.echo_freq
+
+    def get_measured_T2(self, fit_res, **kw):
+        '''
+        Returns measured T2 from the fit to the Ical data.
+         return T2, T2_stderr
+        '''
+        T2 = fit_res.params['tau'].value
+        T2_stderr = fit_res.params['tau'].stderr
+
+        self.T2 = {'T2': T2, 'T2_stderr': T2_stderr}
+
+        return self.T2
+
 
 
 class Rabi_parabola_analysis(Rabi_Analysis):
@@ -3666,6 +4269,20 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.frac1_1 = frac1_1
         self.F_d = F_d
         self.SNR = SNR
+        # Add the fit and data to the analysis object
+        self.n0 = n0 # x-Data for the histograms
+        self.n1 = n1 # x-Data for the histograms
+        self.bins0 = bins0 # y-Data for the histograms
+        self.bins1 = bins1 # y-Data for the histograms
+        self.norm0 = norm0 # x-values of histogram fit
+        self.y0 = y0 # y-values of histogram fit
+        self.y0_0 = y0_0
+        self.y0_1 = y0_1
+        self.norm0 = norm0 # x-values of histogram fit
+        self.y1 = y1 # y-values of histogram fit
+        self.y1_0 = y1_0
+        self.y1_1 = y1_1
+
 
     def plot_2D_histograms(self, shots_I_0, shots_Q_0, shots_I_1, shots_Q_1,
                            **kw):
@@ -4322,6 +4939,7 @@ class Ramsey_Analysis(TD_Analysis):
             art_det = art_det[0]
 
         if textbox:
+            #TODO: this crashes the analysis when stderr == None
             textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
                        % (self.qubit_freq_spec * 1e-9) +
                        '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
@@ -5668,8 +6286,11 @@ class Homodyne_Analysis(MeasurementAnalysis):
             print(lmfit.fit_report(fit_res))
 
         ########## Plot results ##########
+        xlabel = kw.get('xlabel', self.xlabel)
+        ylabel = kw.get('ylabel', 'S21_Mag')
 
         fig, ax = self.default_ax()
+
 
         if 'hanger' in fitting_model:
             self.plot_results_vs_sweepparam(x=self.sweep_points,
@@ -5677,9 +6298,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.sweep_name,
                                             x_unit=self.sweep_unit[0],
-                                            ylabel=str('S21_mag'),
+                                            ylabel=ylabel,
                                             y_unit=self.value_units[0],
-                                            save=False)
+                                            save=False,
+                                            **kw)
             # ensures that amplitude plot starts at zero
             ax.set_ylim(ymin=0.000)
 
@@ -5813,12 +6435,77 @@ class Homodyne_Analysis(MeasurementAnalysis):
                 plt.show()
 
             # save figure
-            self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
+            self.save_fig(fig, xlabel=self.xlabel, ylabel=ylabel, **kw)
 
         # self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
         if close_file:
             self.data_file.close()
         return fit_res
+
+
+class Homodyne_Analysis_Mutipeak(MeasurementAnalysis):
+
+    def __init__(self, label='', dip=False, **kw):
+        # Custome power message is used to create a message in resonator measurements
+        # dict must be custom_power_message={'Power': -15, 'Atten': 86, 'res_len':3e-6}
+        # Power in dBm, Atten in dB and resonator length in m
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        self.dip = dip
+        super().__init__(**kw)
+
+    def run_default_analysis(self,
+                             close_file=False,
+                             show=False, **kw):
+        '''
+
+        '''
+        super(self.__class__, self).run_default_analysis(
+            close_file=False, show=show, **kw)
+        self.add_analysis_datagroup_to_file()
+
+        window_len_filter = kw.get('window_len_filter', 11)
+
+        data_x = self.sweep_points
+        data_y = self.measured_values[0]
+        if self.dip:
+            data_y_find = -data_y
+        else:
+            data_y_find = data_y
+
+        self.peaks = a_tools.peak_finder_v2(data_x, data_y_find,
+                                            window_len=window_len_filter, perc=92)
+        self.peak_indices = np.array([list(data_x).index(p) for p in self.peaks])
+        self.peak_vals = data_y[self.peak_indices]
+        self.peak_amps = np.abs(self.peak_vals-np.mean(data_y))
+
+        fig, ax = self.default_ax()
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.measured_values[0],
+                                        fig=fig, ax=ax,
+                                        xlabel=self.sweep_name,
+                                        x_unit=self.sweep_unit[0],
+                                        ylabel=str('S21_mag'),
+                                        y_unit=self.value_units[0],
+                                        save=False)
+        # ensures that amplitude plot starts at zero
+        ax.set_ylim(ymin=0.000)
+
+        ax.plot(self.peaks, self.peak_vals, 'o',
+                        ms=self.marker_size_special)
+
+        textstr = 'Peak positions and heights'
+        for pos, amp in zip(self.peaks, self.peak_amps):
+            textstr += '\n $f=${:.4g} GHz; $A=${:.2g}'.format(pos/1e9,amp)
+
+        fig.text(1, 0.5, textstr, transform=ax.transAxes,
+                 fontsize=self.font_size,
+                 verticalalignment='center',
+                 horizontalalignment='left', bbox=self.box_props)
+
+        self.save_fig(fig, xlabel=self.xlabel, ylabel='peaks', **kw)
+
+        return self.peaks
 
 
 ################
@@ -5840,6 +6527,7 @@ class VNA_Analysis(MeasurementAnalysis):
 
         # prepare figure in log scale
         data_amp = self.measured_values[0]
+        print(data_amp)
 
         fig, ax = self.default_ax()
         self.plot_dB_from_linear(x=self.sweep_points,
@@ -6054,6 +6742,9 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     Possible kw parameters:
 
+        frequency_guess         (default=None)
+            manually set the initial guess for qubit frequency
+
         analyze_ef              (default=False)
             whether to look for a second peak/dip, which would be the at f_gf/2
 
@@ -6104,6 +6795,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def fit_data(self, analyze_ef=False, **kw):
 
+        frequency_guess = kw.get('frequency_guess', None)
         percentile = kw.get('percentile', 20)
         num_sigma_threshold = kw.get('num_sigma_threshold', 5)
         window_len_filter = kw.get('window_len_filter', 3)
@@ -6118,12 +6810,13 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             self.data_dist = a_tools.calculate_distance_ground_state(
                 data_real=data_real,
                 data_imag=data_imag,
-                normalize=False)
+                normalize=False,
+                percentile=60)
         except:
             # Quick fix to make it work with pulsed spec which does not
             # return both I,Q and, amp and phase
             # only using the amplitude!!
-            self.data_dist = self.measured_values[0]
+            self.data_dist = self.measured_values[0] - np.min(self.measured_values[0])
 
         # Smooth the data by "filtering"
         data_dist_smooth = a_tools.smooth(self.data_dist,
@@ -6138,7 +6831,11 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                          window_len=0)
 
         # extract highest peak -> ge transition
-        if self.peaks['dip'] is None:
+        if frequency_guess is not None:
+            f0 = frequency_guess
+            kappa_guess = (max(self.sweep_points)-min(self.sweep_points))/20
+            key = 'peak'
+        elif self.peaks['dip'] is None:
             f0 = self.peaks['peak']
             kappa_guess = self.peaks['peak_width'] / 4
             key = 'peak'
@@ -6191,8 +6888,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                            max=max(self.sweep_points),
                                            value=f0)
             LorentzianModel.set_param_hint('A',
-                                           value=amplitude_guess)  # ,
-            # min=4*np.var(self.data_dist))
+                                           value=amplitude_guess)
+
             LorentzianModel.set_param_hint('offset',
                                            value=np.mean(self.data_dist),
                                            vary=True)
@@ -6407,12 +7104,15 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             except (TypeError, KeyError, ValueError):
                 logging.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
-                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
-                            self.fit_res.params['f0'].value * scale,
-                            self.fit_res.params['f0'].stderr / 1e6,
-                            self.fit_res.params['kappa'].value / 1e6,
-                            self.fit_res.params['kappa'].stderr / 1e6)
+                try: #Dirty fix, should already be fine in Develop
+                    label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                            '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                                self.fit_res.params['f0'].value * scale,
+                                self.fit_res.params['f0'].stderr / 1e6,
+                                self.fit_res.params['kappa'].value / 1e6,
+                                self.fit_res.params['kappa'].stderr / 1e6)
+                except:
+                    label = None
 
         fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,
                       fontsize=self.font_size, verticalalignment='top',
@@ -6695,6 +7395,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                              linecut_log=False, colorplot_log=False,
                              plot_all=True, save_fig=True,
                              transpose=False, figsize=None, filtered=False,
+                             subtract_mean_x=False, subtract_mean_y=False,
                              **kw):
         '''
         Args:
@@ -6714,6 +7415,9 @@ class TwoD_Analysis(MeasurementAnalysis):
         self.ax_array = []
 
         for i, meas_vals in enumerate(self.measured_values):
+            kw["zlabel"] = kw.get("zlabel", self.value_names[i])
+            kw["z_unit"] = kw.get("zlabel", self.value_units[i])
+
             if filtered:
                 # print(self.measured_values)
                 # print(self.value_names)
@@ -6742,7 +7446,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                                      y_name=self.parameter_names[1],
                                      y_unit=self.parameter_units[1],
                                      log=linecut_log,
-                                     zlabel=self.zlabels[i],
+                                     # zlabel=self.zlabels[i],
                                      fig=fig, ax=ax, **kw)
                 ax.set_title(fig_title)
                 set_xlabel(ax, self.parameter_names[0],
@@ -6772,21 +7476,29 @@ class TwoD_Analysis(MeasurementAnalysis):
                 kw["xlabel"] = self.parameter_names[0]
             if "ylabel" not in kw:
                 kw["ylabel"] = self.parameter_names[1]
+
             if "xunit" not in kw:
                 kw["xunit"] = self.parameter_units[0]
             if "yunit" not in kw:
                 kw["yunit"] = self.parameter_units[1]
 
+            # subtract mean from each row/column if demanded
+            plot_zvals = meas_vals.transpose()
+            if subtract_mean_x:
+                plot_zvals = plot_zvals - np.mean(plot_zvals, axis=1)[:, None]
+            if subtract_mean_y:
+                plot_zvals = plot_zvals - np.mean(plot_zvals, axis=0)[None, :]
+
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
-                               z=meas_vals.transpose(),
-                               zlabel=self.zlabels[i],
+                               z=plot_zvals,
+                               # zlabel=self.zlabels[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
                                transpose=transpose,
                                normalize=normalize,
                                **kw)
-            ax.set_title(fig_title)
+
             # set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
             # set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
 
@@ -6863,7 +7575,7 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def run_default_analysis(self, f01=None, f12=None,
                              amp_lims=[None, None], line_color='k',
-                             phase_lims=[-180, 180], **kw):
+                             phase_lims=[None, None], **kw):
         self.get_naming_and_values_2D()
         # figsize wider for colorbar
         fig1, ax1 = self.default_ax(figsize=(8, 5))
@@ -6885,13 +7597,14 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
         # figsize wider for colorbar
         fig2, ax2 = self.default_ax(figsize=(8, 5))
         fig2_title = self.timestamp_string + self.measurementstring + '_' + 'Phase'
+        if (measured_phases>170).any() and (measured_phases<-170).any():
+            measured_phases = np.mod(measured_phases, 360)
         a_tools.color_plot(x=self.sweep_points,
                            y=self.sweep_points_2D,
                            z=measured_phases.transpose(),
                            xlabel=self.xlabel,
                            ylabel=self.ylabel,
                            zlabel=self.zlabels[1],
-                           clim=phase_lims,
                            plot_title=fig2_title,
                            fig=fig2, ax=ax2)
 
@@ -6970,8 +7683,9 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
     # super(self.__class__, self).run_default_analysis(close_file=False,
     #     save_fig=False, **kw)
     # close_file = kw.pop('close_file', True)
-    def run_default_analysis(self, normalize=True, plot_Q=True, plot_f0=True, plot_linecuts=True,
-                             linecut_log=True, plot_all=False, save_fig=True,
+    def run_default_analysis(self, normalize=True, plot_Q=True, plot_f0=True,
+                             plot_linecuts=True, linecut_log=True,
+                             plot_all=False, save_fig=True, use_min=False,
                              **kw):
         close_file = kw.pop('close_file', True)
         self.add_analysis_datagroup_to_file()
@@ -6982,15 +7696,37 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
         fits = {}  # Dictionary to store the fit results in. Fit results are a
         # dictionary themselfes -> Dictionary of Dictionaries
 
+        f0 = np.zeros(len(self.sweep_points_2D))
         for u, power in enumerate(self.sweep_points_2D):
             fit_res = self.fit_hanger_model(
                 self.sweep_points, self.measured_values[0][:, u])
             self.save_fitted_parameters(
                 fit_res, var_name='Powersweep' + str(u))
             fits[str(power)] = fit_res
+            if use_min:
+                min_index = np.argmin(self.measured_values[0][:, u])
+                f0[u] = np.min(self.sweep_points[min_index])
+            else:
+                f0[u] = fits[str(power)].values['f0']
+            self.f0 = f0
+
         self.fit_results = fits
 
+        xlabel = kw.pop("xlabel", self.sweep_name)
+        ylabel = kw.pop("ylabel", self.sweep_name_2D)
+        x_unit = kw.pop("x_unit", self.sweep_unit)
+        y_unit = kw.pop("y_unit", self.sweep_unit_2D)
+        z_unit_linecuts = self.value_units[0]
+
         for i, meas_vals in enumerate(self.measured_values):
+            if "zlabel" not in kw:
+                kw["zlabel"] = self.value_names[i]
+            if "z_unit" not in kw:
+                if normalize:
+                    kw["z_unit"] = 'normalized'
+                else:
+                    kw["z_unit"] = self.value_units[i]
+
             if (not plot_all) & (i >= 1):
                 break
             # Linecuts are above because normalization changes the values of the
@@ -7014,17 +7750,14 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                     self.sweep_points_2D, Qc, 'green', label='Coupling Q-Factor')
                 ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
                 ax.set_position([0.1, 0.1, 0.5, 0.8])
-                ax.set_ylabel('Quality Factor')
-                ax.set_xlabel('Power [dBm]')
+                set_ylabel(ax, 'Quality Factor')
+                set_xlabel(ax, ylabel, y_unit)
 
                 if save_fig:
                     self.save_fig(
                         fig, figname=fig_title, fig_tight=False, **kw)
 
             if plot_f0:
-                f0 = np.zeros(len(self.sweep_points_2D))
-                for u, power in enumerate(self.sweep_points_2D):
-                    f0[u] = self.fit_results[str(power)].values['f0']
                 fig, ax = self.default_ax(figsize=(8, 5))
                 self.fig_array.append(fig)
                 self.ax_array.append(ax)
@@ -7032,12 +7765,12 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                     timestamp=self.timestamp_string,
                     measurement=self.measurementstring,
                     val_name=self.zlabels[i])
-                ax.plot(
-                    self.sweep_points_2D, f0, 'blue', label='Cavity Frequency')
+                ax.plot(self.sweep_points_2D, f0, 'blue', marker='o',
+                        label='Cavity Frequency')
                 ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
                 ax.set_position([0.15, 0.1, 0.5, 0.8])
-                ax.set_ylabel('Frequency [GHz]')
-                ax.set_xlabel('Power [dBm]')
+                set_ylabel(ax, xlabel, x_unit)
+                set_xlabel(ax, ylabel, y_unit)
 
                 if save_fig:
                     self.save_fig(
@@ -7055,11 +7788,12 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                                      y=self.sweep_points_2D,
                                      z=self.measured_values[i],
                                      plot_title=fig_title,
-                                     xlabel=self.xlabel,
-                                     y_name=self.sweep_name_2D,
-                                     y_unit=self.sweep_unit_2D,
                                      log=linecut_log,
-                                     zlabel=self.zlabels[i],
+                                     xlabel=xlabel,
+                                     x_unit=x_unit,
+                                     y_name=ylabel,
+                                     y_unit=y_unit,
+                                     z_unit_linecuts=z_unit_linecuts,
                                      fig=fig, ax=ax, **kw)
                 if save_fig:
                     self.save_fig(
@@ -7079,15 +7813,46 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
                                plot_title=fig_title,
-                               xlabel=self.xlabel,
-                               ylabel=self.ylabel,
-                               zlabel=self.zlabels[i],
+                               xlabel=xlabel,
+                               x_unit=x_unit,
+                               ylabel=ylabel,
+                               y_unit=y_unit,
                                fig=fig, ax=ax, **kw)
             if save_fig:
                 self.save_fig(fig, figname=fig_title, **kw)
 
         if close_file:
             self.finish()
+
+        # Find low power regime
+        threshold = 0.1e6  # Gotta love hardcoded stuff
+        f_low = f0[0]
+        P_result = self.sweep_points_2D[0]
+        try:
+            for u, f in enumerate(f0):
+                if np.abs(f0[0] - f0[u+1]) < threshold:
+                    f_low = f0[u+1]
+                    P_result = self.sweep_points_2D[u]
+                else:
+                    break
+        except IndexError:
+            pass
+
+        # High power regime: just use the value at highest power
+        f_high = f0[-1]
+
+        if (f_high < f_low):
+            shift = f_high - f_low
+        else:
+            shift = 0
+            logging.warning('No power shift found. Consider attenuation')
+            # raise Exception('High power regime frequency found to be higher than'
+            #                 'low power regime frequency')
+
+        self.f_low = f_low
+        self.f_high = f_high
+        self.shift = shift
+        self.power = P_result
 
     def fit_hanger_model(self, sweep_values, measured_values):
         HangerModel = fit_mods.SlopedHangerAmplitudeModel
@@ -7758,12 +8523,23 @@ class DoubleFrequency(TD_Analysis):
         kw['h5mode'] = 'r+'
         super().__init__(**kw)
 
-    def run_default_analysis(self, **kw):
+    def run_default_analysis(self,close_file=False, **kw):
+        super().run_default_analysis(
+            close_file=close_file,
+            close_main_figure=True, save_fig=True, **kw)
+
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
         x = self.sweep_points
-        y = a_tools.normalize_data_v3(self.measured_values[0])
+        #y1 are the correct TwoD normalized points
+        #y2 is the 1D normalized points, so worse fit
+        y1 = self.normalized_data_points
+        y2 = a_tools.normalize_data_v3(self.measured_values[0])
 
+        y=y2
+        #TODO:Include the calibration points
+        #TODO: implement prony's method and see if it's better
+        y[:-4] = y1
         fit_res = self.fit(x[:-4], y[:-4])
         self.fit_res = fit_res
 
@@ -7772,18 +8548,24 @@ class DoubleFrequency(TD_Analysis):
         fig, ax = plt.subplots()
         self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
 
-        f1 = fit_res.params['freq_1'].value
-        f2 = fit_res.params['freq_2'].value
-        A1 = fit_res.params['amp_1'].value
-        A2 = fit_res.params['amp_2'].value
-        tau1 = fit_res.params['tau_1'].value
-        tau2 = fit_res.params['tau_2'].value
+        fs = [fit_res.params['freq_1'].value, fit_res.params['freq_2'].value]
+        As = [fit_res.params['amp_1'].value, fit_res.params['amp_2'].value]
+        taus = [fit_res.params['tau_1'].value, fit_res.params['tau_2'].value]
+        min_index=fs.index(np.min(fs))
+        max_index=fs.index(np.max(fs))
+        self.f1=fs[min_index]
+        self.f2=fs[max_index]
+        self.A1=As[min_index]
+        self.A2=As[max_index]
+        self.tau1=taus[min_index]
+        self.tau2=taus[max_index]
 
-        textstr = ('$A_1$: {:.3f}       \t$A_2$: {:.3f} \n'.format(A1, A2) +
+
+        textstr = ('$A_1$: {:.3f}       \t$A_2$: {:.3f} \n'.format(self.A1, self.A2) +
                    '$f_1$: {:.3f} MHz\t$f_2$: {:.3f} MHz \n'.format(
-                       f1 * 1e-6, f2 * 1e-6) +
-                   r'$\tau _1$: {:.2f} $\mu$s'.format(tau1 * 1e6) +
-                   '  \t' + r'$\tau _2$: {:.2f}$\mu$s'.format(tau2 * 1e6))
+                       self.f1 * 1e-6, self.f2 * 1e-6) +
+                   r'$\tau _1$: {:.2f} $\mu$s'.format(self.tau1 * 1e6) +
+                   '  \t' + r'$\tau _2$: {:.2f}$\mu$s'.format(self.tau2 * 1e6))
 
         ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
@@ -7793,7 +8575,7 @@ class DoubleFrequency(TD_Analysis):
         ax.set_ylabel(r'$F |1\rangle$')
         ax.set_title('%s: Double Frequency analysis' % self.timestamp)
         ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x * 1e6, y, 'o')
+        ax.plot(plot_x * 1e6, y, 'o-')
         ax.plot(plot_x[:-4] * 1e6, self.fit_plot, '-')
         fig.tight_layout()
         self.save_fig(fig, **kw)
@@ -7802,30 +8584,123 @@ class DoubleFrequency(TD_Analysis):
 
     def fit(self, sweep_values, measured_values):
         Double_Cos_Model = fit_mods.DoubleExpDampOscModel
+        dt= sweep_values[2]-sweep_values[1]
+        zero_mean_values = measured_values-np.mean(measured_values)
         fourier_max_pos = a_tools.peak_finder_v2(
             np.arange(1, len(sweep_values) / 2, 1),
-            abs(np.fft.fft(measured_values))[1:len(measured_values) // 2],
+            abs(np.fft.fft(zero_mean_values))[1:len(zero_mean_values) // 2],
             window_len=1, perc=95)
-        if len(fourier_max_pos) == 1:
-            freq_guess = 1. / sweep_values[-1] * \
-                (fourier_max_pos[0] + np.array([-1, 1]))
+        if (len(fourier_max_pos)==0):
+            print('No strong peak found, trying again')
+            fourier_max_pos = a_tools.peak_finder_v2(
+                np.arange(1, len(sweep_values) / 2, 1),
+                abs(np.fft.fft(zero_mean_values))[1:len(zero_mean_values) // 2],
+                window_len=1, perc=75)
+
+        # if fourier_max_pos was one the above statement mocks it.
+        if len(fourier_max_pos) == 1: #One peak found
+            fmin = 1./sweep_values[-1]*\
+                (fourier_max_pos[0] - 10)
+            fmax = 1./sweep_values[-1]*\
+                (fourier_max_pos[0] + 10)
         else:
-            freq_guess = 1. / sweep_values[-1] * fourier_max_pos
+            fourier_max_pos = fourier_max_pos[0:2]
+            fmin = 1./sweep_values[-1]*\
+                (np.min(fourier_max_pos) - 10)
+            fmax = 1./sweep_values[-1]*\
+                (np.max(fourier_max_pos) + 10)
+        #Do a ZoomFFT
+        if (fmin<0):
+            fmin = 0
+        [chirp_x, chirp_y] = a_tools.zoom_fft(sweep_values,zero_mean_values,
+                                              fmin,fmax)
+        fourier_max_pos = a_tools.peak_finder_v2(
+            np.arange(0,len(chirp_x)),
+            np.abs(chirp_y),
+            window_len=1, perc=85)
+        #Now do Bertocco's algorithm
+        #From [Metrology and Measurement Systems] Frequency and Damping Estimation Methods - An Overview.pdf
+        only_one_peak = False
+        if (len(fourier_max_pos)==1): #If there is still only one peak
+            print('Only one strong frequency found: not a Double Frequency?')
+            only_one_peak = True
+        else:
+            fourier_max_pos = fourier_max_pos[0:2]
+
+        freq_guess = chirp_x[fourier_max_pos]
+        n_shift =min(6,len(chirp_y)-1-max(fourier_max_pos))
+
+        Ratio = chirp_y[fourier_max_pos]/chirp_y[fourier_max_pos+n_shift]
+        Omega_freq = 2*np.pi*dt*freq_guess
+        dOmega_freq = 2*np.pi*dt*(chirp_x[fourier_max_pos + n_shift]-chirp_x[fourier_max_pos])
+        expvalue_res = np.exp(1j*Omega_freq)*(Ratio-1)/(Ratio*np.exp(-1j*dOmega_freq)-1)
+        #    freq_guess= np.imag(np.log(lambda_result))/(2*np.pi*dt)
+        tau_guess= dt/np.real(np.log(expvalue_res))
+        # Now get A and phi from a leastsqrs fit since we know f and tau
+        # See article above for more information
+
+        while (any(np.array(tau_guess)<0) and n_shift>=2):
+            if (n_shift>=3):
+                n_shift -=2
+            else:
+                n_shift -=1
+            Ratio = chirp_y[fourier_max_pos]/chirp_y[fourier_max_pos+n_shift]
+            Omega_freq = 2*np.pi*dt*freq_guess
+            dOmega_freq = 2*np.pi*dt*(chirp_x[fourier_max_pos + n_shift]-chirp_x[fourier_max_pos])
+            expvalue_res = np.exp(1j*Omega_freq)*(Ratio-1)/(Ratio*np.exp(-1j*dOmega_freq)-1)
+            #    freq_guess= np.imag(np.log(lambda_result))/(2*np.pi*dt)
+            tau_guess= dt/np.real(np.log(expvalue_res))
+        if (only_one_peak):
+            expvals = np.array([2j*np.pi*freq_guess[0] - 1/tau_guess[0],-2j*np.pi*freq_guess[0] - 1/tau_guess[0], 0.])
+            E = np.zeros((len(measured_values),3),dtype=complex)
+            for ii in range(len(measured_values)):
+                for jj in range(3):
+                    E[ii,:]=np.exp(expvals*sweep_values[ii])
+            # FIXME: when using numpy >1.14 we should change to rcond=None
+            coeff = np.linalg.lstsq(E, measured_values, rcond=-1)[0]
+            amp_guess = 2*np.abs(coeff[[0]])
+            phi_guess = np.angle(coeff[[0]])
+        else:
+            expvals = np.array([2j*np.pi*freq_guess[0] - 1/tau_guess[0],-2j*np.pi*freq_guess[0] - 1/tau_guess[0],
+               2j*np.pi*freq_guess[1] - 1/tau_guess[1],-2j*np.pi*freq_guess[1] - 1/tau_guess[1],0.])
+            E = np.zeros((len(measured_values),5),dtype=complex)
+            for ii in range(len(measured_values)):
+                for jj in range(5):
+                    E[ii,:]=np.exp(expvals*sweep_values[ii])
+            # FIXME: when using numpy >1.14 we should change to rcond=None
+            coeff = np.linalg.lstsq(E, measured_values, rcond=-1)[0]
+            amp_guess = 2*np.abs(coeff[[0,2]])
+            phi_guess = np.angle(coeff[[0,2]])
+
         Double_Cos_Model.set_param_hint(
-            'tau_1', value=.3 * sweep_values[-1], vary=True)
-        Double_Cos_Model.set_param_hint(
-            'tau_2', value=.3 * sweep_values[-1], vary=True)
+            'tau_1', value=tau_guess[0], vary=True, min=0, max=6*tau_guess[0])
         Double_Cos_Model.set_param_hint(
             'freq_1', value=freq_guess[0], min=0)
-        Double_Cos_Model.set_param_hint(
-            'freq_2', value=freq_guess[1], min=0)
-        Double_Cos_Model.set_param_hint('phase_1', value=1 * np.pi / 2.)
-        Double_Cos_Model.set_param_hint('phase_2', value=3 * np.pi / 2.)
-        Double_Cos_Model.set_param_hint(
-            'amp_1', value=0.25, min=0.1, max=0.4, vary=True)
-        Double_Cos_Model.set_param_hint(
-            'amp_2', value=0.25, min=0.1, max=0.4, vary=True)
+        Double_Cos_Model.set_param_hint('phase_1', value=phi_guess[0])
         Double_Cos_Model.set_param_hint('osc_offset', value=0.5, min=0, max=1)
+        if (only_one_peak):
+            Double_Cos_Model.set_param_hint(
+                'tau_2', value=0, vary=False, min=0)
+            Double_Cos_Model.set_param_hint(
+                'freq_2', value=0, vary=False)
+            Double_Cos_Model.set_param_hint('phase_2', value=0, vary=False)
+            Double_Cos_Model.set_param_hint(
+                'amp_1', value=amp_guess[0], min=0.05, max=0.8, vary=True)
+            Double_Cos_Model.set_param_hint(
+                'amp_2', value=0, vary=False)
+
+        else:
+            Double_Cos_Model.set_param_hint(
+                'tau_2', value=tau_guess[1], vary=True, min=0, max=6*tau_guess[1])
+            Double_Cos_Model.set_param_hint(
+                'freq_2', value=freq_guess[1], min=0)
+            Double_Cos_Model.set_param_hint('phase_2', value=phi_guess[1])
+
+            Double_Cos_Model.set_param_hint(
+                'amp_1', value=amp_guess[0], min=0.05, max=1.1, vary=True)
+            Double_Cos_Model.set_param_hint(
+                'amp_2', value=amp_guess[1], min=0.05, max=1.1, vary=True)
+
         params = Double_Cos_Model.make_params()
         fit_res = Double_Cos_Model.fit(data=measured_values,
                                        t=sweep_values,
@@ -7841,10 +8716,7 @@ class DoubleFrequency(TD_Analysis):
         if type(plot_formats) == str:
             plot_formats = [plot_formats]
         for plot_format in plot_formats:
-            if figname is None:
-                figname = (self.timestamp + figname + '.' + plot_format)
-            else:
-                figname = (figname + '.' + plot_format)
+            figname = (self.timestamp_string + figname + '.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
                 self.folder, figname))
             if fig_tight:
@@ -7857,8 +8729,9 @@ class DoubleFrequency(TD_Analysis):
                     self.savename, dpi=300,
                     # value of 300 is arbitrary but higher than default
                     format=plot_format)
-            except:
+            except Exception:
                 fail_counter = True
+                print('Could not save to '+str(self.savename))
         if fail_counter:
             logging.warning('Figure "%s" has not been saved.' % self.savename)
         if close_fig:
@@ -7957,6 +8830,7 @@ class SWAPN_cost(object):
                 figname = (figname + '.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
                 self.folder, figname))
+
             if fig_tight:
                 try:
                     fig.tight_layout()
@@ -7997,28 +8871,33 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                  xlabel=None, ylabel='Frequency (GHz)',
                  weight_function_magn=0,
                  use_distance=True,
+                 quadratures=None,
+                 blur=None,
                  **kw):
         super().__init__(timestamp=timestamp, label=label, **kw)
         self.get_naming_and_values_2D()
-        measured_magns = np.transpose(
-            self.measured_values[weight_function_magn])
-        measured_phases = np.transpose(
-            self.measured_values[1+weight_function_magn])
-        rad = [(i * np.pi/180) for i in measured_phases]
-        real = [measured_magns[j] * np.cos(i) for j, i in enumerate(rad)]
-        imag = [measured_magns[j] * np.sin(i) for j, i in enumerate(rad)]
-        dists = [a_tools.calculate_distance_ground_state(
-            real[i], imag[i], normalize=True) for i in range(len(real))]
+        if quadratures is not None:
+            real = np.transpose(self.measured_values[quadratures[0]])
+            imag = np.transpose(self.measured_values[quadratures[1]])
+        else:
+            measured_magns = np.transpose(self.measured_values[weight_function_magn])
+            measured_phases = np.transpose(self.measured_values[1+weight_function_magn])
+            rad = [(i * np.pi/180) for i in measured_phases]
+            real = [measured_magns[j] * np.cos(i) for j, i in enumerate(rad)]
+            imag = [measured_magns[j] * np.sin(i) for j, i in enumerate(rad)]
+        dists = [a_tools.calculate_distance_ground_state(real[i],imag[i], normalize=True) for i in range(len(real))]
 
         self.S21dist = dists
         if use_distance:
-            self.Z[0] = np.array(self.S21dist)
+            self.Z[0]=np.array(self.S21dist)
+        if blur is not None:
+            self.Z[0] = gaussian_filter(self.Z[0], blur)
         flux = self.Y[:, 0]
         self.make_raw_figure(transpose=transpose, cmap=cmap,
                              add_title=add_title,
                              xlabel=xlabel, ylabel=ylabel)
 
-        self.peaks_low, self.peaks_high = self.find_peaks()
+        self.peaks_low, self.peaks_high = self.find_peaks(**kw)
         self.f, self.ax = self.make_unfiltered_figure(self.peaks_low, self.peaks_high,
                                                       transpose=transpose, cmap=cmap,
                                                       add_title=add_title,
@@ -8065,7 +8944,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
         peaks = np.zeros((len(self.X), 2))
         for i in range(len(self.X)):
-            p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i])
+            p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i], **kw)
             peaks[i, :] = np.sort(p_dict[:2])
 
         peaks_low = peaks[:, 0]
@@ -8285,11 +9164,13 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         if f1_guess is None:
             f1_guess = np.mean(total_freqs) - g_guess
 
-        c2_guess = (f2_guess - f1_guess) / cross_flux_guess
         if f2_guess is None:
             # The factor *1000* is a magic number but seems to give a
             # reasonable guess that converges well.
             c1_guess = -1 * ((max(total_freqs) - min(total_freqs)) /
+                             (max(total_flux) - min(total_flux))) / 1000
+
+            c2_guess = 1 * ((max(total_freqs) - min(total_freqs)) /
                              (max(total_flux) - min(total_flux))) / 1000
 
             f2_guess = cross_flux_guess * (c1_guess - c2_guess) + f1_guess
@@ -9054,7 +9935,8 @@ def time_domain_DAC_scan_analysis_and_plot(**kwargs):
 def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                            predistort=True, plot=True, timestamp_ground=None,
                            timestamp_excited=None, close_fig=True,
-                           optimization_window=None, post_rotation_angle=None):
+                           optimization_window=None, post_rotation_angle=None,
+                           plot_max_time=4096/1.8e9):
     data_file = MeasurementAnalysis(
         label='_0', auto=True, TwoD=False, close_fig=True, timestamp=timestamp_ground)
     temp = data_file.load_hdf5data()
@@ -9146,8 +10028,9 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
     if plot:
         fig, ax = plt.subplots()
-        plt.plot(x, I0, label='I ground')
-        plt.plot(x, I1, label='I excited')
+        time = np.arange(0, len(weight_I) / 1.8, 1/1.8)
+        plt.plot(time, I0, label='I ground')
+        plt.plot(time, I1, label='I excited')
         ax.set_ylim(-edge, edge)
 
         plt.title('Demodulated I')
@@ -9158,7 +10041,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
             plt.axvline(optimization_start * 1e9, linestyle='--',
                         color='k', label='depletion optimization window')
             plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
-        ax.set_xlim(0, 1500)
+        ax.set_xlim(0, plot_max_time*1e9)
         plt.legend()
 
         plt.savefig(data_file.folder + '\\' +
@@ -9166,8 +10049,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         plt.close()
 
         fig, ax = plt.subplots()
-        plt.plot(x, Q0, label='Q ground')
-        plt.plot(x, Q1, label='Q excited')
+        plt.plot(time, Q0, label='Q ground')
+        plt.plot(time, Q1, label='Q excited')
         ax.set_ylim(-edge, edge)
         plt.title('Demodulated Q')
         plt.xlabel('time (ns)')
@@ -9176,7 +10059,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
             plt.axvline(optimization_start * 1e9, linestyle='--',
                         color='k', label='depletion optimization window')
             plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
-        ax.set_xlim(0, 1500)
+        ax.set_xlim(0, plot_max_time*1e9)
         plt.legend()
 
         plt.savefig(data_file.folder + '\\' +
@@ -9184,13 +10067,13 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         plt.close()
 
         fig, ax = plt.subplots()
-        plt.plot(x, power0 * 1e6, label='ground', lw=4)
-        plt.plot(x, power1 * 1e6, label='excited', lw=4)
+        plt.plot(time, power0 * 1e6, label='ground', lw=4)
+        plt.plot(time, power1 * 1e6, label='excited', lw=4)
         if optimization_window != None:
             plt.axvline(optimization_start * 1e9, linestyle='--',
                         color='k', label='depletion optimization window')
             plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
-        ax.set_xlim(0, 1500)
+        ax.set_xlim(0, plot_max_time*1e9)
         plt.title('Signal power (uW)')
         plt.ylabel('Signal power (uW)')
 
@@ -9315,7 +10198,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.savefig(data_file.folder + '\\' + 'IQ_trajectory_weights')
     plt.close()
 
-    time = np.linspace(0, len(weight_I) / 1.8, len(weight_I))
+    time = np.arange(0, len(weight_I) / 1.8, 1/1.8)
     fig, ax = plt.subplots()
     plt.plot(time, weight_I, label='weight I')
     plt.plot(time, weight_Q, label='weight Q')
@@ -9330,7 +10213,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.title('weight functions_' + data_file.timestamp_string)
     plt.axhline(0, linestyle='--')
     edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
-
+    ax.set_xlim(0, plot_max_time*1e9)
     plt.savefig(data_file.folder + '\\' + 'weight_functions.' +
                 fig_format, format=fig_format)
     plt.close()
@@ -9343,8 +10226,6 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
 
 # analysis functions
-
-
 def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True):
     # predistortion_matrix = np.array(
     #     ((1,  np.tan(phi*2*np.pi/360)),
