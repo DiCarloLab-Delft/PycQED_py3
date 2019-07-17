@@ -7707,7 +7707,7 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                 min_index = np.argmin(self.measured_values[0][:, u])
                 f0[u] = np.min(self.sweep_points[min_index])
             else:
-                f0[u] = fits[str(power)].values['f0'] 
+                f0[u] = fits[str(power)].values['f0']
             self.f0 = f0
 
         self.fit_results = fits
