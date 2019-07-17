@@ -106,10 +106,10 @@ class DeviceCCL(Instrument):
             parameter_class=InstrumentRefParameter)
 
 
-        for i in range(3): # S17 has 3 feedlines 
+        for i in range(3): # S17 has 3 feedlines
             self.add_parameter('instr_acq_{}'.format(i),
                                parameter_class=InstrumentRefParameter)
-        # Two microwave AWGs are used for S17 
+        # Two microwave AWGs are used for S17
         self.add_parameter('instr_AWG_mw_0',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_AWG_mw_1',
@@ -246,13 +246,13 @@ class DeviceCCL(Instrument):
         """
         Responsible for ensuring timing is configured correctly.
 
-        Takes parameters starting with `tim_` and uses them to set the correct 
+        Takes parameters starting with `tim_` and uses them to set the correct
         latencies on the DIO ports of the CCL or QCC.
 
-        N.B. latencies are set in multiples of 20ns in the DIO. 
-        Latencies shorter than 20ns are set as channel delays in the AWGs. 
+        N.B. latencies are set in multiples of 20ns in the DIO.
+        Latencies shorter than 20ns are set as channel delays in the AWGs.
         These are set globablly. If individual (per channel) setting of latency
-        is required in the future, we can add this. 
+        is required in the future, we can add this.
 
         """
         # 2. Setting the latencies
@@ -274,8 +274,8 @@ class DeviceCCL(Instrument):
         for key, val in latencies.items():
             latencies[key] = val - lowest_value
 
-        # ensuring that RO latency is a multiple of 20 ns as the UHFQC does 
-        # not have a fine timing control. 
+        # ensuring that RO latency is a multiple of 20 ns as the UHFQC does
+        # not have a fine timing control.
         ro_latency_modulo_20 = latencies['ro_0'] % 20e-9
         for key, val in latencies.items():
             latencies[key] = val + (20e-9 - ro_latency_modulo_20) % 20e-9
@@ -289,18 +289,18 @@ class DeviceCCL(Instrument):
         for lat_key, dio_ch in dio_map.items():
             lat = latencies[lat_key]
             lat_coarse = int(lat*1e9 // 20)  # Convert to CC dio value
-            lat_fine = int(lat*1e9 % 20)*1e-9 
-            CC.set('dio{}_out_delay'.format(dio_ch), lat_coarse)  
+            lat_fine = int(lat*1e9 % 20)*1e-9
+            CC.set('dio{}_out_delay'.format(dio_ch), lat_coarse)
 
-            # RO devices do not support fine delay setting. 
-            if 'mw' in lat_key or 'flux' in lat_key: 
+            # RO devices do not support fine delay setting.
+            if 'mw' in lat_key or 'flux' in lat_key:
                 # Check name to prevent crash when instrument not specified
                 AWG_name = self.get('instr_AWG_{}'.format(lat_key))
-                if AWG_name is not None: 
+                if AWG_name is not None:
                     AWG = self.find_instrument(AWG_name)
-                    # All channels are set globally from the device object. 
-                    for i in range(8): # assumes the AWG is an HDAWG 
-                        AWG.set('sigouts_{}_delay'.format(i), lat_fine)       
+                    # All channels are set globally from the device object.
+                    for i in range(8): # assumes the AWG is an HDAWG
+                        AWG.set('sigouts_{}_delay'.format(i), lat_fine)
 
 
 
@@ -379,13 +379,13 @@ class DeviceCCL(Instrument):
 
             if self.ro_acq_digitized():
                 # Update the RO theshold
-                if (qb.ro_acq_rotated_SSB_when_optimal() and 
+                if (qb.ro_acq_rotated_SSB_when_optimal() and
                         abs(qb.ro_acq_threshold())>32):
                     threshold = 32
-                    # working around the limitation of threshold in UHFQC 
-                    # which cannot be >abs(32). 
+                    # working around the limitation of threshold in UHFQC
+                    # which cannot be >abs(32).
                     # See also self._prep_ro_integration_weights scaling the weights
-                else: 
+                else:
                     threshold = qb.ro_acq_threshold()
                 acq_ch = qb.ro_acq_weight_chI()
                 qb.instr_acquisition.get_instr().set(
@@ -425,11 +425,11 @@ class DeviceCCL(Instrument):
         int_log_dets=[]
         for j, acq_instrument in enumerate(np.unique(acq_instruments)):
             #selecting the readout channesl for  each acq instrument
-            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
+            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
-            if j == 0: 
+            if j == 0:
                 CC=self.instr_CC.get_instr()
-            else: 
+            else:
                 CC = None
 
             UHFQC = self.find_instrument(acq_instrument)
@@ -438,7 +438,7 @@ class DeviceCCL(Instrument):
                 channels=ro_ch_idx_instr,
                 result_logging_mode=result_logging_mode,
                 integration_length=self.ro_acq_integration_length()))
-        self.int_log_det = det.Multi_Detector(detectors=int_log_dets)
+        self.int_log_det = det.Multi_Detector_UHF(detectors=int_log_dets)
         self.int_log_det.value_names = value_names
         return self.int_log_det
 
@@ -495,17 +495,17 @@ class DeviceCCL(Instrument):
                 result_logging_mode = 'digitized'
         else:
             result_logging_mode = 'raw'
-        
+
         input_average_detectors=[]
         int_avg_det_singles=[]
 
         for j, acq_instrument in enumerate(np.unique(acq_instruments)):
             #selecting the readout channesl for  each acq instrument
-            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
+            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
-            if j == 0: 
+            if j == 0:
                 CC=self.instr_CC.get_instr()
-            else: 
+            else:
                 CC = None
 
             UHFQC = self.find_instrument(acq_instrument)
@@ -523,9 +523,9 @@ class DeviceCCL(Instrument):
                 real_imag=True, single_int_avg=True,
                 integration_length=self.ro_acq_integration_length()))
 
-        self.input_average_detector = det.Multi_Detector(detectors=input_average_detectors)
-        self.int_avg_det_single = det.Multi_Detector(detectors=int_avg_det_singles)
-        
+        self.input_average_detector = det.Multi_Detector_UHF(detectors=input_average_detectors)
+        self.int_avg_det_single = det.Multi_Detector_UHF(detectors=int_avg_det_singles)
+
         self.int_avg_det = self.get_int_avg_det(qubits=qubits)
         self.int_avg_det.value_names = value_names
         self.int_avg_det_single.value_names = value_names
@@ -551,11 +551,11 @@ class DeviceCCL(Instrument):
 
         for j, acq_instrument in enumerate(np.unique(acq_instruments)):
             #selecting the readout channesl for  each acq instrument
-            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]          
+            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]
             ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
-            if j == 0: 
+            if j == 0:
                 CC=self.instr_CC.get_instr()
-            else: 
+            else:
                 CC = None
 
             int_avg_dets.append(det.UHFQC_integrated_average_detector(
@@ -565,7 +565,7 @@ class DeviceCCL(Instrument):
                 result_logging_mode=result_logging_mode,
                 nr_averages=self.ro_acq_averages(),
                 integration_length=self.ro_acq_integration_length(), **kw))
-        int_avg_det = det.Multi_Detector(detectors=int_avg_dets)
+        int_avg_det = det.Multi_Detector_UHF(detectors=int_avg_dets)
         return int_avg_det
 
     def _prep_ro_sources(self, qubits):
@@ -921,7 +921,7 @@ class DeviceCCL(Instrument):
         Perform AllXY measurement simultaneously of two qubits (c.f. measure_allxy
         method of the Qubit class). Order in which the mw pulses are executed
         can be varied.
-        
+
         For detailed description of the (single qubit) AllXY measurement
         and symptomes of different errors see PhD thesis
         by Matthed Reed (2013, Schoelkopf lab), pp. 124.
@@ -1000,7 +1000,7 @@ class DeviceCCL(Instrument):
         d = self.get_int_logging_detector(qubits=[qA],
                                           result_logging_mode='lin_trans')
         # d.nr_shots = 4088  # To ensure proper data binning
-        # Because we are using a multi-detector 
+        # Because we are using a multi-detector
         d.set_child_attr('nr_shots', 4088)
 
         old_soft_avg = MC.soft_avg()
@@ -1569,7 +1569,7 @@ class DeviceCCL(Instrument):
 
         if max_delay == 'auto':
             max_delay = np.max(times) + 40e-9
- 
+
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
         if waveform_name == 'square':
@@ -1613,13 +1613,13 @@ class DeviceCCL(Instrument):
 
         After measuting the pattern use ma2.Timing_Cal_Flux_Fine with manually
         chosen parameters to match the drawn line to the measured patern.
-        
+
         Args:
             q0  (str)     :
                 name of the target qubit
             flux_latencies   (array):
                 array of flux latencies to set (in seconds)
-            microwave_latencies (array): 
+            microwave_latencies (array):
                 array of microwave latencies to set (in seconds)
 
             label (str):
@@ -1627,7 +1627,7 @@ class DeviceCCL(Instrument):
 
             prepare_for_timedomain (bool):
                 calls self.prepare_for_timedomain on start
-        """ 
+        """
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1639,9 +1639,9 @@ class DeviceCCL(Instrument):
 
         CC = self.instr_CC.get_instr()
 
-        # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 80ns 
+        # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 80ns
         p = sqo.FluxTimingCalibration(q0idx,
-                              times=[40e-9], 
+                              times=[40e-9],
                               platf_cfg=self.cfg_openql_platform_fn(),
                               cal_points=False)
         CC.eqasm_program(p.filename)
@@ -1661,7 +1661,7 @@ class DeviceCCL(Instrument):
         ma2.Timing_Cal_Flux_Fine(ch_idx=0, close_figs=False,
                                ro_latency=-100e-9,
                                flux_latency=0,
-                               flux_pulse_duration=10e-9, 
+                               flux_pulse_duration=10e-9,
                                mw_pulse_separation=80e-9)
 
 
@@ -1936,7 +1936,7 @@ class DeviceCCL(Instrument):
                 By default it checks whether the needed sequences were already
                 generated since the most recent change of OpenQL file
                 specified in self.cfg_openql_platform_fn
-            
+
             cal_points (bool):
                 should aclibration point (qubits in 0 and 1 states)
                 be included in the measurement
@@ -2017,10 +2017,10 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        # Using the first detector of the multi-detector as this is 
+        # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
-        d.set_prepare_function(oqh.load_range_of_oql_programs, 
-                               prepare_function_kwargs, 
+        d.set_prepare_function(oqh.load_range_of_oql_programs,
+                               prepare_function_kwargs,
                                detectors='first')
         # d.nr_averages = 128
 
@@ -2047,24 +2047,24 @@ class DeviceCCL(Instrument):
             recompile: bool ='as needed',
             flux_codeword='fl_cw_01'):
         """
-        Perform two qubit interleaved randomized benchmarking with an 
-        interleaved CZ gate. 
+        Perform two qubit interleaved randomized benchmarking with an
+        interleaved CZ gate.
         """
 
         # Perform two-qubit RB (no interleaved gate)
         self.measure_two_qubit_randomized_benchmarking(
-            qubits=qubits, MC=MC, nr_cliffords=nr_cliffords, 
-            interleaving_cliffords=[None], recompile=recompile, 
+            qubits=qubits, MC=MC, nr_cliffords=nr_cliffords,
+            interleaving_cliffords=[None], recompile=recompile,
             flux_codeword=flux_codeword, nr_seeds=nr_seeds)
 
-        # Perform two-qubit RB with CZ interleaved 
+        # Perform two-qubit RB with CZ interleaved
         self.measure_two_qubit_randomized_benchmarking(
-            qubits=qubits, MC=MC, nr_cliffords=nr_cliffords, 
-            interleaving_cliffords=[-4368], recompile=recompile, 
+            qubits=qubits, MC=MC, nr_cliffords=nr_cliffords,
+            interleaving_cliffords=[-4368], recompile=recompile,
             flux_codeword=flux_codeword, nr_seeds=nr_seeds)
 
         ma2.InterleavedRandomizedBenchmarkingAnalysis(
-            ts_base=None, ts_int=None, 
+            ts_base=None, ts_int=None,
             label_base='icl[None]', label_int='icl[-4368]')
 
 
@@ -2111,7 +2111,7 @@ class DeviceCCL(Instrument):
                 By default it checks whether the needed sequences were already
                 generated since the most recent change of OpenQL file
                 specified in self.cfg_openql_platform_fn
-            
+
             cal_points (bool):
                 should aclibration point (qubits in 0 and 1 states)
                 be included in the measurement
@@ -2194,10 +2194,10 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        # Using the first detector of the multi-detector as this is 
+        # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
-        d.set_prepare_function(oqh.load_range_of_oql_programs, 
-                               prepare_function_kwargs, 
+        d.set_prepare_function(oqh.load_range_of_oql_programs,
+                               prepare_function_kwargs,
                                detectors='first')
         # d.nr_averages = 128
 
@@ -2289,10 +2289,10 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        # Using the first detector of the multi-detector as this is 
+        # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
-        d.set_prepare_function(oqh.load_range_of_oql_programs, 
-                               prepare_function_kwargs, 
+        d.set_prepare_function(oqh.load_range_of_oql_programs,
+                               prepare_function_kwargs,
                                detectors='first')
         # d.nr_averages = 128
 
@@ -2346,7 +2346,7 @@ class DeviceCCL(Instrument):
                 By default it checks whether the needed sequences were already
                 generated since the most recent change of OpenQL file
                 specified in self.cfg_openql_platform_fn
-            
+
             cal_points (bool):
                 should aclibration point (qubits in 0 and 1 states)
                 be included in the measurement
@@ -2426,10 +2426,10 @@ class DeviceCCL(Instrument):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        # Using the first detector of the multi-detector as this is 
+        # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
-        d.set_prepare_function(oqh.load_range_of_oql_programs, 
-                               prepare_function_kwargs, 
+        d.set_prepare_function(oqh.load_range_of_oql_programs,
+                               prepare_function_kwargs,
                                detectors='first')
         # d.nr_averages = 128
 
