@@ -33,7 +33,6 @@ t_start = '20180412_190000'
 t_stop = '20180412_210000'
 
 
-
 class Test_CoherenceAnalysis_Helpers(unittest.TestCase):
     def test_calculate_n_avg(self):
         pass
@@ -64,9 +63,9 @@ class Test_CoherenceAnalysis_Helpers(unittest.TestCase):
         freqs = ca.arch(dac_vals, Ec, Ej, offset, dac0)
 
         fit_res = ca.fit_frequencies(dac_vals, freqs)
-
-        fit_res.plot_fit(show_init=True)
+        # fit_res.plot_fit(show_init=True) # For debug purposes
         pars = fit_res.params
+
         self.assertAlmostEqual(Ec, pars['Ec'].value, places=-4)
         self.assertAlmostEqual(Ej, pars['Ej'].value, places=-4)
         self.assertAlmostEqual(offset, pars['offset'].value, places=2)
@@ -97,6 +96,7 @@ class Test_PSD_Analysis(unittest.TestCase):
         self.assertAlmostEqual(sqrtA_echo,
                                -0.058470, places=4)
 
+
 class Test_CoherenceAnalysis(unittest.TestCase):
     @classmethod
     def setUpClass(self):
@@ -108,7 +108,7 @@ class Test_CoherenceAnalysis(unittest.TestCase):
         self.a = ca.CoherenceAnalysis(
             self.testdata_table,
             t_start='20181002_190542', t_stop='20181002_203700',
-            options_dict={'tag_tstamp':False, 'save_figs':False})
+            options_dict={'tag_tstamp': False, 'save_figs': False})
 
     def test_CoherenceAnalysis_quantities(self):
         self.assertAlmostEqual(self.a.proc_data_dict['sqrtA_echo']*1e6,
@@ -138,12 +138,12 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
             plot_versus_frequency=True,
             frequency_key='Instrument settings.' + qubit + '.freq_qubit')
 
-        a = ca.CoherenceTimesAnalysisSingle(t_start='20190702_160000',t_stop='20190702_235900',
-                                label='T1_D1',
-                                dac_key='Instrument settings.fluxcurrent.FBL_D1',
-                                frequency_key='Instrument settings.D1.freq_qubit',
-                                fit_T1_vs_freq=True,
-                                options_dict={'guess_mode_frequency': [6.5e9,7.1e9]})
+        a = ca.CoherenceTimesAnalysisSingle(t_start='20190702_160000', t_stop='20190702_235900',
+                                            label='T1_D1',
+                                            dac_key='Instrument settings.fluxcurrent.FBL_D1',
+                                            frequency_key='Instrument settings.D1.freq_qubit',
+                                            fit_T1_vs_freq=True,
+                                            options_dict={'guess_mode_frequency': [6.5e9, 7.1e9]})
 
         self.assertAlmostEqual(a.fit_res['Q_qubit'],
                                669405.3002364064, places=-2)
@@ -159,7 +159,6 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
                                15860920.61850709, places=-3)
         self.assertAlmostEqual(a.fit_res['kappares2'],
                                452876320.52273417, places=-4)
-
 
     def test_CoherenceTimesAnalysis_old(self):
         a = ca.CoherenceTimesAnalysis_old(
