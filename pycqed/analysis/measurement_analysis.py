@@ -8667,7 +8667,8 @@ class DoubleFrequency(TD_Analysis):
             for ii in range(len(measured_values)):
                 for jj in range(5):
                     E[ii,:]=np.exp(expvals*sweep_values[ii])
-            coeff = np.linalg.lstsq(E, measured_values, rcond=None)[0]
+            # FIXME: when using numpy >1.14 we should change to rcond=None
+            coeff = np.linalg.lstsq(E, measured_values, rcond=-1)[0]
             amp_guess = 2*np.abs(coeff[[0,2]])
             phi_guess = np.angle(coeff[[0,2]])
 
