@@ -149,6 +149,35 @@ try:
                                 platf_cfg=self.config_fn)
             self.assertEqual(p.name, 'ef_rabi_seq')
 
+    """
+        Author:             Wouter Vlothuizen, QuTech
+        Purpose:            single qubit OpenQL tests for Qutech Central Controller
+        Notes:              requires OpenQL with CC backend support
+    """
+
+    # NB: we just hijack the parent class to run the same tests
+
+    # FIXME: This only works with Wouters custom OpenQL.
+    # Need a better check for this
+
+    if ql.get_version() > '0.7.0':
+        class Test_single_qubit_seqs_CC(Test_single_qubit_seqs_CCL):
+            def setUp(self):
+                curdir = os.path.dirname(__file__)
+                self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
+                output_dir = os.path.join(curdir, 'test_output_cc')
+                ql.set_option('output_dir', output_dir)
+
+            def test_RTE(self):
+                pytest.skip("test_RTE() uses conditional gates, which are not implemented yet")
+
+            def test_fast_feedback_control(self):
+                pytest.skip("test_fast_feedback_control() uses conditional gates, which are not implemented yet")
+    else:
+        class Test_single_qubit_seqs_CC(unittest.TestCase):
+                @unittest.skip('OpenQL version does not support CC')
+                def test_fail(self):
+                    pass
 
 except ImportError as e:
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
@@ -156,27 +185,3 @@ except ImportError as e:
         @unittest.skip('Missing dependency - ' + str(e))
         def test_fail(self):
             pass
-
-
-"""
-    Author:             Wouter Vlothuizen, QuTech
-    Purpose:            single qubit OpenQL tests for Qutech Central Controller
-    Notes:              requires OpenQL with CC backend support
-"""
-
-# NB: we just hijack the parent class to run the same tests
-
-# FIXME: This only works with Wouters custom OpenQL.
-# Need a better check for this
-# class Test_single_qubit_seqs_CC(Test_single_qubit_seqs_CCL):
-#     def setUp(self):
-#         curdir = os.path.dirname(__file__)
-#         self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-#         output_dir = os.path.join(curdir, 'test_output_cc')
-#         ql.set_option('output_dir', output_dir)
-
-#     def test_RTE(self):
-#         pytest.skip("test_RTE() uses conditional gates, which are not implemented yet")
-
-#     def test_fast_feedback_control(self):
-#         pytest.skip("test_fast_feedback_control() uses conditional gates, which are not implemented yet")

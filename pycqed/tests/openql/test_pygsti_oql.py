@@ -38,12 +38,16 @@ class Test_pygsti_oql(unittest.TestCase):
 # NB: we just hijack the parent class to run the same tests
 # FIXME: This only works with Wouters custom OpenQL.
 # Need a better check for this
-
-# class Test_pygsti_oql_CC(Test_pygsti_oql):
-#     def setUp(self):
-#         curdir = os.path.dirname(__file__)
-#         self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-#         output_dir = os.path.join(curdir, 'test_output_cc')
-#         ql.set_option('output_dir', output_dir)
-
+if ql.get_version() > '0.7.0':
+    class Test_pygsti_oql_CC(Test_pygsti_oql):
+        def setUp(self):
+            curdir = os.path.dirname(__file__)
+            self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
+            output_dir = os.path.join(curdir, 'test_output_cc')
+            ql.set_option('output_dir', output_dir)
+else:
+    class Test_pygsti_oql_CC(unittest.TestCase):
+            @unittest.skip('OpenQL version does not support CC')
+            def test_fail(self):
+                pass
 
