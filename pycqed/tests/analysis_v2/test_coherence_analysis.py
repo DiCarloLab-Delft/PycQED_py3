@@ -94,7 +94,7 @@ class Test_PSD_Analysis(unittest.TestCase):
         # fixme: this value is based on a hardcoded constant
         sqrtA_echo = a[0]
         self.assertAlmostEqual(sqrtA_echo,
-                               -0.058470, places=4)
+                               -0.059, places=3)
 
 
 class Test_CoherenceAnalysis(unittest.TestCase):
@@ -111,8 +111,9 @@ class Test_CoherenceAnalysis(unittest.TestCase):
             options_dict={'tag_tstamp': False, 'save_figs': False})
 
     def test_CoherenceAnalysis_quantities(self):
-        self.assertAlmostEqual(self.a.proc_data_dict['sqrtA_echo']*1e6,
-                               -0.058470, places=4)
+        self.assertAlmostEqual(
+            self.a.proc_data_dict['sqrtA_echo']*1e6,
+            -0.059, places=3)
 
     def test_CoherenceAnalysis_figs(self):
         expected_fig_keys = {'coherence_times', 'coherence_ratios',
@@ -180,7 +181,7 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
         self.assertAlmostEqual(a.fit_res['D1']['gamma_intercept'],
                                62032.192, places=-2)
         self.assertAlmostEqual(a.fit_res['D1']['sqrtA_echo'],
-                               -0.058470, places=4)
+                               -0.059, places=3)
 
 
 class Test_AliasedCoherenceTimesAnalysis(unittest.TestCase):
