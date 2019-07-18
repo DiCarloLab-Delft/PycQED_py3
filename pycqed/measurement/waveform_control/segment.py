@@ -843,8 +843,29 @@ class Segment:
             channels |= set(pulse.channels)
         return channels
 
-    def calculate_hash(self, element, codeword, channel):
-        return (self.name, element, codeword, channel)
+    def calculate_hash(self, elname, codeword, channel):
+        if not self.pulsar.reuse_waveforms():
+            return (self.name, elname, codeword, channel)
+        
+        awg = self.pulsar.get(f'{channel}_awg')
+        tstart, length = self.element_start_end[elname][awg] 
+        hashlist = []
+        hashlist.append(length)  # element length in samples
+        if self.pulsar.get(f'{channel}_type') == 'analog' and \
+                self.pulsar.get(f'{channel}_distortion') == 'precalculate':
+            # don't compare the kernels, just assume that all channels' 
+            # distortion kernels are different
+            hashlist.append(channel) 
+        else:
+            hashlist.append(self.pulsar.clock(channel=channel))  # clock rate
+            for par in ['type', 'amp', 'offset']:
+                hashlist.append(self.pulsar.get(f'{channel}_{par}'))
+        
+        for pulse in self.elements[elname]:
+            if pulse.codeword in {'no_codeword', codeword}:
+                hashlist += pulse.calculate_hash(tstart, channel)
+        return tuple(hashlist)
+        
 
     def tvals(self, channel_list, element):
         """

@@ -129,6 +129,16 @@ class SSB_DRAG_pulse(Pulse):
 
         return wf
 
+    def hashables(self, tstart, channel):
+        if channel not in self.channels:
+            return []
+        hashlist = [type(self), self.algorithm_time() - tstart]
+        hashlist += [channel == self.I_channel, self.amplitude, self.sigma]
+        hashlist += [self.nr_sigma, self.motzoi, self.mod_frequency]
+        phase = self.phase
+        phase += 360*self.phaselock*self.mod_frequency*self.algorithm_time()
+        hashlist += [self.alpha, self.phi_skew, phase]
+        return hashlist
 
 class BufferedSquarePulse(Pulse):
     def __init__(self,
@@ -185,6 +195,14 @@ class BufferedSquarePulse(Pulse):
                     (tvals - tend) * scaling)) * self.amplitude
             return wave
 
+    def hashables(self, tstart, channel):
+        if channel not in self.channels:
+            return []
+        hashlist = [type(self), self.algorithm_time() - tstart]
+        hashlist += [self.amplitude, self.pulse_length]
+        hashlist += [self.buffer_length_start, self.buffer_length_end]
+        hashlist += [self.gaussian_filter_sigma]
+        return hashlist
 
 class BufferedCZPulse(Pulse):
     def __init__(self,
@@ -258,6 +276,25 @@ class BufferedCZPulse(Pulse):
             2 * np.pi * (self.frequency * t_rel + self.phase / 360.))
         return wave
 
+    def hashables(self, tstart, channel):
+        if channel not in self.channels:
+            return []
+        hashlist = [type(self), self.algorithm_time() - tstart]
+
+        amp = self.amplitude
+        buffer_start = self.buffer_length_start
+        buffer_end = self.buffer_length_end
+        pulse_length = self.pulse_length
+        if channel != self.channel:
+            amp = self.aux_channels_dict[channel]
+            buffer_start -= self.extra_buffer_aux_pulse
+            buffer_end -= self.extra_buffer_aux_pulse
+            pulse_length += 2 * self.extra_buffer_aux_pulse
+
+        hashlist += [amp, pulse_length, buffer_start, buffer_end]
+        hashlist += [self.gaussian_filter_sigma]
+        hashlist += [self.frequency, self.phase%360]
+        return hashlist
 
 class NZBufferedCZPulse(Pulse):
     def __init__(self, channel, element_name, aux_channels_dict=None,
@@ -345,6 +382,24 @@ class NZBufferedCZPulse(Pulse):
                         amp2*sp.special.erf((tvals - tend2)*scaling))
         return wave
 
+    def hashables(self, tstart, channel):
+        if channel not in self.channels:
+            return []
+        hashlist = [type(self), self.algorithm_time() - tstart]
+
+        amp = self.amplitude
+        buffer_start = self.buffer_length_start
+        buffer_end = self.buffer_length_end
+        pulse_length = self.pulse_length
+        if channel != self.channel:
+            amp = self.aux_channels_dict[channel]
+            buffer_start -= self.extra_buffer_aux_pulse
+            buffer_end -= self.extra_buffer_aux_pulse
+            pulse_length += 2 * self.extra_buffer_aux_pulse
+
+        hashlist += [amp, pulse_length, buffer_start, buffer_end]
+        hashlist += [self.gaussian_filter_sigma, self.alpha]
+        return hashlist
 
 class NZMartinisGellarPulse(Pulse):
     def __init__(self, channel, element_name, wave_generation_func,
@@ -419,6 +474,15 @@ class NZMartinisGellarPulse(Pulse):
         }
         return self.wave_generation_func(tvals, params_dict)
 
+    def hashables(self, tstart, channel):
+        if channel not in self.channels:
+            return []
+        hashlist = [type(self), self.algorithm_time() - tstart]
+        hashlist += [self.pulse_length, self.theta_f, self.qbc_freq]
+        hashlist += [self.qbt_freq, self.anharmonicity, self.J, self.dphi_dV]
+        hashlist += [self.loop_asym, self.lambda_2, self.alpha]
+        hashlist += [self.buffer_length_start, hash(self.wave_generation_func)]
+        return hashlist
 
 class GaussFilteredCosIQPulse(Pulse):
     def __init__(self,
@@ -486,3 +550,16 @@ class GaussFilteredCosIQPulse(Pulse):
             return I_mod
         if chan == self.Q_channel:
             return Q_mod
+
+    def hashables(self, tstart, channel):
+        if channel not in self.channels:
+            return []
+        hashlist = [type(self), self.algorithm_time() - tstart]
+        hashlist += [channel == self.I_channel, self.amplitude]
+        hashlist += [self.mod_frequency, self.gaussian_filter_sigma]
+        hashlist += [self.nr_sigma, self.pulse_length]
+        phase = self.phase
+        phase += 360*(not self.phase_lock)*self.mod_frequency \
+            *self.algorithm_time()
+        hashlist += [self.alpha, self.phi_skew, phase]
+        return hashlist
