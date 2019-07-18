@@ -31,7 +31,6 @@ def generate_config(filename: str,
     in the JSON. The details of what can be specified are given in the OpenQL
     documentation under "configuration_specification".
     """
-
     qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10',
              'q11', 'q12', 'q13', 'q14', 'q15', 'q16']
     lut_map = ['i {}', 'rx180 {}', 'ry180 {}', 'rx90 {}', 'ry90 {}',
@@ -84,12 +83,26 @@ def generate_config(filename: str,
         "instructions": {},
         "resources":
             {"qubits": {"count": 17},
-             "qwgs": {"count": 3,
+             "qwgs": {"count": 17,
                       "connection_map":
                       {
-                          "0": [7, 8, 9],
-                          "1": [1, 2, 3, 13, 14, 15],
-                          "2": [0, 4, 5, 6, 10, 11, 12, 16]
+                          "0": [0],
+                          "1": [1],
+                          "2": [2],
+                          "3": [3],
+                          "4": [4],
+                          "5": [5],
+                          "6": [6],
+                          "7": [7],
+                          "8": [8],
+                          "9": [9],
+                          "10": [10],
+                          "11": [11],
+                          "12": [12],
+                          "13": [13],
+                          "14": [14],
+                          "15": [15],
+                          "16": [16]
                       }
                       },
              "meas_units": {"count": 17,
