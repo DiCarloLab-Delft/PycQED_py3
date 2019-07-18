@@ -858,12 +858,12 @@ class Segment:
             hashlist.append(channel) 
         else:
             hashlist.append(self.pulsar.clock(channel=channel))  # clock rate
-            for par in ['type', 'amp', 'offset']:
+            for par in ['type', 'amp']:
                 hashlist.append(self.pulsar.get(f'{channel}_{par}'))
         
         for pulse in self.elements[elname]:
             if pulse.codeword in {'no_codeword', codeword}:
-                hashlist += pulse.calculate_hash(tstart, channel)
+                hashlist += pulse.hashables(tstart, channel)
         return tuple(hashlist)
         
 

@@ -1320,7 +1320,7 @@ def _zi_clear_waves():
         elif f.endswith('.cache'):
             shutil.rmtree(os.path.join(wave_dir, f))
 
-def _zi_wavename_pair_to_argument(self, w1, w2):
+def _zi_wavename_pair_to_argument(w1, w2):
     if w1 is not None and w2 is not None:
         return f'{w1}, {w2}'
     elif w1 is not None and w2 is None:
