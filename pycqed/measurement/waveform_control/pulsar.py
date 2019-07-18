@@ -187,16 +187,13 @@ class UHFQCPulsar:
         if not self._zi_waves_cleared:
             _zi_clear_waves()
             self._zi_waves_cleared = True
-
-
-
         waves_to_upload = {h: waveforms[h]
                                for codewords in awg_sequence.values() 
                                    if codewords is not None
                                for cw, chids in codewords.items()
                                    if cw != 'metadata'
                                for h in chids.values()}
-        _zi_write_waves(waves_to_upload)
+        self._zi_write_waves(waves_to_upload)
 
         defined_waves = set()
         wave_definitions = []
@@ -220,10 +217,10 @@ class UHFQCPulsar:
 
             wave = (chid_to_hash.get('ch1', None), None, 
                     chid_to_hash.get('ch2', None), None)
-            wave_definitions += _zi_wave_definition(wave, defined_waves)
+            wave_definitions += self._zi_wave_definition(wave, defined_waves)
 
             acq = metadata.get('acq', False)
-            playback_strings += _zi_playback_string('uhf', wave, acq=acq)
+            playback_strings += self._zi_playback_string('uhf', wave, acq=acq)
 
             ch_has_waveforms['ch1'] |= wave[0] is not None
             ch_has_waveforms['ch2'] |= wave[2] is not None
@@ -411,8 +408,6 @@ class HDAWG8Pulsar:
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._program_awg(obj, awg_sequence, waveforms)
         
-        # import pdb; pdb.set_trace()
-
         if not self._zi_waves_cleared:
             _zi_clear_waves()
             self._zi_waves_cleared = True
@@ -422,7 +417,7 @@ class HDAWG8Pulsar:
                                for cw, chids in codewords.items() 
                                    if cw != 'metadata'
                                for h in chids.values()}
-        _zi_write_waves(waves_to_upload)
+        self._zi_write_waves(waves_to_upload)
         
         ch_has_waveforms = {'ch{}{}'.format(i + 1, m): False 
                                 for i in range(8) for m in ['','m']}
@@ -461,54 +456,36 @@ class HDAWG8Pulsar:
                 if nr_cw == 1:
                     log.warning(
                         f'Only one codeword has been set for {element}')
-                elif nr_cw == 0:
-                    chid_to_hash = awg_sequence[element]['no_codeword']
-                    wave = tuple(chid_to_hash.get(ch, None)
-                                 for ch in [ch1id, ch1mid, ch2id, ch2mid])
-                    wave_definitions += _zi_wave_definition(wave,
-                                                            defined_waves)
-                    playback_strings += _zi_playback_string(
-                        'hdawg', wave)
-
-                    ch_has_waveforms[ch1id] |= wave[0] is not None
-                    ch_has_waveforms[ch1mid] |= wave[1] is not None
-                    ch_has_waveforms[ch2id] |= wave[2] is not None
-                    ch_has_waveforms[ch2mid] |= wave[3] is not None
-
                 else:
                     for cw in awg_sequence[element]:
                         if cw == 'no_codeword':
-                            # 'no_codeword' element not processed for codeword
-                            # elements
-                            continue
-
+                            if nr_cw != 0:
+                                continue
                         chid_to_hash = awg_sequence[element][cw]
                         wave = tuple(chid_to_hash.get(ch, None)
-                                     for ch in [ch1id, ch1mid, ch2id, ch2mid])
-                        wave_definitions += _zi_wave_definition(wave,
+                                    for ch in [ch1id, ch1mid, ch2id, ch2mid])
+                        wave_definitions += self._zi_wave_definition(wave,
                                                                 defined_waves)
-                        w1, w2 = _zi_waves_to_wavenames(wave)
-                        if cw not in codeword_table:
-                            codeword_table_defs += \
-                                _zi_codeword_table_entry(cw, wave)
-                            codeword_table[cw] = (w1, w2)
-                        elif codeword_table[cw] != (w1, w2):
-                            pass
-                            # Uncomment once hash function is properly implemented
-                            # log.warning('Same codeword used for different '
-                            #             'waveforms. Using first waveform. '
-                            #             f'Ignoring element {element}.')
+                        
+                        if nr_cw != 0:
+                            w1, w2 = self._zi_waves_to_wavenames(wave)
+                            if cw not in codeword_table:
+                                codeword_table_defs += \
+                                    self._zi_codeword_table_entry(cw, wave)
+                                codeword_table[cw] = (w1, w2)
+                            elif codeword_table[cw] != (w1, w2) \
+                                    and self.reuse_waveforms():
+                                log.warning('Same codeword used for different '
+                                            'waveforms. Using first waveform. '
+                                            f'Ignoring element {element}.')
 
                         ch_has_waveforms[ch1id] |= wave[0] is not None
                         ch_has_waveforms[ch1mid] |= wave[1] is not None
                         ch_has_waveforms[ch2id] |= wave[2] is not None
                         ch_has_waveforms[ch2mid] |= wave[3] is not None
 
-                    playback_strings += _zi_playback_string(
-                        'hdawg', wave, codeword=(cw != 'no_codeword'))
-
-                # should be fixed I think, ugly copy paste though. I try
-
+                    playback_strings += self._zi_playback_string(
+                        'hdawg', wave, codeword=(nr_cw != 0))
                 
             if not any([ch_has_waveforms[ch] 
                     for ch in [ch1id, ch1mid, ch2id, ch2mid]]):
@@ -778,7 +755,7 @@ class AWG5014Pulsar:
                         chid_to_hash.get(grp + 'm1', None), 
                         chid_to_hash.get(grp + 'm2', None))
                 grp_has_waveforms[grp] |= (wave != (None, None, None))
-                wfname = hash_to_wavename((maxlen, wave))
+                wfname = self._hash_to_wavename((maxlen, wave))
                 grp_wfs = [np.pad(waveforms.get(h, [0]), 
                                   (0, maxlen - len(waveforms.get(h, [0]))), 
                                   'constant', constant_values=0) for h in wave]
@@ -915,6 +892,9 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                                                vals.Enum('auto')),
                            set_cmd=self._set_inter_element_spacing,
                            get_cmd=self._get_inter_element_spacing)
+        self.add_parameter('reuse_waveforms', initial_value=False,
+                           parameter_class=ManualParameter, vals=vals.Bool())
+                           
         self._inter_element_spacing = 'auto'
         self.channels = set() # channel names
         self.awgs = set() # AWG names
@@ -923,6 +903,9 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         self._awgs_with_waveforms = set()
 
         self._awgs_prequeried_state = False
+
+        self._zi_waves_cleared = False
+        self._hash_to_wavename_table = {}
 
         Pulsar._instance = self
 
@@ -1118,6 +1101,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         waveforms, awg_sequences = sequence.generate_waveforms_sequences()
         
         self._zi_waves_cleared = False
+        self._hash_to_wavename_table = {}
         
         for awg in awgs:
             self._program_awg(self.AWG_obj(awg=awg), 
@@ -1147,6 +1131,101 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         #     raise TypeError('Unsupported AWG instrument: {} of type {}. '
         #                     .format(obj.name, type(obj)) + str(fail))
         super()._program_awg(obj, awg_sequence, waveforms)
+
+    def _hash_to_wavename(self, h):
+        alphabet = 'abcdefghijklmnopqrstuvwxyz'
+        if h not in self._hash_to_wavename_table:
+            hash_int = abs(hash(h))
+            wname = ''.join(to_base(hash_int, len(alphabet), alphabet))[::-1]
+            while wname in self._hash_to_wavename_table.values():
+                hash_int += 1
+                wname = ''.join(to_base(hash_int, len(alphabet), alphabet)) \
+                    [::-1]
+            self._hash_to_wavename_table[h] = wname
+        return self._hash_to_wavename_table[h]
+
+    def _zi_wave_definition(self, wave, defined_waves=None):
+        if defined_waves is None:
+            defined_waves = set()
+        wave_definition = []
+        w1, w2 = self._zi_waves_to_wavenames(wave)
+        for analog, marker, wc in [(wave[0], wave[1], w1), 
+                                   (wave[2], wave[3], w2)]:
+            if analog is not None:
+                wa = self._hash_to_wavename(analog)
+                if wa not in defined_waves:
+                    wave_definition.append(f'wave {wa} = "{wa}";')
+                    defined_waves.add(wa)
+            if marker is not None:        
+                wm = self._hash_to_wavename(marker)
+                if wm not in defined_waves:
+                    wave_definition.append(f'wave {wm} = "{wm}";')
+                    defined_waves.add(wm)
+            if analog is not None and marker is not None:
+                if wc not in defined_waves:
+                    wave_definition.append(f'wave {wc} = {wa} + {wm};')
+                    defined_waves.add(wc)
+        return wave_definition
+
+    def _zi_playback_string(self, device, wave, acq=False, codeword=False):
+        playback_string = []
+        w1, w2 = self._zi_waves_to_wavenames(wave)
+        if not codeword:
+            if w1 is None and w2 is not None:
+                # This hack is needed due to a bug on the HDAWG. 
+                # Remove this if case once the bug is fixed.
+                playback_string.append(
+                    f'prefetch(zeros(1) + marker(1, 0), {w2});')
+            elif w1 is not None or w2 is not None:
+                playback_string.append('prefetch({});'.format(', '.join(
+                        [wn for wn in [w1, w2] if wn is not None])))
+        playback_string.append(
+            'waitDigTrigger(1{});'.format(', 1' if device == 'uhf' else ''))
+        if codeword:
+            playback_string.append('playWaveDIO();')
+        else:
+            if w1 is None and w2 is not None:
+                # This hack is needed due to a bug on the HDAWG. 
+                # Remove this if case once the bug is fixed.
+                playback_string.append(
+                    f'playWave(zeros(1) + marker(1, 0), {w2});')
+            elif w1 is not None or w2 is not None:
+                playback_string.append('playWave({});'.format(
+                    _zi_wavename_pair_to_argument(w1, w2)))
+        if acq:
+            playback_string.append('setTrigger(RO_TRIG);')
+            playback_string.append('setTrigger(WINT_EN);')
+        return playback_string
+
+    def _zi_codeword_table_entry(self, codeword, wave):
+        w1, w2 = self._zi_waves_to_wavenames(wave)
+        if w1 is None and w2 is not None:
+            # This hack is needed due to a bug on the HDAWG. 
+            # Remove this if case once the bug is fixed.
+            return [f'setWaveDIO({codeword}, zeros(1) + marker(1, 0), {w2});']
+        else:
+            return ['setWaveDIO({}, {});'.format(codeword, 
+                        _zi_wavename_pair_to_argument(w1, w2))]
+
+    def _zi_waves_to_wavenames(self, wave):
+        wavenames = []
+        for analog, marker in [(wave[0], wave[1]), (wave[2], wave[3])]:
+            if analog is None and marker is None:
+                wavenames.append(None)
+            elif analog is None and marker is not None:
+                wavenames.append(self._hash_to_wavename(marker))
+            elif analog is not None and marker is None:
+                wavenames.append(self._hash_to_wavename(analog))
+            else:
+                wavenames.append(self._hash_to_wavename((analog, marker)))
+        return wavenames
+
+    def _zi_write_waves(self, waveforms):
+        wave_dir = _zi_wave_dir()
+        for h, wf in waveforms.items():
+            filename = os.path.join(wave_dir, self._hash_to_wavename(h)+'.csv')
+            fmt = '%.18e' if wf.dtype == np.float else '%d'
+            np.savetxt(filename, wf, delimiter=",", fmt=fmt)
 
     def _start_awg(self, awg):
         obj = self.AWG_obj(awg=awg)
@@ -1189,7 +1268,8 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             for awg in self.awgs:
                 self._clocks[awg] = self.clock(awg=awg)
             for c in self.channels:
-                self.get(c + '_amp') # prequery also the output amplitude values
+                # prequery also the output amplitude values
+                self.get(c + '_amp')
             self._awgs_prequeried_state = True
         else:
             self._awgs_prequeried_state = False
@@ -1212,112 +1292,12 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                 return cname
         return None
 
-
-def simplify_name(s):
-    """
-    Changes all non alphanumerics of a string to '_'
-    """
-    s = list(s)
-    for i in range(len(s)):
-        s[i] = '_' if not s[i].isalnum() or s[i] == '-' else s[i]
-    return ''.join(s)
-
-
 def to_base(n, b, alphabet=None, prev=None):
     if prev is None: prev = []
     if n == 0: 
         if alphabet is None: return prev
         else: return [alphabet[i] for i in prev]
     return to_base(n//b, b, alphabet, prev+[n%b])
-
-def hash_to_wavename(h):
-    alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    h = abs(hash(h))
-    return ''.join(to_base(h, len(alphabet), alphabet))[::-1]
-
-def _zi_wave_definition(wave, defined_waves=None):
-    if defined_waves is None:
-        defined_waves = set()
-    wave_definition = []
-    w1, w2 = _zi_waves_to_wavenames(wave)
-    for analog, marker, wc in [(wave[0], wave[1], w1), 
-                               (wave[2], wave[3], w2)]:
-        if analog is not None:
-            wa = hash_to_wavename(analog)
-            if wa not in defined_waves:
-                wave_definition.append(f'wave {wa} = "{wa}";')
-                defined_waves.add(wa)
-        if marker is not None:        
-            wm = hash_to_wavename(marker)
-            if wm not in defined_waves:
-                wave_definition.append(f'wave {wm} = "{wm}";')
-                defined_waves.add(wm)
-        if analog is not None and marker is not None:
-            if wc not in defined_waves:
-                wave_definition.append(f'wave {wc} = {wa} + {wm};')
-                defined_waves.add(wc)
-    return wave_definition
-
-def _zi_playback_string(device, wave, acq=False, codeword=False):
-    playback_string = []
-    w1, w2 = _zi_waves_to_wavenames(wave)
-    if not codeword:
-        if w1 is None and w2 is not None:
-            # This hack is needed due to a bug on the HDAWG. 
-            # Remove this if case once the bug is fixed.
-            playback_string.append(f'prefetch(zeros(1) + marker(1, 0), {w2});')
-        elif w1 is not None or w2 is not None:
-            playback_string.append('prefetch({});'.format(', '.join(
-                    [wn for wn in [w1, w2] if wn is not None])))
-    playback_string.append(
-        'waitDigTrigger(1{});'.format(', 1' if device == 'uhf' else ''))
-    if codeword:
-        playback_string.append('playWaveDIO();')
-    else:
-        if w1 is None and w2 is not None:
-            # This hack is needed due to a bug on the HDAWG. 
-            # Remove this if case once the bug is fixed.
-            playback_string.append(f'playWave(zeros(1) + marker(1, 0), {w2});')
-        elif w1 is not None or w2 is not None:
-            playback_string.append('playWave({});'.format(
-                _zi_wavename_pair_to_argument(w1, w2)))
-    if acq:
-        playback_string.append('setTrigger(RO_TRIG);')
-        playback_string.append('setTrigger(WINT_EN);')
-    return playback_string
-
-def _zi_codeword_table_entry(codeword, wave):
-    w1, w2 = _zi_waves_to_wavenames(wave)
-    if w1 is None and w2 is not None:
-        # This hack is needed due to a bug on the HDAWG. 
-        # Remove this if case once the bug is fixed.
-        return [f'setWaveDIO({codeword}, zeros(1) + marker(1, 0), {w2});']
-    else:
-        return ['setWaveDIO({}, {});'.format(codeword, 
-                    _zi_wavename_pair_to_argument(w1, w2))]
-
-def _zi_waves_to_wavenames(wave):
-    wavenames = []
-    for analog, marker in [(wave[0], wave[1]), (wave[2], wave[3])]:
-        if analog is None and marker is None:
-            wavenames.append(None)
-        elif analog is None and marker is not None:
-            wavenames.append(hash_to_wavename(marker))
-        elif analog is not None and marker is None:
-            wavenames.append(hash_to_wavename(analog))
-        else:
-            wavenames.append(hash_to_wavename((analog, marker)))
-    return wavenames
-
-def _zi_wavename_pair_to_argument(w1, w2):
-    if w1 is not None and w2 is not None:
-        return f'{w1}, {w2}'
-    elif w1 is not None and w2 is None:
-        return f'1, {w1}'
-    elif w1 is None and w2 is not None:
-        return f'2, {w2}'
-    else:
-        return ''
 
 def _zi_wave_dir():
     if os.name == 'nt':
@@ -1340,9 +1320,12 @@ def _zi_clear_waves():
         elif f.endswith('.cache'):
             shutil.rmtree(os.path.join(wave_dir, f))
 
-def _zi_write_waves(waveforms):
-    wave_dir = _zi_wave_dir()
-    for h, wf in waveforms.items():
-        filename = os.path.join(wave_dir, hash_to_wavename(h) + '.csv')
-        fmt = '%.18e' if wf.dtype == np.float else '%d'
-        np.savetxt(filename, wf, delimiter=",", fmt=fmt)
+def _zi_wavename_pair_to_argument(self, w1, w2):
+    if w1 is not None and w2 is not None:
+        return f'{w1}, {w2}'
+    elif w1 is not None and w2 is None:
+        return f'1, {w1}'
+    elif w1 is None and w2 is not None:
+        return f'2, {w2}'
+    else:
+        return ''

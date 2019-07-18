@@ -125,6 +125,10 @@ class Pulse:
     def effective_length(self):
         return self.length - self.start_offset - self.stop_offset
 
+    def hashables(self, tstart, channel):
+        raise NotImplementedError('hashables() not implemented for {}'\
+                                  .format(str(type(self))[1:-1]))
+
 # Z virtual pulse
 class Z_Pulse(Pulse):
 
@@ -132,6 +136,9 @@ class Z_Pulse(Pulse):
         super().__init__(name, element_name)
         self.length = 0
         self.codeword = kw.pop('codeword', 'no_codeword')
+
+    def hashables(self, tstart, channel):
+        return []
 
 
 # Some simple pulse definitions.
@@ -161,8 +168,13 @@ class SquarePulse(Pulse):
 
     def chan_wf(self, chan, tvals):
         return np.ones(len(tvals)) * self.amplitude
-        
 
+    def hashables(self, tstart, channel):
+        if channel not in self.channels:
+            return []
+        hashlist = [type(self), self.algorithm_time() - tstart]
+        hashlist += [self.amplitude, self.length]
+        return hashlist
 
 class CosPulse(Pulse):
 
@@ -190,6 +202,14 @@ class CosPulse(Pulse):
         return self.amplitude * np.cos(2 * np.pi *
                                        (self.frequency * tvals +
                                         self.phase / 360.))
+
+    def hashables(self, tstart, channel):
+        if channel not in self.channels:
+            return []
+        hashlist = [type(self), self.algorithm_time() - tstart]
+        hashlist += [self.amplitude, self.length, self.frequency]
+        hashlist += [(self.phase + self.frequency*tstart*360)%360.]
+        return hashlist
 
 def apply_modulation(I_env, Q_env, tvals, mod_frequency,
                      phase=0, phi_skew=0, alpha=1, phase_lock=False):
