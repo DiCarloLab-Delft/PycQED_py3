@@ -762,7 +762,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                          **kw)
         self.params_dict = {
             'measurementstring': 'measurementstring',
-            'measured_values': 'measured_values',
+            'measured_data': 'measured_data',
             'value_names': 'value_names',
             'value_units': 'value_units'}
         self.numeric_params = []
@@ -789,8 +789,10 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         ######################################################
         # measured values is a list of arrays with measured
         # values for each level in self.levels
-        meas_val = {l: self.raw_data_dict['measured_values'][i]
+        meas_val = {l: np.array([self.raw_data_dict[i]['measured_data'][c]
+                        for c in self.raw_data_dict[i]['measured_data'].keys()])
                     for i, l in enumerate(self.levels)}
+        # print([ c for c in meas_val['e'].keys()])
         intermediate_ro = dict()    # store intermediate ro (preselection)
         data = dict()               # store final data
         mu = dict()                 # store mean of measurements
@@ -1189,7 +1191,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                         k.startswith("data")]
         for dk in data_keys:
             data = self.proc_data_dict[dk]
-            title =  self.raw_data_dict['timestamps'][0] + " " + dk + \
+            title =  self.raw_data_dict[0]['timestamp'] + " " + dk + \
                 "\n{} classifier".format(self.classif_method)
             kwargs.update(dict(title=title))
             # plot data and histograms
@@ -1218,7 +1220,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         if show:
             plt.show()
 
-        title = self.raw_data_dict['timestamps'][0] + "\n{} State Assignment" \
+        title = self.raw_data_dict[0]['timestamp'] + "\n{} State Assignment" \
             " Probability Matrix\nTotal # shots:{}"\
             .format(self.classif_method,
                     self.proc_data_dict['analysis_params']['n_shots'])
@@ -1228,7 +1230,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         self.figs['state_prob_matrix_{}'.format(self.classif_method)] = fig
 
         if self.pre_selection:
-            title = self.raw_data_dict['timestamps'][0] + \
+            title = self.raw_data_dict[0]['timestamp'] + \
                 "\n{} State Assignment Probability Matrix Masked"\
                 "\nTotal # shots:{}".format(
                     self.classif_method,

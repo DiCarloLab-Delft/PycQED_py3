@@ -374,7 +374,7 @@ class NZMartinisGellarPulse(Pulse):
         self.anharmonicity = kw.pop('anharmonicity', 0)
         self.J = kw.pop('J', 0)
         self.loop_asym = kw.pop('loop_asym', 0)
-        self.dphi_dV= kw.pop('dphi_dV', 0)
+        self.dv_dphi= kw.pop('dv_dphi', 0)
         self.lambda_2 = kw.pop('lambda_2', 0)
         self.codeword = kw.pop('codeword', 'no_codeword')
 
@@ -399,7 +399,7 @@ class NZMartinisGellarPulse(Pulse):
         self.qbt_freq = kw.pop('qbt_freq', self.qbt_freq)
         self.J = kw.pop('J', self.J)
         self.loop_asym = kw.pop('loop_asym', self.loop_asym)
-        self.dphi_dV = kw.pop('dphi_dV', self.dphi_dV)
+        self.dv_dphi = kw.pop('dv_dphi', self.dv_dphi)
         self.lambda_2 = kw.pop('lambda_2', self.lambda_2)
         return self
 
@@ -411,7 +411,7 @@ class NZMartinisGellarPulse(Pulse):
             'qbt_freq': self.qbt_freq,
             'anharmonicity': self.anharmonicity,
             'J': self.J,
-            'dphi_dV': self.dphi_dV,
+            'dv_dphi': self.dv_dphi,
             'loop_asym': self.loop_asym,
             'lambda_2': self.lambda_2,
             'alpha': self.alpha,

@@ -142,8 +142,12 @@ class BaseDataAnalysis(object):
         self.timestamps = None
         if data_file_path is None:
             if t_start is None:
-                self.timestamps = [a_tools.latest_data(
-                    contains=label, return_timestamp=True)[0]]
+                if isinstance(label, list):
+                    self.timestamps = [a_tools.latest_data(
+                        contains=lab, return_timestamp=True)[0] for lab in label]
+                else:
+                    self.timestamps = [a_tools.latest_data(
+                        contains=label, return_timestamp=True)[0]]
             elif t_stop is None:
                 self.timestamps = [t_start]
             else:
@@ -153,6 +157,7 @@ class BaseDataAnalysis(object):
 
         if self.timestamps is None or len(self.timestamps) == 0:
             raise ValueError('No data file found.')
+
 
         ########################################
         # These options relate to the plotting #
@@ -322,6 +327,8 @@ class BaseDataAnalysis(object):
              'folder': 'folder',
              'exp_metadata':
                  'Experimental Data.Experimental Metadata'})
+
+
         self.raw_data_dict = self.get_data_from_timestamp_list()
         if len(self.timestamps) == 1:
             self.raw_data_dict = self.add_measured_values_ord_dict(
@@ -360,7 +367,11 @@ class BaseDataAnalysis(object):
                      close_figs: bool = True):
 
         if savedir is None:
-            savedir = self.raw_data_dict.get('folder', '')
+            if isinstance(self.raw_data_dict, tuple):
+                savedir = self.raw_data_dict[0].get('folder', '')
+            else:
+                savedir = self.raw_data_dict.get('folder', '')
+
             if isinstance(savedir, list):
                 savedir = savedir[0]
             if isinstance(savedir, list):
@@ -368,7 +379,10 @@ class BaseDataAnalysis(object):
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_' + self.raw_data_dict['timestamp']
+            if isinstance(self.raw_data_dict, tuple):
+                tstag = '_' + self.raw_data_dict[0]['timestamp']
+            else:
+                tstag = '_' + self.raw_data_dict['timestamp']
         else:
             tstag = ''
 
@@ -514,8 +528,12 @@ class BaseDataAnalysis(object):
         if hasattr(self, 'fit_res') and self.fit_res is not None:
             fn = self.options_dict.get('analysis_result_file', False)
             if fn == False:
+                if isinstance(self.raw_data_dict, tuple):
+                    timestamp = self.raw_data_dict[0]['timestamp']
+                else:
+                    timestamp = self.raw_data_dict['timestamp']
                 fn = a_tools.measurement_filename(a_tools.get_folder(
-                    self.raw_data_dict['timestamp']))
+                    timestamp))
 
             try:
                 os.mkdir(os.path.dirname(fn))
@@ -564,8 +582,12 @@ class BaseDataAnalysis(object):
                 and key in self.proc_data_dict:
             fn = self.options_dict.get('analysis_result_file', False)
             if fn == False:
-                fn = a_tools.measurement_filename(
-                    a_tools.get_folder(self.raw_data_dict['timestamp']))
+                if isinstance(self.raw_data_dict, tuple):
+                    timestamp = self.raw_data_dict[0]['timestamp']
+                else:
+                    timestamp = self.raw_data_dict['timestamp']
+                fn = a_tools.measurement_filename(a_tools.get_folder(
+                    timestamp))
             try:
                 os.mkdir(os.path.dirname(fn))
             except FileExistsError:

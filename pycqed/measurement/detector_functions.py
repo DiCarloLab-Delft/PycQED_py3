@@ -1635,19 +1635,35 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        
+
         # resets UHFQC internal readout counters
         self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout', 
                                 self._get_readout())
-        
+
         # starting AWG
         if self.AWG is not None:
-            self.AWG.start()
+            # self.AWG.start(exclude=['UHF1'])
+            # self.AWG.start()
+
+            self.AWG._stop_awg('AWG1')
+            self.AWG._stop_awg('AWG2')
+            self.AWG._stop_awg('UHF1')
+            self.AWG._stop_awg('TriggerDevice')
+
+            self.AWG._start_awg('AWG1')
+            self.AWG._start_awg('AWG2')
+            time.sleep(1)
+            self.AWG._start_awg('UHF1')
+            time.sleep(1)
+            self.AWG._start_awg('TriggerDevice')
+
 
         # print(self.nr_sweep_points)
-
+        time.sleep(0.1)
+        # self.UHFQC._daq.sync()
+        # self.UHFQC.acquisition_arm()
         data_raw = self.UHFQC.acquisition_poll(
-            samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
+            samples=self.nr_sweep_points, arm=False, acquisition_time=0.1)
         # the self.channels should be the same as data_raw.keys().
         # this is to be tested (MAR 26-9-2017)
 
@@ -1666,6 +1682,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data = np.reshape(data.T,
                           (-1, no_virtual_channels, len(self.channels))).T
         data = data.reshape((len(self.value_names), -1))
+        # Fixme: For debugging purposes
+        #self.UHFQC.acquisition_finalize()
         return data
 
     def convert_to_polar(self, data):
@@ -1734,6 +1752,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+        self.UHFQC.acquisition_finalize()
 
 class UHFQC_SSRO_detector(Hard_Detector):
 

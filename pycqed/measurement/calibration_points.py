@@ -26,7 +26,6 @@ class CalibrationPoints:
 
         for i, seg_states in enumerate(self.states):
             pulse_list = []
-
             for j, qbn in enumerate(self.qb_names):
                 unique, counts = np.unique(self.get_states(qbn)[qbn],
                                            return_counts=True)
@@ -36,6 +35,7 @@ class CalibrationPoints:
                     pulse = deepcopy(operation_dict[pulse_name + qbn])
                     pulse['name'] = f"{seg_states[j]}_{pulse_name + qbn}_" \
                                     f"{cal_pt_idx}"
+
                     if k == 0:
                         pulse['ref_pulse'] = 'segment_start'
                     if len(pulse_modifs) > 0:
@@ -44,9 +44,10 @@ class CalibrationPoints:
                         pulse['name'] = f"{seg_states[j]}_{pulse_name + qbn}_" \
                                         f"{cal_pt_idx}"
                     pulse_list.append(pulse)
-                pulse_list = add_preparation_pulses(pulse_list,
-                                                    operation_dict,
-                                                    [qbn], **prep_params)
+            pulse_list = add_preparation_pulses(pulse_list,
+                                                operation_dict,
+                                                [qbn for qbn in self.qb_names],
+                                                **prep_params)
 
             pulse_list += generate_mux_ro_pulse_list(self.qb_names,
                                                      operation_dict)

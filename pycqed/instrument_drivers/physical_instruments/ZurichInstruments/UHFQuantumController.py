@@ -451,13 +451,17 @@ class UHFQC(Instrument):
         self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
         # t0=time.time()
         # time.sleep(0.001)
-        # self._daq.sync()
+        self._daq.sync()
         # deltat=time.time()-t0
         # print('UHFQC syncing took {}'.format(deltat))
 
     def start(self):
         """Tektronix-style start command"""
+        # self._daq.sync()
+        self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', True)
         self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
+        # time.sleep(0.1)
+        self._daq.sync()
 
     def stop(self):
         """Tektronix-style stop command"""
@@ -587,29 +591,29 @@ class UHFQC(Instrument):
         if mode == 'rl':
             readout = 0
             for c in channels:
-                self.acquisition_paths.append(
-                    '/' + self._device + '/quex/rl/data/{}'.format(c))
+                path = f'/{self._device}/quex/rl/data/{c}'
+                self.acquisition_paths.append(path)
+                self._daq.subscribe(path)
                 readout += (1 << c)
-            self._daq.subscribe('/' + self._device + '/quex/rl/data/*')
             # Enable automatic readout
             self._daq.setInt('/' + self._device + '/quex/rl/readout', readout)
         else:
             for c in channels:
-                self.acquisition_paths.append(
-                    '/' + self._device + '/quex/iavg/data/{}'.format(c))
-            self._daq.subscribe('/' + self._device + '/quex/iavg/data/*')
+                path = f'/{self._device}/quex/iavg/data/{c}'
+                self.acquisition_paths.append(path)
+                self._daq.subscribe(path)
             # Enable automatic readout
             self._daq.setInt('/' + self._device + '/quex/iavg/readout', 1)
 
-        self._daq.subscribe('/' + self._device + '/auxins/0/sample')
+        # self._daq.subscribe('/' + self._device + '/auxins/0/sample')
 
         # Generate more dummy data
-        self._daq.setInt('/' + self._device + '/auxins/0/averaging', 8)
+        # self._daq.setInt('/' + self._device + '/auxins/0/averaging', 8)
 
     def acquisition_finalize(self):
         for p in self.acquisition_paths:
             self._daq.unsubscribe(p)
-        self._daq.unsubscribe('/' + self._device + '/auxins/0/sample')
+        # self._daq.unsubscribe('/' + self._device + '/auxins/0/sample')
 
     def create_parameter_files(self):
         # this functions retrieves all possible settable and gettable

@@ -278,20 +278,21 @@ def chevron_seqs(qbc_name, qbt_name, qbr_name, hard_sweep_dict, soft_sweep_dict,
     flux_pulse['name'] = 'chevron_flux'
     flux_pulse['element_name'] = 'chevron_flux_el'
 
-    ro_pulse = deepcopy(operation_dict['RO ' + qbr_name])
+    ro_pulses = generate_mux_ro_pulse_list([qbc_name, qbt_name],
+                                           operation_dict)
     if 'pulse_length' in hard_sweep_dict:
         max_flux_length = max(hard_sweep_dict['pulse_length']['values'])
-        ro_pulse['ref_pulse'] = 'chevron_pi_qbc'
-        ro_pulse['pulse_delay'] = max_flux_length + \
-                                  flux_pulse.get('buffer_length_start', 0) + \
-                                  flux_pulse.get('buffer_length_end', 0)
+        ro_pulses[0]['ref_pulse'] = 'chevron_pi_qbc'
+        ro_pulses[0]['pulse_delay'] = \
+            max_flux_length + flux_pulse.get('buffer_length_start', 0) + \
+            flux_pulse.get('buffer_length_end', 0)
 
     ssl = len(list(soft_sweep_dict.values())[0]['values'])
     sequences = []
     for i in range(ssl):
         flux_p = deepcopy(flux_pulse)
         flux_p.update({k: v['values'][i] for k, v in soft_sweep_dict.items()})
-        pulses = [ge_pulse_qbc, ge_pulse_qbt, flux_p, ro_pulse]
+        pulses = [ge_pulse_qbc, ge_pulse_qbt, flux_p] + ro_pulses
         swept_pulses = sweep_pulse_params(
             pulses, {f'chevron_flux.{k}': v['values']
                         for k, v in hard_sweep_dict.items()})
@@ -501,6 +502,9 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
                        deepcopy(operation_dict['X90s ' + qbt_name])]
     final_rotations[0]['name'] = 'cphase_final_pi_qbc'
     final_rotations[1]['name'] = 'cphase_final_pihalf_qbt'
+    # final_rotations = [deepcopy(operation_dict['X90 ' + qbt_name])]
+    # final_rotations[0]['name'] = 'cphase_final_pihalf_qbt'
+
     for rot_pulses in final_rotations:
         rot_pulses['element_name'] = 'cphase_final_rots_el'
 
@@ -534,6 +538,8 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
         [initial_rotations[0]['amplitude']*np.ones(hsl//2), np.zeros(hsl//2)]),
               'cphase_final_pi_qbc.amplitude': np.concatenate(
         [final_rotations[0]['amplitude']*np.ones(hsl//2), np.zeros(hsl//2)])}
+    # params = {'cphase_init_pi_qbc.amplitude': np.concatenate(
+    #     [initial_rotations[0]['amplitude']*np.ones(hsl//2), np.zeros(hsl//2)])}
     params.update({f'cphase_final_pihalf_qbt.{k}': v['values']
                    for k, v in hard_sweep_dict.items()})
     ssl = len(list(soft_sweep_dict.values())[0]['values'])

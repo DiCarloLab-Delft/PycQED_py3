@@ -10,6 +10,7 @@ from pycqed.measurement.pulse_sequences import calibration_elements as csqs
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mq_sqs
 from pycqed.measurement.waveform_control import pulsar as ps
 
+import time
 
 
 class File(swf.Hard_Sweep):
@@ -185,8 +186,11 @@ class SegmentHardSweep(swf.Hard_Sweep):
 
     def prepare(self, awgs_to_upload='all', **kw):
         if self.upload:
+            time.sleep(0.1)
             ps.Pulsar.get_instance().program_awgs(self.sequence,
                                                   awgs=awgs_to_upload)
+            time.sleep(0.1)
+            print('programmed hard sweep')
 
 
 class InstrumentSoftSweep(swf.Soft_Sweep):

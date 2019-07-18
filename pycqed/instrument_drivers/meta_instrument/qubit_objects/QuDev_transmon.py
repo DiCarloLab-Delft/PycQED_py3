@@ -1072,20 +1072,18 @@ class QuDev_transmon(Qubit):
             sequence=seq, upload=upload, parameter_name='Delay', unit='s'))
         MC.set_sweep_points(sweep_points)
 
-        MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weights_type() == 'optimal_qutrit'
-                                 else self.int_avg_det)
+        MC.set_detector_function(self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update(
             {'sweep_points_dict': {self.name: times},
              'sweep_name': 'Delay',
-             'sweep_unit': ['s'],
+             'sweep_unit': 's',
              'cal_points': repr(cp),
              'preparation_params': prep_params,
              'last_ge_pulses': [last_ge_pulse],
              'artificial_detuning': artificial_detunings,
-             'rotate': self.acq_weights_type() != 'optimal_qutrit',
+             'rotate': True,
              'data_to_fit': {self.name: 'pf' if for_ef else 'pe'}})
 
         MC.run(label, exp_metadata=exp_metadata)

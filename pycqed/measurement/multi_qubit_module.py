@@ -1842,7 +1842,7 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                    num_cz_gates=1, cal_points=True,
                    n_cal_points_per_state=1, cal_states='auto',
                    prep_params=None, exp_metadata=None, label=None,
-                   analyze=True, upload=True, **kw):
+                   analyze=True, upload=True, for_ef=True, **kw):
     '''
     method to measure the leakage and the phase acquired during a flux pulse
     conditioned on the state of the control qubit (self).
@@ -1880,7 +1880,8 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
         qb.prepare(drive='timedomain')
 
     if cal_points:
-        cal_states = CalibrationPoints.guess_cal_states(cal_states)
+        cal_states = CalibrationPoints.guess_cal_states(cal_states,
+                                                        for_ef=for_ef)
         cp = CalibrationPoints.multi_qubit([qbc.name, qbt.name], cal_states,
                                             n_per_state=n_cal_points_per_state)
     else:
@@ -1889,6 +1890,8 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
     if max_flux_length is not None:
         print(f'max_flux_length = {max_flux_length*1e9:.2f} ns, set by user')
 
+    if prep_params is None:
+        prep_params = qbc.preparation_params()
     operation_dict = get_operation_dict([qbc, qbt])
     sequences, hard_sweep_points, soft_sweep_points = \
         fsqs.cphase_seqs(
@@ -1929,6 +1932,9 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                          'preparation_params': prep_params,
                          'cal_points': repr(cp),
                          'rotate': cal_points,
+                         'cal_states_rotations':
+                             {qbc.name: {'g': 0, 'f': 1},
+                              qbt.name: {'g': 0, 'e': 1}},
                          'data_to_fit': {qbc.name: 'pf', qbt.name: 'pe'},
                          'hard_sweep_params': hard_sweep_params,
                          'soft_sweep_params': soft_sweep_params})
