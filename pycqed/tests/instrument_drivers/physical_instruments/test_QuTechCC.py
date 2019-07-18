@@ -1,3 +1,4 @@
+import pycqed as pq
 import unittest
 import tempfile
 import os
@@ -7,7 +8,6 @@ from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
 
 class Test_QutechCC(unittest.TestCase):
-    @unittest.expectedFailure#'golden test file is not commited to git')
     def test_all(self):
         fn = 'Test_QutechCC_test_all.scpi.txt'
         test_path = os.path.join('test_output',fn)
@@ -62,5 +62,8 @@ class Test_QutechCC(unittest.TestCase):
 
         # check results
         test_output = open(test_path).read()
-        golden = open(os.path.join('golden',fn)).read()
+        fn_g = os.path.join(pq.__path__[0], 'tests',
+                            'instrument_drivers', 'physical_instruments',
+                            'golden', fn)
+        golden = open(fn_g).read()
         self.assertEqual(test_output, golden)
