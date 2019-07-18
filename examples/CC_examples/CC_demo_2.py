@@ -146,7 +146,7 @@ log.debug('connecting to CC')
 instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
 instr.cc.reset()
 instr.cc.clear_status()
-instr.cc.set_status_questionable_frequency_enable(0x7FFF)
+instr.cc.status_preset()
 
 ##########################################
 # Open virtual instruments

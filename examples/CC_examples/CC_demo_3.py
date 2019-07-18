@@ -217,7 +217,7 @@ log.debug('connecting to CC')
 cc = QuTechCC('cc', IPTransport(ip))
 cc.reset()
 cc.clear_status()
-cc.set_status_questionable_frequency_enable(0x7FFF)
+cc.status_preset()
 
 log.debug('uploading program to CC')
 cc.sequence_program(prog)
