@@ -34,6 +34,10 @@ class SCPIBase:
     def _ask_int(self, cmd_str: str) -> int:
         return int(self._ask(cmd_str))  # FIXME: can raise ValueError
 
+    def _ask_bin(self, cmd_str: str) -> bytes:
+        self._transport.write(cmd_str)
+        return self.bin_block_read()
+
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
     ###

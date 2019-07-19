@@ -36,7 +36,12 @@ class QuTechCC_core(SCPIBase):
         bin_block = program_string.encode('ascii')
         self.bin_block_write(bin_block, hdr)
 
-    # FIXME: add function to get assembly errors
+    def get_assembler_error(self) -> int:
+        return self._ask_int('QUTech:SEQuence:PROGram:ASSEMbler:ERRor?')
+
+    def get_assembler_log(self) -> bytes:
+        return self._ask_bin('QUTech:SEQuence:PROGram:ASSEMbler:LOG?')
+
 
     def set_q1_reg(self, ccio: int, reg: int, val: int) -> None:
         # only possible if CC is stopped
@@ -44,13 +49,13 @@ class QuTechCC_core(SCPIBase):
 
     def get_q1_reg(self, ccio: int, reg: int) -> int:
         # only possible if CC is stopped
-        return self._transport.ask_int('QUTech:CCIO{}:Q1REG{}'.format(ccio, reg))
+        return self.ask_int('QUTech:CCIO{}:Q1REG{}'.format(ccio, reg))
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write('QUTech:CCIO{}:VSMbit{}:RISEDELAY {}'.format(ccio, bit, cnt_in_833_ps_steps))
 
     def get_vsm_delay_rise(self, ccio: int, bit: int) -> int:
-        return self._transport._ask_int('QUTech:CCIO#:VSMbit#:RISEDELAY?'.format(ccio, bit))
+        return self._ask_int('QUTech:CCIO#:VSMbit#:RISEDELAY?'.format(ccio, bit))
 
     def set_vsm_delay_fall(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write('QUTech:CCIO{}:VSMbit{}:FALLDELAY {}'.format(ccio, bit, cnt_in_833_ps_steps))
