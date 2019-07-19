@@ -86,22 +86,22 @@ class QuTechCC_core(SCPIBase):
     def get_status_questionable_frequency_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:FREQ:ENABle?')
 
-    # HDAWG DIO/marker bit definitions: output
+    # HDAWG DIO/marker bit definitions: CC output
     HDAWG_TOGGLE_DS = 30
     HDAWG_TRIG = 31
     HDAWG_CW = range(0,23)
 
-    # QWG DIO/marker bit definitions: output
+    # QWG DIO/marker bit definitions: CC output
     QWG_TOGGLE_DS = 30
     QWG_TRIG = 31
     QWG1_CW = range(0,11)
     QWG2_CW = range(16,27)
 
-    # UHFQA DIO/marker bit definitions: output
+    # UHFQA DIO/marker bit definitions: CC output
     UHFQA_TOGGLE_DS = 31
     UHFQA_TRIG = 16
     UHFQA_CW = range(17,26)
 
-    # UHFQA DIO/marker bit definitions: input
+    # UHFQA DIO/marker bit definitions: CC input
     UHFQA_DV = 0
     UHFQA_RSLT = range(1,10)

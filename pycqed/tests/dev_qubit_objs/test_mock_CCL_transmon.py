@@ -168,7 +168,7 @@ class Test_Mock_CCL(unittest.TestCase):
 
             f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
 
-            self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+            self.CCL_qubit.freq_res(self.CCL_qubit.calculate_mock_resonator_frequency())
             self.CCL_qubit.freq_qubit(f_qubit)
 
             self.CCL_qubit.cfg_with_vsm(with_vsm)
@@ -200,7 +200,7 @@ class Test_Mock_CCL(unittest.TestCase):
         f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
         self.CCL_qubit.freq_qubit(f_qubit)
         self.CCL_qubit.cfg_dc_flux_ch(self.CCL_qubit.mock_cfg_dc_flux_ch())
-        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.freq_res(self.CCL_qubit.calculate_mock_resonator_frequency())
 
         freq_res = self.CCL_qubit.calculate_mock_resonator_frequency()
         self.CCL_qubit.ro_freq(freq_res)
@@ -218,8 +218,8 @@ class Test_Mock_CCL(unittest.TestCase):
     ###########################################################
     def test_calibrate_ro_pulse_CW(self):
         self.CCL_qubit.mock_ro_pulse_amp_CW(0.05)
-        self.CCL_qubit.mock_freq_res(7.5e9)
-        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.mock_freq_res_bare(7.5e9)
+        self.CCL_qubit.freq_res(self.CCL_qubit.calculate_mock_resonator_frequency())
 
         self.device.qubits([self.CCL_qubit.name])
 
@@ -261,7 +261,7 @@ class Test_Mock_CCL(unittest.TestCase):
         f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
         self.CCL_qubit.freq_qubit(f_qubit)
 
-        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.freq_res(self.CCL_qubit.calculate_mock_resonator_frequency())
 
         self.CCL_qubit.ro_pulse_amp_CW(self.CCL_qubit.mock_ro_pulse_amp_CW())
         freq_res = self.CCL_qubit.calculate_mock_resonator_frequency()
@@ -294,7 +294,7 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.freq_qubit(f_qubit)
         freq_res = self.CCL_qubit.calculate_mock_resonator_frequency()
 
-        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.freq_res(freq_res)
 
         self.CCL_qubit.ro_pulse_amp_CW(self.CCL_qubit.mock_ro_pulse_amp_CW())
         self.CCL_qubit.ro_freq(freq_res)
@@ -321,7 +321,7 @@ class Test_Mock_CCL(unittest.TestCase):
         f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
         self.CCL_qubit.freq_qubit(f_qubit)
 
-        self.CCL_qubit.freq_res(self.CCL_qubit.mock_freq_res())
+        self.CCL_qubit.freq_res(self.CCL_qubit.calculate_mock_resonator_frequency())
 
         self.CCL_qubit.ro_pulse_amp_CW(self.CCL_qubit.mock_ro_pulse_amp_CW())
         freq_res = self.CCL_qubit.calculate_mock_resonator_frequency()

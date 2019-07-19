@@ -5,11 +5,13 @@
     Notes:              use QuTechCC_core to talk to instrument, do not add knowledge of SCPI syntax here
     Usage:
     Bugs:
+    - _ccio_slots_driving_vsm not handled correctly
+    - dio{}_out_delay not gettable
 
 """
 
 import logging
-
+from typing import List
 from .QuTechCC_core import QuTechCC_core
 from .Transport import Transport
 
@@ -24,13 +26,17 @@ class QuTechCC(QuTechCC_core, Instrument):
                  name: str,
                  transport: Transport,
                  num_ccio: int=9,
-                 ccio_slot_driving_vsm: int=5) -> None:
+                 ccio_slots_driving_vsm: List[int] = None  # NB: default can not be '[]' because that is a mutable default argument
+                 ) -> None:
         super().__init__(name, transport) # calls QuTechCC_core
         Instrument.__init__(self, name) # calls Instrument
 
         # user constants
         self._num_ccio = num_ccio  # the number of CCIO modules used
-        self._ccio_slot_driving_vsm = ccio_slot_driving_vsm  # the slot number of the CCIO driving the VSM (FIXME: supports one VSM only)
+        if ccio_slots_driving_vsm == None:
+            self._ccio_slots_driving_vsm = []
+        else:
+            self._ccio_slots_driving_vsm = ccio_slots_driving_vsm  # the slot numbers of the CCIO driving the VSM
 
         # fixed constants
         self._Q1REG_DIO_DELAY = 63  # the register used in OpenQL generated programs to set DIO delay
@@ -89,8 +95,9 @@ class QuTechCC(QuTechCC_core, Instrument):
         # support 'dio{}_out_delay' for device_object_CCL.py::prepare_timing()
         # NB: DIO starts from 1 on CC-light/QCC, but we use CCIO number starting from 0
         for ccio in range(0, num_ccio):
-            if ccio == self._ccio_slot_driving_vsm:  # skip VSM
-                continue
+            if 0:  # also allow DIO delay setting for slots driving VSM
+                if ccio in self._ccio_slots_driving_vsm:  # skip VSM
+                    continue
             self.add_parameter(
                 'dio{}_out_delay'.format(ccio),
                 label='Output Delay of DIO{}'.format(ccio),
@@ -124,17 +131,17 @@ class QuTechCC(QuTechCC_core, Instrument):
 
     # helper for parameter 'vsm_rise_delay{}'
     def _set_vsm_rise_delay(self, bit: int, cnt_in_833_ps_steps: int) -> None:
-        self.set_vsm_delay_rise(self._ccio_slot_driving_vsm, bit, cnt_in_833_ps_steps)
+        self.set_vsm_delay_rise(self._ccio_slots_driving_vsm, bit, cnt_in_833_ps_steps)
 
     def _get_vsm_rise_delay(self, bit: int) -> int:
-        return self.set_vsm_delay_rise(self._ccio_slot_driving_vsm, bit)
+        return self.set_vsm_delay_rise(self._ccio_slots_driving_vsm, bit)
 
     # helper for parameter 'vsm_fall_delay{}'
     def _set_vsm_fall_delay(self, bit: int, cnt_in_833_ps_steps: int) -> None:
-        self.set_vsm_delay_fall(self._ccio_slot_driving_vsm, bit, cnt_in_833_ps_steps)
+        self.set_vsm_delay_fall(self._ccio_slots_driving_vsm, bit, cnt_in_833_ps_steps)
 
     def _get_vsm_fall_delay(self, bit: int) -> int:
-        return self.set_vsm_delay_fall(self._ccio_slot_driving_vsm, bit)
+        return self.set_vsm_delay_fall(self._ccio_slots_driving_vsm, bit)
 
     ##########################################################################
     # CC-light compatibility support
@@ -153,8 +160,8 @@ class QuTechCC(QuTechCC_core, Instrument):
         cnt_in_20ns_steps = int(delay_ns // 20)
         remain_ns = delay_ns - cnt_in_20ns_steps * 20
         cnt_in_833_ps_steps = round(remain_ns*1.2)  # NB: actual step size is 1/1200 MHz
-        self.set_vsm_delay_rise(self._ccio_slot_driving_vsm, bit, cnt_in_833_ps_steps)
-        self._set_dio_delay(self._ccio_slot_driving_vsm, cnt_in_20ns_steps)
+        self.set_vsm_delay_rise(self._ccio_slots_driving_vsm, bit, cnt_in_833_ps_steps)
+        self._set_dio_delay(self._ccio_slots_driving_vsm, cnt_in_20ns_steps)
 
     # helper for parameter 'dio{}_out_delay'
     def _set_dio_delay(self, ccio: int, cnt_in_20ns_steps: int) -> None:

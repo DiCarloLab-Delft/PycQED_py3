@@ -6802,21 +6802,21 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         optimize = kw.pop('optimize', True)
         verbose = kw.get('verbose', False)
 
-        # try:
-        #     data_amp = self.measured_values[0]
-        #     data_phase = self.measured_values[1]
-        #     data_real = data_amp * np.cos(np.pi * data_phase / 180)
-        #     data_imag = data_amp * np.sin(np.pi * data_phase / 180)
-        #     self.data_dist = a_tools.calculate_distance_ground_state(
-        #         data_real=data_real,
-        #         data_imag=data_imag,
-        #         normalize=False,
-        #         percentile=60)
-        # except:
-        # Quick fix to make it work with pulsed spec which does not
-        # return both I,Q and, amp and phase
-        # only using the amplitude!!
-        self.data_dist = self.measured_values[0] - np.min(self.measured_values[0])
+        try:
+            data_amp = self.measured_values[0]
+            data_phase = self.measured_values[1]
+            data_real = data_amp * np.cos(np.pi * data_phase / 180)
+            data_imag = data_amp * np.sin(np.pi * data_phase / 180)
+            self.data_dist = a_tools.calculate_distance_ground_state(
+                data_real=data_real,
+                data_imag=data_imag,
+                normalize=False,
+                percentile=60)
+        except:
+            # Quick fix to make it work with pulsed spec which does not
+            # return both I,Q and, amp and phase
+            # only using the amplitude!!
+            self.data_dist = self.measured_values[0] - np.min(self.measured_values[0])
 
         # Smooth the data by "filtering"
         data_dist_smooth = a_tools.smooth(self.data_dist,
@@ -7707,7 +7707,7 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                 min_index = np.argmin(self.measured_values[0][:, u])
                 f0[u] = np.min(self.sweep_points[min_index])
             else:
-                f0[u] = fits[str(power)].values['f0'] 
+                f0[u] = fits[str(power)].values['f0']
             self.f0 = f0
 
         self.fit_results = fits
@@ -8656,7 +8656,8 @@ class DoubleFrequency(TD_Analysis):
             for ii in range(len(measured_values)):
                 for jj in range(3):
                     E[ii,:]=np.exp(expvals*sweep_values[ii])
-            coeff = np.linalg.lstsq(E,measured_values,rcond=None)[0]
+            # FIXME: when using numpy >1.14 we should change to rcond=None
+            coeff = np.linalg.lstsq(E, measured_values, rcond=-1)[0]
             amp_guess = 2*np.abs(coeff[[0]])
             phi_guess = np.angle(coeff[[0]])
         else:
@@ -8666,13 +8667,10 @@ class DoubleFrequency(TD_Analysis):
             for ii in range(len(measured_values)):
                 for jj in range(5):
                     E[ii,:]=np.exp(expvals*sweep_values[ii])
-            coeff = np.linalg.lstsq(E,measured_values,rcond=None)[0]
+            # FIXME: when using numpy >1.14 we should change to rcond=None
+            coeff = np.linalg.lstsq(E, measured_values, rcond=-1)[0]
             amp_guess = 2*np.abs(coeff[[0,2]])
             phi_guess = np.angle(coeff[[0,2]])
-        print(tau_guess)
-        print(freq_guess)
-        print(amp_guess)
-        print(phi_guess)
 
         Double_Cos_Model.set_param_hint(
             'tau_1', value=tau_guess[0], vary=True, min=0, max=6*tau_guess[0])
@@ -8718,10 +8716,7 @@ class DoubleFrequency(TD_Analysis):
         if type(plot_formats) == str:
             plot_formats = [plot_formats]
         for plot_format in plot_formats:
-            if figname is None:
-                figname = (self.timestamp + figname + '.' + plot_format)
-            else:
-                figname = (figname + '.' + plot_format)
+            figname = (self.timestamp_string + figname + '.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
                 self.folder, figname))
             if fig_tight:
@@ -8734,7 +8729,7 @@ class DoubleFrequency(TD_Analysis):
                     self.savename, dpi=300,
                     # value of 300 is arbitrary but higher than default
                     format=plot_format)
-            except:
+            except Exception:
                 fail_counter = True
                 print('Could not save to '+str(self.savename))
         if fail_counter:

@@ -30,6 +30,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             - describe "hidden" parameters to mock real experiments.
         """
         # Qubit resonator
+        self.add_parameter('mock_freq_res_bare', label='bare resonator freq',
+                           unit='Hz', parameter_class=ManualParameter,
+                           initial_value=7.487628e9)
+
         self.add_parameter('mock_Qe', parameter_class=ManualParameter,
                            initial_value=13945)
 
@@ -48,7 +52,17 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_phi_0', parameter_class=ManualParameter,
                            initial_value=0)
 
+        self.add_parameter('mock_pow_shift',
+                           label='power needed for low to high regime',
+                           unit='dBm', initial_value=20,
+                           parameter_class=ManualParameter)
+
         # Test resonator
+        self.add_parameter('mock_freq_test_res',
+                           label='test resonator frequency',
+                           unit='Hz', parameter_class=ManualParameter,
+                           initial_value=7.76459e9)
+
         self.add_parameter('mock_test_Qe', parameter_class=ManualParameter,
                            initial_value=1.8e6)
 
@@ -79,7 +93,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_Ej2', label='josephson energy', unit='Hz',
                            parameter_class=ManualParameter,
                            initial_value=8.943e9)
-        
+
         self.add_parameter('mock_freq_qubit_bare', label='qubit frequency',
                            unit='Hz',
                            initial_value=(np.sqrt(8*self.mock_Ec() *
@@ -87,64 +101,28 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                           self.mock_Ec()),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mock_freq_res_bare', label='bare resonator freq',
-                           unit='Hz', parameter_class=ManualParameter,
-                           initial_value=7.487628e9)
-
-        self.add_parameter('mock_freq_test_res',
-                           label='test resonator frequency',
-                           unit='Hz', parameter_class=ManualParameter,
-                           initial_value=7.76459e9)
-
-        self.add_parameter('mock_ro_pulse_amp_CW',
-                           label='Readout pulse amplitude',
-                           unit='Hz', parameter_class=ManualParameter,
-                           initial_value=0.048739)
-
-        # self.add_parameter('mock_sweetspot_current',
-        #                    label='magnitude of sweetspot current',
-        #                    unit='A', parameter_class=ManualParameter,
-        #                    initial_value=-0.642342156e-3)
-
-        self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude',
-                           unit='V', initial_value=0.41235468,
-                           parameter_class=ManualParameter)
-
-        self.add_parameter('mock_T1', label='relaxation time', unit='s',
-                           initial_value=29e-6,
-                           parameter_class=ManualParameter)
-
-        self.add_parameter('mock_T2_star', label='Ramsey T2', unit='s',
-                           initial_value=23.478921e-6,
-                           parameter_class=ManualParameter)
-
-        self.add_parameter('mock_T2_echo', label='Echo T2', unit='s',
-                           initial_value=46.2892e-6,
-                           parameter_class=ManualParameter)
-
         self.add_parameter('mock_anharmonicity', label='anharmonicity',
                            unit='Hz', initial_value=self.mock_Ec(),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mock_spec_pow', label='optimal spec power',
-                           unit='dBm', initial_value=-35,
+
+        # Qubit flux
+        self.add_parameter('mock_fl_dc_V_per_phi0', unit='A/Wb',
+                           initial_value={'FBL_Q1': 20e-3,
+                                          'FBL_Q2': 2},
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mock_12_spec_amp',
-                           label='amplitude for 12 transition', unit='-',
-                           initial_value=0.5, parameter_class=ManualParameter)
+        self.add_parameter('mock_sweetspot_phi_over_phi0',
+                           label='magnitude of sweetspot flux',
+                           unit='-', parameter_class=ManualParameter,
+                           initial_value=0.02)
 
-        self.add_parameter('mock_baseline', label='resonator signal',
-                           unit='V', parameter_class=ManualParameter)
-
-        self.add_parameter('mock_spec_maximum', label='resonator baseline',
-                           unit='V', parameter_class=ManualParameter)
-
-        self.add_parameter('mock_pow_shift',
-                           label='power needed for low to high regime',
-                           unit='dBm', initial_value=20,
+        self.add_parameter('mock_cfg_dc_flux_ch',
+                           label='most closely coupled fluxline',
+                           unit='', initial_value='FBL_Q1',
                            parameter_class=ManualParameter)
 
+        # Qubit-resonator interaction
         self.add_parameter('mock_coupling01',
                            label='coupling qubit to resonator', unit='Hz',
                            initial_value=60e6, parameter_class=ManualParameter)
@@ -173,33 +151,40 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            initial_value=self.mock_chi01()-self.mock_chi12()/2,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mock_freq_res', label='resonator frequency',
+        # Readout parameters
+        self.add_parameter('mock_ro_pulse_amp_CW',
+                           label='Readout pulse amplitude',
                            unit='Hz', parameter_class=ManualParameter,
-                           initial_value=self.mock_freq_res_bare() -
-                           self.mock_chi12() / 2)
+                           initial_value=0.048739)
 
-        self.add_parameter('mock_res_width', label='resonator peak width',
-                           unit='Hz', initial_value=0.25e6,
+        self.add_parameter('mock_spec_pow', label='optimal spec power',
+                           unit='dBm', initial_value=-35,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mock_fl_dc_V_per_phi0', unit='A/Wb',
-                           initial_value={'FBL_Q1': 20e-3,
-                                          'FBL_Q2': 2},
-                           parameter_class=ManualParameter)
-        
-        self.add_parameter('mock_sweetspot_phi_over_phi0',
-                           label='magnitude of sweetspot current',
-                           unit='-', parameter_class=ManualParameter,
-                           initial_value=0.02)
+        self.add_parameter('mock_12_spec_amp',
+                           label='amplitude for 12 transition', unit='-',
+                           initial_value=0.5, parameter_class=ManualParameter)
 
-        self.add_parameter('mock_cfg_dc_flux_ch',
-                           label='most closely coupled fluxline',
-                           unit='', initial_value='FBL_Q1',
+        self.add_parameter('mock_mw_amp180', label='Pi-pulse amplitude',
+                           unit='V', initial_value=0.41235468,
                            parameter_class=ManualParameter)
 
         self.add_parameter('noise', label='nominal noise level', unit='V',
-                           initial_value=0.16e-3, parameter_class=ManualParameter)
+                           initial_value=0.16e-3,
+                           parameter_class=ManualParameter)
 
+        # Qubit characteristics
+        self.add_parameter('mock_T1', label='relaxation time', unit='s',
+                           initial_value=29e-6,
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('mock_T2_star', label='Ramsey T2', unit='s',
+                           initial_value=23.478921e-6,
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('mock_T2_echo', label='Echo T2', unit='s',
+                           initial_value=46.2892e-6,
+                           parameter_class=ManualParameter)
 
 
 
@@ -275,7 +260,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            unit='Hz')
         freqs = np.linspace(VNA.start_frequency(), VNA.stop_frequency(),
                             VNA.npts())
-        f0_res = self.mock_freq_res()/1e9
+        f0_res = self.calculate_mock_resonator_frequency()/1e9
         f0_test = self.mock_freq_test_res()/1e9
 
         Q_test = 346215
@@ -1035,9 +1020,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         h = 10**(power/20)*10e-3   # Lorentzian baseline [V]
         
-        A = 0.8*h                  # Peak height [V]
-        w = self.mock_res_width()  # Width of Lorentzian (HWHM) [Hz]
-
         Q = self.mock_Q()
         Qe = self.mock_Qe()
         theta = self.mock_theta()
@@ -1065,24 +1047,27 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             f0_high = self.mock_freq_res_bare()
 
             f_shift = f0 - f0_high
-            f0 = f0 - (power - res_power)/pow_shift*f_shift
+            f0 = f0 - ((power - res_power)/pow_shift)*f_shift
 
-            Q_decrease = (1+(power-res_power)/pow_shift)*2
+            Q_decrease = (1+(power-res_power)/pow_shift*10)
             
-            QQe = Q/Qe / Q_decrease
-
-
-            Q_nonlinear = Q/Q_decrease
-            Qe_nonlinear = Qe/Q_decrease
+            Q_nonlinear = Q#/Q_decrease
+            Qe_nonlinear = Qe#/Q_decrease
             res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q_nonlinear,
                                                       Qe_nonlinear, h,
                                                       theta, phi_v, phi_0,
-                                                      slope=slope)
+                                                      slope=slope) - h
+            res_qubit_dip = res_qubit_dip/Q_decrease
+
+            res_qubit_dip += h
             # Add some extra noise
             for i, value in enumerate(res_qubit_dip):
                 d = np.abs(value - h)
 
-                value += np.random.normal(0, d/10, 1)
+                value += np.random.normal(0,
+                                          self.noise() /
+                                          self.ro_acq_averages()*10*Q_decrease,
+                                          1)
                 res_qubit_dip[i] = value
         else:
             # High power regime

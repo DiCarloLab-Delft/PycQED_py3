@@ -60,7 +60,7 @@ if 1:
     cc = QuTechCC('cc', IPTransport(ip))
     cc.reset()
     cc.clear_status()
-    cc.set_status_questionable_frequency_enable(0x7FFF)
+    cc.status_preset()
 
     if 1:
         cc.debug_marker_out(0, cc.UHFQA_TRIG) # UHF-QA trigger
