@@ -16,8 +16,11 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
     def setUp(self):
         self.k0.cfg_sampling_rate(2.4e9)
         self.k0.filter_model_00(
-            {'model': 'high-pass', 'params': {'tau': 4.071755778296734e-05}})
+            {'model': 'high-pass',
+             'real-time': False,
+             'params': {'tau': 4.071755778296734e-05}})
         self.k0.filter_model_01({'model': 'exponential',
+                                 'real-time': False,
                                  'params': {'amp': 4.2035373039155806, 'tau': 5.9134605614601521e-06}})
 
     def test_print_overview(self):
@@ -36,7 +39,9 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
 
     def test_reset_kernels(self):
 
-        mod00 = {'model': 'high-pass', 'params':
+        mod00 = {'model': 'high-pass',
+                 'real-time': False,
+                 'params':
                  {'tau': 4.071755778296734e-05}}
         self.k0.filter_model_00(mod00)
 
@@ -48,7 +53,7 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
         self.assertEqual({}, read_back)
 
     def test_reset_kernel_resets_hardware(self):
-
+        self.k0.cfg_awg_channel(1)
         self.k0.filter_model_00(
             {'model': 'exponential',
              'real-time': True,
@@ -66,14 +71,21 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
         # First test that some hardware settings were set
         assert exp_amp != 0
         assert (fir_coeffs == np.linspace(.2, 0, 40)).all()
-        self.k0.set_realtime_distortions_zero()
+
+        # Reset when kernel is used does not reset value
+        self.k0.set_unused_realtime_distortions_zero()
 
         exp_amp = self.AWG.sigouts_0_precompensation_exponentials_0_amplitude()
-        fir_coeffs = self.AWG.sigouts_0_precompensation_fir_coefficients()
+        assert exp_amp != 0
+        # Reset when kernel is not used does reset value
+        self.k0.filter_model_00(
+            {'model': 'exponential',
+             'real-time': False,
+             'params': {'tau': 1e-6, 'amp': 0.1}})
+        self.k0.set_unused_realtime_distortions_zero()
+
+        exp_amp = self.AWG.sigouts_0_precompensation_exponentials_0_amplitude()
         assert exp_amp == 0
-        imp_resp = np.zeros(40)
-        imp_resp[0] = 1
-        assert (fir_coeffs == imp_resp).all()
 
     def test_setting_realtime_filter_exponential(self):
         self.k0.reset_kernels()

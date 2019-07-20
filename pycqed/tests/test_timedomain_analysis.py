@@ -72,6 +72,14 @@ class Test_DoubleFreq_analysis(unittest.TestCase):
         self.assertAlmostEqual(fit_res['amp_1'], 0.25, places=1)
         self.assertAlmostEqual(fit_res['amp_2'], 0.25, places=1)
 
+    def test_failingfreq_fit(self):
+        a = ma.DoubleFrequency(timestamp='20190713_111746')
+        fit_res = a.fit_res.best_values
+        print(fit_res)
+        # Note, this is a failing fit containing mostly noise as data.
+        # this test only tests if the analysis does not crash.
+        # We could at a later date add failure modes (7-2019)
+
 
 class test_ramsey_analysis(unittest.TestCase):
 

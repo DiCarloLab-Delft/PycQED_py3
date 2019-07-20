@@ -295,7 +295,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
     Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
     Makes several plots, such as Tx vs time, Tx vs frequency, Tx vs flux, freq vs current etc.
     Ferforms only up to two fits:
-        - frequency vs current (used to concert current to flux and to calculate 
+        - frequency vs current (used to concert current to flux and to calculate
             flux sensitivity |df/dI|; if requested)
         - A/f to Tx vs frequency (to extract Q-factor from T1 measurements; if requested)
 
@@ -369,7 +369,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  fit_T1_vs_freq=False,
                  mean_and_std=False
                  ):
-        
+
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
@@ -519,7 +519,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                     msg += '$\kappa_2$={:.2g} MHz'.format(self.fit_res['kappares2']/1e6)
 
                 self.proc_data_dict['freq_relation_msg'] = msg
-                    
+
                 self.fit_res['Q_qubit_fitfct'] = lambda x: fit_object_T1_vs_freq.model.eval(
                     fit_object_T1_vs_freq.params, freq=x)
         else:
@@ -1698,13 +1698,13 @@ def fit_T1_purcell_diel(freq, tau, fres_guess):
         Q_factor_model.set_param_hint('fres2', value=fres_guess[1])
         Q_factor_model.set_param_hint('g2', value=10e6)
         Q_factor_model.set_param_hint('kappa2', value=1e8)
-        
+
     fit_result_Q_factor = Q_factor_model.fit(tau, freq=freq)
     return fit_result_Q_factor
 
 
 def fit_frequencies(dac, freq,
-                    Ec_guess=260e6, Ej_guess=19e9, offset_guess=0,
+                    Ec_guess=260e6, Ej_guess=None, offset_guess=0,
                     dac0_guess=None):
     """
     Perform fit against the transmon flux arc model.
@@ -1720,7 +1720,11 @@ def fit_frequencies(dac, freq,
     arch_model = lmfit.Model(arch)
 
     if dac0_guess is None:
-        dac0_guess = np.max(np.abs(dac))*2
+        dac0_guess = np.max(np.abs(dac))
+
+    if Ej_guess is None:
+        f_max = np.max(freq)
+        Ej_guess = (f_max+Ec_guess)**2/(8*Ec_guess)
 
     # set some hardcoded guesses
     arch_model.set_param_hint('Ec', value=Ec_guess, min=1e6, max=350e6)
