@@ -187,7 +187,7 @@ class CCLight_Transmon(Qubit):
             '\n\tand "RO_acq_weight_func_Q"')
 
         self.add_parameter('ro_acq_weight_type',
-                           initial_value='DSB',
+                           initial_value='SSB',
                            vals=vals.Enum(
                                'SSB', 'DSB', 'optimal', 'optimal IQ'),
                            docstring=ro_acq_docstr,
