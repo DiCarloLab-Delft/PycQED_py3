@@ -9,7 +9,7 @@ from matplotlib import cm
 import numpy as np
 import matplotlib.colors as col
 import hsluv
-
+import logging 
 
 def set_xlabel(axis, label, unit=None, **kw):
     """
@@ -73,13 +73,28 @@ def set_cbarlabel(cbar, label, unit=None, **kw):
         **kw : keyword argument to be passed to cbar.set_label
     """
     if unit is not None and unit != '':
-        zticks = cbar.get_ticks()
-        scale_factor, unit = SI_prefix_and_scale_factor(
-            val=max(abs(zticks)), unit=unit)
-        cbar.set_ticks(zticks)
-        cbar.set_ticklabels(zticks*scale_factor)
-        cbar.set_label(label + ' ({})'.format(unit))
-        
+        try: 
+            zticks = cbar.get_ticks()
+
+            scale_factor, unit = SI_prefix_and_scale_factor(
+                val=max(abs(zticks)), unit=unit)
+            cbar.set_ticks(zticks)
+            cbar.set_ticklabels(zticks*scale_factor)
+            cbar.set_label(label + ' ({})'.format(unit))
+            
+        except AttributeError as e: 
+            logging.warning(e) 
+            logging.warning('Upgrade to matplotlib > 2.1 for cbar ticks')
+            # assume y-axis is used 
+            cax = cbar.ax 
+            zticks = cax.get_yticks() 
+
+            scale_factor, unit = SI_prefix_and_scale_factor(
+                val=max(abs(zticks)), unit=unit)
+            cax.set_yticks(zticks)
+            cax.set_yticklabels(zticks*scale_factor)
+            cax.set_ylabel(label + ' ({})'.format(unit))
+            
 
     else:
         cbar.set_label(label, **kw)
