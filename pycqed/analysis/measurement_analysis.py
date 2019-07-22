@@ -8537,7 +8537,6 @@ class DoubleFrequency(TD_Analysis):
         y2 = a_tools.normalize_data_v3(self.measured_values[0])
 
         y=y2
-        #TODO:Include the calibration points
         #TODO: implement prony's method and see if it's better
         y[:-4] = y1
         fit_res = self.fit(x[:-4], y[:-4])
@@ -8567,18 +8566,21 @@ class DoubleFrequency(TD_Analysis):
                    r'$\tau _1$: {:.2f} $\mu$s'.format(self.tau1 * 1e6) +
                    '  \t' + r'$\tau _2$: {:.2f}$\mu$s'.format(self.tau2 * 1e6))
 
-        ax.text(0.4, 0.95, textstr,
+        self.ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-        plot_x = x
+        plot_x = np.linspace(self.sweep_points[0],
+                        self.sweep_points[-self.NoCalPoints - 1],
+                        len(self.sweep_points) * 100)
 
-        ax.set_ylabel(r'$F |1\rangle$')
-        ax.set_title('%s: Double Frequency analysis' % self.timestamp)
-        ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x * 1e6, y, 'o-')
-        ax.plot(plot_x[:-4] * 1e6, self.fit_plot, '-')
-        fig.tight_layout()
-        self.save_fig(fig, **kw)
+        best_vals = fit_res.best_values
+        plot_y = fit_mods.DoubleExpDampOscFunc(
+            plot_x, **best_vals)
+
+        self.ax.set_title('%s: Double Frequency analysis' % self.timestamp)
+        self.ax.plot(plot_x, plot_y, '-')
+        self.fig.tight_layout()
+        self.save_fig(self.fig, **kw)
         self.data_file.close()
         return self.fit_res
 
@@ -8677,7 +8679,7 @@ class DoubleFrequency(TD_Analysis):
         Double_Cos_Model.set_param_hint(
             'freq_1', value=freq_guess[0], min=0)
         Double_Cos_Model.set_param_hint('phase_1', value=phi_guess[0])
-        Double_Cos_Model.set_param_hint('osc_offset', value=0.5, min=0, max=1)
+        Double_Cos_Model.set_param_hint('osc_offset', value=np.mean(measured_values), min=0, max=1)
         if (only_one_peak):
             Double_Cos_Model.set_param_hint(
                 'tau_2', value=0, vary=False, min=0)
@@ -8695,17 +8697,15 @@ class DoubleFrequency(TD_Analysis):
             Double_Cos_Model.set_param_hint(
                 'freq_2', value=freq_guess[1], min=0)
             Double_Cos_Model.set_param_hint('phase_2', value=phi_guess[1])
-
             Double_Cos_Model.set_param_hint(
-                'amp_1', value=amp_guess[0], min=0.05, max=1.1, vary=True)
+                'amp_1', value=amp_guess[0], min=0.05, max=2*amp_guess[0], vary=True)
             Double_Cos_Model.set_param_hint(
-                'amp_2', value=amp_guess[1], min=0.05, max=1.1, vary=True)
+                'amp_2', value=amp_guess[1], min=0.05, max=2*amp_guess[1], vary=True)
 
         params = Double_Cos_Model.make_params()
         fit_res = Double_Cos_Model.fit(data=measured_values,
                                        t=sweep_values,
                                        params=params)
-        self.fit_plot = fit_res.model.func(sweep_values, **fit_res.best_values)
         return fit_res
 
     def save_fig(self, fig, figname='_DoubleFreq_', xlabel='x', ylabel='y',
