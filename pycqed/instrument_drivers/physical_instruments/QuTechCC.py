@@ -40,7 +40,7 @@ class QuTechCC(QuTechCC_core, Instrument):
 
         # fixed constants
         self._Q1REG_DIO_DELAY = 63  # the register used in OpenQL generated programs to set DIO delay
-        self._NUM_VSM_CH = 32  # the number of VSM channels used per connector
+        self._NUM_VSM_CH = 32  # the number of VSM channels used per CCIO connector
         self._CCIO_MAX_VSM_DELAY = 48
 
         self._add_parameters(self._num_ccio)
@@ -95,7 +95,8 @@ class QuTechCC(QuTechCC_core, Instrument):
         # support 'dio{}_out_delay' for device_object_CCL.py::prepare_timing()
         # NB: DIO starts from 1 on CC-light/QCC, but we use CCIO number starting from 0
         for ccio in range(0, num_ccio):
-            if 0:  # also allow DIO delay setting for slots driving VSM
+            if 1:
+                # skip DIO delay setting for slots driving VSM. Note that vsm_channel_delay also sets DIO delay
                 if ccio in self._ccio_slots_driving_vsm:  # skip VSM
                     continue
             self.add_parameter(
@@ -112,6 +113,7 @@ class QuTechCC(QuTechCC_core, Instrument):
         # NB: CC supports 1/1200 MHz ~= 833 ps resolution
         # NB: CC supports setting trailing edge delay separately
         # NB: on CCL, index is qubit, not channel
+        # NB: supports single VSM only, use native parameter for >1 VSM
         for vsm_ch in range(0, self._NUM_VSM_CH):  # NB: VSM channel starts from 0 on CC-light/QCC
             self.add_parameter(
                 'vsm_channel_delay{}'.format(vsm_ch),
@@ -130,18 +132,19 @@ class QuTechCC(QuTechCC_core, Instrument):
     ##########################################################################
 
     # helper for parameter 'vsm_rise_delay{}'
+    # FIXME: hardcoded to first VSM
     def _set_vsm_rise_delay(self, bit: int, cnt_in_833_ps_steps: int) -> None:
-        self.set_vsm_delay_rise(self._ccio_slots_driving_vsm, bit, cnt_in_833_ps_steps)
+        self.set_vsm_delay_rise(self._ccio_slots_driving_vsm[0], bit, cnt_in_833_ps_steps)
 
     def _get_vsm_rise_delay(self, bit: int) -> int:
-        return self.set_vsm_delay_rise(self._ccio_slots_driving_vsm, bit)
+        return self.set_vsm_delay_rise(self._ccio_slots_driving_vsm[0], bit)
 
     # helper for parameter 'vsm_fall_delay{}'
     def _set_vsm_fall_delay(self, bit: int, cnt_in_833_ps_steps: int) -> None:
-        self.set_vsm_delay_fall(self._ccio_slots_driving_vsm, bit, cnt_in_833_ps_steps)
+        self.set_vsm_delay_fall(self._ccio_slots_driving_vsm[0], bit, cnt_in_833_ps_steps)
 
     def _get_vsm_fall_delay(self, bit: int) -> int:
-        return self.set_vsm_delay_fall(self._ccio_slots_driving_vsm, bit)
+        return self.set_vsm_delay_fall(self._ccio_slots_driving_vsm[0], bit)
 
     ##########################################################################
     # CC-light compatibility support
@@ -155,13 +158,14 @@ class QuTechCC(QuTechCC_core, Instrument):
 
     # helper for parameter 'vsm_channel_delay{}'
     # NB: CC-light range max = 127*2.5 ns = 317.5 ns, our fine delay range is 48/1200 MHz = 40 ns, so we must also shift program
+    # NB: supports one VSM only, no intend to upgrade
     def _set_vsm_channel_delay(self, bit: int, cnt_in_2ns5_steps: int) -> None:
         delay_ns = cnt_in_2ns5_steps * 2.5
         cnt_in_20ns_steps = int(delay_ns // 20)
         remain_ns = delay_ns - cnt_in_20ns_steps * 20
         cnt_in_833_ps_steps = round(remain_ns*1.2)  # NB: actual step size is 1/1200 MHz
-        self.set_vsm_delay_rise(self._ccio_slots_driving_vsm, bit, cnt_in_833_ps_steps)
-        self._set_dio_delay(self._ccio_slots_driving_vsm, cnt_in_20ns_steps)
+        self.set_vsm_delay_rise(self._ccio_slots_driving_vsm[0], bit, cnt_in_833_ps_steps)
+        self._set_dio_delay(self._ccio_slots_driving_vsm[0], cnt_in_20ns_steps)
 
     # helper for parameter 'dio{}_out_delay'
     def _set_dio_delay(self, ccio: int, cnt_in_20ns_steps: int) -> None:

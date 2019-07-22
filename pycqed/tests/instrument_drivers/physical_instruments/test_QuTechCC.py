@@ -14,7 +14,7 @@ class Test_QutechCC(unittest.TestCase):
         os.makedirs('test_output', exist_ok=True)
 
         transport = FileTransport(test_path)
-        cc = QuTechCC('cc', transport)
+        cc = QuTechCC('cc', transport, ccio_slots_driving_vsm=[5])
 
         cc.reset()
         cc.clear_status()
