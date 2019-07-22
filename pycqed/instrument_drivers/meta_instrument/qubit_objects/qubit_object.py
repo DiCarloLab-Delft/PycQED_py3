@@ -841,7 +841,8 @@ class Qubit(Instrument):
         if update:
 
             import pycqed.analysis_v2.spectroscopy_analysis as sa
-            fit_res = sa.VNA_DAC_Analysis(timestamp=t_start)
+            timestamp = ma.a_tools.get_timestamps_in_range(t_start,label = 'Resonator')[0]
+            fit_res = sa.VNA_DAC_Analysis(timestamp=timestamp)
             sweetspot_current = fit_res.sweet_spot_value
             self.fl_dc_V0(sweetspot_current)
             fluxcurrent = self.instr_FluxCtrl.get_instr()
