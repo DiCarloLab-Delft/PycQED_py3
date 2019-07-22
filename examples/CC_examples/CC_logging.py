@@ -44,4 +44,4 @@ def print_logger_write(msg):
             else:
                 print_logger.info(line)
 
-sys.stdout.write = print_logger_write
+sys.stdout.write = print_logger_write  # reroute stdout write (and also __stdout__write if __stdout__ equals stdout)

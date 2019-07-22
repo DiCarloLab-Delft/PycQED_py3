@@ -208,7 +208,7 @@ for i,scale in enumerate(scales):
         # generate instruction
         val = (1<<31) + (y<<9) + (x)
         prog += '    seq_out {},1\n'.format(val)
-    prog += '    loop R0,@lop{}\n'.format(i)
+    prog += '    loop R0,@loop{}\n'.format(i)
 prog += '    jmp @start\n'
 log.debug('program generated: {} lines, {} bytes'.format(prog.count('\n'), len(prog)))
 
@@ -221,14 +221,15 @@ cc.status_preset()
 
 log.debug('uploading program to CC')
 cc.sequence_program(prog)
-if cc.get_assembler_error():
-    print(cc.get_assembler_log())
+if cc.get_assembler_error() != 0:
+    sys.stderr.write('error log = {}\n'.format(cc.get_assembler_log()))  # FIXME: result is messy
+    log.warning('assembly failed')
+else:
+    log.debug('checking for SCPI errors on CC')
+    err_cnt = cc.get_system_error_count()
+    for i in range(err_cnt):
+        print(cc.get_error())
+    log.debug('done checking for SCPI errors on CC')
 
-log.debug('checking for errors on CC')
-err_cnt = cc.get_system_error_count()
-for i in range(err_cnt):
-    print(cc.get_error())
-log.debug('done checking for errors on CC')
-
-log.debug('starting CC')
-cc.start()
+    log.debug('starting CC')
+    cc.start()

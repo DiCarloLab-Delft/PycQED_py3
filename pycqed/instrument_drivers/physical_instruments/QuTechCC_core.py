@@ -39,8 +39,8 @@ class QuTechCC_core(SCPIBase):
     def get_assembler_error(self) -> int:
         return self._ask_int('QUTech:SEQuence:PROGram:ASSEMbler:ERRor?')
 
-    def get_assembler_log(self) -> bytes:
-        return self._ask_bin('QUTech:SEQuence:PROGram:ASSEMbler:LOG?')
+    def get_assembler_log(self) -> str:
+        return self._ask_bin('QUTech:SEQuence:PROGram:ASSEMbler:LOG?').decode('utf-8', 'ignore')
 
 
     def set_q1_reg(self, ccio: int, reg: int, val: int) -> None:
