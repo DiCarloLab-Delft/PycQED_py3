@@ -98,3 +98,15 @@ def test_ramp_values_ramp_rate_large():
     assert x == [10]
     dt = time.time() - t0
     assert(dt < .1)  # ramp should take <.1s
+
+
+def test_ramp_values_negative_step():
+    t0 = time.time()
+    x = []
+    ramp_values(0, -1, ramp_rate=1,
+                update_interval=.1,
+                callable=x.append)
+    assert x == approx(list(np.arange(-.1, -1.001, -.1)))
+    dt = time.time() - t0
+    assert(dt < 1)  # ramp should take <1s
+    assert(dt > .8)

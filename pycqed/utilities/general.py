@@ -652,11 +652,12 @@ def ramp_values(start_val: float, end_val: float, ramp_rate: float,
     # Determine the points to ramp over
     stepsize = ramp_rate*update_interval
     if not np.isinf(ramp_rate) and stepsize < abs(end_val-start_val):
+        if end_val < start_val:
+            stepsize *= -1
         ramp_points = np.arange(start_val+stepsize,
                                 end_val+stepsize/10, stepsize)
     else:
         ramp_points = [end_val]
-
     # The loop with delayed setting of the values
     t0 = time.time()
     for v in ramp_points[:-1]:  # Exclude last point
