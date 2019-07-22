@@ -656,6 +656,8 @@ def ramp_values(start_val: float, end_val: float, ramp_rate: float,
             stepsize *= -1
         ramp_points = np.arange(start_val+stepsize,
                                 end_val+stepsize/10, stepsize)
+        if len(ramp_points) == 0: 
+            ramp_points = [end_val]    
     else:
         ramp_points = [end_val]
     # The loop with delayed setting of the values
