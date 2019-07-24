@@ -650,6 +650,9 @@ def ramp_values(start_val: float, end_val: float, ramp_rate: float,
             the callable used to execute the ramp
     """
     # Determine the points to ramp over
+
+    t0 =time.time()
+
     stepsize = ramp_rate*update_interval
     if not np.isinf(ramp_rate) and stepsize < abs(end_val-start_val):
         if end_val < start_val:
@@ -661,8 +664,9 @@ def ramp_values(start_val: float, end_val: float, ramp_rate: float,
     else:
         ramp_points = [end_val]
     # The loop with delayed setting of the values
-    t0 = time.time()
+    t0print = time.time()
     for v in ramp_points[:-1]:  # Exclude last point
+        print("Setting {:.6f}, dt: {:.2f}s".format(v, time.time()-t0print))
         callable(v)
         while (time.time() - t0) < update_interval:
             check_keyboard_interrupt()

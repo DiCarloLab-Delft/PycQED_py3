@@ -53,9 +53,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
                 get_cmd=partial(self._get_current, parname),
                 set_cmd=partial(self._set_current, parname),
                 unit="A",
-                vals=validators.Numbers(min_value=-50e-3, max_value=50e-3),
-                step=0.00001,
-                inter_delay=1e-3)
+                vals=validators.Numbers(min_value=-50e-3, max_value=50e-3))
 
         self.connect_message(begin_time=t0)
 
