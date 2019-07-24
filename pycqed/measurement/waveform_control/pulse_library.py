@@ -419,7 +419,7 @@ class NZMartinisGellarPulse(Pulse):
 
         self.buffer_length_start = kw.pop('buffer_length_start', 0)
         self.buffer_length_end = kw.pop('buffer_length_end', 0)
-        self.extra_buffer_aux_pulse = kw.pop('extra_buffer_aux_pulse', 5e-9)
+        self.extra_buffer_aux_pulse = kw.pop('extra_buffer_aux_pulse', 0e-9)
         self.length = self.pulse_length + self.buffer_length_start + \
                       self.buffer_length_end
 
@@ -459,6 +459,11 @@ class NZMartinisGellarPulse(Pulse):
         return self
 
     def chan_wf(self, chan, tvals):
+
+        dv_dphi = self.dv_dphi
+        if chan != self.channel:
+            dv_dphi *= self.aux_channels_dict[chan]
+
         params_dict = {
             'pulse_length': self.pulse_length,
             'theta_f': self.theta_f,
@@ -466,7 +471,7 @@ class NZMartinisGellarPulse(Pulse):
             'qbt_freq': self.qbt_freq,
             'anharmonicity': self.anharmonicity,
             'J': self.J,
-            'dv_dphi': self.dv_dphi,
+            'dv_dphi': dv_dphi,
             'loop_asym': self.loop_asym,
             'lambda_2': self.lambda_2,
             'alpha': self.alpha,
@@ -479,7 +484,7 @@ class NZMartinisGellarPulse(Pulse):
             return []
         hashlist = [type(self), self.algorithm_time() - tstart]
         hashlist += [self.pulse_length, self.theta_f, self.qbc_freq]
-        hashlist += [self.qbt_freq, self.anharmonicity, self.J, self.dphi_dV]
+        hashlist += [self.qbt_freq, self.anharmonicity, self.J, self.dv_dphi]
         hashlist += [self.loop_asym, self.lambda_2, self.alpha]
         hashlist += [self.buffer_length_start, hash(self.wave_generation_func)]
         return hashlist

@@ -77,7 +77,9 @@ class Spectroscopy(ba.BaseDataAnalysis):
         proc_data_dict['phase_range'] = self.options_dict.get(
             'phase_range', None)
         proc_data_dict['plotsize'] = self.options_dict.get('plotsize', (8, 5))
-        if len(self.raw_data_dict['timestamps']) == 1:
+
+
+        if len(list(self.raw_data_dict)) == 1:
             proc_data_dict['plot_frequency'] = np.squeeze(
                 self.raw_data_dict['freq'])
             proc_data_dict['plot_amp'] = np.squeeze(self.raw_data_dict['amp'])
@@ -94,8 +96,9 @@ class Spectroscopy(ba.BaseDataAnalysis):
                 proc_data_dict['plot_xlabel'] = self.options_dict.get(
                     'xlabel', sweep_param)
             else:
+
                 xvals = np.array([[tt] for tt in range(
-                    len(self.raw_data_dict['timestamps']))])
+                    len(self.raw_data_dict))])
                 proc_data_dict['plot_xvals'] = self.options_dict.get(
                     'xvals', xvals)
                 proc_data_dict['plot_xlabel'] = self.options_dict.get(
@@ -107,18 +110,33 @@ class Spectroscopy(ba.BaseDataAnalysis):
                 dx1 = np.concatenate(([x_diff[0]], x_diff))
                 dx2 = np.concatenate((x_diff, [x_diff[-1]]))
                 proc_data_dict['plot_xwidth'] = np.minimum(dx1, dx2)
-                proc_data_dict['plot_frequency'] = np.array(
-                    self.raw_data_dict['freq'])
-                proc_data_dict['plot_phase'] = np.array(
-                    self.raw_data_dict['phase'])
-                proc_data_dict['plot_amp'] = np.array(
-                    self.raw_data_dict['amp'])
+                proc_data_dict['plot_frequency'] = np.array([self.raw_data_dict[i]['hard_sweep_points']
+                                                    for i in
+                                                    range(len(self.raw_data_dict))])
+                proc_data_dict['plot_phase'] = np.array([self.raw_data_dict[i][
+                                                    'measured_data']['Phase']
+                                                    for i in
+                                                    range(len(
+                                                        self.raw_data_dict))])
+                proc_data_dict['plot_amp'] = np.array([self.raw_data_dict[i][
+                                                  'measured_data']['Magn']
+                                                    for i in
+                                                    range(len(
+                                                        self.raw_data_dict))])
 
             else:
                 # manual setting of plot_xwidths
-                proc_data_dict['plot_frequency'] = self.raw_data_dict['freq']
-                proc_data_dict['plot_phase'] = self.raw_data_dict['phase']
-                proc_data_dict['plot_amp'] = self.raw_data_dict['amp']
+                proc_data_dict['plot_frequency'] = [self.raw_data_dict[i]['hard_sweep_points']
+                                                    for i in
+                                                    range(len(self.raw_data_dict))]
+                proc_data_dict['plot_phase'] = [self.raw_data_dict[i][
+                                                    'measured_data']['Phase']
+                                                    for i in
+                                                    range(len(self.raw_data_dict))]
+                proc_data_dict['plot_amp'] = [self.raw_data_dict[i][
+                                                  'measured_data']['Magn']
+                                                    for i in
+                                                    range(len(self.raw_data_dict))]
 
     def prepare_plots(self):
         proc_data_dict = self.proc_data_dict
@@ -418,7 +436,7 @@ class ResonatorSpectroscopy(Spectroscopy):
         super(ResonatorSpectroscopy, self).process_data()
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
-        if len(self.raw_data_dict['timestamps']) == 1:
+        if len(self.raw_data_dict) == 1:
             self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. *
                               self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
@@ -594,8 +612,8 @@ class ResonatorSpectroscopy(Spectroscopy):
                                       'yvals': proc_data_dict['plot_amp'][0],
                                       'title': 'Spectroscopy amplitude: \n'
                                                '%s-%s' % (
-                                          self.raw_data_dict[
-                                              'measurementstring'][0],
+                                          self.raw_data_dict[0][
+                                              'measurementstring'],
                                           self.timestamps[0]),
                                       'xlabel': proc_data_dict['freq_label'],
                                       'xunit': 'Hz',

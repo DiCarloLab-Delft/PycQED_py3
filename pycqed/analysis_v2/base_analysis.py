@@ -149,7 +149,10 @@ class BaseDataAnalysis(object):
                     self.timestamps = [a_tools.latest_data(
                         contains=label, return_timestamp=True)[0]]
             elif t_stop is None:
-                self.timestamps = [t_start]
+                if isinstance(t_start, list):
+                    self.timestamps = t_start
+                else:
+                    self.timestamps = [t_start]
             else:
                 self.timestamps = a_tools.get_timestamps_in_range(
                     t_start, timestamp_end=t_stop,
@@ -230,6 +233,7 @@ class BaseDataAnalysis(object):
 
     def get_data_from_timestamp_list(self):
         raw_data_dict = []
+        print(self.timestamps)
         for timestamp in self.timestamps:
             raw_data_dict_ts = OrderedDict([(param, []) for param in
                                            self.params_dict])

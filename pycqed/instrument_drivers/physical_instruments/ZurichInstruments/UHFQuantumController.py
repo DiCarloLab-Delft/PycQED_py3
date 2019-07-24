@@ -458,10 +458,10 @@ class UHFQC(Instrument):
     def start(self):
         """Tektronix-style start command"""
         # self._daq.sync()
-        self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', True)
+        # self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', True)
         self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
-        # time.sleep(0.1)
-        self._daq.sync()
+        time.sleep(0.25)
+        # self._daq.sync()
 
     def stop(self):
         """Tektronix-style stop command"""

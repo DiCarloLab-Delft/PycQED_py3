@@ -153,72 +153,109 @@ def get_operation_dict(qubits):
 
 
 def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
-                                               nr_shots=4095, UHFQC=None,
-                                               pulsar=None,
+                                               nr_shots=4095,
                                                used_channels=None,
                                                correlations=None,
                                                add_channels=None,
                                                **kw):
-    max_int_len = 0
+    uhfs = set()
+    uhf_instances = {}
+    max_int_len = {}
+    channels = {}
     for qb in qubits:
-        if qb.acq_length() > max_int_len:
-            max_int_len = qb.acq_length()
+        uhf = qb.instr_uhf()
+        uhfs.add(uhf)
+        uhf_instances[uhf] = qb.instr_uhf.get_instr()
 
-    channels = []
-    for qb in qubits:
-        channels += [qb.acq_I_channel()]
+        if uhf not in max_int_len:
+            max_int_len[uhf] = 0
+        max_int_len[uhf] = max(max_int_len[uhf], qb.acq_length())
+
+        if uhf not in channels:
+            channels[uhf] = []
+        channels[uhf] += [qb.acq_I_channel()]
         if qb.acq_weights_type() in ['SSB', 'DSB', 'optimal_qutrit']:
             if qb.acq_Q_channel() is not None:
-                channels += [qb.acq_Q_channel()]
-    if add_channels is not None:
-        channels += add_channels
+                channels[uhf] += [qb.acq_Q_channel()]
+
+    if add_channels is None:
+        add_channels = {uhf: [] for uhf in uhfs}
+    elif isinstance(add_channels, list):
+        add_channels = {uhf: add_channels for uhf in uhfs}
+    else:  # is a dict
+        pass
+    for uhf in add_channels:
+        channels[uhf] += add_channels[uhf]
 
     if correlations is None:
-        correlations = []
-    # if used_channels is None:
-    #     used_channels = channels
+        correlations = {uhf: [] for uhf in uhfs}
+    elif isinstance(correlations, list):
+        correlations = {uhf: correlations for uhf in uhfs}
+    else:  # is a dict
+        for uhf in uhfs:
+            if uhf not in correlations:
+                correlations[uhf] = []
 
+    if used_channels is None:
+        used_channels = {uhf: None for uhf in uhfs}
+    elif isinstance(used_channels, list):
+        used_channels = {uhf: used_channels for uhf in uhfs}
+    else:  # is a dict
+        for uhf in uhfs:
+            if uhf not in used_channels:
+                used_channels[uhf] = None
+
+    AWG = None
     for qb in qubits:
-        if UHFQC is None:
-            UHFQC = qb.instr_uhf.get_instr()
-        if pulsar is None:
-            pulsar = qb.instr_pulsar.get_instr()
-        break
+        qbAWG = qb.instr_pulsar.get_instr()
+        if AWG is not None and qbAWG is not AWG:
+            raise Exception('Multi qubit detector can not be created with '
+                            'multiple pulsar instances')
+        AWG = qbAWG
 
-    return {
-        'int_log_det': det.UHFQC_integration_logging_det(
-            UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            integration_length=max_int_len, nr_shots=nr_shots,
-            result_logging_mode='raw', **kw),
-        'dig_log_det': det.UHFQC_integration_logging_det(
-            UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            integration_length=max_int_len, nr_shots=nr_shots,
-            result_logging_mode='digitized', **kw),
-        'int_avg_det': det.UHFQC_integrated_average_detector(
-            UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            integration_length=max_int_len, nr_averages=nr_averages, **kw),
-        'int_avg_classif_det': det.UHFQC_integration_average_classifier_det(
-            UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            integration_length=max_int_len, nr_shots=nr_shots,
-            result_logging_mode='raw', **kw),
-        'dig_avg_det': det.UHFQC_integrated_average_detector(
-            UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            integration_length=max_int_len, nr_averages=nr_averages,
-            result_logging_mode='digitized', **kw),
-        'inp_avg_det': det.UHFQC_input_average_detector(
-            UHFQC=UHFQC, AWG=pulsar, nr_averages=nr_averages, nr_samples=4096,
-            **kw),
-        'int_corr_det': det.UHFQC_correlation_detector(
-            UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            used_channels=used_channels,
-            integration_length=max_int_len, nr_averages=nr_averages,
-            correlations=correlations, **kw),
-        'dig_corr_det': det.UHFQC_correlation_detector(
-            UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            used_channels=used_channels,
-            integration_length=max_int_len, nr_averages=nr_averages,
-            correlations=correlations, thresholding=True, **kw),
-    }
+    individual_detectors = {uhf: {
+            'int_log_det': det.UHFQC_integration_logging_det(
+                UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
+                integration_length=max_int_len[uhf], nr_shots=nr_shots,
+                result_logging_mode='raw', **kw),
+            'dig_log_det': det.UHFQC_integration_logging_det(
+                UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
+                integration_length=max_int_len[uhf], nr_shots=nr_shots,
+                result_logging_mode='digitized', **kw),
+            'int_avg_det': det.UHFQC_integrated_average_detector(
+                UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
+                integration_length=max_int_len[uhf], nr_averages=nr_averages, **kw),
+            'int_avg_classif_det': det.UHFQC_integration_average_classifier_det(
+                UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
+                integration_length=max_int_len[uhf], nr_shots=nr_shots,
+                result_logging_mode='raw', **kw),
+            'dig_avg_det': det.UHFQC_integrated_average_detector(
+                UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
+                integration_length=max_int_len[uhf], nr_averages=nr_averages,
+                result_logging_mode='digitized', **kw),
+            'inp_avg_det': det.UHFQC_input_average_detector(
+                UHFQC=uhf_instances[uhf], AWG=AWG, nr_averages=nr_averages,
+                nr_samples=4096,
+                **kw),
+            'int_corr_det': det.UHFQC_correlation_detector(
+                UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
+                used_channels=used_channels[uhf],
+                integration_length=max_int_len[uhf], nr_averages=nr_averages,
+                correlations=correlations[uhf], **kw),
+            'dig_corr_det': det.UHFQC_correlation_detector(
+                UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
+                used_channels=used_channels[uhf],
+                integration_length=max_int_len[uhf], nr_averages=nr_averages,
+                correlations=correlations[uhf], thresholding=True, **kw),
+        } for uhf in uhfs}
+
+    combined_detectors = {det_type: det.UHFQC_multi_detector([
+        individual_detectors[uhf][det_type] for uhf in uhfs])
+        for det_type in ['int_log_det', 'dig_log_det', 'int_avg_det',
+                         'int_avg_classif_det', 'dig_avg_det', 'inp_avg_det',
+                         'int_corr_det', 'dig_corr_det']}
+
+    return combined_detectors
 
 
 def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
@@ -261,7 +298,7 @@ def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
     return ro_spacing
 
 
-def measure_multiplexed_readout(qubits, nreps=1, liveplot=False,
+def measure_multiplexed_readout(qubits, liveplot=False,
                                 shots=5000,
                                 RO_spacing=None, preselection=True,
                                 thresholds=None, thresholded=False,
@@ -289,8 +326,6 @@ def measure_multiplexed_readout(qubits, nreps=1, liveplot=False,
     m = 2 ** (len(qubits))
     if preselection:
         m *= 2
-    # shots = 4094 - 4094 % m
-    shots *= m
     if thresholded:
         df = get_multiplexed_readout_detector_functions(qubits,
                                                         nr_shots=shots)[
@@ -299,18 +334,13 @@ def measure_multiplexed_readout(qubits, nreps=1, liveplot=False,
         df = get_multiplexed_readout_detector_functions(qubits,
                                                         nr_shots=shots)[
             'int_log_det']
-    print('Hi!')
-    print(shots)
-    print(nreps)
 
     MC.live_plot_enabled(liveplot)
     MC.soft_avg(1)
     MC.set_sweep_function(sf)
-    MC.set_sweep_points(np.arange(shots))
-    MC.set_sweep_function_2D(swf.None_Sweep())
-    MC.set_sweep_points_2D(np.arange(nreps))
+    MC.set_sweep_points(np.arange(m))
     MC.set_detector_function(df)
-    MC.run_2D('{}_multiplexed_ssro'.format('-'.join(
+    MC.run('{}_multiplexed_ssro'.format('-'.join(
         [qb.name for qb in qubits])))
 
     if analyse and thresholds is not None:
@@ -2006,6 +2036,8 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
                              'cal_points': repr(cp),
                              'rotate': cal_points,
                              'data_to_fit': {qb.name: 'pe'},
+                             'cal_states_rotations':
+                                 {qb.name: {'g': 0, 'e': 1}},
                              'hard_sweep_params': hard_sweep_params,
                              'leakage_qbname': qbc.name,
                              'cphase_qbname': qbt.name})
