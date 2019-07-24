@@ -21,6 +21,8 @@ reload(csa)
 import pycqed.analysis_v2.cryo_spectrumanalyzer_analysis as csa
 reload(csa)
 import pycqed.analysis_v2.distortions_analysis as da
+import pycqed.analysis_v2.alignment_analysis as aa
+reload(aa)
 import pycqed.analysis_v2.optimization_analysis as oa
 reload(da)
 import pycqed.analysis_v2.coherence_analysis as cs
@@ -65,6 +67,7 @@ from pycqed.analysis_v2.cryo_scope_analysis import RamZFluxArc, \
 from pycqed.analysis_v2.cryo_spectrumanalyzer_analysis import Cryospec_Analysis
 from pycqed.analysis_v2.distortions_analysis import Scope_Trace_analysis
 
+from pycqed.analysis_v2.alignment_analysis import AlignmentAnalysis
 
 from pycqed.analysis_v2.optimization_analysis import OptimizationAnalysis
 from pycqed.analysis_v2.timing_cal_analysis import Timing_Cal_Flux_Coarse, \
