@@ -50,7 +50,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'La_Ducati': 'D:\\Experiments\\1907_Cheesymon_v6_F4\\Data',
                 # 'La_Ducati': 'D:\\Experiments\\1810_Cheesymon_py3_C3\\Data',
 
-                 # 'La_Ducati': 'D:\\Experiments\\1905_Cheesymon_py3_D1\\Data',
+                 # 'La_Ducati': 'D:\\Experiments\\1907_Cheesymon_v6_F4\\Data',
 
                  'La_Ducati_Jr': 'D:\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'Simulation_PC': r'D:\Experiments/testSingleShotFidelityAnalysis/Data',

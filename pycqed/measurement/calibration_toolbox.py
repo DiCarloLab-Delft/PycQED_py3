@@ -319,7 +319,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     SH.ref_lvl(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency.get()),
-        Navg=5, delay=0.0, prepare_each_point=False)
+        Navg=5, delay=0.0, prepare_for_each_point=False)
 
     ad_func_pars = {'adaptive_function': nelder_mead,
                     'x0': [0.0, 0.0],
