@@ -37,6 +37,12 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
             docstring='Limits the rate at which currents can be changed.',
             vals=validators.Numbers(min_value=0, max_value=np.infty),
             parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_verbose',
+            initial_value=True,
+            vals=validators.Bool(),
+            docstring='If True, prints progress while ramping values.',
+            parameter_class=ManualParameter)
 
         # Determine the set of modules required from the channel map
         module_ids = set([ch_map[0] for ch_map in channel_map.values()])
@@ -78,7 +84,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
         ramp_values(start_val=current_value, end_val=value,
                     ramp_rate=self.cfg_ramp_rate(),
                     update_interval=0.1,
-                    callable=setter)
+                    callable=setter, verbose=self.verbose())
         self.current_sources[mod_id].set_current(dac, value)
 
     def print_overview(self):
