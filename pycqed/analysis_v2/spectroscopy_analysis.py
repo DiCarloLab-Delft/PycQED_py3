@@ -82,7 +82,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
 
         if len(self.raw_data_dict['timestamps']) == 1:
             proc_data_dict['xunit'] = self.raw_data_dict['freq_unit'][0][0]
-            proc_data_dict['value_units'] = self.raw_data_dict['value_units'][0]
+            proc_data_dict['value_units'] = self.raw_data_dict.get('value_units','a.u.')
 
             proc_data_dict['plot_frequency'] = np.squeeze(
                 self.raw_data_dict['freq'])
