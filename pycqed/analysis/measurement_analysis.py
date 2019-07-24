@@ -7416,11 +7416,9 @@ class TwoD_Analysis(MeasurementAnalysis):
 
         for i, meas_vals in enumerate(self.measured_values):
             kw["zlabel"] = kw.get("zlabel", self.value_names[i])
-            kw["z_unit"] = kw.get("zlabel", self.value_units[i])
+            kw["z_unit"] = kw.get("z_unit", self.value_units[i])
 
             if filtered:
-                # print(self.measured_values)
-                # print(self.value_names)
                 if self.value_names[i] == 'Phase':
                     self.measured_values[i] = dm_tools.filter_resonator_visibility(
                         x=self.sweep_points,
@@ -7464,8 +7462,7 @@ class TwoD_Analysis(MeasurementAnalysis):
             self.ax_array.append(ax)
             if normalize:
                 print("normalize on")
-            # print "unransposed",meas_vals
-            # print "transposed", meas_vals.transpose()
+
             self.ax_array.append(ax)
             savename = 'Heatmap_{}'.format(self.value_names[i])
             fig_title = '{} {} \n{}'.format(
@@ -7499,8 +7496,8 @@ class TwoD_Analysis(MeasurementAnalysis):
                                normalize=normalize,
                                **kw)
 
-            # set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
-            # set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
+            set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+            set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
 
             if save_fig:
                 self.save_fig(fig, figname=savename, **kw)

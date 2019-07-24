@@ -1,6 +1,8 @@
 import time
-
+import numpy as np
+from qcodes.instrument.parameter import ManualParameter
 from qcodes.instrument.base import Instrument
+from pycqed.utilities.general import ramp_values
 from qcodes import validators
 from functools import partial
 from spirack.spi_rack import SPI_rack
@@ -12,7 +14,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
     def __init__(self, name: str, address: str,
                  channel_map: dict):
         """
-        Creates an instance of the SPI S4g FluxCurrent instrument.
+        Create an instance of the SPI S4g FluxCurrent instrument.
 
         Arguments:
             name:
@@ -29,11 +31,25 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
         self.spi_rack = SPI_rack(address, 9600, timeout=1)
         self.spi_rack.unlock()
 
+        self.add_parameter(
+            'cfg_ramp_rate', unit='A/s',
+            initial_value=0.1e-3,  # 0.1 mA/s
+            docstring='Limits the rate at which currents can be changed.',
+            vals=validators.Numbers(min_value=0, max_value=np.infty),
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_verbose',
+            initial_value=True,
+            vals=validators.Bool(),
+            docstring='If True, prints progress while ramping values.',
+            parameter_class=ManualParameter)
+
         # Determine the set of modules required from the channel map
         module_ids = set([ch_map[0] for ch_map in channel_map.values()])
         # instantiate the controllers for the individual modules
         self.current_sources = {}
         for mod_id in module_ids:
+            # N.B. reset currents has a slow ramp build in.
             self.current_sources[mod_id] = S4g_module(
                 self.spi_rack, module=mod_id, reset_currents=True)
 
@@ -43,9 +59,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
                 get_cmd=partial(self._get_current, parname),
                 set_cmd=partial(self._set_current, parname),
                 unit="A",
-                vals=validators.Numbers(min_value=-50e-3, max_value=50e-3),
-                step=0.00001,
-                inter_delay=1e-3)
+                vals=validators.Numbers(min_value=-50e-3, max_value=50e-3))
 
         self.connect_message(begin_time=t0)
 
@@ -57,8 +71,20 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
         return current
 
     def _set_current(self, parname, value):
+        """
+        Set a current in the s4g module.
+
+        Takes into account  ramp rate cfg_ramp_rate.
+        """
         mod_id, dac = self.channel_map[parname]
 
+        current_value = self.get(parname)
+
+        def setter(v): return self.current_sources[mod_id].set_current(dac, v)
+        ramp_values(start_val=current_value, end_val=value,
+                    ramp_rate=self.cfg_ramp_rate(),
+                    update_interval=0.1,
+                    callable=setter, verbose=self.verbose())
         self.current_sources[mod_id].set_current(dac, value)
 
     def print_overview(self):
@@ -73,8 +99,10 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
 
     def set_dacs_zero(self):
         """
-        Sets the current for all modules to zero, also includes dacs that
-        are not controlled by this instrument (this is intentional).
+        Set the current for all modules to zero.
+
+        Includes dacs that are not controlled by this instrument (this is
+         intentional).
         """
         # First set all "parameters" to zero.
         # this ensures that the safe slow rampdown is used and that the
@@ -92,6 +120,3 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
     def close(self):
         self.spi_rack.close()
         super().close()
-
-
-

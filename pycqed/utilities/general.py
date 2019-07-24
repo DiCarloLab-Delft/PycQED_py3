@@ -1,3 +1,4 @@
+import time
 import os
 import sys
 import numpy as np
@@ -619,7 +620,7 @@ def format_value_string(par_name: str, lmfit_par, end_char='', unit=None):
     val_string += ': {:.4f}$\pm${:.4f} {}{}'
 
     scale_factor, unit = SI_prefix_and_scale_factor(
-            lmfit_par.value, unit)
+        lmfit_par.value, unit)
     val = lmfit_par.value*scale_factor
     if lmfit_par.stderr is not None:
         stderr = lmfit_par.stderr*scale_factor
@@ -629,3 +630,53 @@ def format_value_string(par_name: str, lmfit_par, end_char='', unit=None):
     val_string = fmt.format(val_string, val, stderr,
                             unit, end_char)
     return val_string
+
+
+def ramp_values(start_val: float, end_val: float, ramp_rate: float,
+                update_interval: float, callable, verbose:bool=False):
+    """
+    Ramps a value by setting delayed steps.
+
+    Args:
+        start_val (float)
+            the current value
+        end_val (float)
+            the target of the ramp
+        ramp_rate (float)
+            rate of the ramp in units of [unit/s]
+        update_interval (float)
+            the interval between different updates in units of [s]
+        callable (float)
+            the callable used to execute the ramp
+    """
+    # Determine the points to ramp over
+
+    t0 = time.time()
+
+    stepsize = ramp_rate*update_interval
+    if not np.isinf(ramp_rate) and stepsize < abs(end_val-start_val):
+        if end_val < start_val:
+            stepsize *= -1
+        ramp_points = np.arange(start_val+stepsize,
+                                end_val+stepsize/10, stepsize)
+        if len(ramp_points) == 0:
+            ramp_points = [end_val]
+    else:
+        ramp_points = [end_val]
+
+    # The loop with delayed setting of the values
+    t0print = time.time()
+    for i, v in enumerate(ramp_points[:-1]):  # Exclude last point
+        if verbose:
+            print("Setting {:.2g}, \tdt: {:.2f}s\t{:.1f}%     ".format(
+                v, time.time()-t0print, i/len(ramp_points)*100), end='\r')
+        callable(v)
+        while (time.time() - t0) < update_interval:
+            check_keyboard_interrupt()
+        t0 = time.time()
+
+    # last point is set outside of loop to avoid unneeded delay
+    if verbose:
+        print("Setting {:.2g}, \tdt: {:.2f}s\t{:.1f}%     ".format(
+                    v, time.time()-t0print, 100))
+    callable(ramp_points[-1])
