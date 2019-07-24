@@ -501,6 +501,60 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
         '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])),
         exp_metadata=exp_metadata)
 
+def measure_parity_single_round(ancilla_qubit, data_qubits, CZ_map, 
+                                preps=None, upload=True, prep_params=None, 
+                                cal_points=None,
+                                exp_metadata=None, label=None, 
+                                detector='int_avg'):
+    qubits = [ancilla_qubit] + data_qubits
+    qb_names = [qb.name for qb in qubits]
+    for qb in qubits:
+        qb.prepare(drive='timedomain')
+    
+    if label is None:
+        label = 'Parity-1-round_'+'-'.join([qb.name for qb in qubits])
+    
+    if prep_params is None:
+        prep_params = ancilla_qubit.preparation_params()
+
+    if cal_points is None:
+        cal_points = CalibrationPoints.multi_qubit(qb_names, 'ge'):
+
+    if preps is None:
+        preps = [''.join(s) 
+            for s in itertools.product(*len(data_qubits*['ge'])]
+
+    MC = ancilla_qubit.instr_mc.get_instr()
+
+    seq, sweep_points = mqs.parity_single_round_seq(
+            ancilla_qubit.name, [qb.name for qb in data_qubits], CZ_map,
+            preps=preps, cal_points=cal_points, prep_params=prep_params,
+            operation_dict=get_operation_dict(qubits), upload=False)
+
+    MC.set_sweep_function(awg_swf.SegmentHardSweep(
+            sequence=seq, upload=upload, parameter_name='Preparation'))
+    MC.set_sweep_points(sweep_points)
+
+    MC.set_detector_function(
+        get_multiplexed_readout_detector_functions(
+            qubits, 
+            nr_averages=ancilla_qubit.acq_averages(), 
+            nr_shots=ancilla_qubit.acq_shots(),
+        )[detector])
+    if exp_metadata is None:
+        exp_metadata = {}
+    exp_metadata.update(
+        {'sweep_name': 'Preparation',
+         'preparations': preps,
+         'cal_points': repr(cal_points),
+         'preparation_params': prep_params,
+        })
+
+    MC.run(label, exp_metadata=exp_metadata)
+
+    if analyze:
+        if detector
+        tda.MultiQubit_TimeDomain_Analysis(qb_names=qb_names)
 
 def measure_tomography(qubits, prep_sequence, state_name,
                        rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),

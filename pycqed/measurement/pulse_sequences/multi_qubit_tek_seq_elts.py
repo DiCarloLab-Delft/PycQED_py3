@@ -2041,6 +2041,47 @@ def parity_correction_no_reset_seq(
     else:
         return seq_name
 
+def parity_single_round_seq(ancilla_qubit_name, data_qubit_names, CZ_map,
+                            preps, cal_points, prep_params, operation_dict,
+                            upload=True):
+    seq_name = 'Parity_1_round_sequence'
+    qb_names = [ancilla_qubit_name] + data_qubit_names
+
+    main_ops = ['Y90 ' + ancilla_qubit_name]
+    for dqn in data_qubit_names:
+        op = 'CZ ' + ancilla_qubit_name + ' ' + dqn
+        main_ops += CZ_map.get(op, [op])
+    main_ops += ['mY90 ' + ancilla_qubit_name]
+
+    all_opss = []
+    for prep in preps:
+        prep_ops = [{'g': 'I ', 'e': 'X180 ', '+': 'Y90 ', '-': 'mY90 '}[s] \
+             + dqn for s, dqn in zip(prep, data_qubit_names)]
+        all_opss.append(prep_ops + main_ops)
+    all_pulsess = []
+    for all_ops in all_opss:
+        all_pulses = [deepcopy(operation_dict[op]) for op in all_ops]
+        for i, pulse in enumerate(all_pulses):
+            pulse['ref_point'] = 'start'
+            if i == len(data_qubit_names):
+                break
+        all_pulses += generate_mux_ro_pulse_list(qb_names, operation_dict)
+        all_pulsess.append(all_pulses)
+
+    all_pulsess_with_prep = \
+        [add_preparation_pulses(seg, operation_dict, qb_names, **prep_params)
+         for seg in all_pulsess]
+
+    seq = pulse_list_list_seq(all_pulsess_with_prep, seq_name, upload=False)
+
+    # add calibration segments
+    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+
+    if upload:
+       ps.Pulsar.get_instance().program_awgs(seq)
+
+    return seq, np.arange(seq.n_acq_elements())
+
 
 def n_qubit_tomo_seq(
         qubit_names, operation_dict, prep_sequence=None,
