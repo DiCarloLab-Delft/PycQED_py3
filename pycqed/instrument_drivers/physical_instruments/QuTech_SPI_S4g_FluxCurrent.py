@@ -84,7 +84,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
         ramp_values(start_val=current_value, end_val=value,
                     ramp_rate=self.cfg_ramp_rate(),
                     update_interval=0.1,
-                    callable=setter, verbose=self.verbose())
+                    callable=setter, verbose=self.cfg_verbose())
         self.current_sources[mod_id].set_current(dac, value)
 
     def print_overview(self):

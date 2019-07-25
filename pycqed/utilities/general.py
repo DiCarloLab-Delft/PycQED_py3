@@ -678,5 +678,5 @@ def ramp_values(start_val: float, end_val: float, ramp_rate: float,
     # last point is set outside of loop to avoid unneeded delay
     if verbose:
         print("Setting {:.2g}, \tdt: {:.2f}s\t{:.1f}%     ".format(
-                    v, time.time()-t0print, 100))
+              ramp_points[-1], time.time()-t0print, 100))
     callable(ramp_points[-1])
