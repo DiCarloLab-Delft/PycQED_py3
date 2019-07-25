@@ -11170,13 +11170,13 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
         super().__init__(qb_name=qb_name, TwoD=TwoD, **kw)
 
 
-    def run_default_analysis(self, close_file=True, TwoD=False, **kw):
-
-        super().run_default_analysis(close_file=close_file,
+    def run_default_analysis(self, TwoD=False, **kw):
+        close_file = kw.pop('close_file', True)
+        super().run_default_analysis(close_file=False,
                                      close_main_fig=True,
                                      save_fig=False, **kw)
-
-        self.NoCalPoints = kw.pop('NoCalPoints', 4)
+            
+        self.NoCalPoints = kw.pop('NoCalPoints', 2)
         self.phases = {}
         self.fit_res = {}
         self.fig, self.ax = plt.subplots()
@@ -11209,7 +11209,7 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
         if kw.pop('close_fig', True):
             plt.close(self.fig)
 
-        if kw.pop('close_file', True):
+        if close_file:
             self.data_file.close()
 
     def oneD_sweep_analysis(self, **kw):
@@ -11218,27 +11218,55 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
         cal_points = kw.pop('cal_points', True)
 
         self.get_naming_and_values()
-        length_single = int(len(self.sweep_points)/2)
-        thetas = self.sweep_points[0:length_single-self.NoCalPoints]
-        if cal_points:
-            cal_points_idxs = [[-4, -3], [-2, -1]]
 
-        for i, length in enumerate([0, length_single]):
+        gmetadata = self.data_file['Experimental Data/Experimental Metadata']
+        if 'preparation_params' in gmetadata.keys():
+            if 'reset' in gmetadata['preparation_params'].attrs[
+                'preparation_type']:
+                nreset = gmetadata['preparation_params'].attrs['reset_reps']
+            else:
+                nreset = 0
+        else:
+            nreset = 0
+        data_filter = lambda data: data[nreset::nreset + 1]
+        self.data_filter = data_filter
+
+        length_single = (len(self.sweep_points)//(nreset+1) - self.NoCalPoints)//2
+        thetas = data_filter(self.sweep_points)[0:length_single]
+        if 'hard_sweep_params' in gmetadata.keys():
+            if 'phase' in gmetadata['hard_sweep_params'].keys():
+                if 'values' in gmetadata['hard_sweep_params/phase'].keys():
+                    thetas = np.array(gmetadata['hard_sweep_params/phase/values'])
+                    thetas = thetas[:length_single]/180*np.pi
+
+        if cal_points:
+            cal_points_idxs = [[-2], [-1]]
+
+        for i, start_idx in enumerate([0, length_single]):
             dict_label = self.labels[i]
 
             if len(self.measured_values) == 1:
-                measured_values = self.data[1][
-                                  i*length_single:(i+1)*length_single]
+                measured_values = np.concatenate((
+                    data_filter(self.data[1])[start_idx:start_idx+length_single],
+                    data_filter(self.data[1])[cal_points_idxs[0] +
+                                              cal_points_idxs[1]]
+                ))
                 self.ampls = a_tools.normalize_data_v3(
                     measured_values, cal_zero_points=cal_points_idxs[0],
                     cal_one_points=cal_points_idxs[1])[0:-self.NoCalPoints]
 
             else:
-                measured_values = np.zeros((len(self.measured_values),
-                                            length_single))
+                measured_values = np.zeros(
+                    (len(self.measured_values),
+                     length_single + len(cal_points_idxs[0]) +
+                                     len(cal_points_idxs[1])))
                 for j in range(len(self.measured_values)):
-                    measured_values[j] = self.data[j+1][
-                                         i*length_single:(i+1)*length_single]
+                    measured_values[j] = np.concatenate((
+                        data_filter(self.data[j+1])[
+                            start_idx:start_idx + length_single],
+                            data_filter(self.data[j+1])[cal_points_idxs[0] +
+                                                        cal_points_idxs[1]]
+                     ))
 
                 self.ampls = a_tools.rotate_and_normalize_data(
                     measured_values, cal_zero_points=cal_points_idxs[0],

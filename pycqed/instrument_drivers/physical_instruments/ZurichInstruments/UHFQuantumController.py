@@ -460,7 +460,7 @@ class UHFQC(Instrument):
         # self._daq.sync()
         # self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', True)
         self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
-        time.sleep(0.25)
+        # time.sleep(0.25)
         # self._daq.sync()
 
     def stop(self):
@@ -544,6 +544,9 @@ class UHFQC(Instrument):
             timeout (float): time in seconds before timeout Error is raised.
 
         """
+        print(self.name, 'acquisition_poll')
+        print('acquisition_paths', self.acquisition_paths)
+
         data = {k: [] for k, dummy in enumerate(self.acquisition_paths)}
 
         # Start acquisition
@@ -594,6 +597,7 @@ class UHFQC(Instrument):
                 path = f'/{self._device}/quex/rl/data/{c}'
                 self.acquisition_paths.append(path)
                 self._daq.subscribe(path)
+                print(path, 'subscribed')
                 readout += (1 << c)
             # Enable automatic readout
             self._daq.setInt('/' + self._device + '/quex/rl/readout', readout)
@@ -602,6 +606,7 @@ class UHFQC(Instrument):
                 path = f'/{self._device}/quex/iavg/data/{c}'
                 self.acquisition_paths.append(path)
                 self._daq.subscribe(path)
+                print(path, 'subscribed')
             # Enable automatic readout
             self._daq.setInt('/' + self._device + '/quex/iavg/readout', 1)
 
@@ -613,6 +618,7 @@ class UHFQC(Instrument):
     def acquisition_finalize(self):
         for p in self.acquisition_paths:
             self._daq.unsubscribe(p)
+            print(p, 'unsubscribed')
         # self._daq.unsubscribe('/' + self._device + '/auxins/0/sample')
 
     def create_parameter_files(self):

@@ -10,6 +10,7 @@ from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.analysis_v2.readout_analysis as roa
 import pycqed.analysis_v2.tomography_qudev as tomo
+import re
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from copy import deepcopy
 from pycqed.measurement.calibration_points import CalibrationPoints
@@ -275,6 +276,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 for qb_RO_ch in RO_channels:
                     meas_ROs_per_qb = [RO_ch for RO_ch in measured_RO_channels
                                       if qb_RO_ch in RO_ch]
+
                     for meas_RO in meas_ROs_per_qb:
                         meas_results_per_qb_raw[qb_name][meas_RO] = \
                             self.raw_data_dict[
@@ -444,6 +446,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
     def cal_states_analysis(self):
         self.get_cal_data_points()
         if self.options_dict.get('TwoD', False):
+            print(self.channel_map)
             self.proc_data_dict['projected_data_dict'] = \
                 self.rotate_data_TwoD(
                     self.proc_data_dict['meas_results_per_qb'],
@@ -535,6 +538,10 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                          cal_states_dict, data_to_fit):
         rotated_data_dict = OrderedDict()
         for qb_name, meas_res_dict in meas_results_per_qb.items():
+
+            meas_res_dict_list = [re.sub(r' UHF[0-9]','',s) for s in list(
+                meas_res_dict)]
+
             if len(cal_states_dict[qb_name]) == 0:
                 cal_zero_points = None
                 cal_one_points = None
@@ -553,7 +560,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             data=raw_data_arr[:, col],
                             cal_zero_points=cal_zero_points,
                             cal_one_points=cal_one_points)
-            elif list(meas_res_dict) == channel_map[qb_name]:
+            elif meas_res_dict_list == channel_map[qb_name]:
                 # two RO channels per qubit
                 raw_data_arr = meas_res_dict[list(meas_res_dict)[0]]
                 rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
@@ -573,8 +580,11 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     qb_ro_ch0 = channel_map[qb_name]
                 else:
                     qb_ro_ch0 = channel_map[qb_name][0]
+
                 ro_suffixes = [s[len(qb_ro_ch0)+1::] for s in
                                list(meas_res_dict) if qb_ro_ch0 in s]
+                print(ro_suffixes)
+
                 for i, ro_suf in enumerate(ro_suffixes):
                     if len(ro_suffixes) == len(meas_res_dict):
                         # one RO ch per qubit

@@ -2059,14 +2059,22 @@ def parity_single_round_seq(ancilla_qubit_name, data_qubit_names, CZ_map,
              + dqn for s, dqn in zip(prep, data_qubit_names)]
         all_opss.append(prep_ops + main_ops)
     all_pulsess = []
-    for all_ops in all_opss:
-        all_pulses = [deepcopy(operation_dict[op]) for op in all_ops]
-        for i, pulse in enumerate(all_pulses):
-            pulse['ref_point'] = 'start'
-            if i == len(data_qubit_names):
-                break
+    for all_ops, prep in zip(all_opss, preps):
+        all_pulses = []
+        for i, op in enumerate(all_ops):
+            all_pulses.append(deepcopy(operation_dict[op]))
+            if i == 0:
+                all_pulses[-1]['ref_pulse'] = 'segment_start'
+            elif 0 < i <= len(data_qubit_names):
+                all_pulses[-1]['ref_point'] = 'start'
+            if 'CZ' not in op:
+                all_pulses[-1]['element_name'] = f'drive_{prep}'
+            else:
+                all_pulses[-1]['element_name'] = f'flux_{prep}'
         all_pulses += generate_mux_ro_pulse_list(qb_names, operation_dict)
         all_pulsess.append(all_pulses)
+
+
 
     all_pulsess_with_prep = \
         [add_preparation_pulses(seg, operation_dict, qb_names, **prep_params)
@@ -2075,7 +2083,8 @@ def parity_single_round_seq(ancilla_qubit_name, data_qubit_names, CZ_map,
     seq = pulse_list_list_seq(all_pulsess_with_prep, seq_name, upload=False)
 
     # add calibration segments
-    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+    if cal_points is not None:
+        seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
     if upload:
        ps.Pulsar.get_instance().program_awgs(seq)

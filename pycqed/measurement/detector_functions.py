@@ -519,13 +519,14 @@ class UHFQC_multi_detector(Hard_Detector):
     """
     def __init__(self, detectors):
         super().__init__()
-        self.detectors = detectors
+        self.detectors = [p[1] for p in sorted( \
+            [(d.UHFQC._device, d) for d in detectors], reverse=True)]
         self.AWG = None
         self.value_names = []
         self.value_units = []
         self.AWG = None
         for d in self.detectors:
-            self.value_names += d.value_names
+            self.value_names += [vn + ' ' + d.UHFQC.name for vn in d.value_names]
             self.value_units += d.value_units
             if d.AWG is not None:
                 if self.AWG is None:
@@ -536,18 +537,91 @@ class UHFQC_multi_detector(Hard_Detector):
                 d.AWG = None
 
     def prepare(self, sweep_points):
+        # _daq = self.detectors[0].UHFQC._daq
+        # for d in self.detectors[1:]:
+        #     d.UHFQC._daq = _daq
+
         for d in self.detectors:
             d.prepare(sweep_points)
 
+        # for d in self.detectors[1:]:
+        #     self.detectors[0].UHFQC.acquisition_paths += \
+        #         d.UHFQC.acquisition_paths
+        #     d.UHFQC.acquisition_paths = []
+        #
+        #     self.detectors[0].value_names += d.value_names
+        #     d.value_names = []
+        #     self.detectors[0].channels += d.channels
+        #     d.channels = []
+
     def get_values(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+        UHFs = [d.UHFQC for d in self.detectors]
+
+        for UHF in UHFs:
+            UHF._daq.setInt('/' + UHF._device + '/quex/rl/readout', 1)
+
+
         if self.AWG is not None:
             self.AWG.start()
 
-        data = []
-        for d in self.detectors:
-            data.append(d.get_values())
+        acq_paths = {UHF.name: UHF.acquisition_paths for UHF in UHFs}
 
-        return np.concatenate(data)
+        data = {UHF.name: {k: [] for k, dummy in enumerate(UHF.acquisition_paths)}
+                for UHF in UHFs}
+
+        # Acquire data
+        gotem = {UHF.name: [False] * len(UHF.acquisition_paths) for UHF in UHFs}
+        accumulated_time = 0
+
+        while accumulated_time < UHFs[0].timeout() and \
+                not all(np.concatenate(list(gotem.values()))):
+            dataset = {}
+            for UHF in UHFs:
+                if not all(gotem[UHF.name]):
+                    time.sleep(0.01)
+                    dataset[UHF.name] = UHF._daq.poll(0.001, 1, 4, True)
+
+            # print(dataset)
+
+            for UHFname in dataset.keys():
+                for n, p in enumerate(acq_paths[UHFname]):
+                    if p in dataset[UHFname]:
+                        for v in dataset[UHFname][p]:
+                            data[UHFname][n] = np.concatenate(
+                                (data[UHFname][n], v['vector']))
+                            if len(data[UHFname][n]) >= self.detectors[
+                                0].nr_sweep_points:
+                                gotem[UHFname][n] = True
+            accumulated_time += 0.01*len(UHFs)
+
+        if  not all(np.concatenate(list(gotem.values()))):
+            for UHF in UHFs:
+                UHF.acquisition_finalize()
+                for n, c in enumerate(UHF.acquisition_paths):
+                    if n in data[UHF.name]:
+                        print("\t: Channel {}: Got {} of {} samples".format(
+                            n, len(data[UHF.name][n]), self.detectors[0].nr_sweep_points))
+                raise TimeoutError("Error: Didn't get all results!")
+
+
+        data_flat = np.concatenate([np.array([data[UHF.name][key]
+                         for key in data[UHF.name].keys()]) for UHF in UHFs])
+
+
+
+        data = data_flat * self.detectors[0].scaling_factor
+
+        no_virtual_channels = 1
+
+        # data = np.reshape(data.T,
+        #                   (-1, no_virtual_channels, len(self.channels))).T
+        # data = data.reshape((len(self.value_names), -1))
+
+        return data
+
 
     def finish(self):
         if self.AWG is not None:

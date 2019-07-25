@@ -446,7 +446,7 @@ class Segment:
                 trigger_elements = {}
                 for trigger_awg in trigger_awgs:
                     # if there is no element on that AWG create a new element
-                    if self.elements_on_awg.get(trigger_awg, None) == None:
+                    if self.elements_on_awg.get(trigger_awg, None) is None:
                         trigger_elements[
                             trigger_awg] = 'trigger_element_{}'.format(
                                 self.name)
@@ -840,7 +840,8 @@ class Segment:
         for pulse in self.elements[element]:
             if awg is not None:
                 channels |= set(pulse.channels) & awg_channels
-            channels |= set(pulse.channels)
+            else:
+                channels |= set(pulse.channels)
         return channels
 
     def calculate_hash(self, elname, codeword, channel):
