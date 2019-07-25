@@ -565,7 +565,13 @@ def measure_parity_single_round(ancilla_qubit, data_qubits, CZ_map,
         {'sweep_name': 'Preparation',
          'preparations': preps,
          'cal_points': repr(cal_points),
+         'rotate': True,
+         'cal_states_rotations':
+             {qbn: {'g': 0, 'e': 1} for qbn in qb_names},
+         'data_to_fit': {qbn: 'pe' for qbn in qb_names},
          'preparation_params': prep_params,
+         'hard_sweep_params': {'preps': {'values': np.arange(0, len(preps)),
+                                         'unit': ''}}
         })
 
     MC.run(label, exp_metadata=exp_metadata)

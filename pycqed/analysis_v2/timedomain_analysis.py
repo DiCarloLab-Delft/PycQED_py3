@@ -218,7 +218,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 value_names = value_names
             if 'w' in value_names[0]:
                 self.channel_map = a_tools.get_qb_channel_map_from_file(
-                    self.qb_names, ro_type=value_names,
+                    self.qb_names, value_names=value_names,
                     file_path=self.raw_data_dict['folder'])
             else:
                 self.channel_map = {}
@@ -254,7 +254,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 {qbn: {'sweep_points': data_filter(
                     self.raw_data_dict['hard_sweep_points'])}
                  for qbn in self.qb_names}
-        
 
         measured_RO_channels = list(self.raw_data_dict['measured_data'])
         meas_results_per_qb_raw = {}
@@ -362,7 +361,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['data_to_fit'] = OrderedDict()
         for qbn, prob_data in self.proc_data_dict[
                 'projected_data_dict'].items():
-            print(qbn, prob_data)
             if qbn in self.data_to_fit:
                 self.proc_data_dict['data_to_fit'][qbn] = prob_data[
                     self.data_to_fit[qbn]]
@@ -538,10 +536,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                          cal_states_dict, data_to_fit):
         rotated_data_dict = OrderedDict()
         for qb_name, meas_res_dict in meas_results_per_qb.items():
-
-            meas_res_dict_list = [re.sub(r' UHF[0-9]','',s) for s in list(
-                meas_res_dict)]
-
             if len(cal_states_dict[qb_name]) == 0:
                 cal_zero_points = None
                 cal_one_points = None
@@ -560,7 +554,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                             data=raw_data_arr[:, col],
                             cal_zero_points=cal_zero_points,
                             cal_one_points=cal_one_points)
-            elif meas_res_dict_list == channel_map[qb_name]:
+            elif list(meas_res_dict) == channel_map[qb_name]:
                 # two RO channels per qubit
                 raw_data_arr = meas_res_dict[list(meas_res_dict)[0]]
                 rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
@@ -583,7 +577,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
                 ro_suffixes = [s[len(qb_ro_ch0)+1::] for s in
                                list(meas_res_dict) if qb_ro_ch0 in s]
-                print(ro_suffixes)
 
                 for i, ro_suf in enumerate(ro_suffixes):
                     if len(ro_suffixes) == len(meas_res_dict):
@@ -717,8 +710,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 xlabel = self.metadata["sweep_name"]
                 xunit = self.metadata["sweep_unit"]
             else:
-                xlabel = self.raw_data_dict['sweep_parameter_names'][0]
-                xunit = self.raw_data_dict['sweep_parameter_units'][0]
+                xlabel = self.raw_data_dict['sweep_parameter_names']
+                xunit = self.raw_data_dict['sweep_parameter_units']
             if np.ndim(xunit) > 0:
                 xunit = xunit[0]
             for ax_id, ro_channel in enumerate(raw_data_dict):
@@ -836,8 +829,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             xlabel = self.metadata["sweep_name"]
             xunit = self.metadata["sweep_unit"]
         else:
-            xlabel = self.raw_data_dict['sweep_parameter_names'][0]
-            xunit = self.raw_data_dict['sweep_parameter_units'][0]
+            xlabel = self.raw_data_dict['sweep_parameter_names']
+            xunit = self.raw_data_dict['sweep_parameter_units']
         if np.ndim(xunit) > 0:
             xunit = xunit[0]
 
