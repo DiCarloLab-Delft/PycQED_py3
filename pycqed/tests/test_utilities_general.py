@@ -65,7 +65,7 @@ def test_ramp_values():
     x = []
     ramp_values(0, 1, ramp_rate=1,
                 update_interval=.1,
-                callable=x.append)
+                callable=x.append, verbose=True)
     assert x == approx(list(np.arange(.1, 1.001, .1)))
 
     t0 = time.time()
@@ -112,7 +112,7 @@ def test_ramp_values_negative_step():
     assert(dt > .8)
 
 
-def test_ramp_values_close(): 
+def test_ramp_values_close():
     t0 = time.time()
     x = []
     ramp_values(-0.012499999, -0.01251, ramp_rate=0.0001,
