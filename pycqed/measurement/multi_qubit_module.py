@@ -2126,13 +2126,13 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
             flux_pulse_amp = None
             if 'amplitude' in qbc.get_operation_dict()[cz_pulse_name]:
                 flux_pulse_amp = qbc.get('CZ_{}_pulse_length'.format(qbt.name))
-            MA = ma.Dynamic_phase_Analysis(
-                label=label, TwoD=False,
-                flux_pulse_amp=flux_pulse_amp,
-                flux_pulse_length=qbc.get('CZ_{}_pulse_length'.format(qbt.name)),
-                qb_name=qb.name, close_fig=True)
-            dyn_phases[qb.name] = MA.dyn_phase
-
+            MA = tda.CZDynamicPhaseAnalysis(qb_names=[qb.name], options_dict={
+                'flux_pulse_length': qbc.get(
+                    'CZ_{}_pulse_length'.format(qbt.name)),
+                'flux_pulse_amp': flux_pulse_amp})
+            dyn_phases[qb.name] = \
+                MA.proc_data_dict['analysis_params_dict'][qb.name][
+                    'dynamic_phase']['val']*180/np.pi
     if update and reset_phases_before_measurement:
         qbc.set('CZ_{}_basis_rotation'.format(qbt.name), dyn_phases)
     return dyn_phases

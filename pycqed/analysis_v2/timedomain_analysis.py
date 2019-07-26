@@ -209,9 +209,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         if self.metadata is None:
             self.metadata = {}
 
-        self.channel_map = self.options_dict.get(
-            'channel_map', self.metadata.get('channel_map', None))
-
+        self.channel_map = self.get_param_value('channel_map')
         if self.channel_map is None:
             value_names = self.raw_data_dict['value_names']
             if np.ndim(value_names) > 0:
@@ -229,7 +227,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             raise ValueError('No qubit RO channels have been found.')
 
     def process_data(self):
-        data_filter = self.options_dict.get('data_filter', None)
+        data_filter = self.get_param_value('data_filter')
         if data_filter is None:
             if 'preparation_params' in self.metadata:
                 if 'active' in self.metadata['preparation_params'].get(
@@ -239,16 +237,18 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     data_filter = lambda x: x[reset_reps::reset_reps+1]
         if data_filter is None:
             data_filter = lambda x: x
-        if 'sweep_points_dict' in self.metadata:
+
+        sweep_points_dict = self.get_param_value('sweep_points_dict')
+        hard_sweep_params = self.get_param_value('hard_sweep_params')
+        if sweep_points_dict is not None:
             # assumed to be of the form {qbn1: swpts_array1, qbn2: swpts_array2}
             self.proc_data_dict['sweep_points_dict'] = \
-                {qbn: {'sweep_points': self.metadata['sweep_points_dict'][qbn]}
+                {qbn: {'sweep_points': sweep_points_dict[qbn]}
                  for qbn in self.qb_names}
-        elif 'hard_sweep_params' in self.metadata:
-            hsp = self.metadata['hard_sweep_params']
+        elif hard_sweep_params is not None:
             self.proc_data_dict['sweep_points_dict'] = \
-                {qbn: {'sweep_points': list(hsp.values())[0]['values']}
-                 for qbn in self.qb_names}
+                {qbn: {'sweep_points': list(hard_sweep_params.values())[0][
+                    'values']} for qbn in self.qb_names}
         else:
             self.proc_data_dict['sweep_points_dict'] = \
                 {qbn: {'sweep_points': data_filter(
@@ -293,53 +293,28 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         # temporary fix for appending calibration points to x values but
         # without breaking sequences not yet using this interface.
-        try:
-            cal_points = \
-                self.options_dict.get('cal_points',
-                                      self.metadata.get('cal_points', None))
-            rotate = self.options_dict.get('rotate',
-                                           self.metadata.get('rotate', False))
-            last_ge_pulses = \
-                self.options_dict.get('last_ge_pulses',
-                                      self.metadata.get('last_ge_pulses',
-                                                        False))
+        cal_points = self.get_param_value('cal_points')
+        rotate = self.get_param_value('rotate', default_value=False)
+        last_ge_pulses = self.get_param_value('last_ge_pulses',
+                                              default_value=False)
+        self.cp = eval(cal_points)
 
-            self.cp = eval(cal_points)
+        # for now assuming the same for all qubits.
+        self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
 
-            #for now assuming the same for all qubits.
-            self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
+        cal_states_rots = self.cp.get_rotations(last_ge_pulses,
+                self.qb_names[0])[self.qb_names[0]] if rotate else None
+        self.cal_states_rotations = self.get_param_value(
+            'cal_states_rotations', default_value=cal_states_rots)
 
-            cal_states_rots = self.cp.get_rotations(last_ge_pulses,
-                    self.qb_names[0])[self.qb_names[0]] if rotate else None
-            self.cal_states_rotations = \
-                self.options_dict.get('cal_states_rotations',
-                                      self.metadata.get('cal_states_rotations',
-                                                        cal_states_rots))
-
-            sweep_points_w_calpts = \
-                {qbn: {'sweep_points': self.cp.extend_sweep_points(
-                    self.proc_data_dict['sweep_points_dict'][qbn][
-                        'sweep_points'], qbn)} for qbn in self.qb_names}
-            self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
-        except Exception as e:
-            log.error(str(e))
-            log.warning("Deprecated usage of calibration points and sequences."
-                        " Please adapt your measurement to the new framework. "
-                        "See measure_rabi() for an example of the new"
-                        " measurement.")
-
-            # TODO: Nathan @ Stef: ideally cal_states_dict should also be
-            #  keyed by qbname to allow  different calibration for different qubits.
-            #  This is already implemented in cp.get_indices() and get_rotations().
-            self.cal_states_dict = self.options_dict.get(
-                'cal_states_dict', self.metadata.get('cal_states_dict', None))
-            self.cal_states_rotations = self.options_dict.get(
-                'cal_states_rotations', self.metadata.get(
-                    'cal_states_rotations', None))
+        sweep_points_w_calpts = \
+            {qbn: {'sweep_points': self.cp.extend_sweep_points(
+                self.proc_data_dict['sweep_points_dict'][qbn][
+                    'sweep_points'], qbn)} for qbn in self.qb_names}
+        self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
 
         # create projected_data_dict
-        self.data_to_fit = self.options_dict.get(
-            'data_to_fit', self.metadata.get('data_to_fit', None))
+        self.data_to_fit = self.get_param_value('data_to_fit')
 
         if self.cal_states_rotations is not None:
             self.cal_states_analysis()
@@ -365,7 +340,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 self.proc_data_dict['data_to_fit'][qbn] = prob_data[
                     self.data_to_fit[qbn]]
 
-
         # create msmt_sweep_points, sweep_points, cal_points_sweep_points
         for qbn in self.qb_names:
             if self.num_cal_points > 0:
@@ -385,17 +359,17 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     'cal_points_sweep_points'] = \
                     self.proc_data_dict['sweep_points'][0]
         if self.options_dict.get('TwoD', False):
-            if 'sweep_points_2D_dict' in self.metadata:
+            sweep_points_2D_dict = self.get_param_value('data_to_fit')
+            soft_sweep_params = self.get_param_value('soft_sweep_params')
+            if sweep_points_2D_dict is not None:
                 # assumed to be of the form {qbn1: swpts_array1,
                 # qbn2: swpts_array2}
                 self.proc_data_dict['sweep_points_2D_dict'] = \
-                    {qbn: self.metadata['sweep_points_2D_dict'][qbn] for
-                     qbn in self.qb_names}
-            elif 'soft_sweep_params' in self.metadata:
-                ssp = self.metadata['soft_sweep_params']
+                    {qbn: sweep_points_2D_dict[qbn] for qbn in self.qb_names}
+            elif soft_sweep_params is not None:
                 self.proc_data_dict['sweep_points_2D_dict'] = \
-                    {qbn: list(ssp.values())[0]['values']
-                        for qbn in self.qb_names}
+                    {qbn: list(soft_sweep_params.values())[0]['values']
+                     for qbn in self.qb_names}
             else:
                 self.proc_data_dict['sweep_points_2D_dict'] = \
                     {qbn: self.raw_data_dict['soft_sweep_points'][0] for
@@ -443,8 +417,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
     def cal_states_analysis(self):
         self.get_cal_data_points()
-        if self.options_dict.get('TwoD', False):
-            print(self.channel_map)
+        if self.get_param_value('TwoD', default_value=False):
             self.proc_data_dict['projected_data_dict'] = \
                 self.rotate_data_TwoD(
                     self.proc_data_dict['meas_results_per_qb'],
@@ -627,8 +600,12 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         else:
             return r'$|{}\rangle$'.format(prob_label)
 
+    def get_param_value(self, param_name, default_value=None):
+        return self.options_dict.get(param_name, self.metadata.get(
+            param_name, default_value))
+
     def prepare_plots(self):
-        if self.options_dict.get('plot_proj_data', True):
+        if self.get_param_value('plot_proj_data', default_value=True):
             for qb_name, corr_data in self.proc_data_dict[
                     'projected_data_dict'].items():
                 fig_name = 'projected_plot_' + qb_name
@@ -664,7 +641,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         plot_cal_points=(
                             not self.options_dict.get('TwoD', False)))
 
-        if self.options_dict.get('plot_raw_data', True) and \
+        if self.get_param_value('plot_raw_data', default_value=True) and \
             self.cal_states_rotations is not None:
                 self.prepare_raw_data_plots(plot_filtered=False)
                 if 'preparation_params' in self.metadata:
@@ -702,25 +679,28 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             plot_name = 'raw_plot_' + qb_name + suffix
             # get xunit and label: temporarily with try catch for old
             # sequences which do not have unit and label in meta data
-            if 'hard_sweep_params' in self.metadata:
-                xlabel = list(self.metadata["hard_sweep_params"])[0]
-                xunit = list(self.metadata["hard_sweep_params"].values())[0][
+            hard_sweep_params = self.get_param_value('hard_sweep_params')
+            sweep_name = self.get_param_value('sweep_name')
+            sweep_unit = self.get_param_value('sweep_unit')
+            if hard_sweep_params is not None:
+                xlabel = list(hard_sweep_params)[0]
+                xunit = list(hard_sweep_params.values())[0][
                     'unit']
-            elif 'sweep_name' in self.metadata and 'sweep_unit' in self.metadata:
-                xlabel = self.metadata["sweep_name"]
-                xunit = self.metadata["sweep_unit"]
+            elif (sweep_name is not None) and (sweep_unit is not None):
+                xlabel = sweep_name
+                xunit = sweep_unit
             else:
                 xlabel = self.raw_data_dict['sweep_parameter_names']
                 xunit = self.raw_data_dict['sweep_parameter_units']
             if np.ndim(xunit) > 0:
                 xunit = xunit[0]
             for ax_id, ro_channel in enumerate(raw_data_dict):
-                if self.options_dict.get('TwoD', False):
-                    if 'soft_sweep_params' in self.metadata:
-                        ylabel = list(self.metadata["soft_sweep_params"])[0]
-                        yunit = \
-                            list(self.metadata[
-                                     "soft_sweep_params"].values())[0]['unit']
+                if self.get_param_value('TwoD', default_value=False):
+                    soft_sweep_params = self.get_param_value(
+                        'soft_sweep_params')
+                    if soft_sweep_params is not None:
+                        ylabel = list(soft_sweep_params)[0]
+                        yunit = list(soft_sweep_params.values())[0]['unit']
                     else:
                         ylabel = self.raw_data_dict['sweep_parameter_names'][1]
                         yunit = self.raw_data_dict['sweep_parameter_units'][1]
@@ -765,25 +745,30 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     plot_name + '_' + list(raw_data_dict)[0]]['ax_id'] = None
 
     def prepare_projected_data_plot(
-            self, fig_name, data, qb_name,
-            title_suffix='', plot_cal_points=True,
-            plot_name_suffix='', data_label='Data', data_axis_label=''):
+            self, fig_name, data, qb_name, title_suffix='', sweep_points=None,
+            plot_cal_points=True, plot_name_suffix='', data_label='Data',
+            data_axis_label='', do_legend_data=True, do_legend_cal_states=True):
         title_suffix = qb_name + title_suffix
         if data_axis_label == '':
             data_axis_label = '{} state population'.format(
                 self.get_latex_prob_label(self.data_to_fit[qb_name]))
         plotsize = self.get_default_plot_params(set=False)['figure.figsize']
         plotsize = (plotsize[0], plotsize[0]/1.25)
+
+        if sweep_points is None:
+            sweep_points = self.proc_data_dict['sweep_points_dict'][qb_name][
+                'sweep_points']
+        plot_names_cal = []
         if plot_cal_points and self.num_cal_points != 0:
             yvals = data[:-self.num_cal_points]
-            xvals = self.proc_data_dict['sweep_points_dict'][qb_name][
-                'msmt_sweep_points']
+            xvals = sweep_points[:-self.num_cal_points]
             # plot cal points
             for i, cal_pts_idxs in enumerate(
                     self.cal_states_dict.values()):
-                plot_dict_name = list(self.cal_states_dict)[i] + \
+                plot_dict_name_cal = list(self.cal_states_dict)[i] + \
                                  '_' + qb_name + '_' + plot_name_suffix
-                self.plot_dicts[plot_dict_name] = {
+                plot_names_cal += [plot_dict_name_cal]
+                self.plot_dicts[plot_dict_name_cal] = {
                     'fig_id': fig_name,
                     'plotfn': self.plot_line,
                     'plotsize': plotsize,
@@ -791,14 +776,14 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         'cal_points_sweep_points'][cal_pts_idxs],
                     'yvals': data[cal_pts_idxs],
                     'setlabel': list(self.cal_states_dict)[i],
-                    'do_legend': True,
+                    'do_legend': do_legend_cal_states,
                     'legend_bbox_to_anchor': (1, 0.5),
                     'legend_pos': 'center left',
                     'linestyle': 'none',
                     'line_kws': {'color': self.get_cal_state_color(
                         list(self.cal_states_dict)[i])}}
 
-                self.plot_dicts[plot_dict_name+'_line'] = {
+                self.plot_dicts[plot_dict_name_cal+'_line'] = {
                     'fig_id': fig_name,
                     'plotsize': plotsize,
                     'plotfn': self.plot_hlines,
@@ -811,9 +796,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         else:
             yvals = data
-            xvals = self.proc_data_dict['sweep_points_dict'][qb_name][
-                'sweep_points']
-
+            xvals = sweep_points
         title = (self.raw_data_dict['timestamp'] + ' ' +
                  self.raw_data_dict['measurementstring'])
         if title_suffix is not None:
@@ -821,25 +804,28 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         plot_dict_name = fig_name + '_' + plot_name_suffix
         # get x info (try for old sequences which do not have info in meta
-        if 'hard_sweep_params' in self.metadata:
-            xlabel = list(self.metadata["hard_sweep_params"])[0]
-            xunit = list(self.metadata["hard_sweep_params"].values())[0][
+        hard_sweep_params = self.get_param_value('hard_sweep_params')
+        sweep_name = self.get_param_value('sweep_name')
+        sweep_unit = self.get_param_value('sweep_unit')
+        if hard_sweep_params is not None:
+            xlabel = list(hard_sweep_params)[0]
+            xunit = list(hard_sweep_params.values())[0][
                 'unit']
-        elif 'sweep_name' in self.metadata and 'sweep_unit' in self.metadata:
-            xlabel = self.metadata["sweep_name"]
-            xunit = self.metadata["sweep_unit"]
+        elif (sweep_name is not None) and (sweep_unit is not None):
+            xlabel = sweep_name
+            xunit = sweep_unit
         else:
             xlabel = self.raw_data_dict['sweep_parameter_names']
             xunit = self.raw_data_dict['sweep_parameter_units']
         if np.ndim(xunit) > 0:
             xunit = xunit[0]
 
-        if self.options_dict.get('TwoD', False):
-            if 'soft_sweep_params' in self.metadata:
-                ylabel = list(self.metadata["soft_sweep_params"])[0]
-                yunit = \
-                    list(self.metadata[
-                             "soft_sweep_params"].values())[0]['unit']
+        if self.get_param_value('TwoD', default_value=False):
+            soft_sweep_params = self.get_param_value(
+                'soft_sweep_params')
+            if soft_sweep_params is not None:
+                ylabel = list(soft_sweep_params)[0]
+                yunit = list(soft_sweep_params.values())[0]['unit']
             else:
                 ylabel = self.raw_data_dict['sweep_parameter_names'][1]
                 yunit = self.raw_data_dict['sweep_parameter_units'][1]
@@ -872,9 +858,14 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 'setlabel': data_label,
                 'title': title,
                 'linestyle': 'none',
-                'do_legend': True,
+                'do_legend': do_legend_data,
                 'legend_bbox_to_anchor': (1, 0.5),
                 'legend_pos': 'center left'}
+        if len(plot_names_cal) > 0:
+            if do_legend_data and not do_legend_cal_states:
+                for plot_name in plot_names_cal:
+                    plot_dict_cal = self.plot_dicts.pop(plot_name)
+                    self.plot_dicts[plot_name] = plot_dict_cal
 
 
 class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
@@ -4268,12 +4259,8 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
     def process_data(self):
         super().process_data()
 
-        self.leakage_qbname = self.metadata.get('leakage_qbname',
-                                                self.options_dict.get(
-                                                    'leakage_qbname', None))
-        self.cphase_qbname = self.metadata.get('cphase_qbname',
-                                               self.options_dict.get(
-                                                   'cphase_qbname', None))
+        self.leakage_qbname = self.get_param_value('leakage_qbname')
+        self.cphase_qbname = self.get_param_value('cphase_qbname')
         if self.leakage_qbname is None and self.cphase_qbname is None:
             raise ValueError('Please provide either leakage_qbname or '
                              'cphase_qbname.')
@@ -4293,7 +4280,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                     'sweep_points'].size:
                 self.proc_data_dict['data_to_fit'][qbn] = data.T
 
-        #convert phases to radians
+        # convert phases to radians
         for qbn in self.qb_names:
             sweep_dict = self.proc_data_dict['sweep_points_dict'][qbn]
             sweep_dict['sweep_points'] *= np.pi/180
@@ -4650,6 +4637,12 @@ class CZDynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
 
     def process_data(self):
         super().process_data()
+        # convert phases to radians
+        for qbn in self.qb_names:
+            sweep_dict = self.proc_data_dict['sweep_points_dict'][qbn]
+            sweep_dict['sweep_points'] *= np.pi/180
+
+        # get data with flux pulse and w/o flux pulse
         self.data_with_fp = OrderedDict()
         self.data_no_fp = OrderedDict()
         for qbn in self.qb_names:
@@ -4688,35 +4681,81 @@ class CZDynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
     def analyze_fit_results(self):
         self.proc_data_dict['analysis_params_dict'] = OrderedDict()
         for qbn in self.qb_names:
+            self.proc_data_dict['analysis_params_dict'][qbn] = OrderedDict()
             self.proc_data_dict['analysis_params_dict'][qbn][
-                'dynamic_phase'] = \
-                (self.fit_dicts[f'cos_fit_{qbn}_wfp'][
-                     'fit_res'].best_values['phase'] -
-                 self.fit_dicts[f'cos_fit_{qbn}_ref_measure'][
-                     'fit_res'].best_values['phase'])*180/np.pi
+                'dynamic_phase'] = {
+                'val': (self.fit_dicts[f'cos_fit_{qbn}_wfp'][
+                            'fit_res'].best_values['phase'] -
+                        self.fit_dicts[f'cos_fit_{qbn}_nofp'][
+                            'fit_res'].best_values['phase']),
+                'stderr': np.sqrt(
+                    self.fit_dicts[f'cos_fit_{qbn}_wfp'][
+                        'fit_res'].params['phase'].stderr**2 +
+                    self.fit_dicts[f'cos_fit_{qbn}_nofp'][
+                        'fit_res'].params['phase'].stderr**2)
+                }
         self.save_processed_data(key='analysis_params_dict')
 
     def prepare_plots(self):
         super().prepare_plots()
-
         for qbn in self.qb_names:
             for i, data in enumerate([self.data_with_fp[qbn],
                                       self.data_no_fp[qbn]]):
+                fit_key = f'cos_fit_{qbn}_wfp' if i == 0 else \
+                    f'cos_fit_{qbn}_nofp'
+                plot_name_suffix = 'fit_'+'wfp' if i == 0 else 'nofp'
+                cal_pts_data = self.proc_data_dict['data_to_fit'][qbn][
+                               -self.num_cal_points:]
                 base_plot_name = 'Dynamic_phase_' + qbn
                 self.prepare_projected_data_plot(
                     fig_name=base_plot_name,
-                    data=data,
-                    plot_name_suffix=qbn+'fit',
-                    qb_name=qbn)
+                    data=np.concatenate((data,cal_pts_data)),
+                    sweep_points=np.unique(
+                        self.proc_data_dict['sweep_points_dict'][qbn][
+                            'sweep_points']),
+                    data_label='with flux pulse' if i == 0 else 'no flux pulse',
+                    plot_name_suffix=qbn + plot_name_suffix,
+                    qb_name=qbn,
+                    do_legend_cal_states=(i == 0))
                 if self.do_fitting:
-                    fit_res = self.fit_dicts['cos_fit_' + qbn]['fit_res']
-                    self.plot_dicts['fit_' + qbn] = {
+                    fit_res = self.fit_dicts[fit_key]['fit_res']
+                    self.plot_dicts[plot_name_suffix + '_' + qbn] = {
                         'fig_id': base_plot_name,
                         'plotfn': self.plot_fit,
                         'fit_res': fit_res ,
                         'setlabel': 'cosine fit',
                         'color': 'r',
-                        'do_legend': True,
-                        'legend_ncol': 2,
-                        'legend_bbox_to_anchor': (1, -0.15),
-                        'legend_pos': 'upper right'}
+                        'do_legend': i == 0}
+
+                    textstr = 'Dynamic phase {}:\n\t{:.2f}'.format(
+                        qbn,
+                        self.proc_data_dict['analysis_params_dict'][qbn][
+                            'dynamic_phase']['val']*180/np.pi) + \
+                              r'$^{\circ}$' + \
+                            '$\\pm${:.2f}'.format(
+                        self.proc_data_dict['analysis_params_dict'][qbn][
+                            'dynamic_phase']['stderr']*180/np.pi) + \
+                              r'$^{\circ}$'
+
+                    fpl = self.get_param_value('flux_pulse_length')
+                    if fpl is not None:
+                        textstr += '\n length: {:.2f} ns'.format(fpl*1e9)
+                    fpa = self.get_param_value('flux_pulse_amp')
+                    if fpa is not None:
+                        textstr += '\n amp: {:.2f} V'.format(fpa)
+
+                    self.plot_dicts['text_msg_' + qbn] = {
+                        'fig_id': base_plot_name,
+                        'ypos': -0.15,
+                        'xpos': -0.05,
+                        'horizontalalignment': 'left',
+                        'verticalalignment': 'top',
+                        'plotfn': self.plot_text,
+                        'text_string': textstr}
+            for plot_name in list(self.plot_dicts)[::-1]:
+                if self.plot_dicts[plot_name].get('do_legend', False):
+                    break
+            self.plot_dicts[plot_name].update(
+                {'legend_ncol': 2,
+                 'legend_bbox_to_anchor': (1, -0.15),
+                 'legend_pos': 'upper right'})
