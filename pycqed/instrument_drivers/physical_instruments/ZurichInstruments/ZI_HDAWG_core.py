@@ -34,22 +34,25 @@ Changelog:
 - merged branch 'develop' into 'feature/cc', changes:
     pulled in changed upload_waveform_realtime from ZI_HDAWG8.py again
 
+20190709 NCH
+- Updated to use the improved ZI_base_instrument functionality, which now
+    makes a lot of methods common to both the HDAWG and the UHF-QA.
+- Removed zishell_NH
+
 """
 
 import logging
 import os
 import time
-import numpy as np
 import ctypes
-from ctypes.wintypes import MAX_PATH
+import json
 from zlib import crc32
 
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import zishell_NH as zs
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument import ZI_base_instrument
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 
 log = logging.getLogger(__name__)
 
-class ZI_HDAWG_core(ZI_base_instrument):
+class ZI_HDAWG_core(zibase.ZI_base_instrument):
     """
     This is PycQED/QCoDeS driver driver for the Zurich Instruments HDAWG.
 
@@ -58,91 +61,129 @@ class ZI_HDAWG_core(ZI_base_instrument):
     These are used to add parameters to the instrument.
     """
 
+    # Define minimum required revisions
+    FWREVISION = 62730
+    FPGAREVISION = 62832
+    SLAVEREVISION = 62659
+
+    ##########################################################################
+    # Private methods
+    ##########################################################################
+
+    def _update_num_channels(self):
+        if self.devtype == 'HDAWG8':
+            self._num_channels = 8
+        elif self.devtype == 'HDAWG4':
+            self._num_channels = 4
+        else:
+            raise Exception("Unknown device type '{}'".format(self.devtype))
+
     ##########################################################################
     # 'public' functions: device control
     ##########################################################################
 
-    def __init__(self, name: str,
+    def __init__(self, 
+                 name: str,
                  device: str,
-                 server: str = 'localhost', port = 8004,
+                 interface: str = '1GbE',
+                 server: str = 'localhost', 
+                 port: int = 8004,
+                 num_codewords: int = 32,
                  **kw) -> None:
         """
         Input arguments:
             name:           (str) name of the instrument as seen by the user
             device          (str) the name of the device e.g., "dev8008"
-            server          (str) the ZI data server
-            port            (int) the port to connect to
+            interface       (std) the name of the interface to use ('1GbE' or 'USB')
+            server          (str) the host where the ziDataServer is running
+            port            (int) the port to connect to for the ziDataServer (don't change)
+            num_codewords   (int) the number of codeword-based waveforms to prepare
         """
+        t0 = time.time()
 
-        super().__init__(name=name, **kw)
-
-        # save some parameters
-        self._devname = device
-
-        # determine path for LabOne web server
-        if os.name == 'nt':
-            dll = ctypes.windll.shell32
-            buf = ctypes.create_unicode_buffer(MAX_PATH + 1)
-            if dll.SHGetSpecialFolderPathW(None, buf, 0x0005, False):
-                _basedir = buf.value
-            else:
-                raise Exception('Could not extract my documents folder')
-        else:
-            _basedir = os.path.expanduser('~')
-        self._lab_one_webserver_path = os.path.join(
-            _basedir, 'Zurich Instruments', 'LabOne', 'WebServer')
-
-        # connect to data server and device
-        self._dev = zs.ziShellDevice()
-        self._dev.connect_server(server, port)
-        print("Trying to connect to device {}".format(self._devname))
-        if 1:
-            self._dev.connect_device(self._devname, '1GbE')
-        else: # FIXME
-            log.warning('{}: using USB interface'.format(self._devname))
-            self._dev.connect_device(self._devname, 'USB')
-
-        # add qcodes parameters based on JSON parameter file
-        # FIXME: we might want to skip/remove/(add  to _params_to_skip_update) entries like AWGS/*/ELF/DATA,
-        #       AWGS/*/SEQUENCER/ASSEMBLY, AWGS/*/DIO/DATA
-        dir_path = os.path.dirname(os.path.abspath(__file__))
-        base_fn = os.path.join(dir_path, 'zi_parameter_files')
-        filename = os.path.join(base_fn, 'node_doc_HDAWG8.json')
-        try:
-            self.add_parameters_from_file(filename=filename)  # NB: defined in parent class
-        except FileNotFoundError:
-            log.error("{}: parameter file for data parameters {} not found".
-                      format(self._devname, filename))
-            raise
-            # FIXME: we need to be capable to generate file if none exists
-
-        self._add_ZIshell_device_methods_to_instrument()
-
-        # determine number of channels
-        dev_type = self.get('features_devtype')
-        if dev_type == 'HDAWG8':
-            self._num_channels = 8
-        elif dev_type == 'HDAWG4':
-            self._num_channels = 4
-        else:
-            raise Exception("Unknown device type '{}'".format(dev_type))
+        super().__init__(name=name, device=device, interface=interface, server=server, port=port, **kw)
 
         # show some info
-        serial = self.get('features_serial')
-        options = self.get('features_options') # FIXME: check that we have what we need
-        fw_revision = self.get('system_fwrevision') # Revision of the device internal controller software FIXME: check against minimum we need
-        fpga_revision = self.get('system_fpgarevision') # HDL firmware revision FIXME: check against minimum we need
-        log.info('{}: serial={}, options={}, fw_revision={}, fpga_revision={}'
-                 .format(self._devname, serial, options.replace('\n','|'), fw_revision, fpga_revision))
         log.info('{}: DIO interface found in mode {} (0=CMOS, 1=LVDS)'
-                 .format(self._devname, self.get('dios_0_interface'))) # NB: mode is persistent across device restarts
-        # FIXME:
-        #log.info('{}: zi_about_fwrevision={}'
-        #         .format(self._devname, self._dev.daq.get('/zi/about/fwrevision', False, 1)))    # getv:error,geti:0
-        # /zi/about/dataserver
-        # /zi/about/revision
+                 .format(self.devname, self.get('dios_0_interface'))) # NB: mode is persistent across device restarts
+
+        t1 = time.time()
+        print('Initialized ZI_HDAWG_core', self.devname, 'in %.2fs' % (t1-t0))
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
+        
+        # Structure for storing errors
+        self._errors = None
+        # Structure for storing errors that should be demoted to warnings
+        self._errors_to_ignore = []
+        # Make initial error check
+        self.check_errors()
+
+    def _check_devtype(self):
+        if self.devtype != 'HDAWG8' and self.devtype != 'HDAWG4':
+            raise zibase.ziDeviceError('Device {} of type {} is not a HDAWG instrument!'.format(self.devname, self.devtype))
+
+    def _check_options(self):
+        """
+        Checks that the correct options are installed on the instrument.
+        """
+        options = self.gets('features/options').split('\n')
+        if 'ME' not in options:
+            raise zibase.ziOptionsError('Device {} is missing the ME option!'.format(self.devname))
+        if 'PC' not in options:
+            raise zibase.ziOptionsError('Device {} is missing the PC option!'.format(self.devname))
+
+    def _check_awg_nr(self, awg_nr):
+        """
+        Checks that the given AWG index is valid for the device.
+        """
+        if self.devtype == 'HDAWG8' and (awg_nr < 0 or awg_nr > 3):
+            raise zibase.ziValueError('Invalid AWG index of {} detected!'.format(awg_nr))
+        elif self.devtype == 'HDAWG4' and (awg_nr < 0 or awg_nr > 1):
+            raise zibase.ziValueError('Invalid AWG index of {} detected!'.format(awg_nr))
+
+    def _check_versions(self):
+        """
+        Checks that sufficient versions of the firmware are available.
+        """
+        if self.geti('system/fwrevision') < ZI_HDAWG_core.FWREVISION:
+            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.FWREVISION, self.geti('system/fwrevision')))
+
+        if self.geti('system/fpgarevision') < ZI_HDAWG_core.FPGAREVISION:
+            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.FPGAREVISION, self.geti('system/fpgarevision')))
+
+        if self.geti('system/slaverevision') < ZI_HDAWG_core.SLAVEREVISION:
+            raise zibase.ziVersionError('Insufficient FPGA Slave revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.SLAVEREVISION, self.geti('system/slaverevision')))
+
+    def _update_num_channels(self):
+        # Add this point we know self.devtype is either 'HDAWG8' or 'HDAWG4'
+        if self.devtype != 'HDAWG8':
+            self._num_channels = 8
+        else:
+            self._num_channels = 4
+
+    def _codeword_table_preamble(self, awg_nr):
+        """
+        Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
+        The generated code depends on the instrument type. For the HDAWG instruments, we use the seWaveDIO
+        function.
+        """
+        program = ''
+        
+        # because awg_channels come in pairs
+        ch = awg_nr*2           
+
+        for cw in range(self._num_codewords):
+            parnames = 2*['']
+            csvnames = 2*['']
+            # Every AWG drives two channels
+            for i in range(2):
+                parnames[i] = zibase.gen_waveform_name(ch+i, cw)  # NB: parameter naming identical to QWG
+                csvnames[i] = self.devname + '_' + parnames[i]
+            
+            program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(cw, csvnames[0], csvnames[1])
+
+        return program
 
     def load_default_settings(self):
         """
@@ -164,18 +205,6 @@ class ZI_HDAWG_core(ZI_base_instrument):
         # SYSTEM/AWG/CHANNELGROUPING
         # SYSTEM/CLOCKS/SAMPLECLOCK/FREQ
         #
-
-
-    def get_idn(self) -> dict:
-        # FIXME, update using new parameters for this purpose
-        idn_dict = {'vendor': 'ZurichInstruments',
-                    'model': self._dev.daq.getByte(
-                        '/{}/features/devtype'.format(self._devname)),
-                    'serial': self._devname,
-                    'firmware': self._dev.geti('system/fwrevision'),
-                    'fpga_firmware': self._dev.geti('system/fpgarevision')
-                    }
-        return idn_dict
 
     def assure_ext_clock(self) -> None:
         """
@@ -212,7 +241,6 @@ class ZI_HDAWG_core(ZI_base_instrument):
             else:
                 break
         print('\nDone')
-        # FIXME: also look at SYSTEM/CLOCKS/SAMPLECLOCK/STATUS ?
 
     # FIXME: add check_virt_mem_use(self)
     # AWGS/0/SEQUENCER/MEMORYUSAGE
@@ -227,43 +255,83 @@ class ZI_HDAWG_core(ZI_base_instrument):
         for i in range(int(self._num_channels/2)):
             self.set('awgs_{}_enable'.format(i), 0)
 
+        self.check_errors()
+
     def start(self) -> None:
         """
         Starts the program on all AWG's part of this HDAWG unit
         """
-        for i in range(int(self._num_channels/2)):
+        self.check_errors()
+
+        for i in range(self._num_channels//2):
             self.set('awgs_{}_enable'.format(i), 1)
+
+    def check_errors(self):
+        errors = json.loads(self.getv('raw/error/json/errors'))
+
+        # If this is the first time we are called, log the detected errors, but don't raise
+        # any exceptions
+        if self._errors is None:
+            raise_exceptions = False
+            self._errors = {}
+        else:
+            raise_exceptions = True
+
+        # First report if anything has changed
+        if errors['new_errors'] > 0:
+            log.warning('{}: Found {} new errors!'.format(self.devname, errors['new_errors']))
+            print('WARNING: Found {} new errors!'.format(errors['new_errors']))
+
+        # Asserted in case errors were found
+        found_errors = False
+
+        # Go through the errors and update our structure, raise exceptions if anything changed
+        for m in errors['messages']:
+            code     = m['code']
+            count    = m['count']
+            severity = m['severity']
+            message  = m['message']
+
+            if not raise_exceptions:
+                self._errors[code] = {
+                    'count'   : count, 
+                    'severity': severity,
+                    'message' : message}
+                log.warning('{}: Code {}: "{}" ({})'.format(self.devname, code, message, severity))
+                print('WARNING: {} ({}/{})'.format(message, code, severity))
+            else:
+                # Optionally skip the error completely
+                if code in self._errors_to_ignore:
+                    continue
+
+                # Check if there are new errors
+                if code not in self._errors or count > self._errors[code]['count']:
+                    log.error('{}: {} ({}/{})'.format(self.devname, message, code, severity))
+                    print('ERROR: {} ({}/{})'.format(message, code, severity))
+                    found_errors = True
+
+                if code in self._errors:
+                    self._errors[code]['count'] = count
+                else:
+                    self._errors[code] = {
+                        'count'   : count, 
+                        'severity': severity,
+                        'message' : message}
+
+        if found_errors:
+            raise zibase.ziRuntimeError('Errors detected during run-time!')
+
+    def demote_error(self, code):
+        self._errors_to_ignore.append(code)
+
+    def get_idn(self) -> dict:
+        idn_dict = super().get_idn()
+        idn_dict['slave_firmware'] = self.geti('system/slaverevision')
+        return idn_dict
 
     ##########################################################################
     # 'public' functions: generic AWG/waveform support
     ##########################################################################
-
-    def configure_awg_from_string(self, awg_nr: int, program_string: str,
-                                  timeout: float = 15) -> None:
-        """
-        Uploads a program string to one of the AWGs of the HDAWG.
-        """
-        if 0: # FIXME: debugging
-            self._dev.configure_awg_from_string(awg_nr=awg_nr,
-                                                program_string=program_string,
-                                                timeout=timeout)
-        else:
-            try:
-                self._dev.configure_awg_from_string(awg_nr=awg_nr,
-                                                    program_string=program_string,
-                                                    timeout=timeout)
-            except TimeoutError as e:
-                print('*** awgModule/compiler/statusstring ***:')
-                print(self._dev.awgModule.get('awgModule/compiler/statusstring')['compiler']['statusstring'][0])
-                print('*** awgModule/compiler/sourcestring ***:')
-                print(self._dev.awgModule.get('awgModule/compiler/sourcestring')['compiler']['sourcestring'][0])
-                print('*** done ***')
-                raise
-
-        # FIXME: side effect: the function above touches '/dio/strobe/slope'
-        hash_val = crc32(program_string.encode('utf-8'))
-        self.set('awgs_{}_sequencer_program_crc32_hash'.format(awg_nr),
-                 hash_val)
 
     def upload_waveform_realtime(self, w0, w1, awg_nr: int, wf_nr: int = 1):
         """
@@ -283,114 +351,21 @@ class ZI_HDAWG_core(ZI_base_instrument):
         - loading speed depends on the size of w0 and w1 and is ~80ms for 20us.
 
         """
-        # these two attributes are added for debugging purposes.
-        # they allow checking what the realtime loaded waveforms are.
-        self._realtime_w0 = w0
-        self._realtime_w1 = w1
-
-        # Checked and everything matches
-        # print(self)
-        # print(hex(id(self)))
-        # print(self._dev)
-        # print(hex(id(self._dev)))
-
-        c = np.vstack((w0, w1)).reshape((-2,), order='F')
-        self._dev.seti('awgs/{}/enable'.format(awg_nr), 0)
-        self._dev.subs('awgs/{}/ready'.format(awg_nr))
-        self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
-        # self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
-        # Try as float32 instead
-        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c.astype(np.float32))
-
-        # Commented out checking if ready.
-        # creates too much time overhead.
-        # data = self._dev.poll()
-        # t0 = time.time()
-        # while not data:
-        #     data = self._dev.poll()
-        #     if time.time()-t0> self.timeout():
-        #         raise TimeoutError
-        # self._dev.unsubs('awgs/{}/ready'.format(awg_nr))
-        self._dev.seti('awgs/{}/enable'.format(awg_nr), 1)
+        raise NotImplementedError('Please use the waveform parameters ("wave_chN_cwM") of the object to change waveforms!')
 
     ##########################################################################
     # 'private' functions, internal to the driver
     ##########################################################################
 
-    def _add_ZIshell_device_methods_to_instrument(self) -> None:
-        """
-        Some methods defined in the zishell are convenient as public
-        methods of the instrument. These are added here.
-        """
-        self.reconnect = self._dev.reconnect
-        self.restart_device = self._dev.restart_device
-        self.poll = self._dev.poll
-        self.sync = self._dev.sync
-        self.read_from_scope = self._dev.read_from_scope
-        self.restart_scope_module = self._dev.restart_scope_module
-        self.restart_awg_module = self._dev.restart_awg_module
-
-    def _gen_write_csv(self, wf_name):
-        def write_func(waveform):
-            # The length of HDAWG waveforms should be a multiple of 8 samples.
-            if (len(waveform) % 8) != 0:
-                extra_zeros = 8-(len(waveform) % 8)
-                waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
-            return self._write_csv_waveform(
-                wf_name=wf_name, waveform=waveform)
-        return write_func
-
-    def _write_csv_waveform(self, wf_name: str, waveform) -> None:
-        filename = os.path.join(
-            self._lab_one_webserver_path, 'awg', 'waves',
-            self._devname+'_'+wf_name+'.csv')
-        np.savetxt(filename, waveform, delimiter=",")
-
-    def _gen_read_csv(self, wf_name):
-        def read_func():
-            return self._read_csv_waveform(
-                wf_name=wf_name)
-        return read_func
-
-    def _read_csv_waveform(self, wf_name: str):
-        filename = os.path.join(
-            self._lab_one_webserver_path, 'awg', 'waves',
-            self._devname+'_'+wf_name+'.csv')
-        try:
-            return np.genfromtxt(filename, delimiter=',')
-        except OSError as e:
-            # if the waveform does not exist yet dont raise exception
-            log.warning(e)
-            print(e)
-            return None
-
-    def _set_dio_delay(self, awg, strb_mask, data_mask, delay):
-        """
-        The function sets the DIO delay for a given FPGA. The valid delay range is
-        0 to 6. The delays are created by either delaying the data bits or the strobe
-        bit. The data_mask input represents all bits that are part of the codeword or
-        the valid bit. The strb_mask input represents the bit that define the strobe.
+    def _set_dio_delay(self, delay):
+        """ 
+        The function sets the DIO delay for the instrument. The valid delay range is
+        0 to 15. The delays are applied to all bits of the DIO bus.
         """
         if delay < 0:
             print('WARNING: Clamping delay to 0')
-        if delay > 6:
-            print('WARNING: Clamping delay to 6')
-            delay = 6
+        if delay > 15:
+            print('WARNING: Clamping delay to 15')
+            delay = 15
 
-        strb_delay = 0
-        data_delay = 0
-        if delay > 3:
-            strb_delay = delay-3
-        else:
-            data_delay = 3-delay
-
-        for i in range(32):
-            self._dev.seti('awgs/{}/dio/delay/index'.format(awg), i)
-            if strb_mask & (1 << i):
-                self._dev.seti(
-                    'awgs/{}/dio/delay/value'.format(awg), strb_delay)
-            elif data_mask & (1 << i):
-                self._dev.seti(
-                    'awgs/{}/dio/delay/value'.format(awg), data_delay)
-            else:
-                self._dev.seti('awgs/{}/dio/delay/value'.format(awg), 0)
+        self.seti('raw/dios/0/delays/*/value', delay)
