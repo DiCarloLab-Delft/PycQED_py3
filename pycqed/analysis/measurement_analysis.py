@@ -8942,7 +8942,11 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         peaks = np.zeros((len(self.X), 2))
         for i in range(len(self.X)):
             p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i], **kw)
-            peaks[i, :] = np.sort(p_dict[:2])
+            try:
+                peaks[i, :] = np.sort(p_dict[:2])
+            except Exception as e:
+                logging.warning(e)
+                peaks[i, :] = np.array([np.NaN, np.NaN])
 
         peaks_low = peaks[:, 0]
         peaks_high = peaks[:, 1]
