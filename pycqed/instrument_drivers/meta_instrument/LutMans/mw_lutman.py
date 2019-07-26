@@ -17,9 +17,11 @@ default_mw_lutmap = {
     7: {"name": "rPhi90",   "theta": 90, "phi": 0, "type": "ge"},
     8: {"name": "spec",     "type": "spec"},
     9: {"name": "rX12",      "theta": 180, "phi": 0, "type": "ef"},
+    10: {"name": "square",   "type": "square"},
+       
 }
 
-valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw'}
+valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square'}
 
 # _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
 #            'rXm90',  'rYm90', 'rPhi90', 'spec']
@@ -216,6 +218,13 @@ class Base_MW_LutMan(Base_LutMan):
                     sampling_rate=self.sampling_rate(),
                     delay=0,
                     phase=0)
+
+            elif waveform['type'] == 'square': 
+                self._wave_dict[idx] = wf.mod_square(
+                    amp=self.sq_amp(), length=self.mw_gauss_width()*4, 
+                    f_modulation=self.mw_modulation(),  phase=0,
+                    motzoi=0, sampling_rate=self.sampling_rate())         
+
             else:
                 raise ValueError
 

@@ -2,6 +2,8 @@
 Module containing a collection of detector functions used by the
 Measurement Control.
 '''
+
+import qcodes as qc
 import numpy as np
 import logging
 import time
@@ -1252,7 +1254,7 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         self.delay = delay
         self.SH = signal_hound
         if frequency is not None:
-            self.SH.set('frequency', frequency)
+            self.SH.frequency(frequency)
         self.Navg = Navg
         self.prepare_for_each_point = prepare_for_each_point
         self.prepare_function = prepare_function
@@ -1262,10 +1264,15 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         if self.prepare_for_each_point:
             self.prepare()
         time.sleep(self.delay)
-        return self.SH.get_power_at_freq(Navg=self.Navg)
+        if qc.__version__ < '0.1.11': 
+            return self.SH.get_power_at_freq(Navg=self.Navg)
+        else: 
+            self.SH.avg(self.Navg)
+            return self.SH.power()
 
     def prepare(self, **kw):
-        self.SH.prepare_for_measurement()
+        if qc.__version__ < '0.1.11': 
+            self.SH.prepare_for_measurement()
         if self.prepare_function is not None:
             self.prepare_function(**self.prepare_function_kwargs)
 

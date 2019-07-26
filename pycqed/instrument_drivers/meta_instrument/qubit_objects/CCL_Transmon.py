@@ -1779,13 +1779,26 @@ class CCLight_Transmon(Qubit):
                 mw_lutman.sq_amp(.5)
 
             spurious_sideband_freq = self.freq_qubit() - 2*self.mw_freq_mod()
+
+            # This is to ensure the square waveform is pulse 10! 
+            mw_lutman.set_default_lutmap()
+
+            def load_square(): 
+                AWG = mw_lutman.AWG.get_instr()
+                AWG.stop()
+                # Codeword 10 is hardcoded in the generate CCL config
+                # mw_lutman.load_waveform_realtime(waveform_key=10)
+
+                mw_lutman.load_waveforms_onto_AWG_lookuptable(force_load_sequencer_program=False)                
+                AWG.start()
+
+
             detector = det.Signal_Hound_fixed_frequency(
                 self.instr_SH.get_instr(), spurious_sideband_freq,
                 prepare_for_each_point=True,
                 Navg=5,
-                prepare_function=mw_lutman.load_waveform_realtime,
-                # Codeword 10 is hardcoded in the generate CCL config
-                prepare_function_kwargs={'waveform_key': 'square', 'wf_nr': 10})
+                prepare_function=load_square) #mw_lutman.load_waveform_realtime,
+                # prepare_function_kwargs={'waveform_key': 'square', 'wf_nr': 10})
             ad_func_pars = {'adaptive_function': cma.fmin,
                             'x0': x0,
                             'sigma0': 1,
@@ -2914,7 +2927,9 @@ class CCLight_Transmon(Qubit):
                     return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
 
     def measure_SSRO_frequency_amplitude_sweep(self, freqs=None, amps_rel=np.linspace(0, 1, 11),
-                                               nr_shots=4092*4, nested_MC=None, analyze=True):
+                                               nr_shots=4092*4, nested_MC=None, analyze=True,
+                                               use_optimal_weights=False, 
+                                               label='SSRO_freq_amp_sweep'):
         """
         Measures SNR and readout fidelities as a function of the readout pulse amplitude
         and frequency. Resonator depletion pulses are automatically scaled.
@@ -2949,17 +2964,35 @@ class CCLight_Transmon(Qubit):
             optimization_M_amp_down1s=[self.ro_pulse_down_amp1()],
             upload=True
         )
-        d = det.Function_Detector(
-            self.measure_ssro,
-            msmt_kw={
-                'nr_shots': nr_shots,
-                'analyze': True, 'SNR_detector': True,
-                'cal_residual_excitation': True,
-                'prepare': False,
-                'disable_metadata': True
-            },
-            result_keys=['SNR', 'F_d', 'F_a']
-        )
+
+        def ssro_and_optimal_weights():
+            self.calibrate_optimal_weights(verify=False,
+                                           analyze=True,
+                                           update=True)
+            ret = self.measure_ssro(nr_shots=nr_shots,
+                                    analyze=True, SNR_detector=True,
+                                    cal_residual_excitation=True,
+                                    prepare=False,
+                                    disable_metadata=True)
+            return ret
+        if use_optimal_weights:
+            d = det.Function_Detector(
+                ssro_and_optimal_weights,
+                msmt_kw={},
+                result_keys=['SNR', 'F_d', 'F_a']
+            )
+        else:
+            d = det.Function_Detector(
+                self.measure_ssro,
+                msmt_kw={
+                    'nr_shots': nr_shots,
+                    'analyze': True, 'SNR_detector': True,
+                    'cal_residual_excitation': True,
+                    'prepare': False,
+                    'disable_metadata': True
+                },
+                result_keys=['SNR', 'F_d', 'F_a']
+            )
         nested_MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
             MW_LO_source=self.instr_LO_ro.get_instr(),
             IF=self.ro_freq_mod()))
@@ -2967,7 +3000,7 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_detector_function(d)
         nested_MC.set_sweep_function_2D(sweep_function)
         nested_MC.set_sweep_points_2D(amps_rel)
-        label = 'SSRO_freq_amp_sweep' + self.msmt_suffix
+        label = label + self.msmt_suffix
         nested_MC.run(label, mode='2D')
 
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
