@@ -189,6 +189,51 @@
             }
         },
         {
+            "docstring": "This parameter determines the extra output delay introduced for the DIO9 channel. The unit is 20ns.",
+            "get_cmd": "QUTech:DioDelayNine?",
+            "label": "Output Delay of DIO9",
+            "name": "dio9_out_delay",
+            "set_cmd": "QUTech:DioDelayNine {}",
+            "unit": "20 ns",
+            "vals": {
+                "range": [
+                    0,
+                    31
+                ],
+                "type": "Non_Neg_Number"
+            }
+        },
+        {
+            "docstring": "This parameter determines the extra output delay introduced for the DIO10 channel. The unit is 20ns.",
+            "get_cmd": "QUTech:DioDelayTen?",
+            "label": "Output Delay of DIO10",
+            "name": "dio10_out_delay",
+            "set_cmd": "QUTech:DioDelayTen {}",
+            "unit": "20 ns",
+            "vals": {
+                "range": [
+                    0,
+                    31
+                ],
+                "type": "Non_Neg_Number"
+            }
+        },
+        {
+            "docstring": "This parameter determines the extra output delay introduced for the DIO11 channel. The unit is 20ns.",
+            "get_cmd": "QUTech:DioDelayEleven?",
+            "label": "Output Delay of DIO11",
+            "name": "dio11_out_delay",
+            "set_cmd": "QUTech:DioDelayEleven {}",
+            "unit": "20 ns",
+            "vals": {
+                "range": [
+                    0,
+                    31
+                ],
+                "type": "Non_Neg_Number"
+            }
+        },
+        {
             "docstring": "This parameter modifies the reset register of the QEC decoder submodule. Valid input: 1 = reset, 0 = idle",
             "get_cmd": "QUTech:QecCtrlReset?",
             "label": "Reset QEC Decoder",
@@ -523,7 +568,7 @@
         }
     ],
     "version": {
-        "Embedded Software Build Time": "20190709-14:25:01",
+        "Embedded Software Build Time": "20190724-15:57:28",
         "Embedded Software Version": "0.2.0",
         "Firmware": "0.2.0",
         "Firmware Build Time": "24/10/2016-13:27:47",

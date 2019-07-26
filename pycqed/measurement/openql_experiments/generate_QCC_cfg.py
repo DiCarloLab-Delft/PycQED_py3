@@ -216,7 +216,6 @@ def generate_config(filename: str,
             "x %0": ["rx180 %0"],
             "y %0": ["ry180 %0"],
             "roty90 %0": ["ry90 %0"],
-            "cnot %0,%1": ["ry90 %1", "cz %0,%1", "ry90 %1"],
 
             # To support other forms of writing the same gates
             "x180 %0": ["rx180 %0"],
@@ -225,6 +224,41 @@ def generate_config(filename: str,
             "x90 %0": ["rx90 %0"],
             "my90 %0": ["rym90 %0"],
             "mx90 %0": ["rxm90 %0"],
+
+            # Decomposition of two qubit flux interations as single-qubit flux
+            # operations with parking pulses
+            # Edge 0/24
+            "cz q0, q2": ['sf_cz_ne q2', 'sf_cz_sw q0', 'sf_park q3'],
+            "cz q2, q0": ['sf_cz_ne q2', 'sf_cz_sw q0', 'sf_park q3'],
+            # Edge 1/25
+            "cz q0, q3": ['sf_cz_nw q3', 'sf_cz_se q0', 'sf_park q2'],
+            "cz q3, q0": ['sf_cz_nw q3', 'sf_cz_se q0', 'sf_park q2'],
+            # Edge 5/29
+            "cz q2, q6": ['sf_cz_nw q6', 'sf_cz_se q2'],
+            "cz q6, q2": ['sf_cz_nw q6', 'sf_cz_se q2'],
+            # Edge 6/30
+            "cz q3, q6": ['sf_cz_ne q6', 'sf_cz_sw q3'],
+            "cz q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3'], 
+            # Edge 2/26
+            # Edge 3/27
+            # Edge 4/28
+            # Edge 7/31
+            # Edge 8/32
+            # Edge 9/33
+            # Edge 10/34
+            # Edge 11/35
+            # Edge 12/36
+            # Edge 13/37
+            # Edge 14/38
+            # Edge 15/39
+            # Edge 16/40
+            # Edge 17/41
+            # Edge 18/42
+            # Edge 19/43
+            # Edge 20/44
+            # Edge 21/45
+            # Edge 22/46
+            # Edge 23/47
 
             # Clifford decomposition per Eptstein et al. Phys. Rev. A 89, 062321
             # (2014)
@@ -375,6 +409,21 @@ def generate_config(filename: str,
                 "cc_light_instr": "fl_cw_{:02}".format(cw_flux),
                 "cc_light_codeword": cw_flux,
                 "cc_light_opcode": 128+cw_flux
+            }
+
+    # Prepare 20 ns special parking operation
+    for flux_q in range(17):
+            cfg["instructions"]["sf_sp_park q{}".format(flux_q)] = {
+                "duration": flux_pulse_duration/2,
+                "latency": fl_latency,
+                "qubits": ['q{}'.format(flux_q)],
+                "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+                "disable_optimization": True,
+                "type": "flux",
+                "cc_light_instr_type": "single_qubit_gate",
+                "cc_light_instr": "fl_cw_05",
+                "cc_light_codeword": 5,
+                "cc_light_opcode": 133
             }
 
     with open(filename, 'w') as f:
