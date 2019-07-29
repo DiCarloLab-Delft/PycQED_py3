@@ -6,6 +6,7 @@ from . import zishell_NH as zs
 from qcodes.utils import validators as vals
 from .ZI_base_instrument import ZI_base_instrument
 from qcodes.instrument.parameter import ManualParameter
+from qcodes.utils.helpers import full_class
 from zlib import crc32
 
 import ctypes
@@ -76,6 +77,25 @@ class ZI_HDAWG8(ZI_base_instrument):
 
         self._add_codeword_parameters()
         self._add_extra_parameters()
+
+        # Ensure snapshot is fairly small for HDAWGs 
+        self._snapshot_whitelist = {'IDN', 'clockbase', 
+            'system_clocks_referenceclock_source', 'system_clocks_referenceclock_status', 
+            'system_clocks_referenceclock_freq'}
+        for i in range(4): 
+            self._snapshot_whitelist.update({'awgs_{}_enable'.format(i), 
+                'awgs_{}_outputs_0_amplitude'.format(i), 
+                'awgs_{}_outputs_1_amplitude'.format(i), 
+                'awgs_{}_sequencer_program_crc32_hash'.format(i)})
+
+        for i in range(8): 
+            self._snapshot_whitelist.update({
+                'sigouts_{}_direct'.format(i), 'sigouts_{}_offset'.format(i),
+                'sigouts_{}_on'.format(i) , 'sigouts_*_range'})
+
+
+        self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
+
         self.connect_message(begin_time=t0)
 
     def _add_extra_parameters(self):
@@ -105,12 +125,54 @@ class ZI_HDAWG8(ZI_base_instrument):
                 parameter_class=ManualParameter,
                 initial_value=0, vals=vals.Ints())
 
-    def snapshot_base(self, update=False, params_to_skip_update=None):
-        if params_to_skip_update is None:
-            params_to_skip_update = self._params_to_skip_update
-        snap = super().snapshot_base(
-            update=update, params_to_skip_update=params_to_skip_update)
+
+    def snapshot_base(self, update: bool=False,
+                      params_to_skip_update =None, 
+                      params_to_exclude = None ):
+        """
+        State of the instrument as a JSON-compatible dict.
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+        Returns:
+            dict: base snapshot
+        """
+
+
+        if params_to_exclude is None: 
+            params_to_exclude = self._params_to_exclude
+
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                pass 
+            elif params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+                try:
+                    snap['parameters'][name] = param.snapshot(update=update_par)
+                except:
+                    logging.info("Snapshot: Could not update parameter: {}".format(name))
+                    snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
         return snap
+
 
     def add_ZIshell_device_methods_to_instrument(self):
         """
@@ -330,7 +392,6 @@ class ZI_HDAWG8(ZI_base_instrument):
                  'The waveforms must be uploaded using ' +
                  '"upload_codeword_program". The channel number corresponds' +
                  ' to the channel as indicated on the device (1 is lowest).')
-        self._params_to_skip_update = []
         for ch in range(self._num_channels):
             for cw in range(self._num_codewords):
                 parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
@@ -342,8 +403,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                     set_cmd=self._gen_write_csv(parname),
                     get_cmd=self._gen_read_csv(parname),
                     docstring=docst)
-                self._params_to_skip_update.append(parname)
-
+        
     def _gen_write_csv(self, wf_name):
         def write_func(waveform):
             # The lenght of AWG8 waveforms should be a multiple of 8 samples.
