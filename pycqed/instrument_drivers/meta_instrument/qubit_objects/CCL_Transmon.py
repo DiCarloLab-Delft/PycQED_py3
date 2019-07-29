@@ -1780,16 +1780,17 @@ class CCLight_Transmon(Qubit):
 
             spurious_sideband_freq = self.freq_qubit() - 2*self.mw_freq_mod()
 
-            # This is to ensure the square waveform is pulse 10! 
+            # This is to ensure the square waveform is pulse 10!
             mw_lutman.set_default_lutmap()
 
-            def load_square(): 
+            def load_square():
                 AWG = mw_lutman.AWG.get_instr()
                 AWG.stop()
                 # Codeword 10 is hardcoded in the generate CCL config
-                # mw_lutman.load_waveform_realtime(waveform_key=10)
+                # mw_lutman.load_waveform_realtime(wave_id='square')
 
-                mw_lutman.load_waveforms_onto_AWG_lookuptable(force_load_sequencer_program=False)                
+                mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                    force_load_sequencer_program=False)
                 AWG.start()
 
 
@@ -1797,7 +1798,8 @@ class CCLight_Transmon(Qubit):
                 self.instr_SH.get_instr(), spurious_sideband_freq,
                 prepare_for_each_point=True,
                 Navg=5,
-                prepare_function=load_square) #mw_lutman.load_waveform_realtime,
+                prepare_function=load_square)
+                #mw_lutman.load_waveform_realtime,
                 # prepare_function_kwargs={'waveform_key': 'square', 'wf_nr': 10})
             ad_func_pars = {'adaptive_function': cma.fmin,
                             'x0': x0,
@@ -2661,7 +2663,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_anharmonicity(self, freqs_01, freqs_12, f_01_power=None,
                               f_12_power=None,
-                              MC=None, spec_source_2=None, 
+                              MC=None, spec_source_2=None,
                               mode='pulsed_marked'):
         """
         Measures the qubit spectroscopy as a function of frequency of the two
@@ -2684,10 +2686,10 @@ class CCLight_Transmon(Qubit):
                 by 10-20 dB to yield meaningful result
             spec_source_2: instrument used to apply second MW drive.
                 By default instrument specified by self.instr_spec_source_2 is used
-            mode (str): 
+            mode (str):
                 if pulsed_marked uses pulsed spectroscopy sequence assuming
-                that the sources are pulsed using a marker. 
-                Otherwise, uses CW spectroscopy. 
+                that the sources are pulsed using a marker.
+                Otherwise, uses CW spectroscopy.
         """
         f_anharmonicity = np.mean(freqs_01) - np.mean(freqs_12)
         if f_01_power == None:
@@ -2711,17 +2713,17 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         self.int_avg_det_single._set_real_imag(False)
         spec_source.on()
-        if mode == 'pulsed_marked': 
+        if mode == 'pulsed_marked':
             spec_source.pulsemod_state('On')
-        else: 
+        else:
             spec_source.pulsemod_state('Off')
 
         spec_source.power(f_01_power)
 
         spec_source_2.on()
-        if mode == 'pulsed_marked': 
+        if mode == 'pulsed_marked':
             spec_source_2.pulsemod_state('On')
-        else: 
+        else:
             spec_source_2.pulsemod_state('Off')
         spec_source_2.power(f_12_power)
 
@@ -2928,7 +2930,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_SSRO_frequency_amplitude_sweep(self, freqs=None, amps_rel=np.linspace(0, 1, 11),
                                                nr_shots=4092*4, nested_MC=None, analyze=True,
-                                               use_optimal_weights=False, 
+                                               use_optimal_weights=False,
                                                label='SSRO_freq_amp_sweep'):
         """
         Measures SNR and readout fidelities as a function of the readout pulse amplitude
