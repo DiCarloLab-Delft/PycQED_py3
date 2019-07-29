@@ -12,7 +12,7 @@ from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 
 class QuTech_SPI_S4g_FluxCurrent(Instrument):
     def __init__(self, name: str, address: str,
-                 channel_map: dict):
+                 channel_map: dict, reset_currents: bool=False):
         """
         Create an instance of the SPI S4g FluxCurrent instrument.
 
@@ -20,6 +20,8 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
             name:
             address: used to connect to the SPI rack e.g., "COM10"
             channel map: {"parameter_name": (module_nr, dac_nr)}
+            reset_currents: if True, ramps all currents to zero upon 
+                connecting.
 
         For an example of how to use this instrument see
             examples/SPI_rack_examples/SPI_rack_example.py
@@ -51,7 +53,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
         for mod_id in module_ids:
             # N.B. reset currents has a slow ramp build in.
             self.current_sources[mod_id] = S4g_module(
-                self.spi_rack, module=mod_id, reset_currents=True)
+                self.spi_rack, module=mod_id, reset_currents=reset_currents)
 
         for parname, (mod_id, dac) in self.channel_map.items():
             self.add_parameter(
