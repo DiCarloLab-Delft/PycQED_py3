@@ -2048,10 +2048,15 @@ def parity_single_round_seq(ancilla_qubit_name, data_qubit_names, CZ_map,
     qb_names = [ancilla_qubit_name] + data_qubit_names
 
     main_ops = ['Y90 ' + ancilla_qubit_name]
-    for dqn in data_qubit_names:
+    for i, dqn in enumerate(data_qubit_names):
         op = 'CZ ' + ancilla_qubit_name + ' ' + dqn
         main_ops += CZ_map.get(op, [op])
-    main_ops += ['mY90 ' + ancilla_qubit_name]
+        if i != len(data_qubit_names) - 1:
+            main_ops += ['Y180 ' + ancilla_qubit_name]
+    if len(data_qubit_names)%2 == 0:
+        main_ops += ['Y90 ' + ancilla_qubit_name]
+    else:
+        main_ops += ['mY90 ' + ancilla_qubit_name]
 
     all_opss = []
     for prep in preps:

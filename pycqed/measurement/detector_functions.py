@@ -14,6 +14,8 @@ from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 import pycqed.measurement.pulse_sequences.calibration_elements as cal_elts
+import logging
+log = logging.getLogger(__name__)
 
 class Detector_Function(object):
 
@@ -1635,7 +1637,7 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
                                   classified_data.shape[1])), axis=0)
         if state_prob_mtx is not None:
             classified_data = np.linalg.inv(state_prob_mtx) @ classified_data.T
-            print('Corrected based on state_prob_mtx.')
+            log.info('Data corrected based on state_prob_mtx.')
         else:
             classified_data = classified_data.T
 
