@@ -2798,7 +2798,9 @@ class CCLight_Transmon(Qubit):
         spec_source.off()
         spec_source_2.off()
 
-    def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=4092*4,
+    def measure_ssro(self, MC=None, analyze: bool=True, 
+                    # FIXME!!! Make this shots per case and change the variable name 
+                    nr_shots: int=4092*4,
                      cases=('off', 'on'), update_threshold: bool=True,
                      prepare: bool=True, no_figs: bool=False,
                      post_select: bool = False,
@@ -3344,7 +3346,7 @@ class CCLight_Transmon(Qubit):
             return ssro_dict
         return True
 
-    def measure_rabi(self, MC=None, amps=None,
+    def measure_rabi(self, MC=None, amps=np.linspace(0, 1, 31),
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
         """
