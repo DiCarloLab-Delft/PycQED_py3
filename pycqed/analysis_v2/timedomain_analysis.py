@@ -227,6 +227,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             raise ValueError('No qubit RO channels have been found.')
 
     def process_data(self):
+        super().process_data()
         data_filter = self.get_param_value('data_filter')
         if data_filter is None:
             if 'preparation_params' in self.metadata:
@@ -599,10 +600,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             return r'$|{}\rangle$'.format(prob_label[-1])
         else:
             return r'$|{}\rangle$'.format(prob_label)
-
-    def get_param_value(self, param_name, default_value=None):
-        return self.options_dict.get(param_name, self.metadata.get(
-            param_name, default_value))
 
     def prepare_plots(self):
         if self.get_param_value('plot_proj_data', default_value=True):

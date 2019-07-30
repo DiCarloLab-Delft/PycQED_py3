@@ -5,11 +5,7 @@
 # created: 04/2019
 
 import numpy as np
-from copy import deepcopy
-import pycqed.measurement.waveform_control.pulse_library as pl
-import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
 import pycqed.measurement.waveform_control.pulsar as ps
-import pycqed.measurement.waveform_control.segment as sg
 from collections import OrderedDict as odict
 
 

@@ -231,6 +231,10 @@ class BaseDataAnalysis(object):
             s = [s.decode('utf-8') for s in s]
         return s
 
+    def get_param_value(self, param_name, default_value=None):
+        return self.options_dict.get(param_name, self.metadata.get(
+            param_name, default_value))
+
     def get_data_from_timestamp_list(self):
         raw_data_dict = []
         print(self.timestamps)
