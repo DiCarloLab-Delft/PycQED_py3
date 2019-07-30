@@ -288,14 +288,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         }
 
     def analyze_fit_results(self):
-        ###################################
-        #  Save Q.O.F.                    #
-        ###################################
-        self.proc_data_dict['quantities_of_interest'] = {
-            'SNR': self.fit_res['shots_all'].params['SNR'],
-            'F_d': self.proc_data_dict['F_discr'],
-            'F_a': self.proc_data_dict['F_assignment_raw']
-            }
         # Create a CDF based on the fit functions of both fits.
         fr = self.fit_res['shots_all']
         bv = fr.best_values
@@ -371,6 +363,15 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         bv = fr.params
         self.proc_data_dict['residual_excitation'] = bv['B_spurious'].value
         self.proc_data_dict['measurement_induced_relaxation'] = bv['A_spurious'].value
+
+        ###################################
+        #  Save Q.O.F.                    #
+        ###################################
+        self.proc_data_dict['quantities_of_interest'] = {
+            'SNR': self.fit_res['shots_all'].params['SNR'],
+            'F_d': self.proc_data_dict['F_discr'],
+            'F_a': self.proc_data_dict['F_assignment_raw']
+            }
 
     def prepare_plots(self):
         # Did we load two voltage components (shall we do 2D plots?)
