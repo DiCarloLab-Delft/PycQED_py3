@@ -16,7 +16,8 @@ class Test_Alignment_Analysis(unittest.TestCase):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         a_tools.datadir = self.datadir
 
-    @unittest.expectedFailure
+    # @unittest.expectedFailure
     def test_alignment_analysis(self):
         opt_dict = {'fit_options': {'model': 'complex'}}
-        a = aa.AlignmentAnalysis('20190724_122351')
+        a = aa.AlignmentAnalysis(t_start='20190724_122351',
+                                 t_stop='20190724_123047')
