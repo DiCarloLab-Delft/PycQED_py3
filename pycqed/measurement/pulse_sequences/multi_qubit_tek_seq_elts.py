@@ -1018,16 +1018,13 @@ def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False,
         return seq_name
 
 
-def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
-                                      nr_cliffords_value, #scalar
-                                      nr_seeds,           #array
-                                      max_clifford_idx=11520,
-                                      CZ_pulse_name=None,
-                                      net_clifford=0,
-                                      clifford_decomposition_name='HZ',
-                                      interleaved_gate=None,
-                                      seq_name=None, upload=True,
-                                      return_seq=False, verbose=False):
+def two_qubit_randomized_benchmarking_seqs(
+        qb1n, qb2n, operation_dict,
+        cliffords, #scalar
+        nr_seeds,  #array
+        max_clifford_idx=11520, cz_pulse_name=None, cal_points=None,
+        net_clifford=0, clifford_decomposition_name='HZ',
+        interleaved_gate=None, upload=True, prep_params=dict()):
 
     """
     Args
@@ -1043,16 +1040,9 @@ def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
         clifford_decomp_name (str): the decomposition of Clifford gates
             into primitives; can be "XY", "HZ", or "5Primitives"
         interleaved_gate (str): pycqed name for a gate
-        seq_name (str): sequence name
         upload (bool): whether to upload sequence to AWGs
-        return_seq (bool): whether to return seq and el_list or just seq
-        verbose (bool): print detailed runtime information
     """
-
-    if seq_name is None:
-        seq_name = '2Qb_RB_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq_name = '2Qb_RB_sequence'
 
     # Set Clifford decomposition
     tqc.gate_decomposition = rb.get_clifford_decomposition(
@@ -1060,7 +1050,7 @@ def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
 
     for i in nr_seeds:
         cl_seq = rb.randomized_benchmarking_sequence_new(
-            nr_cliffords_value,
+            cliffords,
             number_of_qubits=2,
             max_clifford_idx=max_clifford_idx,
             interleaving_cl=interleaved_gate,
