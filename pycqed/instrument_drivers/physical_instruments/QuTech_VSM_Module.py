@@ -64,6 +64,10 @@ class QuTechVSMModule(SCPI):
         self._sync_time_and_add_parameter()
         self.connect_message()
 
+        self._params_to_exclude = []
+        for p in self.parameters:
+            if p[:1] == '_':
+                self._params_to_exclude.append(p)
 
     def add_parameters(self):
         self.add_temperature_parameters()
@@ -301,6 +305,52 @@ class QuTechVSMModule(SCPI):
         current_time_str = datetime.now().strftime('%YT%mT%dT%HT%MT%S')
         self.sync_time(current_time_str)
 
+    def snapshot_base(self, update: bool=False,
+                      params_to_skip_update =None, 
+                      params_to_exclude = None ):
+        """
+        State of the instrument as a JSON-compatible dict.
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+        Returns:
+            dict: base snapshot
+        """
+
+
+        if params_to_exclude is None: 
+            params_to_exclude = self._params_to_exclude
+
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                pass 
+            elif params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+                try:
+                    snap['parameters'][name] = param.snapshot(update=update_par)
+                except:
+                    logging.info("Snapshot: Could not update parameter: {}".format(name))
+                    snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
+        return snap
 
 class Dummy_QuTechVSMModule(QuTechVSMModule):
 
