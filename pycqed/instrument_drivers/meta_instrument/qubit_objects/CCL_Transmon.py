@@ -389,6 +389,7 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Enum('ext', 'int'),
                            parameter_class=ManualParameter)
 
+        self._mw_vsm_delay = 0
         self.add_parameter(
             'mw_vsm_delay', label='CCL VSM trigger delay',
             vals=vals.Ints(0, 127), unit='samples',
@@ -399,6 +400,8 @@ class CCLight_Transmon(Qubit):
             set_cmd=self._set_mw_vsm_delay,
             get_cmd=self._get_mw_vsm_delay)
 
+
+        self._mw_fine_delay = 0
         self.add_parameter('mw_fine_delay', label='fine delay of the AWG channel',
             unit='s',
             docstring='This parameters serves for fine tuning of '
@@ -409,6 +412,8 @@ class CCLight_Transmon(Qubit):
             set_cmd=self._set_mw_fine_delay,
             get_cmd=self._get_mw_fine_delay)
 
+
+        self._flux_fine_delay = 0
         self.add_parameter('flux_fine_delay', label='fine delay of the AWG channel',
             unit='s',
             docstring='This parameters serves for fine tuning of '
@@ -716,6 +721,7 @@ class CCLight_Transmon(Qubit):
         self.add_parameter('asymmetry', unit='',
                            docstring='Asymmetry parameter of the SQUID loop',
                            initial_value=0,
+
                            parameter_class=ManualParameter)
         self.add_parameter('anharmonicity', unit='Hz',
                            label='Anharmonicity',
@@ -786,6 +792,9 @@ class CCLight_Transmon(Qubit):
             self._prep_ro_pulse(CW=CW)
             self._prep_ro_integration_weights()
             self._prep_deskewing_matrix()
+        else: 
+            warnings.warn('"cfg_prepare_ro_awg" set to False, not preparing readout .')
+
 
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
@@ -983,6 +992,10 @@ class CCLight_Transmon(Qubit):
             UHFQC.sigouts_0_offset(self.ro_pulse_mixer_offs_I())
             UHFQC.sigouts_1_offset(self.ro_pulse_mixer_offs_Q())
 
+            if [self.cfg_qubit_nr()] not in ro_lm.resonator_combinations(): 
+                warnings.warn('Qubit number of {} is not '.format(self.name)+
+                    'present in resonator_combinations of the readout lutman.')
+
     def _prep_ro_integration_weights(self):
         """
         Sets the ro acquisition integration weights.
@@ -1094,7 +1107,6 @@ class CCLight_Transmon(Qubit):
         # 1. Gets instruments and prepares cases
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         AWG = MW_LutMan.AWG.get_instr()
-        do_prepare = self.cfg_prepare_mw_awg()
         using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
         using_VSM = self.cfg_with_vsm()
 
@@ -1176,8 +1188,12 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_GQ())
 
         # 4. reloads the waveforms
-        if do_prepare:
+        if self.cfg_prepare_mw_awg():
             MW_LutMan.load_waveforms_onto_AWG_lookuptable()
+        else: 
+            warnings.warn('"cfg_prepare_mw_awg" set to False, '
+                'not preparing microwave pulses.')
+
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
@@ -1247,6 +1263,9 @@ class CCLight_Transmon(Qubit):
             print('Moving {} to {:.3f} mA'.format(self.name, self.fl_dc_V0()/1e-3))
         fluxcurrent[self.cfg_dc_flux_ch()](self.fl_dc_V0())
         return True
+
+
+
     ####################################################
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
@@ -2799,8 +2818,7 @@ class CCLight_Transmon(Qubit):
         spec_source_2.off()
 
     def measure_ssro(self, MC=None, analyze: bool=True, 
-                    # FIXME!!! Make this shots per case and change the variable name 
-                    nr_shots: int=4092*4,
+                     nr_shots_per_case: int=2**13, #8192
                      cases=('off', 'on'), update_threshold: bool=True,
                      prepare: bool=True, no_figs: bool=False,
                      post_select: bool = False,
@@ -2808,9 +2826,9 @@ class CCLight_Transmon(Qubit):
                      update: bool=True,
                      verbose: bool=True,
                      SNR_detector: bool=False,
-                     shots_per_meas: int=4092,
+                     shots_per_meas: int=2**16,
                      cal_residual_excitation: bool=False,
-                     disable_metadata: bool=False):
+                     disable_metadata: bool=False, label: str=''):
         """
         Performs a number of single shot measurements with qubit in ground and excited state
         to extract the SNR and readout fidelities.
@@ -2819,7 +2837,7 @@ class CCLight_Transmon(Qubit):
             analyze (bool):
                 should the analysis be executed
 
-            nr_shots (int):
+            nr_shots_per_case (int):
                 total number of measurements in qubit ground and excited state
 
             cases:
@@ -2839,8 +2857,16 @@ class CCLight_Transmon(Qubit):
             shots_per_meas (int):
                 number of single shot measurements per single
                 acquisition with UHFQC
+
+            cal_residual_excitation (bool): 
+                if True, uses the last known values of residual excitation 
+                and measurement induced relaxation and keeps these fixed. 
             ...
         """
+
+        # off and on, not including post selection init measurements yet
+        nr_shots=nr_shots_per_case*2 
+
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
 
@@ -2852,13 +2878,13 @@ class CCLight_Transmon(Qubit):
         MC.live_plot_enabled(False)
         if prepare:
             self.prepare_for_timedomain()
-            p = sqo.off_on(
-                qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
-                initialize=post_select,
-                platf_cfg=self.cfg_openql_platform_fn())
-            self.instr_CC.get_instr().eqasm_program(p.filename)
-        else:
-            p = None  # object needs to exist for the openql_sweep to work
+
+        # This snippet causes 0.08 s of overhead but is dangerous to bypass
+        p = sqo.off_on(
+            qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
+            initialize=post_select,
+            platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
 
         # digitization setting is reset here but the detector still uses
         # the disabled setting that was set above
@@ -2872,11 +2898,16 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
-        d.nr_shots = shots_per_meas
+        d.nr_shots = np.min([shots_per_meas, nr_shots])
         MC.set_detector_function(d)
-        MC.run('SSRO{}'.format(self.msmt_suffix),
+
+        MC.run('SSRO_{}{}'.format(label, self.msmt_suffix),
                disable_snapshot_metadata=disable_metadata)
         MC.live_plot_enabled(old_plot_setting)
+
+        ######################################################################
+        # SSRO Analysis 
+        ######################################################################
         if analyze:
             if SNR_detector:
                 if cal_residual_excitation:
@@ -2930,10 +2961,11 @@ class CCLight_Transmon(Qubit):
                     self.ro_acq_rotated_SSB_rotation_angle(a.theta)
                     return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
 
-    def measure_SSRO_frequency_amplitude_sweep(self, freqs=None, amps_rel=np.linspace(0, 1, 11),
-                                               nr_shots=4092*4, nested_MC=None, analyze=True,
-                                               use_optimal_weights=False,
-                                               label='SSRO_freq_amp_sweep'):
+
+    def measure_ssro_vs_frequency_amplitude(
+            self, freqs=None, amps_rel=np.linspace(0, 1, 11),
+            nr_shots=4092*4, nested_MC=None, analyze=True,
+            use_optimal_weights=False, label='SSRO_freq_amp_sweep'):
         """
         Measures SNR and readout fidelities as a function of the readout pulse amplitude
         and frequency. Resonator depletion pulses are automatically scaled.
@@ -2950,6 +2982,8 @@ class CCLight_Transmon(Qubit):
             nr_shots (int):
                 total number of measurements in qubit ground and excited state
         """
+        warnings.warn('FIXME: Does not make use of the SSRO detector')
+
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
         if freqs is None:
@@ -3012,8 +3046,9 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label=label, plot_all=True, auto=True)
 
-    def measure_SSRO_frequency_power_sweep_TWPA(self, pump_source,freqs, powers,
-                                               nr_shots=4092*4, nested_MC=None, analyze=True):
+    def measure_ssro_vs_TWPA_frequency_power(
+            self, pump_source,freqs, powers,
+            nr_shots=4092*4, nested_MC=None, analyze=True):
         """
         Measures the SNR and readout fidelities as a function of the TWPA
             pump frequency and power.
@@ -3032,6 +3067,8 @@ class CCLight_Transmon(Qubit):
                 number of single-shot measurements used to estimate SNR
                 and redout fidelities
         """
+        warnings.warn('FIXME: Does not make use of the SSRO detector')
+
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
@@ -3068,7 +3105,7 @@ class CCLight_Transmon(Qubit):
 
 
 
-    def measure_SSRO_pulse_length_sweep(self, lengths=np.arange(100e-9, 1501e-9, 100e-9),
+    def measure_ssro_vs_pulse_length(self, lengths=np.arange(100e-9, 1501e-9, 100e-9),
                                         nr_shots=4092*4, nested_MC=None, analyze=True,
                                         label_suffix: str=''):
         """
@@ -3084,6 +3121,8 @@ class CCLight_Transmon(Qubit):
                 number of single-shot measurements used to estimate SNR
                 and redout fidelities
         """
+        warnings.warn('FIXME: Does not make use of the SSRO detector')
+
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
         self.ro_acq_digitized(False)
@@ -3118,6 +3157,7 @@ class CCLight_Transmon(Qubit):
                            prepare: bool=True, depletion_analysis: bool=True,
                            depletion_analysis_plot: bool=True,
                            depletion_optimization_window=None,
+                           disable_metadata:bool=False,
                            plot_max_time=None):
         # docstring from parent class
         if MC is None:
@@ -3162,7 +3202,8 @@ class CCLight_Transmon(Qubit):
                 sampling_rate)
             MC.set_detector_function(self.input_average_detector)
             data = MC.run(
-                'Measure_transients{}_{}'.format(self.msmt_suffix, i))
+                'Measure_transients{}_{}'.format(self.msmt_suffix, i), 
+                disable_snapshot_metadata=disable_metadata)
             dset = data['dset']
             transients.append(dset.T[1:])
             if analyze:
@@ -3284,6 +3325,7 @@ class CCLight_Transmon(Qubit):
                                   optimal_IQ: bool=False,
                                   measure_transients_CCL_switched: bool=False,
                                   prepare: bool=True,
+                                  disable_metadata: bool=False,
                                   )->bool:
         """
         Measures readout transients for the qubit in ground and excited state to indicate
@@ -3300,6 +3342,8 @@ class CCLight_Transmon(Qubit):
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
+        if prepare:
+            self.prepare_for_timedomain() 
 
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.ro_acq_averages()
@@ -3311,7 +3355,8 @@ class CCLight_Transmon(Qubit):
                                                               depletion_analysis=False)
         else:
             transients = self.measure_transients(MC=MC, analyze=analyze,
-                                                 depletion_analysis=False)
+                                                 depletion_analysis=False, 
+                                                 disable_metadata=disable_metadata)
         if analyze:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
 
@@ -3340,9 +3385,10 @@ class CCLight_Transmon(Qubit):
             else:
                 self.ro_acq_weight_type('optimal')
         if verify:
+            self._prep_ro_integration_weights()
             ssro_dict = self.measure_ssro(
                 no_figs=no_figs, update_threshold=update_threshold,
-                prepare=prepare)
+                prepare=False, disable_metadata=disable_metadata)
             return ssro_dict
         return True
 
@@ -4777,6 +4823,48 @@ class CCLight_Transmon(Qubit):
         freq = a['frequency']
         check_result = (freq-self.freq_qubit())/freq
         return check_result
+
+
+    def create_ssro_detector(self, nr_shots_per_case=8192,  
+                             calibrate_optimal_weights:bool=False, 
+                             prepare_function=None, 
+                             prepare_function_kwargs=None):
+        """
+        Wraps measure_ssro using the Function Detector. 
+
+        Args: 
+            calibrate_optimal_weights 
+        """
+        if not calibrate_optimal_weights: 
+            d = det.Function_Detector(
+                    self.measure_ssro,
+                    msmt_kw={
+                        'nr_shots_per_case': nr_shots_per_case,
+                        'analyze': True, 'SNR_detector': True,
+                        'cal_residual_excitation': True,
+                        'prepare': False,
+                        'disable_metadata': True
+                    },
+                    result_keys=['SNR', 'F_d', 'F_a'], 
+                    prepare_function=prepare_function,
+                    prepare_function_kwargs=prepare_function_kwargs, 
+                )
+        else: 
+            d = det.Function_Detector(
+                self.calibrate_optimal_weights, 
+                msmt_kw={
+                        'nr_shots_per_case': nr_shots_per_case,
+                        'analyze': True, 'SNR_detector': True,
+                        'cal_residual_excitation': True,
+                        'prepare': False,
+                        'disable_metadata': True
+                    },
+                    result_keys=['SNR', 'F_d', 'F_a'], 
+                    prepare_function=prepare_function,
+                    prepare_function_kwargs=prepare_function_kwargs, )
+        return d 
+
+
 
     ###########################################################################
     # Dep graph
