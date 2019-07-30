@@ -7415,8 +7415,8 @@ class TwoD_Analysis(MeasurementAnalysis):
         self.ax_array = []
 
         for i, meas_vals in enumerate(self.measured_values):
-            kw["zlabel"] = kw.get("zlabel", self.value_names[i])
-            kw["z_unit"] = kw.get("z_unit", self.value_units[i])
+            # kw["zlabel"] = kw.get("zlabel", self.value_names[i])
+            # kw["z_unit"] = kw.get("z_unit", self.value_units[i])
 
             if filtered:
                 if self.value_names[i] == 'Phase':
@@ -7444,7 +7444,6 @@ class TwoD_Analysis(MeasurementAnalysis):
                                      y_name=self.parameter_names[1],
                                      y_unit=self.parameter_units[1],
                                      log=linecut_log,
-                                     # zlabel=self.zlabels[i],
                                      fig=fig, ax=ax, **kw)
                 ax.set_title(fig_title)
                 set_xlabel(ax, self.parameter_names[0],
@@ -7469,16 +7468,6 @@ class TwoD_Analysis(MeasurementAnalysis):
                 self.timestamp_string, self.measurementstring,
                 self.value_names[i])
 
-            if "xlabel" not in kw:
-                kw["xlabel"] = self.parameter_names[0]
-            if "ylabel" not in kw:
-                kw["ylabel"] = self.parameter_names[1]
-
-            if "xunit" not in kw:
-                kw["xunit"] = self.parameter_units[0]
-            if "yunit" not in kw:
-                kw["yunit"] = self.parameter_units[1]
-
             # subtract mean from each row/column if demanded
             plot_zvals = meas_vals.transpose()
             if subtract_mean_x:
@@ -7489,7 +7478,8 @@ class TwoD_Analysis(MeasurementAnalysis):
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=plot_zvals,
-                               # zlabel=self.zlabels[i],
+                               zlabel=self.value_names[i],
+                               z_unit=self.value_units[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
                                transpose=transpose,
@@ -9955,6 +9945,10 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     print('offset I {}, offset Q {}'.format(offset_I, offset_Q))
     y1 = data_file.measured_values[0] - offset_I
     y2 = data_file.measured_values[1] - offset_Q
+
+    I0_no_demod = y1
+    Q0_no_demod = y2
+
     I0, Q0 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
                        Q_o=Q_o, IF=IF, predistort=predistort)
     power0 = (I0 ** 2 + Q0 ** 2) / 50
@@ -9973,6 +9967,10 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     y2 = data_file.measured_values[1] - offset_Q
     I1, Q1 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
                        Q_o=Q_o, IF=IF, predistort=predistort)
+
+    I1_no_demod = y1
+    Q1_no_demod = y2
+    
     power1 = (I1 ** 2 + Q1 ** 2) / 50
 
     amps = np.sqrt((I1 - I0) ** 2 + (Q1 - Q0) ** 2)
@@ -9980,6 +9978,21 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     # defining weight functions for postrotation
     weight_I = (I1 - I0) / amp_max
     weight_Q = (Q1 - Q0) / amp_max
+
+
+    weight_I_no_demod = (I1_no_demod - I0_no_demod) / amp_max
+    weight_Q_no_demod = (Q1_no_demod - Q0_no_demod) / amp_max
+
+    # Identical rescaling as is happening in the CCL transmon class 
+    maxI_no_demod = np.max(np.abs(weight_I_no_demod))
+    maxQ_no_demod = np.max(np.abs(weight_Q_no_demod))
+    weight_scale_factor = 1./(4*np.max([maxI_no_demod, maxQ_no_demod]))
+    weight_I_no_demod = np.array(
+        weight_scale_factor*weight_I_no_demod)
+    weight_Q_no_demod = np.array(
+        weight_scale_factor*weight_Q_no_demod)
+
+
 
     if post_rotation_angle == None:
         arg_max = np.argmax(amps)
@@ -10211,6 +10224,26 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.legend()
     plt.xlabel('time (ns)')
     plt.ylabel('Integration weight (V)')
+    plt.title('demodulated weight functions_' + data_file.timestamp_string)
+    plt.axhline(0, linestyle='--')
+    edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
+    ax.set_xlim(0, plot_max_time*1e9)
+    plt.savefig(data_file.folder + '\\' + 'demodulated_weight_functions.' +
+                fig_format, format=fig_format)
+    plt.close()
+
+
+    fig, ax = plt.subplots()
+    plt.plot(time, weight_I_no_demod, label='weight I')
+    plt.plot(time, weight_Q_no_demod, label='weight Q')
+    if optimization_window != None:
+        plt.axvline((optimization_start - shift_w) * 1e9, linestyle='--',
+                    color='k', label='depletion optimization window')
+        plt.axvline((optimization_stop - shift_w) *
+                    1e9, linestyle='--', color='k')
+    plt.legend()
+    plt.xlabel('time (ns)')
+    plt.ylabel('Integration weight (V)')
     plt.title('weight functions_' + data_file.timestamp_string)
     plt.axhline(0, linestyle='--')
     edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
@@ -10218,6 +10251,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.savefig(data_file.folder + '\\' + 'weight_functions.' +
                 fig_format, format=fig_format)
     plt.close()
+
+
 
     # should return a dict for the function detector
     # return cost_skew, cost_offset, depletion_cost, x, y1, y2, I0, Q0, I1, Q1
