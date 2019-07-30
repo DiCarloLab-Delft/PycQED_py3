@@ -16,6 +16,7 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
+from pycqed.analysis_v2 import alignment_analysis as aa
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_UHFQC
@@ -1296,7 +1297,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                                             'maxf':maxf,
                                             'MC':MC},
                                    value_units=['Hz'],
-                                   value_names=[r'f$_{\mathrm{res}}$'],
+                                   value_names=['f_res'],
                                    result_keys=['f_res'])
 
         MC_outer_loop.set_detector_function(d)

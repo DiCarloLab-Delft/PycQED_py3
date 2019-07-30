@@ -17,7 +17,7 @@ class AlignmentAnalysis(ba.BaseDataAnalysis):
                                 do_fitting=do_fitting,
                                 extract_only=extract_only)
 
-                # self.single_timestamp = False
+        # self.single_timestamp = True
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
                             'xvals': 'sweep_points',
@@ -25,7 +25,8 @@ class AlignmentAnalysis(ba.BaseDataAnalysis):
                             'value_names': 'value_names',
                             'value_units': 'value_units',
                             'measured_values': 'measured_values'}
-
+        self.labels = ['Alignment']
+        self.exact_label_match =False
 
 
         self.numeric_params = ['xvals','measured_values']
@@ -42,20 +43,10 @@ class AlignmentAnalysis(ba.BaseDataAnalysis):
         # proc_dict['yunit'][0] = 'Hz' ## change this in the qubit object
 
         # Now prepare the 2-D plot
-        ## First get the timestamps
-        num_inner_points = len(proc_dict['xvals'])
-        tstart = self.raw_data_dict['timestamps'][0]
-        tstop = get_datetimestamp()
-        list_all_ts = a_tools.get_timestamps_in_range(timestamp_start=tstart,
-                                                      timestamp_end=tstop,
-                                                      label='fine')
-        ts_inner_points = list_all_ts[:num_inner_points]
 
-        ts_start = ts_inner_points[0]
-        ts_stop = ts_inner_points[-1]
         options_dict_fine={'scan_label':'fine',
                            'exact_label_match':False}
-        reso_amps = ResonatorSpectroscopy(t_start=ts_start, t_stop=ts_stop,
+        reso_amps = ResonatorSpectroscopy(t_start=self.t_start, t_stop=self.t_stop,
                               extract_only=True,
                               do_fitting=False,
                               auto=True,
