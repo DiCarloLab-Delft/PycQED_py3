@@ -40,9 +40,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'auto_rotation_angle' : (bool) automatically find the I/Q mixing angle
             'rotation_angle' : manually define the I/Q mixing angle (ignored if auto_rotation_angle is set to True)
             'nr_bins' : number of bins to use for the histograms
-            'post_select' :
-            'post_select_threshold' :
-            'nr_samples' : amount of different samples (e.g. ground and excited = 2)
+            'post_select' : (bool) sets on or off the post_selection based on an initialization measurement (needs to be in agreement with nr_samples)
+            'post_select_threshold' : (float) threshold used for post-selection (only activated by above parameter)
+            'nr_samples' : amount of different samples (e.g. ground and excited = 2 and with post-selection = 4)
             'sample_0' : index of first sample (ground-state)
             'sample_1' : index of second sample (first excited-state)
             'max_datapoints' : maximum amount of datapoints for culumative fit
@@ -106,7 +106,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # Do we have two quadratures?
         if len(meas_val) == 2:
             ########################################################
-            #
+            # Bin the data in 2D, to calculate the opt. angle
             ########################################################
             data_range_x = (np.min([np.min(b) for b in shots[:, 0]]),
                             np.max([np.max(b) for b in shots[:, 0]]))
@@ -243,6 +243,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['threshold_raw'] = all_x[opt_idx]
 
     def prepare_fitting(self):
+        ###################################
+        #  First fit the histograms (PDF) #
+        ###################################
         self.fit_dicts = OrderedDict()
 
         bin_x = self.proc_data_dict['bin_centers']
@@ -263,6 +266,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                              'fixed_p10': self.options_dict.get('fixed_p10', False)},
         }
 
+        ###################################
+        #  Fit the CDF                    #
+        ###################################
         m_cul = lmfit.model.Model(ro_CDF)
         cdf_xs = self.proc_data_dict['cumsum_x_ds']
         cdf_xs = [np.array(cdf_xs), np.array(cdf_xs)]
@@ -282,6 +288,14 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         }
 
     def analyze_fit_results(self):
+        ###################################
+        #  Save Q.O.F.                    #
+        ###################################
+        self.proc_data_dict['quantities_of_interest'] = {
+            'SNR': self.fit_res['shots_all'].params['SNR'],
+            'F_d': self.proc_data_dict['F_discr'],
+            'F_a': self.proc_data_dict['F_assignment_raw']
+            }
         # Create a CDF based on the fit functions of both fits.
         fr = self.fit_res['shots_all']
         bv = fr.best_values
@@ -377,7 +391,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         title = ('\n' + self.timestamps[0] + ' - "' +
                  self.raw_data_dict['measurementstring'] + '"')
 
-        # 1D histograms
+        # 1D histograms (PDF)
         log_hist = self.options_dict.get('log_hist', False)
         bin_x = self.proc_data_dict['bin_edges']
         bin_y = self.proc_data_dict['hist']
