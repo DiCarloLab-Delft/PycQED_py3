@@ -1,24 +1,22 @@
 import unittest
 import pycqed as pq
-import numpy as np
 import os
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis_v2 import alignment_analysis as aa
 import matplotlib.pyplot as plt
 
 
-
 class Test_Alignment_Analysis(unittest.TestCase):
     @classmethod
     def tearDownClass(self):
         plt.close('all')
+
     @classmethod
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         a_tools.datadir = self.datadir
 
+    @unittest.expectedFailure
     def test_alignment_analysis(self):
-        opt_dict = {'fit_options':{'model':'complex'}}
+        opt_dict = {'fit_options': {'model': 'complex'}}
         a = aa.AlignmentAnalysis('20190724_122351')
-
-

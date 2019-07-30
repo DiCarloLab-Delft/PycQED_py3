@@ -1,4 +1,4 @@
-from .base_lutman import Base_LutMan, get_redundant_codewords
+from .base_lutman import Base_LutMan, get_redundant_codewords, get_wf_idx_from_name
 import numpy as np
 from collections import Iterable, OrderedDict
 from qcodes.instrument.parameter import ManualParameter
@@ -17,9 +17,11 @@ default_mw_lutmap = {
     7: {"name": "rPhi90",   "theta": 90, "phi": 0, "type": "ge"},
     8: {"name": "spec",     "type": "spec"},
     9: {"name": "rX12",      "theta": 180, "phi": 0, "type": "ef"},
+    10: {"name": "square",   "type": "square"},
+
 }
 
-valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw'}
+valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square'}
 
 # _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
 #            'rXm90',  'rYm90', 'rPhi90', 'spec']
@@ -216,6 +218,21 @@ class Base_MW_LutMan(Base_LutMan):
                     sampling_rate=self.sampling_rate(),
                     delay=0,
                     phase=0)
+
+            elif waveform['type'] == 'square':
+                # Using a slightly different construction as above
+                # as the call signatures of these functions is different.
+                if 'sq_amp' in self.parameters:
+                    self._wave_dict[idx] = wf.mod_square(
+                        amp=self.sq_amp(), length=self.mw_gauss_width()*4,
+                        f_modulation=self.mw_modulation(),  phase=0,
+                        motzoi=0, sampling_rate=self.sampling_rate())
+                elif 'sq_G_amp' in self.parameters:
+                    self._wave_dict[idx] = wf.mod_square_VSM(
+                        amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
+                        length=self.mw_gauss_width()*4,
+                        f_modulation=self.mw_modulation(),
+                        sampling_rate=self.sampling_rate())
             else:
                 raise ValueError
 
@@ -460,18 +477,19 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
         for waveform_key in self.LutMap().keys():
             self.load_waveform_realtime(
-                waveform_key=waveform_key, regenerate_waveforms=False)
+                wave_id=waveform_key, regenerate_waveforms=False)
 
         self._update_expected_program_hash()
 
-    def load_waveform_realtime(self, waveform_key,
+    def load_waveform_realtime(self, wave_id,
                                wf_nr: int = None,
                                regenerate_waveforms: bool=True):
         """
         Loads a waveform using the realtime memory manipulation.
 
         Args:
-            waveform_key:         (int) : key of the waveform in _wave_dict
+            wave_id: can be either the "name" of a waveform or
+                the integer key in self._wave_dict.
             wf_nr                 (int) : what codeword to load the pulse onto
                 if set to None, will determine awg_nr based on self.LutMap
             regenerate_waveforms (bool) : if True regenerates all waveforms
@@ -480,10 +498,13 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        I, Q = self._wave_dict[waveform_key]
+        if wave_id not in self.LutMap().keys():
+            wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
+
+        I, Q = self._wave_dict[wave_id]
 
         if wf_nr is None:
-            wf_nr = waveform_key
+            wf_nr = wave_id
 
         AWG = self.AWG.get_instr()
 
@@ -566,19 +587,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0)
 
-    def generate_standard_waveforms(self):
-        wave_dict = super(AWG8_MW_LutMan, self).generate_standard_waveforms()
-        wave_dict['square'] = wf.mod_square_VSM(
-            amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
-            length=self.mw_gauss_width()*4,  # to ensure same duration as mw
-            f_modulation=self.mw_modulation(),
-            sampling_rate=self.sampling_rate())
-
-        if self.mixer_apply_predistortion_matrix():
-            self._wave_dict = self.apply_mixer_predistortion_corrections(
-                self._wave_dict)
-        return self._wave_dict
-
     def _add_channel_params(self):
         self.add_parameter(
             'channel_amp', unit='a.u.', vals=vals.Numbers(0, 1),
@@ -604,14 +612,15 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                 parameter_class=ManualParameter, initial_value=None,
                 vals=vals.Ints())
 
-    def load_waveform_realtime(self, waveform_key,
+    def load_waveform_realtime(self, wave_id,
                                wf_nr: int = None,
                                regenerate_waveforms: bool=True):
         """
         Loads a waveform using the realtime memory manipulation.
 
         Args:
-            waveform_key:         (int) : key of the waveform in _wave_dict
+            wave_id: can be either the "name" of a waveform or
+                the integer key in self._wave_dict.
             wf_nr                 (int) : what codeword to load the pulse onto
                 if set to None, will determine awg_nr based on self.LutMap
             regenerate_waveforms (bool) : if True regenerates all waveforms
@@ -620,10 +629,13 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        GI, GQ, DI, DQ = self._wave_dict[waveform_key]
+        if wave_id not in self.LutMap().keys():
+            wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
+
+        GI, GQ, DI, DQ = self._wave_dict[wave_id]
 
         if wf_nr is None:
-            wf_nr = waveform_key
+            wf_nr = wave_id
 
         AWG = self.AWG.get_instr()
 
