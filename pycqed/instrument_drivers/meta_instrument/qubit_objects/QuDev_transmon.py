@@ -537,6 +537,9 @@ class QuDev_transmon(Qubit):
         operation_dict['RO ' + self.name]['operation_type'] = 'RO'
         operation_dict['X180 ' + self.name]['operation_type'] = 'MW'
         operation_dict['X180_ef ' + self.name]['operation_type'] = 'MW'
+        operation_dict['X180 ' + self.name]['basis'] = self.name
+        operation_dict['X180_ef ' + self.name]['basis'] = self.name + \
+                                                                   '_ef'
         operation_dict['X180_ef ' + self.name]['I_channel'] = \
             operation_dict['X180 ' + self.name]['I_channel']
         operation_dict['X180_ef ' + self.name]['Q_channel'] = \
@@ -664,9 +667,9 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(close_fig=close_fig, qb_name=self.name, 
                                    TwoD=(mode == '2D'))
 
-    def measure_rabi(self, amps, analyze=True, close_fig=True, cal_points=True,
-                     upload=True, label=None, n=1, last_ge_pulse=False,
-                     n_cal_points_per_state=2, cal_states='auto', for_ef=False,
+    def measure_rabi(self, amps, analyze=True, upload=True, label=None, n=1,
+                     last_ge_pulse=False, n_cal_points_per_state=2,
+                     cal_states='auto', for_ef=False, classified_ro=False,
                      prep_params=None, exp_metadata=None):
 
         """
@@ -709,17 +712,16 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(awg_swf.SegmentHardSweep(
             sequence=seq, upload=upload, parameter_name='Amplitude', unit='V'))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_avg_classif_det if classified_ro else
+                                 self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: amps},
-                             'use_cal_points': cal_points,
                              'preparation_params': prep_params,
                              'cal_points': repr(cp),
-                             'rotate': cal_points,
+                             'rotate': len(cp.states) != 0,
                              'last_ge_pulses': [last_ge_pulse],
-                             'data_to_fit': {self.name: 'pf' if for_ef \
-                                                else 'pe'},
+                             'data_to_fit': {self.name: 'pf' if for_ef else 'pe'},
                              "sweep_name": "Amplitude",
                              "sweep_unit": "V"})
         MC.run(label, exp_metadata=exp_metadata)
@@ -741,7 +743,7 @@ class QuDev_transmon(Qubit):
             upload=upload))
         MC.set_sweep_points(scales)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Rabi_amp90_scales_n{}'.format(n)+self.msmt_suffix)
+        MC.run('Rabi_amp90_scales_n{}'.format(n)+ self.msmt_suffix)
 
     def measure_T1(self, times=None, analyze=True, upload=True,
                    close_fig=True, cal_points=True, label=None,
@@ -869,8 +871,9 @@ class QuDev_transmon(Qubit):
 
 
     def measure_qscale(self, qscales=None, analyze=True, upload=True, label=None,
-                       cal_states="auto", n_cal_points_per_state=2, last_ge_pulse=True,
-                       for_ef=False, prep_params=None, exp_metadata=None):
+                       cal_states="auto", n_cal_points_per_state=2,
+                       last_ge_pulse=True, for_ef=False, classified_ro=False,
+                       prep_params=None, exp_metadata=None):
         if qscales is None:
             raise ValueError("Unspecified qscale values for measure_qscale")
         uniques = np.unique(qscales[range(3)])
@@ -902,9 +905,8 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(awg_swf.SegmentHardSweep(
             sequence=seq, upload=upload, parameter_name='Qscale factor'))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_avg_classif_det if
-                                 self.acq_weights_type() == 'optimal_qutrit'
-                                 else self.int_avg_det)
+        MC.set_detector_function(self.int_avg_classif_det if classified_ro else
+                                 self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: qscales},
@@ -912,7 +914,7 @@ class QuDev_transmon(Qubit):
              'sweep_unit': '',
              'cal_points': repr(cp),
              'last_ge_pulses': [last_ge_pulse],
-             'rotate': self.acq_weights_type() != 'optimal_qutrit',
+             'rotate': len(cp.states) != 0,
              'data_to_fit': {self.name: 'pf' if for_ef else 'pe'}})
         MC.run(label, exp_metadata=exp_metadata)
 
@@ -1046,7 +1048,7 @@ class QuDev_transmon(Qubit):
                        MC=None, analyze=True, close_fig=True,
                        cal_states="auto", n_cal_points_per_state=2,
                        n=1, upload=True, last_ge_pulse=True, for_ef=False,
-                       prep_params=None, exp_metadata=None):
+                       classified_ro=False, prep_params=None, exp_metadata=None):
         self.prepare(drive='timedomain')
         if MC is None:
             MC = self.instr_mc.get_instr()
@@ -1072,7 +1074,8 @@ class QuDev_transmon(Qubit):
             sequence=seq, upload=upload, parameter_name='Delay', unit='s'))
         MC.set_sweep_points(sweep_points)
 
-        MC.set_detector_function(self.int_avg_det)
+        MC.set_detector_function(self.int_avg_classif_det if classified_ro else
+                                 self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update(
@@ -1083,7 +1086,7 @@ class QuDev_transmon(Qubit):
              'preparation_params': prep_params,
              'last_ge_pulses': [last_ge_pulse],
              'artificial_detuning': artificial_detunings,
-             'rotate': True,
+             'rotate': len(cp.states) != 0,
              'data_to_fit': {self.name: 'pf' if for_ef else 'pe'}})
 
         MC.run(label, exp_metadata=exp_metadata)
@@ -1830,6 +1833,7 @@ class QuDev_transmon(Qubit):
         m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
         iq_traces = {l: m_a[l].measured_values[0]
                         + 1j * m_a[l].measured_values[1] for l in levels}
+        final_basis_labels = ['ge'] # default basis vector if only qubit ro
         if qutrit:
             ref_state = kw.get('ref_state', 'g')
             basis = [iq_traces[l] - iq_traces[ref_state] for l in levels
@@ -1842,16 +1846,15 @@ class QuDev_transmon(Qubit):
             final_basis_2nd = math.gram_schmidt(np.array(basis_2nd).transpose())
             final_basis_2nd = final_basis_2nd.transpose()
             if kw.get('non_ortho_basis', False):
-                print("Using Non Orthonormal Basis: {}"
-                      .format(basis_labels))
+                final_basis_labels = basis_labels
                 final_basis = np.array([final_basis[0], final_basis_2nd[0]])
             elif kw.get('basis_2nd', False):
-                print("Using 2nd ortho normal Basis: {} and ortho"
-                      .format(basis_labels[1]))
+                final_basis_labels = [basis_labels[1]] + ['ortho']
                 final_basis = final_basis_2nd
             else:
-                print("Using 1st ortho normal Basis.: {} and ortho"
-                      .format(basis_labels[0]))
+                final_basis_labels = [basis_labels[0]] + ['ortho']
+
+            log.info(f"Setting Basis: {final_basis_labels}")
         if update:
             # FIXME: could merge qutrit and non qutrit although normalization is not
             #  the same but would be a good thing to do. First test if qutrit works
@@ -1878,8 +1881,9 @@ class QuDev_transmon(Qubit):
             tbase = np.linspace(0, npoints/1.8e9, npoints, endpoint=False)
             modulation = np.exp(2j * np.pi * self.ro_mod_freq() * tbase)
             fig, ax = plt.subplots(len(levels) + 1, figsize=(20,20))
-            plt.title('optimized weights ' + self.name +
-                      "".join('\n' + m_a[l].timestamp_string for l in levels))
+            ax[0].set_title('optimized weights ' + self.name +
+                        "".join('\n' + m_a[l].timestamp_string for l in levels)
+                        + f'\nWeight Basis: {final_basis_labels}')
             for i, l in enumerate(levels):
                 ax[i].plot(tbase / 1e-9, np.real(iq_traces[l] * modulation), '-',
                          label='I_' + l)
@@ -2225,7 +2229,7 @@ class QuDev_transmon(Qubit):
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         update=False, close_fig=True, cal_points=True,
                         no_cal_points=None, upload=True, last_ge_pulse=True,
-                        analyze=True, prep_params=None, **kw):
+                        classified_ro=False, analyze=True, prep_params=None, **kw):
         """
             Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
             experiment. Uses the Rabi_Analysis(_new)
@@ -2343,9 +2347,9 @@ class QuDev_transmon(Qubit):
             label += self.msmt_suffix
 
         #Perform Rabi
-        self.measure_rabi(amps=rabi_amps, close_fig=close_fig, analyze=False,
-                          cal_points=cal_points, upload=upload, label=label,
-                          n=n, last_ge_pulse=last_ge_pulse, for_ef=for_ef,
+        self.measure_rabi(amps=rabi_amps, analyze=False,
+                          upload=upload, label=label, n=n, last_ge_pulse=last_ge_pulse,
+                          for_ef=for_ef, classified_ro=classified_ro,
                           prep_params=prep_params)
 
         #get pi and pi/2 amplitudes from the analysis results
@@ -2569,8 +2573,8 @@ class QuDev_transmon(Qubit):
     def find_frequency_T2_ramsey(self, times, artificial_detunings=0,
                                  upload=True, label=None, n=1,
                                  cal_states="auto", n_cal_points_per_state=2,
-                                 analyze=True, close_fig=True, update=False,
-                                 for_ef=False, last_ge_pulse=False,
+                                 analyze=True, update=False, for_ef=False,
+                                 last_ge_pulse=False, classified_ro=False,
                                  prep_params=None, exp_metadata=None, **kw):
         """
         Finds the real qubit GE or EF transition frequencies and the dephasing
@@ -2644,6 +2648,7 @@ class QuDev_transmon(Qubit):
                             n_cal_points_per_state=2,
                             n=n, upload=upload,
                             last_ge_pulse=last_ge_pulse, for_ef=for_ef,
+                            classified_ro=classified_ro,
                             prep_params=prep_params,
                             exp_metadata=exp_metadata)
 
@@ -2821,9 +2826,9 @@ class QuDev_transmon(Qubit):
 
 
     def find_qscale(self, qscales, label=None, for_ef=False, update=False,
-                    close_fig=True, last_ge_pulse=True, upload=True,
+                    last_ge_pulse=True, upload=True,
                     cal_states="auto", n_cal_points_per_state=2,
-                    prep_params=None, **kw):
+                    classified_ro=False, prep_params=None, **kw):
 
         '''
         Performs the QScale calibration measurement ( (xX)-(xY)-(xmY) ) and
@@ -2926,7 +2931,7 @@ class QuDev_transmon(Qubit):
                             cal_states=cal_states,
                             n_cal_points_per_state=n_cal_points_per_state,
                             last_ge_pulse=last_ge_pulse, for_ef=for_ef,
-                            prep_params=prep_params)
+                            classified_ro=classified_ro, prep_params=prep_params)
 
         # Perform analysis and extract the optimal qscale parameter
         # Returns the optimal qscale parameter

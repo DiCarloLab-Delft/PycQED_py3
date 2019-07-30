@@ -294,8 +294,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         # temporary fix for appending calibration points to x values but
         # without breaking sequences not yet using this interface.
-        cal_points = self.get_param_value('cal_points')
         rotate = self.get_param_value('rotate', default_value=False)
+        cal_points = self.get_param_value('cal_points')
         last_ge_pulses = self.get_param_value('last_ge_pulses',
                                               default_value=False)
         self.cp = eval(cal_points)
@@ -638,13 +638,13 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         plot_cal_points=(
                             not self.options_dict.get('TwoD', False)))
 
-        if self.get_param_value('plot_raw_data', default_value=True) and \
-            self.cal_states_rotations is not None:
-                self.prepare_raw_data_plots(plot_filtered=False)
-                if 'preparation_params' in self.metadata:
-                    if 'active' in self.metadata['preparation_params'].get(
-                            'preparation_type', 'wait'):
-                        self.prepare_raw_data_plots(plot_filtered=True)
+        if self.get_param_value('plot_raw_data', default_value=True):
+            # self.cal_states_rotations is not None:
+            self.prepare_raw_data_plots(plot_filtered=False)
+            if 'preparation_params' in self.metadata:
+                if 'active' in self.metadata['preparation_params'].get(
+                        'preparation_type', 'wait'):
+                    self.prepare_raw_data_plots(plot_filtered=True)
 
     def prepare_raw_data_plots(self, plot_filtered=False):
         if plot_filtered:

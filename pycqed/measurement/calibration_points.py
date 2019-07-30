@@ -178,8 +178,12 @@ class CalibrationPoints:
         Returns:
             sweep_points + calib_fake_sweep points
         """
-        step = np.abs(sweep_points[-1] - sweep_points[-2])
         n_cal_pts = len(self.get_states(qb_name)[qb_name])
+
+        if len(sweep_points) == 0:
+            log.warning("No sweep points, returning a range.")
+            return np.arange(n_cal_pts)
+        step = np.abs(sweep_points[-1] - sweep_points[-2])
         plot_sweep_points = \
             np.concatenate([sweep_points, [sweep_points[-1] + i * step
                                            for i in range(1, n_cal_pts + 1)]])
