@@ -563,6 +563,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                                                      yerr=self.raw_data_dict['freq_sorted_tau_stderr'],
                                                      fitfunc=self.fit_res['Q_qubit_fitfct'],
                                                      pdict_scatter=plot_dict, pdict_fit=plot_dict)
+                pds['yrange']  = (0, 1.1 * np.max(self.raw_data_dict['freq_sorted_tau']))
                 self.plot_dicts["freq_relation_scatter"] = pds
                 self.plot_dicts["freq_relation_fit"] = pdf
 
@@ -1773,9 +1774,9 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
     """
     # create a parameter set for the initial guess
     p = lmfit.Parameters()
-    p.add('slope_ramsey', value=100.0, vary=True)
-    p.add('slope_echo', value=100.0, vary=True)
-    p.add('intercept', value=100.0, vary=True)
+    p.add('slope_ramsey', value=1e-5, vary=True, min=0)
+    p.add('slope_echo', value=1e-5, vary=True, min=0)
+    p.add('intercept', value=1e-3, vary=True)
 
     # mi = lmfit.minimize(super_residual, p)
     def wrap_residual(p): return residual_Gamma(
