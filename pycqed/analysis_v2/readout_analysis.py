@@ -368,14 +368,14 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         #  Save quantities of interest.   #
         ###################################
         self.proc_data_dict['quantities_of_interest'] = {
-            'SNR': self.fit_res['shots_all'].params['SNR'],
+            'SNR': self.fit_res['shots_all'].params['SNR'].value,
             'F_d': self.proc_data_dict['F_discr'],
             'F_a': self.proc_data_dict['F_assignment_raw'],
             'residual_excitation': self.proc_data_dict['residual_excitation'],
             'measurement_induced_relaxation':
                 self.proc_data_dict['measurement_induced_relaxation']
             }
-        self.qoi = proc_data_dict['quantities_of_interest']
+        self.qoi = self.proc_data_dict['quantities_of_interest']
 
     def prepare_plots(self):
         # Did we load two voltage components (shall we do 2D plots?)

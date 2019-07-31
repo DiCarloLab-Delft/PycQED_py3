@@ -2817,14 +2817,13 @@ class CCLight_Transmon(Qubit):
         spec_source.off()
         spec_source_2.off()
 
-    def measure_ssro(self, MC=None, analyze: bool=True,
+    def measure_ssro(self, MC=None, 
                      nr_shots_per_case: int=2**13, #8192
-                     cases=('off', 'on'), update_threshold: bool=True,
+                     cases=('off', 'on'),
                      prepare: bool=True, no_figs: bool=False,
                      post_select: bool = False,
                      post_select_threshold: float =None,
                      update: bool=True,
-                     verbose: bool=True,
                      SNR_detector: bool=False,
                      shots_per_meas: int=2**16,
                      cal_residual_excitation: bool=False,
@@ -2908,57 +2907,47 @@ class CCLight_Transmon(Qubit):
         ######################################################################
         # SSRO Analysis
         ######################################################################
-        if analyze:
-            if SNR_detector:
-                if cal_residual_excitation:
-                    a = ma2.Singleshot_Readout_Analysis()
+        if post_select_threshold == None:
+            post_select_threshold = self.ro_acq_threshold()
 
-                    self.res_exc = a.proc_data_dict['quantities_of_interest']['residual_excitation']
-                    self.mmt_rel = a.proc_data_dict['quantities_of_interest']['measurement_induced_relaxation']
-                else:
-                    a = ma2.Singleshot_Readout_Analysis(options_dict=
-                        {'fixed_p10':self.res_exc,
-                         'fixed_p01':self.mmt_rel, })
+        options_dict={'post_select': post_select,
+                      'nr_samples': 2+2*post_select,
+                      'post_select_threshold': post_select_threshold}
+        if not cal_residual_excitation:
+            options_dict.update(
+                {'fixed_p10':self.res_exc,
+                 'fixed_p01':self.mmt_rel})
 
-                return {'SNR': a.qoi['SNR'],
-                        'F_d': a.qoi['F_d'], 'F_a': a.qoi['F_a']}
+        a = ma2.Singleshot_Readout_Analysis(
+            options_dict=options_dict, 
+            extract_only=no_figs)
 
-            else:
-                if len(d.value_names) == 1:
-                    if post_select_threshold == None:
-                        post_select_threshold = self.ro_acq_threshold()
-                    a = ma2.Singleshot_Readout_Analysis(
-                        options_dict={'post_select': post_select,
-                                      'nr_samples': 2+2*post_select,
-                                      'post_select_threshold': post_select_threshold},
-                        extract_only=no_figs)
-                    if update_threshold:
-                        # UHFQC threshold is wrong, the magic number is a
-                        #  dirty hack. This works. we don't know why.
-                        magic_scale_factor = 1  # 0.655
-                        self.ro_acq_threshold(
-                            a.proc_data_dict['threshold_raw'] *
-                            magic_scale_factor)
-                    if update:
-                        self.F_ssro(a.proc_data_dict['F_assignment_raw'])
-                        self.F_discr(a.proc_data_dict['F_discr'])
-                    if verbose:
-                        print('Avg. Assignement fidelity: \t{:.4f}\n'.format(
-                            a.proc_data_dict['F_assignment_raw']) +
-                            'Avg. Discrimination fidelity: \t{:.4f}'.format(
-                            a.proc_data_dict['F_discr']))
-                    return {'SNR': a.fit_res['shots_all'].params['SNR'],
-                            'F_d': a.proc_data_dict['F_discr'],
-                            'F_a': a.proc_data_dict['F_assignment_raw'],
-                            'relaxation': a.proc_data_dict['measurement_induced_relaxation'],
-                            'excitation': a.proc_data_dict['residual_excitation']}
-                else:
-                    a = ma2.Singleshot_Readout_Analysis(options_dict=
-                        {'fixed_p10':self.res_exc,
-                         'fixed_p01':self.mmt_rel, })
-                    warnings.warn("FIXME rotation angle could not be set")
-                    # self.ro_acq_rotated_SSB_rotation_angle(a.theta)
-                    return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
+        ######################################################################
+        # Update parameters in the qubit object based on the analysis
+        ######################################################################
+        if update:
+            self.res_exc = a.proc_data_dict['quantities_of_interest']['residual_excitation']
+            self.mmt_rel = a.proc_data_dict['quantities_of_interest']['measurement_induced_relaxation']
+            # UHFQC threshold is wrong, the magic number is a
+            #  dirty hack. This works. we don't know why.
+            magic_scale_factor = 1  # 0.655
+            self.ro_acq_threshold(
+                a.proc_data_dict['threshold_raw'] *
+                magic_scale_factor)
+
+            self.F_ssro(a.proc_data_dict['F_assignment_raw'])
+            self.F_discr(a.proc_data_dict['F_discr'])
+
+            warnings.warn("FIXME rotation angle could not be set")
+            # self.ro_acq_rotated_SSB_rotation_angle(a.theta)
+
+        return {'SNR': a.qoi['SNR'],
+                'F_d': a.qoi['F_d'], 
+                'F_a': a.qoi['F_a'],
+                'relaxation': a.proc_data_dict['measurement_induced_relaxation'],
+                'excitation': a.proc_data_dict['residual_excitation']}
+
+
 
 
     def measure_ssro_vs_frequency_amplitude(
@@ -3320,7 +3309,6 @@ class CCLight_Transmon(Qubit):
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
                                   no_figs: bool=False,
-                                  update_threshold: bool=True,
                                   optimal_IQ: bool=False,
                                   measure_transients_CCL_switched: bool=False,
                                   prepare: bool=True,
@@ -3396,7 +3384,7 @@ class CCLight_Transmon(Qubit):
                 self._prep_ro_integration_weights()
                 self._prep_ro_instantiate_detectors()
                 ssro_dict = self.measure_ssro(
-                    no_figs=no_figs, update_threshold=update_threshold,
+                    no_figs=no_figs, update=update,
                     prepare=False, disable_metadata=disable_metadata, 
                     nr_shots_per_case=nr_shots_per_case, 
                     post_select=post_select, 
