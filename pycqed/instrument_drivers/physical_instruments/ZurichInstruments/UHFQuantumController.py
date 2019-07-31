@@ -544,8 +544,6 @@ class UHFQC(Instrument):
             timeout (float): time in seconds before timeout Error is raised.
 
         """
-        print(self.name, 'acquisition_poll')
-        print('acquisition_paths', self.acquisition_paths)
 
         data = {k: [] for k, dummy in enumerate(self.acquisition_paths)}
 
