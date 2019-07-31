@@ -792,7 +792,7 @@ class CCLight_Transmon(Qubit):
             self._prep_ro_pulse(CW=CW)
             self._prep_ro_integration_weights()
             self._prep_deskewing_matrix()
-        else: 
+        else:
             warnings.warn('"cfg_prepare_ro_awg" set to False, not preparing readout .')
 
 
@@ -992,7 +992,7 @@ class CCLight_Transmon(Qubit):
             UHFQC.sigouts_0_offset(self.ro_pulse_mixer_offs_I())
             UHFQC.sigouts_1_offset(self.ro_pulse_mixer_offs_Q())
 
-            if [self.cfg_qubit_nr()] not in ro_lm.resonator_combinations(): 
+            if [self.cfg_qubit_nr()] not in ro_lm.resonator_combinations():
                 warnings.warn('Qubit number of {} is not '.format(self.name)+
                     'present in resonator_combinations of the readout lutman.')
 
@@ -1190,7 +1190,7 @@ class CCLight_Transmon(Qubit):
         # 4. reloads the waveforms
         if self.cfg_prepare_mw_awg():
             MW_LutMan.load_waveforms_onto_AWG_lookuptable()
-        else: 
+        else:
             warnings.warn('"cfg_prepare_mw_awg" set to False, '
                 'not preparing microwave pulses.')
 
@@ -2817,7 +2817,7 @@ class CCLight_Transmon(Qubit):
         spec_source.off()
         spec_source_2.off()
 
-    def measure_ssro(self, MC=None, analyze: bool=True, 
+    def measure_ssro(self, MC=None, analyze: bool=True,
                      nr_shots_per_case: int=2**13, #8192
                      cases=('off', 'on'), update_threshold: bool=True,
                      prepare: bool=True, no_figs: bool=False,
@@ -2858,14 +2858,14 @@ class CCLight_Transmon(Qubit):
                 number of single shot measurements per single
                 acquisition with UHFQC
 
-            cal_residual_excitation (bool): 
-                if True, uses the last known values of residual excitation 
-                and measurement induced relaxation and keeps these fixed. 
+            cal_residual_excitation (bool):
+                if True, uses the last known values of residual excitation
+                and measurement induced relaxation and keeps these fixed.
             ...
         """
 
         # off and on, not including post selection init measurements yet
-        nr_shots=nr_shots_per_case*2 
+        nr_shots=nr_shots_per_case*2
 
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
@@ -2906,31 +2906,28 @@ class CCLight_Transmon(Qubit):
         MC.live_plot_enabled(old_plot_setting)
 
         ######################################################################
-        # SSRO Analysis 
+        # SSRO Analysis
         ######################################################################
         if analyze:
             if SNR_detector:
                 if cal_residual_excitation:
-                    a = ma.SSRO_Analysis(rotate=True, label='SSRO',
-                                         no_fits=False, close_fig=True,
-                                         peg=None, pge=None,
-                                         timestamp=None, channels=d.value_names)
-                    self.peg = a.frac1_0
-                    self.pge = 1-a.frac1_1
+                    a = ma2.Singleshot_Readout_Analysis()
+
+                    self.res_exc = a.proc_data_dict['quantities_of_interest']['residual_excitation']
+                    self.mmt_rel = a.proc_data_dict['quantities_of_interest']['measurement_induced_relaxation']
                 else:
-                    a = ma.SSRO_Analysis(rotate=True, label='SSRO',
-                                         no_fits=False, close_fig=True,
-                                         peg=self.peg, pge=self.pge,
-                                         channels=d.value_names)
-                return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
+                    a = ma2.Singleshot_Readout_Analysis(options_dict=
+                        {'fixed_p10':self.res_exc,
+                         'fixed_p01':self.mmt_rel, })
+
+                return {'SNR': a.qoi['SNR'],
+                        'F_d': a.qoi['F_d'], 'F_a': a.qoi['F_a']}
 
             else:
                 if len(d.value_names) == 1:
                     if post_select_threshold == None:
                         post_select_threshold = self.ro_acq_threshold()
                     a = ma2.Singleshot_Readout_Analysis(
-                        t_start=None, t_stop=None,
-                        label='SSRO',
                         options_dict={'post_select': post_select,
                                       'nr_samples': 2+2*post_select,
                                       'post_select_threshold': post_select_threshold},
@@ -2939,8 +2936,9 @@ class CCLight_Transmon(Qubit):
                         # UHFQC threshold is wrong, the magic number is a
                         #  dirty hack. This works. we don't know why.
                         magic_scale_factor = 1  # 0.655
-                        self.ro_acq_threshold(a.proc_data_dict['threshold_raw'] *
-                                              magic_scale_factor)
+                        self.ro_acq_threshold(
+                            a.proc_data_dict['threshold_raw'] *
+                            magic_scale_factor)
                     if update:
                         self.F_ssro(a.proc_data_dict['F_assignment_raw'])
                         self.F_discr(a.proc_data_dict['F_discr'])
@@ -2955,10 +2953,11 @@ class CCLight_Transmon(Qubit):
                             'relaxation': a.proc_data_dict['measurement_induced_relaxation'],
                             'excitation': a.proc_data_dict['residual_excitation']}
                 else:
-                    a = ma.SSRO_Analysis(label='SSRO',
-                                         channels=d.value_names,
-                                         no_fits=no_figs, rotate=True)
-                    self.ro_acq_rotated_SSB_rotation_angle(a.theta)
+                    a = ma2.Singleshot_Readout_Analysis(options_dict=
+                        {'fixed_p10':self.res_exc,
+                         'fixed_p01':self.mmt_rel, })
+                    warnings.warn("FIXME rotation angle could not be set")
+                    # self.ro_acq_rotated_SSB_rotation_angle(a.theta)
                     return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
 
 
@@ -3202,7 +3201,7 @@ class CCLight_Transmon(Qubit):
                 sampling_rate)
             MC.set_detector_function(self.input_average_detector)
             data = MC.run(
-                'Measure_transients{}_{}'.format(self.msmt_suffix, i), 
+                'Measure_transients{}_{}'.format(self.msmt_suffix, i),
                 disable_snapshot_metadata=disable_metadata)
             dset = data['dset']
             transients.append(dset.T[1:])
@@ -3352,7 +3351,7 @@ class CCLight_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare:
-            self.prepare_for_timedomain() 
+            self.prepare_for_timedomain()
 
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.ro_acq_averages()
@@ -3364,7 +3363,7 @@ class CCLight_Transmon(Qubit):
                                                               depletion_analysis=False)
         else:
             transients = self.measure_transients(MC=MC, analyze=analyze,
-                                                 depletion_analysis=False, 
+                                                 depletion_analysis=False,
                                                  disable_metadata=disable_metadata)
         if analyze:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
@@ -4846,10 +4845,10 @@ class CCLight_Transmon(Qubit):
                              prepare_function_kwargs: dict=None, 
                              ssro_kwargs: dict=None):
         """
-        Wraps measure_ssro using the Function Detector. 
+        Wraps measure_ssro using the Function Detector.
 
-        Args: 
-            calibrate_optimal_weights 
+        Args:
+            calibrate_optimal_weights
         """
         if ssro_kwargs is None: 
             ssro_kwargs = {
@@ -4866,16 +4865,16 @@ class CCLight_Transmon(Qubit):
                     msmt_kw=ssro_kwargs,
                     result_keys=['SNR', 'F_d', 'F_a'], 
                     prepare_function=prepare_function,
-                    prepare_function_kwargs=prepare_function_kwargs, 
+                    prepare_function_kwargs=prepare_function_kwargs,
                 )
-        else: 
+        else:
             d = det.Function_Detector(
                 self.calibrate_optimal_weights, 
                 msmt_kw=ssro_kwargs,
                     result_keys=['SNR', 'F_d', 'F_a'], 
                     prepare_function=prepare_function,
                     prepare_function_kwargs=prepare_function_kwargs, )
-        return d 
+        return d
 
 
 

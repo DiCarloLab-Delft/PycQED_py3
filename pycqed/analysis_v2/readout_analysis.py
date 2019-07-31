@@ -35,8 +35,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                  **kw):
         '''
         options dict options:
-            'fixed_p10' fixes p(e|g) (do not vary in fit)
-            'fixed_p01' : fixes p(g|pi) (do not vary in fit)
+            'fixed_p10'   fixes p(e|g)  res_exc (do not vary in fit)
+            'fixed_p01' : fixes p(g|pi) mmt_rel (do not vary in fit)
             'auto_rotation_angle' : (bool) automatically find the I/Q mixing angle
             'rotation_angle' : manually define the I/Q mixing angle (ignored if auto_rotation_angle is set to True)
             'nr_bins' : number of bins to use for the histograms
@@ -365,13 +365,17 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['measurement_induced_relaxation'] = bv['A_spurious'].value
 
         ###################################
-        #  Save Q.O.F.                    #
+        #  Save quantities of interest.   #
         ###################################
         self.proc_data_dict['quantities_of_interest'] = {
             'SNR': self.fit_res['shots_all'].params['SNR'],
             'F_d': self.proc_data_dict['F_discr'],
-            'F_a': self.proc_data_dict['F_assignment_raw']
+            'F_a': self.proc_data_dict['F_assignment_raw'],
+            'residual_excitation': self.proc_data_dict['residual_excitation'],
+            'measurement_induced_relaxation':
+                self.proc_data_dict['measurement_induced_relaxation']
             }
+        self.qoi = proc_data_dict['quantities_of_interest']
 
     def prepare_plots(self):
         # Did we load two voltage components (shall we do 2D plots?)
