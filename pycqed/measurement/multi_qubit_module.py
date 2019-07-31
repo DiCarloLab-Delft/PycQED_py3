@@ -162,6 +162,8 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
     uhf_instances = {}
     max_int_len = {}
     channels = {}
+    acq_classifier_params = []
+    acq_state_prob_mtxs = []
     for qb in qubits:
         uhf = qb.instr_uhf()
         uhfs.add(uhf)
@@ -177,6 +179,15 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
         if qb.acq_weights_type() in ['SSB', 'DSB', 'optimal_qutrit']:
             if qb.acq_Q_channel() is not None:
                 channels[uhf] += [qb.acq_Q_channel()]
+
+        acq_classifier_params += [qb.acq_classifier_params()]
+        acq_state_prob_mtxs += [qb.acq_state_prob_mtx]
+
+    classif_det_get_values_kws = {
+        'classifier_params': acq_classifier_params,
+        'state_prob_mtx': acq_state_prob_mtxs,
+        'average': True
+    }
 
     if add_channels is None:
         add_channels = {uhf: [] for uhf in uhfs}
@@ -228,7 +239,13 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
             'int_avg_classif_det': det.UHFQC_integration_average_classifier_det(
                 UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
                 integration_length=max_int_len[uhf], nr_shots=nr_shots,
+                get_values_function_kwargs=classif_det_get_values_kws,
                 result_logging_mode='raw', **kw),
+            'int_avg_classif_corr_det': det.UHFQC_integration_average_classifier_det(
+                UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
+                integration_length=max_int_len[uhf], nr_shots=nr_shots,
+                get_values_function_kwargs=classif_det_get_values_kws,
+                correlations=correlations[uhf], result_logging_mode='raw', **kw),
             'dig_avg_det': det.UHFQC_integrated_average_detector(
                 UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
                 integration_length=max_int_len[uhf], nr_averages=nr_averages,
@@ -251,8 +268,9 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
 
     combined_detectors = {det_type: det.UHFQC_multi_detector([
         individual_detectors[uhf][det_type] for uhf in uhfs])
-        for det_type in ['int_log_det', 'dig_log_det', 'int_avg_det',
-                         'int_avg_classif_det', 'dig_avg_det', 'inp_avg_det',
+        for det_type in ['int_log_det', 'dig_log_det',
+                         'int_avg_det', 'dig_avg_det', 'inp_avg_det',
+                         'int_avg_classif_det', 'int_avg_classif_corr_det',
                          'int_corr_det', 'dig_corr_det']}
 
     return combined_detectors
@@ -742,10 +760,10 @@ def measure_two_qubit_randomized_benchmarking(
 
     operation_dict = get_operation_dict(qubits)
     sequences, hard_sweep_points, soft_sweep_points = \
-        mqs.two_qubit_randomized_benchmarking_seq(
+        mqs.two_qubit_randomized_benchmarking_seqs(
             qb1n=qb1n, qb2n=qb2n, operation_dict=operation_dict,
             cliffords=cliffords, nr_seeds=np.arange(nr_seeds),
-            max_clifford_idx=24 ** 2 if character_rb else 11520,
+            max_clifford_idx=24**2 if character_rb else 11520,
             cz_pulse_name=cz_pulse_name, net_clifford=net_clifford,
             clifford_decomposition_name=clifford_decomposition_name,
             interleaved_gate=interleaved_gate, upload=False, cal_points=cp)
@@ -760,12 +778,18 @@ def measure_two_qubit_randomized_benchmarking(
         hard_sweep_func, sequences, 'Nr. Seeds', ''))
     MC.set_sweep_points_2D(soft_sweep_points)
 
-    correlations = [(qb1.acq_I_channel(), qb2.acq_Q_channel())]
-    # det_name = 'int_avg{}_det'.format('_classif' if classified else '')
-    det_name = 'dig_corr_det'
+    if classified:
+        correlations = [(
+            (qb1.acq_I_channel(), qb1.acq_Q_channel()),
+            (qb2.acq_I_channel(), qb2.acq_Q_channel())
+        )]
+        det_name = 'int_avg_classif_corr_det'
+    else:
+        correlations = [(qb1.acq_I_channel(), qb2.acq_I_channel())]
+        det_name = 'dig_corr_det'
     det_func = get_multiplexed_readout_detector_functions(
         qubits, nr_averages=max(qb.acq_averages() for qb in qubits),
-        orrelations=correlations)[det_name]
+        correlations=correlations)[det_name]
     MC.set_detector_function(det_func)
     exp_metadata = {'preparation_params': prep_params,
                     'cal_points': repr(cp),
@@ -1794,7 +1818,7 @@ def measure_chevron(qbc, qbt, qbr, hard_sweep_params, soft_sweep_params,
                                            options_dict={'TwoD': True})
 
 
-def measure_cphase_old(qbc, qbt, qbr, lengths, amps, alphas=None,
+def measure_cphase_nn(qbc, qbt, qbr, lengths, amps, alphas=None,
                    CZ_pulse_name=None,
                    phases=None, MC=None,
                    cal_points=False, plot=False,
