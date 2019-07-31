@@ -3326,6 +3326,9 @@ class CCLight_Transmon(Qubit):
                                   measure_transients_CCL_switched: bool=False,
                                   prepare: bool=True,
                                   disable_metadata: bool=False,
+                                  nr_shots_per_case: int =2**13, 
+                                  post_select: bool = False, 
+                                  post_select_threshold: float = None, 
                                   )->bool:
         """
         Measures readout transients for the qubit in ground and excited state to indicate
@@ -3333,6 +3336,12 @@ class CCLight_Transmon(Qubit):
         that are used to  weigh measuremet traces to maximize the SNR.
 
         Args:
+            optimal_IQ (bool): 
+                if set to True sets both the I and Q weights of the optimal 
+                weight functions for the verification experiment. 
+                A good sanity check is that when using optimal IQ one expects 
+                to see no signal in the  Q quadrature of the verification 
+                SSRO experiment. 
             verify (bool):
                 indicates whether to run measure_ssro at the end of the routine
                 to find the new SNR and readout fidelities with optimized weights
@@ -3384,12 +3393,18 @@ class CCLight_Transmon(Qubit):
                 self.ro_acq_weight_type('optimal IQ')
             else:
                 self.ro_acq_weight_type('optimal')
-        if verify:
-            self._prep_ro_integration_weights()
-            ssro_dict = self.measure_ssro(
-                no_figs=no_figs, update_threshold=update_threshold,
-                prepare=False, disable_metadata=disable_metadata)
-            return ssro_dict
+            if verify:
+                self._prep_ro_integration_weights()
+                self._prep_ro_instantiate_detectors()
+                ssro_dict = self.measure_ssro(
+                    no_figs=no_figs, update_threshold=update_threshold,
+                    prepare=False, disable_metadata=disable_metadata, 
+                    nr_shots_per_case=nr_shots_per_case, 
+                    post_select=post_select, 
+                    post_select_threshold=post_select_threshold)
+                return ssro_dict
+        if verify: 
+            warnings.warn('Not verifying as settings were not updated.')
         return True
 
     def measure_rabi(self, MC=None, amps=np.linspace(0, 1, 31),
@@ -4825,26 +4840,30 @@ class CCLight_Transmon(Qubit):
         return check_result
 
 
-    def create_ssro_detector(self, nr_shots_per_case=8192,  
+    def create_ssro_detector(self,  
                              calibrate_optimal_weights:bool=False, 
                              prepare_function=None, 
-                             prepare_function_kwargs=None):
+                             prepare_function_kwargs: dict=None, 
+                             ssro_kwargs: dict=None):
         """
         Wraps measure_ssro using the Function Detector. 
 
         Args: 
             calibrate_optimal_weights 
         """
+        if ssro_kwargs is None: 
+            ssro_kwargs = {
+                        'nr_shots_per_case': 8192,
+                        'analyze': True, 
+                        'prepare': False,
+                        'disable_metadata': True
+                    }
+
+
         if not calibrate_optimal_weights: 
             d = det.Function_Detector(
                     self.measure_ssro,
-                    msmt_kw={
-                        'nr_shots_per_case': nr_shots_per_case,
-                        'analyze': True, 'SNR_detector': True,
-                        'cal_residual_excitation': True,
-                        'prepare': False,
-                        'disable_metadata': True
-                    },
+                    msmt_kw=ssro_kwargs,
                     result_keys=['SNR', 'F_d', 'F_a'], 
                     prepare_function=prepare_function,
                     prepare_function_kwargs=prepare_function_kwargs, 
@@ -4852,13 +4871,7 @@ class CCLight_Transmon(Qubit):
         else: 
             d = det.Function_Detector(
                 self.calibrate_optimal_weights, 
-                msmt_kw={
-                        'nr_shots_per_case': nr_shots_per_case,
-                        'analyze': True, 'SNR_detector': True,
-                        'cal_residual_excitation': True,
-                        'prepare': False,
-                        'disable_metadata': True
-                    },
+                msmt_kw=ssro_kwargs,
                     result_keys=['SNR', 'F_d', 'F_a'], 
                     prepare_function=prepare_function,
                     prepare_function_kwargs=prepare_function_kwargs, )
