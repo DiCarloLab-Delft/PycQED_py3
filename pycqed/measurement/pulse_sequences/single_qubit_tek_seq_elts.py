@@ -1230,74 +1230,39 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     else:
         return seq, seg_list
 
-def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
-                                            nr_cliffords_value, #scalar
-                                            nr_seeds,           #array
-                                            net_clifford=0,
-                                            gate_decomposition='HZ',
-                                            interleaved_gate=None,
-                                            cal_points=False,
-                                            resetless=False,
-                                            seq_name=None,
-                                            verbose=False,
-                                            upload=True, upload_all=True):
+def randomized_renchmarking_seqs(
+        qb_name, operation_dict, cliffords, nr_seeds, net_clifford=0,
+        gate_decomposition='HZ', interleaved_gate=None, upload=True,
+        cal_points=None, prep_params=dict()):
 
-    if seq_name is None:
-        seq_name = 'RandomizedBenchmarking_sequence_one_length'
-    seq = sequence.Sequence(seq_name)
-    seg_list = []
-    pulses = get_pulse_dict_from_pars(pulse_pars)
+    seq_name = '1Qb_RB_sequence'
 
-    if upload_all:
-        upload_AWGs = 'all'
-    else:
-        upload_AWGs = ['AWG1']
-        upload_AWGs += [ps.Pulsar.get_instance().get(pulse_pars['I_channel'] + '_AWG'),
-                        ps.Pulsar.get_instance().get(pulse_pars['Q_channel'] + '_AWG')]
-        upload_AWGs = list(set(upload_AWGs))
-    print(upload_AWGs)
-
-    # pulse_keys_list = []
-    for i in nr_seeds:
-        if cal_points and (i == (len(nr_seeds)-4) or
-                                   i == (len(nr_seeds)-3)):
-             seg = segment.Segment('segment_{}'.format(i),
-                                 [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(nr_seeds)-2) or
-                                     i == (len(nr_seeds)-1)):
-             seg = segment.Segment('segment_{}'.format(i),
-                                 [pulses['X180'], RO_pars])
-        else:
+    sequences = []
+    for nCl in cliffords:
+        pulse_list_list_all = []
+        for i in nr_seeds:
             cl_seq = rb.randomized_benchmarking_sequence(
-                nr_cliffords_value, desired_net_cl=net_clifford,
+                nCl, desired_net_cl=net_clifford,
                 interleaved_gate=interleaved_gate)
-            if i == 0:
-                if interleaved_gate == 'X90':
-                    print(np.any(np.array([cl_seq[1::2]]) != 16))
-                elif interleaved_gate == 'Y90':
-                    print(np.any(np.array([cl_seq[1::2]]) != 21))
             pulse_keys = rb.decompose_clifford_seq(
-                cl_seq,
-                gate_decomp=gate_decomposition)
-            pulse_list = [pulses[x] for x in pulse_keys]
-            pulse_list += [RO_pars]
-            seg = segment.Segment('segment_{}'.format(i), pulse_list)
-        seg_list.append(seg)
-        seq.add(seg)
+                cl_seq, gate_decomp=gate_decomposition)
+            pulse_list = [operation_dict[x + ' ' + qb_name] for x in pulse_keys]
+            pulse_list += [operation_dict['RO ' + qb_name]]
+            pulse_list_w_prep = [add_preparation_pulses(
+                pulse_list, operation_dict, [qb_name], **prep_params)]
+            pulse_list_list_all.append(pulse_list_w_prep)
+        seq = pulse_list_list_seq(pulse_list_list_all, seq_name+f'_{nCl}',
+                                  upload=False)
+        if cal_points is not None:
+            seq.extend(cal_points.create_segments(operation_dict,
+                                                  **prep_params))
+        sequences.append(seq)
 
-        # If the element is too long, add in an extra wait elt
-        # to skip a trigger
-        if resetless and nr_cliffords_value*pulse_pars[
-            'pulse_delay']*1.875 > 50e-6:
-            seg = segment.Segment('segment_{}'.format(i), [pulses['I']])
-            seg_list.append(seg)
-            seq.add(seg)
     if upload:
-        ps.Pulsar.get_instance().program_awgs(seq)
-        return seq, seg_list
-    else:
-        return seq, seg_list
+        ps.Pulsar.get_instance().program_awgs(sequences[0])
 
+    return sequences, np.arange(sequences[0].n_acq_elements()), \
+           np.arange(cliffords)
 
 def Freq_XY(freqs, pulse_pars, RO_pars,
             cal_points=True, verbose=False, return_seq=False):
