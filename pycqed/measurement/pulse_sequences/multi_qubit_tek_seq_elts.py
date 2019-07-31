@@ -1,4 +1,5 @@
 import logging
+log = logging.getLogger(__name__)
 import itertools
 import numpy as np
 from copy import deepcopy
@@ -9,7 +10,7 @@ from pycqed.measurement.pulse_sequences.standard_elements import \
 import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
-    get_pulse_dict_from_pars
+    get_pulse_dict_from_pars, add_preparation_pulses, pulse_list_list_seq
 from pycqed.measurement.gate_set_tomography.gate_set_tomography import \
     create_experiment_list_pyGSTi_qudev as get_exp_list
 from pycqed.measurement.waveform_control import pulsar as ps
@@ -958,7 +959,7 @@ def two_qubit_tomo_cphase_cardinal(cardinal_state,
     return seq, el_list
 
 
-def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False, verbose=False,
+def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False,
                    parallel_pulses=False, preselection=False, upload=True,
                    RO_spacing=2000e-9):
     n = len(pulse_pars_list)
@@ -994,7 +995,6 @@ def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False, verbose=Fals
     pulse_combinations = []
 
     for pulse_list in itertools.product(*(n*[['I', 'X180']])):
-        print(pulse_list)
         pulse_comb = (n)*['']
         for i, pulse in enumerate(pulse_list):
             pulse_comb[i] = pulse + ' {}'.format(i)
@@ -1006,10 +1006,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False, verbose=Fals
         pulses += RO_pars_list
         if preselection:
             pulses = pulses + RO_pars_list_presel
-        for pulse in pulses:
-            print(pulse)
-            print('')
-        print('')
+
         seg = segment.Segment('segment_{}'.format(i), pulses)
         seg_list.append(seg)
         seq.add(seg)
@@ -1021,16 +1018,13 @@ def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False, verbose=Fals
         return seq_name
 
 
-def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
-                                      nr_cliffords_value, #scalar
-                                      nr_seeds,           #array
-                                      max_clifford_idx=11520,
-                                      CZ_pulse_name=None,
-                                      net_clifford=0,
-                                      clifford_decomposition_name='HZ',
-                                      interleaved_gate=None,
-                                      seq_name=None, upload=True,
-                                      return_seq=False, verbose=False):
+def two_qubit_randomized_benchmarking_seqs(
+        qb1n, qb2n, operation_dict,
+        cliffords, #scalar
+        nr_seeds,  #array
+        max_clifford_idx=11520, cz_pulse_name=None, cal_points=None,
+        net_clifford=0, clifford_decomposition_name='HZ',
+        interleaved_gate=None, upload=True, prep_params=dict()):
 
     """
     Args
@@ -1046,16 +1040,9 @@ def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
         clifford_decomp_name (str): the decomposition of Clifford gates
             into primitives; can be "XY", "HZ", or "5Primitives"
         interleaved_gate (str): pycqed name for a gate
-        seq_name (str): sequence name
         upload (bool): whether to upload sequence to AWGs
-        return_seq (bool): whether to return seq and el_list or just seq
-        verbose (bool): print detailed runtime information
     """
-
-    if seq_name is None:
-        seq_name = '2Qb_RB_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    seq_name = '2Qb_RB_sequence'
 
     # Set Clifford decomposition
     tqc.gate_decomposition = rb.get_clifford_decomposition(
@@ -1063,7 +1050,7 @@ def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
 
     for i in nr_seeds:
         cl_seq = rb.randomized_benchmarking_sequence_new(
-            nr_cliffords_value,
+            cliffords,
             number_of_qubits=2,
             max_clifford_idx=max_clifford_idx,
             interleaving_cl=interleaved_gate,
@@ -1466,8 +1453,35 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
     # return seq, seq_pulse_list
     return seq, el_list
 
+def n_qubit_reset(qubit_names, operation_dict, cal_points,
+                  prep_params=dict(),
+                  upload=True):
+    """
 
-def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
+    Timing constraints:
+        The reset_cycle_time and the readout fixed point should be commensurate
+        with the UHFQC trigger grid and the granularity of the AWGs.
+
+        When the -ro_acq_marker_delay of the readout pulse is larger than
+        the drive pulse length, then it is important that its length is a
+        multiple of the granularity of the AWG.
+    """
+
+    seq_name = '{}_reset_x{}_sequence'.format(','.join(qubit_names),
+                                              prep_params.get('reset_reps',
+                                                              '_default_n_reps'))
+    seq = sequence.Sequence(seq_name)
+
+    # add calibration segments
+    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+
+    log.debug(seq)
+    if upload:
+        ps.Pulsar.get_instance().program_awgs(seq)
+
+    return seq, np.arange(seq.n_acq_elements())
+
+def n_qubit_reset_old(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
                   return_seq=False, verbose=False, codeword_indices=None,
                   upload=True):
     """
@@ -2016,6 +2030,61 @@ def parity_correction_no_reset_seq(
         return seq, el_list
     else:
         return seq_name
+
+def parity_single_round_seq(ancilla_qubit_name, data_qubit_names, CZ_map,
+                            preps, cal_points, prep_params, operation_dict,
+                            upload=True):
+    seq_name = 'Parity_1_round_sequence'
+    qb_names = [ancilla_qubit_name] + data_qubit_names
+
+    main_ops = ['Y90 ' + ancilla_qubit_name]
+    for i, dqn in enumerate(data_qubit_names):
+        op = 'CZ ' + ancilla_qubit_name + ' ' + dqn
+        main_ops += CZ_map.get(op, [op])
+        if i != len(data_qubit_names) - 1:
+            main_ops += ['Y180 ' + ancilla_qubit_name]
+    if len(data_qubit_names)%2 == 0:
+        main_ops += ['Y90 ' + ancilla_qubit_name]
+    else:
+        main_ops += ['mY90 ' + ancilla_qubit_name]
+
+    all_opss = []
+    for prep in preps:
+        prep_ops = [{'g': 'I ', 'e': 'X180 ', '+': 'Y90 ', '-': 'mY90 '}[s] \
+             + dqn for s, dqn in zip(prep, data_qubit_names)]
+        all_opss.append(prep_ops + main_ops)
+    all_pulsess = []
+    for all_ops, prep in zip(all_opss, preps):
+        all_pulses = []
+        for i, op in enumerate(all_ops):
+            all_pulses.append(deepcopy(operation_dict[op]))
+            if i == 0:
+                all_pulses[-1]['ref_pulse'] = 'segment_start'
+            elif 0 < i <= len(data_qubit_names):
+                all_pulses[-1]['ref_point'] = 'start'
+            if 'CZ' not in op:
+                all_pulses[-1]['element_name'] = f'drive_{prep}'
+            else:
+                all_pulses[-1]['element_name'] = f'flux_{prep}'
+        all_pulses += generate_mux_ro_pulse_list(qb_names, operation_dict)
+        all_pulsess.append(all_pulses)
+
+
+
+    all_pulsess_with_prep = \
+        [add_preparation_pulses(seg, operation_dict, qb_names, **prep_params)
+         for seg in all_pulsess]
+
+    seq = pulse_list_list_seq(all_pulsess_with_prep, seq_name, upload=False)
+
+    # add calibration segments
+    if cal_points is not None:
+        seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+
+    if upload:
+       ps.Pulsar.get_instance().program_awgs(seq)
+
+    return seq, np.arange(seq.n_acq_elements())
 
 
 def n_qubit_tomo_seq(
