@@ -538,8 +538,6 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
         [initial_rotations[0]['amplitude']*np.ones(hsl//2), np.zeros(hsl//2)]),
               'cphase_final_pi_qbc.amplitude': np.concatenate(
         [final_rotations[0]['amplitude']*np.ones(hsl//2), np.zeros(hsl//2)])}
-    # params = {'cphase_init_pi_qbc.amplitude': np.concatenate(
-    #     [initial_rotations[0]['amplitude']*np.ones(hsl//2), np.zeros(hsl//2)])}
     params.update({f'cphase_final_pihalf_qbt.{k}': v['values']
                    for k, v in hard_sweep_dict.items()})
     ssl = len(list(soft_sweep_dict.values())[0]['values'])

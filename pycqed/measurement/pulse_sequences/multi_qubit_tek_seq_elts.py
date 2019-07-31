@@ -687,144 +687,6 @@ def two_qubit_tomo_bell(bell_state,
 
     return seq, el_list
 
-
-def cphase_fringes(phases, q0_pulse_pars, q1_pulse_pars, RO_pars,
-                   swap_pars_q0, cphase_pars_q1, timings_dict,
-                   distortion_dict, verbose=False, upload=True, return_seq=False):
-    '''
-    '''
-    preloaded_kernels_vec = preload_kernels_func(distortion_dict)
-    original_delay = deepcopy(RO_pars)[0]['pulse_delay']
-    seq_name = 'CPhase'
-    seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
-    el_list = []
-    # print(q0_pulse_pars)
-    q0_pulses = add_suffix_to_dict_keys(
-        get_pulse_dict_from_pars(q0_pulse_pars[0]), ' q0')
-    q1_pulses = add_suffix_to_dict_keys(
-        get_pulse_dict_from_pars(q1_pulse_pars[0]), ' q1')
-
-    pulse_dict = {}
-    pulse_dict.update(q0_pulses)
-    pulse_dict.update(q1_pulses)
-    pulse_dict.update({'RO': RO_pars[0]})
-    # print({'RO': RO_pars})
-
-    # Timings
-    buffer_mw_flux = timings_dict[0]['buffer_mw_flux']
-    buffer_flux_mw = timings_dict[0]['buffer_flux_mw']
-    msmt_buffer = timings_dict[0]['msmt_buffer']
-    dead_time = timings_dict[0]['dead_time']
-    # print(buffer_mw_flux,buffer_flux_mw,msmt_buffer,dead_time)
-
-    # defining main pulses
-    exc_pulse = deepcopy(pulse_dict['X180 q0'])
-    exc_pulse['pulse_delay'] += 0.01e-6
-    swap_pulse_1 = deepcopy(swap_pars_q0[0])
-    # print(swap_pulse_1)
-    swap_pulse_1['pulse_delay'] = buffer_mw_flux + \
-        exc_pulse['sigma']*exc_pulse['nr_sigma']
-
-    ramsey_1 = deepcopy(pulse_dict['Y90 q1'])
-    ramsey_1['pulse_delay'] = buffer_flux_mw + swap_pulse_1['length']
-    cphase_pulse = cphase_pars_q1[0]
-    cphase_amp = cphase_pulse['amplitude']
-    cphase_pulse['pulse_delay'] = buffer_mw_flux + \
-        ramsey_1['sigma']*ramsey_1['nr_sigma']
-    ramsey_2 = deepcopy(pulse_dict['X90 q1'])
-    ramsey_2['pulse_delay'] = buffer_flux_mw + cphase_pulse['length']
-
-    swap_pulse_2 = deepcopy(swap_pars_q0[0])
-    swap_pulse_2['pulse_delay'] = buffer_mw_flux + \
-        ramsey_2['sigma']*ramsey_2['nr_sigma']
-    RO_pars[0]['pulse_delay'] = msmt_buffer + swap_pulse_2['length']
-
-    # defining compensation pulses
-    swap_comp_1 = deepcopy(swap_pulse_1)
-    swap_pulse_1['pulse_delay'] = RO_pars[0]['length'] + dead_time
-    cphase_comp = deepcopy(cphase_pulse)
-    swap_comp_2 = deepcopy(swap_pulse_2)
-
-    dead_time_pulse = {'pulse_type': 'SquarePulse',
-                       'pulse_delay': RO_pars[0]['pulse_delay'],
-                       'channel': swap_pars_q0[0]['channel'],
-                       'amplitude': 0,
-                       'length': dead_time}
-
-    for i, ph2 in enumerate(phases[0]):
-        # print(ph2)
-        ramsey_2['phase'] = ph2
-
-        cphase_pulse['amplitude'] = cphase_amp
-        pulse_list = [exc_pulse,
-                      swap_pulse_1,
-                      ramsey_1,
-                      cphase_pulse,
-                      ramsey_2,
-                      swap_pulse_2,
-                      RO_pars[0],
-                      swap_comp_1,
-                      cphase_comp,
-                      swap_comp_2,
-                      dead_time_pulse]
-        el = multi_pulse_elt(2*i, station, pulse_list)
-        el_list.append(el)
-
-        cphase_pulse['amplitude'] = 0.
-        pulse_list = [exc_pulse,
-                      swap_pulse_1,
-                      ramsey_1,
-                      cphase_pulse,
-                      ramsey_2,
-                      swap_pulse_2,
-                      RO_pars[0],
-                      swap_comp_1,
-                      cphase_comp,
-                      swap_comp_2,
-                      dead_time_pulse]
-        el = multi_pulse_elt(2*i+1, station, pulse_list)
-        el_list.append(el)
-
-    # Compensations
-    for i, el in enumerate(el_list):
-        if distortion_dict is not None:
-            el = distort_and_compensate(
-                el, distortion_dict, preloaded_kernels_vec)
-            el_list[i] = el
-        seq.append_element(el, trigger_wait=True)
-    cal_points = 4
-    RO_pars[0]['pulse_delay'] = original_delay
-
-    # Calibration points
-    cal_points = [['I q0', 'I q1', 'RO'],
-                  ['I q0', 'I q1', 'RO'],
-                  ['X180 q0', 'I q1', 'RO'],
-                  ['X180 q0', 'I q1', 'RO'],
-                  ['I q0', 'X180 q1', 'RO'],
-                  ['I q0', 'X180 q1', 'RO'],
-                  ['X180 q0', 'X180 q1', 'RO'],
-                  ['X180 q0', 'X180 q1', 'RO']]
-
-    for i, pulse_comb in enumerate(cal_points):
-        pulses = []
-        for p in pulse_comb:
-            pulses += [pulse_dict[p]]
-        pulses[0]['pulse_delay'] += 0.01e-6
-
-        el = multi_pulse_elt(2*len(phases)+i, station, pulses)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-
-    # upload
-    if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-    if return_seq:
-        return seq, el_list
-    else:
-        return seq
-
-
 def preload_kernels_func(distortion_dict):
     output_dict = {ch: [] for ch in distortion_dict['ch_list']}
     for ch in distortion_dict['ch_list']:
@@ -1019,9 +881,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False,
 
 
 def two_qubit_randomized_benchmarking_seqs(
-        qb1n, qb2n, operation_dict,
-        cliffords, #scalar
-        nr_seeds,  #array
+        qb1n, qb2n, operation_dict, cliffords, nr_seeds,
         max_clifford_idx=11520, cz_pulse_name=None, cal_points=None,
         net_clifford=0, clifford_decomposition_name='HZ',
         interleaved_gate=None, upload=True, prep_params=dict()):
@@ -1048,46 +908,53 @@ def two_qubit_randomized_benchmarking_seqs(
     tqc.gate_decomposition = rb.get_clifford_decomposition(
         clifford_decomposition_name)
 
-    for i in nr_seeds:
-        cl_seq = rb.randomized_benchmarking_sequence_new(
-            cliffords,
-            number_of_qubits=2,
-            max_clifford_idx=max_clifford_idx,
-            interleaving_cl=interleaved_gate,
-            desired_net_cl=net_clifford)
+    sequences = []
+    for nCl in cliffords:
+        pulse_list_list_all = []
+        for i in nr_seeds:
+            cl_seq = rb.randomized_benchmarking_sequence_new(
+                nCl,
+                number_of_qubits=2,
+                max_clifford_idx=max_clifford_idx,
+                interleaving_cl=interleaved_gate,
+                desired_net_cl=net_clifford)
 
-        pulse_list = []
-        for idx in cl_seq:
-            pulse_tuples_list = tqc.TwoQubitClifford(idx).gate_decomposition
-            pulsed_qubits = {qb1n, qb2n}
-            for j, pulse_tuple in enumerate(pulse_tuples_list):
-                if isinstance(pulse_tuple[1], list):
-                    pulse_list += [operation_dict[CZ_pulse_name]]
-                    pulsed_qubits = {qb1n, qb2n}
-                else:
-                    qb_name = qb1n if '0' in pulse_tuple[1] else qb2n
-                    pulse_name = pulse_tuple[0]
-                    if 'Z' not in pulse_name:
-                        if qb_name not in pulsed_qubits:
-                            pulse_name += 's'
-                        else:
-                            pulsed_qubits = set()
-                        pulsed_qubits |= {qb_name}
-                    pulse_list += [operation_dict[pulse_name + ' ' + qb_name]]
-        pulse_list += [operation_dict['RO mux']]
-
-        el = multi_pulse_elt(i, station, pulse_list)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
+            pulse_list = []
+            for idx in cl_seq:
+                pulse_tuples_list = tqc.TwoQubitClifford(idx).gate_decomposition
+                pulsed_qubits = {qb1n, qb2n}
+                for j, pulse_tuple in enumerate(pulse_tuples_list):
+                    if isinstance(pulse_tuple[1], list):
+                        pulse_list += [operation_dict[cz_pulse_name]]
+                        pulsed_qubits = {qb1n, qb2n}
+                    else:
+                        qb_name = qb1n if '0' in pulse_tuple[1] else qb2n
+                        pulse_name = pulse_tuple[0]
+                        if 'Z' not in pulse_name:
+                            if qb_name not in pulsed_qubits:
+                                pulse_name += 's'
+                            else:
+                                pulsed_qubits = set()
+                            pulsed_qubits |= {qb_name}
+                        pulse_list += [
+                            operation_dict[pulse_name + ' ' + qb_name]]
+            pulse_list += generate_mux_ro_pulse_list(
+                [qb1n, qb2n], operation_dict)
+            pulse_list_w_prep = [add_preparation_pulses(
+                pulse_list, operation_dict, [qb1n, qb2n], **prep_params)]
+            pulse_list_list_all.append(pulse_list_w_prep)
+        seq = pulse_list_list_seq(pulse_list_list_all, seq_name+f'_{nCl}',
+                                  upload=False)
+        if cal_points is not None:
+            seq.extend(cal_points.create_segments(operation_dict,
+                                                  **prep_params))
+        sequences.append(seq)
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        ps.Pulsar.get_instance().program_awgs(sequences[0])
 
-    if return_seq:
-        return seq, el_list
-    else:
-        return seq
-
+    return sequences, np.arange(sequences[0].n_acq_elements()), \
+           np.arange(cliffords)
 
 def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
                                                      operation_dict,
@@ -2346,63 +2213,6 @@ def Ramsey_add_pulse_sweep_phase_seq(
     else:
         return seq_name
 
-
-def fgge_gate_length_seq(lengths, qbt_name, qbm_name, fgge_pulse_name,
-                         amplitude, mod_frequency, operation_dict,
-                         upload=True, upload_all=True,
-                         return_seq=False, cal_points=True,
-                         verbose=False):
-
-    seq_name = 'fgge_gate_seq'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-
-    if amplitude > 1:
-        raise ValueError('fgge pulse amplitude must be smaller than 1.')
-
-    fgge_pulse = deepcopy(operation_dict[fgge_pulse_name])
-    fgge_pulse['amplitude'] = amplitude
-    fgge_pulse['mod_frequency'] = mod_frequency
-
-    if upload_all:
-        upload_AWGs = 'all'
-    else:
-        upload_AWGs = [station.pulsar.get(fgge_pulse['I_channel'] + '_AWG'),
-                       station.pulsar.get(fgge_pulse['Q_channel'] + '_AWG')]
-
-    for i, length in enumerate(lengths):
-        if cal_points and (i == (len(lengths)-4) or i == (len(lengths)-3)):
-            el = multi_pulse_elt(i, station,
-                                 [operation_dict['I ' + qbm_name],
-                                  operation_dict['RO ' + qbm_name]])
-        elif cal_points and (i == (len(lengths)-2) or i == (len(lengths)-1)):
-            el = multi_pulse_elt(i, station,
-                                 [operation_dict['X180 ' + qbm_name],
-                                  operation_dict['RO ' + qbm_name]])
-        else:
-            fgge_pulse['pulse_length'] = length - \
-                                             (fgge_pulse['nr_sigma'] *
-                                              fgge_pulse['gaussian_filter_sigma'])
-            el = multi_pulse_elt(i, station,
-                                 [operation_dict['X180 ' + qbt_name],
-                                  fgge_pulse,
-                                  operation_dict['RO ' + qbm_name]])
-
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-
-    if upload:
-        station.pulsar.program_awgs(seq, *el_list,
-                                    AWGs=upload_AWGs,
-                                    channels='all',
-                                    verbose=verbose)
-
-    if return_seq:
-        return seq, el_list
-    else:
-        return seq_name
-
-
 #### Multi-qubit time-domain
 def general_multi_qubit_seq(
         sweep_params,
@@ -2744,63 +2554,6 @@ def get_DD_pulse_list(operation_dict, qb_names, DD_time,
     pulse_dict_list += pulse_dict_list_end
 
     return pulse_dict_list
-
-def fgge_frequency_seq(mod_frequencies, length, amplitude,
-                       qbt_name, qbm_name,
-                       fgge_pulse_name, operation_dict,
-                       upload_all=True,
-                       verbose=False, cal_points=False,
-                       upload=True, return_seq=False):
-
-
-
-    seq_name = 'fgge_frequency_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-
-    RO_pulse = operation_dict['RO ' + qbm_name]
-    fgge_pulse = operation_dict[fgge_pulse_name]
-
-    fgge_pulse['amplitude'] = amplitude
-    fgge_pulse['pulse_length'] = length
-
-    # if upload_all:
-    upload_AWGs = 'all'
-    upload_channels = 'all'
-    # else:
-    #     upload_AWGs = [station.pulsar.get(fgge_pulse['channel'] + '_AWG')]
-    #     upload_channels = 'all'
-
-    for i, frequency in enumerate(mod_frequencies):
-        if cal_points and (i == (len(mod_frequencies)-4) or
-                                   i == (len(mod_frequencies)-3)):
-            el = multi_pulse_elt(i, station, [RO_pulse])
-        elif cal_points and (i == (len(mod_frequencies)-2) or
-                                     i == (len(mod_frequencies)-1)):
-            el = multi_pulse_elt(i, station,
-                                 [operation_dict['X180 ' + qbm_name],
-                                  RO_pulse])
-        else:
-            fgge_pulse['mod_frequency'] = frequency
-            el = multi_pulse_elt(i, station,
-                                 # [operation_dict['X180 ' + qbt_name],
-                                 [fgge_pulse,
-                                  RO_pulse])
-
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-
-    if upload:
-        station.pulsar.program_awgs(seq, *el_list,
-                                    AWGs=upload_AWGs,
-                                    channels=upload_channels,
-                                    verbose=verbose)
-
-    if return_seq:
-        return seq, el_list
-    else:
-        return seq_name
-
 
 def pygsti_seq(qb_names, pygsti_listOfExperiments, operation_dict,
                preselection=True, ro_spacing=1e-6,
