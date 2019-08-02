@@ -9,7 +9,7 @@ from matplotlib import cm
 import numpy as np
 import matplotlib.colors as col
 import hsluv
-import logging 
+import logging
 
 def set_xlabel(axis, label, unit=None, **kw):
     """
@@ -381,6 +381,15 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     two sweep points.
     zvals should be a list of arrays with the measured values with shape
     (len(yvals), len(xvals)).
+
+    **grid-orientation**
+        The grid orientation for the zvals is the same as is used in
+        ax.pcolormesh.
+        Note that the column index corresponds to the x-coordinate,
+        and the row index corresponds to y.
+        This can be counterintuitive: zvals(y_idx, x_idx)
+        and can be inconsistent with some arrays of zvals
+        (such as a 2D histogram from numpy).
     """
 
     xvals = np.array(xvals)
