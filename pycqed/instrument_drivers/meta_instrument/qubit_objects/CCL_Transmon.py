@@ -1974,6 +1974,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_resonator_power(self, freqs, powers, MC=None,
                                 analyze: bool=True, close_fig: bool=True,
+                                qubit_spec_tone=False,
                                 label: str=''):
         """
         Mesures the readout resonator with UHFQC as a function of the pulse power.
@@ -1998,7 +1999,14 @@ class CCLight_Transmon(Qubit):
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
         CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+        # CCL gets started in the int_avg detectorq
+
+        if qubit_spec_tone:
+            spec_source = self.instr_spec_source.get_instr() # get mw source for excitation tone
+            spec_source.frequency(self.freq_qubit())
+            spec_source.power(self.spec_pow())
+            spec_source.pulsemod_state('off')
+            spec_source.on()
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
             MW_LO_source=self.instr_LO_ro.get_instr(),
@@ -2247,7 +2255,7 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Qubit_dac_scan'+self.msmt_suffix, mode='2D')
         if analyze:
-            ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
+            return ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, mode='pulsed_marked', MC=None,
                              analyze=True, close_fig=True, label='',
