@@ -831,11 +831,12 @@ class CCLight_Transmon(Qubit):
             # corrected for the offset as this is only applied in
             # software.
 
-            if self.ro_acq_rotated_SSB_when_optimal() and abs(self.ro_acq_threshold())>32:
+            if abs(self.ro_acq_threshold())>32:
                 threshold = 32
+                warnings.warn('Clipping {}.ro_acq_threshold {}>32'.format(
+                    self.name, self.ro_acq_threshold()))
                 # working around the limitation of threshold in UHFQC
                 # which cannot be >abs(32).
-                # See also self._prep_ro_integration_weights scaling the weights
             else:
                 threshold = self.ro_acq_threshold()
 
@@ -2826,7 +2827,7 @@ class CCLight_Transmon(Qubit):
                      update: bool=True,
                      SNR_detector: bool=False,
                      shots_per_meas: int=2**16,
-                     cal_residual_excitation: bool=False,
+                     vary_residual_excitation: bool=True,
                      disable_metadata: bool=False, label: str=''):
         """
         Performs a number of single shot measurements with qubit in ground and excited state
@@ -2857,8 +2858,8 @@ class CCLight_Transmon(Qubit):
                 number of single shot measurements per single
                 acquisition with UHFQC
 
-            cal_residual_excitation (bool):
-                if True, uses the last known values of residual excitation
+            vary_residual_excitation (bool):
+                if False, uses the last known values of residual excitation
                 and measurement induced relaxation and keeps these fixed.
             ...
         """
@@ -2913,7 +2914,7 @@ class CCLight_Transmon(Qubit):
         options_dict={'post_select': post_select,
                       'nr_samples': 2+2*post_select,
                       'post_select_threshold': post_select_threshold}
-        if not cal_residual_excitation:
+        if not vary_residual_excitation:
             options_dict.update(
                 {'fixed_p10':self.res_exc,
                  'fixed_p01':self.mmt_rel})
@@ -4854,14 +4855,15 @@ class CCLight_Transmon(Qubit):
                     result_keys=['SNR', 'F_d', 'F_a'], 
                     prepare_function=prepare_function,
                     prepare_function_kwargs=prepare_function_kwargs,
-                )
+                    always_prepare=True)
         else:
             d = det.Function_Detector(
                 self.calibrate_optimal_weights, 
                 msmt_kw=ssro_kwargs,
                     result_keys=['SNR', 'F_d', 'F_a'], 
                     prepare_function=prepare_function,
-                    prepare_function_kwargs=prepare_function_kwargs, )
+                    prepare_function_kwargs=prepare_function_kwargs, 
+                    always_prepare=True)
         return d
 
 
