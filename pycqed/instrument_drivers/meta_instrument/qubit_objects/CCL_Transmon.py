@@ -2248,7 +2248,9 @@ class CCLight_Transmon(Qubit):
         if nested_resonator_calibration:
             dac_par = swf.Nested_resonator_tracker(qubit=self,
                                                    nested_MC=self.instr_nested_MC.get_instr(), freqs=resonator_freqs,
-                                                   par=dac_par, use_min = nested_resonator_calibration_use_min)
+                                                   par=dac_par, use_min = nested_resonator_calibration_use_min,
+                                                   CCL_for_reload=CCL,
+                                                   sequence_load_after=p)
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)
@@ -2707,10 +2709,15 @@ class CCLight_Transmon(Qubit):
         print('f_anharmonicity estimation', f_anharmonicity)
         print('f_12 estimations', np.mean(freqs_12))
         CCL = self.instr_CC.get_instr()
-        p = sqo.pulsed_spec_seq(
+        # p = sqo.pulsed_spec_seq(
+        #     qubit_idx=self.cfg_qubit_nr(),
+        #     spec_pulse_length=self.spec_pulse_length(),
+        #     platf_cfg=self.cfg_openql_platform_fn())
+        p = sqo.pulsed_spec_seq_marked(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
-            platf_cfg=self.cfg_openql_platform_fn())
+            platf_cfg=self.cfg_openql_platform_fn(),
+            trigger_idx=0)
         CCL.eqasm_program(p.filename)
         if MC is None:
             MC = self.instr_MC.get_instr()
