@@ -15,9 +15,11 @@ from .SCPI import SCPI
 import numpy as np
 import struct
 import json
+import logging
 from qcodes import validators as vals
 import warnings
-from typing import List
+from typing import List, Sequence, Dict
+from qcodes.utils.helpers import full_class
 
 
 from qcodes.instrument.parameter import Parameter
@@ -89,6 +91,10 @@ class QuTech_AWG_Module(SCPI):
 
         # FIXME: not in [V]
 
+        # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        self._params_exclude_snapshot = []
+
+        self._params_to_skip_update = []
         self.add_parameters()
         self.connect_message()
 
@@ -136,14 +142,19 @@ class QuTech_AWG_Module(SCPI):
         # Triggers parameter
         for i in range(1, self.device_descriptor.numTriggers+1):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)
+            triglev_name = 'tr{}_trigger_level'.format(i)
             # individual trigger level per trigger input:
-            self.add_parameter('tr{}_trigger_level'.format(i),
+            self.add_parameter(triglev_name,
                                unit='V',
                                label='Trigger level channel {} (V)'.format(i),
                                get_cmd=triglev_cmd + '?',
                                set_cmd=triglev_cmd + ' {}',
                                vals=self.device_descriptor.mvals_trigger_level,
-                               get_parser=float)
+                               get_parser=float,
+                               snapshot_exclude=True)
+
+            # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+            self._params_exclude_snapshot.append(triglev_name)
 
         self.add_parameter('run_mode',
                            get_cmd='AWGC:RMO?',
@@ -307,11 +318,13 @@ class QuTech_AWG_Module(SCPI):
                                  +'Get Return:\n   Setting of the gain in interger (0 - 4095)\n'\
                                  +'Set parameter:\n   Integer: Gain of the DAC in , min: 0, max: 4095')
 
-            self.add_parameter('_dac{}_digital_value'.format(ch),
+            dac_digital_value_name = '_dac{}_digital_value'.format(ch)
+            self.add_parameter(dac_digital_value_name,
                                unit='',
                                label=('DAC {}, set digital value').format(ch),
                                set_cmd=dac_digital_value_cmd + ' {}',
                                vals=vals.Ints(0, 4095),
+                               snapshot_exclude=True,
                                docstring='FOR DEVELOPMENT ONLY: Set a digital value directly into the DAC\n' \
                                  +'Used for testing the DACs.\n' \
                                  +'Notes:\n\tThis command will also set the ' \
@@ -320,6 +333,8 @@ class QuTech_AWG_Module(SCPI):
                                  +'This will also stop the wave the other channel of the pair!\n\n' \
                                  +'Set parameter:\n\tInteger: Value to write to the DAC, min: 0, max: 4095\n' \
                                  +'\tWhere 0 is minimal DAC scale and 4095 is maximal DAC scale \n')
+            # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+            self._params_exclude_snapshot.append(dac_digital_value_name)
 
             self.add_parameter('ch{}_bit_select'.format(ch),
                                unit='',
@@ -398,10 +413,15 @@ class QuTech_AWG_Module(SCPI):
                 ch = j+1
                 # Codeword 0 corresponds to bitcode 0
                 cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
-                self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
+                cw_param = 'codeword_{}_ch{}_waveform'.format(cw, ch)
+                self.add_parameter(cw_param,
                                    get_cmd=cw_cmd+'?',
                                    set_cmd=cw_cmd+' "{:s}"',
-                                   vals=vals.Strings())
+                                   vals=vals.Strings(),
+                                   snapshot_exclude=True)
+                # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+                self._params_exclude_snapshot.append(cw_param)
+
         # Waveform parameters
         self.add_parameter('WlistSize',
                            label='Waveform list size',
@@ -461,7 +481,6 @@ class QuTech_AWG_Module(SCPI):
         self.getErrors()
 
     def _add_codeword_parameters(self):
-        self._params_to_skip_update = []
         docst = ('Specifies a waveform for a specific codeword. ' +
                  'The channel number corresponds' +
                  ' to the channel as indicated on the device (1 is lowest).')
@@ -479,8 +498,10 @@ class QuTech_AWG_Module(SCPI):
                         self._set_cw_waveform, ch, cw),
                     get_cmd=self._gen_ch_cw_get_func(
                         self._get_cw_waveform, ch, cw),
+                    snapshot_exclude=True,
                     docstring=docst)
-                self._params_to_skip_update.append(parname)
+                # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+                self._params_exclude_snapshot.append(parname)
 
     def _set_cw_waveform(self, ch: int, cw: int, waveform):
         wf_name = 'wave_ch{}_cw{:03}'.format(ch, cw)
@@ -882,6 +903,76 @@ class QuTech_AWG_Module(SCPI):
         if not len(signals) == 16:
             raise ValueError(f"Invalid number of DIO signals; expected 16, actual: {len(signals)}")
         self.write("DIO:DBG:SIG {}".format(','.join(map(str, signals))))
+
+    def snapshot_base(self, update=False,
+                      params_to_skip_update: Sequence[str] = None,
+                      params_to_exclude: Sequence[str] = None) -> Dict:
+        """
+        State of the instrument as a JSON-compatible dict.
+
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+            params_to_exclude: List of parameter names that will be excluded from the snapshot
+
+        Returns:
+            dict: base snapshot
+        """
+
+        if params_to_skip_update is None:
+            params_to_skip_update = self._params_to_skip_update
+
+        # TODO: Enable when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        # snap = super().snapshot_base(update=update,
+        #                              params_to_skip_update=params_to_skip_update)
+        # return snap
+
+        # TODO: Workaround, remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        if params_to_exclude is None:
+            params_to_exclude = self._params_exclude_snapshot
+        #
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                continue
+            if params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+
+            try:
+                snap['parameters'][name] = param.snapshot(update=update_par)
+            except:
+                # really log this twice. Once verbose for the UI and once
+                # at lower level with more info for file based loggers
+                logging.info("Snapshot: Could not update parameter: {}".format(name))
+                self.log.info(f"Details for Snapshot:",
+                              exc_info=True)
+                snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
+        snap['port'] = self._port
+        snap['confirmation'] = self._confirmation
+        snap['address'] = self._address
+        snap['terminator'] = self._terminator
+        snap['timeout'] = self._timeout
+        snap['persistent'] = self._persistent
+        return snap
+        # TODO: End remove
 
     ##########################################################################
     # Generic (i.e. at least AWG520 and AWG5014) Tektronix AWG functions
