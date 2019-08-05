@@ -20,8 +20,10 @@ import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from scipy.optimize import minimize
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
+    set_cbarlabel, flex_colormesh_plot_vs_xy
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pycqed.analysis.tools.data_manipulation as dm_tools
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.utilities.general import int2base
 from pycqed.utilities.general import format_value_string
 
@@ -503,6 +505,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     'ylabel': y_volt_label,
                     'yunit': y_volt_unit,
                     'marker': 'x',
+                    'aspect': 'equal',
                     'linestyle': '',
                     'color': 'black',
                     #'line_kws': {'markersize': 1, 'color': 'black', 'alpha': 1},
@@ -516,7 +519,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.plot_dicts['2D_histogram_0'] = {
                 'title': 'Raw '+label_0+' Binned Shot Counts' + title,
                 'ax_id': '2D_histogram_0',
-                'plotfn': self.plot_colorxy,
+                # 'plotfn': self.plot_colorxy,
+                'plotfn':plot_2D_ssro_histogram,
                 'xvals': self.proc_data_dict['2D_histogram_x'],
                 'yvals': self.proc_data_dict['2D_histogram_y'],
                 'zvals': self.proc_data_dict['2D_histogram_z'][0].T,
@@ -536,7 +540,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.plot_dicts['2D_histogram_1'] = {
                 'title': 'Raw '+label_1+' Binned Shot Counts' + title,
                 'ax_id': '2D_histogram_1',
-                'plotfn': self.plot_colorxy,
+                # 'plotfn': self.plot_colorxy,
+                'plotfn':plot_2D_ssro_histogram,
                 'xvals': self.proc_data_dict['2D_histogram_x'],
                 'yvals': self.proc_data_dict['2D_histogram_y'],
                 'zvals': self.proc_data_dict['2D_histogram_z'][1].T,
@@ -555,19 +560,22 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
             # Scatter Shots
             volts = self.proc_data_dict['all_channel_int_voltages']
-            vxr = [np.min([np.min(a) for a in volts[:][1]]),
-                   np.max([np.max(a) for a in volts[:][1]])]
-            vyr = [np.min([np.min(a) for a in volts[:][0]]),
-                   np.max([np.max(a) for a in volts[:][0]])]
+
+            v_flat =np.concatenate(np.concatenate(volts))
+            plot_range = (np.min(v_flat), np.max(v_flat))
+
+            vxr = plot_range
+            vyr=plot_range
             self.plot_dicts['2D_shots_0'] = {
                 'title': 'Raw Shots' + title,
                 'ax_id': '2D_shots',
+                'aspect': 'equal',
                 'plotfn': self.plot_line,
                 'xvals': volts[0][0],
                 'yvals': volts[0][1],
-                #'range': [vxr, vyr],
-                #'xrange': vxr,
-                #'yrange': vyr,
+                'range': [vxr, vyr],
+                'xrange': vxr,
+                'yrange': vyr,
                 'xlabel': x_volt_label,
                 'xunit': x_volt_unit,
                 'ylabel': y_volt_label,
@@ -585,9 +593,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'plotfn': self.plot_line,
                 'xvals': volts[1][0],
                 'yvals': volts[1][1],
-                #'range': [vxr, vyr],
-                #'xrange': vxr,
-                #'yrange': vyr,
+                'aspect': 'equal',
+                'range': [vxr, vyr],
+                'xrange': vxr,
+                'yrange': vyr,
                 'xlabel': x_volt_label,
                 'xunit': x_volt_unit,
                 'ylabel': y_volt_label,
@@ -1080,3 +1089,42 @@ def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
 
     if title is not None:
         ax.set_title(title)
+
+
+
+def plot_2D_ssro_histogram(xvals, yvals, zvals, xlabel, xunit, ylabel, yunit, zlabel, zunit,
+                           xlim=None, ylim=None,
+                           title='',
+                           cmap='viridis',
+                           cbarwidth='10%',
+                           cbarpad =  '5%',
+                           no_label=False,
+                           ax=None, cax=None, **kw):
+    if ax is None:
+        f, ax=plt.subplots()
+    if not no_label:
+        ax.set_title(title)
+
+    # Plotting the "heatmap"
+    out = flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=ax,
+                                             plot_cbar=True, cmap=cmap)
+    # Adding the colorbar
+    if cax is None:
+        ax.ax_divider = make_axes_locatable(ax)
+        ax.cax = ax.ax_divider.append_axes(
+            'right', size=cbarwidth, pad=cbarpad)
+    else:
+        ax.cax = cax
+    ax.cbar = plt.colorbar(out['cmap'], cax=ax.cax)
+
+    # Setting axis limits aspect ratios and labels
+    ax.set_aspect(1)
+    set_xlabel(ax, xlabel, xunit)
+    set_ylabel(ax, ylabel, yunit)
+    set_cbarlabel(ax.cbar, zlabel, zunit)
+    if xlim is None:
+        xlim = np.min([xvals, yvals]),np.max([xvals, yvals])
+    ax.set_xlim(xlim)
+    if ylim is None:
+        ylim = np.min([xvals, yvals]),np.max([xvals, yvals])
+    ax.set_ylim(ylim)
