@@ -262,11 +262,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         measured_RO_channels = list(self.raw_data_dict[
                                         'measured_values_ord_dict'])
-        print(measured_RO_channels)
         meas_results_per_qb_per_ROch = {}
         for qb_name, RO_channels in self.channel_map.items():
             meas_results_per_qb_per_ROch[qb_name] = {}
-            print(qb_name, RO_channels)
             if isinstance(RO_channels, str):
                 meas_ROs_per_qb = [RO_ch for RO_ch in measured_RO_channels
                                    if RO_channels in RO_ch]
@@ -373,9 +371,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         self.num_cal_points = np.array(list(
             self.cal_states_dict.values())).flatten().size
-        print(self.num_cal_points)
-        print(self.cal_states_dict)
-        print(self.cal_states_dict_for_rotation)
 
     def cal_states_analysis(self):
         self.get_cal_data_points()

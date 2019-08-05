@@ -442,6 +442,10 @@ class QuDev_transmon(Qubit):
             real_imag=False, single_int_avg=True,
             integration_length=self.RO_acq_integration_length())
 
+    def apply_RO_threshold(self):
+        self.UHFQC.set('quex_thres_{}_level'.format(self.RO_acq_weight_function_I()),
+                  self.RO_threshold())
+
     def prepare_for_continuous_wave(self):
         self.heterodyne.auto_seq_loading(True)
         self.heterodyne._awg_seq_parameters_changed = False
@@ -929,7 +933,7 @@ class QuDev_transmon(Qubit):
 
     def measure_rabi(self, amps=None, MC=None, analyze=True,
              close_fig=True, cal_points=True, no_cal_points=2,
-             upload=True, label=None,  n=1, exp_metadata=None):
+             upload=True, label=None,  n=1, exp_metadata=None, classified=False):
 
         """
         Varies the amplitude of the qubit drive pulse and measures the readout
@@ -993,8 +997,7 @@ class QuDev_transmon(Qubit):
                                            no_cal_points=no_cal_points,
                                            upload=upload))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1014,7 +1017,7 @@ class QuDev_transmon(Qubit):
     def measure_rabi_2nd_exc(self, amps=None, n=1, MC=None, analyze=True,
                              label=None, last_ge_pulse=True,
                              close_fig=True, cal_points=True, no_cal_points=4,
-                             upload=True, exp_metadata=None):
+                             upload=True, exp_metadata=None, classified=False):
 
         if amps is None:
             raise ValueError("Unspecified amplitudes for measure_rabi")
@@ -1059,8 +1062,7 @@ class QuDev_transmon(Qubit):
                         n=n, upload=upload,
                         cal_points=cal_points, no_cal_points=no_cal_points))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1095,7 +1097,7 @@ class QuDev_transmon(Qubit):
 
     def measure_T1(self, times=None, MC=None, analyze=True, upload=True,
                    close_fig=True, cal_points=True, label=None,
-                   exp_metadata=None):
+                   exp_metadata=None, classified=False):
 
         if times is None:
             raise ValueError("Unspecified times for measure_T1")
@@ -1128,8 +1130,7 @@ class QuDev_transmon(Qubit):
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1147,7 +1148,8 @@ class QuDev_transmon(Qubit):
 
     def measure_T1_2nd_exc(self, times=None, MC=None, analyze=True, upload=True,
                            close_fig=True, cal_points=True, no_cal_points=6,
-                           label=None, last_ge_pulse=True, exp_metadata=None):
+                           label=None, last_ge_pulse=True, exp_metadata=None,
+                           classified=False):
 
         if times is None:
             raise ValueError("Unspecified times for measure_T1_2nd_exc")
@@ -1200,8 +1202,7 @@ class QuDev_transmon(Qubit):
                                 no_cal_points=no_cal_points,
                                 last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1221,7 +1222,7 @@ class QuDev_transmon(Qubit):
 
     def measure_qscale(self, qscales=None, MC=None, analyze=True, upload=True,
                        close_fig=True, label=None, cal_points=True,
-                       exp_metadata=None):
+                       exp_metadata=None, classified=False):
 
         if qscales is None:
             raise ValueError("Unspecified qscale values for measure_qscale")
@@ -1254,8 +1255,7 @@ class QuDev_transmon(Qubit):
                 pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
                 upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1275,7 +1275,8 @@ class QuDev_transmon(Qubit):
     def measure_qscale_2nd_exc(self, qscales=None, MC=None, analyze=True,
                                upload=True, close_fig=True, label=None,
                                cal_points=True, no_cal_points=6,
-                               last_ge_pulse=True, exp_metadata=None):
+                               last_ge_pulse=True, exp_metadata=None,
+                               classified=False):
 
         if qscales is None:
             raise ValueError("Unspecified qscale values for"
@@ -1329,8 +1330,7 @@ class QuDev_transmon(Qubit):
             upload=upload, cal_points=cal_points, no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse))
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1406,7 +1406,7 @@ class QuDev_transmon(Qubit):
 
     def measure_ramsey(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
-                       upload=True, exp_metadata=None):
+                       upload=True, exp_metadata=None, classified=False):
 
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
@@ -1445,8 +1445,7 @@ class QuDev_transmon(Qubit):
             upload=upload)
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1532,7 +1531,7 @@ class QuDev_transmon(Qubit):
     def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
                        n=1, upload=True, last_ge_pulse=True, no_cal_points=6,
-                       exp_metadata=None):
+                       exp_metadata=None, classified=False):
 
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
@@ -1590,8 +1589,7 @@ class QuDev_transmon(Qubit):
             last_ge_pulse=last_ge_pulse)
         MC.set_sweep_function(Rams_2nd_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1681,7 +1679,7 @@ class QuDev_transmon(Qubit):
 
     def measure_echo(self, times=None, MC=None, artificial_detuning=None,
                      upload=True, analyze=True, close_fig=True, cal_points=True,
-                     label=None, exp_metadata=None):
+                     label=None, exp_metadata=None, classified=False):
 
         if times is None:
             raise ValueError("Unspecified times for measure_echo")
@@ -1711,8 +1709,7 @@ class QuDev_transmon(Qubit):
             artificial_detuning=artificial_detuning, upload=upload)
         MC.set_sweep_function(Echo_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -1732,7 +1729,8 @@ class QuDev_transmon(Qubit):
     def measure_echo_2nd_exc(self, times=None, artificial_detuning=None,
                              label=None, MC=None, analyze=True,
                              cal_points=True, no_cal_points=6, upload=True,
-                             last_ge_pulse=True, exp_metadata=None):
+                             last_ge_pulse=True, exp_metadata=None,
+                             classified=False):
 
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
@@ -1790,8 +1788,7 @@ class QuDev_transmon(Qubit):
             last_ge_pulse=last_ge_pulse)
         MC.set_sweep_function(Echo_2nd_swf)
         MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(self.int_log_classif_det if
-                                 self.ro_acq_weight_type() == 'optimal_qutrit'
+        MC.set_detector_function(self.int_log_classif_det if classified
                                  else self.int_avg_det)
         if exp_metadata is None:
             exp_metadata = {}
@@ -2552,7 +2549,7 @@ class QuDev_transmon(Qubit):
         ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
 
     def find_optimized_weights(self, MC=None, update=True, measure=True,
-                               qutrit=False, **kw):
+                               qutrit=False, timestamps=None ,**kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
         # I agree (Christian, 07.11.2018 -- around 1 year later)
 
@@ -2560,14 +2557,15 @@ class QuDev_transmon(Qubit):
         if measure:
             self.measure_transients(MC, analyze=True, levels=levels, **kw)
 
-        # create label, measurement analysis and data for each level
-        if kw.get("name_extra", False):
-            labels = {l: 'timetrace_{}_'.format(l) + kw.get('name_extra')
-                         + "_{}".format(self.name) for l in levels}
+        if timestamps == None:
+            # create label, measurement analysis and data for each level
+            print('No timestamps provided! Using the lastest data')
+            labels = {l: 'timetrace_{}{}_{}'.format(l, kw.get('name_extra', ''), self.name) for l in levels}
+            m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
         else:
-            labels = {l: 'timetrace_{}'.format(l)
-                         + "_{}".format(self.name) for l in levels}
-        m_a = {l: ma.MeasurementAnalysis(label=labels[l]) for l in levels}
+                print('Timestamps provided! Using the given data')
+                m_a = {l: ma.MeasurementAnalysis(timestamp=timestamps[i]) for i, l in enumerate(levels)}
+        
         iq_traces = {l: m_a[l].measured_values[0]
                         + 1j * m_a[l].measured_values[1] for l in levels}
         if qutrit:
@@ -3239,7 +3237,7 @@ class QuDev_transmon(Qubit):
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         update=False, MC=None, close_fig=True, cal_points=True,
                         no_cal_points=None, upload=True, last_ge_pulse=True,
-                        analyze=True, **kw):
+                        analyze=True, classified=False, **kw):
 
         """
             Finds the pi and pi/2 pulse amplitudes from the fit to a Rabi
@@ -3367,14 +3365,14 @@ class QuDev_transmon(Qubit):
                               label=label,
                               cal_points=cal_points,
                               no_cal_points=no_cal_points,
-                              upload=upload)
+                              upload=upload, classified=classified)
         else:
             self.measure_rabi_2nd_exc(amps=rabi_amps, n=n, MC=MC,
                                       close_fig=close_fig, label=label,
                                       cal_points=cal_points,
                                       last_ge_pulse=last_ge_pulse,
                                       no_cal_points=no_cal_points,
-                                      upload=upload)
+                                      upload=upload, classified=classified)
 
         #get pi and pi/2 amplitudes from the analysis results
         if analyze:

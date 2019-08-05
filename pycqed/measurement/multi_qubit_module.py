@@ -2685,7 +2685,7 @@ def measure_cphase(qbc, qbt, qbr, lengths, amps, alphas=None,
 
 def measure_cphase_nz(qbc, qbt, soft_sweep_params_dict, f_LO,
                       CZ_pulse_name=None, max_flux_length=None,
-                      num_cz_gates=1,
+                      num_cz_gates=1, classified=False,
                       phases=None, MC=None,
                       UHFQC=None, pulsar=None,
                       cal_points=True, num_cal_points=4, plot=False,
@@ -2793,9 +2793,11 @@ def measure_cphase_nz(qbc, qbt, soft_sweep_params_dict, f_LO,
     for qb in [qbc, qbt]:
         qb.prepare_for_timedomain(multiplexed=True)
     multiplexed_pulse([qbc, qbt], f_LO, upload=True)
+    nr_averages = max(qb.RO_acq_averages() for qb in [qbc, qbt])
     det_func = get_multiplexed_readout_detector_functions(
-        [qbc, qbt], nr_averages=max(qb.RO_acq_averages() for qb in [qbc, qbt]),
-        UHFQC=UHFQC, pulsar=pulsar)['int_avg_det']
+            [qbc, qbt], nr_averages=nr_averages, nr_shots=nr_averages,
+            UHFQC=UHFQC, pulsar=pulsar)['int_log_classif_det' if classified
+                                         else 'int_avg_det']
     MC.set_detector_function(det_func)
 
     exp_metadata = {'leakage_qbname': qbc.name,

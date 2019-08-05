@@ -1190,6 +1190,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                           label="threshold i.u. {}: {:.5f}".format(k, thres),
                           color='k', linestyle="--")
                 main_ax.legend(loc=[0.2,-0.62])
+
             self.figs['{}_classifier_{}'.format(self.classif_method, dk)] = fig
         if show:
             plt.show()
@@ -1748,6 +1749,7 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
                                              self.preselection_available)
 
         self.observables = options_dict.get('observables', None)
+
         if self.observables is None:
             combination_list = list(itertools.product([False, True],
                                                       repeat=len(qubits)))
