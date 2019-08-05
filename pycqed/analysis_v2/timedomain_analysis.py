@@ -303,10 +303,13 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         # for now assuming the same for all qubits.
         self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
 
-        cal_states_rots = self.cp.get_rotations(last_ge_pulses,
-                self.qb_names[0])[self.qb_names[0]] if rotate else None
-        self.cal_states_rotations = self.get_param_value(
-            'cal_states_rotations', default_value=cal_states_rots)
+        if rotate:
+            cal_states_rots = self.cp.get_rotations(last_ge_pulses,
+                    self.qb_names[0])[self.qb_names[0]]
+            self.cal_states_rotations = self.get_param_value(
+                'cal_states_rotations', default_value=cal_states_rots)
+        else:
+            self.cal_states_rotations = None
 
         sweep_points_w_calpts = \
             {qbn: {'sweep_points': self.cp.extend_sweep_points(
@@ -318,6 +321,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.data_to_fit = self.get_param_value('data_to_fit')
 
         if self.cal_states_rotations is not None:
+            print('here')
             self.cal_states_analysis()
         else:
             self.proc_data_dict['projected_data_dict'] = OrderedDict()
