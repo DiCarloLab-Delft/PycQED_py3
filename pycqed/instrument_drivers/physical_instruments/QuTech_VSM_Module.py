@@ -51,6 +51,7 @@ from qcodes.instrument.base import Instrument
 from qcodes import validators
 from qcodes.instrument.parameter import ManualParameter
 from datetime import datetime
+from qcodes.utils.helpers import full_class
 
 
 class QuTechVSMModule(SCPI):
