@@ -381,6 +381,14 @@ class QWG_MW_LutMan(Base_MW_LutMan):
                            docstring=('using the channel amp as additional'
                                       'parameter to allow rabi-type experiments without'
                                       'wave reloading. Should not be using VSM'))
+        # parameters related to codeword bits
+        self.add_parameter('bit_shift', unit='', vals=vals.Ints(0, 8),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+        self.add_parameter('bit_width', unit='', vals=vals.Ints(0, 8),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
