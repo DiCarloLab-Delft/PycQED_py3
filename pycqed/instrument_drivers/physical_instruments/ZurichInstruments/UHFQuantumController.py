@@ -211,6 +211,9 @@ class UHFQC(zibase.ZI_base_instrument):
         
         super().__init__(name=name, device=device, interface=interface, server=server, port=port, **kw)
 
+        # Set default waveform length to 20 ns at 1.8 GSa/s
+        self._default_waveform_length = 32
+
         t1 = time.time()
         print('Initialized UHFQC', self.devname, 'in %.2fs' % (t1-t0))
 
@@ -377,7 +380,7 @@ setUserReg(4, err_cnt);"""
 
         # If the program needs cases, but none are defined, flag it as an error
         if self._awg_program_features['cases'] and self._cases is None:
-            raise zibase.ziValueError('Missing definition of cases for AWG program!')
+            raise zibase.ziConfigurationError('Missing definition of cases for AWG program!')
 
         # because awg_channels come in pairs
         ch = awg_nr*2           
@@ -665,6 +668,12 @@ setUserReg(4, err_cnt);"""
         if self.qas_0_monitor_errors() > 0:
             raise ziUHFQCHoldoffError('Holdoff error detected when reading Quantum Analyzer Input Monitor! Increase the delay between trigger signals from the AWG!')
 
+    def check_errors(self) -> None:
+        pass
+
+    def clear_errors(self) -> None:
+        pass
+
     ##########################################################################
     # 'public' functions: DIO support
     ##########################################################################
@@ -753,12 +762,12 @@ setUserReg(4, err_cnt);"""
             cases = numpy.arange(self._num_codewords)
         else:
             if len(cases) > self._num_codewords:
-                raise zibase.ziValueError('More cases ({}) defined than available codewords ({})!'.format(len(cases), len(self._num_codewords)))
+                raise zibase.ziConfigurationError('More cases ({}) defined than available codewords ({})!'.format(len(cases), len(self._num_codewords)))
 
             # There is probably a more efficient way of doing this
             for case in cases:
                 if (case < 0) or (case >= self._num_codewords):
-                    raise zibase.ziValueError('Case {} is out of range defined by the available codewords ({})!'.format(case, len(self._num_codewords)))
+                    raise zibase.ziConfigurationError('Case {} is out of range defined by the available codewords ({})!'.format(case, len(self._num_codewords)))
 
         # Sanity check on the parameters
         if Iwaves is not None and (len(Iwaves) != len(cases)):
@@ -808,7 +817,7 @@ setUserReg(4, err_cnt);"""
             codewords=None, timeout=5):
 
         if codewords is None:
-            raise zibase.ziValueError('Trying to define an AWG program with DIO output, but no output values are defined!')
+            raise zibase.ziConfigurationError('Trying to define an AWG program with DIO output, but no output values are defined!')
         else:
             self._diocws = codewords
 
@@ -821,12 +830,12 @@ setUserReg(4, err_cnt);"""
             cases = numpy.arange(self._num_codewords)
         else:
             if len(cases) > self._num_codewords:
-                raise zibase.ziValueError('More cases ({}) defined than available codewords ({})!'.format(len(cases), len(self._num_codewords)))
+                raise zibase.ziConfigurationError('More cases ({}) defined than available codewords ({})!'.format(len(cases), len(self._num_codewords)))
 
             # There is probably a more efficient way of doing this
             for case in cases:
                 if (case < 0) or (case >= self._num_codewords):
-                    raise zibase.ziValueError('Case {} is out of range defined by the available codewords ({})!'.format(case, len(self._num_codewords)))
+                    raise zibase.ziConfigurationError('Case {} is out of range defined by the available codewords ({})!'.format(case, len(self._num_codewords)))
 
         # Sanity check on the parameters
         if Iwaves is not None and (len(Iwaves) != len(cases)):
@@ -891,7 +900,7 @@ setUserReg(4, err_cnt);"""
 
         # Check the we have sufficient codewords defined
         if self._num_codewords < 1:
-            raise zibase.ziValueError('Insufficient number of codewords defined! Need at least 1 codeword.')
+            raise zibase.ziConfigurationError('Insufficient number of codewords defined! Need at least 1 codeword.')
 
         # Configure the actual waveforms
         if Iwave is not None: 
@@ -982,7 +991,7 @@ setTrigger(0);
 
         # Check the we have sufficient codewords defined
         if self._num_codewords < 1:
-            raise zibase.ziValueError('Insufficient number of codewords defined! Need at least 1 codeword.')
+            raise zibase.ziConfigurationError('Insufficient number of codewords defined! Need at least 1 codeword.')
 
         # Define number of samples
         N = 16       

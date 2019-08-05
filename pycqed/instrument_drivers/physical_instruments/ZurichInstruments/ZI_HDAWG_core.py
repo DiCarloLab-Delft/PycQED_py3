@@ -94,21 +94,20 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         Input arguments:
             name:           (str) name of the instrument as seen by the user
             device          (str) the name of the device e.g., "dev8008"
-            interface       (std) the name of the interface to use ('1GbE' or 'USB')
+            interface       (str) the name of the interface to use ('1GbE' or 'USB')
             server          (str) the host where the ziDataServer is running
             port            (int) the port to connect to for the ziDataServer (don't change)
             num_codewords   (int) the number of codeword-based waveforms to prepare
         """
         t0 = time.time()
+        super().__init__(name=name, device=device, interface=interface, server=server, port=port, num_codewords=num_codewords, **kw)
 
-        super().__init__(name=name, device=device, interface=interface, server=server, port=port, **kw)
+        # Set default waveform length to 20 ns at 2.4 GSa/s
+        self._default_waveform_length = 48
 
         # show some info
-        log.info('{}: DIO interface found in mode {} (0=CMOS, 1=LVDS)'
-                 .format(self.devname, self.get('dios_0_interface'))) # NB: mode is persistent across device restarts
-
-        t1 = time.time()
-        print('Initialized ZI_HDAWG_core', self.devname, 'in %.2fs' % (t1-t0))
+        log.info('{}: DIO interface found in mode {}'
+                 .format(self.devname, 'CMOS' if self.get('dios_0_interface') == 0 else 'LVDS')) # NB: mode is persistent across device restarts
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
         
@@ -119,6 +118,13 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         # Make initial error check
         self.check_errors()
 
+        # Configure instrument to blink forever
+        self.seti('raw/error/blinkseverity', 1)
+        self.seti('raw/error/blinkforever', 1)
+
+        t1 = time.time()
+        print('Initialized ZI_HDAWG_core', self.devname, 'in %.2fs' % (t1-t0))
+    
     def _check_devtype(self):
         if self.devtype != 'HDAWG8' and self.devtype != 'HDAWG4':
             raise zibase.ziDeviceError('Device {} of type {} is not a HDAWG instrument!'.format(self.devname, self.devtype))
@@ -157,7 +163,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
 
     def _update_num_channels(self):
         # Add this point we know self.devtype is either 'HDAWG8' or 'HDAWG4'
-        if self.devtype != 'HDAWG8':
+        if self.devtype == 'HDAWG8':
             self._num_channels = 8
         else:
             self._num_channels = 4
@@ -198,8 +204,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         # clear AWGs
 
         # reset DIO parameters (bits, timing)
-        for awg in range(4):
-            self._set_dio_delay(awg, 0, 0xFFFFFFFF, 0)  # set all delays to 0
+        self._set_dio_delay(0)  # set all delays to 0
 
         # interesting nodes:
         # SYSTEM/AWG/CHANNELGROUPING
@@ -245,26 +250,6 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
     # FIXME: add check_virt_mem_use(self)
     # AWGS/0/SEQUENCER/MEMORYUSAGE
     # AWGS/0/WAVEFORM/MEMORYUSAGE
-
-    # FIXME: add support for nodes: RAW/ERROR/*, see https://people.zhinst.com/%7Eniels/
-
-    def stop(self) -> None:
-        """
-        Stops the program on all AWG's part of this HDAWG unit
-        """
-        for i in range(int(self._num_channels/2)):
-            self.set('awgs_{}_enable'.format(i), 0)
-
-        self.check_errors()
-
-    def start(self) -> None:
-        """
-        Starts the program on all AWG's part of this HDAWG unit
-        """
-        self.check_errors()
-
-        for i in range(self._num_channels//2):
-            self.set('awgs_{}_enable'.format(i), 1)
 
     def check_errors(self):
         errors = json.loads(self.getv('raw/error/json/errors'))
@@ -321,6 +306,9 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         if found_errors:
             raise zibase.ziRuntimeError('Errors detected during run-time!')
 
+    def clear_errors(self):
+        self.seti('raw/error/clear', 1)
+
     def demote_error(self, code):
         self._errors_to_ignore.append(code)
 
@@ -352,6 +340,21 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
 
         """
         raise NotImplementedError('Please use the waveform parameters ("wave_chN_cwM") of the object to change waveforms!')
+
+    ##########################################################################
+    # 'public' functions: DIO debug support
+    ##########################################################################
+
+    def plot_dio_snapshot(self, bits=range(32)):
+        zibase.plot_timing_diagram(self.getv('raw/dios/0/data'), bits, 64)
+
+    def plot_awg_codewords(self, awg_nr=0, range=None):
+        ts = []
+        cws = []
+        for d in self.getv('awgs/{}/dio/data'.format(awg_nr)):
+            cws.append(d & 0x3ff)
+            ts.append((d >> 10) & 0x3fffff)
+        zibase.plot_codeword_diagram(ts, cws, range)
 
     ##########################################################################
     # 'private' functions, internal to the driver

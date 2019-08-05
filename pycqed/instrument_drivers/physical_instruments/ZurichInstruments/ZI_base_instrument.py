@@ -98,7 +98,6 @@ def plot_timing_diagram(data, bits, line_length=30):
         plt.gca().axis('off')
         plt.show()
 
-    last = False
     while len(data) > 0:
         if len(data) > line_length:
             d = data[0:line_length]
@@ -106,9 +105,22 @@ def plot_timing_diagram(data, bits, line_length=30):
         else:
             d = data
             data = []
-            last = True
 
         _plot_timing_diagram(d, bits)
+
+def plot_codeword_diagram(ts, cws, range=None):
+    plt.figure(figsize=(20, 10))
+    plt.stem((numpy.array(ts)-ts[0])*10.0/3, numpy.array(cws))
+    if range is not None:
+        plt.xlim(range[0], range[1])
+        xticks = numpy.arange(range[0], range[1], step=20)
+        while len(xticks) > 20:
+            xticks = xticks[::2]
+        plt.xticks(xticks)
+    plt.xlabel('Time (ns)')
+    plt.ylabel('Codeword (#)')
+    plt.grid()
+    plt.show()
 
 def _gen_set_cmd(dev_set_func, node_path: str):
     """
@@ -168,6 +180,40 @@ class ziRuntimeError(Exception):
     """Exception raised when a device detects an error at runtime."""
     pass
 
+class ziConfigurationError(Exception):
+    """Exception raised when a wrong configuration is detected."""
+    pass
+
+##########################################################################
+# Class
+##########################################################################
+
+class MockDAQServer():
+    """
+    This class implements a mock version of the DAQ object used for
+    communicating with the instruments.
+    WARNING: The mock version is not yet working!
+    """
+    def __init__(self, server, port, apilevel):
+        self.server = server
+        self.port = port
+        self.apilevel = apilevel
+        self.device = None
+        self.interface = None
+
+    def setDebugLevel(self, debuglevel: int):
+        print('Setting debug level to {}'.format(debuglevel))
+
+    def connectDevice(self, device, interface):
+        if self.device is not None:
+            raise ziDAQError('Trying to connect to a device that is already connected!')
+
+        if self.interface is not None and self.interface != interface:
+            raise ziDAQError('Trying to change interface on an already connected device!')
+
+        self.device = device
+        self.interface = interface
+
 ##########################################################################
 # Class
 ##########################################################################
@@ -199,9 +245,15 @@ class ZI_base_instrument(Instrument):
             port            (int) the port to connect to for the ziDataServer (don't change)
             num_codewords   (int) the number of codeword-based waveforms to prepare
         """
+        t0 = time.time()
         super().__init__(name=name, **kw)
 
-        self.daq = zi.ziDAQServer(server, port, apilevel)
+        # Decide which server to use based on name
+        if server == 'emulator':
+            self.daq = MockDAQServer(server, port, apilevel)
+        else:
+            self.daq = zi.ziDAQServer(server, port, apilevel)
+
         if not self.daq:
             raise(ziDAQError())
 
@@ -220,6 +272,9 @@ class ZI_base_instrument(Instrument):
         self._check_devtype()
         self._check_versions()
         self._check_options()
+
+        # Default waveform length used when initializing waveforms to zero
+        self._default_waveform_length = 32
 
         # Number of channels can now be updated
         self._num_channels = 0
@@ -266,6 +321,8 @@ class ZI_base_instrument(Instrument):
         fpga_revision = self.get('system_fpgarevision')
         log.info('{}: serial={}, options={}, fw_revision={}, fpga_revision={}'
                  .format(self.devname, serial, options.replace('\n','|'), fw_revision, fpga_revision))
+
+        self.connect_message(begin_time=t0)
     
     ##########################################################################
     # Private methods
@@ -514,6 +571,19 @@ class ZI_base_instrument(Instrument):
     def _get_awg_directory(self):
         return os.path.join(self._awgModule.get('awgModule/directory')['directory'][0], 'awg')
 
+    def _initialize_waveform_to_zeros(self):
+        """
+        Generates all zeros waveforms for all codewords.
+        """
+        t0 = time.time()
+        wf = numpy.zeros(self._default_waveform_length)
+        waveform_params = [value for key, value in self.parameters.items()
+                           if 'wave_ch' in key.lower()]
+        for par in waveform_params:
+            par(wf)
+        t1 = time.time()
+        print('Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
+
     def _gen_write_waveform(self, ch, cw):
         def write_func(waveform):
             # Determine which AWG this waveform belongs to
@@ -521,6 +591,10 @@ class ZI_base_instrument(Instrument):
 
             # Name of this waveform
             wf_name = gen_waveform_name(ch, cw)
+
+            # Check that we're allowed to modify this waveform
+            if self._awg_waveforms[wf_name]['readonly']:
+                raise ziConfigurationError('Trying to modify read-only waveform on codeword {}, channel {}'.format(cw, ch))
 
             # The length of HDAWG waveforms should be a multiple of 8 samples.
             if (len(waveform) % 8) != 0:
@@ -557,7 +631,7 @@ class ZI_base_instrument(Instrument):
             # Check if the waveform data is in our dictionary
             if wf_name not in self._awg_waveforms:
                 # Initialize elements
-                self._awg_waveforms[wf_name] = {'waveform': None, 'dirty': False}
+                self._awg_waveforms[wf_name] = {'waveform': None, 'dirty': False, 'readonly': False}
                 # Make sure everything gets recompiled
                 self._awg_needs_configuration[awg_nr] = True
                 # It isn't, so try to read the data from CSV
@@ -603,11 +677,18 @@ class ZI_base_instrument(Instrument):
 
             # First one is shorter
             if len_wf < len_other_wf:
+                # Temporarily unset the readonly flag to be allowed to append zeros
+                readonly = self._awg_waveforms[wf_name]['readonly']
+                self._awg_waveforms[wf_name]['readonly'] = False
                 self.set(wf_name, numpy.concatenate((self._awg_waveforms[wf_name]['waveform'], numpy.zeros(len_other_wf-len_wf))))
                 self._awg_waveforms[wf_name]['dirty'] = True
+                self._awg_waveforms[wf_name]['readonly'] = readonly
             elif len_other_wf < len_wf:
+                readonly = self._awg_waveforms[other_wf_name]['readonly']
+                self._awg_waveforms[other_wf_name]['readonly'] = False
                 self.set(other_wf_name, numpy.concatenate((self._awg_waveforms[other_wf_name]['waveform'], numpy.zeros(len_wf-len_other_wf))))
                 self._awg_waveforms[other_wf_name]['dirty'] = True
+                self._awg_waveforms[other_wf_name]['readonly'] = readonly
 
     def _clear_dirty_waveforms(self, awg_nr):
         """
@@ -620,6 +701,40 @@ class ZI_base_instrument(Instrument):
 
             other_wf_name = gen_waveform_name(2*awg_nr+1, cw)
             self._awg_waveforms[other_wf_name]['dirty'] = False
+
+    def _clear_readonly_waveforms(self, awg_nr):
+        """
+        Clear the read-only flag of all configured waveforms. Typically used when switching 
+        configurations (i.e. programs).
+        """
+        for cw in range(self._num_codewords):
+            wf_name = gen_waveform_name(2*awg_nr+0, cw)
+            self._awg_waveforms[wf_name]['readonly'] = False
+
+            other_wf_name = gen_waveform_name(2*awg_nr+1, cw)
+            self._awg_waveforms[other_wf_name]['readonly'] = False
+
+    def _set_readonly_waveform(self, ch: int, cw: int):
+        """
+        Mark a waveform as being read-only. Typically used to limit which waveforms the user
+        is allowed to change based on the overall configuration of the instrument and the type
+        of AWG program being executed.
+        """
+        # Sanity check
+        if cw >= self._num_codewords:
+            raise ziConfigurationError('Codeword {} is out of range of the configured number of codewords ({})!'.format(cw, self._num_codewords))
+
+        if ch >= self._num_channels:
+            raise ziConfigurationError('Channel {} is out of range of the configured number of channels ({})!'.format(ch, self._num_channels))
+
+        # Name of this waveform
+        wf_name = gen_waveform_name(ch, cw)
+        
+        # Check if the waveform data is in our dictionary
+        if wf_name not in self._awg_waveforms:
+            raise ziConfigurationError('Trying to mark waveform {} as read-only, but the waveform has not been configured yet!'.format(wf_name))
+
+        self._awg_waveforms[wf_name]['readonly'] = True
 
     def _upload_updated_waveforms(self):
         """
@@ -652,9 +767,12 @@ class ZI_base_instrument(Instrument):
         Configures an AWG with the program stored in the object in the self._awg_program[awg_nr] member.
         """
         if self._awg_program[awg_nr] is None:
-            raise ziValueError('No program defined for AWG {}!'.format(awg_nr))
+            raise ziConfigurationError('No program defined for AWG {}!'.format(awg_nr))
         
-        full_program = self._codeword_table_preamble(awg_nr) + '\n' + self._awg_program[awg_nr]
+        full_program = \
+            '// Start of automatically generated codeword table\n' + \
+            self._codeword_table_preamble(awg_nr) + \
+            '// End of automatically generated codeword table\n' + self._awg_program[awg_nr]
 
         self.configure_awg_from_string(awg_nr, full_program)
 
@@ -727,6 +845,8 @@ class ZI_base_instrument(Instrument):
         self.daq.sync()
 
     def start(self):
+        self.check_errors()
+
         # Loop through each AWG and check whether to reconfigure it
         for awg_nr in range(self._num_channels//2):
             self._length_match_waveforms(awg_nr)
@@ -756,10 +876,16 @@ class ZI_base_instrument(Instrument):
         for awg_nr in range(self._num_channels//2):
             self.set('awgs_{}_enable'.format(awg_nr), 0)
 
+        self.check_errors()
+
     def close(self) -> None:
         try:
             if self._is_device_connected(self.devname):
+                # Stop all AWG's
+                self.stop()
+                # Disconnect device from server
                 self.daq.disconnectDevice(self.devname)
+            # Disconnect application server
             self.daq.disconnect()
         except AttributeError:
             pass
@@ -769,6 +895,9 @@ class ZI_base_instrument(Instrument):
         raise NotImplementedError('Virtual method with no implementation!')
 
     def clear_errors(self) -> None:
+        raise NotImplementedError('Virtual method with no implementation!')
+
+    def demote_error(self, code):
         raise NotImplementedError('Virtual method with no implementation!')
 
     def initialize_all_waveforms_to_zeros(self):  # FIXME: typo, but used in some Notebooks
@@ -800,7 +929,7 @@ class ZI_base_instrument(Instrument):
 
         # This check (and while loop) is added as a workaround for #9
         while not success_and_ready:
-            print('Configuring AWG_nr {}.'.format(awg_nr))
+            print('Configuring AWG {}...'.format(awg_nr))
 
             self._awgModule.set('awgModule/index', awg_nr)
             self._awgModule.set('awgModule/compiler/sourcestring', program_string)
@@ -849,18 +978,33 @@ class ZI_base_instrument(Instrument):
         print(self._awgModule.get('awgModule/compiler/statusstring')
               ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))
 
+        # Check status
+        if self.get('awgs_{}_waveform_memoryusage'.format(awg_nr)) > 1.0:
+            log.warning('{}: Waveform memory usage exceeds available internal memory!'.format(self.devname))
+            print('WARNING: Waveform memory usage exceeds available internal memory!')
+
+        if self.get('awgs_{}_sequencer_memoryusage'.format(awg_nr)) > 1.0:
+            log.warning('{}: Sequencer memory usage exceeds available instruction memory!'.format(self.devname))
+            print('WARNING: Sequencer memory usage exceeds available instruction memory!')
+
+    def plot_dio_snapshot(self, bits=range(32)):
+        raise NotImplementedError('Virtual method with no implementation!')
+
+    def plot_awg_codewords(self, awg_nr=0, range=None):
+        raise NotImplementedError('Virtual method with no implementation!')        
+
     def get_idn(self) -> dict:
         idn_dict = {}
-        idn_dict['vendor'] = 'ZurichInstruments'
-        idn_dict['model'] = self.devtype
-        idn_dict['serial'] = self.devname
-        idn_dict['firmware'] = self.geti('system/fwrevision')
+        idn_dict['vendor']        = 'ZurichInstruments'
+        idn_dict['model']         = self.devtype
+        idn_dict['serial']        = self.devname
+        idn_dict['firmware']      = self.geti('system/fwrevision')
         idn_dict['fpga_firmware'] = self.geti('system/fpgarevision')
         
         return idn_dict
 
     def load_default_settings(self):
-        pass
+        raise NotImplementedError('Virtual method with no implementation!')
 
     def assure_ext_clock(self) -> None:
-        pass
+        raise NotImplementedError('Virtual method with no implementation!')
