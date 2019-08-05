@@ -8,6 +8,7 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
+from pycqed.utilities.general import check_keyboard_interrupt
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils.helpers import full_class
 
@@ -604,6 +605,12 @@ class UHFQC(Instrument):
 
         while accumulated_time < self.timeout() and not all(gotem):
             dataset = self._daq.poll(acquisition_time, 1, 4, True)
+            try: 
+                check_keyboard_interrupt()
+            except KeyboardInterrupt as e:
+                # Finalize acquisition before raising exception
+                self.acquisition_finalize() 
+                raise e  
 
             for n, p in enumerate(self.acquisition_paths):
                 if p in dataset:
