@@ -9,7 +9,7 @@ stages:
 
 variables:
   OPENQL_STABLE: "master"
-  QCODES_STABLE: "v0.1.11"
+  QCODES_STABLE: "v0.4.0"
   OPENQL_UNSTABLE: "develop"
   QCODES_UNSTABLE: "master"
 
