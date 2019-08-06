@@ -1,5 +1,4 @@
 FROM python:3.6-stretch
-MAINTAINER Viacheslav Ostroukh <V.Ostroukh@tudelft.nl>
 
 # make our environment sane
 ENV LANG C.UTF-8
