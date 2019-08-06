@@ -142,8 +142,8 @@ def two_qubit_randomized_benchmarking_seqs(
                             operation_dict[pulse_name + ' ' + qb_name]]
             pulse_list += generate_mux_ro_pulse_list(
                 [qb1n, qb2n], operation_dict)
-            pulse_list_w_prep = [add_preparation_pulses(
-                pulse_list, operation_dict, [qb1n, qb2n], **prep_params)]
+            pulse_list_w_prep = add_preparation_pulses(
+                pulse_list, operation_dict, [qb1n, qb2n], **prep_params)
             pulse_list_list_all.append(pulse_list_w_prep)
         seq = pulse_list_list_seq(pulse_list_list_all, seq_name+f'_{nCl}',
                                   upload=False)
@@ -156,7 +156,7 @@ def two_qubit_randomized_benchmarking_seqs(
         ps.Pulsar.get_instance().program_awgs(sequences[0])
 
     return sequences, np.arange(sequences[0].n_acq_elements()), \
-           np.arange(cliffords)
+           np.arange(len(cliffords))
 
 
 def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,

@@ -319,7 +319,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
         # create projected_data_dict
         self.data_to_fit = self.get_param_value('data_to_fit')
-
         if self.cal_states_rotations is not None:
             print('here')
             self.cal_states_analysis()
@@ -4478,17 +4477,29 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             else:
                 legend_label = 'qbc in $|g\\rangle$' if \
                     row % 2 != 0 else 'qbc in $|e\\rangle$'
-
+            hard_sweep_params = self.get_param_value('hard_sweep_params')
+            sweep_name = self.get_param_value('sweep_name')
+            sweep_unit = self.get_param_value('sweep_unit')
+            if hard_sweep_params is not None:
+                xlabel = list(hard_sweep_params)[0]
+                xunit = list(hard_sweep_params.values())[0][
+                    'unit']
+            elif (sweep_name is not None) and (sweep_unit is not None):
+                xlabel = sweep_name
+                xunit = sweep_unit
+            else:
+                xlabel = self.raw_data_dict['sweep_parameter_names']
+                xunit = self.raw_data_dict['sweep_parameter_units']
+            if np.ndim(xunit) > 0:
+                xunit = xunit[0]
             self.plot_dicts['data_{}_{}_{}'.format(
                 row, qbn, prob_label)] = {
                 'plotfn': self.plot_line,
                 'fig_id': figure_name,
                 'plotsize': plotsize,
                 'xvals': phases,
-                'xlabel': self.raw_data_dict[
-                    'sweep_parameter_names'][0][0],
-                'xunit': self.raw_data_dict[
-                    'sweep_parameter_units'][0][0],
+                'xlabel': xlabel,
+                'xunit': xunit,
                 'yvals': data,
                 'ylabel': '{} state population'.format(
                     self.get_latex_prob_label(prob_label)),
@@ -4496,7 +4507,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                 'setlabel': 'Data - ' + legend_label
                 if row in [0, 1] else '',
                 'title': self.raw_data_dict['timestamp'] + ' ' +
-                         self.raw_data_dict['measurementstring'],
+                         self.raw_data_dict['measurementstring'] + '-' + qbn,
                 'linestyle': 'none',
                 'color': 'C0' if row % 2 == 0 else 'C2',
                 'do_legend': row in [0, 1],
