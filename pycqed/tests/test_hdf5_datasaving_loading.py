@@ -125,7 +125,8 @@ class Test_HDF5(unittest.TestCase):
         h5d.read_dict_from_hdf5(new_dict, opened_hdf5_file)
         # objects are not identical but the string representation should be
         self.assertEqual(test_dict.keys(), new_dict.keys())
-        self.assertEqual(test_dict['list_of_ints'], new_dict['list_of_ints'])
+        self.assertEqual(test_dict['list_of_ints'],
+                         new_dict['list_of_ints'])
         self.assertEqual(test_dict['list_of_floats'],
                          new_dict['list_of_floats'])
         self.assertEqual(test_dict['weird_dict'], new_dict['weird_dict'])
@@ -205,3 +206,22 @@ class Test_HDF5(unittest.TestCase):
         self.assertEqual(self.mock_parabola_2.status(), True)
         self.assertEqual(self.mock_parabola_2.dict_like(),
                          {'a': {'b': [2, 3, 5]}})
+
+
+def test_wr_rd_hdf5_array():
+    datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+    test_dict = {
+        'x': np.linspace(0, 1, 14),
+        'y': np.cos(np.linspace(0, 2*np.pi, 11))}
+    data_object = h5d.Data(name='test_object', datadir=datadir)
+    h5d.write_dict_to_hdf5(test_dict, data_object)
+    data_object.close()
+    filepath = data_object.filepath
+
+    new_dict = {}
+    opened_hdf5_file = h5py.File(filepath, 'r')
+    h5d.read_dict_from_hdf5(new_dict, opened_hdf5_file)
+
+    assert test_dict.keys() == new_dict.keys()
+    np.testing.assert_allclose(test_dict['x'], new_dict['x'])
+    np.testing.assert_allclose(test_dict['y'], new_dict['y'])
