@@ -1,120 +1,7 @@
 import numpy as np
-import logging
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts as sqs2
 import time
-
-class two_qubit_off_on(swf.Hard_Sweep):
-
-    def __init__(self, q0_pulse_pars, q1_pulse_pars, RO_pars, upload=True,
-                 return_seq=False, nr_samples=4, verbose=False):
-        super().__init__()
-        self.q0_pulse_pars = q0_pulse_pars
-        self.q1_pulse_pars = q1_pulse_pars
-        self.RO_pars = RO_pars
-        self.upload = upload
-        self.parameter_name = 'sample'
-        self.unit = '#'
-        self.sweep_points = np.arange(nr_samples)
-        self.verbose = verbose
-        self.return_seq = return_seq
-        self.name = 'two_qubit_off_on'
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs2.two_qubit_off_on(q0_pulse_pars=self.q0_pulse_pars,
-                                  q1_pulse_pars=self.q1_pulse_pars,
-                                  RO_pars=self.RO_pars,
-                                  return_seq=self.return_seq,
-                                  verbose=self.verbose)
-
-
-class three_qubit_off_on(swf.Hard_Sweep):
-
-    def __init__(self, q0_pulse_pars, q1_pulse_pars, q2_pulse_pars, RO_pars, upload=True,
-                 return_seq=False, nr_samples=4, verbose=False):
-        super().__init__()
-        self.q0_pulse_pars = q0_pulse_pars
-        self.q1_pulse_pars = q1_pulse_pars
-        self.q2_pulse_pars = q2_pulse_pars
-        self.RO_pars = RO_pars
-        self.upload = upload
-        self.parameter_name = 'sample'
-        self.unit = '#'
-        self.sweep_points = np.arange(nr_samples)
-        self.verbose = verbose
-        self.return_seq = return_seq
-        self.name = 'three_qubit_off_on'
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs2.three_qubit_off_on(q0_pulse_pars=self.q0_pulse_pars,
-                                    q1_pulse_pars=self.q1_pulse_pars,
-                                    q2_pulse_pars=self.q2_pulse_pars,
-                                    RO_pars=self.RO_pars,
-                                    return_seq=self.return_seq,
-                                    verbose=self.verbose)
-
-
-class four_qubit_off_on(swf.Hard_Sweep):
-
-    def __init__(self, q0_pulse_pars, q1_pulse_pars, q2_pulse_pars,  q3_pulse_pars, RO_pars, upload=True,
-                 return_seq=False, nr_samples=4, verbose=False):
-        super().__init__()
-        self.q0_pulse_pars = q0_pulse_pars
-        self.q1_pulse_pars = q1_pulse_pars
-        self.q2_pulse_pars = q2_pulse_pars
-        self.q3_pulse_pars = q3_pulse_pars
-        self.RO_pars = RO_pars
-        self.upload = upload
-        self.parameter_name = 'sample'
-        self.unit = '#'
-        self.sweep_points = np.arange(nr_samples)
-        self.verbose = verbose
-        self.return_seq = return_seq
-        self.name = 'four_qubit_off_on'
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs2.four_qubit_off_on(q0_pulse_pars=self.q0_pulse_pars,
-                                   q1_pulse_pars=self.q1_pulse_pars,
-                                   q2_pulse_pars=self.q2_pulse_pars,
-                                   q3_pulse_pars=self.q3_pulse_pars,
-                                   RO_pars=self.RO_pars,
-                                   return_seq=self.return_seq,
-                                   verbose=self.verbose)
-
-
-class five_qubit_off_on(swf.Hard_Sweep):
-
-    def __init__(self, q0_pulse_pars, q1_pulse_pars, q2_pulse_pars,
-                 q3_pulse_pars, q4_pulse_pars, RO_pars, upload=True,
-                 return_seq=False, nr_samples=4, verbose=False):
-        super().__init__()
-        self.q0_pulse_pars = q0_pulse_pars
-        self.q1_pulse_pars = q1_pulse_pars
-        self.q2_pulse_pars = q2_pulse_pars
-        self.q3_pulse_pars = q3_pulse_pars
-        self.q4_pulse_pars = q4_pulse_pars
-        self.RO_pars = RO_pars
-        self.upload = upload
-        self.parameter_name = 'sample'
-        self.unit = '#'
-        self.sweep_points = np.arange(nr_samples)
-        self.verbose = verbose
-        self.return_seq = return_seq
-        self.name = 'five_qubit_off_on'
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs2.four_qubit_off_on(q0_pulse_pars=self.q0_pulse_pars,
-                                   q1_pulse_pars=self.q1_pulse_pars,
-                                   q2_pulse_pars=self.q2_pulse_pars,
-                                   q3_pulse_pars=self.q3_pulse_pars,
-                                   q4_pulse_pars=self.q4_pulse_pars,
-                                   RO_pars=self.RO_pars,
-                                   return_seq=self.return_seq,
-                                   verbose=self.verbose)
 
 
 class n_qubit_seq_sweep(swf.Hard_Sweep):
@@ -137,20 +24,17 @@ class n_qubit_seq_sweep(swf.Hard_Sweep):
 
 class n_qubit_off_on(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars_list, RO_pars, upload=True,
-                 preselection=False, parallel_pulses=False,
-                 verbose=False, RO_spacing=200e-9):
+    def __init__(self, pulse_pars_list, RO_pars_list, upload=True,
+                 preselection=False, parallel_pulses=False, RO_spacing=200e-9):
         super().__init__()
         self.pulse_pars_list = pulse_pars_list
-        self.RO_pars = RO_pars
+        self.RO_pars_list = RO_pars_list
         self.upload = upload
         self.parameter_name = 'sample'
         self.unit = '#'
         samples = 2**len(pulse_pars_list)
         if preselection:
             samples *= 2
-        # self.sweep_points = np.arange(samples)
-        self.verbose = verbose
         self.preselection = preselection
         self.parallel_pulses = parallel_pulses
         self.RO_spacing = RO_spacing
@@ -159,16 +43,15 @@ class n_qubit_off_on(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs2.n_qubit_off_on(pulse_pars_list=self.pulse_pars_list,
-                                RO_pars=self.RO_pars,
+                                RO_pars_list=self.RO_pars_list,
                                 preselection=self.preselection,
                                 parallel_pulses=self.parallel_pulses,
-                                RO_spacing=self.RO_spacing,
-                                verbose=self.verbose)
+                                RO_spacing=self.RO_spacing)
+
 
 class n_qubit_reset(swf.Hard_Sweep):
     def __init__(self, qubit_names, operation_dict, reset_cycle_time,
-                 nr_resets=1, upload=True, verbose=False,
-                 codeword_indices=None):
+                 nr_resets=1, upload=True, codeword_indices=None):
         super().__init__()
         self.qubit_names = qubit_names
         self.operation_dict = operation_dict
@@ -179,7 +62,6 @@ class n_qubit_reset(swf.Hard_Sweep):
         self.nr_resets = nr_resets
         samples = nr_resets*2**len(qubit_names)
         self.sweep_points = np.arange(samples)
-        self.verbose = verbose
         self.name = '{}_reset_x{}'.format(','.join(qubit_names), nr_resets)
 
     def prepare(self, **kw):
@@ -187,8 +69,7 @@ class n_qubit_reset(swf.Hard_Sweep):
             sqs2.n_qubit_reset(qubit_names=self.qubit_names,
                                operation_dict=self.operation_dict,
                                reset_cycle_time=self.reset_cycle_time,
-                               nr_resets=self.nr_resets,
-                               verbose=self.verbose)
+                               nr_resets=self.nr_resets)
 
 
 class n_qubit_Simultaneous_RB_sequence_lengths(swf.Soft_Sweep):
@@ -293,177 +174,6 @@ class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
                 seq_name=self.seq_name,
                 return_seq=self.return_seq,
                 verbose=self.verbose)
-
-
-class two_qubit_randomized_benchmarking_nr_cliffords(swf.Soft_Sweep):
-
-    def __init__(self, sweep_control='soft',
-                 two_qubit_RB_sweepfunction=None, upload=True):
-        super().__init__()
-
-        self.sweep_control = sweep_control
-        self.two_qubit_RB_sweepfunction = two_qubit_RB_sweepfunction
-        self.upload = upload
-        self.name = 'Two_Qubit_Randomized_Benchmarking_nr_cliffords'
-        self.parameter_name = 'Nr of Cliffords'
-        self.unit = '#'
-
-
-    def set_parameter(self, val):
-        self.two_qubit_RB_sweepfunction.nr_cliffords_value = val
-        self.two_qubit_RB_sweepfunction.upload = self.upload
-        self.two_qubit_RB_sweepfunction.prepare()
-
-
-class two_qubit_randomized_benchmarking_one_length(swf.Hard_Sweep):
-
-    def __init__(self, qb1n, qb2n, operation_dict,
-                 nr_cliffords_value,
-                 max_clifford_idx=11520,
-                 CZ_pulse_name=None,
-                 net_clifford=0,
-                 clifford_decomposition_name='HZ',
-                 interleaved_gate=None,
-                 seq_name=None, upload=True,
-                 return_seq=False, verbose=False):
-
-        super().__init__()
-        self.qb1n = qb1n
-        self.qb2n = qb2n
-        self.operation_dict = operation_dict
-        self.nr_cliffords_value = nr_cliffords_value
-        self.max_clifford_idx = max_clifford_idx
-        self.CZ_pulse_name = CZ_pulse_name
-        self.net_clifford = net_clifford
-        self.clifford_decomposition_name = clifford_decomposition_name
-        self.interleaved_gate = interleaved_gate
-        self.seq_name = seq_name
-        self.upload = upload
-        self.return_seq = return_seq
-        self.verbose = verbose
-
-        self.parameter_name = 'Nr of Seeds'
-        self.unit = '#'
-        self.name = 'Two_Qubit_Randomized_Benchmarking_one_length'
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs2.two_qubit_randomized_benchmarking_seq(
-                qb1n=self.qb1n, qb2n=self.qb2n,
-                operation_dict=self.operation_dict,
-                nr_cliffords_value=self.nr_cliffords_value,
-                max_clifford_idx=self.max_clifford_idx,
-                nr_seeds=self.sweep_points,
-                CZ_pulse_name=self.CZ_pulse_name,
-                net_clifford=self.net_clifford,
-                clifford_decomposition_name=self.clifford_decomposition_name,
-                interleaved_gate=self.interleaved_gate,
-                seq_name=self.seq_name, upload=self.upload,
-                return_seq=self.return_seq, verbose=self.verbose)
-
-
-class two_qubit_AllXY(swf.Hard_Sweep):
-
-    def __init__(self, q0_pulse_pars, q1_pulse_pars, RO_pars, upload=True,
-                 return_seq=False, verbose=False, X_mid=False, simultaneous=False):
-        super().__init__()
-        self.q0_pulse_pars = q0_pulse_pars
-        self.q1_pulse_pars = q1_pulse_pars
-        self.RO_pars = RO_pars
-        self.upload = upload
-        self.parameter_name = 'sample'
-        self.unit = '#'
-        self.sweep_points = np.arange(42*2)
-        self.verbose = verbose
-        self.return_seq = return_seq
-        self.name = 'two_qubit_AllXY'
-        self.X_mid = X_mid
-        self.simultaneous = simultaneous
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs2.two_qubit_AllXY(q0_pulse_pars=self.q0_pulse_pars,
-                                  q1_pulse_pars=self.q1_pulse_pars,
-                                  RO_pars=self.RO_pars,
-                                  double_points=True,
-                                  return_seq=self.return_seq,
-                                  verbose=self.verbose,
-                                  X_mid=self.X_mid,
-                                  simultaneous=self.simultaneous)
-
-
-class tomo_Bell(swf.Hard_Sweep):
-
-    def __init__(self, bell_state, qb_c, qb_t, RO_pars,
-                 num_flux_pulses=0, basis_pulses=None,
-                 cal_state_repeats=7,
-                 CZ_disabled=False, spacing=100e9,
-                 verbose=False, upload=True, return_seq=False):
-        super().__init__()
-        self.bell_state = bell_state
-        self.qb_c = qb_c
-        self.qb_t = qb_t
-        self.RO_pars = RO_pars
-        self.num_flux_pulses = num_flux_pulses
-        self.cal_state_repeats = cal_state_repeats
-        self.basis_pulses = basis_pulses
-        self.upload = upload
-        self.CZ_disabled = CZ_disabled
-        self.parameter_name = 'sample'
-        self.unit = '#'
-        self.verbose = verbose
-        self.spacing = spacing
-        self.return_seq = return_seq
-        self.name = 'tomo_Bell'
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs2.two_qubit_tomo_bell_qudev_seq(
-                bell_state=self.bell_state,
-                qb_c=self.qb_c, qb_t=self.qb_t,
-                RO_pars=self.RO_pars,
-                basis_pulses=self.basis_pulses,
-                num_flux_pulses=self.num_flux_pulses,
-                cal_state_repeats=self.cal_state_repeats,
-                CZ_disabled=self.CZ_disabled,
-                verbose=self.verbose,
-                upload=self.upload,
-                spacing=self.spacing)
-
-
-class three_qubit_GHZ_tomo(swf.Hard_Sweep):
-
-    def __init__(self, qubits, RO_pars,
-                 CZ_qubit_dict,
-                 basis_pulses=None,
-                 cal_state_repeats=2,
-                 spacing=100e-9,
-                 verbose=False, upload=True, return_seq=False):
-        super().__init__()
-        self.qubits = qubits
-        self.RO_pars = RO_pars
-        self.CZ_qubit_dict = CZ_qubit_dict
-        self.basis_pulses = basis_pulses
-        self.cal_state_repeats = cal_state_repeats
-        self.upload = upload
-        self.parameter_name = 'sample'
-        self.unit = '#'
-        self.verbose = verbose
-        self.spacing = spacing
-        self.return_seq = return_seq
-        self.name = 'tomo_3_qubit_GHZ'
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs2.three_qubit_GHZ_tomo_seq(
-                qubits=self.qubits,
-                RO_pars=self.RO_pars,
-                CZ_qubit_dict=self.CZ_qubit_dict,
-                basis_pulses=self.basis_pulses,
-                cal_state_repeats=self.cal_state_repeats,
-                spacing=self.spacing,
-                verbose=self.verbose,
-                upload=self.upload)
 
 
 class parity_correction(swf.Hard_Sweep):
@@ -633,149 +343,6 @@ class calibrate_n_qubits(swf.Hard_Sweep):
                                          return_seq=self.return_seq)
 
 
-class FGGE_length_swf(swf.Hard_Sweep):
-    def __init__(self, qbt_name, qbm_name, fgge_pulse_name, lengths,
-                 amplitude, operation_dict, mod_frequency, upload=False,
-                 cal_points=True, return_seq=False, verbose=False):
-
-        super().__init__()
-        self.name = 'FGGE Length Sweep'
-        self.qbm_name = qbm_name
-        self.qbt_name = qbt_name
-        self.fgge_pulse_name = fgge_pulse_name
-        self.lengths = lengths
-        self.amplitude = amplitude
-        self.operation_dict = operation_dict
-        self.mod_frequency = mod_frequency
-        self.cal_points = cal_points
-        self.upload = upload
-        self.return_seq = return_seq
-        self.parameter_name = 'Pulse length'
-        self.unit = 's'
-        self.verbose = verbose
-
-    def prepare(self,  upload_all=True, **kw):
-        if self.upload:
-            sqs2.fgge_gate_length_seq(lengths=self.lengths,
-                                      qbt_name=self.qbt_name,
-                                      qbm_name=self.qbm_name,
-                                      fgge_pulse_name=self.fgge_pulse_name,
-                                      amplitude=self.amplitude,
-                                      mod_frequency=self.mod_frequency,
-                                      operation_dict=self.operation_dict,
-                                      upload=True,
-                                      upload_all=upload_all,
-                                      return_seq=self.return_seq,
-                                      cal_points=self.cal_points,
-                                      verbose=self.verbose)
-
-
-class FGGE_amplitude_swf(swf.Soft_Sweep):
-
-    def __init__(self, hard_sweep):
-        '''
-        Sweep function class (soft sweep) for 2D Chevron experiment where
-        the amplitude of the fluxpulse is swept. Used in combination with
-        the Chevron_length_hard_swf class.
-
-        Args:
-           qb_control (QuDev_Transmon): control qubit (fluxed qubit)
-           qb_target (QuDev_Transmon): target qubit (non-fluxed qubit)
-           hard_sweep: hard sweep function (fast axis sweep function)
-        '''
-        super().__init__()
-        self.name = 'FGGE Amplitude Sweep'
-        self.parameter_name = 'Pulse amplitude'
-        self.unit = 'V'
-        self.hard_sweep = hard_sweep
-        self.is_first_sweeppoint = True
-
-    def prepare(self):
-        pass
-
-    def set_parameter(self, val, **kw):
-        self.hard_sweep.amplitude = val
-        self.hard_sweep.upload = True
-        self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
-        self.is_first_sweeppoint = False
-
-    def finish(self):
-        pass
-
-
-class FGGE_frequency_swf(swf.Soft_Sweep):
-
-    def __init__(self, hard_sweep):
-        '''
-        Sweep function class (soft sweep) for 2D Chevron experiment where
-        the amplitude of the fluxpulse is swept. Used in combination with
-        the Chevron_length_hard_swf class.
-
-        Args:
-           qb_control (QuDev_Transmon): control qubit (fluxed qubit)
-           qb_target (QuDev_Transmon): target qubit (non-fluxed qubit)
-           hard_sweep: hard sweep function (fast axis sweep function)
-        '''
-        super().__init__()
-        self.name = 'FGGE Frequency Sweep'
-        self.parameter_name = 'Pulse frequency'
-        self.unit = 'Hz'
-        self.hard_sweep = hard_sweep
-        self.is_first_sweeppoint = True
-
-    def prepare(self):
-        pass
-
-    def set_parameter(self, val, **kw):
-        self.hard_sweep.mod_frequency = val
-        self.hard_sweep.upload = True
-        self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
-        self.is_first_sweeppoint = False
-
-    def finish(self):
-        pass
-
-
-class fgge_frequency_hard_swf(swf.Hard_Sweep):
-
-    def __init__(self, mod_frequencies, length, amplitude,
-                 qbt_name, qbm_name,
-                 fgge_pulse_name, operation_dict,
-                 verbose=False, cal_points=False,
-                 upload=True, return_seq=False):
-
-        super().__init__()
-        self.length = length
-        self.amplitude = amplitude
-        self.mod_frequencies = mod_frequencies
-        self.qbt_name = qbt_name
-        self.qbm_name = qbm_name
-        self.fgge_pulse_name = fgge_pulse_name
-        self.operation_dict = operation_dict
-        self.upload = upload
-        self.cal_points = cal_points
-        self.verbose = verbose
-        self.return_seq = return_seq
-
-        self.name = 'Chevron flux pulse frequency sweep'
-        self.parameter_name = 'Fluxpulse frequency'
-        self.unit = 'Hz'
-
-    def prepare(self, upload_all=True, **kw):
-        if self.upload:
-            sqs2.fgge_frequency_seq(
-                mod_frequencies=self.mod_frequencies,
-                length=self.length,
-                amplitude=self.amplitude,
-                qbt_name=self.qbt_name,
-                qbm_name=self.qbm_name,
-                upload_all=upload_all,
-                fgge_pulse_name=self.fgge_pulse_name,
-                operation_dict=self.operation_dict,
-                verbose=self.verbose, cal_points=self.cal_points,
-                upload=self.upload, return_seq=self.return_seq)
-
-
 class GST_experiment_sublist_swf(swf.Soft_Sweep):
 
     def __init__(self, hard_swf, pygsti_sublistOfExperiments):
@@ -796,6 +363,7 @@ class GST_experiment_sublist_swf(swf.Soft_Sweep):
         self.hard_swf.upload = True
         self.hard_swf.prepare(upload_all=self.is_first_sweeppoint)
         self.is_first_sweeppoint = False
+
 
 class GST_swf(swf.Hard_Sweep):
 
@@ -835,7 +403,6 @@ class GST_swf(swf.Hard_Sweep):
 
 
 class RO_dynamic_phase_swf(swf.Hard_Sweep):
-
     def __init__(self, qbp_name, qbr_names,
                  phases, operation_dict,
                  pulse_separation, init_state,
@@ -868,6 +435,7 @@ class RO_dynamic_phase_swf(swf.Hard_Sweep):
                 verbose=self.verbose, cal_points=self.cal_points,
                 upload=True, return_seq=self.return_seq)
 
+
 class Measurement_Induced_Dephasing_Phase_Swf(swf.Hard_Sweep):
     def __init__(self, qbn_dephased, ro_op, operation_dict, readout_separation,
                  nr_readouts, cal_points=((-4,-3), (-2,-1)), upload=True):
@@ -894,6 +462,7 @@ class Measurement_Induced_Dephasing_Phase_Swf(swf.Hard_Sweep):
                 readout_separation=self.readout_separation, 
                 nr_readouts=self.nr_readouts, 
                 cal_points=self.cal_points)
+
 
 class Measurement_Induced_Dephasing_Amplitude_Swf(swf.Soft_Sweep):
     class DummyQubit:

@@ -9,6 +9,7 @@ from qcodes.utils import validators as vals
 import ctypes
 from ctypes.wintypes import MAX_PATH
 
+
 class VirtualAWG8(Instrument):
     """
     Dummy instrument that implements some of the interface of the AWG8.
@@ -21,10 +22,12 @@ class VirtualAWG8(Instrument):
 
     def __init__(self, name):
         super().__init__(name)
-        self.add_parameter('timeout', unit='s', initial_value=5,
-                           parameter_class=ManualParameter,
-                           vals=vals.MultiType(vals.Numbers(min_value=0),
-                                               vals.Enum(None)))
+        self.add_parameter(
+            'timeout',
+            unit='s',
+            initial_value=5,
+            parameter_class=ManualParameter,
+            vals=vals.MultiType(vals.Numbers(min_value=0), vals.Enum(None)))
         self._num_channels = 8
         self._num_codewords = 256
 
@@ -49,28 +52,49 @@ class VirtualAWG8(Instrument):
     def add_dummy_parameters(self):
         parnames = []
         for i in range(8):
-            parnames.append('sigouts_{}_offset'.format(i))
-            parnames.append('sigouts_{}_on'.format(i))
-            parnames.append('sigouts_{}_direct'.format(i))
-            parnames.append('sigouts_{}_range'.format(i))
-            parnames.append('triggers_in_{}_imp50'.format(i))
-            parnames.append('triggers_in_{}_level'.format(i))
+            parnames.append('sigouts_{}_offset'.format(i))  #0
+            parnames.append('sigouts_{}_on'.format(i))  #1
+            parnames.append('sigouts_{}_direct'.format(i))  #0
+            parnames.append('sigouts_{}_range'.format(i))  #5
+            parnames.append('triggers_in_{}_imp50'.format(i))  #1
+            parnames.append('triggers_in_{}_level'.format(i))  #0.5
         for i in range(4):
-            parnames.append('awgs_{}_enable'.format(i))
-            parnames.append('awgs_{}_auxtriggers_0_channel'.format(i))
-            parnames.append('awgs_{}_auxtriggers_0_slope'.format(i))
-            parnames.append('awgs_{}_dio_mask_value'.format(i))
-            parnames.append('awgs_{}_dio_mask_shift'.format(i))
-            parnames.append('awgs_{}_dio_strobe_index'.format(i))
-            parnames.append('awgs_{}_dio_strobe_slope'.format(i))
-            parnames.append('awgs_{}_dio_valid_index'.format(i))
-            parnames.append('awgs_{}_dio_valid_polarity'.format(i))
-            parnames.append('awgs_{}_outputs_0_amplitude'.format(i))
-            parnames.append('awgs_{}_outputs_1_amplitude'.format(i))
-        parnames.append('system_extclk')
+            parnames.append('awgs_{}_enable'.format(i))  # 0
+            parnames.append('awgs_{}_auxtriggers_0_channel'.format(i))  #2*i
+            parnames.append('awgs_{}_auxtriggers_0_slope'.format(i))  #0
+            parnames.append('awgs_{}_dio_mask_value'.format(i))  # 1
+            parnames.append('awgs_{}_dio_mask_shift'.format(i))  # 0
+            parnames.append('awgs_{}_dio_strobe_index'.format(i))  #0
+            parnames.append('awgs_{}_dio_strobe_slope'.format(i))  #0
+            parnames.append('awgs_{}_dio_valid_index'.format(i))  #0
+            parnames.append('awgs_{}_dio_valid_polarity'.format(i))  #0
+            parnames.append('awgs_{}_outputs_0_amplitude'.format(i))  #0
+            parnames.append('awgs_{}_outputs_1_amplitude'.format(i))  #0
+        parnames.append('system_extclk')  #0
 
         for par in parnames:
             self.add_parameter(par, parameter_class=ManualParameter)
+        for i in range(8):
+            self.set('sigouts_{}_offset'.format(i), 0)
+            self.set('sigouts_{}_on'.format(i), 1)
+            self.set('sigouts_{}_direct'.format(i), 0)
+            self.set('sigouts_{}_range'.format(i), 5)
+            self.set('triggers_in_{}_imp50'.format(i), 1)
+            self.set('triggers_in_{}_level'.format(i), 0.5)
+
+        for i in range(4):
+            self.set('awgs_{}_enable'.format(i), 0)
+            self.set('awgs_{}_auxtriggers_0_channel'.format(i), 2 * i)
+            self.set('awgs_{}_auxtriggers_0_slope'.format(i), 0)
+            self.set('awgs_{}_dio_mask_value'.format(i), 1)
+            self.set('awgs_{}_dio_mask_shift'.format(i), 0)
+            self.set('awgs_{}_dio_strobe_index'.format(i), 0)
+            self.set('awgs_{}_dio_strobe_slope'.format(i), 0)
+            self.set('awgs_{}_dio_valid_index'.format(i), 0)
+            self.set('awgs_{}_dio_valid_polarity'.format(i), 0)
+            self.set('awgs_{}_outputs_0_amplitude'.format(i), 0)
+            self.set('awgs_{}_outputs_1_amplitude'.format(i), 0)
+        self.set('system_extclk', 0)
 
     def snapshot_base(self, update=False, params_to_skip_update=None):
         if params_to_skip_update is None:
@@ -93,11 +117,11 @@ class VirtualAWG8(Instrument):
         self._params_to_skip_update = []
         for ch in range(self._num_channels):
             for cw in range(self._num_codewords):
-                parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
+                parname = 'wave_ch{}_cw{:03}'.format(ch + 1, cw)
                 self.add_parameter(
                     parname,
                     label='Waveform channel {} codeword {:03}'.format(
-                        ch+1, cw),
+                        ch + 1, cw),
                     vals=vals.Arrays(),  # min_value, max_value = unknown
                     parameter_class=ManualParameter,
                     docstring=docst)
@@ -122,16 +146,14 @@ class VirtualAWG8(Instrument):
         self._waveforms[awg_nr][i] = (data1.copy(), data2.copy())
 
     def _write_csv_waveform(self, wf_name: str, waveform):
-        filename = os.path.join(
-            self.lab_one_webserver_path, 'awg', 'waves',
-            self._devname+'_'+wf_name+'.csv')
+        filename = os.path.join(self.lab_one_webserver_path, 'awg', 'waves',
+                                self._devname + '_' + wf_name + '.csv')
         with open(filename, 'w') as f:
             np.savetxt(filename, waveform, delimiter=",")
 
     def _read_csv_waveform(self, wf_name: str):
-        filename = os.path.join(
-            self.lab_one_webserver_path, 'awg', 'waves',
-            self._devname+'_'+wf_name+'.csv')
+        filename = os.path.join(self.lab_one_webserver_path, 'awg', 'waves',
+                                self._devname + '_' + wf_name + '.csv')
         try:
             return np.genfromtxt(filename, delimiter=',')
         except OSError as e:
@@ -139,3 +161,9 @@ class VirtualAWG8(Instrument):
             logging.warning(e)
             print(e)
             return None
+
+    def _delete_chache_files(self):
+        return None
+
+    def _delete_csv_files(self):
+        return None

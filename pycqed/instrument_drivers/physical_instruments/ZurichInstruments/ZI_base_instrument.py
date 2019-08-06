@@ -18,8 +18,8 @@ class ZI_base_instrument(Instrument):
         Takes in a node_doc JSON file auto generates parameters based on
         the contents of this file.
         """
-        f = open(filename).read()
-        node_pars = json.loads(f)
+        with open(filename) as f:
+            node_pars = json.loads(f.read())
         for par in node_pars.values():
             node = par['Node'].split('/')
             # The parfile is valid for all devices of a certain type

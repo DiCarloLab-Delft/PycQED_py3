@@ -24,7 +24,11 @@ import json
 import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
+from pycqed.measurement.hdf5_data import read_dict_from_hdf5
 import copy
+import logging
+log = logging.getLogger()
+log.addHandler(logging.StreamHandler())
 
 
 class BaseDataAnalysis(object):
@@ -63,7 +67,7 @@ class BaseDataAnalysis(object):
     '''
 
     def __init__(self, t_start: str = None, t_stop: str = None,
-                 label: str or list = '', data_file_path: str = None,
+                 label: str = '', data_file_path: str = None,
                  close_figs: bool = True, options_dict: dict = None,
                  extract_only: bool = False, do_fitting: bool = False):
         '''
@@ -117,16 +121,14 @@ class BaseDataAnalysis(object):
                                 -'verbose'
                                 -'auto-keys'
                                 -'twoD'
-                                -'ma_type'
-                                -'scan_label'
+                                -'timestamp_end'
+                                -'msmt_label'
                                 -'do_individual_traces'
-                                -'filter_no_analysis'
                                 -'exact_label_match'
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
         '''
-        # todo: what exactly does this flag do? May 2018 (Adriaan/Rene)
-        self.single_timestamp = False
+
         # initialize an empty dict to store results of analysis
         self.proc_data_dict = OrderedDict()
         if options_dict is None:
@@ -134,58 +136,31 @@ class BaseDataAnalysis(object):
         else:
             self.options_dict = options_dict
 
-        self.ma_type = self.options_dict.get('ma_type', 'MeasurementAnalysis')
-
         ################################################
         # These options determine what data to extract #
         ################################################
-        scan_label = self.options_dict.get('scan_label', label)
-        if scan_label is None:
-            self.labels = []
-        elif type(scan_label) is not list:
-            self.labels = [scan_label]
-        else:
-            self.labels = scan_label
-
-        # Initialize to None such that the attribute always exists.
-        self.data_file_path = None
-        if t_start is None and t_stop is None and data_file_path is None:
-            # Nothing specified -> find last file with label
-            # This is quite a hacky way to support finding the last file
-            # with a certain label, something that was trivial in the old
-            # analysis. A better solution should be implemented.
-            if isinstance(scan_label, list) and len(scan_label) > 1:
-                timestamps = []
-                for label in scan_label:
-                    timestamps.append(a_tools.latest_data(label,
-                                               return_timestamp=True)[0])
-                self.t_start = timestamps
-                self.timestamps = timestamps
+        self.timestamps = None
+        if data_file_path is None:
+            if t_start is None:
+                if isinstance(label, list):
+                    self.timestamps = [a_tools.latest_data(
+                        contains=lab, return_timestamp=True)[0] for lab in label]
+                else:
+                    self.timestamps = [a_tools.latest_data(
+                        contains=label, return_timestamp=True)[0]]
+            elif t_stop is None:
+                if isinstance(t_start, list):
+                    self.timestamps = t_start
+                else:
+                    self.timestamps = [t_start]
             else:
-                self.t_start = a_tools.latest_data(scan_label,
-                                                   return_timestamp=True)[0]
-        elif data_file_path is not None:
-            # Data file path specified ignore timestamps
-            self.extract_from_file = True
-            self.t_start = None
-            self.data_file_path = data_file_path
-        elif t_start is not None:
-            # No data file specified -> use timestamps
-            self.t_start = t_start
-        else:
-            raise ValueError('Either t_start or data_file_path must be '
-                             'given.')
+                self.timestamps = a_tools.get_timestamps_in_range(
+                    t_start, timestamp_end=t_stop,
+                    label=label if label != '' else None)
 
-        if t_stop is None:
-            self.t_stop = self.t_start
-        else:
-            self.t_stop = t_stop
-        self.do_individual_traces = self.options_dict.get(
-            'do_individual_traces', False)
-        self.filter_no_analysis = self.options_dict.get(
-            'filter_no_analysis', False)
-        self.exact_label_match = self.options_dict.get(
-            'exact_label_match', False)
+        if self.timestamps is None or len(self.timestamps) == 0:
+            raise ValueError('No data file found.')
+
 
         ########################################
         # These options relate to the plotting #
@@ -195,6 +170,8 @@ class BaseDataAnalysis(object):
         self.figs = OrderedDict()
         self.presentation_mode = self.options_dict.get(
             'presentation_mode', False)
+        self.do_individual_traces = self.options_dict.get(
+            'do_individual_traces', False)
         self.tight_fig = self.options_dict.get('tight_fig', True)
         # used in self.plot_text, here for future compatibility
         self.fancy_box_props = dict(boxstyle='round', pad=.4,
@@ -239,133 +216,137 @@ class BaseDataAnalysis(object):
             self.save_figures(close_figs=self.options_dict.get(
                 'close_figs', False))
 
-    def get_timestamps(self):
-        """
-        Extracts timestamps based on variables
-            self.t_start
-            self.t_stop
-            self.labels # currently set from options dict
-        """
-        if type(self.t_start) is list:
-            if (type(self.t_stop) is list and
-                    len(self.t_stop) == len(self.t_start)):
-                self.timestamps = []
-                for tt in range(len(self.t_start)):
-                    self.timestamps.extend(
-                        a_tools.get_timestamps_in_range(
-                            self.t_start[tt], self.t_stop[tt],
-                            label=self.labels,
-                            exact_label_match=self.exact_label_match))
-            else:
-                raise ValueError("Invalid number of t_stop timestamps.")
-        else:
-            self.timestamps = a_tools.get_timestamps_in_range(
-                self.t_start, self.t_stop,
-                label=self.labels,
-                exact_label_match=self.exact_label_match)
+    @staticmethod
+    def get_hdf_param_value(group, param_name):
+        '''
+        Returns an attribute "key" of the group "Experimental Data"
+        in the hdf5 datafile.
+        '''
+        s = group.attrs[param_name]
+        # converts byte type to string because of h5py datasaving
+        if type(s) == bytes:
+            s = s.decode('utf-8')
+        # If it is an array of value decodes individual entries
+        if type(s) == np.ndarray:
+            s = [s.decode('utf-8') for s in s]
+        return s
 
-        if len(np.ravel(self.timestamps)) < 1:
-            raise ValueError(
-                "No timestamps in range! Check the labels and other filters.")
+    def get_param_value(self, param_name, default_value=None):
+        return self.options_dict.get(param_name, self.metadata.get(
+            param_name, default_value))
+
+    def get_data_from_timestamp_list(self):
+        raw_data_dict = []
+        print(self.timestamps)
+        for timestamp in self.timestamps:
+            raw_data_dict_ts = OrderedDict([(param, []) for param in
+                                           self.params_dict])
+
+            folder = a_tools.get_folder(timestamp)
+            h5mode = self.options_dict.get('h5mode', 'r+')
+            h5filepath = a_tools.measurement_filename(folder)
+            data_file = h5py.File(h5filepath, h5mode)
+
+            if 'timestamp' in raw_data_dict_ts:
+                raw_data_dict_ts['timestamp'] = timestamp
+            if 'folder' in raw_data_dict_ts:
+                raw_data_dict_ts['folder'] = folder
+            if 'measurementstring' in raw_data_dict_ts:
+                raw_data_dict_ts['measurementstring'] = \
+                    os.path.split(folder)[1][7:]
+            if 'measured_data' in raw_data_dict_ts:
+                raw_data_dict_ts['measured_data'] = \
+                    np.array(data_file['Experimental Data']['Data']).T
+
+            for save_par, file_par in self.params_dict.items():
+                if len(file_par.split('.')) == 1:
+                    par_name = file_par.split('.')[0]
+                    for group_name in data_file.keys():
+                        if par_name in list(data_file[group_name].attrs):
+                            raw_data_dict_ts[save_par] = \
+                                self.get_hdf_param_value(
+                                    data_file[group_name], par_name)
+                else:
+                    group_name = '/'.join(file_par.split('.')[:-1])
+                    par_name = file_par.split('.')[-1]
+                    if group_name in data_file:
+                        if par_name in list(data_file[group_name].attrs):
+                            raw_data_dict_ts[save_par] = \
+                                self.get_hdf_param_value(
+                                    data_file[group_name], par_name)
+                        elif par_name in list(data_file[group_name].keys()):
+                            raw_data_dict_ts[save_par] = read_dict_from_hdf5(
+                                {}, data_file[group_name][par_name])
+                if isinstance(raw_data_dict_ts[save_par], list) and \
+                        len(raw_data_dict_ts[save_par]) == 1:
+                    raw_data_dict_ts[save_par] = raw_data_dict_ts[save_par][0]
+            raw_data_dict.append(raw_data_dict_ts)
+
+        if len(raw_data_dict) == 1:
+            raw_data_dict = raw_data_dict[0]
+        for par_name in raw_data_dict:
+            if par_name in self.numeric_params:
+                raw_data_dict[par_name] = np.double(raw_data_dict[par_name])
+        return raw_data_dict
+
+    @staticmethod
+    def add_measured_values_ord_dict(raw_data_dict):
+        if 'measured_data' in raw_data_dict and \
+                'value_names' in raw_data_dict:
+            measured_data = raw_data_dict.pop('measured_data')
+            raw_data_dict['measured_data'] = OrderedDict()
+            sweep_points = measured_data[:-len(raw_data_dict['value_names'])]
+            if sweep_points.shape[0] > 1:
+                raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
+                raw_data_dict['soft_sweep_points'] = np.unique(sweep_points[1:])
+            else:
+                raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
+
+            data = measured_data[-len(raw_data_dict['value_names']):]
+            if data.shape[0] != len(raw_data_dict['value_names']):
+                raise ValueError('Shape mismatch between data and ro channels.')
+            for i, ro_ch in enumerate(raw_data_dict['value_names']):
+                if 'soft_sweep_points' in raw_data_dict:
+                    hsl = len(raw_data_dict['hard_sweep_points'])
+                    ssl = len(raw_data_dict['soft_sweep_points'])
+                    measured_data = np.reshape(data[i], (ssl, hsl)).T
+                else:
+                    measured_data = data[i]
+                raw_data_dict['measured_data'][ro_ch] = measured_data
+        return raw_data_dict
 
     def extract_data(self):
         """
         Extracts the data specified in
             self.params_dict
             self.numeric_params
+        from each timestamp in self.timestamps
         and stores it into: self.raw_data_dict
-
-        Data extraction is now supported in three different ways
-            - using json
-            - single timestamp only
         """
-        if self.data_file_path is not None:
-            extension = self.data_file_path.split('.')[-1]
-            if extension == 'json':
-                with open(self.data_file_path, 'r') as file:
-                    self.raw_data_dict = json.load(file)
-            else:
-                raise RuntimeError('Cannot load data from file "{}". '
-                                   'Unknown file extension "{}"'
-                                   .format(self.data_file_path, extension))
-            return
 
-        if not hasattr(self, 'timestamps'):
-            self.get_timestamps()
+        self.params_dict.update(
+            {'sweep_parameter_names': 'sweep_parameter_names',
+             'sweep_parameter_units': 'sweep_parameter_units',
+             'measurementstring': 'measurementstring',
+             'value_names': 'value_names',
+             'value_units': 'value_units',
+             'measured_data': 'measured_data',
+             'timestamp': 'timestamp',
+             'folder': 'folder',
+             'exp_metadata':
+                 'Experimental Data.Experimental Metadata'})
 
-        # this disables the data extraction for other files if there is only
-        # one file being used to load data from
-        if self.single_timestamp:
-            self.timestamps = [self.timestamps[0]]
-        TwoD = self.options_dict.get('TwoD', False)
-        TwoD_tuples = self.options_dict.get('TwoD_tuples', False)
-        # this should always be extracted as it is used to determine where
-        # the file is as required for datasaving
-        self.params_dict['folder'] = 'folder'
-        self.raw_data_dict = a_tools.get_data_from_timestamp_list(
-            self.timestamps, param_names=self.params_dict,
-            ma_type=self.ma_type, TwoD_tuples=TwoD_tuples,
-            TwoD=TwoD, numeric_params=self.numeric_params,
-            filter_no_analysis=self.filter_no_analysis)
 
-        # Use timestamps to calculate datetimes and add to dictionary
-        self.raw_data_dict['datetime'] = [a_tools.datetime_from_timestamp(
-            timestamp) for timestamp in self.raw_data_dict['timestamps']]
-
-        # Convert temperature data to dictionary form and extract Tmc
-        if 'temperatures' in self.raw_data_dict:
-            temp = []
-            self.raw_data_dict['Tmc'] = []
-            for ii in range(len(self.raw_data_dict['temperatures'])):
-                exec("temp.append(%s)" %
-                     (self.raw_data_dict['temperatures'][ii]))
-                self.raw_data_dict['Tmc'].append(
-                    temp[ii].get('T_MClo', None))
-            self.raw_data_dict['temperatures'] = temp
-
-        # this is a hacky way to use the same data extraction when there is
-        # many files as when there is few files.
-        if self.single_timestamp:
-            new_dict = {}
-            for key, value in self.raw_data_dict.items():
-                if key != 'timestamps':
-                    new_dict[key] = value[0]
-            self.raw_data_dict = new_dict
-            self.raw_data_dict['timestamp'] = self.timestamps[0]
-        self.raw_data_dict['timestamps'] = self.timestamps
-        self.raw_data_dict['nr_experiments'] = len(self.timestamps)
-
-        # Converts a multi file 'measured_values' dict to an ordered dict
-        # from which values can be easily extracted
-        if ('measured_values' in self.raw_data_dict and
-                'value_names' in self.raw_data_dict and
-                not self.single_timestamp):
-            # the not self.single_timestamp is there for legacy reasons
-            measured_values_dict = OrderedDict()
-            for key in (self.raw_data_dict['value_names'][0]):
-                measured_values_dict[key] = []
-            for dset in self.raw_data_dict['measured_values']:
-                for i, col in enumerate(dset):
-                    measured_values_dict[self.raw_data_dict[
-                        'value_names'][0][i]].append(col)
-            self.raw_data_dict[
-                'measured_values_ord_dict'] = measured_values_dict
-
-    def extract_data_json(self):
-        file_name = self.t_start
-        with open(file_name, 'r') as f:
-            raw_data_dict = json.load(f)
-        # print [[key, type(val[0]), len(val)] for key, val in
-        # raw_data_dict.items()]
-        self.raw_data_dict = {}
-        for key, val in list(raw_data_dict.items()):
-            if type(val[0]) is dict:
-                self.raw_data_dict[key] = val[0]
-            else:
-                self.raw_data_dict[key] = np.double(val)
-        # print [[key, type(val), len(val)] for key, val in
-        # self.raw_data_dict.items()]
-        self.raw_data_dict['timestamps'] = [self.t_start]
+        self.raw_data_dict = self.get_data_from_timestamp_list()
+        if len(self.timestamps) == 1:
+            self.raw_data_dict = self.add_measured_values_ord_dict(
+                self.raw_data_dict)
+        else:
+            temp_dict_list = []
+            for i, rd_dict in enumerate(self.raw_data_dict):
+                temp_dict_list.append(
+                    self.add_measured_values_ord_dict(rd_dict))
+            self.raw_data_dict = tuple(temp_dict_list)
 
     def process_data(self):
         """
@@ -394,7 +375,11 @@ class BaseDataAnalysis(object):
                      close_figs: bool = True):
 
         if savedir is None:
-            savedir = self.raw_data_dict.get('folder', '')
+            if isinstance(self.raw_data_dict, tuple):
+                savedir = self.raw_data_dict[0].get('folder', '')
+            else:
+                savedir = self.raw_data_dict.get('folder', '')
+
             if isinstance(savedir, list):
                 savedir = savedir[0]
             if isinstance(savedir, list):
@@ -402,7 +387,10 @@ class BaseDataAnalysis(object):
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_' + self.raw_data_dict['timestamps'][0]
+            if isinstance(self.raw_data_dict, tuple):
+                tstag = '_' + self.raw_data_dict[0]['timestamp']
+            else:
+                tstag = '_' + self.raw_data_dict['timestamp']
         else:
             tstag = ''
 
@@ -462,7 +450,7 @@ class BaseDataAnalysis(object):
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_' + self.raw_data_dict['timestamps'][0]
+            tstag = '_' + self.raw_data_dict['timestamp'][0]
         else:
             tstag = ''
 
@@ -548,7 +536,12 @@ class BaseDataAnalysis(object):
         if hasattr(self, 'fit_res') and self.fit_res is not None:
             fn = self.options_dict.get('analysis_result_file', False)
             if fn == False:
-                fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
+                if isinstance(self.raw_data_dict, tuple):
+                    timestamp = self.raw_data_dict[0]['timestamp']
+                else:
+                    timestamp = self.raw_data_dict['timestamp']
+                fn = a_tools.measurement_filename(a_tools.get_folder(
+                    timestamp))
 
             try:
                 os.mkdir(os.path.dirname(fn))
@@ -597,8 +590,12 @@ class BaseDataAnalysis(object):
                 and key in self.proc_data_dict:
             fn = self.options_dict.get('analysis_result_file', False)
             if fn == False:
-                fn = a_tools.measurement_filename(
-                    a_tools.get_folder(self.timestamps[0]))
+                if isinstance(self.raw_data_dict, tuple):
+                    timestamp = self.raw_data_dict[0]['timestamp']
+                else:
+                    timestamp = self.raw_data_dict['timestamp']
+                fn = a_tools.measurement_filename(a_tools.get_folder(
+                    timestamp))
             try:
                 os.mkdir(os.path.dirname(fn))
             except FileExistsError:

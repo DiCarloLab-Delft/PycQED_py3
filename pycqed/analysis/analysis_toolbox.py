@@ -1,6 +1,7 @@
 # some convenience tools
 #
 import logging
+log = logging.getLogger(__name__)
 import numpy as np
 import os
 import time
@@ -318,52 +319,43 @@ def get_param_value_from_file(file_path, instr_name, param_name, h5mode='r+'):
         if param_name in list(instr_settings[instr_name].attrs):
             param_val = float(instr_settings[instr_name].attrs[param_name])
         else:
-            raise ValueError('"{}" does not exist for instrument "{}"'.format(
+            raise KeyError('"{}" does not exist for instrument "{}"'.format(
                 param_name, instr_name))
     else:
-        raise ValueError('"{}" does not exist in "Instrument settings."'.format(
+        raise KeyError('"{}" does not exist in "Instrument settings."'.format(
             instr_name))
 
     return param_val
 
 
-def get_qb_channel_map_from_file(qb_names, file_path,
-                                 ro_type='', h5mode='r+'):
+def get_qb_channel_map_from_file(qb_names, file_path, value_names, h5mode='r+'):
 
     data_file = h5py.File(measurement_filename(file_path), h5mode)
     instr_settings = data_file['Instrument settings']
     channel_map = {}
 
-    if len(ro_type) != 0:
-        if 'raw' in ro_type:
-            ro_type = 'raw w'
-        elif 'digitized' in ro_type:
-            ro_type = 'digitized w'
-        elif 'lin_trans' in ro_type:
-            ro_type = 'lin_trans w'
-        else:
-            input_ro_type = ro_type
-            ro_type = 'w'
-            logging.warning('Readout type "{}" does not have standard '
-                            'format.'.format(input_ro_type))
+    if 'raw' in value_names[0]:
+        ro_type = 'raw w'
+    elif 'digitized' in value_names[0]:
+        ro_type = 'digitized w'
+    elif 'lin_trans' in value_names[0]:
+        ro_type = 'lin_trans w'
+    else:
+        input_ro_type = value_names[0]
+        ro_type = 'w'
+        logging.warning('Readout type "{}" does not have standard '
+                        'format.'.format(input_ro_type))
 
     for qbn in qb_names:
         try:
-            ro_acq_weight_type = instr_settings[qbn].attrs['ro_acq_weight_type']
-            if ro_acq_weight_type in ['optimal', 'square_rot']:
-                channel_map[qbn] = [ro_type + str(
-                    instr_settings[qbn].attrs['RO_acq_weight_function_I'])]
-            elif ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
-                channel_map[qbn] = [
-                    ro_type +
-                    str(instr_settings[qbn].attrs['RO_acq_weight_function_I']),
-                    ro_type +
-                    str(instr_settings[qbn].attrs['RO_acq_weight_function_Q'])]
-            else:
-                raise ValueError('Unknown ro_acq_weight_type "{}."'.format(
-                    ro_acq_weight_type))
+            qbchs = [str(instr_settings[qbn].attrs['acq_I_channel'])]
+            ro_acq_weight_type = instr_settings[qbn].attrs['acq_weights_type']
+            if ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
+                qbchs += [str(instr_settings[qbn].attrs['acq_Q_channel'])]
+            channel_map[qbn] = [ch for ch in value_names for nr in qbchs
+                                if ro_type+nr in ch]
         except KeyError:
-            print('Could not get channels')
+            log.warning('Could not get channels')
             pass
     return channel_map
 
@@ -816,11 +808,12 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         # Remove all hidden folders to prevent errors
         all_measdirs = [d for d in all_measdirs if not d.startswith('.')]
 
-        if exact_label_match:
-            all_measdirs = [x for x in all_measdirs if label in x]
-        else:
-            for each_label in label:
-                all_measdirs = [x for x in all_measdirs if each_label in x]
+        if np.all([l is not None for l in label]):
+            if exact_label_match:
+                all_measdirs = [x for x in all_measdirs if label in x]
+            else:
+                for each_label in label:
+                    all_measdirs = [x for x in all_measdirs if each_label in x]
         if (date.date() - datetime_start.date()).days == 0:
             # Check if newer than starting timestamp
             timemark_start = timemark_from_datetime(datetime_start)
