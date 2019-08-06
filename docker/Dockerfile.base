@@ -42,7 +42,7 @@ RUN pip install --upgrade --no-cache-dir pip && \
         networkx \
         spirack \
         pyzmq \
-        "pygsti<0.9.6" \
+        "pygsti==0.9.6" \
         pyqtgraph \
         pyserial \
         pytest \
