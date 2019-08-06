@@ -11,7 +11,7 @@ Bugs:
 '''
 
 from .SCPI import SCPI
-
+from qcodes.instrument.base import Instrument
 import numpy as np
 import struct
 import json
@@ -20,8 +20,7 @@ from qcodes import validators as vals
 import warnings
 from typing import List, Sequence, Dict
 from qcodes.utils.helpers import full_class
-
-
+from qcodes.instrument.parameter import ManualParameter
 from qcodes.instrument.parameter import Parameter
 from qcodes.instrument.parameter import Command
 
@@ -183,7 +182,7 @@ class QuTech_AWG_Module(SCPI):
                            label='DIO calibration status',
                            get_cmd='DIO:CALibrate?',
                            val_mapping={True: '1', False: '0'},
-                           docstring="""Get DIO calibration status\n 
+                           docstring="""Get DIO calibration status\n
                                         Result:\n
                                        \tTrue: DIO is calibrated\n
                                        \tFalse: DIO is not calibrated"""
@@ -1006,3 +1005,76 @@ class QuTech_AWG_Module(SCPI):
         def get_func():
             return fun(ch, cw)
         return get_func
+
+
+
+
+class Mock_QWG(QuTech_AWG_Module):
+    """
+    This is a mock QWG instrument designed to mock the QWG
+    interface for testing purposes
+    """
+
+    def __init__(self, name, **kwargs):
+        Instrument.__init__(self, name=name,  **kwargs)
+
+        # AWG properties
+        self.device_descriptor = type('', (), {})()
+        self.device_descriptor.model = 'QWG'
+        self.device_descriptor.numChannels = 4
+        self.device_descriptor.numDacBits = 12
+        self.device_descriptor.numMarkersPerChannel = 2
+        self.device_descriptor.numMarkers = 8
+        self.device_descriptor.numTriggers = 14
+
+        self._nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
+        self.device_descriptor.numMaxCwBits = 32 # Some random mock val
+
+        self._nr_cw_inp_cmd = "SYSTem:CODEwords:SELect?"
+        self.device_descriptor.numSelectCwInputs = 5 # Some random mock val
+        self.device_descriptor.numCodewords = pow(2, 5) # Some random mock val
+
+        # valid values
+        self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
+        self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 5.0)
+
+        cw_protocol_mt = {
+            # Name          Ch1,    Ch2,    Ch3,    Ch4
+            'FLUX':         [0x5F,  0x5F,   0x5F,   0x5F],
+            'MICROWAVE':    [0x5F,  0x5F,   0x5F,   0x5F]
+        }
+
+        cw_protocol_dio = {
+            # Name          Ch1,   Ch2,  Ch3,  Ch4
+            'FLUX':         [0x07, 0x38, 0x1C0, 0xE00],
+            'MICROWAVE':    [0x3FF, 0x3FF, 0x3FF, 0x3FF]
+        }
+
+        if self.device_descriptor.numMaxCwBits <= 7:
+            self.codeword_protocols = cw_protocol_mt
+        else:
+            self.codeword_protocols = cw_protocol_dio
+
+
+        # FIXME: not in [V]
+
+        # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        self._params_exclude_snapshot = []
+
+        self._params_to_skip_update = []
+        self.add_parameters()
+        # self.connect_message()
+
+    def add_parameter(self, name: str,
+                      parameter_class: type=Parameter, **kwargs) -> None:
+
+        kwargs.pop('get_cmd', None)
+        kwargs.pop('set_cmd', None)
+        return super().add_parameter(name=name,
+                                     parameter_class=ManualParameter, **kwargs)
+
+    def stop(self):
+        pass
+
+    def start(self):
+        pass
