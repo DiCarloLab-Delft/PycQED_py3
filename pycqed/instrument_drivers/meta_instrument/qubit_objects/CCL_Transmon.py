@@ -363,10 +363,10 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mw_channel_amp',
-                           label='AWG8 channel amplitude',
+                           label='AWG channel amplitude. WARNING: Check your hardware specific limits!',
                            unit='',
                            initial_value=.5,
-                           vals=vals.Numbers(min_value=0, max_value=1.0),
+                           vals=vals.Numbers(min_value=0, max_value=1.6),
                            parameter_class=ManualParameter)
 
         self.add_parameter('mw_ef_amp',
