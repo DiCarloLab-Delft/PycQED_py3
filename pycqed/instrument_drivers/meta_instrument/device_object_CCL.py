@@ -421,7 +421,7 @@ class DeviceCCL(Instrument):
         return d
 
     def get_int_logging_detector(self, qubits,
-                                 result_logging_mode='lin_trans'):
+                                 result_logging_mode='raw'):
         acq_instruments, ro_ch_idx, value_names = \
             self._get_ro_channels_and_labels(qubits)
         int_log_dets=[]
@@ -1170,7 +1170,7 @@ class DeviceCCL(Instrument):
                                detector=None,
                                nr_shots: int=4088*4,
                                prepare_for_timedomain: bool =True,
-                               result_logging_mode='lin_trans',
+                               result_logging_mode='raw',
                                initialize: bool=False,
                                analyze=True,
                                MC=None):
@@ -1197,7 +1197,7 @@ class DeviceCCL(Instrument):
         if detector is None:
             # right is LSQ
             d = self.get_int_logging_detector(qubits,
-                                              result_logging_mode='lin_trans')
+                                              result_logging_mode=result_logging_mode)
             #d.nr_shots = 4088  # To ensure proper data binning
         else:
             d = detector
