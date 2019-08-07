@@ -233,6 +233,8 @@ class Base_MW_LutMan(Base_LutMan):
                         length=self.mw_gauss_width()*4,
                         f_modulation=self.mw_modulation(),
                         sampling_rate=self.sampling_rate())
+                else:
+                    raise KeyError('Expected parameter "sq_amp" to exist')
             else:
                 raise ValueError
 
@@ -255,7 +257,8 @@ class Base_MW_LutMan(Base_LutMan):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        if isinstance(waveform_name, int):  # FIXME: type mismatch with function parameter, misleading name
+        # FIXME: type mismatch with function parameter, misleading name
+        if isinstance(waveform_name, int):
             cw_idx = waveform_name
         else:
             raise DeprecationWarning
@@ -279,7 +282,6 @@ class Base_MW_LutMan(Base_LutMan):
             lm[i+9] = {"name": "rPhi90",    "theta": 90,
                        "phi": phase, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
-
 
     def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
                                                mod_freqs: list=None):
@@ -389,6 +391,13 @@ class QWG_MW_LutMan(Base_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0)
 
+    def _add_waveform_parameters(self):
+        super()._add_waveform_parameters()
+        # Parameters for a square pulse
+        self.add_parameter('sq_amp',
+                           unit='frac', vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter,
+                           initial_value=0.5)
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
@@ -402,52 +411,38 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         assert val_Q == val_I
         return val_I
 
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
+    def load_waveform_onto_AWG_lookuptable(
+            self, wave_id: str, regenerate_waveforms: bool=False):
+        """
+        Load a waveform into the AWG.
+
+        Args:
+            wave_id: can be either the "name" of a waveform or
+                the integer key in self._wave_dict.
+            regenerate_waveforms (bool) : if True regenerates all waveforms
+        """
         if regenerate_waveforms:
             self.generate_standard_waveforms()
-        # waveform_name is pulse string (i.e. 'X180')
-        # waveforms is the tuple (G,D) with the actual pulseshape array
-        # codewords is the tuple (A,B) with the strings wave_chY_cwXXX
-        # codeword_int is the number XXX (see line above)
-        codeword_int = waveform_name
-        wf_name = self._get_wf_name_from_cw(codeword_int)
-        waveforms = self._wave_dict[codeword_int]
-        # get redundant codewords as a list
-        redundant_cw_list = get_redundant_codewords(codeword_int,
-                                                    bit_width=self.bit_width(),
-                                                    bit_shift=self.bit_shift())
-        # update all of them
-        for redundant_cw_idx in redundant_cw_list:
-            redundant_cw_I = 'wave_ch{}_cw{:03}'.format(self.channel_I(),
-                                                        redundant_cw_idx)
-            self.AWG.get_instr().set(redundant_cw_I, waveforms[0])
-            redundant_cw_Q = 'wave_ch{}_cw{:03}'.format(self.channel_Q(),
-                                                        redundant_cw_idx)
-            self.AWG.get_instr().set(redundant_cw_Q, waveforms[1])
 
-    def _get_wf_name_from_cw(self, codeword: int):
-        for idx, waveform in self.LutMap().items():
-            if int(idx) == codeword:
-                return waveform['name']
-        raise ValueError("Codeword {} not specified"
-                         " in LutMap".format(codeword))
+        if wave_id not in self.LutMap().keys():
+            wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
 
-    def _get_cw_from_wf_name(self, wf_name: str):
-        for idx, waveform in self.LutMap().items():
-            if wf_name == waveform['name']:
-                return int(idx)
-        raise ValueError("Waveform {} not specified"
-                         " in LutMap".format(wf_name))
+        wf_I, wf_Q = self._wave_dict[wave_id]
+
+        wf_name_I = 'wave_ch{}_cw{:03}'.format(self.channel_I(), wave_id)
+        wf_name_Q = 'wave_ch{}_cw{:03}'.format(self.channel_Q(), wave_id)
+
+        self.AWG.get_instr().set(wf_name_I, wf_I)
+        self.AWG.get_instr().set(wf_name_Q, wf_Q)
 
     def apply_mixer_predistortion_corrections(self, wave_dict):
         M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
                                           self.mixer_phi())
 
-        self.AWG.get_instr()._setMatrix(chPair=self.channel_I(), mat=M)
+        self.AWG.get_instr().set(
+            'ch_pair{}_transform_matrix'.format(self.channel_I()), M)
 
         return wave_dict
-
 
 
 class AWG8_MW_LutMan(Base_MW_LutMan):
@@ -799,10 +794,12 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         super().__init__(name, **kw)
 
         # sacrifices last pulse 'Spec' from std list to have 3 bit (8)
-        self._def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90', 'rXm90',  'rYm90', 'rPhi90']
+        self._def_lm = ['I', 'rX180',  'rY180', 'rX90',
+                        'rY90', 'rXm90',  'rYm90', 'rPhi90']
         self.set_default_lutmap()
 
-        self._vqe_lm = ['I', 'X180c',  'Y180c', 'X90c',  'Xm90c', 'Y90c',  'Y90c', 'rY180']
+        self._vqe_lm = ['I', 'X180c',  'Y180c',
+                        'X90c',  'Xm90c', 'Y90c',  'Y90c', 'rY180']
 
     def set_VQE_lutmap(self):
         """
@@ -830,7 +827,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0)
         # parameters related to timings
-        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0,1e-6),
+        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0, 1e-6),
                            parameter_class=ManualParameter,
                            initial_value=0)
 
@@ -841,7 +838,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         else:
             f_modulation = 0
             self.AWG.get_instr().set('ch_pair{}_sideband_frequency'.format(self.channel_I()),
-                           self.mw_modulation())
+                                     self.mw_modulation())
             self.AWG.get_instr().syncSidebandGenerators()
 
         ########################################

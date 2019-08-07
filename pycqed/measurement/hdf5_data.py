@@ -259,7 +259,8 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
                 # the writing part in the writing function above.
                 list_of_str = [x[0] for x in item.value]
                 data_dict[key] = list_of_str
-
+            elif item.attrs['list_type'] == 'array':
+                data_dict[key] = list(item.value)
             else:
                 data_dict[key] = list(item.value)
     for key, item in h5_group.attrs.items():
