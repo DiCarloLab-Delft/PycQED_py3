@@ -217,7 +217,7 @@ class Multi_Detector(Detector_Function):
             detector.finish()
 
 
-class Multi_Detector_UHF(Detector_Function):
+class Multi_Detector_UHF(Multi_Detector):
     """
     Special multi detector
     """
@@ -1083,6 +1083,8 @@ class Function_Detector(Soft_Detector):
             self.prepare_function(**self.prepare_function_kwargs)
 
     def acquire_data_point(self, **kw):
+        if self.always_prepare:
+            self.prepare()
         measurement_kwargs = {}
         # If an entry has a get method that will be used to set the value.
         # This makes parameters work in this context.

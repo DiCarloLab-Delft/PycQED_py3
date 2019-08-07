@@ -8,8 +8,9 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
+from pycqed.utilities.general import check_keyboard_interrupt
 from qcodes.instrument.parameter import ManualParameter
-
+from qcodes.utils.helpers import full_class
 
 class UHFQC(Instrument):
 
@@ -173,10 +174,89 @@ class UHFQC(Instrument):
                                parameter_class=ManualParameter)
         if init:
             self.load_default_settings()
+        
+
+        # Ensure snapshot is fairly small for HDAWGs 
+        self._snapshot_whitelist = {
+            'IDN', 'timeout', 'system_extclk', 
+            'quex_wint_mode','quex_wint_delay','quex_wint_length',
+            'sigins_0_min', 'sigins_0_max', 
+            'sigins_0_on', 'sigins_0_range', 'sigins_0_scaling',
+            'sigins_1_on', 'sigins_1_range', 'sigins_1_scaling' 
+            'sigouts_0_on', 'sigouts_0_range', 'sigouts_0_amplitudes_0'
+            'sigouts_1_on', 'sigouts_1_range', 'sigouts_1_amplitudes_1' 
+            'quex_rl_acqcnt','quex_rl_avgcnt','quex_rl_length', 'quex_rl_delay',
+            'quex_iavg_acqcnt','quex_iavg_avgcnt','quex_iavg_length', 'quex_iavg_delay',
+            'awgs_0_enable', 'awgs_0_outputs_0_amplitude', 'awgs_0_outputs_1_amplitude'
+
+}
+        for i in range(16): 
+            self._snapshot_whitelist.update({ 
+                'awgs_0_userregs_{}'.format(i)})
+
+        for i in range(9): 
+            self._snapshot_whitelist.update({
+                'qeux_thres_{}_level'.format(i),
+                'qeux_wint_source_{}'.format(i),
+                
+                })
+
+
+        self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
+
         t1 = time.time()
 
         print('Initialized UHFQC', self._device,
               'in %.2fs' % (t1-t0))
+
+
+
+    def snapshot_base(self, update: bool=False,
+                      params_to_skip_update =None, 
+                      params_to_exclude = None ):
+        """
+        State of the instrument as a JSON-compatible dict.
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+        Returns:
+            dict: base snapshot
+        """
+
+
+        if params_to_exclude is None: 
+            params_to_exclude = self._params_to_exclude
+
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                pass 
+            elif params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+                try:
+                    snap['parameters'][name] = param.snapshot(update=update_par)
+                except:
+                    logging.info("Snapshot: Could not update parameter: {}".format(name))
+                    snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
+        return snap
 
     def load_default_settings(self, upload_sequence=True):
         # standard configurations adapted from Haendbaek's notebook
@@ -525,6 +605,12 @@ class UHFQC(Instrument):
 
         while accumulated_time < self.timeout() and not all(gotem):
             dataset = self._daq.poll(acquisition_time, 1, 4, True)
+            try: 
+                check_keyboard_interrupt()
+            except KeyboardInterrupt as e:
+                # Finalize acquisition before raising exception
+                self.acquisition_finalize() 
+                raise e  
 
             for n, p in enumerate(self.acquisition_paths):
                 if p in dataset:

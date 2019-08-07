@@ -298,9 +298,11 @@ class DeviceCCL(Instrument):
                 AWG_name = self.get('instr_AWG_{}'.format(lat_key))
                 if AWG_name is not None:
                     AWG = self.find_instrument(AWG_name)
-                    # All channels are set globally from the device object.
-                    for i in range(8): # assumes the AWG is an HDAWG
-                        AWG.set('sigouts_{}_delay'.format(i), lat_fine)
+                    using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+                    if not using_QWG:
+                        # All channels are set globally from the device object.
+                        for i in range(8): # assumes the AWG is an HDAWG
+                            AWG.set('sigouts_{}_delay'.format(i), lat_fine)
 
 
 
@@ -419,7 +421,7 @@ class DeviceCCL(Instrument):
         return d
 
     def get_int_logging_detector(self, qubits,
-                                 result_logging_mode='lin_trans'):
+                                 result_logging_mode='raw'):
         acq_instruments, ro_ch_idx, value_names = \
             self._get_ro_channels_and_labels(qubits)
         int_log_dets=[]
@@ -916,6 +918,7 @@ class DeviceCCL(Instrument):
                                 sequence_type='sequential',
                                 replace_q1_pulses_X180: bool=False,
                                 analyze: bool=True, close_fig: bool=True,
+                                detector: str='correl',
                                 prepare_for_timedomain: bool=True, MC=None):
         '''
         Perform AllXY measurement simultaneously of two qubits (c.f. measure_allxy
@@ -958,7 +961,10 @@ class DeviceCCL(Instrument):
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
 
-        d = self.get_correlation_detector([q0, q1])
+        if detector == 'correl':
+            d = self.get_correlation_detector([q0, q1])
+        elif detector == 'int_avg':
+            d = self.get_int_avg_det(qubits=[q0,q1])
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
@@ -1164,7 +1170,7 @@ class DeviceCCL(Instrument):
                                detector=None,
                                nr_shots: int=4088*4,
                                prepare_for_timedomain: bool =True,
-                               result_logging_mode='lin_trans',
+                               result_logging_mode='raw',
                                initialize: bool=False,
                                analyze=True,
                                MC=None):
@@ -1191,7 +1197,7 @@ class DeviceCCL(Instrument):
         if detector is None:
             # right is LSQ
             d = self.get_int_logging_detector(qubits,
-                                              result_logging_mode='lin_trans')
+                                              result_logging_mode=result_logging_mode)
             #d.nr_shots = 4088  # To ensure proper data binning
         else:
             d = detector

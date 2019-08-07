@@ -233,6 +233,8 @@ class Base_MW_LutMan(Base_LutMan):
                         length=self.mw_gauss_width()*4,
                         f_modulation=self.mw_modulation(),
                         sampling_rate=self.sampling_rate())
+                else:
+                    raise KeyError('Expected parameter "sq_amp" to exist')
             else:
                 raise ValueError
 
@@ -255,7 +257,8 @@ class Base_MW_LutMan(Base_LutMan):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        if isinstance(waveform_name, int):  # FIXME: type mismatch with function parameter, misleading name
+        # FIXME: type mismatch with function parameter, misleading name
+        if isinstance(waveform_name, int):
             cw_idx = waveform_name
         else:
             raise DeprecationWarning
@@ -279,7 +282,6 @@ class Base_MW_LutMan(Base_LutMan):
             lm[i+9] = {"name": "rPhi90",    "theta": 90,
                        "phi": phase, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
-
 
     def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
                                                mod_freqs: list=None):
@@ -381,6 +383,21 @@ class QWG_MW_LutMan(Base_MW_LutMan):
                            docstring=('using the channel amp as additional'
                                       'parameter to allow rabi-type experiments without'
                                       'wave reloading. Should not be using VSM'))
+        # parameters related to codeword bits
+        self.add_parameter('bit_shift', unit='', vals=vals.Ints(0, 8),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+        self.add_parameter('bit_width', unit='', vals=vals.Ints(0, 8),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+
+    def _add_waveform_parameters(self):
+        super()._add_waveform_parameters()
+        # Parameters for a square pulse
+        self.add_parameter('sq_amp',
+                           unit='frac', vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter,
+                           initial_value=0.5)
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
@@ -393,6 +410,43 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         val_Q = AWG.get('ch{}_amp'.format(self.channel_Q()))
         assert val_Q == val_I
         return val_I
+
+    def load_waveform_onto_AWG_lookuptable(
+            self, wave_id: str, regenerate_waveforms: bool=False):
+        """
+        Load a waveform into the AWG.
+
+        Args:
+            wave_id: can be either the "name" of a waveform or
+                the integer key in self._wave_dict.
+            regenerate_waveforms (bool) : if True regenerates all waveforms
+        """
+        if regenerate_waveforms:
+            self.generate_standard_waveforms()
+
+        if wave_id not in self.LutMap().keys():
+            wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
+
+        wf_I, wf_Q = self._wave_dict[wave_id]
+
+        wf_name_I = 'wave_ch{}_cw{:03}'.format(self.channel_I(), wave_id)
+        wf_name_Q = 'wave_ch{}_cw{:03}'.format(self.channel_Q(), wave_id)
+
+        self.AWG.get_instr().set(wf_name_I, wf_I)
+        self.AWG.get_instr().set(wf_name_Q, wf_Q)
+
+    def apply_mixer_predistortion_corrections(self, wave_dict):
+        M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
+                                          self.mixer_phi())
+
+        self.AWG.get_instr().set(
+            'ch_pair{}_transform_matrix'.format(self.channel_I()), M)
+        # in the QWG the predistortion matrix is implemented in hardware 
+        # and does not modify the actual wave dict. 
+        # the wave dict is still returned unmodified to preserve the 
+        # call signature as required for HDAWG compatibility. 
+
+        return wave_dict
 
 
 class AWG8_MW_LutMan(Base_MW_LutMan):
@@ -744,10 +798,12 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         super().__init__(name, **kw)
 
         # sacrifices last pulse 'Spec' from std list to have 3 bit (8)
-        self._def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90', 'rXm90',  'rYm90', 'rPhi90']
+        self._def_lm = ['I', 'rX180',  'rY180', 'rX90',
+                        'rY90', 'rXm90',  'rYm90', 'rPhi90']
         self.set_default_lutmap()
 
-        self._vqe_lm = ['I', 'X180c',  'Y180c', 'X90c',  'Xm90c', 'Y90c',  'Y90c', 'rY180']
+        self._vqe_lm = ['I', 'X180c',  'Y180c',
+                        'X90c',  'Xm90c', 'Y90c',  'Y90c', 'rY180']
 
     def set_VQE_lutmap(self):
         """
@@ -775,7 +831,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0)
         # parameters related to timings
-        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0,1e-6),
+        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0, 1e-6),
                            parameter_class=ManualParameter,
                            initial_value=0)
 
@@ -786,7 +842,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         else:
             f_modulation = 0
             self.AWG.get_instr().set('ch_pair{}_sideband_frequency'.format(self.channel_I()),
-                           self.mw_modulation())
+                                     self.mw_modulation())
             self.AWG.get_instr().syncSidebandGenerators()
 
         ########################################
