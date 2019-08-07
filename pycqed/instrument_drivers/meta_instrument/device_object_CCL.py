@@ -298,9 +298,11 @@ class DeviceCCL(Instrument):
                 AWG_name = self.get('instr_AWG_{}'.format(lat_key))
                 if AWG_name is not None:
                     AWG = self.find_instrument(AWG_name)
-                    # All channels are set globally from the device object.
-                    for i in range(8): # assumes the AWG is an HDAWG
-                        AWG.set('sigouts_{}_delay'.format(i), lat_fine)
+                    using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+                    if not using_QWG:
+                        # All channels are set globally from the device object.
+                        for i in range(8): # assumes the AWG is an HDAWG
+                            AWG.set('sigouts_{}_delay'.format(i), lat_fine)
 
 
 
