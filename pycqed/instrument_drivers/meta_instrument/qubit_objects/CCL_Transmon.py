@@ -33,6 +33,10 @@ import cma
 from pycqed.measurement.optimization import nelder_mead
 import datetime
 
+# Imported for a type check 
+from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
+    import QuTech_AWG_Module
+
 
 class CCLight_Transmon(Qubit):
 
@@ -457,6 +461,14 @@ class CCLight_Transmon(Qubit):
                            initial_value=0, unit='deg',
                            parameter_class=ManualParameter)
 
+    def _using_QWG(self): 
+        """
+        Checks if a QWG is used for microwave control. 
+        """
+        AWG = self.instr_LutMan_MW.get_instr().AWG.get_instr()
+        return isinstance(AWG, QuTech_AWG_Module)
+
+
     def _set_mw_vsm_delay(self, val):
         # sort of a pseudo Manual Parameter
         self.instr_CC.get_instr().set(
@@ -473,8 +485,7 @@ class CCLight_Transmon(Qubit):
         else:
             lutman = self.find_instrument(self.instr_LutMan_MW())
             AWG = lutman.find_instrument(lutman.AWG())
-            using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
-            if using_QWG:
+            if self._using_QWG():
                 logging.warning('CCL transmon is using QWG. mw_fine_delay not supported.')
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_I()-1), val)
@@ -489,8 +500,7 @@ class CCLight_Transmon(Qubit):
         if self.instr_LutMan_Flux() is not None:
             lutman = self.find_instrument(self.instr_LutMan_Flux())
             AWG = lutman.find_instrument(lutman.AWG())
-            using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
-            if using_QWG:
+            if self._using_QWG():
                 logging.warning('CCL transmon is using QWG. Not implemented.')
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
@@ -1108,8 +1118,6 @@ class CCLight_Transmon(Qubit):
         # 1. Gets instruments and prepares cases
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         AWG = MW_LutMan.AWG.get_instr()
-        using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
-        using_VSM = self.cfg_with_vsm()
 
         # 2. Prepares map and parameters for waveforms
         #    (except pi-pulse amp, which depends on VSM usage)
@@ -1128,7 +1136,7 @@ class CCLight_Transmon(Qubit):
         # 3. Does case-dependent things:
         #                mixers offset+skewness
         #                pi-pulse amplitude
-        if using_VSM:
+        if self.cfg_with_vsm():
             # case with VSM (both QWG and AWG8)
             MW_LutMan.mw_amp180(self.mw_amp180())
             MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
@@ -1141,7 +1149,7 @@ class CCLight_Transmon(Qubit):
             MW_LutMan.channel_DI(2+self.mw_awg_ch())
             MW_LutMan.channel_DQ(3+self.mw_awg_ch())
 
-            if using_QWG:
+            if self._using_QWG():
                 # N.B. This part is QWG specific
                 if hasattr(MW_LutMan, 'channel_GI'):
                     # 4-channels are used for VSM based AWG's.
@@ -1162,7 +1170,7 @@ class CCLight_Transmon(Qubit):
         else:
             MW_LutMan.mw_amp180(1)
             MW_LutMan.channel_amp(self.mw_channel_amp())
-            if using_QWG:
+            if self._using_QWG():
                 # case without VSM and with QWG
                 if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())
                         or (self.mw_G_mixer_alpha() != self.mw_D_mixer_alpha())):
@@ -1628,7 +1636,6 @@ class CCLight_Transmon(Qubit):
         using_VSM = self.cfg_with_vsm()
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         AWG = MW_LutMan.AWG.get_instr()
-        using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
 
         if using_VSM:
             if AWG.__class__.__name__ == 'QuTech_AWG_Module':
@@ -1691,7 +1698,7 @@ class CCLight_Transmon(Qubit):
                     self.mw_mixer_offs_DQ(offset_Q)
 
         else:
-            if using_QWG:
+            if self._using_QWG():
                 QWG_MW = self.instr_LutMan_MW.get_instr().AWG.get_instr()
                 chI = self.instr_LutMan_MW.get_instr().channel_I()
                 chQ = self.instr_LutMan_MW.get_instr().channel_Q()
@@ -1803,22 +1810,28 @@ class CCLight_Transmon(Qubit):
             # This is to ensure the square waveform is pulse 10!
             mw_lutman.set_default_lutmap()
 
-            def load_square():
-                AWG = mw_lutman.AWG.get_instr()
-                AWG.stop()
-                # Codeword 10 is hardcoded in the generate CCL config
-                # mw_lutman.load_waveform_realtime(wave_id='square')
+            if self._using_QWG():
+                prepare_function = mw_lutman.apply_mixer_predistortion_corrections
+                prepare_function_kwargs = {'wave_dict':{}}
+            else: 
+                def load_square():
+                    AWG = mw_lutman.AWG.get_instr()
+                    AWG.stop()
+                    # Codeword 10 is hardcoded in the generate CCL config
+                    # mw_lutman.load_waveform_realtime(wave_id='square')
 
-                mw_lutman.load_waveforms_onto_AWG_lookuptable(
-                    force_load_sequencer_program=False)
-                AWG.start()
-
+                    mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                        force_load_sequencer_program=False)
+                    AWG.start()
+                prepare_function = load_square
+                prepare_function_kwargs = {}
 
             detector = det.Signal_Hound_fixed_frequency(
                 self.instr_SH.get_instr(), spurious_sideband_freq,
                 prepare_for_each_point=True,
                 Navg=5,
-                prepare_function=load_square)
+                prepare_function=prepare_function, 
+                prepare_function_kwargs=prepare_function_kwargs)
                 #mw_lutman.load_waveform_realtime,
                 # prepare_function_kwargs={'waveform_key': 'square', 'wf_nr': 10})
             ad_func_pars = {'adaptive_function': cma.fmin,
@@ -3497,8 +3510,7 @@ class CCLight_Transmon(Qubit):
         """
 
         MW_LutMan = self.instr_LutMan_MW.get_instr()
-        using_QWG = (MW_LutMan.AWG.get_instr(
-        ).__class__.__name__ == 'QuTech_AWG_Module')
+
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -4334,7 +4346,6 @@ class CCLight_Transmon(Qubit):
         using_VSM = self.cfg_with_vsm()
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         AWG = MW_LutMan.AWG.get_instr()
-        using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -4359,7 +4370,7 @@ class CCLight_Transmon(Qubit):
                 mod_out, ch_in)]
             swf_func = wrap_par_to_swf(D_par, retrieve_value=True)
         else:
-            if using_QWG:
+            if self._using_QWG():
                 if motzoi_amps is None:
                     motzoi_amps = np.linspace(-.3, .3, 31)
                 swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,

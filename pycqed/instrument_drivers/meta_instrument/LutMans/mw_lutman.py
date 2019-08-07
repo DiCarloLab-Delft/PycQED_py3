@@ -441,6 +441,10 @@ class QWG_MW_LutMan(Base_MW_LutMan):
 
         self.AWG.get_instr().set(
             'ch_pair{}_transform_matrix'.format(self.channel_I()), M)
+        # in the QWG the predistortion matrix is implemented in hardware 
+        # and does not modify the actual wave dict. 
+        # the wave dict is still returned unmodified to preserve the 
+        # call signature as required for HDAWG compatibility. 
 
         return wave_dict
 
