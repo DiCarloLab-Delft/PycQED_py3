@@ -1,6 +1,7 @@
 """
 This file contains an instrument for correcting distortions
-using linear filtering (scipy.signal.lfilter).
+using linear filtering (scipy.signal.lfilter) and/or setting
+the real-time distortion corrections in the HDAWG instrument.
 
 It is based on the kernel_object.DistortionsKernel
 """
@@ -62,9 +63,29 @@ class LinDistortionKernel(Instrument):
                 return filt_id
         raise ValueError('No empty filter')
 
-    def set_realtime_distortions_zero(self):
+
+    def get_number_of_realtime_filters(self):
+        rt_exp_models = 0
+        rt_fir_models = 0
+        rt_bounce_models = 0
+        for filt_id in range(self._num_models):
+
+            filt = self.get('filter_model_{:02}'.format(filt_id))
+            if filt != {}:
+                model = filt['model']
+                params = filt['params']
+                if (filt['model'] == 'FIR') and (filt['real-time'] is True):
+                    rt_fir_models+=1
+                elif (filt['model'] == 'exponential') and (filt['real-time'] is True):
+                    rt_exp_models += 1
+                elif (filt['model'] == 'bounce') and (filt['real-time'] is True):
+                    rt_bounce_models+=1
+        return {'rt_exp_models': rt_exp_models, 'rt_fir_models': rt_fir_models,
+                'rt_bounce_models': rt_bounce_models}
+
+    def set_unused_realtime_distortions_zero(self):
         """
-        Turns off all used real-time distortion filters by setting their
+        Turns off all unused real-time distortion filters by setting their
         amplitude to zero. This method of disabling is used so as not to
         change the latency that is introduced.
         """
@@ -73,18 +94,34 @@ class LinDistortionKernel(Instrument):
             AWG = self.instr_AWG.get_instr()
         except Exception as e:
             logging.warning(e)
-            logging.warning('Could not set realtime distortions to 0, AWG not found')
+            logging.warning(
+                'Could not set realtime distortions to 0, AWG not found')
             return
 
+        # Returns a dict with filter type and number of that type
+        nr_filts = self.get_number_of_realtime_filters()
+        print("nr_filts")
+        print(nr_filts)
         # set exp_filters to 0
         for i in range(max_exp_filters):
-            AWG.set(
-                'sigouts_{}_precompensation_exponentials_{}_amplitude'.format(
-                    self.cfg_awg_channel()-1, i), 0)
+            if i >= nr_filts['rt_exp_models']:
+                AWG.set(
+                    'sigouts_{}_precompensation_exponentials_{}_amplitude'.format(
+                        self.cfg_awg_channel()-1, i), 0)
+
+
         # set bounce filters to 0
-        AWG.set(
-            'sigouts_{}_precompensation_bounces_{}_enable'.format(
-                self.cfg_awg_channel()-1, 0), 0)
+        if nr_filts['rt_bounce_models'] == 0:
+            AWG.set(
+                'sigouts_{}_precompensation_bounces_{}_enable'.format(
+                    self.cfg_awg_channel()-1, 0), 0)
+
+        # Reset
+        if nr_filts['rt_fir_models'] == 0:
+            impulse_resp = np.zeros(40)
+            impulse_resp[0] = 1
+            AWG.set('sigouts_{}_precompensation_fir_coefficients'.format(
+                    self.cfg_awg_channel()-1), impulse_resp)
 
         # set bias-tee filters to 0
         pass  # Currently broken
@@ -93,16 +130,22 @@ class LinDistortionKernel(Instrument):
                          inverse: bool=False):
         """
         Distorts a waveform using the models specified in the Kernel Object.
+
         Args:
             waveform (array)    : waveform to be distorted
             lenght_samples (int): number of samples after which to cut of wf
             inverse (bool)      : if True apply the inverse of the waveform.
 
-        Returns:
+        Return:
             y_sig (array)       : waveform with distortion filters applied
 
-        N.B. the bounce correction does not have an inverse implemented
+        N.B. The bounce correction does not have an inverse implemented
             (June 2018) MAR
+        N.B.2 The real-time FIR also does not have an inverse implemented.
+            (May 2019) MAR
+        N.B.3 the real-time distortions are reset and set on the HDAWG every
+            time a waveform is distorted. This is a suboptimal workflow.
+
         """
         if length_samples is not None:
             extra_samples = length_samples - len(waveform)
@@ -114,7 +157,7 @@ class LinDistortionKernel(Instrument):
             y_sig = waveform
 
         # Specific real-time filters are turned on below
-        self.set_realtime_distortions_zero()
+        self.set_unused_realtime_distortions_zero()
         nr_real_time_exp_models = 0
         nr_real_time_hp_models = 0
         nr_real_time_bounce_models = 0
@@ -125,6 +168,7 @@ class LinDistortionKernel(Instrument):
                 pass  # dict is empty
             else:
                 model = filt['model']
+                AWG = self.instr_AWG.get_instr()
                 if model == 'high-pass':
                     if ('real-time' in filt.keys() and filt['real-time']):
                         # Implementation tested and found not working -MAR
@@ -139,7 +183,6 @@ class LinDistortionKernel(Instrument):
                             **filt['params'])
                 elif model == 'exponential':
                     if ('real-time' in filt.keys() and filt['real-time']):
-                        AWG = self.instr_AWG.get_instr()
 
                         AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_timeconstant'.format(
@@ -165,7 +208,6 @@ class LinDistortionKernel(Instrument):
                             inverse=inverse, **filt['params'])
                 elif model == 'bounce':
                     if ('real-time' in filt.keys() and filt['real-time']):
-                        AWG = self.instr_AWG.get_instr()
 
                         AWG.set('sigouts_{}_precompensation_bounces'
                                 '_{}_delay'.format(
@@ -189,14 +231,22 @@ class LinDistortionKernel(Instrument):
                             amp=filt['params']['amp'], awg_sample_rate=2.4e9)
 
                 elif model == 'FIR':
+                    fir_filter_coeffs = filt['params']['weights']
                     if ('real-time' in filt.keys() and filt['real-time']):
-                        raise KeyError('Real-time for {} model implemented'.format(model))
+                        if len(fir_filter_coeffs) != 40:
+                            raise ValueError(
+                                'Realtime FIR filter must contain 40 weights')
+                        else:
+                            AWG.set('sigouts_{}_precompensation_fir_coefficients'.format(
+                                self.cfg_awg_channel()-1), fir_filter_coeffs)
+                            AWG.set('sigouts_{}_precompensation_fir_enable'.format(
+                                self.cfg_awg_channel()-1), 1)
                     else:
-                        fir_filter_coeffs = filt['params']['weights']
                         if not inverse:
                             y_sig = signal.lfilter(fir_filter_coeffs, 1, y_sig)
                         elif inverse:
-                            y_sig = signal.lfilter(np.ones(1), fir_filter_coeffs, y_sig)
+                            y_sig = signal.lfilter(
+                                np.ones(1), fir_filter_coeffs, y_sig)
 
                 else:
                     raise KeyError('Model {} not recognized'.format(model))

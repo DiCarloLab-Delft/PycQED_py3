@@ -5,7 +5,8 @@ import numpy as np
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
 from pycqed.utilities import general
-from pycqed.utilities.general import dict_to_ordered_tuples
+from pycqed.utilities.general import dict_to_ordered_tuples, \
+    delete_keys_from_dict
 from pycqed.utilities.get_default_datadir import get_default_datadir
 
 # Used for auto qcodes parameter wrapping
@@ -440,7 +441,6 @@ class MeasurementControl(Instrument):
         self.last_sweep_pts = x
 
         datasetshape = self.dset.shape
-        # self.iteration = datasetshape[0] + 1
 
         vals = self.detector_function.acquire_data_point()
         start_idx, stop_idx = self.get_datawriting_indices_update_ctr(vals)
@@ -1293,11 +1293,11 @@ class MeasurementControl(Instrument):
         h5d.write_dict_to_hdf5(res_dict, entry_point=opt_res_grp)
 
     def save_instrument_settings(self, data_object=None, *args):
-        '''
-        uses QCodes station snapshot to save the last known value of any
-        parameter. Only saves the value and not the update time (which is
-        known in the snapshot)
-        '''
+        """
+        Store the last known value of all parameters in the datafile.
+
+        Datasaving is based on the snapshot of the QCoDeS station object.
+        """
         if data_object is None:
             data_object = self.data_object
         if not hasattr(self, 'station'):
@@ -1307,7 +1307,13 @@ class MeasurementControl(Instrument):
             # This saves the snapshot of the entire setup
             snap_grp = data_object.create_group('Snapshot')
             snap = self.station.snapshot()
-            h5d.write_dict_to_hdf5(snap, entry_point=snap_grp)
+            exclude_keys = {
+                'inter_delay', 'post_delay',
+                'vals', 'instrument', 'functions', '__class__',
+                'raw_value', 'instrument_name', 'full_name', 'val_mapping'}
+            cleaned_snapshot = delete_keys_from_dict(snap, exclude_keys)
+
+            h5d.write_dict_to_hdf5(cleaned_snapshot, entry_point=snap_grp)
 
             # Below is old style saving of snapshot, exists for the sake of
             # preserving deprecated functionality
@@ -1326,7 +1332,7 @@ class MeasurementControl(Instrument):
 
     def save_MC_metadata(self, data_object=None, *args):
         '''
-        Saves metadata on the MC (such as timings)
+        Save metadata on the MC (such as timings)
         '''
         set_grp = data_object.create_group('MC settings')
 

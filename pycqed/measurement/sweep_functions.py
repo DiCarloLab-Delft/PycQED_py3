@@ -1153,10 +1153,19 @@ class FLsweep(Soft_Sweep):
         self.unit = par.unit
         self.name = par.name
 
+
+        AWG = self.lm.AWG.get_instr()
+        awg_unit = self.lm.cfg_awg_channel()//2
+        self.AWG_ready_par = AWG.parameters['awgs_{}_ready'.format(awg_unit)]
+
     def set_parameter(self, val):
         self.par(val)
         self.lm.load_waveform_realtime(self.waveform_name,
                                        regenerate_waveforms=True)
+        return 
+
+
+
 
 
 class FLsweep_QWG(Soft_Sweep):
@@ -1195,7 +1204,7 @@ class Nested_resonator_tracker(Soft_Sweep):
     """
     For resonator tr.
     """
-    def __init__(self, qubit, nested_MC, par, freqs=None, **kw):
+    def __init__(self, qubit, nested_MC, par, use_min = False, freqs=None, **kw):
         super().__init__(**kw)
         self.qubit = qubit
         self.freqs = freqs
@@ -1204,10 +1213,11 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
+        self.use_min = use_min
 
     def set_parameter(self, val):
         self.par(val)
-        self.qubit.find_resonator_frequency(freqs=self.freqs, MC=self.nested_MC)
+        self.qubit.find_resonator_frequency(freqs=self.freqs, MC=self.nested_MC,use_min = self.use_min)
         self.qubit._prep_ro_sources()
         spec_source = self.qubit.instr_spec_source.get_instr()
         spec_source.on()
@@ -1215,3 +1225,46 @@ class Nested_resonator_tracker(Soft_Sweep):
 
 
 
+class tim_flux_latency_sweep(Soft_Sweep):
+    def __init__(self,device):
+        super().__init__()
+        self.dev = device
+        self.name = 'Flux latency'
+        self.parameter_name = 'Flux latency'
+        self.unit = 's'
+
+    def set_parameter(self, val):
+        self.dev.tim_flux_latency_0(val)
+        self.dev.tim_flux_latency_1(val)
+        self.dev.tim_flux_latency_2(val)
+        self.dev.prepare_timing()
+        return val
+
+class tim_ro_latency_sweep(Soft_Sweep):
+    def __init__(self,device):
+        super().__init__()
+        self.dev = device
+        self.name = 'RO latency'
+        self.parameter_name = 'RO latency'
+        self.unit = 's'
+
+    def set_parameter(self, val):
+        self.dev.tim_ro_latency_0(val)
+        self.dev.tim_ro_latency_1(val)
+        self.dev.tim_ro_latency_2(val)
+        self.dev.prepare_timing()
+        return val
+
+class tim_mw_latency_sweep(Soft_Sweep):
+    def __init__(self,device):
+        super().__init__()
+        self.dev = device
+        self.name = 'MW latency'
+        self.parameter_name = 'MW latency'
+        self.unit = 's'
+
+    def set_parameter(self, val):
+        self.dev.tim_mw_latency_0(val)
+        self.dev.tim_mw_latency_1(val)
+        self.dev.prepare_timing()
+        return val

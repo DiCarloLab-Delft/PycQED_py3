@@ -27,7 +27,9 @@ import qutip as qp
 import qutip.metrics as qpmetrics
 
 from matplotlib.colors import LogNorm
-
+from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabel,
+                                            data_to_table_png,
+                                            SI_prefix_and_scale_factor)
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
 
@@ -222,10 +224,10 @@ def data_from_time(timestamp, folder=None):
 def measurement_filename(directory=os.getcwd(), file_id=None, ext='hdf5'):
     dirname = os.path.split(directory)[1]
     if file_id is None:
-        if dirname[6:9] == '_X_':
-            fn = dirname[0:7] + dirname[9:] + '.' + ext
-        else:
-            fn = dirname + '.' + ext
+        # if dirname[6:9] == '_X_':
+        #     fn = dirname[0:7] + dirname[9:] + '.' + ext
+        # else:
+        fn = dirname + '.' + ext
     if os.path.exists(os.path.join(directory, fn)):
         return os.path.join(directory, fn)
     else:
@@ -751,6 +753,14 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
 
 def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                             label=None, exact_label_match=False, folder=None):
+    '''
+    Input parameters:
+        label: a string or list of strings to compare the experiment name to
+        exact_label_match: 'True' : the label should exactly match the folder name
+        (excluding "timestamp_"). 'False': the label must be a substring of the folder name
+
+
+    '''
     if folder is None:
         folder = datadir
 
@@ -764,16 +774,21 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
     for day in reversed(list(range(days_delta + 1))):
         date = datetime_start + datetime.timedelta(days=day)
         datemark = timestamp_from_datetime(date)[:8]
+        #TODO:Sometimes, when choosing multiples days, there is a day with no measurmeents
+
         all_measdirs = [d for d in os.listdir(os.path.join(folder, datemark))]
         # Remove all hidden folders to prevent errors
         all_measdirs = [d for d in all_measdirs if not d.startswith('.')]
 
         if exact_label_match:
-            all_measdirs = [x for x in all_measdirs if label in x]
-            #BUG: does not compare the exact string, just a substring
-            #So 'q5_spectroscopy_f02' will be included in a search for
-            #'q5_spectroscopy'
+            if isinstance(label,str):
+                label = [label]
+            for each_label in label:
+                #Remove 'hhmmss_' timestamp and check if exactly equals
+                all_measdirs = [x for x in all_measdirs if each_label == x[7:]]
         else:
+            if isinstance(label,str):
+                label = [label]
             for each_label in label:
                 all_measdirs = [x for x in all_measdirs if each_label in x]
         if (date.date() - datetime_start.date()).days == 0:
@@ -1728,7 +1743,9 @@ def current_timemark():
 
 def color_plot(x, y, z, fig=None, ax=None, cax=None,
                show=False, normalize=False, log=False,
-               transpose=False, add_colorbar=True, **kw):
+               transpose=False, add_colorbar=True,
+               xlabel='', ylabel='', zlabel='',
+               x_unit='', y_unit='', z_unit='',  **kw):
     """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
@@ -1812,11 +1829,12 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
 
     title = kw.pop('title', None)
 
-    xlabel = kw.pop('xlabel', None)
-    ylabel = kw.pop('ylabel', None)
-    x_unit = kw.pop('x_unit', None)
-    y_unit = kw.pop('y_unit', None)
-    zlabel = kw.pop('zlabel', None)
+    xlabel = kw.get('xlabel', xlabel)
+    ylabel = kw.get('ylabel', ylabel)
+    zlabel = kw.get('zlabel', zlabel)
+    x_unit = kw.get('x_unit', x_unit)
+    y_unit = kw.get('y_unit', y_unit)
+    z_unit = kw.get('z_unit', z_unit)
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
@@ -1853,7 +1871,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
             cax = ax_divider.append_axes('right', size='5%', pad='2%')
         cbar = plt.colorbar(colormap, cax=cax, orientation='vertical')
         if zlabel is not None:
-            cbar.set_label(zlabel)
+            set_cbarlabel(cbar, zlabel, unit=z_unit)
         return fig, ax, colormap, cbar
     return fig, ax, colormap
 
@@ -1912,15 +1930,17 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
 
 
 def linecut_plot(x, y, z, fig, ax,
-                 xlabel=None,
+                 xlabel=None, x_unit='',
                  y_name='', y_unit='', log=True,
-                 zlabel=None, legend=True,
+                 zlabel=None, z_unit_linecuts='', legend=True,
                  line_offset=0, **kw):
     """
     Plots horizontal linecuts of a 2D plot.
     x and y must be 1D arrays.
     z must be a 2D array with shape(len(x),len(y)).
     """
+    z_unit_linecuts = kw.pop("z_unit_linecuts", z_unit_linecuts)
+
     colormap = plt.cm.get_cmap('RdYlBu')
     ax.set_prop_cycle('color', [colormap(i) for i in np.linspace(
         0, 0.9, len(y))])
@@ -1934,8 +1954,8 @@ def linecut_plot(x, y, z, fig, ax,
     if legend:
         ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
     ax.set_position([0.1, 0.1, 0.5, 0.8])
-    ax.set_ylabel(xlabel)
-    ax.set_ylabel(zlabel)
+    set_xlabel(ax, xlabel, x_unit)
+    set_ylabel(ax, zlabel, z_unit_linecuts)
     return ax
 
 
@@ -2811,8 +2831,58 @@ def solve_quadratic_equation(a, b, c, verbose=False):
             print("This equation has two solutions: ", x1, " or", x2)
         return [x1, x2]
 
+"""Chirp z-Transform.
+As described in
+Rabiner, L.R., R.W. Schafer and C.M. Rader.
+The Chirp z-Transform Algorithm.
+IEEE Transactions on Audio and Electroacoustics, AU-17(2):86--92, 1969
+"""
 
-def calculate_f_qubit_from_power_scan(f_bare,f_shifted,g_coupling=65e6):
+def chirpz(x,A,W,M):
+    """Compute the chirp z-transform.
+    The discrete z-transform,
+    X(z) = \sum_{n=0}^{N-1} x_n z^{-n}
+    is calculated at M points,
+    z_k = AW^-k, k = 0,1,...,M-1
+    for A and W complex, which gives
+    X(z_k) = \sum_{n=0}^{N-1} x_n z_k^{-n}
+    """
+    A = np.complex(A)
+    W = np.complex(W)
+    if np.issubdtype(np.complex,x.dtype) or np.issubdtype(np.float,x.dtype):
+        dtype = x.dtype
+    else:
+        dtype = float
+
+    x = np.asarray(x,dtype=np.complex)
+
+    N = x.size
+    L = int(2**np.ceil(np.log2(M+N-1)))
+
+    n = np.arange(N,dtype=float)
+    y = np.power(A,-n) * np.power(W,n**2 / 2.) * x
+    Y = np.fft.fft(y,L)
+
+    v = np.zeros(L,dtype=np.complex)
+    v[:M] = np.power(W,-n[:M]**2/2.)
+    v[L-N+1:] = np.power(W,-n[N-1:0:-1]**2/2.)
+    V = np.fft.fft(v)
+
+    g = np.fft.ifft(V*Y)[:M]
+    k = np.arange(M)
+    g *= np.power(W,k**2 / 2.)
+
+    return g
+
+def zoom_fft(t,y,fmin,fmax):
+    m = len(t)
+    Fs = 1./(t[1]-t[0])
+    chirp_y = chirpz(y,M=m,A=np.exp(2*1j*np.pi*fmin/(Fs)),W=np.exp(-2*1j*np.pi*(fmax-fmin)/(m*Fs)))
+    chirp_x = fmin + np.arange(m)*(fmax-fmin)/m
+    return [chirp_x,chirp_y]
+
+
+def calculate_f_qubit_from_power_scan(f_bare,f_shifted,g_coupling=65e6,RWA = False):
     '''
     Inputs are in Hz
     f_bare: the resonator frequency without a coupled qubit
@@ -2826,14 +2896,12 @@ def calculate_f_qubit_from_power_scan(f_bare,f_shifted,g_coupling=65e6):
     g = 2*np.pi * g_coupling
     shift =(w_shift - w_r)/g**2
     #f_shift > 0 when f_qubit<f_res
-    if (shift>0):
+    #For the non-RWA result (only dispersive approximation)
+    if (RWA == False):
         w_q = -1/(shift) + np.sqrt(1/(shift**2)+w_r**2)
-        #For the RWA approximation
-        # w_q_RWA = -1/shift + w_r
+    #For the RWA approximation
     else:
-        w_q = 1/shift + np.sqrt(1/(shift**2)+w_r**2)
-
-        # w_q_RWA = 1/shift + w_r
+        w_q = -1/shift + w_r
     return w_q/(2.*np.pi)
 
 def calculate_g_coupling_from_frequency_shift(f_bare,f_shifted,f_qubit):

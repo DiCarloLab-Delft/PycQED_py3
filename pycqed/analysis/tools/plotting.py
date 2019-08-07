@@ -9,7 +9,7 @@ from matplotlib import cm
 import numpy as np
 import matplotlib.colors as col
 import hsluv
-
+import logging 
 
 def set_xlabel(axis, label, unit=None, **kw):
     """
@@ -53,7 +53,7 @@ def set_ylabel(axis, label, unit=None, **kw):
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(yticks)), unit=unit)
         formatter = matplotlib.ticker.FuncFormatter(
-            lambda x, pos: '{:.4g}'.format(x*scale_factor))
+            lambda x, pos: '{:.6g}'.format(x*scale_factor))
 
         axis.yaxis.set_major_formatter(formatter)
 
@@ -62,12 +62,33 @@ def set_ylabel(axis, label, unit=None, **kw):
         axis.set_ylabel(label, **kw)
     return axis
 
+def set_cbarlabel(cbar, label, unit=None, **kw):
+    """
+    Add a unit aware z-label to a colorbar object
+
+    Args:
+        cbar: colorbar object to set label on
+        label: the desired label
+        unit:  the unit
+        **kw : keyword argument to be passed to cbar.set_label
+    """
+    if unit is not None and unit != '':
+        zticks = cbar.get_ticks()
+        scale_factor, unit = SI_prefix_and_scale_factor(
+            val=max(abs(zticks)), unit=unit)
+        cbar.set_ticks(zticks)
+        cbar.set_ticklabels(zticks*scale_factor)
+        cbar.set_label(label + ' ({})'.format(unit))
+
+    else:
+        cbar.set_label(label, **kw)
+    return cbar
 
 SI_PREFIXES = dict(zip(range(-24, 25, 3), 'yzafpnμm kMGTPEZY'))
 SI_PREFIXES[0] = ""
 
 # N.B. not all of these are SI units, however, all of these support SI prefixes
-SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms,$\Phi_0$'.split(
+SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms,$\Phi_0$,A/s'.split(
     ',')
 
 

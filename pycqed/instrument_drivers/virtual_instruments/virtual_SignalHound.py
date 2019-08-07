@@ -86,6 +86,11 @@ class virtual_SignalHound_USB_SA124B(Instrument):
                            initial_value=1e3,
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+        self.add_parameter('avg',
+                           label='Number of averages',
+                           initial_value=2,
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
         t1 = time()
         print('Initialized SignalHound in %.2fs' % (t1-t0))
 
