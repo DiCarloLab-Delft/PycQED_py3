@@ -118,7 +118,10 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=sfreq_cmd + '?',
                                set_cmd=sfreq_cmd + ' {}',
                                vals=vals.Numbers(-300e6, 300e6),
-                               get_parser=float)
+                               get_parser=float,
+                               docstring='Set the frequency of the sideband modulator\n'
+                                         'Resolution: ~0.23 Hz\n'
+                                         'Effective immediately when send')
             self.add_parameter(f'ch_pair{ch_pair}_sideband_phase',
                                parameter_class=HandshakeParameter,
                                unit='deg',
@@ -127,7 +130,9 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=sph_cmd + '?',
                                set_cmd=sph_cmd + ' {}',
                                vals=vals.Numbers(-180, 360),
-                               get_parser=float)
+                               get_parser=float,
+                               docstring='Sideband phase differance between channels\n'
+                                         'Effective immediately when send')
 
             self.add_parameter(f'ch_pair{ch_pair}_transform_matrix',
                                parameter_class=HandshakeParameter,
@@ -142,7 +147,7 @@ class QuTech_AWG_Module(SCPI):
                                vals=vals.Arrays(-2, 2, shape=(2, 2)),
                                docstring='Q & I transformation per channel pair.\n'
                                          'Used for mixer correction\n'
-                                         'Effective immediately after send')
+                                         'Effective immediately when send')
 
         # Triggers parameter
         for trigger in range(1, self.device_descriptor.numTriggers+1):
@@ -164,7 +169,14 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameter('run_mode',
                            get_cmd='AWGC:RMO?',
                            set_cmd='AWGC:RMO ' + '{}',
-                           vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'))
+                           vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'),
+                           docstring='Run mode:\n' 
+                                     '\t- NONE: No mode selected (default)\n'
+                                     '\t- CODeword: Codeword mode, will play wave based on codewords input'
+                                     'via IORearDIO or IORearMT board'
+                                     '\t- CONt: Continues mode, plays defined wave back to back\n'
+                                     '\t- SEQ: (Not implemented)\n'
+                                     'Effective after start command')
         # NB: setting mode "CON" (valid SCPI abbreviation) reads back as "CONt"
 
         self.add_parameter('dio_mode',
@@ -181,7 +193,8 @@ class QuTech_AWG_Module(SCPI):
                                      '\t\tEnables single-ended and differential inputs\n' 
                                      '\tSLAVE; Use DIO codeword (upper 14 bits) input '
                                      'from the connected master IORearDIO board\n'
-                                     '\t\tDisables SE and DIFF inputs\n')
+                                     '\t\tDisables SE and DIFF inputs\n'
+                                     'Effective immediately when send')
 
         self.add_parameter('dio_is_calibrated',
                            unit='',
@@ -203,6 +216,7 @@ class QuTech_AWG_Module(SCPI):
                            vals=vals.Ints(0, 20),
                            docstring='Get and set DIO calibration index\n' 
                                      'See dio_calibrate() paramater\n'
+                                     'Effective immediately when send'
                            )
 
         self.add_parameter('dio_suitable_indexes',
@@ -261,7 +275,10 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=state_cmd + '?',
                                set_cmd=state_cmd + ' {}',
                                val_mapping={True: '1', False: '0'},
-                               vals=vals.Bool())
+                               vals=vals.Bool(),
+                               docstring='Enables or disables the output of channels\n'
+                                         'Default: Disabled\n'
+                                         'Effective immediately when send')
 
             self.add_parameter(
                 f'ch{ch}_amp',
@@ -269,7 +286,7 @@ class QuTech_AWG_Module(SCPI):
                 label=f'Channel {ch} Amplitude ',
                 unit='Vpp',
                 docstring=f'Amplitude channel {ch} (Vpp into 50 Ohm) \n' 
-                          'Effective immediately after send',
+                          'Effective immediately when send',
                 get_cmd=amp_cmd + '?',
                 set_cmd=amp_cmd + ' {:.6f}',
                 vals=vals.Numbers(-1.6, 1.6),
@@ -280,7 +297,7 @@ class QuTech_AWG_Module(SCPI):
                                label=f'Offset channel {ch}',
                                unit='V',
                                docstring=f'Offset channel {ch}\n'
-                               'Effective immediately after send',
+                               'Effective immediately when send',
                                get_cmd=offset_cmd + '?',
                                set_cmd=offset_cmd + ' {:.3f}',
                                vals=vals.Numbers(-.25, .25),
@@ -383,7 +400,7 @@ class QuTech_AWG_Module(SCPI):
                                    self._set_bit_map, ch),
                                get_parser=self._int_to_array,
                                docstring='Codeword bit map for a channel\n'
-                                         'Effective immediately after send')
+                                         'Effective immediately when send')
 
             # Trigger parameters
             doc_trgs_log_inp = 'Reads the current input values on the all the trigger ' \
@@ -482,7 +499,8 @@ class QuTech_AWG_Module(SCPI):
                           call_cmd='wlist:waveform:delete all')
 
         doc_sSG = 'Synchronize both sideband frequency ' \
-                  'generators, i.e. restart them with their defined phases.'
+                  'generators, i.e. restart them with their defined phases.\n' \
+                  'Effective immediately when send'
         self.add_function('syncSidebandGenerators',
                           call_cmd='QUTEch:OUTPut:SYNCsideband',
                           docstring=doc_sSG)
