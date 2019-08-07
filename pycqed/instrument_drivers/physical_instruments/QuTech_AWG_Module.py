@@ -423,14 +423,19 @@ class QuTech_AWG_Module(SCPI):
                 self._params_exclude_snapshot.append(cw_param)
 
         # Waveform parameters
-        self.add_parameter('WlistSize',
-                           label='Waveform list size',
-                           unit='#',
-                           get_cmd='wlist:size?',
-                           get_parser=int)
-        self.add_parameter('Wlist',
-                           label='Waveform list',
-                           get_cmd=self._getWlist)
+        wlist_size = self.add_parameter('WlistSize',
+                                        label='Waveform list size',
+                                        unit='#',
+                                        get_cmd='wlist:size?',
+                                        get_parser=int,
+                                        snapshot_exclude=True)
+        self._params_exclude_snapshot.append(wlist_size)
+
+        wlist = self.add_parameter('Wlist',
+                                   label='Waveform list',
+                                   get_cmd=self._getWlist,
+                                   snapshot_exclude=True)
+        self._params_exclude_snapshot.append(wlist)
 
         self.add_parameter('get_system_status',
                            unit='JSON',
