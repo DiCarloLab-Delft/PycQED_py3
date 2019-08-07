@@ -190,7 +190,8 @@ class Base_RO_LutMan(Base_LutMan):
             # 1. Generate Pulse envelopes
             ## Simple pulse
             up_len = self.get('M_length_R{}'.format(res))-gauss_length
-            M = self.add_pulse(self.get('M_amp_R{}'.format(res)), up_len,
+            M = self.add_pulse(amplitude=self.get('M_amp_R{}'.format(res)),
+                               length=up_len,
                                delay=0,
                                phase=self.get('M_phi_R{}'.format(res)))
             res_wave_dict['M_simple_R{}'.format(res)] = M
@@ -319,7 +320,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
 
         for i, resonator_combination in enumerate(resonator_combinations):
             if not resonator_combination:
-                # empty combination, generating empty 20 ns pulse
+                # empty combination (= []), generating empty 20 ns pulse
                 I_waves.append(np.zeros(36))
                 Q_waves.append(np.zeros(36))
             else:

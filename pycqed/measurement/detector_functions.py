@@ -217,7 +217,7 @@ class Multi_Detector(Detector_Function):
             detector.finish()
 
 
-class Multi_Detector_UHF(Detector_Function):
+class Multi_Detector_UHF(Multi_Detector):
     """
     Special multi detector
     """

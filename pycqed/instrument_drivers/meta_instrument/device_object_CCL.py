@@ -918,6 +918,7 @@ class DeviceCCL(Instrument):
                                 sequence_type='sequential',
                                 replace_q1_pulses_X180: bool=False,
                                 analyze: bool=True, close_fig: bool=True,
+                                detector: str='correl',
                                 prepare_for_timedomain: bool=True, MC=None):
         '''
         Perform AllXY measurement simultaneously of two qubits (c.f. measure_allxy
@@ -960,7 +961,10 @@ class DeviceCCL(Instrument):
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
 
-        d = self.get_correlation_detector([q0, q1])
+        if detector == 'correl':
+            d = self.get_correlation_detector([q0, q1])
+        elif detector == 'int_avg':
+            d = self.get_int_avg_det(qubits=[q0,q1])
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
