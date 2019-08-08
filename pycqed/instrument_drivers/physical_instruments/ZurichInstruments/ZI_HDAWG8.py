@@ -546,10 +546,10 @@ class ZI_HDAWG8(ZI_base_instrument):
         # New dynamic waveform upload
         c = self._awg_waveform(w0, w1)
         try:
-            self._dev.daq.setVector('/' + self._devname + '/awgs/{}/waveform/waves/{}'.format(awg_nr, wf_nr), c)
-        except:
-            pass
-
+            self._dev.daq.setVector('/' + self._devname + 
+                '/awgs/{}/waveform/waves/{}'.format(awg_nr, wf_nr), c)
+        except Exception as e:
+            logging.warning(e) 
         # Commented out checking if ready. 
         # creates too much time overhead.
         # data = self._dev.poll()
