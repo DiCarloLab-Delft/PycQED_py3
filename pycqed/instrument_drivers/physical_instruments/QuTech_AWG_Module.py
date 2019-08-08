@@ -1,4 +1,4 @@
-'''
+"""
 File:       QuTech_AWG_Module.py
 Author:     Wouter Vlothuizen, TNO/QuTech,
             edited by Adriaan Rol, Gerco Versloot
@@ -6,9 +6,9 @@ Purpose:    Instrument driver for Qutech QWG
 Usage:
 Notes:      It is possible to view the QWG log using ssh. To do this connect
             using ssh e.g., "ssh root@192.168.0.10"
-            Logging can be enabled using "tail -f /tmpLog/qwg.log"
+            Logging can be enabled using "tailf /var/qwg.log"
 Bugs:
-'''
+"""
 
 from .SCPI import SCPI
 from qcodes.instrument.base import Instrument
@@ -730,6 +730,26 @@ class QuTech_AWG_Module(SCPI):
         is empty and an error is pushed onto the error stack\n
         """
         self.write(f'DIO:CALibrate {target_index}')
+
+    def dio_calibration_rapport(self, extended: bool=False) -> str:
+        """
+        Return a string containing the latest DIO calibration rapport (successful and failed calibrations). Includes:
+        selected index, dio mode, valid indexes, calibrated DIO bits and the DIO bitDiff table.
+        :param extended: Adds more information about DIO: interboard and LVDS
+        :return: String of DIO calibration rapport
+        """
+        info = f'- Calibrated:          {self.dio_is_calibrated()}\n' \
+               f'- Mode:                {self.dio_mode()}\n' \
+               f'- Selected index:      {self.dio_active_index()}\n' \
+               f'- Suitable indexes:    {self.dio_suitable_indexes()}\n' \
+               f'- Calibrated DIO bits: {bin(self.dio_calibrated_inputs())}\n' \
+               f'- DIO bit diff table:\n{self._dio_bit_diff_table()}'
+
+        if extended:
+            info += f'- LVDS detected:       {self.dio_lvds()}\n' \
+                    f'- Interboard detected: {self.dio_interboard()}'
+
+        return info
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
