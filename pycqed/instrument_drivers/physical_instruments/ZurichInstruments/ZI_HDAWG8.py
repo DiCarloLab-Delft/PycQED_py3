@@ -291,8 +291,8 @@ while (1) {
     # 'private' functions: DIO calibrration
     ##########################################################################
 
-    def _get_awg_dio_data(dev, awg):
-        data = dev.getv('awgs/' + str(awg) + '/dio/data')
+    def _get_awg_dio_data(self, awg):
+        data = self.getv('awgs/' + str(awg) + '/dio/data')
         ts = len(data)*[0]
         cw = len(data)*[0]
         for n, d in enumerate(data):
