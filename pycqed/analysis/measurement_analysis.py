@@ -4018,6 +4018,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         signal = abs(mu0_0 - mu1_1)
         noise = (sigma0_0 + sigma1_1) / 2
         SNR = signal / noise
+        p_rem = 0
 
         if plot:
             # plotting s-curves
@@ -4180,6 +4181,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         fid_grp.attrs.create(name='V_th_a', data=self.V_th_a)
         fid_grp.attrs.create(name='V_th_d', data=self.V_th_d)
         fid_grp.attrs.create(name='F_a', data=self.F_a)
+        fid_grp.attrs.create(name='p_rem', data=p_rem)
 
         self.sigma0_0 = sigma0_0
         self.sigma1_1 = sigma1_1
@@ -11301,7 +11303,7 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
                                     print_fit_results=print_fit_results)
 
         # plot
-        ax.plot(thetas, ampls, 'o-', label=dict_label)
+        ax.plot(thetas, ampls, 'o', label=dict_label)
 
         thetas_fine = np.linspace(thetas[0], thetas[-1], len(thetas)*100)
         if fit_res.best_values['amplitude'] > 0:
