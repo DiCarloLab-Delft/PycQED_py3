@@ -185,7 +185,7 @@ class ziConfigurationError(Exception):
     pass
 
 ##########################################################################
-# Class
+# Mock classes
 ##########################################################################
 
 class MockDAQServer():
@@ -200,6 +200,12 @@ class MockDAQServer():
         self.apilevel = apilevel
         self.device = None
         self.interface = None
+        self.nodes = {'/zi/devices/connected': {'type': 'String', 'value': ''}}
+        self.devtype = None
+
+    @classmethod
+    def awgModule(cls):
+        return cls.MockAwgModule()
 
     def setDebugLevel(self, debuglevel: int):
         print('Setting debug level to {}'.format(debuglevel))
@@ -213,6 +219,120 @@ class MockDAQServer():
 
         self.device = device
         self.interface = interface
+
+        if self.device.lower().startswith('dev2'):
+            self.devtype = 'UHFQA'
+        elif self.device.lower().startswith('dev8'):
+            self.devtype = 'HDAWG8'
+
+        # Add paths
+        filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'zi_parameter_files', 'node_doc_{}.json'.format(self.devtype))
+        if not os.path.isfile(filename):
+            raise ziRuntimeError('No parameter file available for devices of type ' + self.devtype)
+        self._load_parameter_file(filename=filename)  # NB: defined in parent class
+
+        # Update connected status
+        self.nodes['/zi/devices/connected']['value'] = self.device
+        self.nodes['/' + self.device + '/features/devtype'] = {'type': 'String', 'value': self.devtype}
+        self.nodes['/' + self.device + '/system/fwrevision'] = {'type': 'Integer', 'value': 99999}
+        self.nodes['/' + self.device + '/system/fpgarevision'] = {'type': 'Integer', 'value': 99999}
+        self.nodes['/' + self.device + '/system/slaverevision'] = {'type': 'Integer', 'value': 99999}
+
+        if self.devtype == 'UHFQA':
+            self.nodes['/' + self.device + '/features/options'] = {'type': 'String', 'value':'QA\nAWG'}
+        elif self.devtype == 'HDAWG8':
+            self.nodes['/' + self.device + '/features/options'] = {'type': 'String', 'value':'PC\nME'}
+            self.nodes['/' + self.device + '/raw/error/json/errors'] = {'type': 'String', 'value': '{"sequence_nr":0,"new_errors":0,"first_timestamp":0,"timestamp":0,"timestamp_utc":"2019-08-07 17:33:55","messages":[]}'}
+            self.nodes['/' + self.device + '/raw/error/blinkseverity'] = {'type': 'Integer', 'value': 0}
+            self.nodes['/' + self.device + '/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
+
+    def listNodesJSON(self, path):
+        pass
+
+    def getString(self, path):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+
+        if self.nodes[path]['type'] != 'String':
+            raise ziRuntimeError("Trying to node '" + path + "' as string, but the type is '" + self.nodes[path]['type'] + "'!")
+
+        return self.nodes[path]['value']
+
+    def getInt(self, path):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+
+        return int(self.nodes[path]['value'])
+        
+
+    def getDouble(self, path):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+
+        return float(self.nodes[path]['value'])
+
+    def setInt(self, path, value):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+
+        self.nodes[path]['value'] = value
+
+    def setDouble(self, path, value):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+
+        self.nodes[path]['value'] = value
+
+    def get(self, path, flat, flags):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+
+        return {path: [{'vector': self.nodes[path]['value']}]}
+
+    def _load_parameter_file(self, filename: str):
+        """
+        Takes in a node_doc JSON file auto generates paths based on
+        the contents of this file.
+        """
+        f = open(filename).read()
+        node_pars = json.loads(f)
+        for par in node_pars.values():
+            node = par['Node'].split('/')
+            # The parfile is valid for all devices of a certain type
+            # so the device name has to be split out.
+            parpath = '/' + self.device + '/' + '/'.join(node)
+            if par['Type'].startswith('Integer'):
+                self.nodes[parpath.lower()] = {'type': par['Type'], 'value': 0}
+            elif par['Type'].startswith('Double'):
+                self.nodes[parpath.lower()] = {'type': par['Type'], 'value': 0.0}
+            elif par['Type'].startswith('Complex'):
+                self.nodes[parpath.lower()] = {'type': par['Type'], 'value': 0 + 0j}
+            elif par['Type'].startswith('String'):
+                self.nodes[parpath.lower()] = {'type': par['Type'], 'value': ''}
+
+    class MockAwgModule():
+        """
+        This class implements a mock version of the awgModule object used for
+        compiling and uploading AWG programs.
+        """
+        def __init__(self):
+            if not os.path.isdir('awg/waves'):
+                os.makedirs('awg/waves')
+
+        def set(self, path, value):
+            pass
+
+        def get(self, path):
+            value = ['']
+            for elem in reversed(path.split('/')[1:]):
+                rv = {}
+                rv[elem] = value
+                value = rv
+            
+            return rv
+
+        def execute(self):
+            pass
 
 ##########################################################################
 # Class
