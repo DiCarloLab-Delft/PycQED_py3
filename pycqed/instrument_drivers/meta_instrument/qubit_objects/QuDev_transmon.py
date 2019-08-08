@@ -2011,7 +2011,7 @@ class QuDev_transmon(Qubit):
                 ssqtro = \
                     Singleshot_Readout_Analysis_Qutrit(label=labels,
                                                        options_dict=options)
-                state_prob_mtx =  ssqtro.proc_data_dict[
+                state_prob_mtx = ssqtro.proc_data_dict[
                            'analysis_params']['state_prob_mtx']
                 classifier_params = ssqtro.proc_data_dict[
                            'analysis_params'].get('classifier_params', None)

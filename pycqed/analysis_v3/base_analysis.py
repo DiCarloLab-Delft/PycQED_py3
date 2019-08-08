@@ -67,7 +67,7 @@ class BaseDataAnalysis(object):
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '', data_file_path: str = None,
                  close_figs: bool = True, options_dict: dict = None,
-                 extract_only: bool = False, do_fitting: bool = False,
+                 extract_only: bool = False, do_fitting: bool = True,
                  auto=True, params_dict=dict(), numeric_params=dict(),
                  **kwargs):
         '''
@@ -210,6 +210,7 @@ class BaseDataAnalysis(object):
             self.analyze_fit_results()
 
         if not self.extract_only:
+            self.prepare_plots()
             self.plot(key_list='auto')  # make the plots
 
         if self.options_dict.get('save_figs', False):
@@ -240,22 +241,22 @@ class BaseDataAnalysis(object):
 
         self.data_dict = self.get_data_from_timestamp_list()
         if len(self.timestamps) == 1:
-            self.data_dict = self.add_measured_values_ord_dict(
+            self.data_dict = self.add_measured_data(
                 self.data_dict)
         else:
             temp_dict_list = []
             for i, rd_dict in enumerate(self.data_dict):
                 temp_dict_list.append(
-                    self.add_measured_values_ord_dict(rd_dict))
+                    self.add_measured_data(rd_dict))
             self.data_dict = tuple(temp_dict_list)
 
         self.metadata = self.data_dict.get('exp_metadata', {})
         if self.metadata is None:
             self.metadata = {}
 
-        self.processing_pipes = self.get_param_value('processing_pipes')
-        if self.processing_pipes is None:
-            self.processing_pipes = []
+        self.processing_pipe = self.get_param_value('processing_pipe')
+        if self.processing_pipe is None:
+            self.processing_pipe = []
 
     @staticmethod
     def get_hdf_param_value(group, param_name):
@@ -331,7 +332,7 @@ class BaseDataAnalysis(object):
         return raw_data_dict
 
     @staticmethod
-    def add_measured_values_ord_dict(raw_data_dict):
+    def add_measured_data(raw_data_dict):
         if 'measured_data' in raw_data_dict and \
                 'value_names' in raw_data_dict:
             measured_data = raw_data_dict.pop('measured_data')
@@ -373,14 +374,20 @@ class BaseDataAnalysis(object):
         under the key/dictionary keys path specified in 'chs_out' in the
         **kw of each node.
         """
-        if len(self.processing_pipes) == 0:
+        if len(self.processing_pipe) == 0:
             raise ValueError('Experimental metadata or options_dict must '
-                             'contain "processing_pipes."')
+                             'contain "processing_pipe."')
 
-        for node_dict in self.processing_pipes:
+        for node_dict in self.processing_pipe:
             try:
-                self.data_dict = getattr(dat_proc, node_dict["node_type"])(
-                        self.data_dict, **node_dict)
+                node = getattr(dat_proc, node_dict["node_type"])
+                if isinstance(node, type):
+                    # node is a class
+                    proc_obj = node(self.data_dict, **node_dict)
+                    self.data_dict = proc_obj.process_data()
+                else:
+                    # node is a function
+                    self.data_dict = node(self.data_dict, **node_dict)
             except AttributeError:
                 raise KeyError(f'Processing node "{node_dict["node_type"]}" '
                                f'not recognized')
@@ -437,7 +444,6 @@ class BaseDataAnalysis(object):
         with open(filepath, 'w') as file:
             json.dump(save_dict, file, cls=NumpyJsonEncoder, indent=4)
         print('Data saved to "{}".'.format(filepath))
-
 
     def save_processed_data(self, key=None, overwrite=True):
         """
@@ -501,9 +507,9 @@ class BaseDataAnalysis(object):
         be implemented here.
         '''
         self.fit_res = {}
-        for pipe_name, data_dict in self.proc_data_dict.items():
-            if 'fit_dicts' in data_dict:
-                fit_dicts = data_dict['fit_dicts']
+        for key in self.data_dict:
+            if key == 'fit_dicts':
+                fit_dicts = self.data_dict['fit_dicts']
                 for key, fit_dict in fit_dicts.items():
                     guess_dict = fit_dict.get('guess_dict', None)
                     guess_pars = fit_dict.get('guess_pars', None)
@@ -559,10 +565,10 @@ class BaseDataAnalysis(object):
         if hasattr(self, 'fit_res') and self.fit_res is not None:
             fn = self.options_dict.get('analysis_result_file', False)
             if fn == False:
-                if isinstance(self.raw_data_dict, tuple):
-                    timestamp = self.raw_data_dict[0]['timestamp']
+                if isinstance(self.data_dict, tuple):
+                    timestamp = self.data_dict[0]['timestamp']
                 else:
-                    timestamp = self.raw_data_dict['timestamp']
+                    timestamp = self.data_dict['timestamp']
                 fn = a_tools.measurement_filename(a_tools.get_folder(
                     timestamp))
 
@@ -630,24 +636,45 @@ class BaseDataAnalysis(object):
 
     def analyze_fit_results(self):
         """
-        Finds all pipes which resulted in fits (contain fit_dicts), and
-        calls the analyze_fit_results method of the objects in those pipes that
-        produced the fit.
-        """
+        Finds the node that is a class, and calls analyze_fit_results.
 
-        # Get all pipes that have fit_dicts
-        pipe_names_w_fits = [pn for pn, dd in self.proc_data_dict.items() if
-                             'fit_dicts' in dd]
-        # Get all processing units (tuples of (proc_obj_name, kw)) in the pipes
-        # that contain fit_dicts (ie in pipe_names_w_fits)
-        proc_units_w_fits = [p[k] for k in pipe_names_w_fits for
-                             p in self.processing_pipes if k in p]
-        for pipe_name in pipe_names_w_fits:
-            pipe_data_dict = self.proc_data_dict[pipe_name]
-            for proc_unit in proc_units_w_fits:
-                proc_obj = dat_proc.getattr(proc_unit[0])
-                if hasattr(proc_obj, 'analyze_fit_results'):
-                    proc_obj.analyze_fit_results(pipe_data_dict)
+        ! Assumptions:
+            - the pipe had ONLY ONE node that did fitting (there is only one
+            'fit_dicts' entry in data_dict
+            - the only node that is a class is the one that produced the fit(s)
+        """
+        for node_dict in self.processing_pipe:
+            node = getattr(dat_proc, node_dict["node_type"])
+            if isinstance(node, type):
+                # the node is a class
+                node_inst = node(self.data_dict, prepare_fits=False,
+                                 auto=True, **node_dict)
+                if hasattr(node_inst, 'analyze_fit_results'):
+                    node_inst.analyze_fit_results(
+                        fit_dicts=self.data_dict['fit_dicts'])
+                    self.data_dict = copy.deepcopy(node_inst.data_dict)
+
+    def prepare_plots(self):
+        """
+        Finds the node that is a class, and calls prepare_plots.
+
+        ! Assumptions:
+            - the pipe had ONLY ONE node that does plotting (there is only one
+            'plot_dicts' entry in data_dict
+            - the only node that is a class is the one that produced the plot(s)
+            - this same node was also the one that did fitting (there is only
+            one 'fit_dicts' entry in data_dict
+        """
+        for node_dict in self.processing_pipe:
+            node = getattr(dat_proc, node_dict["node_type"])
+            if isinstance(node, type):
+                # the node is a class
+                node_inst = node(self.data_dict, prepare_fits=False,
+                                 auto=True, **node_dict)
+                if hasattr(node_inst, 'prepare_plots'):
+                    node_inst.prepare_plots(
+                        fit_dicts=self.data_dict['fit_dicts'])
+                    self.data_dict = copy.deepcopy(node_inst.data_dict)
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):
@@ -658,112 +685,110 @@ class BaseDataAnalysis(object):
         proc_dat_dict[pipe_name]['fit_dicts'] for each pipe_name,
         if 'fit_dicts' exists, and creates the desired figures.
         """
-        for pipe_name, data_dict in self.proc_data_dict.items():
-            if 'plot_dicts' in data_dict:
-                axs = OrderedDict()
-                figs = OrderedDict()
-                plot_dicts = data_dict['plot_dicts']
+        self.axs = OrderedDict()
+        self.figs = OrderedDict()
+        plot_dicts = self.data_dict['plot_dicts']
 
-                if presentation_mode is None:
-                    presentation_mode = self.presentation_mode
-                if axs_dict is not None:
-                    for key, val in list(axs_dict.items()):
-                        axs[key] = val
-                if key_list is 'auto':
-                    key_list = self.auto_keys
-                if key_list is None:
-                    key_list = plot_dicts.keys()
-                if type(key_list) is str:
-                    key_list = [key_list]
-                self.key_list = key_list
+        if presentation_mode is None:
+            presentation_mode = self.presentation_mode
+        if axs_dict is not None:
+            for key, val in list(axs_dict.items()):
+                self.axs[key] = val
+        if key_list is 'auto':
+            key_list = self.auto_keys
+        if key_list is None:
+            key_list = plot_dicts.keys()
+        if type(key_list) is str:
+            key_list = [key_list]
+        self.key_list = key_list
 
-                for key in key_list:
-                    # go over all the plot_dicts
-                    pdict = plot_dicts[key]
-                    pdict['no_label'] = no_label
-                    # Use the key of the plot_dict if no ax_id is specified
-                    pdict['fig_id'] = pdict.get('fig_id', key)
-                    pdict['ax_id'] = pdict.get('ax_id', None)
+        for key in key_list:
+            # go over all the plot_dicts
+            pdict = plot_dicts[key]
+            pdict['no_label'] = no_label
+            # Use the key of the plot_dict if no ax_id is specified
+            pdict['fig_id'] = pdict.get('fig_id', key)
+            pdict['ax_id'] = pdict.get('ax_id', None)
 
-                    if isinstance(pdict['ax_id'], str):
-                        pdict['fig_id'] = pdict['ax_id']
-                        pdict['ax_id'] = None
+            if isinstance(pdict['ax_id'], str):
+                pdict['fig_id'] = pdict['ax_id']
+                pdict['ax_id'] = None
 
-                    if pdict['fig_id'] not in axs:
-                        # This fig variable should perhaps be a different
-                        # variable for each plot!!
-                        # This might fix a bug.
-                        figs[pdict['fig_id']], axs[pdict['fig_id']] = \
-                            plt.subplots(pdict.get('numplotsy', 1),
-                                         pdict.get('numplotsx', 1),
-                                         sharex=pdict.get('sharex', False),
-                                         sharey=pdict.get('sharey', False),
-                                         figsize=pdict.get('plotsize', None))
-                        if pdict.get('3d', False):
-                            axs[pdict['fig_id']].remove()
-                            axs[pdict['fig_id']] = Axes3D(
-                                figs[pdict['fig_id']],
-                                azim=pdict.get('3d_azim', -35),
-                                elev=pdict.get('3d_elev', 35))
-                            axs[pdict['fig_id']].patch.set_alpha(0)
+            if pdict['fig_id'] not in self.axs:
+                # This fig variable should perhaps be a different
+                # variable for each plot!!
+                # This might fix a bug.
+                self.figs[pdict['fig_id']], self.axs[pdict['fig_id']] = \
+                    plt.subplots(pdict.get('numplotsy', 1),
+                                 pdict.get('numplotsx', 1),
+                                 sharex=pdict.get('sharex', False),
+                                 sharey=pdict.get('sharey', False),
+                                 figsize=pdict.get('plotsize', None))
+                if pdict.get('3d', False):
+                    self.axs[pdict['fig_id']].remove()
+                    self.axs[pdict['fig_id']] = Axes3D(
+                        self.figs[pdict['fig_id']],
+                        azim=pdict.get('3d_azim', -35),
+                        elev=pdict.get('3d_elev', 35))
+                    self.axs[pdict['fig_id']].patch.set_alpha(0)
 
-                        # transparent background around axes for presenting data
-                        figs[pdict['fig_id']].patch.set_alpha(0)
+                # transparent background around axes for presenting data
+                self.figs[pdict['fig_id']].patch.set_alpha(0)
 
-                if presentation_mode:
-                    self.plot_for_presentation(key_list=key_list,
-                                               no_label=no_label)
+        if presentation_mode:
+            self.plot_for_presentation(key_list=key_list,
+                                       no_label=no_label)
+        else:
+            for key in key_list:
+                pdict = plot_dicts[key]
+                plot_touching = pdict.get('touching', False)
+
+                if type(pdict['plotfn']) is str:
+                    plotfn = getattr(self, pdict['plotfn'])
                 else:
-                    for key in key_list:
-                        pdict = plot_dicts[key]
-                        plot_touching = pdict.get('touching', False)
+                    plotfn = pdict['plotfn']
 
-                        if type(pdict['plotfn']) is str:
-                            plotfn = getattr(self, pdict['plotfn'])
-                        else:
-                            plotfn = pdict['plotfn']
+                # used to ensure axes are touching
+                if plot_touching:
+                    self.axs[pdict['fig_id']].figure.subplots_adjust(
+                        wspace=0, hspace=0)
 
-                        # used to ensure axes are touching
-                        if plot_touching:
-                            axs[pdict['fig_id']].figure.subplots_adjust(
-                                wspace=0, hspace=0)
+                # Check if pdict is one of the accepted arguments,
+                # these are the plotting functions in the
+                # analysis base class.
+                if 'pdict' in signature(plotfn).parameters:
+                    if pdict['ax_id'] is None:
+                        plotfn(pdict=pdict, axs=self.axs[pdict['fig_id']])
+                    else:
+                        plotfn(pdict=pdict,
+                               axs=self.axs[pdict['fig_id']].flatten()[
+                               pdict['ax_id']])
+                        self.axs[pdict['fig_id']].flatten()[
+                            pdict['ax_id']].figure.subplots_adjust(
+                            hspace=0.35)
 
-                        # Check if pdict is one of the accepted arguments,
-                        # these are the plotting functions in the
-                        # analysis base class.
-                        if 'pdict' in signature(plotfn).parameters:
-                            if pdict['ax_id'] is None:
-                                plotfn(pdict=pdict, axs=axs[pdict['fig_id']])
-                            else:
-                                plotfn(pdict=pdict,
-                                       axs=axs[pdict['fig_id']].flatten()[
-                                       pdict['ax_id']])
-                                axs[pdict['fig_id']].flatten()[
-                                    pdict['ax_id']].figure.subplots_adjust(
-                                    hspace=0.35)
+                # most normal plot functions also work, it is required
+                # that these accept an "ax" argument to plot on and
+                # **kwargs the pdict is passed in as kwargs to such
+                # a function
+                elif 'ax' in signature(plotfn).parameters:
+                    # Calling the function passing along anything
+                    # defined in the specific plot dict as kwargs
+                    if pdict['ax_id'] is None:
+                        plotfn(ax=self.axs[pdict['fig_id']], **pdict)
+                    else:
+                        plotfn(pdict=pdict,
+                               axs=self.axs[pdict['fig_id']].flatten()[
+                                   pdict['ax_id']])
+                        self.axs[pdict['fig_id']].flatten()[
+                            pdict['ax_id']].figure.subplots_adjust(
+                            hspace=0.35)
+                else:
+                    raise ValueError(
+                        f'"{plotfn}" is not a valid plot function')
 
-                        # most normal plot functions also work, it is required
-                        # that these accept an "ax" argument to plot on and
-                        # **kwargs the pdict is passed in as kwargs to such
-                        # a function
-                        elif 'ax' in signature(plotfn).parameters:
-                            # Calling the function passing along anything
-                            # defined in the specific plot dict as kwargs
-                            if pdict['ax_id'] is None:
-                                plotfn(ax=axs[pdict['fig_id']], **pdict)
-                            else:
-                                plotfn(pdict=pdict,
-                                       axs=axs[pdict['fig_id']].flatten()[
-                                           pdict['ax_id']])
-                                axs[pdict['fig_id']].flatten()[
-                                    pdict['ax_id']].figure.subplots_adjust(
-                                    hspace=0.35)
-                        else:
-                            raise ValueError(
-                                f'"{plotfn}" is not a valid plot function')
-
-                    self.format_datetime_xaxes(key_list)
-                    self.add_to_plots(key_list=key_list)
+            self.format_datetime_xaxes(key_list)
+            self.add_to_plots(key_list=key_list)
 
     def save_figures(self, savedir: str = None, savebase: str = None,
                      tag_tstamp: bool = True, dpi: int = 300,
@@ -771,10 +796,10 @@ class BaseDataAnalysis(object):
                      close_figs: bool = True):
 
         if savedir is None:
-            if isinstance(self.raw_data_dict, tuple):
-                savedir = self.raw_data_dict[0].get('folder', '')
+            if isinstance(self.data_dict, tuple):
+                savedir = self.data_dict[0].get('folder', '')
             else:
-                savedir = self.raw_data_dict.get('folder', '')
+                savedir = self.data_dict.get('folder', '')
 
             if isinstance(savedir, list):
                 savedir = savedir[0]
@@ -783,10 +808,10 @@ class BaseDataAnalysis(object):
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            if isinstance(self.raw_data_dict, tuple):
-                tstag = '_' + self.raw_data_dict[0]['timestamp']
+            if isinstance(self.data_dict, tuple):
+                tstag = '_' + self.data_dict[0]['timestamp']
             else:
-                tstag = '_' + self.raw_data_dict['timestamp']
+                tstag = '_' + self.data_dict['timestamp']
         else:
             tstag = ''
 
@@ -823,7 +848,7 @@ class BaseDataAnalysis(object):
 
     def format_datetime_xaxes(self, key_list):
         for key in key_list:
-            pdict = self.plot_dicts[key]
+            pdict = self.data_dict['plot_dicts'][key]
             # this check is needed as not all plots have xvals e.g., plot_text
             if 'xvals' in pdict.keys():
                 if (type(pdict['xvals'][0]) is datetime.datetime and
@@ -832,9 +857,9 @@ class BaseDataAnalysis(object):
 
     def plot_for_presentation(self, key_list=None, no_label=False):
         if key_list is None:
-            key_list = list(self.plot_dicts.keys())
+            key_list = list(self.data_dict['plot_dicts'].keys())
         for key in key_list:
-            self.plot_dicts[key]['title'] = None
+            self.data_dict['plot_dicts'][key]['title'] = None
 
         self.plot(key_list=key_list, presentation_mode=False,
                   no_label=no_label)
@@ -1458,7 +1483,7 @@ class BaseDataAnalysis(object):
     def plot_colorbar(self, cax=None, key=None, pdict=None, axs=None,
                       orientation='vertical'):
         if key is not None:
-            pdict = self.plot_dicts[key]
+            pdict = self.data_dict['plot_dicts'][key]
             axs = self.axs[key]
         else:
             if pdict is None or axs is None:

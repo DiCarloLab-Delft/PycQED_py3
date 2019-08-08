@@ -290,7 +290,7 @@ class BaseDataAnalysis(object):
         return raw_data_dict
 
     @staticmethod
-    def add_measured_values_ord_dict(raw_data_dict):
+    def add_measured_data(raw_data_dict):
         if 'measured_data' in raw_data_dict and \
                 'value_names' in raw_data_dict:
             measured_data = raw_data_dict.pop('measured_data')
@@ -339,13 +339,13 @@ class BaseDataAnalysis(object):
 
         self.raw_data_dict = self.get_data_from_timestamp_list()
         if len(self.timestamps) == 1:
-            self.raw_data_dict = self.add_measured_values_ord_dict(
+            self.raw_data_dict = self.add_measured_data(
                 self.raw_data_dict)
         else:
             temp_dict_list = []
             for i, rd_dict in enumerate(self.raw_data_dict):
                 temp_dict_list.append(
-                    self.add_measured_values_ord_dict(rd_dict))
+                    self.add_measured_data(rd_dict))
             self.raw_data_dict = tuple(temp_dict_list)
 
     def process_data(self):

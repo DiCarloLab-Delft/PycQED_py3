@@ -328,7 +328,7 @@ def get_param_value_from_file(file_path, instr_name, param_name, h5mode='r+'):
     return param_val
 
 
-def get_qb_channel_map_from_file(qb_names, file_path, value_names, h5mode='r+'):
+def get_qb_channel_map_from_hdf(qb_names, file_path, value_names, h5mode='r+'):
 
     data_file = h5py.File(measurement_filename(file_path), h5mode)
     instr_settings = data_file['Instrument settings']
@@ -341,22 +341,19 @@ def get_qb_channel_map_from_file(qb_names, file_path, value_names, h5mode='r+'):
     elif 'lin_trans' in value_names[0]:
         ro_type = 'lin_trans w'
     else:
-        input_ro_type = value_names[0]
         ro_type = 'w'
-        logging.warning('Readout type "{}" does not have standard '
-                        'format.'.format(input_ro_type))
 
     for qbn in qb_names:
-        try:
-            qbchs = [str(instr_settings[qbn].attrs['acq_I_channel'])]
-            ro_acq_weight_type = instr_settings[qbn].attrs['acq_weights_type']
-            if ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
-                qbchs += [str(instr_settings[qbn].attrs['acq_Q_channel'])]
-            channel_map[qbn] = [ch for ch in value_names for nr in qbchs
-                                if ro_type+nr in ch]
-        except KeyError:
-            log.warning('Could not get channels')
-            pass
+        qbchs = [str(instr_settings[qbn].attrs['acq_I_channel'])]
+        ro_acq_weight_type = instr_settings[qbn].attrs['acq_weights_type']
+        if ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
+            qbchs += [str(instr_settings[qbn].attrs['acq_Q_channel'])]
+        channel_map[qbn] = [ch for ch in value_names for nr in qbchs
+                            if ro_type+nr in ch]
+
+    all_values_empty = np.all([len(v) == 0 for v in channel_map.values()])
+    if len(channel_map) == 0 or all_values_empty:
+        raise ValueError('Did not find any channels. qb_channel_map is empty.')
     return channel_map
 
 
@@ -1550,8 +1547,8 @@ def normalize_2D_data_on_elements(data_2D, elements):
     return data_2D
 
 
-def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
-                              zero_coord=None, one_coord=None, **kw):
+def rotate_and_normalize_data_IQ(data, cal_zero_points=None, cal_one_points=None,
+                                 zero_coord=None, one_coord=None, **kw):
     '''
     Rotates and normalizes data with respect to some reference coordinates.
     There are two ways to specify the reference coordinates.
@@ -1603,10 +1600,10 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         line_slope = fit_res.params['slope'].value
         line_intercept = fit_res.params['intercept'].value
         #finx the x, y coordinates of the projected points
-        x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
-        y_proj= line_slope*(x_proj)+line_intercept
+        x_proj = (x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
+        y_proj = line_slope*(x_proj)+line_intercept
 
-        #find the minimum (on th ey axis) point on the line
+        #find the minimum (on the y axis) point on the line
         y_min_line = min(fit_res.best_fit)
         x_min_line = x[np.argmin(fit_res.best_fit)]
 
@@ -1701,8 +1698,8 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     return normalized_data
 
 
-def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
-                      cal_one_points=np.arange(-2, 0, 1), **kw):
+def rotate_and_normalize_data_1ch(data, cal_zero_points=np.arange(-4, -2, 1),
+                                  cal_one_points=np.arange(-2, 0, 1), **kw):
     '''
     Normalizes data according to calibration points
     Inputs:
@@ -1722,6 +1719,7 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
     normalized_data = trans_data/one_zero_dist
 
     return normalized_data
+
 
 def predict_gm_proba_from_cal_points(X, cal_points):
     """

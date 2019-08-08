@@ -154,7 +154,7 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
         if len(self.raw_data_dict['measured_values']) == 1:
             # if only one weight function is used rotation is not required
-            self.proc_data_dict['corr_data'] = a_tools.normalize_data_v3(
+            self.proc_data_dict['corr_data'] = a_tools.rotate_and_normalize_data_1ch(
                 self.raw_data_dict['measured_values'][0],
                 cal_zero_points=cal_points[0],
                 cal_one_points=cal_points[1])
@@ -215,7 +215,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             if np.ndim(value_names) > 0:
                 value_names = value_names
             if 'w' in value_names[0]:
-                self.channel_map = a_tools.get_qb_channel_map_from_file(
+                self.channel_map = a_tools.get_qb_channel_map_from_hdf(
                     self.qb_names, value_names=value_names,
                     file_path=self.raw_data_dict['folder'])
             else:
@@ -321,7 +321,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         self.data_to_fit = self.get_param_value('data_to_fit')
 
         if self.cal_states_rotations is not None:
-            print('here')
             self.cal_states_analysis()
         else:
             self.proc_data_dict['projected_data_dict'] = OrderedDict()
@@ -364,7 +363,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     'cal_points_sweep_points'] = \
                     self.proc_data_dict['sweep_points'][0]
         if self.options_dict.get('TwoD', False):
-            sweep_points_2D_dict = self.get_param_value('data_to_fit')
+            sweep_points_2D_dict = self.get_param_value('sweep_points_2D_dict')
             soft_sweep_params = self.get_param_value('soft_sweep_params')
             if sweep_points_2D_dict is not None:
                 # assumed to be of the form {qbn1: swpts_array1,
@@ -375,6 +374,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 self.proc_data_dict['sweep_points_2D_dict'] = \
                     {qbn: list(soft_sweep_params.values())[0]['values']
                      for qbn in self.qb_names}
+                print(self.proc_data_dict['sweep_points_2D_dict'])
             else:
                 self.proc_data_dict['sweep_points_2D_dict'] = \
                     {qbn: self.raw_data_dict['soft_sweep_points'][0] for
@@ -467,14 +467,14 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             if len(meas_res_dict) == 1:
                 # one RO channel per qubit
                 rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
-                    a_tools.normalize_data_v3(
+                    a_tools.rotate_and_normalize_data_1ch(
                         data=meas_res_dict[list(meas_res_dict)[0]],
                         cal_zero_points=cal_zero_points,
                         cal_one_points=cal_one_points)
             elif list(meas_res_dict) == channel_map[qb_name]:
                 # two RO channels per qubit
                 rotated_data_dict[qb_name][data_to_fit[qb_name]], _, _ = \
-                    a_tools.rotate_and_normalize_data(
+                    a_tools.rotate_and_normalize_data_IQ(
                         data=np.array([v for v in meas_res_dict.values()]),
                         cal_zero_points=cal_zero_points,
                         cal_one_points=cal_one_points)
@@ -490,7 +490,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     if len(ro_suffixes) == len(meas_res_dict):
                         # one RO ch per qubit
                         rotated_data_dict[qb_name][ro_suf] = \
-                            a_tools.normalize_data_v3(
+                            a_tools.rotate_and_normalize_data_1ch(
                                 data=meas_res_dict[list(meas_res_dict)[i]],
                                 cal_zero_points=cal_zero_points,
                                 cal_one_points=cal_one_points)
@@ -528,7 +528,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     deepcopy(raw_data_arr.transpose())
                 for col in range(raw_data_arr.shape[1]):
                     rotated_data_dict[qb_name][data_to_fit[qb_name]][col] = \
-                        a_tools.normalize_data_v3(
+                        a_tools.rotate_and_normalize_data_1ch(
                             data=raw_data_arr[:, col],
                             cal_zero_points=cal_zero_points,
                             cal_one_points=cal_one_points)
@@ -565,7 +565,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         for col in range(raw_data_arr.shape[1]):
                             rotated_data_dict[qb_name][
                                 ro_suf][col] = \
-                                a_tools.normalize_data_v3(
+                                a_tools.rotate_and_normalize_data_1ch(
                                     data=raw_data_arr[:, col],
                                     cal_zero_points=cal_zero_points,
                                     cal_one_points=cal_one_points)
@@ -1032,7 +1032,7 @@ class Grovers_TwoQubitAllStates_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
 
             if normalize_to_cal_points:
-                yvals = a_tools.normalize_data_v3(yvals,
+                yvals = a_tools.rotate_and_normalize_data_1ch(yvals,
                     cal_zero_points=cal_points[idx][0],
                     cal_one_points=cal_points[idx][1])
             self.proc_data_dict['yvals_{}'.format(idx)] = yvals
@@ -1684,7 +1684,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
 
             if normalize_to_cal_points:
-                yvals = a_tools.normalize_data_v3(yvals,
+                yvals = a_tools.rotate_and_normalize_data_1ch(yvals,
                     cal_zero_points=cal_points[i][0],
                     cal_one_points=cal_points[i][1])
                 i +=1
@@ -3036,7 +3036,7 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                            if ch[-8:] == '_measure']
         if len(rdd['measured_values']) == 1:
             # if only one weight function is used rotation is not required
-            pdd['corr_data_all'] = a_tools.normalize_data_v3(
+            pdd['corr_data_all'] = a_tools.rotate_and_normalize_data_1ch(
                     rdd['measured_values'], 
                     cal_zero_points=self.cal_points[0],
                     cal_one_points=self.cal_points[1])
