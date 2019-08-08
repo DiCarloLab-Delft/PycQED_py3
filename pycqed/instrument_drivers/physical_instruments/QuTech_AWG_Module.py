@@ -25,6 +25,7 @@ from typing import List, Sequence, Dict
 
 from qcodes.instrument.parameter import Parameter
 from qcodes.instrument.parameter import Command
+import os
 
 
 # Note: the HandshakeParameter is a temporary param that should be replaced
@@ -1062,6 +1063,56 @@ class QuTech_AWG_Module(SCPI):
         def get_func():
             return fun(ch, cw)
         return get_func
+
+
+class QWGMultiDevices:
+    """
+    QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
+    Usually all methods are static
+    """
+    from pycqed.instrument_drivers.physical_instruments import QuTech_CCL
+
+    @staticmethod
+    def dio_calibration(ccl: QuTech_CCL, qwgs: List[QuTech_AWG_Module], verbose: bool = False):
+        """
+        Calibrate multiple QWG using a CCLight
+        First QWG will be used als base DIO calibration for all other QWGs.
+        On failure of calibration an exception is raised.
+
+        Note: Will use the QWG_DIO_Calibration.qisa file as calibration program by the CCLight. This qisa file should
+        be in the same folder as this (driver) file.
+        :param ccl: CCLight device, connection has to be active
+        :param qwgs: List of QWG which will be calibrated, all QWGs are expected to have an active connection
+        :param verbose: Print the DIO calibration rapport of all QWGs
+        :return: None
+        """
+        if not ccl:
+            raise ValueError("Cannot calibrate QWGs; No CCL provided")
+
+        if ccl.ask("QUTech:RUN?") == '1':
+            ccl.stop()
+        qisa_qwg_dio_calibrate = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), 'QWG_DIO_Calibration.qisa'))
+        ccl.eqasm_program(qisa_qwg_dio_calibrate)
+        ccl.start()
+        ccl.getOperationComplete()
+
+        if not qwgs:
+            raise ValueError("Can not calibrate QWGs; No QWGs provided")
+
+        main_qwg = qwgs[0]
+        main_qwg.dio_calibrate()
+        main_qwg.getErrors()
+        active_index = main_qwg.dio_active_index()
+
+        for qwg in qwgs[1:]:
+            qwg.dio_calibrate(active_index)
+            qwg.getErrors()
+
+        if verbose:
+            for qwg in qwgs:
+                print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
+        ccl.stop()
 
 
 class Mock_QWG(QuTech_AWG_Module):
