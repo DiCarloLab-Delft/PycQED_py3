@@ -1950,6 +1950,36 @@ class CCLight_Transmon(Qubit):
             self.ro_pulse_mixer_offs_Q(offset_Q)
         return True
 
+    def calibrate_mw_pulses_basic(self, amps=np.linspace(0,1.6,31),
+                           freq_steps=[1, 3, 10, 30, 100, 300, 1000],
+                           n_iter_flipping=2, soft_avg_allxy=3):
+        """
+        Performs a standard calibration of microwave pulses consisting of 
+
+        - mixer offsets
+        - mixer skewness 
+        - pulse ampl coarse (rabi) 
+        - frequency (ramsey)
+        - motzoi 
+        - ampl fine (flipping) 
+        - AllXY (to verify)
+
+        Note that this is a basic calibration and does not involve fine tuning
+        to ~99.9% and only works if the qubit is well behaved. 
+        """
+        self.calibrate_mixer_offsets_drive()
+        self.calibrate_mixer_skewness_drive() 
+        
+        self.calibrate_mw_pulse_amplitude_coarse(amps=amps)
+        self.find_frequency('ramsey', steps=freq_steps)
+        self.calibrate_motzoi()
+        for i in range(n_iter_flipping):
+            self.measure_flipping(update=True)
+        old_soft_avg = self.ro_soft_avg()
+        self.ro_soft_avg(soft_avg_allxy)
+        self.measure_allxy()
+        self.ro_soft_avg(old_soft_avg)
+        return True
     #####################################################
     # "measure_" methods below
     #####################################################
