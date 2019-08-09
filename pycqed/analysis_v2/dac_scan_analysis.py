@@ -171,24 +171,14 @@ class FluxFrequency(ba.BaseDataAnalysis):
         # self.proc_data_dict['peaks'] = {}
         for k in ['amplitude_values', 'phase_values', 'distance_values']:
             self.proc_data_dict[k + '_smooth'] = {}
-            # peaklist_x = []
-            # peaklist_z = []
             for i, dac_value in enumerate(self.proc_data_dict['dac_values']):
-                peaks_x, peaks_z, smoothed_z = a_tools.peak_finder_v3(freqs[i],
-                                                                      self.proc_data_dict[k][i],
-                                                                      smoothing=smooth,
-                                                                      perc=self.options_dict.get(
-                                                                          'peak_perc', 99),
-                                                                      window_len=self.options_dict.get(
-                                                                          'smoothing_win_len',
-                                                                          False),
-                                                                      factor=self.options_dict.get('data_factor', 1))
-                # print(dac_value, peaks_x, peaks_z)
-                # peaklist_x.append(list(peaks_x))
-                # peaklist_z.append(peaks_z)
+                peaks_x, peaks_z, smoothed_z = a_tools.peak_finder_v3(
+                    freqs[i], self.proc_data_dict[k][i], smoothing=smooth,
+                    perc=self.options_dict.get('peak_perc', 99),
+                    window_len=self.options_dict.get('smoothing_win_len',
+                                                     False),
+                    factor=self.options_dict.get('data_factor', 1))
                 self.proc_data_dict[k + '_smooth'][i] = smoothed_z
-                # self.proc_data_dict['peaks'][k[:-7]] = np.array([peaklist_x, peaklist_z])
-                # Fixme: save peaks
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
@@ -450,7 +440,7 @@ class Susceptibility_to_Flux_Bias(sa.Basic2DInterpolatedAnalysis):
         linearly dependent on the flux parameter.
         The input dataset needs to be 2D, frequency (x-axis) vs flux parameter (y-axis).
 
-        The final result in units of Hz per unit-of-DC-flux-parameter is stored in 
+        The final result in units of Hz per unit-of-DC-flux-parameter is stored in
         self.proc_data_dict['susceptibility'].
 
         TODO: Add plotting to verify the extraction of susceptibility is correct
@@ -567,7 +557,28 @@ class Susceptibility_to_Flux_Bias(sa.Basic2DInterpolatedAnalysis):
 
 
 class DACarcPolyFit(ba.BaseDataAnalysis):
-          # todo docstring
+    '''
+    Uses a series of spectroscopy measurements at different flux biases
+    to perform a polynomial fit and find approximate dependence f(\Phi).
+
+    Args:
+        t_start (str):
+            timestamp of the first measurement
+
+        t_start (str):
+            timestamp of the last measurement
+
+        dac_key (str):
+            key pointing to the parameter that stores the current
+            applied to the flux bias line
+
+        frequency_key (str):
+            key pointing to the parameter that stores the fitted
+            qubit frequency
+
+        degree (int): order of the polynomial to be fitted
+
+    '''
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = 'spectroscopy',
                  options_dict: dict = None, extract_only: bool = False,
@@ -575,19 +586,7 @@ class DACarcPolyFit(ba.BaseDataAnalysis):
                  frequency_key='Analysis.Fitted Params HM.f0.value',
                  do_fitting=True, degree=2
                  ):
-        '''
-        Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
 
-        :param t_start: start time of scan as a string of format YYYYMMDD_HHmmss
-        :param t_stop: end time of scan as a string of format YYYYMMDD_HHmmss
-        :param label: the label that was used to name the measurements (only necessary if non-relevant measurements are in the time range)
-        :param options_dict: Available options are the ones from the base_analysis and:
-                                - (todo)
-        :param extract_only: Should we also do the plots?
-        :param do_fitting: Should the run_fitting method be executed?
-        :param dac_key: key for the dac current values, e.g. 'Instrument settings.fluxcurrent.Q'
-        :param frequency_key: key for the dac current values, e.g. 'Instrument settings.Q.freq_qubit'
-        '''
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
@@ -659,7 +658,7 @@ class DAC_analysis(ma.TwoD_Analysis):
     the qubit frequency at each DAC value.
 
     Fits a 2nd degree polynomial through the extracted qubit frequencies with
-    the np.polyfit method. 
+    the np.polyfit method.
 
     This function can be called with the timestamp of the DAC arc as its only
     argument. It is heavily inspired by the VNA_DAC_Analysis in
@@ -676,22 +675,24 @@ class DAC_analysis(ma.TwoD_Analysis):
                  options_dict=None,
                  do_fitting=True,
                  extract_only=False,
-                 auto=True):
+                 auto=True,
+                 **kw):
         super(ma.TwoD_Analysis, self).__init__(timestamp=timestamp,
                                                options_dict=options_dict,
                                                extract_only=extract_only,
                                                auto=auto,
-                                               do_fitting=do_fitting)
+                                               do_fitting=do_fitting,
+                                               **kw)
         linecut_fit_result = self.fit_linecuts()
         self.linecut_fit_result = linecut_fit_result
         f0s = []
         for res in self.linecut_fit_result:
             f0s.append(res.values['f0'])
         self.f0s = np.array(f0s)
-        self.run_full_analysis()
+        self.run_full_analysis(**kw)
         self.dac_fit_res = self.fit_dac_arc()
         self.sweet_spot_value = self.dac_fit_res['sweetspot_dac']
-        self.plot_fit_result()
+        self.plot_fit_result(**kw)
 
     def fit_linecuts(self):
         linecut_mag = np.array(self.measured_values)[0].T
@@ -834,10 +835,14 @@ class DAC_analysis(ma.TwoD_Analysis):
             kw["xlabel"] = self.parameter_names[0]
         if "ylabel" not in kw:
             kw["ylabel"] = self.parameter_names[1]
-        if "xunit" not in kw:
-            kw["xunit"] = 'Hz' #self.parameter_units[0]
-        if "yunit" not in kw:
-            kw["yunit"] = 'A' # self.parameter_units[1]
+        if "zlabel" not in kw:
+            kw["zlabel"] = self.value_names[0]
+        if "x_unit" not in kw:
+            kw["x_unit"] = self.parameter_units[0]
+        if "y_unit" not in kw:
+            kw["y_unit"] = self.parameter_units[1]
+        if "z_unit" not in kw:
+            kw["z_unit"] = self.value_units[0]
 
         # subtract mean from each row/column if demanded
         plot_zvals = self.measured_values[0].transpose()
@@ -849,7 +854,7 @@ class DAC_analysis(ma.TwoD_Analysis):
         a_tools.color_plot(x=self.sweep_points,
                            y=self.sweep_points_2D,
                            z=plot_zvals,
-                           zlabel=self.zlabels[0],
+                           # zlabel=self.zlabels[0],
                            fig=fig, ax=ax,
                            log=colorplot_log,
                            transpose=transpose,
@@ -861,9 +866,8 @@ class DAC_analysis(ma.TwoD_Analysis):
 
         fit_plot = self.dac_fit_res['fit_polynomial'](plot_dacs)
 
-        set_xlabel(ax, 'Frequency', 'Hz')
-        # ylabel is value units as we are plotting linecuts
-        set_ylabel(ax, 'FBL_L', 'A')
+        # set_xlabel(ax, kw["xlabel"], kw["x_unit"])
+        # set_ylabel(ax, kw["ylabel"], kw["y_unit"])
 
         ax.plot(self.f0s, self.sweep_points_2D, 'ro-')
         ax.plot(fit_plot, plot_dacs, 'b')
@@ -923,7 +927,7 @@ class DAC_analysis(ma.TwoD_Analysis):
                                      y_name=self.parameter_names[1],
                                      y_unit=self.parameter_units[1],
                                      log=linecut_log,
-                                     zlabel=self.zlabels[i],
+                                     # zlabel=self.zlabels[i],
                                      fig=fig, ax=ax, **kw)
                 ax.set_title(fig_title)
                 set_xlabel(ax, self.parameter_names[0],
@@ -951,10 +955,14 @@ class DAC_analysis(ma.TwoD_Analysis):
                 kw["xlabel"] = self.parameter_names[0]
             if "ylabel" not in kw:
                 kw["ylabel"] = self.parameter_names[1]
-            if "xunit" not in kw:
-                kw["xunit"] = self.parameter_units[0]
-            if "yunit" not in kw:
-                kw["yunit"] = self.parameter_units[1]
+            if "zlabel" not in kw:
+                kw["zlabel"] = self.value_names[0]
+            if "x_unit" not in kw:
+                kw["x_unit"] = self.parameter_units[0]
+            if "y_unit" not in kw:
+                kw["y_unit"] = self.parameter_units[1]
+            if "z_unit" not in kw:
+                kw["z_unit"] = self.value_units[0]
 
             # subtract mean from each row/column if demanded
             plot_zvals = meas_vals.transpose()
@@ -966,11 +974,15 @@ class DAC_analysis(ma.TwoD_Analysis):
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=plot_zvals,
-                               zlabel=self.zlabels[i],
+                               # zlabel=self.sweept_val[i],u
                                fig=fig, ax=ax,
                                log=colorplot_log,
                                transpose=transpose,
                                normalize=normalize,
                                **kw)
             ax.set_title(fig_title)
-            
+            set_xlabel(ax, kw["xlabel"], kw["x_unit"])
+            set_ylabel(ax, kw["ylabel"], kw["y_unit"])
+            if save_fig:
+                self.save_fig(fig, figname=savename,
+                              fig_tight=False, **kw)

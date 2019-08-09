@@ -1,8 +1,12 @@
 #!/usr/bin/python
 
+### setup logging before all imports (before any logging is done as to prevent a default root logger)
+import CC_logging
+
+### imports
+import sys
 import os
 import logging
-import sys
 from pathlib import Path
 import numpy as np
 
@@ -18,26 +22,28 @@ import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 
 from qcodes import station
 
+# configure our logger
+log = logging.getLogger('demo_2')
+log.setLevel(logging.DEBUG)
+log.debug('starting')
 
-def set_waveforms(awg, waveform_type, sequence_length):
+
+def set_waveforms(instr_awg, waveform_type, sequence_length):
     if waveform_type == 'square':
-        for ch in range(8):
-            for i in range(sequence_length):
-                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), np.ones(48) * i / (sequence_length - 1))
+        for i in range(sequence_length):
+            wav = np.ones(48) * i / (sequence_length - 1)
+            for ch in range(8):
+                instr_awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), wav)
     elif waveform_type == 'cos':
-        for ch in range(8):
-            for i in range(sequence_length):
-                awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), np.cos(np.arange(48) / 2) * i / (sequence_length - 1))
+        for i in range(sequence_length):
+            wav = np.cos(np.arange(48) / 2) * i / (sequence_length - 1)
+            for ch in range(8):
+                instr_awg.set('wave_ch{}_cw{:03}'.format(ch + 1, i), wav)
     else:
         raise KeyError()
 
-
-log = logging.getLogger('pycqed')
-log.setLevel(logging.DEBUG)
-log.debug('started')
-
-
 # parameter handling
+log.debug('started')
 sel = 0
 if len(sys.argv)>1:
     sel = int(sys.argv[1])
@@ -49,7 +55,8 @@ if len(sys.argv)>1:
 conf = lambda:0 # create empty 'struct'
 conf.ro_0 = ''
 conf.ro_0 = 'dev2295'
-conf.mw_0 = 'dev8079'
+#conf.mw_0 = 'dev8079'
+conf.mw_0 = 'dev8078'
 conf.flux_0 = ''
 conf.cc_ip = '192.168.0.241'
 
@@ -136,7 +143,7 @@ if conf.ro_0 != '':
     #station.add_component(instr.ro_0)
 
 log.debug('connecting to CC')
-instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
+instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip, timeout=5.0)) # FIXME: raised timeout until assembly time reduced
 instr.cc.reset()
 instr.cc.clear_status()
 instr.cc.set_status_questionable_frequency_enable(0x7FFF)
@@ -151,6 +158,7 @@ rolut = UHFQC_RO_LutMan('rolut', num_res=7)
 #  Configure AWGs
 ##########################################
 if conf.mw_0 != '':
+    log.debug('configuring mw_0')
     # define sequence
     sequence_length = 32
 
@@ -158,22 +166,48 @@ if conf.mw_0 != '':
     instr.mw_0.load_default_settings()
     instr.mw_0.assure_ext_clock()
     set_waveforms(instr.mw_0, 'square', sequence_length)
+    if 0: # FIXME
+        log.warning('setting DIO interface to CMOS')
+        instr.mw_0.set('dios_0_interface', 1)
     instr.mw_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
     instr.mw_0.cfg_codeword_protocol('microwave')
     instr.mw_0.upload_codeword_program()
+    if 1:   # FIXME: should be moved to driver
+        instr.mw_0._dev.setd('raw/dios/0/extclk', 1)  # enable 50 MHz sampling of DIO inputs
+        for awg in range(4):
+            instr.mw_0.set('awgs_{}_dio_strobe_slope'.format(awg), 0)  # disable strobe triggering
+
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
     if 0:
         delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
         for awg in range(4):
             instr.mw_0._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)  # skew TOGGLE_DS versus rest
     else:
-        delay = 1  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
+        delay = 0  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
         instr.mw_0._dev.setd('raw/dios/0/delays/*/value', delay)  # new interface?, range [0:15]
         for awg in range(4):
             dio_timing_errors = instr.mw_0._dev.geti('awgs/{}/dio/error/timing'.format(awg))
             log.debug('DIO timing errors on AWG {}: {}'.format(awg,dio_timing_errors))
 
 """
+    dev8079 *After* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
+    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
+    0       +       0/0/0/0         66
+    1       +       0/0/0/0         66
+    2       +       0/0/0/0         66
+    
+    3       +       1/0/0/0         86
+    4       +       1/0/0/0         86
+    5       +       0/0/0/0         86
+    6       +       0/0/0/0         86
+    7       +       0/0/0/0         86
+    8       +       0/0/0/0         86
+    
+    9       +       1/0/0/0        106
+
+
+
+    dev8079 *Before* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
     delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
     0       +       0/0/0/0         60
     1       +       0/0/0/0         60
@@ -198,10 +232,13 @@ if conf.mw_0 != '':
     - delay steps are 3.33 ns each
     - 15 steps == 50 ns
     - 6 steps == 20 ns, pattern repeats after that
+    ...
+    
     
 """
 
 if conf.flux_0 != '':
+    log.debug('configuring flux_0')
     # define sequence
     sequence_length = 8
 
@@ -219,36 +256,67 @@ if conf.flux_0 != '':
 ##########################################
 
 if conf.ro_0 != '':
-    instr.mw_0.load_default_settings() # FIXME: also done at init?
-    rolut.AWG(instr.mw_0.name)
+    log.debug('configuring ro_0')
+    instr.ro_0.load_default_settings() # FIXME: also done at init?
 
+    # configure UHFQC to generate codeword based readout signals
+    instr.ro_0.quex_rl_length(1)
+    instr.ro_0.quex_wint_length(int(600e-9 * 1.8e9))
 
+    if 1:
+        # generate waveforms and ZIseqC program using rolut
+        amps = [0.1, 0.2, 0.3, 0.4, 0.5]
+        resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]   # FIXME: default Base_RO_LutMan _resonator_codeword_bit_mapping
 
+        for i,res in enumerate(resonator_codeword_bit_mapping):
+            rolut.set('M_amp_R{}'.format(res), amps[i])
+            rolut.set('M_phi_R{}'.format(res), -45)
+
+            rolut.set('M_down_amp0_R{}'.format(res), amps[i] / 2)
+            rolut.set('M_down_amp1_R{}'.format(res), -amps[i] / 2)
+            rolut.set('M_down_phi0_R{}'.format(res), -45 + 180)
+            rolut.set('M_down_phi1_R{}'.format(res), -45)
+
+            rolut.set('M_length_R{}'.format(res), 500e-9)
+            rolut.set('M_down_length0_R{}'.format(res), 200e-9)
+            rolut.set('M_down_length1_R{}'.format(res), 200e-9)
+            rolut.set('M_modulation_R{}'.format(res), 0)
+
+        rolut.acquisition_delay(200e-9)
+        rolut.AWG(instr.ro_0.name)
+        rolut.sampling_rate(1.8e9)
+        rolut.generate_standard_waveforms()
+        rolut.pulse_type('M_up_down_down')
+        #rolut.resonator_combinations([[0], [2], [3], [5], [6]])  # FIXME: must use resonators from resonator_codeword_bit_mapping
+        rolut.resonator_combinations([[0,2,3,5,6]])  # FIXME: must use resonators from resonator_codeword_bit_mapping
+        rolut.load_DIO_triggered_sequence_onto_UHFQC()  # upload waveforms and ZIseqC program
+
+        instr.ro_0.awgs_0_userregs_0(1024)  # loop_cnt, see UHFQC driver (awg_sequence_acquisition_and_DIO_triggered_pulse)
 
 ##########################################
 #  Configure CC
 ##########################################
 
+log.debug('configuring CC')
 instr.cc.debug_marker_out(slot_ro_1, instr.cc.UHFQA_TRIG) # UHF-QA trigger
 instr.cc.debug_marker_out(slot_mw_0, instr.cc.HDAWG_TRIG) # HDAWG trigger
 
 log.debug("uploading '{}' to CC".format(p.filename))
 instr.cc.eqasm_program(p.filename)
 
-if 0:
-    err_cnt = instr.cc.get_system_error_count()
-    if err_cnt>0:
-        log.warning('CC status after upload')
-    for i in range(err_cnt):
-        print(instr.cc.get_error())
+log.debug("printing CC errors")
+err_cnt = instr.cc.get_system_error_count()
+if err_cnt>0:
+    log.warning('CC status after upload')
+for i in range(err_cnt):
+    print(instr.cc.get_error())
 
 log.debug('starting CC')
 instr.cc.start()
 
-if 0:
-    err_cnt = instr.cc.get_system_error_count()
-    if err_cnt>0:
-        log.warning('CC status after start')
-    for i in range(err_cnt):
-        print(instr.cc.get_error())
+err_cnt = instr.cc.get_system_error_count()
+if err_cnt>0:
+    log.warning('CC status after start')
+for i in range(err_cnt):
+    print(instr.cc.get_error())
 

@@ -5,7 +5,8 @@ import numpy as np
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
 from pycqed.utilities import general
-from pycqed.utilities.general import dict_to_ordered_tuples
+from pycqed.utilities.general import dict_to_ordered_tuples, \
+    delete_keys_from_dict, check_keyboard_interrupt, KeyboardFinish
 from pycqed.utilities.get_default_datadir import get_default_datadir
 
 # Used for auto qcodes parameter wrapping
@@ -174,7 +175,7 @@ class MeasurementControl(Instrument):
                       datadir=self.datadir()) as self.data_object:
             try:
 
-                self.check_keyboard_interrupt()
+                check_keyboard_interrupt()
                 self.get_measurement_begintime()
                 if not disable_snapshot_metadata:
                     self.save_instrument_settings(self.data_object)
@@ -254,7 +255,7 @@ class MeasurementControl(Instrument):
             print(self.sweep_function.sweep_control)
             print(self.detector_function.detector_control)
 
-        self.check_keyboard_interrupt()
+        check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         if self.mode == '2D':
@@ -320,7 +321,7 @@ class MeasurementControl(Instrument):
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
-        self.check_keyboard_interrupt()
+        check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         self.update_plotmon_adaptive(force_update=True)
@@ -378,7 +379,7 @@ class MeasurementControl(Instrument):
                 # specified that you don't want to crash (e.g. on -off seq)
                 pass
 
-        self.check_keyboard_interrupt()
+        check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon()
         if self.mode == '2D':
@@ -440,7 +441,6 @@ class MeasurementControl(Instrument):
         self.last_sweep_pts = x
 
         datasetshape = self.dset.shape
-        # self.iteration = datasetshape[0] + 1
 
         vals = self.detector_function.acquire_data_point()
         start_idx, stop_idx = self.get_datawriting_indices_update_ctr(vals)
@@ -456,7 +456,7 @@ class MeasurementControl(Instrument):
 
         self.dset[start_idx:stop_idx, :] = new_vals
         # update plotmon
-        self.check_keyboard_interrupt()
+        check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon()
         if self.mode == '2D':
@@ -1293,11 +1293,11 @@ class MeasurementControl(Instrument):
         h5d.write_dict_to_hdf5(res_dict, entry_point=opt_res_grp)
 
     def save_instrument_settings(self, data_object=None, *args):
-        '''
-        uses QCodes station snapshot to save the last known value of any
-        parameter. Only saves the value and not the update time (which is
-        known in the snapshot)
-        '''
+        """
+        Store the last known value of all parameters in the datafile.
+
+        Datasaving is based on the snapshot of the QCoDeS station object.
+        """
         if data_object is None:
             data_object = self.data_object
         if not hasattr(self, 'station'):
@@ -1307,7 +1307,13 @@ class MeasurementControl(Instrument):
             # This saves the snapshot of the entire setup
             snap_grp = data_object.create_group('Snapshot')
             snap = self.station.snapshot()
-            h5d.write_dict_to_hdf5(snap, entry_point=snap_grp)
+            exclude_keys = {
+                'inter_delay', 'post_delay',
+                'vals', 'instrument', 'functions', '__class__',
+                'raw_value', 'instrument_name', 'full_name', 'val_mapping'}
+            cleaned_snapshot = delete_keys_from_dict(snap, exclude_keys)
+
+            h5d.write_dict_to_hdf5(cleaned_snapshot, entry_point=snap_grp)
 
             # Below is old style saving of snapshot, exists for the sake of
             # preserving deprecated functionality
@@ -1326,7 +1332,7 @@ class MeasurementControl(Instrument):
 
     def save_MC_metadata(self, data_object=None, *args):
         '''
-        Saves metadata on the MC (such as timings)
+        Save metadata on the MC (such as timings)
         '''
         set_grp = data_object.create_group('MC settings')
 
@@ -1484,20 +1490,6 @@ class MeasurementControl(Instrument):
             self.total_nr_acquired_values += xlen
 
         return start_idx, stop_idx
-
-    def check_keyboard_interrupt(self):
-        try:  # Try except statement is to make it work on non windows pc
-            if msvcrt.kbhit():
-                key = msvcrt.getch()
-                if b'q' in key:
-                    # this causes a KeyBoardInterrupt
-                    raise KeyboardInterrupt('Human "q" terminated experiment.')
-                elif b'f' in key:
-                    # this should not raise an exception
-                    raise KeyboardFinish(
-                        'Human "f" terminated experiment safely.')
-        except Exception:
-            pass
 
     ####################################
     # Non-parameter get/set functions  #
@@ -1669,12 +1661,3 @@ class MeasurementControl(Instrument):
         return {'vendor': 'PycQED', 'model': 'MeasurementControl',
                 'serial': '', 'firmware': '2.0'}
 
-
-class KeyboardFinish(KeyboardInterrupt):
-    """
-    Indicates that the user safely aborts/finishes the experiment.
-    Used to finish the experiment without raising an exception.
-    """
-
-    # FIXME: replace with version from pycqed/utilities/general
-    pass

@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
+import pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module as qwg
 
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -13,6 +14,9 @@ class Test_MW_LutMan(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.AWG = v8.VirtualAWG8('DummyAWG8')
+        # We use an HDAWG because the interface should be similar
+        # to a QWG and we do not have a dummy driver
+        self.QWG = qwg.Mock_QWG('mock_qwg')
 
         self.AWG8_MW_LutMan = mwl.AWG8_MW_LutMan('MW_LutMan')
         self.AWG8_MW_LutMan.AWG(self.AWG.name)
@@ -34,6 +38,9 @@ class Test_MW_LutMan(unittest.TestCase):
 
         self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
         self.QWG_MW_LutMan = mwl.QWG_MW_LutMan('QWG_MW_LutMan')
+        self.QWG_MW_LutMan.AWG(self.QWG.name)
+        self.QWG_MW_LutMan.channel_I(1)
+        self.QWG_MW_LutMan.channel_Q(2)
 
     def test_program_hash_differs_AWG8_lutman(self):
 
@@ -86,6 +93,28 @@ class Test_MW_LutMan(unittest.TestCase):
             sampling_rate=self.AWG8_MW_LutMan.sampling_rate(),
             delay=0, phase=0)[0]
         uploaded_wf = self.AWG.get('wave_ch1_cw008')
+        np.testing.assert_array_almost_equal(expected_wf_spec, uploaded_wf)
+
+    def test_uploading_standard_pulses_QWG_lutman(self):
+        # Tests that all waveforms are present and no error is raised.
+        self.QWG_MW_LutMan.load_waveforms_onto_AWG_lookuptable(
+        )
+        expected_wf = wf.mod_gauss(
+            amp=self.QWG_MW_LutMan.mw_amp180(),
+            sigma_length=self.QWG_MW_LutMan.mw_gauss_width(),
+            f_modulation=self.QWG_MW_LutMan.mw_modulation(),
+            sampling_rate=self.QWG_MW_LutMan.sampling_rate(), phase=0,
+            motzoi=self.QWG_MW_LutMan.mw_motzoi())[0]
+
+        uploaded_wf = self.QWG.get('wave_ch1_cw001')
+        np.testing.assert_array_almost_equal(expected_wf, uploaded_wf)
+
+        expected_wf_spec = wf.block_pulse(
+            length=self.QWG_MW_LutMan.spec_length(),
+            amp=self.QWG_MW_LutMan.spec_amp(),
+            sampling_rate=self.QWG_MW_LutMan.sampling_rate(),
+            delay=0, phase=0)[0]
+        uploaded_wf = self.QWG.get('wave_ch1_cw008')
         np.testing.assert_array_almost_equal(expected_wf_spec, uploaded_wf)
 
     def test_generating_standard_pulses(self):
@@ -210,7 +239,6 @@ class Test_MW_LutMan(unittest.TestCase):
     def test_render_wave_PSD(self):
         self.AWG8_VSM_MW_LutMan.render_wave_PSD('rX180', show=False)
 
-
     @classmethod
     def tearDownClass(self):
         for inststr in list(self.AWG._all_instruments):
@@ -259,8 +287,6 @@ class Test_LutMan_Utils(unittest.TestCase):
     def test_get_wf_idx_from_name(self):
         idx = get_wf_idx_from_name('rX12', mwl.default_mw_lutmap)
         self.assertEqual(idx, 9)
-
-
 
 
 def dict_contained_in(subset, superset):

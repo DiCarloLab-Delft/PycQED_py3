@@ -31,7 +31,7 @@ class Base_RO_LutMan(Base_LutMan):
             elif self._feedline_number == 2: 
                 self._resonator_codeword_bit_mapping = [0, 2, 3, 6, 9, 12]                
             else:
-                raise NotImplementedError('hardcoded for feedline 0 and 1 of Surface-7')
+                raise NotImplementedError('hardcoded for feedline 0 and 1 of Surface-7') # FIXME: copy/paste error
 
         else: 
             raise ValueError('Feedline map not in {"S7", "S17"}.')
@@ -190,7 +190,8 @@ class Base_RO_LutMan(Base_LutMan):
             # 1. Generate Pulse envelopes
             ## Simple pulse
             up_len = self.get('M_length_R{}'.format(res))-gauss_length
-            M = self.add_pulse(self.get('M_amp_R{}'.format(res)), up_len,
+            M = self.add_pulse(amplitude=self.get('M_amp_R{}'.format(res)),
+                               length=up_len,
                                delay=0,
                                phase=self.get('M_phi_R{}'.format(res)))
             res_wave_dict['M_simple_R{}'.format(res)] = M
@@ -301,7 +302,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         Load a single pulse to the lookuptable, it uses the lut_mapping to
             determine which lookuptable to load to.
 
-        hardcode_case_0 is a workaround as long as it's not clear how
+        FIXME: hardcode_case_0 is a workaround as long as it's not clear how
         to make the qisa assembler output the codeword mask on DIO.
         The first element of self.resonator_combinations is linked
         to codeword 0, the others are not uploaded.
@@ -319,7 +320,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
 
         for i, resonator_combination in enumerate(resonator_combinations):
             if not resonator_combination:
-                # empty combination, generating empty 20 ns pulse
+                # empty combination (= []), generating empty 20 ns pulse
                 I_waves.append(np.zeros(36))
                 Q_waves.append(np.zeros(36))
             else:

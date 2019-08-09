@@ -20,8 +20,10 @@ import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from scipy.optimize import minimize
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
+    set_cbarlabel, flex_colormesh_plot_vs_xy
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pycqed.analysis.tools.data_manipulation as dm_tools
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.utilities.general import int2base
 from pycqed.utilities.general import format_value_string
 
@@ -35,14 +37,14 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                  **kw):
         '''
         options dict options:
-            'fixed_p10' fixes p(e|g) (do not vary in fit)
-            'fixed_p01' : fixes p(g|pi) (do not vary in fit)
+            'fixed_p10'   fixes p(e|g)  res_exc (do not vary in fit)
+            'fixed_p01' : fixes p(g|pi) mmt_rel (do not vary in fit)
             'auto_rotation_angle' : (bool) automatically find the I/Q mixing angle
             'rotation_angle' : manually define the I/Q mixing angle (ignored if auto_rotation_angle is set to True)
             'nr_bins' : number of bins to use for the histograms
-            'post_select' :
-            'post_select_threshold' :
-            'nr_samples' : amount of different samples (e.g. ground and excited = 2)
+            'post_select' : (bool) sets on or off the post_selection based on an initialization measurement (needs to be in agreement with nr_samples)
+            'post_select_threshold' : (float) threshold used for post-selection (only activated by above parameter)
+            'nr_samples' : amount of different samples (e.g. ground and excited = 2 and with post-selection = 4)
             'sample_0' : index of first sample (ground-state)
             'sample_1' : index of second sample (first excited-state)
             'max_datapoints' : maximum amount of datapoints for culumative fit
@@ -106,7 +108,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # Do we have two quadratures?
         if len(meas_val) == 2:
             ########################################################
-            #
+            # Bin the data in 2D, to calculate the opt. angle
             ########################################################
             data_range_x = (np.min([np.min(b) for b in shots[:, 0]]),
                             np.max([np.max(b) for b in shots[:, 0]]))
@@ -243,6 +245,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['threshold_raw'] = all_x[opt_idx]
 
     def prepare_fitting(self):
+        ###################################
+        #  First fit the histograms (PDF) #
+        ###################################
         self.fit_dicts = OrderedDict()
 
         bin_x = self.proc_data_dict['bin_centers']
@@ -263,6 +268,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                              'fixed_p10': self.options_dict.get('fixed_p10', False)},
         }
 
+        ###################################
+        #  Fit the CDF                    #
+        ###################################
         m_cul = lmfit.model.Model(ro_CDF)
         cdf_xs = self.proc_data_dict['cumsum_x_ds']
         cdf_xs = [np.array(cdf_xs), np.array(cdf_xs)]
@@ -358,6 +366,19 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['residual_excitation'] = bv['B_spurious'].value
         self.proc_data_dict['measurement_induced_relaxation'] = bv['A_spurious'].value
 
+        ###################################
+        #  Save quantities of interest.   #
+        ###################################
+        self.proc_data_dict['quantities_of_interest'] = {
+            'SNR': self.fit_res['shots_all'].params['SNR'].value,
+            'F_d': self.proc_data_dict['F_discr'],
+            'F_a': self.proc_data_dict['F_assignment_raw'],
+            'residual_excitation': self.proc_data_dict['residual_excitation'],
+            'measurement_induced_relaxation':
+                self.proc_data_dict['measurement_induced_relaxation']
+            }
+        self.qoi = self.proc_data_dict['quantities_of_interest']
+
     def prepare_plots(self):
         # Did we load two voltage components (shall we do 2D plots?)
         two_dim_data = len(
@@ -377,7 +398,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         title = ('\n' + self.timestamps[0] + ' - "' +
                  self.raw_data_dict['measurementstring'] + '"')
 
-        # 1D histograms
+        # 1D histograms (PDF)
         log_hist = self.options_dict.get('log_hist', False)
         bin_x = self.proc_data_dict['bin_edges']
         bin_y = self.proc_data_dict['hist']
@@ -477,13 +498,14 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 iq_centers = self.proc_data_dict['IQ_pos']
                 peak_marker_2D = {
                     'plotfn': self.plot_line,
-                    'xvals': iq_centers[1],
-                    'yvals': iq_centers[0],
+                    'xvals': iq_centers[0],
+                    'yvals': iq_centers[1],
                     'xlabel': x_volt_label,
                     'xunit': x_volt_unit,
                     'ylabel': y_volt_label,
                     'yunit': y_volt_unit,
                     'marker': 'x',
+                    'aspect': 'equal',
                     'linestyle': '',
                     'color': 'black',
                     #'line_kws': {'markersize': 1, 'color': 'black', 'alpha': 1},
@@ -497,10 +519,11 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.plot_dicts['2D_histogram_0'] = {
                 'title': 'Raw '+label_0+' Binned Shot Counts' + title,
                 'ax_id': '2D_histogram_0',
-                'plotfn': self.plot_colorxy,
-                'xvals': self.proc_data_dict['2D_histogram_y'],
-                'yvals': self.proc_data_dict['2D_histogram_x'],
-                'zvals': self.proc_data_dict['2D_histogram_z'][0],
+                # 'plotfn': self.plot_colorxy,
+                'plotfn':plot_2D_ssro_histogram,
+                'xvals': self.proc_data_dict['2D_histogram_x'],
+                'yvals': self.proc_data_dict['2D_histogram_y'],
+                'zvals': self.proc_data_dict['2D_histogram_z'][0].T,
                 'xlabel': x_volt_label,
                 'xunit': x_volt_unit,
                 'ylabel': y_volt_label,
@@ -517,10 +540,11 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.plot_dicts['2D_histogram_1'] = {
                 'title': 'Raw '+label_1+' Binned Shot Counts' + title,
                 'ax_id': '2D_histogram_1',
-                'plotfn': self.plot_colorxy,
-                'xvals': self.proc_data_dict['2D_histogram_y'],
-                'yvals': self.proc_data_dict['2D_histogram_x'],
-                'zvals': self.proc_data_dict['2D_histogram_z'][1],
+                # 'plotfn': self.plot_colorxy,
+                'plotfn':plot_2D_ssro_histogram,
+                'xvals': self.proc_data_dict['2D_histogram_x'],
+                'yvals': self.proc_data_dict['2D_histogram_y'],
+                'zvals': self.proc_data_dict['2D_histogram_z'][1].T,
                 'xlabel': x_volt_label,
                 'xunit': x_volt_unit,
                 'ylabel': y_volt_label,
@@ -536,19 +560,22 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
             # Scatter Shots
             volts = self.proc_data_dict['all_channel_int_voltages']
-            vxr = [np.min([np.min(a) for a in volts[:][1]]),
-                   np.max([np.max(a) for a in volts[:][1]])]
-            vyr = [np.min([np.min(a) for a in volts[:][0]]),
-                   np.max([np.max(a) for a in volts[:][0]])]
+
+            v_flat =np.concatenate(np.concatenate(volts))
+            plot_range = (np.min(v_flat), np.max(v_flat))
+
+            vxr = plot_range
+            vyr=plot_range
             self.plot_dicts['2D_shots_0'] = {
                 'title': 'Raw Shots' + title,
                 'ax_id': '2D_shots',
+                'aspect': 'equal',
                 'plotfn': self.plot_line,
-                'xvals': volts[0][1],
-                'yvals': volts[0][0],
-                #'range': [vxr, vyr],
-                #'xrange': vxr,
-                #'yrange': vyr,
+                'xvals': volts[0][0],
+                'yvals': volts[0][1],
+                'range': [vxr, vyr],
+                'xrange': vxr,
+                'yrange': vyr,
                 'xlabel': x_volt_label,
                 'xunit': x_volt_unit,
                 'ylabel': y_volt_label,
@@ -564,11 +591,12 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.plot_dicts['2D_shots_1'] = {
                 'ax_id': '2D_shots',
                 'plotfn': self.plot_line,
-                'xvals': volts[1][1],
-                'yvals': volts[1][0],
-                #'range': [vxr, vyr],
-                #'xrange': vxr,
-                #'yrange': vyr,
+                'xvals': volts[1][0],
+                'yvals': volts[1][1],
+                'aspect': 'equal',
+                'range': [vxr, vyr],
+                'xrange': vxr,
+                'yrange': vyr,
                 'xlabel': x_volt_label,
                 'xunit': x_volt_unit,
                 'ylabel': y_volt_label,
@@ -1061,3 +1089,42 @@ def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
 
     if title is not None:
         ax.set_title(title)
+
+
+
+def plot_2D_ssro_histogram(xvals, yvals, zvals, xlabel, xunit, ylabel, yunit, zlabel, zunit,
+                           xlim=None, ylim=None,
+                           title='',
+                           cmap='viridis',
+                           cbarwidth='10%',
+                           cbarpad =  '5%',
+                           no_label=False,
+                           ax=None, cax=None, **kw):
+    if ax is None:
+        f, ax=plt.subplots()
+    if not no_label:
+        ax.set_title(title)
+
+    # Plotting the "heatmap"
+    out = flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=ax,
+                                             plot_cbar=True, cmap=cmap)
+    # Adding the colorbar
+    if cax is None:
+        ax.ax_divider = make_axes_locatable(ax)
+        ax.cax = ax.ax_divider.append_axes(
+            'right', size=cbarwidth, pad=cbarpad)
+    else:
+        ax.cax = cax
+    ax.cbar = plt.colorbar(out['cmap'], cax=ax.cax)
+
+    # Setting axis limits aspect ratios and labels
+    ax.set_aspect(1)
+    set_xlabel(ax, xlabel, xunit)
+    set_ylabel(ax, ylabel, yunit)
+    set_cbarlabel(ax.cbar, zlabel, zunit)
+    if xlim is None:
+        xlim = np.min([xvals, yvals]),np.max([xvals, yvals])
+    ax.set_xlim(xlim)
+    if ylim is None:
+        ylim = np.min([xvals, yvals]),np.max([xvals, yvals])
+    ax.set_ylim(ylim)

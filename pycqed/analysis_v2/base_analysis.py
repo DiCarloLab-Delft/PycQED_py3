@@ -939,6 +939,8 @@ class BaseDataAnalysis(object):
                 plot_linekws['xerr'] = plot_linekws.get('xerr', xerr)
 
         pdict['line_kws'] = plot_linekws
+
+        axs.set_aspect(pdict.get('aspect', 'auto'))
         pfunc = getattr(axs, pdict.get('func', 'plot'))
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']

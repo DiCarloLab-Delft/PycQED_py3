@@ -149,8 +149,10 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             try:
                 entry_point.attrs[key] = item
             except Exception as e:
+
                 print('Exception occurred while writing'
-                      ' {}:{} of type {}'.format(key, item, type(item)))
+                      ' {}:{} of type {} at entry point {}'
+                      .format(key, item, type(item),entry_point))
                 logging.warning(e)
         elif isinstance(item, np.ndarray):
             entry_point.create_dataset(key, data=item)
@@ -257,7 +259,8 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
                 # the writing part in the writing function above.
                 list_of_str = [x[0] for x in item.value]
                 data_dict[key] = list_of_str
-
+            elif item.attrs['list_type'] == 'array':
+                data_dict[key] = list(item.value)
             else:
                 data_dict[key] = list(item.value)
     for key, item in h5_group.attrs.items():

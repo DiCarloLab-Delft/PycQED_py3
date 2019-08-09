@@ -210,6 +210,33 @@ try:
             self.assertEqual(p.name, 'sliding_flux_pulses_seq')
 
 
+    """
+        Author:             Wouter Vlothuizen, QuTech
+        Purpose:            multi qubit OpenQL tests for Qutech Central Controller
+        Notes:              requires OpenQL with CC backend support
+    """
+    # import test_multi_qubit_oql as parent  # rename to stop pytest from running tests directly
+
+    # NB: we just hijack the parent class to run the same tests
+
+    # FIXME: This only works with Wouters custom OpenQL.
+    # Need a better check for this
+    if ql.get_version() > '0.7.0':
+        class Test_multi_qubit_oql_CC(Test_multi_qubit_oql):
+            def setUp(self):
+                curdir = os.path.dirname(__file__)
+                self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
+                output_dir = os.path.join(curdir, 'test_output_cc')
+                ql.set_option('output_dir', output_dir)
+
+            def test_multi_qubit_off_on(self):
+                pytest.skip("test_multi_qubit_off_on() gives signalconflict (FIXME)")
+    else:
+        class Test_multi_qubit_oql_CC(unittest.TestCase):
+                @unittest.skip('OpenQL version does not support CC')
+                def test_fail(self):
+                    pass
+
 except ImportError as e:
 
     class Test_multi_qubit_oql(unittest.TestCase):
@@ -217,23 +244,4 @@ except ImportError as e:
         @unittest.skip('Missing dependency - ' + str(e))
         def test_fail(self):
             pass
-
-
-"""
-    Author:             Wouter Vlothuizen, QuTech
-    Purpose:            multi qubit OpenQL tests for Qutech Central Controller
-    Notes:              requires OpenQL with CC backend support
-"""
-#import test_multi_qubit_oql as parent  # rename to stop pytest from running tests directly
-
-# NB: we just hijack the parent class to run the same tests
-class Test_multi_qubit_oql_CC(Test_multi_qubit_oql):
-    def setUp(self):
-        curdir = os.path.dirname(__file__)
-        self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-        output_dir = os.path.join(curdir, 'test_output_cc')
-        ql.set_option('output_dir', output_dir)
-
-    def test_multi_qubit_off_on(self):
-        pytest.skip("test_multi_qubit_off_on() gives signalconflict (FIXME)")
 

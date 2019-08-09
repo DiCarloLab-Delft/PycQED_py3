@@ -291,7 +291,70 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
 
 
 class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
-    # todo docstring
+    """
+    Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
+    Makes several plots, such as Tx vs time, Tx vs frequency, Tx vs flux, freq vs current etc.
+    Ferforms only up to two fits:
+        - frequency vs current (used to concert current to flux and to calculate
+            flux sensitivity |df/dI|; if requested)
+        - A/f to Tx vs frequency (to extract Q-factor from T1 measurements; if requested)
+
+    Args:
+        t_start (str):
+            start time of scan as a string of format YYYYMMDD_HHmmss
+
+        t_stop (str):
+            end time of scan as a string of format YYYYMMDD_HHmmss
+
+        label (str):
+            the label that was used to name the measurements
+            (only necessary if non-relevant measurements are in the time range)
+
+        options_dict (dict):
+            Guesses of resonator frequencits for purcell effect can be specified:
+                'guess_mode_frequency': float OR
+                'guess_mode_frequency': [float, float]
+            only up to two modes are supported at this point.
+            ...
+            Other available options are the ones from the base_analysis and:
+                                - (todo)
+
+        auto (bool):
+            Execute all steps automatically
+
+        close_figs (bool):
+            Close the figure (do not display)
+
+        extract_only (bool):
+            Should we also do the plots?
+
+        do_fitting (bool):
+            Should the run_fitting method be executed?
+
+        fit_T1_vs_freq (bool):
+            Should fitting T1 vs freq be done?
+            in options dict. If not specified only 1/f dependence is fitted.
+
+        tau_key (str):
+            key for the tau (time) fit result, e.g. 'Analysis.Fitted Params F|1>.tau.value'
+
+        tau_std_key (str):
+            key for the tau (time) standard deviation fit result,
+            e.g. 'Analysis.Fitted Params F|1>.tau.stderr'
+
+        plot_versus_dac (bool): Extract and plot dac value?
+            E.g. set False if you did not vary the dac for this measurement.
+
+        dac_key (str):
+            key for the dac current values, e.g. 'Instrument settings.fluxcurrent.Q'
+
+        plot_versus_frequency (bool):
+            Extract and plot frequency value?
+            E.g. set False if you did not use the Qubit object.
+
+        frequency_key (bool):
+            key for the dac current values, e.g. 'Instrument settings.Q.freq_qubit'
+    """
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='',
                  options_dict: dict=None, extract_only: bool=False, auto: bool=True,
@@ -303,32 +366,10 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  dac_key='Instrument settings.fluxcurrent.Q',
                  plot_versus_frequency=True,
                  frequency_key='Instrument settings.Q.freq_qubit',
-                 fit_qubit_Q_factor=False,
+                 fit_T1_vs_freq=False,
                  mean_and_std=False
                  ):
-        '''
-        Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
 
-        :param t_start: start time of scan as a string of format YYYYMMDD_HHmmss
-        :param t_stop: end time of scan as a string of format YYYYMMDD_HHmmss
-        :param label: the label that was used to name the measurements (only necessary if non-relevant measurements are in the time range)
-        :param options_dict: Available options are the ones from the base_analysis and:
-                                - (todo)
-        :param auto: Execute all steps automatically
-        :param close_figs: Close the figure (do not display)
-        :param extract_only: Should we also do the plots?
-        :param do_fitting: Should the run_fitting method be executed?
-        :param fit_qubit_Q_factor: Should fitting of a Q-factor be done? (for T1 measurement only!)
-        :param tau_key: key for the tau (time) fit result, e.g. 'Analysis.Fitted Params F|1>.tau.value'
-        :param tau_std_key: key for the tau (time) standard deviation fit result,
-                            e.g. 'Analysis.Fitted Params F|1>.tau.stderr'
-        :param plot_versus_dac: Extract and plot dac value?
-                                    E.g. set False if you did not vary the dac for this measurement.
-        :param dac_key: key for the dac current values, e.g. 'Instrument settings.fluxcurrent.Q'
-        :param plot_versus_frequency: Extract and plot frequency value?
-                                      E.g. set False if you did not use the Qubit object.
-        :param frequency_key: key for the dac current values, e.g. 'Instrument settings.Q.freq_qubit'
-        '''
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
@@ -356,7 +397,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                                 }
             self.numeric_params = ['tau', 'tau_stderr']  # , 'chisquared'
 
-        self.fit_qubit_Q_factor = fit_qubit_Q_factor
+        self.fit_T1_vs_freq = fit_T1_vs_freq
 
         self.plot_versus_dac = plot_versus_dac
         if plot_versus_dac:
@@ -434,13 +475,53 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                     # todo: print EC and EJ
                     pass
 
-            if self.fit_qubit_Q_factor:
+            # Fit T1 vs frequency dependence using model of decay due to dielectric losses
+            # and (if 'guess_mode_frequency' are specified in options dict) due to
+            # purcell effect
+            # Refs:
+            #     Luthi PRL 2018
+            #     Krantz arXiv:1904.06560 pp. 48
+            if self.fit_T1_vs_freq:
+                guess_freq = self.options_dict.get('guess_mode_frequency', None)
+
                 freq = self.raw_data_dict['dac_sorted_freq']
-                tau = self.raw_data_dict['freq_sorted_tau']
-                fit_object_Q_factor = fit_fixed_Q_factor(freq, tau)
-                self.fit_res['Q_qubit'] = fit_object_Q_factor.best_values['Q']
-                self.fit_res['Q_qubit_fitfct'] = lambda x: fit_object_Q_factor.model.eval(
-                    fit_object_Q_factor.params, freq=x)
+                tau = self.raw_data_dict['dac_sorted_tau']
+
+                if guess_freq is None:
+                    fit_object_T1_vs_freq = fit_fixed_Q_factor(freq, tau)
+                    self.fit_res['Q_qubit'] = fit_object_T1_vs_freq.best_values['Q']
+                    msg = '$Q$={:.3g}'.format(self.fit_res['Q_qubit'])
+                elif type(guess_freq) is float:
+                    fit_object_T1_vs_freq = fit_T1_purcell_diel(freq, tau, guess_freq)
+                    self.fit_res['Q_qubit'] = fit_object_T1_vs_freq.best_values['Q']
+                    self.fit_res['fres'] = fit_object_T1_vs_freq.best_values['fres']
+                    self.fit_res['gres'] = np.abs(fit_object_T1_vs_freq.best_values['g'])
+                    self.fit_res['kappares'] = fit_object_T1_vs_freq.best_values['kappa']
+                    msg = '$Q$={:.3g} \n'.format(self.fit_res['Q_qubit'])
+                    msg += '$f$={:.3g} GHz\n'.format(self.fit_res['fres']/1e9)
+                    msg += '$g$={:.3g} MHz\n'.format(self.fit_res['gres']/1e6)
+                    msg += '$\kappa$={:.3g} MHz'.format(self.fit_res['kappares']/1e6)
+                else:
+                    fit_object_T1_vs_freq = fit_T1_purcell_diel(freq, tau, guess_freq)
+                    self.fit_res['Q_qubit'] = fit_object_T1_vs_freq.best_values['Q']
+                    self.fit_res['fres1'] = fit_object_T1_vs_freq.best_values['fres1']
+                    self.fit_res['gres1'] = np.abs(fit_object_T1_vs_freq.best_values['g1'])
+                    self.fit_res['kappares1'] = fit_object_T1_vs_freq.best_values['kappa1']
+                    self.fit_res['fres2'] = fit_object_T1_vs_freq.best_values['fres2']
+                    self.fit_res['gres2'] = np.abs(fit_object_T1_vs_freq.best_values['g2'])
+                    self.fit_res['kappares2'] = fit_object_T1_vs_freq.best_values['kappa2']
+                    msg = '$Q$={:.3g} \n'.format(self.fit_res['Q_qubit'])
+                    msg += '$f_1$={:.3g} GHz\n'.format(self.fit_res['fres1']/1e9)
+                    msg += '$g_1$={:.2g} MHz\n'.format(self.fit_res['gres1']/1e6)
+                    msg += '$\kappa_1$={:.2g} MHz\n'.format(self.fit_res['kappares1']/1e6)
+                    msg += '$f_2$={:.3g} GHz\n'.format(self.fit_res['fres2']/1e9)
+                    msg += '$g_2$={:.2g} MHz\n'.format(self.fit_res['gres2']/1e6)
+                    msg += '$\kappa_2$={:.2g} MHz'.format(self.fit_res['kappares2']/1e6)
+
+                self.proc_data_dict['freq_relation_msg'] = msg
+
+                self.fit_res['Q_qubit_fitfct'] = lambda x: fit_object_T1_vs_freq.model.eval(
+                    fit_object_T1_vs_freq.params, freq=x)
         else:
             print('Warning: first run extract_data!')
 
@@ -471,7 +552,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                 'xpos': 0.05, 'ypos': 0.05, 'ax_id': 'time_stability',
                 'horizontalalignment': 'left', 'verticalalignment': 'bottom'}
 
-            if self.plot_versus_frequency and self.fit_qubit_Q_factor:
+            if self.plot_versus_frequency and self.fit_T1_vs_freq:
                 plot_dict = {
                     'xlabel': 'Qubit Frequency', 'xunit': 'Hz',
                     'ylabel': 'T1', 'yunit': 's'
@@ -482,8 +563,15 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                                                      yerr=self.raw_data_dict['freq_sorted_tau_stderr'],
                                                      fitfunc=self.fit_res['Q_qubit_fitfct'],
                                                      pdict_scatter=plot_dict, pdict_fit=plot_dict)
+                pds['yrange']  = (0, 1.1 * np.max(self.raw_data_dict['freq_sorted_tau']))
                 self.plot_dicts["freq_relation_scatter"] = pds
                 self.plot_dicts["freq_relation_fit"] = pdf
+
+                self.plot_dicts['freq_relation_text'] = {
+                    'plotfn': self.plot_text,
+                    'text_string': self.proc_data_dict['freq_relation_msg'],
+                    'xpos': 1.05, 'ypos': .6, 'ax_id': 'freq_relation',
+                    'horizontalalignment': 'left'}
             else:
                 self._prepare_plot(ax_id='freq_relation', xvals=self.raw_data_dict['freq_sorted'],
                                    yvals=self.raw_data_dict['freq_sorted_tau'],
@@ -1293,7 +1381,7 @@ class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
              dac_key=dac_key,
              plot_versus_frequency=False,
              frequency_key=frequency_key,
-             fit_qubit_Q_factor=False)
+             fit_T1_vs_freq=False)
 
 
 
@@ -1424,7 +1512,7 @@ class CoherenceAnalysisDataExtractor(ba.BaseDataAnalysis):
 #                                 }
 #             self.numeric_params = ['tau', 'tau_stderr']  # , 'chisquared'
 
-#         self.fit_qubit_Q_factor = fit_qubit_Q_factor
+#         self.fit_T1_vs_freq = fit_T1_vs_freq
 
 #         self.plot_versus_dac = plot_versus_dac
 #         if plot_versus_dac:
@@ -1558,7 +1646,6 @@ def fixed_Q_factor_model(freq, Q):
     with a constant Q-factor of a qubit: Q = 2*pi*f*T1
     Here is a function calculating T1(f) that can be fitted to data
     '''
-
     model = Q/(2*np.pi*freq)
     return model
 
@@ -1570,8 +1657,55 @@ def fit_fixed_Q_factor(freq, tau):
     return fit_result_Q_factor
 
 
+def fixed_purcell_diel(freq, Q, fres, g, kappa):
+    '''
+    Inverse proportional dependence of the qubit T1 on frequrncy can be described
+    with a constant Q-factor of a qubit: Q = 2*pi*f*T1
+    Except for that I include decay rate due to purcell effect.
+    Refs:
+        Luthi PRL 2018
+        Krantz arXiv:1904.06560 pp. 48
+    Here is a function calculating T1(f) that can be fitted to data
+    '''
+    Qfact_rate = (2*np.pi*freq)/Q
+    purcell_rate = fres/freq*g**2/kappa/(1+8*np.pi*(freq-fres)**2/kappa**2)
+    model = 1/(Qfact_rate + purcell_rate)
+    return model
+
+def fixed_purcell_diel2(freq, Q, fres1, g1, kappa1, fres2, g2, kappa2):
+    '''
+    T1 with purcell decay due to two resonators
+    '''
+    Qfact_rate = (2*np.pi*freq)/Q
+    purcell_rate1 = fres1/freq*g1**2/kappa1/(1+8*np.pi*(freq-fres1)**2/kappa1**2)
+    purcell_rate2 = fres2/freq*g2**2/kappa2/(1+8*np.pi*(freq-fres2)**2/kappa2**2)
+    model = 1/(Qfact_rate + purcell_rate1 + purcell_rate2)
+    return model
+
+def fit_T1_purcell_diel(freq, tau, fres_guess):
+    Q_guess = 2*np.pi*np.mean(freq)*np.mean(tau)
+    if type(fres_guess) is float:
+        Q_factor_model = lmfit.Model(fixed_purcell_diel)
+        Q_factor_model.set_param_hint('Q', value=Q_guess)
+        Q_factor_model.set_param_hint('fres', value=fres_guess)
+        Q_factor_model.set_param_hint('g', value=10e6)
+        Q_factor_model.set_param_hint('kappa', value=1e8)
+    else:
+        Q_factor_model = lmfit.Model(fixed_purcell_diel2)
+        Q_factor_model.set_param_hint('Q', value=Q_guess)
+        Q_factor_model.set_param_hint('fres1', value=fres_guess[0])
+        Q_factor_model.set_param_hint('g1', value=10e6)
+        Q_factor_model.set_param_hint('kappa1', value=1e8)
+        Q_factor_model.set_param_hint('fres2', value=fres_guess[1])
+        Q_factor_model.set_param_hint('g2', value=10e6)
+        Q_factor_model.set_param_hint('kappa2', value=1e8)
+
+    fit_result_Q_factor = Q_factor_model.fit(tau, freq=freq)
+    return fit_result_Q_factor
+
+
 def fit_frequencies(dac, freq,
-                    Ec_guess=260e6, Ej_guess=19e9, offset_guess=0,
+                    Ec_guess=260e6, Ej_guess=None, offset_guess=0,
                     dac0_guess=None):
     """
     Perform fit against the transmon flux arc model.
@@ -1587,7 +1721,11 @@ def fit_frequencies(dac, freq,
     arch_model = lmfit.Model(arch)
 
     if dac0_guess is None:
-        dac0_guess = np.max(np.abs(dac))*2
+        dac0_guess = np.max(np.abs(dac))
+
+    if Ej_guess is None:
+        f_max = np.max(freq)
+        Ej_guess = (f_max+Ec_guess)**2/(8*Ec_guess)
 
     # set some hardcoded guesses
     arch_model.set_param_hint('Ec', value=Ec_guess, min=1e6, max=350e6)
@@ -1636,9 +1774,9 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
     """
     # create a parameter set for the initial guess
     p = lmfit.Parameters()
-    p.add('slope_ramsey', value=100.0, vary=True)
-    p.add('slope_echo', value=100.0, vary=True)
-    p.add('intercept', value=100.0, vary=True)
+    p.add('slope_ramsey', value=1e-5, vary=True, min=0)
+    p.add('slope_echo', value=1e-5, vary=True, min=0)
+    p.add('intercept', value=1e-3, vary=True)
 
     # mi = lmfit.minimize(super_residual, p)
     def wrap_residual(p): return residual_Gamma(

@@ -551,6 +551,7 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
     """
     determines if compilation of a file is needed based on it's timestamp
     and an optional recompile option.
+    FIXME: program_fn is platform dependent, because it includes extension
 
     The behaviour of this function depends on the recompile argument.
 

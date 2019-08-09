@@ -41,7 +41,9 @@ class Spectroscopy(ba.BaseDataAnalysis):
                             'measurementstring': 'measurementstring',
                             'freq': 'sweep_points',
                             'amp': 'amp',
-                            'phase': 'phase'}
+                            'phase': 'phase',
+                            'value_units': 'value_units',
+                            'value_names': 'value_names'}
 
         self.options_dict.get('xwidth', None)
         # {'xlabel': 'sweep_name',
@@ -67,17 +69,21 @@ class Spectroscopy(ba.BaseDataAnalysis):
 
     def process_data(self):
         proc_data_dict = self.proc_data_dict
-        proc_data_dict['freq_label'] = 'Frequency (GHz)'
-        proc_data_dict['amp_label'] = 'Transmission amplitude (arb. units)'
+        proc_data_dict['freq_label'] = 'Frequency'
+        proc_data_dict['amp_label'] = '|S21|'
 
-        proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
+        proc_data_dict['phase_label'] = 'S21 phase'
         proc_data_dict['freq_range'] = self.options_dict.get(
             'freq_range', None)
         proc_data_dict['amp_range'] = self.options_dict.get('amp_range', None)
         proc_data_dict['phase_range'] = self.options_dict.get(
             'phase_range', None)
         proc_data_dict['plotsize'] = self.options_dict.get('plotsize', (8, 5))
+
         if len(self.raw_data_dict['timestamps']) == 1:
+            proc_data_dict['xunit'] = self.raw_data_dict['freq_unit'][0][0]
+            proc_data_dict['value_units'] = self.raw_data_dict.get('value_units','a.u.')
+
             proc_data_dict['plot_frequency'] = np.squeeze(
                 self.raw_data_dict['freq'])
             proc_data_dict['plot_amp'] = np.squeeze(self.raw_data_dict['amp'])
@@ -85,6 +91,9 @@ class Spectroscopy(ba.BaseDataAnalysis):
                 self.raw_data_dict['phase'])
         else:
             # TRANSPOSE ALSO NEEDS TO BE CODED FOR 2D
+            proc_data_dict['yunit'] = self.raw_data_dict['freq_unit'][0][0]
+            proc_data_dict['value_units'] = self.raw_data_dict['value_units'][0]
+            #if the x-value of the sweep is given
             sweep_param = self.options_dict.get('sweep_param', None)
             if sweep_param is not None:
                 proc_data_dict['plot_xvals'] = np.array(
@@ -94,7 +103,8 @@ class Spectroscopy(ba.BaseDataAnalysis):
                 proc_data_dict['plot_xlabel'] = self.options_dict.get(
                     'xlabel', sweep_param)
             else:
-                xvals = np.array([[tt] for tt in range(
+                #if there is no sweep parameter given
+                xvals = np.array([tt for tt in range(
                     len(self.raw_data_dict['timestamps']))])
                 proc_data_dict['plot_xvals'] = self.options_dict.get(
                     'xvals', xvals)
@@ -102,6 +112,8 @@ class Spectroscopy(ba.BaseDataAnalysis):
                     'xlabel', 'Scan number')
             proc_data_dict['plot_xwidth'] = self.options_dict.get(
                 'xwidth', None)
+
+            # Automatic scaling of the plot_xwidths
             if proc_data_dict['plot_xwidth'] == 'auto':
                 x_diff = np.diff(np.ravel(proc_data_dict['plot_xvals']))
                 dx1 = np.concatenate(([x_diff[0]], x_diff))
@@ -115,7 +127,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
                     self.raw_data_dict['amp'])
 
             else:
-                # manual setting of plot_xwidths
+                # manual setting of the plot_xwidths
                 proc_data_dict['plot_frequency'] = self.raw_data_dict['freq']
                 proc_data_dict['plot_phase'] = self.raw_data_dict['phase']
                 proc_data_dict['plot_amp'] = self.raw_data_dict['amp']
@@ -132,8 +144,12 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                       'xlabel': proc_data_dict['freq_label'],
                                       'ylabel': proc_data_dict['amp_label'],
                                       'yrange': proc_data_dict['amp_range'],
+                                      'xunit':proc_data_dict['xunit'],
+                                      'yunit':proc_data_dict['value_units'][0],
                                       'do_legend':True,
-                                      'plotsize': plotsize
+                                      'plotsize': plotsize,
+                                      'setdesc':'|S21| Data',
+                                      'setlabel':'',
                                       }
             self.plot_dicts['phase'] = {'plotfn': plot_fn,
                                         'xvals': proc_data_dict['plot_frequency'],
@@ -142,8 +158,12 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                         'xlabel': proc_data_dict['freq_label'],
                                         'ylabel': proc_data_dict['phase_label'],
                                         'yrange': proc_data_dict['phase_range'],
+                                        'xunit':proc_data_dict['xunit'],
+                                        'yunit':proc_data_dict['value_units'][1],
                                         'do_legend':True,
-                                        'plotsize': plotsize
+                                        'plotsize': plotsize,
+                                        'setdesc':'Phase Data',
+                                        'setlabel':'',
                                         }
         else:
             self.plot_dicts['amp'] = {'plotfn': self.plot_colorx,
@@ -157,14 +177,22 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                       'zlabel': proc_data_dict['amp_label'],
                                       'yrange': proc_data_dict['freq_range'],
                                       'zrange': proc_data_dict['amp_range'],
+                                      'xunit':'#',
+                                      'yunit':proc_data_dict['yunit'],
+                                      'zunit':proc_data_dict['value_units'][0],
                                       'plotsize': plotsize,
                                       'plotcbar': self.options_dict.get('colorbar', False),
                                       }
 
-            self.plot_dicts['amp'] = {'plotfn': self.plot_colorx,
+            # self.plot_dicts['amp'] = {'plotfn': self.plot_colorx,
+            #                           'xvals': proc_data_dict['plot_xvals'],
+            #                           'yvals': proc_data_dict['plot_frequency'],
+            #                           'zvals': proc_data_dict['plot_amp'],
+            #                           }
+            self.plot_dicts['phase'] = {'plotfn': self.plot_colorx,
                                       'xvals': proc_data_dict['plot_xvals'],
                                       'yvals': proc_data_dict['plot_frequency'],
-                                      'zvals': proc_data_dict['plot_amp'],
+                                      'zvals': proc_data_dict['plot_phase'],
                                       }
 
     def plot_for_presentation(self, key_list=None, no_label=False):
@@ -312,7 +340,8 @@ class VNA_analysis(complex_spectroscopy):
     Performs as fit to the resonance using data acquired using VNA R&S ZNB 20
 
     eg. to use complex model:
-    ma2.VNA_analysis(t_start='20010101_213600', options_dict={'fit_options': {'model': 'complex'}})
+    ma2.VNA_analysis(t_start='20010101_213600',
+            options_dict={'fit_options': {'model': 'complex'}})
     '''
     def __init__(self, t_start,
                  options_dict=None,
@@ -337,19 +366,33 @@ class VNA_analysis(complex_spectroscopy):
         Qe = self.fit_dicts['reso_fit']['fit_res'].params['Qe']
         theta = self.fit_dicts['reso_fit']['fit_res'].params['theta']
 
-        Qc = 1/np.real(1/(Qe*np.exp(1j*theta)))
-        Qi = 1/(1/Q - 1/Qc)
+        Qc = 1/np.real(1/(Qe.value*np.exp(1j*theta.value)))
+        Qi = 1/(1/Q.value - 1/Qc)
+        # FIXME: replace if statement with .format_value string which can handle None values as stderr
+        if ((freq.stderr==None)):
+            msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.value/1e6)
+            msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.value/1e3)
+            msg += '\n'
+            msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+            msg += '\n'
+            msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+            msg += '\n'
+            msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
 
-        msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq/1e6,freq.stderr/1e6)
-        msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q/1e3,Q.stderr/1e3)
-        msg += '\n'
-        msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
-        msg += '\n'
-        msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe/1e3)
-        msg += '\n'
-        msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
+            self.proc_data_dict['complex_fit_msg'] = msg
+            # print('Fitting went wrong')
+        else:
+            msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.stderr/1e6)
+            msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.stderr/1e3)
+            msg += '\n'
+            msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+            msg += '\n'
+            msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+            msg += '\n'
+            msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
 
-        self.proc_data_dict['complex_fit_msg'] = msg
+            self.proc_data_dict['complex_fit_msg'] = msg
+
 
 
 
@@ -513,21 +556,52 @@ class VNA_analysis(complex_spectroscopy):
         pass
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class VNA_TwoD_Analysis(MA.TwoD_Analysis):
-  """
-  TwoD analysis of a 2D-VNA resonator scan. Plot points on all resonator frequencies,
-  by fitting resonators to the linecuts
-  """
-  def __init__(self, t_start,
+    """
+    TwoD analysis of a 2D-VNA resonator scan. Plot points on all resonator
+    frequencies, by fitting resonators to the linecuts
+    """
+    def __init__(self, timestamp,
                  options_dict=None,
                  do_fitting=True,
                  extract_only=False,
-                 auto=True):
-        super(MA.TwoD_Analysis, self).__init__(timestamp = timestamp,
-                                           options_dict=options_dict,
-                                           extract_only=extract_only,
-                                           auto=auto,
-                                           do_fitting=do_fitting)
+                 auto=True,
+                 **kw):
+        super(MA.TwoD_Analysis, self).__init__(timestamp=timestamp,
+                                               options_dict=options_dict,
+                                               extract_only=extract_only,
+                                               auto=auto,
+                                               do_fitting=do_fitting,
+                                               **kw)
 
         linecut_fit_result = self.fit_linecuts()
         self.linecut_fit_result = linecut_fit_result
@@ -535,240 +609,241 @@ class VNA_TwoD_Analysis(MA.TwoD_Analysis):
         for res in self.linecut_fit_result:
             f0s.append(res.values['f0']*1e9)
         self.f0s = np.array(f0s)
-        self.run_full_analysis()
+        self.run_full_analysis(**kw)
 
-  # Better: try to define the fitting dictionaries like in the complex VNA fit MA
+        # Better: try to define the fitting dictionaries like in the complex VNA fit MA
 
-          # if len(self.raw_data_dict['timestamps']) == 1:
-          #   if fitting_model == 'complex':
-          #       ### do the initial guess
-          #       complex_data = np.add(self.proc_data_dict['real'],1.j*self.proc_data_dict['imag'])
-          #       self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
-          #                                     'guess_dict':complex_guess,
-          #                                     'fit_yvals': {'data': complex_data},
-          #                                     'fit_xvals': {'f': self.proc_data_dict['plot_frequency']},
-          #                                     'fitting_type':'minimize'}
+        # if len(self.raw_data_dict['timestamps']) == 1:
+        #   if fitting_model == 'complex':
+        #       ### do the initial guess
+        #       complex_data = np.add(self.proc_data_dict['real'],1.j*self.proc_data_dict['imag'])
+        #       self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
+        #                                     'guess_dict':complex_guess,
+        #                                     'fit_yvals': {'data': complex_data},
+        #                                     'fit_xvals': {'f': self.proc_data_dict['plot_frequency']},
+        #                                     'fitting_type':'minimize'}
 
+    def fit_linecuts(self):
+        linecut_mag = np.array(self.measured_values)[0].T
+        sweep_points = self.sweep_points
+        fit_result = []
+        for linecut in linecut_mag:
+            fit_result.append(self.resonator_fit(sweep_points, linecut))
 
+        return fit_result
 
+    def resonator_fit(self, sweep_points, linecut_mag):
+        """
+        ########## Fit data ##########
 
+        Note that not the full functionality of the fit function of
+        resonators is implemented yet
 
-  def fit_linecuts(self):
+        Fit Power to a Lorentzian
+        """
+        min_index = np.argmin(linecut_mag)
+        max_index = np.argmax(linecut_mag)
 
-    linecut_mag = np.array(self.measured_values)[0].T
-    sweep_points = self.sweep_points
-    fit_result = []
-    for linecut in linecut_mag:
-      fit_result.append(self.resonator_fit(sweep_points,linecut))
+        min_frequency = sweep_points[min_index]
+        max_frequency = sweep_points[max_index]
 
-    return fit_result
+        measured_powers_smooth = a_tools.smooth(linecut_mag,
+                                                window_len=11)
+        peaks = a_tools.peak_finder(sweep_points,
+                                    measured_powers_smooth,
+                                    window_len=0)
 
-  def resonator_fit(self,sweep_points,linecut_mag):
-            ########## Fit data ##########
+        # Search for peak
+        if peaks['dip'] is not None:  # look for dips first
+            f0 = peaks['dip']
+            amplitude_factor = -1.
+        elif peaks['peak'] is not None:  # then look for peaks
+            f0 = peaks['peak']
+            amplitude_factor = 1.
+        else:  # Otherwise take center of range
+            f0 = np.median(sweep_points)
+            amplitude_factor = -1.
+            logging.warning('No peaks or dips in range')
+            # If this error is raised, it should continue the analysis but
+            # not use it to update the qubit object
+            # N.B. This not updating is not implemented as of 9/2017
 
-    # Note that not the full functionality of the fit function of resonators is implemented yet
+            # f is expected in Hz but f0 in GHz!
+        Model = fit_mods.SlopedHangerAmplitudeModel
+        # added reject outliers to be robust agains CBox data acq bug.
+        # this should have no effect on regular data acquisition and is
+        # only used in the guess.
+        amplitude_guess = max(
+            dm_tools.reject_outliers(np.sqrt(linecut_mag)))
 
-      # Fit Power to a Lorentzian
+        # Creating parameters and estimations
+        S21min = (min(dm_tools.reject_outliers(np.sqrt(linecut_mag))) /
+                  max(dm_tools.reject_outliers(np.sqrt(linecut_mag))))
 
-      min_index = np.argmin(linecut_mag)
-      max_index = np.argmax(linecut_mag)
+        Q = f0 / abs(min_frequency - max_frequency)
+        Qe = abs(Q / abs(1 - S21min))
 
-      min_frequency = sweep_points[min_index]
-      max_frequency = sweep_points[max_index]
+        # Note: input to the fit function is in GHz for convenience
+        Model.set_param_hint('f0', value=f0 * 1e-9,
+                             min=min(sweep_points) * 1e-9,
+                             max=max(sweep_points) * 1e-9)
+        Model.set_param_hint('A', value=amplitude_guess)
+        Model.set_param_hint('Q', value=Q, min=1, max=50e6)
+        Model.set_param_hint('Qe', value=Qe, min=1, max=50e6)
+        # NB! Expressions are broken in lmfit for python 3.5 this has
+        # been fixed in the lmfit repository but is not yet released
+        # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
+        Model.set_param_hint('Qi', expr='abs(1./(1./Q-1./Qe*cos(theta)))',
+                             vary=False)
+        Model.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
+        Model.set_param_hint('theta', value=0, min=-np.pi / 2,
+                             max=np.pi / 2)
+        Model.set_param_hint('slope', value=0, vary=True)
 
-      measured_powers_smooth = a_tools.smooth(linecut_mag,
-                                              window_len=11)
-      peaks = a_tools.peak_finder((sweep_points),
-                                       measured_powers_smooth,
-                                       window_len=0)
+        params = Model.make_params()
 
-      # Search for peak
-      if peaks['dip'] is not None:  # look for dips first
-          f0 = peaks['dip']
-          amplitude_factor = -1.
-      elif peaks['peak'] is not None:  # then look for peaks
-          f0 = peaks['peak']
-          amplitude_factor = 1.
-      else:  # Otherwise take center of range
-          f0 = np.median(sweep_points)
-          amplitude_factor = -1.
-          logging.warning('No peaks or dips in range')
-          # If this error is raised, it should continue the analysis but
-          # not use it to update the qubit object
-          # N.B. This not updating is not implemented as of 9/2017
+        data_x = sweep_points
+        data_y = np.sqrt(linecut_mag)
 
-          # f is expected in Hz but f0 in GHz!
-      Model = fit_mods.SlopedHangerAmplitudeModel
-      # added reject outliers to be robust agains CBox data acq bug.
-      # this should have no effect on regular data acquisition and is
-      # only used in the guess.
-      amplitude_guess = max(
-          dm_tools.reject_outliers(np.sqrt(linecut_mag)))
+        # # make sure that frequencies are in Hz
+        # if np.floor(data_x[0]/1e8) == 0:  # frequency is defined in GHz
+        #     data_x = data_x*1e9
 
-      # Creating parameters and estimations
-      S21min = (min(dm_tools.reject_outliers(np.sqrt(linecut_mag))) /
-                max(dm_tools.reject_outliers(np.sqrt(linecut_mag))))
+        fit_res = Model.fit(data=data_y,
+                            f=data_x, verbose=False)
+        return fit_res
 
-      Q = f0 / abs(min_frequency - max_frequency)
-      Qe = abs(Q / abs(1 - S21min))
+    def run_full_analysis(self, normalize=False, plot_linecuts=True,
+                          linecut_log=False, colorplot_log=False,
+                          plot_all=True, save_fig=True,
+                          transpose=False, figsize=None, filtered=False,
+                          subtract_mean_x=False, subtract_mean_y=False,
+                          **kw):
+        '''
+        Args:
+            linecut_log (bool):
+                log scale for the line cut?
+                Remember to set the labels correctly.
+            colorplot_log (string/bool):
+                True/False for z axis scaling, or any string containing any
+                combination of letters x, y, z for scaling of the according axis.
+                Remember to set the labels correctly.
 
-      # Note: input to the fit function is in GHz for convenience
-      Model.set_param_hint('f0', value=f0 * 1e-9,
-                           min=min(sweep_points) * 1e-9,
-                           max=max(sweep_points) * 1e-9)
-      Model.set_param_hint('A', value=amplitude_guess)
-      Model.set_param_hint('Q', value=Q, min=1, max=50e6)
-      Model.set_param_hint('Qe', value=Qe, min=1, max=50e6)
-      # NB! Expressions are broken in lmfit for python 3.5 this has
-      # been fixed in the lmfit repository but is not yet released
-      # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
-      Model.set_param_hint('Qi', expr='abs(1./(1./Q-1./Qe*cos(theta)))',
-                           vary=False)
-      Model.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
-      Model.set_param_hint('theta', value=0, min=-np.pi / 2,
-                           max=np.pi / 2)
-      Model.set_param_hint('slope', value=0, vary=True)
+        '''
+        close_file = kw.pop('close_file', True)
+        self.fig_array = []
+        self.ax_array = []
 
-      params = Model.make_params()
+        for i, meas_vals in enumerate(self.measured_values[:1]):
+            kw["zlabel"] = self.value_names[i]
+            kw["z_unit"] = self.value_units[i]
 
-      
-      data_x = sweep_points
-      data_y = np.sqrt(linecut_mag)
+            if filtered:
+                # print(self.measured_values)
+                # print(self.value_names)
+                if self.value_names[i] == 'Phase':
+                    self.measured_values[i] = dm_tools.filter_resonator_visibility(
+                                                        x=self.sweep_points,
+                                                        y=self.sweep_points_2D,
+                                                        z=self.measured_values[i],
+                                                        **kw)
 
-      # # make sure that frequencies are in Hz
-      # if np.floor(data_x[0]/1e8) == 0:  # frequency is defined in GHz
-      #     data_x = data_x*1e9
+            if (not plot_all) & (i >= 1):
+                break
+            # Linecuts are above because somehow normalization applies to both
+            # colorplot and linecuts otherwise.
+            if plot_linecuts:
+                fig, ax = plt.subplots(figsize=figsize)
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                savename = 'linecut_{}'.format(self.value_names[i])
+                fig_title = '{} {} \nlinecut {}'.format(
+                    self.timestamp_string, self.measurementstring,
+                    self.value_names[i])
+                a_tools.linecut_plot(x=self.sweep_points,
+                                     y=self.sweep_points_2D,
+                                     z=self.measured_values[i],
+                                     y_name=self.parameter_names[1],
+                                     y_unit=self.parameter_units[1],
+                                     log=linecut_log,
+                                     # zlabel=self.zlabels[i],
+                                     fig=fig, ax=ax, **kw)
+                ax.set_title(fig_title)
+                set_xlabel(ax, self.parameter_names[0],
+                           self.parameter_units[0])
+                # ylabel is value units as we are plotting linecuts
+                set_ylabel(ax, self.value_names[i],
+                           self.value_units[i])
 
-      fit_res = Model.fit(data=data_y,
-                          f=data_x, verbose=False)
-      return fit_res
+                if save_fig:
+                    self.save_fig(fig, figname=savename,
+                                  fig_tight=False, **kw)
 
-  def run_full_analysis(self, normalize=False, plot_linecuts=True,
-                               linecut_log=False, colorplot_log=False,
-                               plot_all=True, save_fig=True,
-                               transpose=False, figsize=None, filtered=False,
-                               subtract_mean_x=False, subtract_mean_y=False,
-                               **kw):
-          '''
-          Args:
-              linecut_log (bool):
-                  log scale for the line cut?
-                  Remember to set the labels correctly.
-              colorplot_log (string/bool):
-                  True/False for z axis scaling, or any string containing any
-                  combination of letters x, y, z for scaling of the according axis.
-                  Remember to set the labels correctly.
+            fig, ax = plt.subplots(figsize=figsize)
+            self.fig_array.append(fig)
+            self.ax_array.append(ax)
+            if normalize:
+                print("normalize on")
+            # self.ax_array.append(ax)
+            savename = 'Heatmap_{}'.format(self.value_names[i])
+            fig_title = '{} {} \n{}'.format(
+                self.timestamp_string, self.measurementstring,
+                self.value_names[i])
 
-          '''
-          close_file = kw.pop('close_file', True)
-          self.fig_array = []
-          self.ax_array = []
+            if "xlabel" not in kw:
+                kw["xlabel"] = self.parameter_names[0]
+            if "ylabel" not in kw:
+                kw["ylabel"] = self.parameter_names[1]
+            if "xunit" not in kw:
+                kw["x_unit"] = self.parameter_units[0]
+            if "yunit" not in kw:
+                kw["y_unit"] = self.parameter_units[1]
 
-          for i, meas_vals in enumerate(self.measured_values[:1]):
-              if filtered:
-                  # print(self.measured_values)
-                  # print(self.value_names)
-                  if self.value_names[i] == 'Phase':
-                      self.measured_values[i] = dm_tools.filter_resonator_visibility(
-                                                          x=self.sweep_points,
-                                                          y=self.sweep_points_2D,
-                                                          z=self.measured_values[i],
-                                                          **kw)
+            # subtract mean from each row/column if demanded
+            plot_zvals = meas_vals.transpose()
+            if subtract_mean_x:
+                plot_zvals = plot_zvals - np.mean(plot_zvals, axis=1)[:, None]
+            if subtract_mean_y:
+                plot_zvals = plot_zvals - np.mean(plot_zvals, axis=0)[None, :]
 
-              if (not plot_all) & (i >= 1):
-                  break
-              # Linecuts are above because somehow normalization applies to both
-              # colorplot and linecuts otherwise.
-              if plot_linecuts:
-                  fig, ax = plt.subplots(figsize=figsize)
-                  self.fig_array.append(fig)
-                  self.ax_array.append(ax)
-                  savename = 'linecut_{}'.format(self.value_names[i])
-                  fig_title = '{} {} \nlinecut {}'.format(
-                      self.timestamp_string, self.measurementstring,
-                      self.value_names[i])
-                  a_tools.linecut_plot(x=self.sweep_points,
-                                       y=self.sweep_points_2D,
-                                       z=self.measured_values[i],
-                                       y_name=self.parameter_names[1],
-                                       y_unit=self.parameter_units[1],
-                                       log=linecut_log,
-                                       zlabel=self.zlabels[i],
-                                       fig=fig, ax=ax, **kw)
-                  ax.set_title(fig_title)
-                  set_xlabel(ax, self.parameter_names[0],
-                             self.parameter_units[0])
-                  # ylabel is value units as we are plotting linecuts
-                  set_ylabel(ax, self.value_names[i],
-                             self.value_units[i])
+            a_tools.color_plot(x=self.sweep_points,
+                               y=self.sweep_points_2D,
+                               z=plot_zvals,
+                               fig=fig, ax=ax,
+                               log=colorplot_log,
+                               transpose=transpose,
+                               normalize=normalize,
+                               **kw)
+            ax.plot(self.f0s, self.sweep_points_2D, 'ro-')
 
-                  if save_fig:
-                      self.save_fig(fig, figname=savename,
-                                    fig_tight=False, **kw)
+            ax.set_title(fig_title)
 
-              fig, ax = plt.subplots(figsize=figsize)
-              self.fig_array.append(fig)
-              self.ax_array.append(ax)
-              if normalize:
-                  print("normalize on")
-              self.ax_array.append(ax)
-              savename = 'Heatmap_{}'.format(self.value_names[i])
-              fig_title = '{} {} \n{}'.format(
-                  self.timestamp_string, self.measurementstring,
-                  self.value_names[i])
+            if save_fig:
+                self.save_fig(fig, figname=savename, **kw)
+        if close_file:
+            self.finish()
 
-              if "xlabel" not in kw:
-                  kw["xlabel"] = self.parameter_names[0]
-              if "ylabel" not in kw:
-                  kw["ylabel"] = self.parameter_names[1]
-              if "xunit" not in kw:
-                  kw["xunit"] = self.parameter_units[0]
-              if "yunit" not in kw:
-                  kw["yunit"] = self.parameter_units[1]
-
-              # subtract mean from each row/column if demanded
-              plot_zvals = meas_vals.transpose()
-              if subtract_mean_x:
-                  plot_zvals = plot_zvals - np.mean(plot_zvals,axis=1)[:,None]
-              if subtract_mean_y:
-                  plot_zvals = plot_zvals - np.mean(plot_zvals,axis=0)[None,:]
-
-              a_tools.color_plot(x=self.sweep_points,
-                                 y=self.sweep_points_2D,
-                                 z=plot_zvals,
-                                 zlabel=self.zlabels[i],
-                                 fig=fig, ax=ax,
-                                 log=colorplot_log,
-                                 transpose=transpose,
-                                 normalize=normalize,
-                                 **kw)
-              ax.plot(self.f0s,self.sweep_points_2D,'ro-')
-              
-              ax.set_title(fig_title)
-
-              if save_fig:
-                  self.save_fig(fig, figname=savename, **kw)
-          if close_file:
-              self.finish()
 
 class VNA_DAC_Analysis(VNA_TwoD_Analysis):
-  """
-  This function can be called with timestamp as its only argument. It will fit
-  a cosine to any VNA DAC arc. The fit is stored in dac_fit_res.
-  Use .sweetspotvalue to get a guess for the qubit sweetspot current,
-  and use .current_to_flux to get the current requiired for one flux period
-  """
+    """
+    This function can be called with timestamp as its only argument. It will
+    fit a cosine to any VNA DAC arc. The fit is stored in dac_fit_res.
+    Use .sweetspotvalue to get a guess for the qubit sweetspot current,
+    and use .current_to_flux to get the current required for one flux period
+    """
 
-  def __init__(self, timestamp,
-             options_dict=None,
-             do_fitting=True,
-             extract_only=False,
-             auto=True):
-        super(VNA_TwoD_Analysis, self).__init__(timestamp = timestamp,
-                                       options_dict=options_dict,
-                                       extract_only=extract_only,
-                                       auto=auto,
-                                       do_fitting=do_fitting)
+    def __init__(self, timestamp,
+                 options_dict=None,
+                 do_fitting=True,
+                 extract_only=False,
+                 auto=True,
+                 **kw):
+        super(VNA_TwoD_Analysis, self).__init__(timestamp=timestamp,
+                                                options_dict=options_dict,
+                                                extract_only=extract_only,
+                                                auto=auto,
+                                                do_fitting=do_fitting,
+                                                **kw)
 
         linecut_fit_result = self.fit_linecuts()
         self.linecut_fit_result = linecut_fit_result
@@ -776,87 +851,89 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
         for res in self.linecut_fit_result:
             f0s.append(res.values['f0']*1e9)
         self.f0s = np.array(f0s)
-        self.run_full_analysis()
+        self.run_full_analysis(**kw)
         self.dac_fit_res = self.fit_dac_arc()
         self.sweet_spot_value = -1*self.dac_fit_res.values['phase']
         self.current_to_flux = 1/self.dac_fit_res.values['frequency']
-        self.plot_fit_result()
+        self.plot_fit_result(**kw)
 
-  def fit_dac_arc(self):
-      DAC_values = self.sweep_points_2D
-      f0s = self.f0s
+    def fit_dac_arc(self):
+        DAC_values = self.sweep_points_2D
+        f0s = self.f0s
 
-      max_index = np.where(f0s==max(f0s))[0]
-      min_index = np.where(f0s==min(f0s))[0]
-      max_DAC = DAC_values[max_index]
-      min_DAC = DAC_values[min_index]
+        max_index = np.where(f0s == max(f0s))[0]
+        min_index = np.where(f0s == min(f0s))[0]
+        max_DAC = DAC_values[max_index]
+        min_DAC = DAC_values[min_index]
 
-      freq = 1/(np.abs(max_DAC-min_DAC)*2)
+        freq = 1/(np.abs(max_DAC-min_DAC)*2)
 
-      Model = fit_mods.CosModel2
-      Model.set_param_hint('frequency', value=freq, min=0)
-      Model.set_param_hint('offset', value=np.mean(f0s), min=min(f0s),
-                                                         max=max(f0s))
-      Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2, min=0)
-      Model.set_param_hint('phase', value=0)
-      params = Model.make_params()
-      fit_res = Model.fit(data=f0s, t=DAC_values, verbose=False)
+        Model = fit_mods.CosModel2
+        Model.set_param_hint('frequency', value=freq, min=0)
+        Model.set_param_hint('offset', value=np.mean(f0s),
+                             min=min(f0s), max=max(f0s))
+        Model.set_param_hint('amplitude', value=(max(f0s)-min(f0s))/2, min=0)
+        Model.set_param_hint('phase', value=0)
+        Model.make_params()
+        fit_res = Model.fit(data=f0s, t=DAC_values, verbose=False)
 
-      return fit_res
+        return fit_res
 
-  def plot_fit_result(self,normalize=False, plot_linecuts=True,
-                      linecut_log=False, colorplot_log=False,
-                      plot_all=True, save_fig=True,
-                      transpose=False, figsize=None, filtered=False,
-                      subtract_mean_x=False, subtract_mean_y=False,
-                      **kw): 
-      fig, ax = plt.subplots(figsize=figsize)
-      self.fig_array.append(fig)
-      self.ax_array.append(ax)
-      # print "unransposed",meas_vals
-      # print "transposed", meas_vals.transpose()
-      self.ax_array.append(ax)
-      savename = 'Heatmap_{}'.format(self.value_names[0])
-      fig_title = '{} {} \n{}'.format(
-          self.timestamp_string, self.measurementstring,
-          self.value_names[0])
+    def plot_fit_result(self, normalize=False, plot_linecuts=True,
+                        linecut_log=False, colorplot_log=False,
+                        plot_all=True, save_fig=True,
+                        transpose=False, figsize=None, filtered=False,
+                        subtract_mean_x=False, subtract_mean_y=False,
+                        **kw):
+        fig, ax = plt.subplots(figsize=figsize)
+        self.fig_array.append(fig)
+        self.ax_array.append(ax)
+        # print "unransposed",meas_vals
+        # print "transposed", meas_vals.transpose()
+        self.ax_array.append(ax)
+        savename = 'Heatmap_{}_fit'.format(self.value_names[0])
+        fig_title = kw.pop('title', '{} {} \n{} fit'.format(self.timestamp_string,
+                                                        self.measurementstring,
+                                                        self.value_names[0]))
+        if "xlabel" not in kw:
+            kw["xlabel"] = self.parameter_names[0]
+        if "ylabel" not in kw:
+            kw["ylabel"] = self.parameter_names[1]
+        if "zlabel" not in kw:
+            kw["zlabel"] = self.value_names[0]
+        if "x_unit" not in kw:
+            kw["x_unit"] = self.parameter_units[0]
+        if "y_unit" not in kw:
+            kw["y_unit"] = self.parameter_units[1]
+        if "z_unit" not in kw:
+            kw["z_unit"] = self.value_units[0]
 
-      if "xlabel" not in kw:
-          kw["xlabel"] = self.parameter_names[0]
-      if "ylabel" not in kw:
-          kw["ylabel"] = self.parameter_names[1]
-      if "xunit" not in kw:
-          kw["xunit"] = self.parameter_units[0]
-      if "yunit" not in kw:
-          kw["yunit"] = self.parameter_units[1]
+        # subtract mean from each row/column if demanded
+        plot_zvals = self.measured_values[0].transpose()
+        if subtract_mean_x:
+            plot_zvals = plot_zvals - np.mean(plot_zvals, axis=1)[:, None]
+        if subtract_mean_y:
+            plot_zvals = plot_zvals - np.mean(plot_zvals, axis=0)[None, :]
+        a_tools.color_plot(x=self.sweep_points,
+                           y=self.sweep_points_2D,
+                           z=plot_zvals,
+                           fig=fig, ax=ax,
+                           log=colorplot_log,
+                           transpose=transpose,
+                           normalize=normalize,
+                           **kw)
 
-      # subtract mean from each row/column if demanded
-      plot_zvals = self.measured_values[0].transpose()
-      if subtract_mean_x:
-          plot_zvals = plot_zvals - np.mean(plot_zvals,axis=1)[:,None]
-      if subtract_mean_y:
-          plot_zvals = plot_zvals - np.mean(plot_zvals,axis=0)[None,:]
+        plot_dacs = np.linspace(min(self.sweep_points_2D),
+                                max(self.sweep_points_2D), 101)
+        plot_freqs = fit_mods.CosFunc2(plot_dacs, **self.dac_fit_res.params)
 
-      a_tools.color_plot(x=self.sweep_points,
-                         y=self.sweep_points_2D,
-                         z=plot_zvals,
-                         zlabel=self.zlabels[0],
-                         fig=fig, ax=ax,
-                         log=colorplot_log,
-                         transpose=transpose,
-                         normalize=normalize,
-                         **kw)
+        # ax.plot(self.f0s, self.sweep_points_2D, 'ro-')
+        # ax.plot(plot_freqs, plot_dacs, 'b')
 
-      plot_dacs = np.linspace(min(self.sweep_points_2D),max(self.sweep_points_2D),101)
-      plot_freqs = fit_mods.CosFunc2(plot_dacs,**self.dac_fit_res.params)
+        ax.set_title(fig_title)
 
-      ax.plot(self.f0s,self.sweep_points_2D,'ro-')
-      ax.plot(plot_freqs,plot_dacs,'b')
-      
-      ax.set_title(fig_title)
-
-      if save_fig:
-          self.save_fig(fig, figname=savename, **kw)
+        if save_fig:
+            self.save_fig(fig, figname=savename, **kw)
 
 
 class VNA_DAC_Analysis_v2(VNA_TwoD_Analysis):
@@ -962,7 +1039,7 @@ class VNA_DAC_Analysis_v2(VNA_TwoD_Analysis):
 
         ax.plot(self.f0s,self.sweep_points_2D,'ro-')
         ax.plot(plot_freqs,plot_dacs,'b')
-        
+
         ax.set_title(fig_title)
 
         if save_fig:
@@ -994,7 +1071,7 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
       freqs = freqs[0]
       data = data[0]
 
-      peak_freqs, peak_heights, data = a_tools.peak_finder_v3(freqs, 
+      peak_freqs, peak_heights, data = a_tools.peak_finder_v3(freqs,
                                                           data,
                                                           perc=99, factor=-1,
                                                           window_len=11)
@@ -1053,7 +1130,7 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
 
       savename = 'Found Peaks'
 
-      ax.plot(self.raw_data_dict['freq'][0], self.raw_data_dict['amp'][0], 
+      ax.plot(self.raw_data_dict['freq'][0], self.raw_data_dict['amp'][0],
               marker='o', color='C0')
       ax.plot(self.peaks, self.peak_height, marker='o', linestyle='', color='r')
 
@@ -1133,11 +1210,11 @@ class ResonatorSpectroscopy(Spectroscopy):
 
     def process_data(self):
         super(ResonatorSpectroscopy, self).process_data()
-        self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
-        self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
+        self.proc_data_dict['amp_label'] = '|S21| '
+        self.proc_data_dict['phase_label'] = 'Phase'
         if len(self.raw_data_dict['timestamps']) == 1:
             self.proc_data_dict['plot_phase'] = np.unwrap(self.proc_data_dict['plot_phase'],discont=3.141592653589793)
-            self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
+            self.proc_data_dict['plot_xlabel'] = 'Frequency'
         else:
             pass
 
@@ -1243,6 +1320,7 @@ class ResonatorSpectroscopy(Spectroscopy):
 
     def prepare_plots(self):
         super(ResonatorSpectroscopy, self).prepare_plots()
+        del self.plot_dicts['phase']
 
     def plot_fitting(self):
         if self.do_fitting:
@@ -1281,6 +1359,9 @@ class ResonatorSpectroscopy(Spectroscopy):
                                                 axs_dict=axs_dict, presentation_mode=presentation_mode)
         if self.do_fitting:
             self.plot_fitting()
+
+
+
 
 
 class ResonatorDacSweep(ResonatorSpectroscopy):
@@ -1327,10 +1408,10 @@ class ResonatorDacSweep(ResonatorSpectroscopy):
 
 class SpecPowAnalysis(ba.BaseDataAnalysis):
   '''
-  Finds the optimal spectroscopy power for the 01 transition from a series of 
+  Finds the optimal spectroscopy power for the 01 transition from a series of
   measurements by finding the power where the ratio of the peak amplitude and
   width is maximal.
-  
+
   DOES NOT YIELD ACCURATE RESULTS YET
   TODO: Could be done with less datapoints and some interpolation.
   '''
@@ -1343,9 +1424,9 @@ class SpecPowAnalysis(ba.BaseDataAnalysis):
                do_fitting=True,
                extract_only: bool=False):
 
-    super().__init__(t_start=t_start, t_stop=t_stop, 
+    super().__init__(t_start=t_start, t_stop=t_stop,
                      label=label,
-                     do_fitting=do_fitting, 
+                     do_fitting=do_fitting,
                      extract_only=extract_only)
 
     self.params_dict = {'power': pow_key,
