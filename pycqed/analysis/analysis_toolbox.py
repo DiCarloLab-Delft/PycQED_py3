@@ -3051,7 +3051,7 @@ def print_pars_table(n_ts=10, pars=None):
     nparams = []
     for i, p in enumerate(pars):
         pdict.update({p: p})
-    opt_dict = {'scan_label': '', 'exact_label_match': True}
+    opt_dict = {'scan_label': '', 'exact_label_match': False}
     # print(ts_list)
     scans = RA.quick_analysis(t_start=ts_list[-1], t_stop=ts_list[0],
                               options_dict=opt_dict,
