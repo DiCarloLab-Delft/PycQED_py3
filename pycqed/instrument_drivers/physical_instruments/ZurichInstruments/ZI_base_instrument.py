@@ -856,23 +856,22 @@ class ZI_base_instrument(Instrument):
 
         self._awg_waveforms[wf_name]['readonly'] = True
 
-    def _upload_updated_waveforms(self):
+    def _upload_updated_waveforms(self, awg_nr):
         """
         Loop through all configured waveforms and use dynamic waveform uploading
         to update changed waveforms on the instrument as needed.
         """
         # Upload waveform for each codeword
         for cw in range(self._num_codewords):
-            for awg_nr in range(self._num_channels//2):
-                # Loop through all AWG's
-                wf_name = gen_waveform_name(2*awg_nr+0, cw)
-                other_wf_name = gen_waveform_name(2*awg_nr+1, cw)
-                if self._awg_waveforms[wf_name]['dirty'] or self._awg_waveforms[other_wf_name]['dirty']:
-                    # Combine the waveforms and upload
-                    wf_data = merge_waveforms(self._awg_waveforms[wf_name]['waveform'], 
-                                              self._awg_waveforms[other_wf_name]['waveform'])
-                    # Write the new waveform
-                    self.setv('awgs/{}/waveform/waves/{}'.format(awg_nr, cw), wf_data)
+            # Loop through all AWG's
+            wf_name = gen_waveform_name(2*awg_nr+0, cw)
+            other_wf_name = gen_waveform_name(2*awg_nr+1, cw)
+            if self._awg_waveforms[wf_name]['dirty'] or self._awg_waveforms[other_wf_name]['dirty']:
+                # Combine the waveforms and upload
+                wf_data = merge_waveforms(self._awg_waveforms[wf_name]['waveform'], 
+                                            self._awg_waveforms[other_wf_name]['waveform'])
+                # Write the new waveform
+                self.setv('awgs/{}/waveform/waves/{}'.format(awg_nr, cw), wf_data)
     
     def _codeword_table_preamble(self, awg_nr):
         """
@@ -978,7 +977,8 @@ class ZI_base_instrument(Instrument):
                 self._clear_dirty_waveforms(awg_nr)
             else:
                 # Loop through all waveforms and update accordingly
-                self._upload_updated_waveforms()
+                self._upload_updated_waveforms(awg_nr)
+                self._clear_dirty_waveforms(awg_nr)
 
         # Start all AWG's
         for awg_nr in range(self._num_channels//2):
