@@ -250,7 +250,7 @@ class QuTech_AWG_Module(SCPI):
                            set_cmd='DIO:MODE ' + '{}',
                            vals=vals.Enum('MASTER', 'SLAVE'),
                            val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
-                           docstring=_dio_mode_doc + '\n Effective after start command')
+                           docstring=_dio_mode_doc + '\nEffective immediately when send')
 
         self.add_parameter('dio_is_calibrated',
                            unit='',
@@ -414,40 +414,6 @@ class QuTech_AWG_Module(SCPI):
                                          'Set parameter:\n\tInteger: Value to write to the DAC, min: 0, max: 4095\n'
                                          '\tWhere 0 is minimal DAC scale and 4095 is maximal DAC scale \n')
 
-            self.add_parameter(f'ch{ch}_bit_select',
-                               unit='',
-                               label=f'Channel {ch}, set bit selection for this channel',
-                               get_cmd=self._gen_ch_get_func(
-                                    self._get_bit_select, ch),
-                               set_cmd=self._gen_ch_set_func(
-                                    self._set_bit_select, ch),
-                               get_parser=np.uint32,
-                               docstring='Codeword bit select for a channel\n'
-                                         'Set: \n'
-                                         '\tParameter: Integer, the bit select\n'
-                                         '\nWhen a bit is enabled (1) in the bitSelect, this bit is used as part of '
-                                         'the codeword for that channel. '
-                                         ' If a bit is disabled (0), it will be ignored.\n'
-                                         'This can be used to control individual channels with a their own codeword.\n'
-                                         'Note that codeword 1 will start on the first enabled bit. Bit endianness: '
-                                         'LSB, lowest bit right \n'
-                                         '\nExamples:\n'
-                                         '\tCh1: 0b000011(0x03); Only the first and second bit will be used as '
-                                         'codeword for channel 1.\n'
-                                         '\tCh2: 0b001100(0x0C); Only the third and forth bit will be used as '
-                                         'codeword for channel 2.\n'
-                                         '\tCh3: 0b110000(0x30); Only the fifth and sixth bit will be used as '
-                                         'codeword for channel 3.\n'
-                                         '\tCh4: 0b110000(0x30); Only the fifth and sixth bit will be used as '
-                                         'codeword for channel 4.\n'
-                                         'The bit select of different channels are only allowed to overlap each other '
-                                         'if their least significant bit is the same.\n'
-                                         'So a bitSelect of ch1: 0b011, and ch2: 0b010 is not allowed. '
-                                         'This will be checked on `start()`. '
-                                         'Errors are reported by `getError()` or `getErrors()`.'
-                                         '\n\n Get:\n'
-                                         '\tResult:  Integer that represent the bit select of the channel\n')
-
             self.add_parameter(f'ch{ch}_bit_map',
                                unit='',
                                label=f'Channel {ch}, set bit map for this channel',
@@ -549,7 +515,7 @@ class QuTech_AWG_Module(SCPI):
                            get_cmd=self._getCodewordProtocol,
                            set_cmd=self._setCodewordProtocol,
                            vals=vals.Enum('MICROWAVE', 'FLUX'),
-                           docstring=_codeword_protocol_doc + '\n Effective after start command')
+                           docstring=_codeword_protocol_doc + '\nEffective immediately when send')
 
         self._add_codeword_parameters()
 
@@ -655,13 +621,13 @@ class QuTech_AWG_Module(SCPI):
             self.set(f"ch{ch+1}_bit_map", bitMap)
 
     def _getCodewordProtocol(self):
-        channels_bit_sels = []
+        channels_bit_maps = []
         result = "Custom"  # Default, if no protocol matches
         for ch in range(1, self.device_descriptor.numChannels + 1):
-            channels_bit_sels.append(self.get(f"ch{ch}_bit_select"))
+            channels_bit_maps.append(list(map(int, self.get(f"ch{ch}_bit_map"))))
 
-        for prtc_name, prtc_bitSels in self.codeword_protocols.items():
-            if channels_bit_sels == prtc_bitSels:
+        for prtc_name, prtc_bit_map in self.codeword_protocols.items():
+            if channels_bit_maps == prtc_bit_map:
                 result = prtc_name
                 break
 
@@ -712,22 +678,6 @@ class QuTech_AWG_Module(SCPI):
         if msg == "\"\"":
             return []
         return msg.split(',')
-
-    def _set_bit_select(self, ch: int, selection: int):
-        bit_map = []
-        if selection.bit_length() > self.device_descriptor.numMaxCwBits:
-            raise ValueError(f'Cannot set bit select; highest set bit is to high; '
-                             f'max: {self.device_descriptor.numMaxCwBits}, actual: {selection.bit_length()}')
-
-        for cw_bit_input in range(0, selection.bit_length()):
-            if (1 << cw_bit_input) & selection:
-                bit_map.append(cw_bit_input)
-
-        self._set_bit_map(ch, bit_map)
-
-    def _get_bit_select(self, ch: type = int):
-        result = self.ask(f"DAC{ch}:BITmap?")
-        return result.split(",")
 
     def _set_bit_map(self, ch: int, bit_map: List[int]):
         """
