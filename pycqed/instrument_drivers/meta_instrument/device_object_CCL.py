@@ -1429,11 +1429,13 @@ class DeviceCCL(Instrument):
 
         if waveform_name == 'square':
             length_par = fl_lutman.sq_length
+            flux_cw = 6
             # fl_lutman.cfg_operating_mode('CW_single_02')
             # fl_lutman_spec.cfg_operating_mode('CW_single_02')
 
-        elif waveform_name == 'cz_z':
+        elif 'cz' in waveform_name:
             length_par = fl_lutman.cz_length
+            flux_cw = fl_lutman._get_cw_from_wf_name(waveform_name)
             # fl_lutman.cfg_operating_mode('CW_single_01')
             # fl_lutman_spec.cfg_operating_mode('CW_single_01')
 
@@ -1452,7 +1454,6 @@ class DeviceCCL(Instrument):
             sw = swf.FLsweep_QWG(fl_lutman, length_par,
                                  realtime_loading=True,
                                  waveform_name=waveform_name)
-            flux_cw = 0
 
         else:
             awg_ch = fl_lutman.cfg_awg_channel()-1  # -1 is to account for starting at 1
@@ -1463,7 +1464,6 @@ class DeviceCCL(Instrument):
                 awg_nr, ch_pair)]
             sw = swf.FLsweep(fl_lutman, length_par,
                              waveform_name=waveform_name)
-            flux_cw = 2
 
         p = mqo.Chevron(q0idx, q_specidx, buffer_time=40e-9,
                         buffer_time2=max(lengths)+40e-9,
