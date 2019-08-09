@@ -5,6 +5,7 @@ import warnings
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
+from pycqed.measurement import detector_functions as det 
 from qcodes.instrument.parameter import ManualParameter
 
 from pycqed.utilities.general import gen_sweep_pts
@@ -1348,6 +1349,101 @@ class Qubit(Instrument):
         self.freq_qubit(freq_sweetspot)
         self.fl_dc_I(dac_sweetspot)
         self.fl_dc_I0(dac_sweetspot)
+
+
+
+    def tune_freq_to(self, target_frequency, 
+                          MC, nested_MC, 
+                          calculate_initial_step: bool=False,
+                          initial_flux_step: float = None, 
+                          max_repetitions=15,
+                          resonator_use_min=True): 
+        """
+        Iteratively tune the qubit frequency to a specific target frequency
+        """ 
+
+        if target_frequency > self.freq_max(): 
+            raise ValueError('Attempting to tune to a frequency ({:.2f} GHz)'
+                'larger than the sweetspot frequency ({:.2f} GHz)'.format(
+                    target_frequency, self.freq_max()))
+
+        # Current frequency 
+        f_q = self.freq_qubit()
+        delta_freq = target_frequency - f_q  
+
+
+        if abs(delta_freq) > 50e6: 
+            find_res = True
+
+
+        fluxcontrol= self.instr_FluxCtrl.get_instr()
+        fluxpar = fluxcontrol.parameters[(self.fl_dc_ch())]
+
+        current_dac_val = fluxpar.get()
+
+        # set up ranges and parameters
+        if calculate_initial_step:
+            raise NotImplementedError()
+        #    construct predicted arch from I_per_phi0, E_c, E_j BALLPARK SHOULD SUFFICE.
+        #    predict first jump
+        #    next_dac_value =
+        else:
+            if initial_flux_step is None: 
+                # If we do not calculate the initial step, we take small steps from 
+                # our starting point
+                initial_flux_step = self.fl_dc_I_per_phi0()/30
+
+            next_dac_value = current_dac_val + initial_flux_step
+
+
+        def measure_qubit_freq_nested(target_frequency, 
+                spans=[100e6, 400e6, 800e6], **kw): 
+
+            # measure freq
+            if find_res:
+                freq_res = self.find_resonator_frequency(
+                                    MC=nested_MC,
+                                    use_min=resonator_use_min)
+            else: 
+                freq_res = self.freq_res
+
+            spec_success = False
+            for span in spans:    
+                spec_succes = self.find_frequency(f_span=span,  MC=nested_MC)
+                if spec_succes:
+                    break
+
+            if not spec_succes: 
+                raise ValueError("Could not find the qubit. Aborting.")
+            freq_qubit = self.freq_qubit()  # as updated in this function call
+
+            
+            abs_freq_diff = abs(target_frequency-freq_qubit)
+
+            return {'abs_freq_diff': abs_freq_diff, 'freq_qubit': freq_qubit, 
+                    'freq_resonator': freq_res}
+
+
+        qubit_freq_det = det.Function_Detector(measure_qubit_freq_nested, 
+            msmt_kw={'target_frequency': target_frequency},
+            result_keys=['abs_freq_diff', 'freq_qubit', 'freq_resonator'], 
+            value_units=['Hz']*3)
+
+
+        from scipy.optimize import minimize_scalar
+        ad_func_pars = {'adaptive_function': minimize_scalar,
+                    'method': 'brent', 
+                    'bracket': [current_dac_val, next_dac_value],
+                    # 'x0': x0,
+                    'tol': 1e-6,  # Relative tolerance in brent
+                    'minimize': True,
+                    'options':{'maxiter': max_repetitions}}
+
+        MC.set_sweep_function(fluxpar)
+        MC.set_detector_function(qubit_freq_det)
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run('Tune_to_freq', mode='adaptive')
+
 
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
