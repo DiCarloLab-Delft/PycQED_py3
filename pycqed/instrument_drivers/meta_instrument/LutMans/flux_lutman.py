@@ -5,6 +5,7 @@ from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
+import warnings 
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 try:
@@ -699,13 +700,19 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
         awg_nr = awg_ch//2
         ch_pair = awg_ch % 2
-        for i in range(5):
-            channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
+
+        channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
                 awg_nr, ch_pair))
-            if channel_amp is not None:
-                break
-            time.sleep(0.5)
         return channel_amp
+
+    def _set_awg_channel_amplitude(self, val):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
+        awg_nr = awg_ch//2
+        ch_pair = awg_ch % 2
+        channel_amp = AWG.set('awgs_{}_outputs_{}_amplitude'.format(
+            awg_nr, ch_pair), val)
+    
 
     def _get_awg_channel_range(self):
         AWG = self.AWG.get_instr()
@@ -881,6 +888,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self.add_parameter('cfg_awg_channel_amplitude',
                            docstring='digital scale factor between 0 and 1',
                            get_cmd=self._get_awg_channel_amplitude,
+                           set_cmd=self._set_awg_channel_amplitude,
                            unit='a.u.', vals=vals.Numbers(0, 1))
 
     def _set_cfg_operating_mode(self, val):
@@ -1373,6 +1381,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
 class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def __init__(self, name, **kw):
+        warnings.warn('Deprecated, use HDAWG_Flux_LutMan.')
         _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
         self._def_lm = _def_lm
         super().__init__(name, **kw)

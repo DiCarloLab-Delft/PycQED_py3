@@ -587,10 +587,16 @@ def get_data_from_timestamp_list(timestamps,
                     remove_timestamps.append(timestamp)
                     do_analysis = True
                 ana.finish()
-            except Exception as inst:
+            except KeyError as e: 
+
+                logging.warning('KeyError "%s" when processing timestamp %s' %
+                                (e, timestamp))
+                logging.warning(e) 
+
+            except Exception as e:
                 logging.warning('Error "%s" when processing timestamp %s' %
-                                (inst, timestamp))
-                raise
+                                (e, timestamp))
+                raise(e)
 
     if len(remove_timestamps) > 0:
         for timestamp in remove_timestamps:
