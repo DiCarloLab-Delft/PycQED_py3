@@ -64,6 +64,12 @@ class Qubit(Instrument):
             calculates a quantity based on parameters specified in the qubit
             object e.g. calculate_frequency
 
+        - tune_xx_to_ 
+            Similar to calibrate but actively tries to set a parameter xx to a 
+            specific target value. An example is tune_to_frequency where 
+            several routines are used to set the qubit frequency to a desired
+            value. 
+
     Naming conventions for parameters:
         (only for qubit objects after Sept 2017)
         Parameters are grouped based on their functionality. This grouping
@@ -1252,6 +1258,97 @@ class Qubit(Instrument):
         raise NotImplementedError()
 
         return True
+
+
+
+    def tune_freq_to_sweetspot(self, verbose = True ): 
+        """
+        Tunes the qubit to the sweetspot 
+        """
+
+        within_50MHz_of_sweetspot = True
+
+        # if within 50 MHz of sweetspot, we can start the iterative procedure
+        if within_50MHz_of_sweetspot:
+            pass
+
+        # Requires an estimate of V_per_phi0 (which should be a current)
+
+        freqs = self.freq_max() + np.arange(-80e6, +20e6, .5e6)
+
+        # Should be replaced by self.fl_dc_I() # which gets this automatically
+        # self.fl_dc_I()
+        fluxcontrol= self.instr_FluxCtrl.get_instr()
+        current_dac_val = fluxcontrol.parameters[(self.fl_dc_ch())].get()
+        
+        dac_range  = 0.1 * self.fl_dc_I_per_phi0() # Should correspond to approx 50MHz around sweetspot.  
+        dac_values = current_dac_val + np.linspace(-dac_range/2, dac_range/2, 6)
+
+        self.measure_qubit_frequency_dac_scan(freqs=freqs, dac_values=dac_values)
+        
+        analysis_obj = ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=True)
+        freqs = analysis_obj.sweep_points
+        dac_vals = analysis_obj.sweep_points_2D
+        signal_magn = analysis_obj.measured_values[0]
+
+
+        # FIXME: This function should be moved out of the qubit object upon cleanup.
+        def quick_analyze_dac_scan(x_vals, y_vals, Z_vals):  
+            def find_peaks(x_vals, y_vals, Z_vals):
+                peaks = np.zeros(len(y_vals))
+                for i in range(len(y_vals)):
+                    p_dict = a_tools.peak_finder(x_vals, Z_vals[:, i], 
+                        optimize=False, num_sigma_threshold=15)
+                        # FIXME hardcoded num_sigma_threshold 
+                    try:
+                        peaks[i] = p_dict['peak']
+                    except Exception as e:
+                        logging.warning(e)
+                        peaks[i] = np.NaN
+
+                return peaks
+
+            peaks = find_peaks(x_vals, y_vals, Z_vals)
+
+            dac_masked=  y_vals[~np.isnan(peaks)]
+            peaks_masked= peaks[~np.isnan(peaks)]
+            pv = np.polyfit(x=dac_masked, y=peaks_masked, deg=2)
+            sweetspot_current = -0.5*pv[1]/pv[0]
+            sweetspot_freq = np.polyval(pv,sweetspot_current)
+            return sweetspot_current, sweetspot_freq
+
+
+        dac_sweetspot, freq_sweetspot = quick_analyze_dac_scan(
+            x_vals=freqs, y_vals=dac_vals, Z_vals=signal_magn)
+
+        if dac_sweetspot>np.max(dac_values) or dac_sweetspot<np.min(dac_values): 
+            warnings.warn("Fit returns something weird. Not updating flux bias")
+            procedure_success = False  
+        elif freq_sweetspot > self.freq_max()+50e6: 
+            warnings.warn("Fit returns something weird. Not updating flux bias")
+            procedure_success = False
+        elif freq_sweetspot < self.freq_max()-50e6: 
+            warnings.warn("Fit returns something weird. Not updating flux bias")
+            procedure_success = False
+        else: 
+            procedure_success = True
+        if not procedure_success: 
+            # reset the current to the last known value. 
+            fluxcontrol.parameters[(self.fl_dc_ch())].set(current_dac_val)
+        
+
+        if verbose: 
+            # FIXME replace by unit aware printing 
+            print("Setting flux bias to {:.3f} mA".format(dac_sweetspot*1e3))
+            print("Setting qubit frequency to {:.4f} GHz".format(freq_sweetspot*1e-9))
+            
+        # self.fl_dc_I(dac_sweetspot)
+        # FIXME, this should be included in the set of fl_dc_I 
+        fluxcontrol.parameters[(self.fl_dc_ch())].set(dac_sweetspot)
+        self.freq_qubit(freq_sweetspot)
+        self.fl_dc_I(dac_sweetspot)
+        self.fl_dc_I0(dac_sweetspot)
+
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):

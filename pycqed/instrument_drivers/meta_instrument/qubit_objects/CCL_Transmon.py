@@ -571,31 +571,43 @@ class CCLight_Transmon(Qubit):
 
     def add_flux_parameters(self):
         # fl_dc_ is the prefix for DC flux bias related params
+        # FIXME: 
         self.add_parameter(
-            'flux_polycoeff',
+            'fl_dc_polycoeff',
             docstring='Polynomial coefficients for current to frequency conversion',
             vals=vals.Arrays(),
             # initial value is chosen to not raise errors
             initial_value=np.array([0, 0, -1e12, 0, 6e9]),
             parameter_class=ManualParameter)
+
         self.add_parameter(
-            'fl_dc_V_per_phi0', label='Flux bias V/Phi0',
-            docstring='Conversion factor for flux bias',
-            vals=vals.Numbers(), unit='V', initial_value=1,
+            'fl_ac_polycoeff',
+            docstring='Polynomial coefficients for current to frequency conversion',
+            vals=vals.Arrays(),
+            # initial value is chosen to not raise errors
+            initial_value=np.array([0, 0, -1e12, 0, 6e9]),
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'fl_dc_I_per_phi0', label='Flux bias I/Phi0',
+            docstring='Conversion factor for flux bias, current per flux quantum',
+            vals=vals.Numbers(), unit='A', initial_value=10e-3,
             parameter_class=ManualParameter)
         self.add_parameter(
-            'fl_dc_V', label='Flux bias', unit='V',
+            'fl_dc_I', label='Flux bias', unit='A',
             docstring='Current flux bias setting', vals=vals.Numbers(),
             initial_value=0, parameter_class=ManualParameter)
         self.add_parameter(
-            'fl_dc_V0', unit='V', label='Flux bias sweet spot', docstring=(
+            'fl_dc_I0', unit='A', label='Flux bias sweet spot', docstring=(
                 'Flux bias offset corresponding to the sweetspot'),
             vals=vals.Numbers(), initial_value=0,
             parameter_class=ManualParameter)
         #? not used anywhere
         self.add_parameter(
-            'fl_dc_ch',  docstring=(
-                'Flux bias channel'),
+            'fl_dc_ch',  label='Flux bias channel',
+            docstring=('Used to determine the DAC channel used for DC '
+                       'flux biasing. Should be an int when using an IVVI rack'
+                       'or a str (channel name) when using an SPI rack.'),
             vals=vals.Strings(), initial_value='',
             parameter_class=ManualParameter)
 
@@ -687,13 +699,7 @@ class CCLight_Transmon(Qubit):
                                       ' bypasses all commands to vsm if set False'),
                            initial_value=True,
                            parameter_class=ManualParameter)
-        self.add_parameter(
-            'cfg_dc_flux_ch', label='Flux DAC channel',
-            docstring=('Used to determine the DAC channel used for DC '
-                       'flux biasing. Should be an int when using an IVVI rack'
-                       'or a str (channel name) when using an SPI rack.'),
-            initial_value=1,
-            parameter_class=ManualParameter)
+
         self.add_parameter('cfg_spec_mode', vals=vals.Bool(),
                            docstring=(
                                'Used to activate spec mode in measurements'),
@@ -1261,16 +1267,16 @@ class CCLight_Transmon(Qubit):
         for qubit_name in device.qubits():
             if (qubit_name not in exceptions) and (qubit_name != self.name):
                 qubit = device.find_instrument(qubit_name)
-                channel = qubit.cfg_dc_flux_ch()
-                current = qubit.fl_dc_V0() + qubit.fl_dc_V_per_phi0()/2
+                channel = qubit.fl_dc_ch()
+                current = qubit.fl_dc_I0() + qubit.fl_dc_I_per_phi0()/2
                 fluxcurrent[channel](current)
                 if verbose:
                     print('\t Moving {} to {:.3f} mA'
                           .format(qubit_name, current/1e-3))
         # Move self to sweetspot:
         if verbose:
-            print('Moving {} to {:.3f} mA'.format(self.name, self.fl_dc_V0()/1e-3))
-        fluxcurrent[self.cfg_dc_flux_ch()](self.fl_dc_V0())
+            print('Moving {} to {:.3f} mA'.format(self.name, self.fl_dc_I0()/1e-3))
+        fluxcurrent[self.fl_dc_ch()](self.fl_dc_I0())
         return True
 
 
@@ -1341,8 +1347,8 @@ class CCLight_Transmon(Qubit):
                                             'Adjusting currents'
                                             .format(qubit.name))
                         fluxcurrent = self.instr_FluxCtrl.get_instr()
-                        old_current = fluxcurrent[qubit.cfg_dc_flux_ch()]()
-                        fluxcurrent[qubit.cfg_dc_flux_ch()](5e-3)
+                        old_current = fluxcurrent[qubit.fl_dc_ch()]()
+                        fluxcurrent[qubit.fl_dc_ch()](5e-3)
                         n -= 1
                         success = False
 
@@ -1415,15 +1421,15 @@ class CCLight_Transmon(Qubit):
             freqs = np.arange(freq_center - freq_range, freq_center + 5e6,
                               0.5e6)
         if dac_values is None:
-            if self.fl_dc_V0() is not None:
-                dac_values = np.linspace(self.fl_dc_V0() - 1e-3,
-                                         self.fl_dc_V0() + 1e-3, 8)
+            if self.fl_dc_I0() is not None:
+                dac_values = np.linspace(self.fl_dc_I0() - 1e-3,
+                                         self.fl_dc_I0() + 1e-3, 8)
             else:
                 dac_values = np.linspace(-1e3, 1e-3, 8)
 
         if fluxChan is None:
-            if self.cfg_dc_flux_ch() is not None:
-                fluxChan = self.cfg_dc_flux_ch()
+            if self.fl_dc_ch() is not None:
+                fluxChan = self.fl_dc_ch()
             else:
                 logging.error('No fluxchannel found or specified. Please '
                               'specify fluxChan')
@@ -1447,7 +1453,7 @@ class CCLight_Transmon(Qubit):
             t_start = time.strftime('%Y%m%d_%H%M%S')
 
             for i, dac_value in enumerate(dac_values):
-                self.instr_FluxCtrl.get_instr()[self.cfg_dc_flux_ch()](dac_value)
+                self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()](dac_value)
                 if i == 0:
                     self.find_frequency(freqs=freqs, update=True)
                 else:
@@ -1457,7 +1463,7 @@ class CCLight_Transmon(Qubit):
 
             a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
                                   label='spectroscopy__' + self.name,
-                                  dac_key='Instrument settings.fluxcurrent.'+self.cfg_dc_flux_ch(),
+                                  dac_key='Instrument settings.fluxcurrent.'+self.fl_dc_ch(),
                                   degree=2)
 
             pc = a.fit_res['fit_polycoeffs']
@@ -1470,14 +1476,14 @@ class CCLight_Transmon(Qubit):
                           'Use "DAC" or "tracked".'.format(method))
 
         if update:
-            self.fl_dc_V0(sweetspot_current)
+            self.fl_dc_I0(sweetspot_current)
             self.freq_max(self.calc_current_to_freq(sweetspot_current))
         if set_to_sweetspot:
-            self.instr_FluxCtrl.get_instr()[self.cfg_dc_flux_ch()](sweetspot_current)
+            self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()](sweetspot_current)
 
         # Sanity check: does this peak move with flux?
         check_vals = [self.calc_current_to_freq(np.min(dac_values)),
-                      self.calc_current_to_freq(self.fl_dc_V0()),
+                      self.calc_current_to_freq(self.fl_dc_I0()),
                       self.calc_current_to_freq(np.max(dac_values))]
 
         if check_vals[0] == pytest.approx(check_vals[1], abs=0.5e6):
@@ -2149,7 +2155,7 @@ class CCLight_Transmon(Qubit):
 
             fluxChan (str):
                 channel of the instrument controlling the flux to sweep. By default
-                the channel used is specified by self.cfg_dc_flux_ch.
+                the channel used is specified by self.fl_dc_ch.
 
             analyze (bool):
                 indicates whether to generate colormaps of the measured data
@@ -2182,12 +2188,12 @@ class CCLight_Transmon(Qubit):
 
         if 'ivvi' in self.instr_FluxCtrl().lower():
             IVVI = self.instr_FluxCtrl.get_instr()
-            dac_par = IVVI.parameters['dac{}'.format(self.cfg_dc_flux_ch())]
+            dac_par = IVVI.parameters['dac{}'.format(self.fl_dc_ch())]
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
             if fluxChan==None:
-                dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+                dac_par = fluxcontrol.parameters[(self.fl_dc_ch())]
             else:
                 dac_par = fluxcontrol.parameters[(fluxChan)]
 
@@ -2220,7 +2226,7 @@ class CCLight_Transmon(Qubit):
                 specifies the spectroscopy mode (cf. measure_spectroscopy method)
 
             fluxChan (str):
-                Fluxchannel that is varied. Defaults to self.cfg_dc_flux_ch
+                Fluxchannel that is varied. Defaults to self.fl_dc_ch
 
             nested_resonator_calibration (bool):
                 specifies whether to track the RO resonator
@@ -2278,14 +2284,14 @@ class CCLight_Transmon(Qubit):
         if 'ivvi' in self.instr_FluxCtrl().lower():
             if fluxChan is None:
                 IVVI = self.instr_FluxCtrl.get_instr()
-                dac_par = IVVI.parameters['dac{}'.format(self.cfg_dc_flux_ch())]
+                dac_par = IVVI.parameters['dac{}'.format(self.fl_dc_ch())]
             else:
                 dac_par = IVVI.parameters[fluxChan]
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
             if fluxChan == None:
-                dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+                dac_par = fluxcontrol.parameters[(self.fl_dc_ch())]
             else:
                 dac_par = fluxcontrol.parameters[(fluxChan)]
 
@@ -4760,21 +4766,21 @@ class CCLight_Transmon(Qubit):
                 Is used inside the composite detector
 
             fluxChan (str):
-                Fluxchannel that is varied. Defaults to self.cfg_dc_flux_ch
+                Fluxchannel that is varied. Defaults to self.fl_dc_ch
         """
 
         if dac_values is None:
-            if self.fl_dc_V0() is None:
+            if self.fl_dc_I0() is None:
                 dac_values = np.linspace(-5e-3, 5e-3, 11)
             else:
-                dac_values_1 = np.linspace(self.fl_dc_V0(),
-                                           self.fl_dc_V0() + 3e-3,
+                dac_values_1 = np.linspace(self.fl_dc_I0(),
+                                           self.fl_dc_I0() + 3e-3,
                                            11)
-                dac_values_2 = np.linspace(self.fl_dc_V0() + 3e-3,
-                                           self.fl_dc_V0() + 5e-3,
+                dac_values_2 = np.linspace(self.fl_dc_I0() + 3e-3,
+                                           self.fl_dc_I0() + 5e-3,
                                            6)
-                dac_values_ = np.linspace(self.fl_dc_V0(),
-                                           self.fl_dc_V0() - 5e-3,
+                dac_values_ = np.linspace(self.fl_dc_I0(),
+                                           self.fl_dc_I0() - 5e-3,
                                            11)
 
         dac_values = np.concatenate([dac_values_1, dac_values_2])
@@ -4787,7 +4793,7 @@ class CCLight_Transmon(Qubit):
 
         fluxcontrol = self.instr_FluxCtrl.get_instr()
         if fluxChan is None:
-            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            dac_par = fluxcontrol.parameters[(self.fl_dc_ch())]
         else:
             dac_par = fluxcontrol.parameters[(fluxChan)]
 
