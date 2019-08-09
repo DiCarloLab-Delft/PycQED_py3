@@ -192,6 +192,44 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
                 search_dir, daydir, measdir)
 
 
+def get_datafilepath_from_timestamp(timestamp):
+    """
+    Return the full filepath of a datafile designated by a timestamp.
+
+    Args:
+        timestamp (str)
+            formatted as "YYMMHH_hhmmss""
+    Return:
+        filepath (str)
+            the full filepath of a datafile
+
+    Note: there also exist two separate functions that are typically
+    combined in analysis to achieve the same effect.
+    These are "data_from_time" and "measurement_filename".
+
+    This function is intended to replace both of these and be faster.
+
+    """
+
+    # Not only verifies but also decomposes the timestamp
+    daystamp, tstamp = verify_timestamp(timestamp)
+
+    daydir = os.listdir(os.path.join(datadir, daystamp))
+
+    # Loooking for the folder starting with the right timestamp
+    measdir_names = [item for item in daydir if item.startswith(tstamp)]
+
+    if len(measdir_names) > 1:
+        raise ValueError('Timestamp is not unique')
+    elif len(measdir_names) == 0:
+        raise ValueError('No data at timestamp.')
+    measdir_name = measdir_names[0]
+    # Naming follows a standard convention
+    data_fp = os.path.join(datadir, daystamp, measdir_name,
+                           measdir_name+'.hdf5')
+    return data_fp
+
+
 def data_from_time(timestamp, folder=None):
     """
     returns the full path of the data specified by its timestamp in the
@@ -199,7 +237,6 @@ def data_from_time(timestamp, folder=None):
     """
     if (folder is None):
         folder = datadir
-    daydirs = os.listdir(folder)
 
     if len(daydirs) == 0:
         raise Exception('No data in the data directory specified')
@@ -776,7 +813,8 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         date = datetime_start + datetime.timedelta(days=day)
         datemark = timestamp_from_datetime(date)[:8]
         try:
-            all_measdirs = [d for d in os.listdir(os.path.join(folder, datemark))]
+            all_measdirs = [d for d in os.listdir(
+                os.path.join(folder, datemark))]
         except FileNotFoundError:
             # Sometimes, when choosing multiples days, there is a day
             # with no measurements
