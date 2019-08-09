@@ -48,9 +48,53 @@ class HandshakeParameter(Parameter):
         self.has_set = set_cmd is not None
 
 
-class QuTech_AWG_Module(SCPI):
+# These docstrings are both used in the QWG __init__ and for the parameters
+_run_mode_doc = 'Run mode:\n' \
+                '\t- NONE: No mode selected (default)\n' \
+                '\t- CODeword: Codeword mode, will play wave based on codewords input' \
+                'via IORearDIO or IORearMT board\n' \
+                '\t- CONt: Continues mode, plays defined wave back to back\n' \
+                '\t- SEQ: (Not implemented)'
 
-    def __init__(self, name, address, port, **kwargs):
+_dio_mode_doc = 'Get or set the DIO input operation mode\n' \
+                '\tOptions:\n' \
+                '\t- MASTER: Use DIO codeword (lower 14 bits) input ' \
+                'from its own IORearDIO board (Default)\n' \
+                '\t\tEnables single-ended (SE) and differential (DIFF) inputs\n' \
+                '\t- SLAVE: Use DIO codeword (upper 14 bits) input ' \
+                'from the connected master IORearDIO board\n' \
+                '\t\tDisables single-ended (SE) and differential (DIFF) inputs'
+
+_codeword_protocol_doc = 'Configures the codeword input bits/channels per channel. These are predefined sets of ' \
+                         'bit maps.\n \tOptions:\n' \
+                         '\t- MICROWAVE: bit map preset for microwave (Default)\n' \
+                         '\t- FLUX: bit map preset for flux\n' \
+                         '\tNote: at the moment the presets are created for CCL use which only allows calibration of ' \
+                         '8 bits, the QWG can support up to 14 bits of which 10 are selectable'
+
+
+class QuTech_AWG_Module(SCPI):
+    __doc__ = f"""
+    Driver for a Qutech AWG Module (QWG) instrument. Will establish a connection to a module via ethernet.
+    :param name: Name of the instrument  
+    :param address: Ethernet address of the device
+    :param port: Device port  
+    :param reset: Set device to the default settings
+    :param run_mode: {_run_mode_doc}
+    :param dio_mode: {_dio_mode_doc}
+    :param codeword_protocol: {_codeword_protocol_doc}
+    :param kwargs: base class parameters (Instruments)
+    """
+
+    def __init__(self,
+                 name: str,
+                 address: str,
+                 port: int = 5025,
+                 reset: bool = False,
+                 run_mode: str = None,
+                 dio_mode: str = None,
+                 codeword_protocol: str = None,
+                 **kwargs):
         super().__init__(name, address, port, **kwargs)
 
         # AWG properties
@@ -73,16 +117,32 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
         self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 5.0)
 
-        cw_protocol_mt = {
-            # Name          Ch1,    Ch2,    Ch3,    Ch4
-            'FLUX':         [0x5F,  0x5F,   0x5F,   0x5F],
-            'MICROWAVE':    [0x5F,  0x5F,   0x5F,   0x5F]
+        # Codeword protocols: Pre-defined per channel bit maps
+        cw_protocol_dio = {
+            # FIXME: CCLight is limited to 8 cw bits output, QWG can have up to cw 14 bits input of which 10 are
+            #  selectable
+            'MICROWAVE': [[0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
+                          [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
+                          [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
+                          [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
+
+            'FLUX':      [[0, 1, 2],  # Ch1
+                          [3, 4, 5],  # Ch2
+                          [6, 7, 8],  # Ch3
+                          [6, 7, 8]],  # Ch4  # See limitation/fixme; will use ch 3's bitmap
         }
 
-        cw_protocol_dio = {
-            # Name          Ch1,   Ch2,  Ch3,  Ch4
-            'FLUX':         [0x07, 0x38, 0x1C0, 0xE00],
-            'MICROWAVE':    [0x3FF, 0x3FF, 0x3FF, 0x3FF]
+        cw_protocol_mt = {
+            # Name
+            'MICROWAVE': [[0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
+                          [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
+                          [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
+                          [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
+
+            'FLUX':      [[0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
+                          [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
+                          [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
+                          [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
         }
 
         if self.device_descriptor.numMaxCwBits <= 7:
@@ -90,15 +150,24 @@ class QuTech_AWG_Module(SCPI):
         else:
             self.codeword_protocols = cw_protocol_dio
 
-
-        # FIXME: not in [V]
-
-        # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
         self._params_exclude_snapshot = []
 
         self._params_to_skip_update = []
         self.add_parameters()
         self.connect_message()
+
+        if reset:
+            self.reset()
+
+        if run_mode:
+            self.run_mode(run_mode)
+
+        if dio_mode:
+            self.dio_mode(dio_mode)
+
+        if codeword_protocol:
+            self.codeword_protocol(codeword_protocol)
 
     def add_parameters(self):
         #######################################################################
@@ -164,20 +233,14 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=float,
                                snapshot_exclude=True)
 
-            # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+            # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
             self._params_exclude_snapshot.append(triglev_name)
 
         self.add_parameter('run_mode',
                            get_cmd='AWGC:RMO?',
                            set_cmd='AWGC:RMO ' + '{}',
                            vals=vals.Enum('NONE', 'CONt', 'SEQ', 'CODeword'),
-                           docstring='Run mode:\n' 
-                                     '\t- NONE: No mode selected (default)\n'
-                                     '\t- CODeword: Codeword mode, will play wave based on codewords input'
-                                     'via IORearDIO or IORearMT board'
-                                     '\t- CONt: Continues mode, plays defined wave back to back\n'
-                                     '\t- SEQ: (Not implemented)\n'
-                                     'Effective after start command')
+                           docstring=_run_mode_doc + '\n Effective after start command')
         # NB: setting mode "CON" (valid SCPI abbreviation) reads back as "CONt"
 
         self.add_parameter('dio_mode',
@@ -187,15 +250,7 @@ class QuTech_AWG_Module(SCPI):
                            set_cmd='DIO:MODE ' + '{}',
                            vals=vals.Enum('MASTER', 'SLAVE'),
                            val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
-                           docstring='Get or set the DIO input operation mode\n'
-                                     'Parameters:\n'
-                                     '\tMASTER: Use DIO codeword (lower 14 bits) input '
-                                     'from its own IORearDIO board' 
-                                     '\t\tEnables single-ended and differential inputs\n' 
-                                     '\tSLAVE; Use DIO codeword (upper 14 bits) input '
-                                     'from the connected master IORearDIO board\n'
-                                     '\t\tDisables SE and DIFF inputs\n'
-                                     'Effective immediately when send')
+                           docstring=_dio_mode_doc + '\n Effective after start command')
 
         self.add_parameter('dio_is_calibrated',
                            unit='',
@@ -216,7 +271,7 @@ class QuTech_AWG_Module(SCPI):
                            get_parser=np.uint32,
                            vals=vals.Ints(0, 20),
                            docstring='Get and set DIO calibration index\n' 
-                                     'See dio_calibrate() paramater\n'
+                                     'See dio_calibrate() parameter\n'
                                      'Effective immediately when send'
                            )
 
@@ -369,7 +424,7 @@ class QuTech_AWG_Module(SCPI):
                                get_parser=np.uint32,
                                docstring='Codeword bit select for a channel\n'
                                          'Set: \n'
-                                         '\tParamater: Integer, the bit select\n'
+                                         '\tParameter: Integer, the bit select\n'
                                          '\nWhen a bit is enabled (1) in the bitSelect, this bit is used as part of '
                                          'the codeword for that channel. '
                                          ' If a bit is disabled (0), it will be ignored.\n'
@@ -384,7 +439,7 @@ class QuTech_AWG_Module(SCPI):
                                          '\tCh3: 0b110000(0x30); Only the fifth and sixth bit will be used as '
                                          'codeword for channel 3.\n'
                                          '\tCh4: 0b110000(0x30); Only the fifth and sixth bit will be used as '
-                                         'codeword for channel 4.\n'\
+                                         'codeword for channel 4.\n'
                                          'The bit select of different channels are only allowed to overlap each other '
                                          'if their least significant bit is the same.\n'
                                          'So a bitSelect of ch1: 0b011, and ch2: 0b010 is not allowed. '
@@ -400,26 +455,30 @@ class QuTech_AWG_Module(SCPI):
                                set_cmd=self._gen_ch_set_func(
                                    self._set_bit_map, ch),
                                get_parser=self._int_to_array,
-                               docstring='Codeword bit map for a channel\n'
+                               docstring='Codeword bit map for a channel, 14 bits available of which 10 are '
+                                         'selectable \n'
+                                         'The codeword bit map specifies which bits of the codeword (coming from a '
+                                         'central controller) are used for the codeword of a channel. This allows to '
+                                         'split up the codeword into sections for each channel\n'
                                          'Effective immediately when send')
 
             # Trigger parameters
-            doc_trgs_log_inp = 'Reads the current input values on the all the trigger ' \
-                               'inputs for a channel, after the bitSelect.\nReturn:\n    uint32 where trigger 1 (T1) ' \
-                               'is on the Least significant bit (LSB), T2 on the second  ' \
-                               'bit after LSB, etc.\n\n For example, if only T3 is ' \
-                               'connected to a high signal, the return value is: ' \
-                               '4 (0b0000100)\n\n Note: To convert the return value ' \
-                               'to a readable ' \
-                               'binary output use: `print(\"{0:#010b}\".format(qwg.' \
-                               'triggers_logic_input()))`'
             self.add_parameter(f'ch{ch}_triggers_logic_input',
                                label='Read triggers input value',
                                get_cmd=f'QUTEch:TRIGgers{ch}:LOGIcinput?',
                                get_parser=np.uint32,  # Did not convert to readable
                                                       # string because a uint32 is more
                                                       # useful when other logic is needed
-                               docstring=doc_trgs_log_inp)
+                               docstring='Reads the current input values on the all the trigger '
+                                         'inputs for a channel, after the bitSelect.\nReturn:'
+                                         '\n\tuint32 where rigger 1 (T1) ' 
+                                         'is on the Least significant bit (LSB), T2 on the second  '
+                                         'bit after LSB, etc.\n\n For example, if only T3 is '
+                                         'connected to a high signal, the return value is: '
+                                         '4 (0b0000100)\n\n Note: To convert the return value '
+                                         'to a readable '
+                                         'binary output use: `print(\"{0:#010b}\".format(qwg.'
+                                         'triggers_logic_input()))`')
 
         # Single parameters
         self.add_parameter('status_frontIO_temperature',
@@ -433,14 +492,14 @@ class QuTech_AWG_Module(SCPI):
 
         self.add_parameter('status_fpga_temperature',
                            unit='C',
-                           label=('FPGA temperature'),
+                           label='FPGA temperature',
                            get_cmd='STATus:FPGA:TEMperature?',
                            get_parser=int,
                            docstring='Reads the temperature of the FPGA.\n'
                                      'Temperature measurement interval is 10 seconds\n'
                                      'Return:\n     float with temperature in Celsius')
 
-        # Paramater for codeword per channel
+        # Parameter for codeword per channel
         for cw in range(self.device_descriptor.numCodewords):
             for j in range(self.device_descriptor.numChannels):
                 ch = j+1
@@ -452,7 +511,7 @@ class QuTech_AWG_Module(SCPI):
                                    set_cmd=cw_cmd+' "{:s}"',
                                    vals=vals.Strings(),
                                    snapshot_exclude=True)
-                # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+                # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(cw_param)
 
         # Waveform parameters
@@ -490,21 +549,18 @@ class QuTech_AWG_Module(SCPI):
                            get_cmd=self._getCodewordProtocol,
                            set_cmd=self._setCodewordProtocol,
                            vals=vals.Enum('MICROWAVE', 'FLUX'),
-                           docstring='Reads the current system status. E.q. channel '
-                                     'status: on or off, overflow, underdrive.\n'
-                                     'Return:\n     JSON object with system status')
+                           docstring=_codeword_protocol_doc + '\n Effective after start command')
 
         self._add_codeword_parameters()
 
         self.add_function('deleteWaveformAll',
                           call_cmd='wlist:waveform:delete all')
 
-        doc_sSG = 'Synchronize both sideband frequency ' \
-                  'generators, i.e. restart them with their defined phases.\n' \
-                  'Effective immediately when send'
         self.add_function('syncSidebandGenerators',
                           call_cmd='QUTEch:OUTPut:SYNCsideband',
-                          docstring=doc_sSG)
+                          docstring='Synchronize both sideband frequency '
+                                    'generators, i.e. restart them with their defined phases.\n'
+                                    'Effective immediately when send')
 
     def stop(self):
         """
@@ -533,7 +589,7 @@ class QuTech_AWG_Module(SCPI):
                         self._get_cw_waveform, ch, cw),
                     snapshot_exclude=True,
                     docstring=docst)
-                # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+                # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(parname)
 
     def _set_cw_waveform(self, ch: int, cw: int, waveform):
@@ -595,8 +651,8 @@ class QuTech_AWG_Module(SCPI):
             allowed_protocols = ", ".join(f'{protocol_name}' for protocols_name in self.codeword_protocols)
             raise ValueError(f"Invalid protocol: actual: {protocol_name}, expected: {allowed_protocols}")
 
-        for ch, bitSelect in enumerate(protocol):
-            self.set(f"ch{ch+1}_bit_select", bitSelect)
+        for ch, bitMap in enumerate(protocol):
+            self.set(f"ch{ch+1}_bit_map", bitMap)
 
     def _getCodewordProtocol(self):
         channels_bit_sels = []
@@ -981,12 +1037,12 @@ class QuTech_AWG_Module(SCPI):
         if params_to_skip_update is None:
             params_to_skip_update = self._params_to_skip_update
 
-        # TODO: Enable when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        # FIXME: Enable when QCodes PR #1653 is merged, see PycQED_py3 issue #566
         # snap = super().snapshot_base(update=update,
         #                              params_to_skip_update=params_to_skip_update)
         # return snap
 
-        # TODO: Workaround, remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        # FIXME: Workaround, remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
         if params_to_exclude is None:
             params_to_exclude = self._params_exclude_snapshot
         #
@@ -1028,7 +1084,7 @@ class QuTech_AWG_Module(SCPI):
         snap['timeout'] = self._timeout
         snap['persistent'] = self._persistent
         return snap
-        # TODO: End remove
+        # FIXME: End remove
 
     ##########################################################################
     # Generic (i.e. at least AWG520 and AWG5014) Tektronix AWG functions
@@ -1078,14 +1134,19 @@ class QWGMultiDevices:
         Calibrate multiple QWG using a CCLight
         First QWG will be used als base DIO calibration for all other QWGs.
         On failure of calibration an exception is raised.
+        Will stop all QWGs before calibration
 
         Note: Will use the QWG_DIO_Calibration.qisa file as calibration program by the CCLight. This qisa file should
-        be in the same folder as this (driver) file.
+        be in the same folder as the QWG driver file.
         :param ccl: CCLight device, connection has to be active
         :param qwgs: List of QWG which will be calibrated, all QWGs are expected to have an active connection
         :param verbose: Print the DIO calibration rapport of all QWGs
         :return: None
         """
+        # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
+        for qwg in qwgs:
+            qwg.stop()
+
         if not ccl:
             raise ValueError("Cannot calibrate QWGs; No CCL provided")
 
@@ -1100,15 +1161,20 @@ class QWGMultiDevices:
         if not qwgs:
             raise ValueError("Can not calibrate QWGs; No QWGs provided")
 
+        def try_errors(qwg):
+            try:
+                qwg.getErrors()
+            except Exception as e:
+                raise type(e)(f'{qwg.name}: {e}')
+
         main_qwg = qwgs[0]
         main_qwg.dio_calibrate()
-        main_qwg.getErrors()
+        try_errors(main_qwg)
         active_index = main_qwg.dio_active_index()
 
         for qwg in qwgs[1:]:
             qwg.dio_calibrate(active_index)
-            qwg.getErrors()
-
+            try_errors(qwg)
         if verbose:
             for qwg in qwgs:
                 print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
@@ -1159,9 +1225,7 @@ class Mock_QWG(QuTech_AWG_Module):
         else:
             self.codeword_protocols = cw_protocol_dio
 
-        # FIXME: not in [V]
-
-        # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
         self._params_exclude_snapshot = []
 
         self._params_to_skip_update = []
