@@ -543,7 +543,7 @@ setUserReg(4, err_cnt);"""
         self.awg(filename)
 
     def awg_update_waveform(self, index, data) -> None:
-        raise zibase.ziMissingError('Method not implemented! Please use the corresponding waveform parameters \'wave_chN_cwM\' to update waveforms!')
+        raise NotImplementedError('Method not implemented! Please use the corresponding waveform parameters \'wave_chN_cwM\' to update waveforms!')
 
     ##########################################################################
     # 'public' functions: acquisition support
