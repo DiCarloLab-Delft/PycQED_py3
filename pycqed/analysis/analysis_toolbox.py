@@ -415,7 +415,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
             try:
                 tmp_var = ma.data_file['Instrument settings'][
                     'MC'].attrs['detector_function_name']
-            except:
+            except Exception:
                 tmp_var = None
             if tmp_var == 'TimeDomainDetector':
                 temp2 = ma.data_file['Instrument settings']['TD_Meas']
