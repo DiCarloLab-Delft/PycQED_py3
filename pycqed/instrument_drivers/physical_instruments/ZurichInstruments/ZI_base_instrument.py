@@ -202,10 +202,10 @@ class MockDAQServer():
         self.interface = None
         self.nodes = {'/zi/devices/connected': {'type': 'String', 'value': ''}}
         self.devtype = None
+        self.poll_data = None
 
-    @classmethod
-    def awgModule(cls):
-        return cls.MockAwgModule()
+    def awgModule(self):
+        return MockAwgModule(self)
 
     def setDebugLevel(self, debuglevel: int):
         print('Setting debug level to {}'.format(debuglevel))
@@ -240,11 +240,17 @@ class MockDAQServer():
 
         if self.devtype == 'UHFQA':
             self.nodes['/' + self.device + '/features/options'] = {'type': 'String', 'value':'QA\nAWG'}
+            self.nodes['/' + self.device + '/awgs/0/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
         elif self.devtype == 'HDAWG8':
-            self.nodes['/' + self.device + '/features/options'] = {'type': 'String', 'value':'PC\nME'}
-            self.nodes['/' + self.device + '/raw/error/json/errors'] = {'type': 'String', 'value': '{"sequence_nr":0,"new_errors":0,"first_timestamp":0,"timestamp":0,"timestamp_utc":"2019-08-07 17:33:55","messages":[]}'}
-            self.nodes['/' + self.device + '/raw/error/blinkseverity'] = {'type': 'Integer', 'value': 0}
-            self.nodes['/' + self.device + '/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
+            self.nodes['/' + self.device + '/features/options']        = {'type': 'String'      , 'value': 'PC\nME'}
+            self.nodes['/' + self.device + '/raw/error/json/errors']   = {'type': 'String'      , 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
+            self.nodes['/' + self.device + '/raw/error/blinkseverity'] = {'type': 'Integer'     , 'value': 0}
+            self.nodes['/' + self.device + '/raw/error/blinkforever']  = {'type': 'Integer'     , 'value': 0}
+            self.nodes['/' + self.device + '/raw/dios/0/extclk']       = {'type': 'Integer'     , 'value': 0}
+            self.nodes['/' + self.device + '/awgs/0/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+            self.nodes['/' + self.device + '/awgs/1/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+            self.nodes['/' + self.device + '/awgs/2/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+            self.nodes['/' + self.device + '/awgs/3/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
 
     def listNodesJSON(self, path):
         pass
@@ -263,7 +269,6 @@ class MockDAQServer():
             raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
 
         return int(self.nodes[path]['value'])
-        
 
     def getDouble(self, path):
         if path not in self.nodes:
@@ -283,11 +288,31 @@ class MockDAQServer():
 
         self.nodes[path]['value'] = value
 
+    def setVector(self, path, value):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+
+        if self.nodes[path]['type'] != 'ZIVectorData':
+            raise ziRuntimeError("Unable to set node '" + path + "' using setVector!")
+
+        self.nodes[path]['value'] = value
+
     def get(self, path, flat, flags):
         if path not in self.nodes:
             raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
 
         return {path: [{'vector': self.nodes[path]['value']}]}
+
+    def getAsEvent(self, path):
+        if path.endswith('/ready'):
+            self.poll_data = {path: {'value': [1]}}
+        else:
+            self.poll_data = {path: {'value': [0]}}
+
+    def poll(self, poll_time, timeout, flags, flat):
+        tmp = self.poll_data
+        self.poll_data = None
+        return tmp
 
     def _load_parameter_file(self, filename: str):
         """
@@ -310,29 +335,61 @@ class MockDAQServer():
             elif par['Type'].startswith('String'):
                 self.nodes[parpath.lower()] = {'type': par['Type'], 'value': ''}
 
-    class MockAwgModule():
-        """
-        This class implements a mock version of the awgModule object used for
-        compiling and uploading AWG programs.
-        """
-        def __init__(self):
-            if not os.path.isdir('awg/waves'):
-                os.makedirs('awg/waves')
+class MockAwgModule():
+    """
+    This class implements a mock version of the awgModule object used for
+    compiling and uploading AWG programs.
+    """
+    def __init__(self, daq):
+        self._daq = daq
+        self._device = None
+        self._index = None
+        self._sourcestring = None
+        self._compilation_count = {}
+        if not os.path.isdir('awg/waves'):
+            os.makedirs('awg/waves')
 
-        def set(self, path, value):
-            pass
+    def get_compilation_count(self, index):
+        if index not in self._compilation_count:
+            raise ziModuleError('Trying to access compilation count of invalid index ' + str(index) + '!')
 
-        def get(self, path):
-            value = ['']
-            for elem in reversed(path.split('/')[1:]):
-                rv = {}
-                rv[elem] = value
-                value = rv
+        return self._compilation_count[index]
+
+    def set(self, path, value):
+        if path == 'awgModule/device':
+            self._device = value
+        elif path == 'awgModule/index':
+            self._index = value
+            if self._index not in self._compilation_count:
+                self._compilation_count[self._index] = 0
+        elif path == 'awgModule/compiler/sourcestring':
+            if self._index not in self._compilation_count:
+                raise ziModuleError('Trying to compile AWG program, but no AWG index has been configured!')
+
+            if self._device is None:
+                raise ziModuleError('Trying to compile AWG program, but no AWG device has been configured!')
+
+            self._compilation_count[self._index] += 1
+            self._daq.setInt('/' + self._device + '/' + 'awgs/' + str(self._index) + '/ready', 1)
             
-            return rv
+    def get(self, path):
+        if path == 'awgModule/device':
+            value = [self._device]
+        elif path == 'awgModule/index':
+            value [self._index]
+        elif path == 'awgModule/compiler/statusstring':
+            value = ['File successfully uploaded']
+        else:
+            value = ['']
 
-        def execute(self):
-            pass
+        for elem in reversed(path.split('/')[1:]):
+            rv = {elem: value}
+            value = rv
+        
+        return rv
+
+    def execute(self):
+        pass
 
 ##########################################################################
 # Class
@@ -347,14 +404,14 @@ class ZI_base_instrument(Instrument):
     # Constructor
     ##########################################################################
 
-    def __init__(self, 
-                 name: str,
-                 device: str,
-                 interface: str = '1GbE',
-                 server: str = 'localhost', 
-                 port: int = 8004,
-                 apilevel: int = 5,
-                 num_codewords: int = 0,
+    def __init__(self          , 
+                 name          : str, 
+                 device        : str, 
+                 interface     : str= '1GbE', 
+                 server        : str= 'localhost', 
+                 port          : int= 8004, 
+                 apilevel      : int= 5, 
+                 num_codewords : int= 0, 
                  **kw) -> None:
         """
         Input arguments:
@@ -1062,13 +1119,15 @@ class ZI_base_instrument(Instrument):
             while len(self._awgModule.get('awgModule/compiler/sourcestring')
                       ['compiler']['sourcestring'][0]) > 0:
                 time.sleep(0.01)
-                comp_msg = (self._awgModule.get(
-                    'awgModule/compiler/statusstring')['compiler']
-                    ['statusstring'][0])
+                
                 if (time.time()-t0 >= timeout):
                     success = False
                     # print('Timeout encountered during compilation.')
                     raise TimeoutError('Timeout while waiting for compilation to finish!')
+
+            comp_msg = (self._awgModule.get(
+                    'awgModule/compiler/statusstring')['compiler']
+                    ['statusstring'][0])
 
             if not comp_msg.endswith(succes_msg):
                 success = False
