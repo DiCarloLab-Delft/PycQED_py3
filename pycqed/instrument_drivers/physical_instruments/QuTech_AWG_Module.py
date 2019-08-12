@@ -1082,7 +1082,8 @@ class QWGMultiDevices:
     def dio_calibration(ccl: QuTech_CCL, qwgs: List[QuTech_AWG_Module], verbose: bool = False):
         """
         Calibrate multiple QWG using a CCLight
-        First QWG will be used als base DIO calibration for all other QWGs.
+        First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
+        master.
         On failure of calibration an exception is raised.
         Will stop all QWGs before calibration
 
@@ -1118,6 +1119,9 @@ class QWGMultiDevices:
                 raise type(e)(f'{qwg.name}: {e}')
 
         main_qwg = qwgs[0]
+        if main_qwg.dio_mode() is not 'MASTER':
+            raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefor it is not save the use it "
+                             f"as base QWG for calibration of multiple QWGs.")
         main_qwg.dio_calibrate()
         try_errors(main_qwg)
         active_index = main_qwg.dio_active_index()
