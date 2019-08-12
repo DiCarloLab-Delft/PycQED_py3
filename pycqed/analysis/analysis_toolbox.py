@@ -238,6 +238,7 @@ def data_from_time(timestamp, folder=None):
     if (folder is None):
         folder = datadir
 
+    daydirs = os.listdir(folder)
     if len(daydirs) == 0:
         raise Exception('No data in the data directory specified')
 
@@ -852,7 +853,8 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
     # Ensures the order of the timestamps is ascending
     all_timestamps.sort()
     if len(all_timestamps) == 0:
-        raise ValueError('No matching timestamps found')
+        raise ValueError('No matching timestamps found for label "{}"'.format(
+            label))
     return all_timestamps
 
 
