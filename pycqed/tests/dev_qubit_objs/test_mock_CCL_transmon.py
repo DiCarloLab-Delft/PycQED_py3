@@ -8,7 +8,6 @@ import openql
 import warnings
 import pycqed.analysis.analysis_toolbox as a_tools
 
-import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
@@ -16,7 +15,8 @@ import pycqed.instrument_drivers.meta_instrument.qubit_objects.mock_CCL_Transmon
 from pycqed.measurement import measurement_control
 from qcodes import station
 
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQC import dummy_UHFQC
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
 from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
@@ -54,7 +54,7 @@ class Test_Mock_CCL(unittest.TestCase):
         self.MW2 = vmw.VirtualMWsource('MW2')
         self.MW3 = vmw.VirtualMWsource('MW3')
         self.SH = sh.virtual_SignalHound_USB_SA124B('SH')
-        self.UHFQC = dummy_UHFQC('UHFQC')
+        self.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator', num_codewords=32, device='dev2109', interface='1GbE')
 
         self.CCL = dummy_CCL('CCL')
         # self.VSM = Dummy_Duplexer('VSM')
@@ -70,7 +70,7 @@ class Test_Mock_CCL(unittest.TestCase):
         self.MC.datadir(test_datadir)
         a_tools.datadir = self.MC.datadir()
 
-        self.AWG = v8.VirtualAWG8('DummyAWG8')
+        self.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
         self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
         self.AWG8_VSM_MW_LutMan.AWG(self.AWG.name)
         self.AWG8_VSM_MW_LutMan.channel_GI(1)
