@@ -189,27 +189,33 @@ class Test_Mock_CCL(unittest.TestCase):
     # Test find qubit sweetspot
     ###########################################################
     def test_find_qubit_sweetspot(self):
+        assert self.CCL_qubit.mock_fl_dc_ch() == 'FBL_Q1'
+        self.CCL_qubit.fl_dc_ch(self.CCL_qubit.mock_fl_dc_ch())
+
         self.CCL_qubit.mock_sweetspot_phi_over_phi0(0.01343)
-        current = 0.01343*self.CCL_qubit.mock_fl_dc_V_per_phi0()[
-                        self.CCL_qubit.mock_cfg_dc_flux_ch()]
-        self.CCL_qubit.fl_dc_V0(current)
+        current = 0.01343*self.CCL_qubit.mock_fl_dc_I_per_phi0()[
+                        self.CCL_qubit.mock_fl_dc_ch()]
+        self.CCL_qubit.fl_dc_I0(current)
 
         fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
-        fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+        fluxcurrent[self.CCL_qubit.mock_fl_dc_ch()](current)
+
+        assert self.CCL_qubit.mock_fl_dc_ch() == 'FBL_Q1'
 
         f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
         self.CCL_qubit.freq_qubit(f_qubit)
-        self.CCL_qubit.cfg_dc_flux_ch(self.CCL_qubit.mock_cfg_dc_flux_ch())
+
         self.CCL_qubit.freq_res(self.CCL_qubit.calculate_mock_resonator_frequency())
 
+        assert self.CCL_qubit.mock_fl_dc_ch() == 'FBL_Q1'
+        assert self.CCL_qubit.fl_dc_ch() == 'FBL_Q1'
         freq_res = self.CCL_qubit.calculate_mock_resonator_frequency()
         self.CCL_qubit.ro_freq(freq_res)
-        
-        
 
+        assert self.CCL_qubit.mock_fl_dc_ch() == 'FBL_Q1'
         self.CCL_qubit.find_qubit_sweetspot()
 
-        assert self.CCL_qubit.fl_dc_V0() == pytest.approx(
+        assert self.CCL_qubit.fl_dc_I0() == pytest.approx(
                                     current,
                                     abs=30e-6)
 
@@ -288,7 +294,7 @@ class Test_Mock_CCL(unittest.TestCase):
         fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
         current = self.CCL_qubit.mock_sweetspot_phi_over_phi0()
 
-        fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+        fluxcurrent[self.CCL_qubit.mock_fl_dc_ch()](current)
 
         f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
         self.CCL_qubit.freq_qubit(f_qubit)

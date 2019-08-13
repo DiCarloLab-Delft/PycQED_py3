@@ -32,7 +32,7 @@ import cma
 from pycqed.measurement.optimization import nelder_mead
 import datetime
 
-# Imported for a type check 
+# Imported for a type check
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 
@@ -460,9 +460,9 @@ class CCLight_Transmon(Qubit):
                            initial_value=0, unit='deg',
                            parameter_class=ManualParameter)
 
-    def _using_QWG(self): 
+    def _using_QWG(self):
         """
-        Checks if a QWG is used for microwave control. 
+        Checks if a QWG is used for microwave control.
         """
         AWG = self.instr_LutMan_MW.get_instr().AWG.get_instr()
         return isinstance(AWG, QuTech_AWG_Module)
@@ -570,7 +570,7 @@ class CCLight_Transmon(Qubit):
 
     def add_flux_parameters(self):
         # fl_dc_ is the prefix for DC flux bias related params
-        # FIXME: 
+        # FIXME:
         self.add_parameter(
             'fl_dc_polycoeff',
             docstring='Polynomial coefficients for current to frequency conversion',
@@ -607,7 +607,7 @@ class CCLight_Transmon(Qubit):
             docstring=('Used to determine the DAC channel used for DC '
                        'flux biasing. Should be an int when using an IVVI rack'
                        'or a str (channel name) when using an SPI rack.'),
-            vals=vals.Strings(), initial_value='',
+            vals=vals.Strings(), initial_value=None,
             parameter_class=ManualParameter)
 
         # Currently this has only the parameters for 1 CZ gate.
@@ -1445,7 +1445,7 @@ class CCLight_Transmon(Qubit):
                                                               self.msmt_suffix)
             timestamp = timestamp[0]
             a = ma2.da.DAC_analysis(timestamp=timestamp)
-            self.flux_polycoeff(a.dac_fit_res['fit_polycoeffs'])
+            self.fl_dc_polycoeff(a.dac_fit_res['fit_polycoeffs'])
             sweetspot_current = a.dac_fit_res['sweetspot_dac']
 
         elif method == 'tracked':
@@ -1467,7 +1467,7 @@ class CCLight_Transmon(Qubit):
 
             pc = a.fit_res['fit_polycoeffs']
 
-            self.flux_polycoeff(pc)
+            self.fl_dc_polycoeff(pc)
             sweetspot_current = -pc[1]/(2*pc[0])
 
         else:
@@ -1492,7 +1492,7 @@ class CCLight_Transmon(Qubit):
                                     'Peak is not a qubit')
                     return False
 
-        if self.flux_polycoeff()[1] < 1e6 and self.flux_polycoeff()[2] < 1e6:
+        if self.fl_dc_polycoeff()[1] < 1e6 and self.fl_dc_polycoeff()[2] < 1e6:
             logging.warning('No qubit shift found with varying flux. Peak is '
                             'not a qubit')
             return False
@@ -1819,7 +1819,7 @@ class CCLight_Transmon(Qubit):
             if self._using_QWG():
                 prepare_function = mw_lutman.apply_mixer_predistortion_corrections
                 prepare_function_kwargs = {'wave_dict':{}}
-            else: 
+            else:
                 def load_square():
                     AWG = mw_lutman.AWG.get_instr()
                     AWG.stop()
@@ -1836,7 +1836,7 @@ class CCLight_Transmon(Qubit):
                 self.instr_SH.get_instr(), spurious_sideband_freq,
                 prepare_for_each_point=True,
                 Navg=5,
-                prepare_function=prepare_function, 
+                prepare_function=prepare_function,
                 prepare_function_kwargs=prepare_function_kwargs)
                 #mw_lutman.load_waveform_realtime,
                 # prepare_function_kwargs={'waveform_key': 'square', 'wf_nr': 10})
@@ -1958,27 +1958,27 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_mw_pulses_basic(self, amps=np.linspace(0,1.6,31),
                            freq_steps=[1, 3, 10, 30, 100, 300, 1000],
-                           n_iter_flipping=2, soft_avg_allxy=3, 
+                           n_iter_flipping=2, soft_avg_allxy=3,
                            cal_skewness=False, cal_offsets=True):
         """
-        Performs a standard calibration of microwave pulses consisting of 
+        Performs a standard calibration of microwave pulses consisting of
 
         - mixer offsets
-        - mixer skewness 
-        - pulse ampl coarse (rabi) 
+        - mixer skewness
+        - pulse ampl coarse (rabi)
         - frequency (ramsey)
-        - motzoi 
-        - ampl fine (flipping) 
+        - motzoi
+        - ampl fine (flipping)
         - AllXY (to verify)
 
         Note that this is a basic calibration and does not involve fine tuning
-        to ~99.9% and only works if the qubit is well behaved. 
+        to ~99.9% and only works if the qubit is well behaved.
         """
         if cal_offsets:
             self.calibrate_mixer_offsets_drive()
         if cal_skewness:
             self.calibrate_mixer_skewness_drive()
-        
+
         self.calibrate_mw_pulse_amplitude_coarse(amps=amps)
         self.find_frequency('ramsey', steps=freq_steps)
         self.calibrate_motzoi()
@@ -2870,7 +2870,7 @@ class CCLight_Transmon(Qubit):
         spec_source.off()
         spec_source_2.off()
 
-    def measure_ssro(self, MC=None, 
+    def measure_ssro(self, MC=None,
                      nr_shots_per_case: int=2**13, #8192
                      cases=('off', 'on'),
                      prepare: bool=True, no_figs: bool=False,
@@ -2972,7 +2972,7 @@ class CCLight_Transmon(Qubit):
                  'fixed_p01':self.mmt_rel})
 
         a = ma2.Singleshot_Readout_Analysis(
-            options_dict=options_dict, 
+            options_dict=options_dict,
             extract_only=no_figs)
 
         ######################################################################
@@ -2995,7 +2995,7 @@ class CCLight_Transmon(Qubit):
             # self.ro_acq_rotated_SSB_rotation_angle(a.theta)
 
         return {'SNR': a.qoi['SNR'],
-                'F_d': a.qoi['F_d'], 
+                'F_d': a.qoi['F_d'],
                 'F_a': a.qoi['F_a'],
                 'relaxation': a.proc_data_dict['measurement_induced_relaxation'],
                 'excitation': a.proc_data_dict['residual_excitation']}
@@ -3366,9 +3366,9 @@ class CCLight_Transmon(Qubit):
                                   measure_transients_CCL_switched: bool=False,
                                   prepare: bool=True,
                                   disable_metadata: bool=False,
-                                  nr_shots_per_case: int =2**13, 
-                                  post_select: bool = False, 
-                                  post_select_threshold: float = None, 
+                                  nr_shots_per_case: int =2**13,
+                                  post_select: bool = False,
+                                  post_select_threshold: float = None,
                                   )->bool:
         """
         Measures readout transients for the qubit in ground and excited state to indicate
@@ -3376,12 +3376,12 @@ class CCLight_Transmon(Qubit):
         that are used to  weigh measuremet traces to maximize the SNR.
 
         Args:
-            optimal_IQ (bool): 
-                if set to True sets both the I and Q weights of the optimal 
-                weight functions for the verification experiment. 
-                A good sanity check is that when using optimal IQ one expects 
-                to see no signal in the  Q quadrature of the verification 
-                SSRO experiment. 
+            optimal_IQ (bool):
+                if set to True sets both the I and Q weights of the optimal
+                weight functions for the verification experiment.
+                A good sanity check is that when using optimal IQ one expects
+                to see no signal in the  Q quadrature of the verification
+                SSRO experiment.
             verify (bool):
                 indicates whether to run measure_ssro at the end of the routine
                 to find the new SNR and readout fidelities with optimized weights
@@ -3438,12 +3438,12 @@ class CCLight_Transmon(Qubit):
                 self._prep_ro_instantiate_detectors()
                 ssro_dict = self.measure_ssro(
                     no_figs=no_figs, update=update,
-                    prepare=False, disable_metadata=disable_metadata, 
-                    nr_shots_per_case=nr_shots_per_case, 
-                    post_select=post_select, 
+                    prepare=False, disable_metadata=disable_metadata,
+                    nr_shots_per_case=nr_shots_per_case,
+                    post_select=post_select,
                     post_select_threshold=post_select_threshold)
                 return ssro_dict
-        if verify: 
+        if verify:
             warnings.warn('Not verifying as settings were not updated.')
         return True
 
@@ -4801,7 +4801,7 @@ class CCLight_Transmon(Qubit):
             dac_par = fluxcontrol.parameters[(fluxChan)]
 
         if polycoeffs is None:
-            polycoeffs = self.flux_polycoeff()
+            polycoeffs = self.fl_dc_polycoeff()
 
         d = cdf.Tracked_Qubit_Spectroscopy(qubit=self,
                                            nested_MC=nested_MC,
@@ -4878,10 +4878,10 @@ class CCLight_Transmon(Qubit):
         return check_result
 
 
-    def create_ssro_detector(self,  
-                             calibrate_optimal_weights:bool=False, 
-                             prepare_function=None, 
-                             prepare_function_kwargs: dict=None, 
+    def create_ssro_detector(self,
+                             calibrate_optimal_weights:bool=False,
+                             prepare_function=None,
+                             prepare_function_kwargs: dict=None,
                              ssro_kwargs: dict=None):
         """
         Wraps measure_ssro using the Function Detector.
@@ -4889,30 +4889,30 @@ class CCLight_Transmon(Qubit):
         Args:
             calibrate_optimal_weights
         """
-        if ssro_kwargs is None: 
+        if ssro_kwargs is None:
             ssro_kwargs = {
                         'nr_shots_per_case': 8192,
-                        'analyze': True, 
+                        'analyze': True,
                         'prepare': False,
                         'disable_metadata': True
                     }
 
 
-        if not calibrate_optimal_weights: 
+        if not calibrate_optimal_weights:
             d = det.Function_Detector(
                     self.measure_ssro,
                     msmt_kw=ssro_kwargs,
-                    result_keys=['SNR', 'F_d', 'F_a'], 
+                    result_keys=['SNR', 'F_d', 'F_a'],
                     prepare_function=prepare_function,
                     prepare_function_kwargs=prepare_function_kwargs,
                     always_prepare=True)
         else:
             d = det.Function_Detector(
-                self.calibrate_optimal_weights, 
+                self.calibrate_optimal_weights,
                 msmt_kw=ssro_kwargs,
-                    result_keys=['SNR', 'F_d', 'F_a'], 
+                    result_keys=['SNR', 'F_d', 'F_a'],
                     prepare_function=prepare_function,
-                    prepare_function_kwargs=prepare_function_kwargs, 
+                    prepare_function_kwargs=prepare_function_kwargs,
                     always_prepare=True)
         return d
 
@@ -5348,7 +5348,7 @@ class CCLight_Transmon(Qubit):
             curr (float):
                 current in A
         """
-        polycoeffs = self.flux_polycoeff()
+        polycoeffs = self.fl_dc_polycoeff()
 
         return np.polyval(polycoeffs, curr)
 
@@ -5366,5 +5366,5 @@ class CCLight_Transmon(Qubit):
         """
 
         return ct.freq_to_amp_root_parabola(freq=freq,
-                                         poly_coeffs=self.flux_polycoeff(),
+                                         poly_coeffs=self.fl_dc_polycoeff(),
                                          **kw)
