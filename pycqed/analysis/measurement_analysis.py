@@ -6795,7 +6795,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def fit_data(self, analyze_ef=False, **kw):
 
-        frequency_guess = kw.get('frequency_guess', None)
+        frequency_guess = kw.get('frequency_guess', 'max')
         percentile = kw.get('percentile', 20)
         num_sigma_threshold = kw.get('num_sigma_threshold', 5)
         window_len_filter = kw.get('window_len_filter', 3)
@@ -6832,7 +6832,10 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
         # extract highest peak -> ge transition
         if frequency_guess is not None:
-            f0 = frequency_guess
+            if isinstance(frequency_guess,float):
+                f0 = frequency_guess
+            elif frequency_guess=='max':
+                f0 = self.sweep_points[np.argmax(data_dist_smooth)]
             kappa_guess = (max(self.sweep_points)-min(self.sweep_points))/20
             key = 'peak'
         elif self.peaks['dip'] is None:
