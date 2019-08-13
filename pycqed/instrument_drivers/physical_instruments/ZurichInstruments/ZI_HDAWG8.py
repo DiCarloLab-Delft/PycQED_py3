@@ -91,7 +91,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         for i in range(8): 
             self._snapshot_whitelist.update({
                 'sigouts_{}_direct'.format(i), 'sigouts_{}_offset'.format(i),
-                'sigouts_{}_on'.format(i) , 'sigouts_*_range'})
+                'sigouts_{}_on'.format(i) , 'sigouts_{}_range'.format(i)})
 
 
         self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
