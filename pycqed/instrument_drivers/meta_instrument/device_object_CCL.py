@@ -386,7 +386,7 @@ class DeviceCCL(Instrument):
                     threshold = qb.ro_acq_threshold()
                 acq_ch = qb.ro_acq_weight_chI()
                 qb.instr_acquisition.get_instr().set(
-                    'quex_thres_{}_level'.format(acq_ch), threshold)
+                    'qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
     def get_correlation_detector(self, qubits: list, single_int_avg: bool =False,
                                  seg_per_point: int=1):
@@ -2601,11 +2601,11 @@ class DeviceCCL(Instrument):
 
         if calibrate_optimal_weights:
             # Important that this happens before calibrating the weights
-            # 5 is the number of channels in the UHFQC
-            for i in range(5):
-                UHFQC.set('quex_trans_offset_weightfunction_{}'.format(i), 0)
+            # 10 is the number of channels in the UHFQC
+            for i in range(10):
+                UHFQC.set('qas_0_trans_offset_weightfunction_{}'.format(i), 0)
 
-            UHFQC.upload_transformation_matrix(np.eye(5))
+            UHFQC.upload_transformation_matrix(np.eye(10))
             q0.calibrate_optimal_weights(
                 analyze=True, verify=verify_optimal_weights)
             q1.calibrate_optimal_weights(
@@ -2621,8 +2621,8 @@ class DeviceCCL(Instrument):
 
             # weights 0 and 1 are the correct indices because I set the numbering
             # at the start of this calibration script.
-            UHFQC.quex_trans_offset_weightfunction_0(V_offset_cor[0])
-            UHFQC.quex_trans_offset_weightfunction_1(V_offset_cor[1])
+            UHFQC.qas_trans_offset_weightfunction_0(V_offset_cor[0])
+            UHFQC.qas_trans_offset_weightfunction_1(V_offset_cor[1])
 
             # Does not work because axes are not normalized
             matrix_normalized = res_dict['mu_matrix_inv']

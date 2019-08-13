@@ -7,7 +7,6 @@ import time
 from pytest import approx
 import pycqed.analysis.analysis_toolbox as a_tools
 
-import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
@@ -16,7 +15,8 @@ import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as c
 from pycqed.measurement import measurement_control
 from qcodes import station
 
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQC import dummy_UHFQC
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
 
@@ -53,7 +53,7 @@ class Test_Device_obj(unittest.TestCase):
         self.MW2 = vmw.VirtualMWsource('MW2')
         self.MW3 = vmw.VirtualMWsource('MW3')
         self.SH = sh.virtual_SignalHound_USB_SA124B('SH')
-        self.UHFQC = dummy_UHFQC('UHFQC')
+        self.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator', num_codewords=32, device='dev2109', interface='1GbE')
 
         self.CCL = dummy_CCL('CCL')
         self.QCC = dummy_QCC('QCC')
@@ -69,10 +69,10 @@ class Test_Device_obj(unittest.TestCase):
         self.MC.datadir(test_datadir)
         a_tools.datadir = self.MC.datadir()
 
-        self.AWG_mw_0 = v8.VirtualAWG8('AWG_mw_0')
+        self.AWG_mw_0 = HDAWG.ZI_HDAWG8(name='AWG_mw_0', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
 
-        self.AWG_mw_1 = v8.VirtualAWG8('AWG_mw_1')
-        self.AWG_flux_0 = v8.VirtualAWG8('AWG_flux_0')
+        self.AWG_mw_1 = HDAWG.ZI_HDAWG8(name='AWG_mw_1', server='emulator', num_codewords=32, device='dev8027', interface='1GbE')
+        self.AWG_flux_0 = HDAWG.ZI_HDAWG8(name='AWG_flux_0', server='emulator', num_codewords=32, device='dev8028', interface='1GbE')
 
         self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
         self.AWG8_VSM_MW_LutMan.AWG(self.AWG_mw_0.name)

@@ -188,8 +188,8 @@ class TwoQubitDevice(DeviceObject):
         self.prepare_for_timedomain()
 
         # Important that this happens before calibrating the weights
-        UHFQC.quex_trans_offset_weightfunction_0(0)
-        UHFQC.quex_trans_offset_weightfunction_1(0)
+        UHFQC.qas_0_trans_offset_weightfunction_0(0)
+        UHFQC.qas_0_trans_offset_weightfunction_1(0)
         UHFQC.upload_transformation_matrix([[1, 0], [0, 1]])
 
         if calibrate_optimal_weights:
@@ -208,8 +208,8 @@ class TwoQubitDevice(DeviceObject):
 
         # weights 0 and 1 are the correct indices because I set the numbering
         # at the start of this calibration script.
-        UHFQC.quex_trans_offset_weightfunction_0(V_offset_cor[0])
-        UHFQC.quex_trans_offset_weightfunction_1(V_offset_cor[1])
+        UHFQC.qas_0_trans_offset_weightfunction_0(V_offset_cor[0])
+        UHFQC.qas_0_trans_offset_weightfunction_1(V_offset_cor[1])
 
         # Does not work because axes are not normalized
         UHFQC.upload_transformation_matrix(res_dict['mu_matrix_inv'])

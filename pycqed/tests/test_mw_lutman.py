@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 import pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module as qwg
 
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
@@ -8,12 +8,18 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import \
     get_redundant_codewords, get_wf_idx_from_name
 
+def adjust_array_len(x, multiple_of_n):
+    """Adjust the length of a numpy array x to be a multiple of multiple_of_n samples by appending zeros."""
+    if len(x) % multiple_of_n != 0:
+        to_append = int(multiple_of_n*np.ceil(len(x)/float(multiple_of_n))) - len(x)
+        x = np.concatenate((x, np.zeros(to_append)))
+    return x
 
 class Test_MW_LutMan(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
-        self.AWG = v8.VirtualAWG8('DummyAWG8')
+        self.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
         # We use an HDAWG because the interface should be similar
         # to a QWG and we do not have a dummy driver
         self.QWG = qwg.Mock_QWG('mock_qwg')
@@ -84,6 +90,9 @@ class Test_MW_LutMan(unittest.TestCase):
             sampling_rate=self.AWG8_MW_LutMan.sampling_rate(), phase=0,
             motzoi=self.AWG8_MW_LutMan.mw_motzoi())[0]
 
+        # Make sure the expected waveform has a length that is a multiple of
+        # 8 samples.
+        expected_wf = adjust_array_len(expected_wf, 8)
         uploaded_wf = self.AWG.get('wave_ch1_cw001')
         np.testing.assert_array_almost_equal(expected_wf, uploaded_wf)
 
@@ -92,6 +101,8 @@ class Test_MW_LutMan(unittest.TestCase):
             amp=self.AWG8_MW_LutMan.spec_amp(),
             sampling_rate=self.AWG8_MW_LutMan.sampling_rate(),
             delay=0, phase=0)[0]
+        
+        expected_wf_spec = adjust_array_len(expected_wf_spec, 8)
         uploaded_wf = self.AWG.get('wave_ch1_cw008')
         np.testing.assert_array_almost_equal(expected_wf_spec, uploaded_wf)
 
@@ -188,7 +199,7 @@ class Test_MW_LutMan(unittest.TestCase):
         dict_contained_in(expected_dict, self.AWG8_VSM_MW_LutMan.LutMap())
 
     def test_realtime_loading_square_wf_AWG8_VSM(self):
-        self.AWG8_VSM_MW_LutMan.load_waveform_realtime('square', wf_nr=3)
+        self.AWG8_VSM_MW_LutMan.load_waveform_onto_AWG_lookuptable('square')
 
     def test_uploading_standard_pulses_AWG8_VSM(self):
         # Tests that all waveforms are present and no error is raised.
@@ -201,8 +212,9 @@ class Test_MW_LutMan(unittest.TestCase):
             motzoi=self.AWG8_VSM_MW_LutMan.mw_motzoi())
 
         for i in range(4):
+            expected_wf = adjust_array_len(expected_wfs[i], 8)
             uploaded_wf = self.AWG.get('wave_ch{}_cw001'.format(i+1))
-            np.testing.assert_array_almost_equal(expected_wfs[i], uploaded_wf)
+            np.testing.assert_array_almost_equal(expected_wf, uploaded_wf)
 
     def test_load_ef_rabi_pulses_to_AWG_lookuptable_correct_pars(self):
         self.AWG8_VSM_MW_LutMan.load_ef_rabi_pulses_to_AWG_lookuptable()
@@ -230,6 +242,7 @@ class Test_MW_LutMan(unittest.TestCase):
             sampling_rate=self.AWG8_MW_LutMan.sampling_rate(), phase=0,
             motzoi=self.AWG8_MW_LutMan.mw_motzoi())[0]
 
+        expected_wf = adjust_array_len(expected_wf, 8)
         uploaded_wf = self.AWG.get('wave_ch1_cw009')
         np.testing.assert_array_almost_equal(expected_wf, uploaded_wf)
 

@@ -821,10 +821,10 @@ class CCLight_Transmon(Qubit):
         predistortion_matrix = np.array(
             ((1, -alpha * np.sin(phi * 2 * np.pi / 360)),
              (0, alpha * np.cos(phi * 2 * np.pi / 360))))
-        UHFQC.quex_deskew_0_col_0(predistortion_matrix[0,0])
-        UHFQC.quex_deskew_0_col_1(predistortion_matrix[0,1])
-        UHFQC.quex_deskew_1_col_0(predistortion_matrix[1,0])
-        UHFQC.quex_deskew_1_col_1(predistortion_matrix[1,1])
+        UHFQC.qas_0_deskew_rows_0_cols_0(predistortion_matrix[0,0])
+        UHFQC.qas_0_deskew_rows_0_cols_1(predistortion_matrix[0,1])
+        UHFQC.qas_0_deskew_rows_1_cols_0(predistortion_matrix[1,0])
+        UHFQC.qas_0_deskew_rows_1_cols_1(predistortion_matrix[1,1])
         return predistortion_matrix
 
     def _prep_ro_instantiate_detectors(self):
@@ -856,7 +856,7 @@ class CCLight_Transmon(Qubit):
                 threshold = self.ro_acq_threshold()
 
             self.instr_acquisition.get_instr().set(
-                'quex_thres_{}_level'.format(acq_ch), threshold)
+                'qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
         else:
             ro_channels = [self.ro_acq_weight_chI(),
@@ -1080,24 +1080,20 @@ class CCLight_Transmon(Qubit):
                             [zeros, opt_WQ[:-abs(del_sampl)]])
                     else:
                         pass
-                    UHFQC.set('quex_wint_weights_{}_real'.format(
+                    UHFQC.set('qas_0_integration_weights_{}_real'.format(
                         self.ro_acq_weight_chI()), opt_WI)
-                    UHFQC.set('quex_wint_weights_{}_imag'.format(
+                    UHFQC.set('qas_0_integration_weights_{}_imag'.format(
                         self.ro_acq_weight_chI()), opt_WQ)
-                    UHFQC.set('quex_rot_{}_real'.format(
-                        self.ro_acq_weight_chI()), 1.0)
-                    UHFQC.set('quex_rot_{}_imag'.format(
-                        self.ro_acq_weight_chI()), -1.0)
+                    UHFQC.set('qas_0_rotations_{}'.format(
+                        self.ro_acq_weight_chI()), 1.0 - 1.0j)
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
-                        UHFQC.set('quex_wint_weights_{}_real'.format(
+                        UHFQC.set('qas_0_integration_weights_{}_real'.format(
                             self.ro_acq_weight_chQ()), opt_WQ)
-                        UHFQC.set('quex_wint_weights_{}_imag'.format(
+                        UHFQC.set('qas_0_integration_weights_{}_imag'.format(
                             self.ro_acq_weight_chQ()), opt_WI)
-                        UHFQC.set('quex_rot_{}_real'.format(
-                            self.ro_acq_weight_chQ()), 1.0)
-                        UHFQC.set('quex_rot_{}_imag'.format(
-                            self.ro_acq_weight_chQ()), 1.0)
+                        UHFQC.set('qas_0_rotations_{}'.format(
+                            self.ro_acq_weight_chQ()), 1.0 + 1.0j)
 
         else:
             raise NotImplementedError(

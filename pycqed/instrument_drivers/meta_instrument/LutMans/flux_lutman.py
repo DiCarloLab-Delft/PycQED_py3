@@ -1,4 +1,4 @@
-from .base_lutman import Base_LutMan
+from .base_lutman import Base_LutMan, get_wf_idx_from_name
 import numpy as np
 import logging
 from copy import copy
@@ -154,7 +154,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['park'] = self._gen_park()
         self._wave_dict['custom_wf'] = self._gen_custom_wf()
 
-        for idx, waveform in self.LutMap().items():
+        for _, waveform in self.LutMap().items():
             wave_name = waveform['name']
             if waveform['type'] == 'cz' or waveform['type'] == 'idle_z':
                 which_gate = waveform['which']
@@ -1072,11 +1072,12 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             regenerate_waveforms (bool): if True calls
                 generate_standard_waveforms before uploading.
             stop_start           (bool): if True stops and starts the AWG.
-
-
-        Because of realtime loading vs the DIO sequencer program the uploading
-        flow for the AWG8 is slightly different.
+            force_load_sequencer_program (bool): if True forces a new compilation
+                and upload of the program on the sequencer.
         """
+
+        if stop_start:
+            self.AWG.get_instr().stop()
 
         # Generate the waveforms and link them to the AWG8 parameters
         lutmans = [self]
@@ -1087,18 +1088,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         else:
             lutmans += [self.instr_partner_lutman.get_instr()]
 
-        if self.cfg_operating_mode() != 'Codeword_normal':
-            # Regenerating only one waveform in this case, see below
-            regenerate_waveforms_realtime = regenerate_waveforms
-            regenerate_waveforms = False
-
-        for lm in lutmans:
-            if regenerate_waveforms:
-                lm.generate_standard_waveforms()
-                for idx, waveform in lm.LutMap().items():
-                    waveform_name = waveform['name']
-                    lm.load_waveform_onto_AWG_lookuptable(waveform_name)
-
         # Uploading the codeword program if required
         if self._program_hash_differs() or force_load_sequencer_program:
             # FIXME: List of conditions in which reloading is required
@@ -1107,121 +1096,23 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             # N.B. these other conditions need to be included here.
             # This ensures only the channels that are relevant get reconfigured
             awg_nr = (self.cfg_awg_channel()-1)//2
-            self._upload_codeword_program(awg_nr)
-
-        if self.cfg_operating_mode() == 'Codeword_normal':
-            for idx, waveform in lm.LutMap().items():
-                if idx == 0: 
-                    # idx 0 is hardcoded to not play a wave. 
-                    # it still exists in the LutMap for redundant combinations. 
-                    continue 
-                self.load_waveform_realtime(
-                    waveform_name=waveform['name'],
-                    wf_nr=None, regenerate_waveforms=False)
-        else:
-            # Only load one waveform and do it in realtime.
-            cw_idx = int(self.cfg_operating_mode()[-2:])
-            waveform_name = self._get_wf_name_from_cw(cw_idx)
-            self.load_waveform_realtime(
-                waveform_name=waveform_name,
-                wf_nr=None, regenerate_waveforms=regenerate_waveforms_realtime)
+            self.AWG.get_instr().upload_codeword_program(awgs=[awg_nr])
+            
+        for lm in lutmans:
+            if regenerate_waveforms:
+                lm.generate_standard_waveforms()
+                for _, waveform in lm.LutMap().items():
+                    waveform_name = waveform['name']
+                    lm.load_waveform_onto_AWG_lookuptable(waveform_name)
+        
         # updating channel amplitude and range
         self.cfg_awg_channel_amplitude()
         self.cfg_awg_channel_range()
+
+        if stop_start:
+            self.AWG.get_instr().start()
+
         self._update_expected_program_hash()
-
-    def load_waveform_realtime(self, waveform_name: str,
-                               wf_nr: int = None,
-                               regenerate_waveforms: bool = True):
-        """
-        Args:
-            waveform_name:        (str) : name of the waveform
-            wf_nr                 (int) : what codeword to load the pulse onto
-                if set to None, will determine awg_nr based on self.LutMap
-            regenerate_waveforms (bool) : if True regenerates all waveforms
-
-        """
-
-        if wf_nr is None:
-            wf_nr = self._get_cw_from_wf_name(waveform_name)
-
-        if regenerate_waveforms:
-            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
-            waveform = gen_wf_func()
-            if self.cfg_append_compensation():
-                waveform = self.add_compensation_pulses(waveform)
-            if self.cfg_distort():
-                waveform = self.distort_waveform(waveform)
-                self._wave_dict_dist[waveform_name] = waveform
-            else:
-                waveform = self._append_zero_samples(waveform)
-                self._wave_dict_dist[waveform_name] = waveform
-
-        waveform = self._wave_dict_dist[waveform_name]
-        codeword = wf_nr
-        self.AWG.get_instr().set('wave_ch{}_cw{:03}'.format(
-            self.cfg_awg_channel(), codeword), waveform)
-
-        if self.instr_partner_lutman() is None:
-            logging.warning('no partner lutman specified')
-            other_waveform = np.zeros(len(waveform))
-        else:
-            partner_lm = self.instr_partner_lutman.get_instr()
-            prtnr_wf_name = partner_lm._get_wf_name_from_cw(codeword=wf_nr)
-            if regenerate_waveforms:
-                gen_wf_func = getattr(partner_lm,
-                                      '_gen_{}'.format(prtnr_wf_name))
-                prtnr_wf = gen_wf_func()
-
-                if partner_lm.cfg_append_compensation():
-                    prtnr_wf = partner_lm.add_compensation_pulses(prtnr_wf)
-
-                if partner_lm.cfg_distort():
-                    prtnr_wf = partner_lm.distort_waveform(prtnr_wf)
-                    partner_lm._wave_dict_dist[prtnr_wf_name] = prtnr_wf
-
-            other_waveform = partner_lm._wave_dict_dist[prtnr_wf_name]
-
-        if len(waveform) != len(other_waveform):
-            other_waveform = np.zeros(len(waveform))
-            msg = ('Lenghts of waveforms "{}" ({}) and "{}" ({}) do '
-                   'not match.'.format(waveform_name, len(waveform),
-                                       prtnr_wf_name, len(other_waveform)))
-            logging.warning(msg)
-            logging.warning('Setting "other waveform" to array of zeros.')
-
-        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
-        ch_pair = awg_ch % 2
-        awg_nr = awg_ch//2
-
-        if ch_pair == 0:
-            waveforms = (waveform, other_waveform)
-        else:
-            waveforms = (other_waveform, waveform)
-
-        self.AWG.get_instr().upload_waveform_realtime(
-            w0=waveforms[0], w1=waveforms[1], awg_nr=awg_nr, wf_nr=wf_nr)
-
-    def _generate_single_cw_program(self, cw_idx):
-        devname = self.AWG.get_instr()._devname
-        ch = self.cfg_awg_channel() - (self.cfg_awg_channel()+1) % 2
-        awg_single_wf_program = (
-            '\nwhile (1) {\n' +
-            'waitDIOTrigger();\n' +
-            'playWave("{}_wave_ch{}_cw{:03}", '.format(devname, ch, cw_idx) +
-            '"{}_wave_ch{}_cw{:03}");'.format(devname, ch+1, cw_idx) + '\n}')
-        return awg_single_wf_program
-
-    def _upload_codeword_program(self, awg_nr):
-        awg = self.AWG.get_instr()
-        if self.cfg_operating_mode() == 'Codeword_normal':
-            awg.upload_codeword_program(awgs=[awg_nr])
-        else:
-            cw_idx = int(self.cfg_operating_mode()[-2:])
-            single_cw_program = self._generate_single_cw_program(cw_idx)
-            awg.configure_awg_from_string(awg_nr, single_cw_program)
-            awg.configure_codeword_protocol()
-            awg.start()
 
     def _append_zero_samples(self, waveform):
         """
@@ -2470,7 +2361,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             # only regenerate the one waveform that is desired
             gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
             self._wave_dict[waveform_name] = gen_wf_func()
-
+    
         waveform = self._wave_dict[waveform_name]
         codeword = self.LutMap()[waveform_name]
 
@@ -2501,11 +2392,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             regenerate_waveforms (bool): if True calls
                 generate_standard_waveforms before uploading.
             stop_start           (bool): if True stops and starts the AWG.
-
-
-        Because of realtime loading vs the DIO sequencer program the uploading
-        flow for the AWG8 is slightly different.
+            force_load_sequencer_program (bool): if True forces a new compilation
+                and upload of the program on the sequencer.
         """
+
+        if stop_start:
+            self.AWG.get_instr().stop()
 
         # Generate the waveforms and link them to the AWG8 parameters
         lutmans = [self]
@@ -2516,17 +2408,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         else:
             lutmans += [self.instr_partner_lutman.get_instr()]
 
-        if self.cfg_operating_mode() != 'Codeword_normal':
-            # Regenerating only one waveform in this case, see below
-            regenerate_waveforms_realtime = regenerate_waveforms
-            regenerate_waveforms = False
-
-        for lm in lutmans:
-            if regenerate_waveforms:
-                lm.generate_standard_waveforms()
-                for waveform_name, lookuptable in lm.LutMap().items():
-                    lm.load_waveform_onto_AWG_lookuptable(waveform_name)
-
         # Uploading the codeword program if required
         if self._program_hash_differs() or force_load_sequencer_program:
             # FIXME: List of conditions in which reloading is required
@@ -2535,45 +2416,22 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             # N.B. these other conditions need to be included here.
             # This ensures only the channels that are relevant get reconfigured
             awg_nr = (self.cfg_awg_channel()-1)//2
-            self._upload_codeword_program(awg_nr)
-
-        if self.cfg_operating_mode() == 'Codeword_normal':
-            for waveform_name in self.LutMap().keys():
-                self.load_waveform_realtime(
-                    waveform_name=waveform_name,
-                    wf_nr=None, regenerate_waveforms=False)
-        else:
-            # Only load one waveform and do it in realtime.
-            cw_idx = int(self.cfg_operating_mode()[-2:])
-            waveform_name = self._get_wf_name_from_cw(cw_idx)
-            self.load_waveform_realtime(
-                waveform_name=waveform_name,
-                wf_nr=None, regenerate_waveforms=regenerate_waveforms_realtime)
+            self.AWG.get_instr().upload_codeword_program(awgs=[awg_nr])
+            
+        for lm in lutmans:
+            if regenerate_waveforms:
+                lm.generate_standard_waveforms()
+                for waveform in lm.LutMap().keys():
+                    lm.load_waveform_onto_AWG_lookuptable(waveform)
+        
         # updating channel amplitude and range
         self.cfg_awg_channel_amplitude()
         self.cfg_awg_channel_range()
+
+        if stop_start:
+            self.AWG.get_instr().start()
+
         self._update_expected_program_hash()
-
-    def _generate_single_cw_program(self, cw_idx):
-        devname = self.AWG.get_instr()._devname
-        ch = self.cfg_awg_channel() - (self.cfg_awg_channel()+1) % 2
-        awg_single_wf_program = (
-            '\nwhile (1) {\n' +
-            'waitDIOTrigger();\n' +
-            'playWave("{}_wave_ch{}_cw{:03}", '.format(devname, ch, cw_idx) +
-            '"{}_wave_ch{}_cw{:03}");'.format(devname, ch+1, cw_idx) + '\n}')
-        return awg_single_wf_program
-
-    def _upload_codeword_program(self, awg_nr):
-        awg = self.AWG.get_instr()
-        if self.cfg_operating_mode() == 'Codeword_normal':
-            awg.upload_codeword_program(awgs=[awg_nr])
-        else:
-            cw_idx = int(self.cfg_operating_mode()[-2:])
-            single_cw_program = self._generate_single_cw_program(cw_idx)
-            awg.configure_awg_from_string(awg_nr, single_cw_program)
-            awg.configure_codeword_protocol()
-            awg.start()
 
     def _append_zero_samples(self, waveform):
         """
@@ -2655,77 +2513,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             self._wave_dict_dist[waveform_name] = waveform
 
         self.AWG.get_instr().set(codeword, waveform)
-
-    def load_waveform_realtime(self, waveform_name: str,
-                               wf_nr: int = None,
-                               regenerate_waveforms: bool = True):
-        """
-        Args:
-            waveform_name:        (str) : name of the waveform
-            wf_nr                 (int) : what codeword to load the pulse onto
-                if set to None, will determine awg_nr based on self.LutMap
-            regenerate_waveforms (bool) : if True regenerates all waveforms
-
-        """
-
-        if wf_nr is None:
-            wf_nr = int(self.LutMap()[waveform_name][-3:])
-
-        if regenerate_waveforms:
-            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
-            waveform = gen_wf_func()
-            if self.cfg_append_compensation():
-                waveform = self.add_compensation_pulses(waveform)
-            if self.cfg_distort():
-                waveform = self.distort_waveform(waveform)
-                self._wave_dict_dist[waveform_name] = waveform
-            else:
-                waveform = self._append_zero_samples(waveform)
-                self._wave_dict_dist[waveform_name] = waveform
-
-        waveform = self._wave_dict_dist[waveform_name]
-        codeword = self.LutMap()[waveform_name]
-        self.AWG.get_instr().set(codeword, waveform)
-
-        if self.instr_partner_lutman() is None:
-            logging.warning('no partner lutman specified')
-            other_waveform = np.zeros(len(waveform))
-        else:
-            partner_lm = self.instr_partner_lutman.get_instr()
-            prtnr_wf_name = partner_lm._get_wf_name_from_cw(codeword=wf_nr)
-            if regenerate_waveforms:
-                gen_wf_func = getattr(partner_lm,
-                                      '_gen_{}'.format(prtnr_wf_name))
-                prtnr_wf = gen_wf_func()
-
-                if partner_lm.cfg_append_compensation():
-                    prtnr_wf = partner_lm.add_compensation_pulses(prtnr_wf)
-
-                if partner_lm.cfg_distort():
-                    prtnr_wf = partner_lm.distort_waveform(prtnr_wf)
-                    partner_lm._wave_dict_dist[prtnr_wf_name] = prtnr_wf
-
-            other_waveform = partner_lm._wave_dict_dist[prtnr_wf_name]
-
-        if len(waveform) != len(other_waveform):
-            other_waveform = np.zeros(len(waveform))
-            msg = ('Lenghts of waveforms "{}" ({}) and "{}" ({}) do '
-                   'not match.'.format(waveform_name, len(waveform),
-                                       prtnr_wf_name, len(other_waveform)))
-            logging.warning(msg)
-            logging.warning('Setting "other waveform" to array of zeros.')
-
-        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
-        ch_pair = awg_ch % 2
-        awg_nr = awg_ch//2
-
-        if ch_pair == 0:
-            waveforms = (waveform, other_waveform)
-        else:
-            waveforms = (other_waveform, waveform)
-
-        self.AWG.get_instr().upload_waveform_realtime(
-            w0=waveforms[0], w1=waveforms[1], awg_nr=awg_nr, wf_nr=wf_nr)
 
     def add_compensation_pulses(self, waveform):
         """
