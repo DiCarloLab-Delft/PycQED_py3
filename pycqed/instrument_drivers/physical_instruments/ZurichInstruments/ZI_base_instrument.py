@@ -824,7 +824,7 @@ class ZI_base_instrument(Instrument):
         for par in waveform_params:
             par(wf)
         t1 = time.time()
-        print('Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
+        log.debug('Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
 
     def _gen_write_waveform(self, ch, cw):
         def write_func(waveform):
@@ -1223,11 +1223,9 @@ class ZI_base_instrument(Instrument):
         # Check status
         if self.get('awgs_{}_waveform_memoryusage'.format(awg_nr)) > 1.0:
             log.warning('{}: Waveform memory usage exceeds available internal memory!'.format(self.devname))
-            print('WARNING: Waveform memory usage exceeds available internal memory!')
 
         if self.get('awgs_{}_sequencer_memoryusage'.format(awg_nr)) > 1.0:
             log.warning('{}: Sequencer memory usage exceeds available instruction memory!'.format(self.devname))
-            print('WARNING: Sequencer memory usage exceeds available instruction memory!')
 
     def plot_dio_snapshot(self, bits=range(32)):
         raise NotImplementedError('Virtual method with no implementation!')
