@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 from pycqed.instrument_drivers.meta_instrument import lfilt_kernel_object as lko
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import get_wf_idx_from_name
@@ -13,7 +13,7 @@ class TestMultiQubitFluxLutMan:
     @classmethod
     def setup_class(cls):
         # gets called at initialization of test class
-        cls.AWG = v8.VirtualAWG8('DummyAWG8')
+        cls.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
 
         cls.fluxlutman = flm.HDAWG_Flux_LutMan('fluxlutman_main')
         cls.k0 = lko.LinDistortionKernel('k0')
@@ -397,7 +397,7 @@ class TestLegacyFluxLutMan:
     @classmethod
     def setup_class(cls):
         # gets called at initialization of test class
-        cls.AWG = v8.VirtualAWG8('DummyAWG8')
+        cls.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
 
         cls.fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman_main')
         cls.k0 = lko.LinDistortionKernel('k0')
