@@ -15,6 +15,7 @@ from pycqed.analysis import fitting_models as fit_mods
 import pycqed.analysis.fit_toolbox.geometry as geo
 import lmfit
 import logging
+log = logging.getLogger(__name__)
 from collections import OrderedDict
 from scipy import integrate
 import importlib
@@ -801,12 +802,12 @@ class ResonatorSpectroscopy(Spectroscopy):
 
 
 class ResonatorSpectroscopy_v2(Spectroscopy):
-    def __init__(self, t_start,
+    def __init__(self, t_start=None,
                  options_dict=None,
                  t_stop=None,
                  do_fitting=False,
                  extract_only=False,
-                 auto=True):
+                 auto=True, **kw):
         """
         FIXME: Nathan: the dependency on the # of timestamps is carried
          through the entire class and is horrible. We should loop and make fits
@@ -832,11 +833,13 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
             extract_only:
             auto:
         """
-        super(ResonatorSpectroscopy_v2, self).__init__(t_start, t_stop=t_stop,
+        super(ResonatorSpectroscopy_v2, self).__init__(t_start=t_start,
+                                                       t_stop=t_stop,
                                                     options_dict=options_dict,
                                                     extract_only=extract_only,
                                                     auto=False,
-                                                    do_fitting=do_fitting)
+                                                    do_fitting=do_fitting,
+                                                       **kw)
         self.do_fitting = do_fitting
         self.fitparams_guess = self.options_dict.get('fitparams_guess', {})
 
@@ -854,7 +857,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
             message = "Analyzing spectra of {} states but no ref_state " \
                       "was passed. Assuming timestamp[0]: {} is the " \
                       "timestamp of reference state with label {}"
-            logging.warning(
+            log.warning(
                 message.format(n_spectra, self.raw_data_dict['timestamps'][0],
                                default_ref_state))
             self.ref_state = default_ref_state
@@ -896,7 +899,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
         msg = "Assuming following mapping templates of spectra: {}." \
               "\nspectra_mapping can be used in options_dict to modify" \
               "this behavior."
-        logging.warning(msg.format(spectra_mapping))
+        log.warning(msg.format(spectra_mapping))
         return spectra_mapping
 
 
@@ -914,7 +917,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
         self.proc_data_dict['fit_results'] = OrderedDict()
         self.fit_res = dict()
         if subtract_background:
-            logging.warning("Substract background might not work and has "
+            log.warning("Substract background might not work and has "
                             "not been tested.")
             self.do_subtract_background(
                 thres=self.options_dict['background_thres'],
@@ -1022,16 +1025,20 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
             f_RO = self.proc_data_dict['plot_frequency'][0][
                 np.argmax(self.proc_data_dict['iq_distance'][key])]
         elif len(states) == 3:
-            f_RO = self._find_f_RO_qutrit(
+            f_RO, raw_results = self._find_f_RO_qutrit(
                 self.proc_data_dict['spectra'],
                 self.proc_data_dict['plot_frequency'][0],
                 **self.options_dict.get('qutrit_fit_options', dict()))
+            print(states)
+            self.proc_data_dict["fit_raw_results"][key] = raw_results
         else:
             raise ValueError("{} states were given but method expects 1, "
                              "2 or 3 states.")
         return f_RO
 
-    def _find_f_RO_qutrit(self, spectra, freqs, sigma_init=0.01, **kw):
+    @staticmethod
+    def _find_f_RO_qutrit(spectra, freqs, sigma_init=0.01,
+                          return_full=True, **kw):
         n_iter = 0
         avg_fidelities = OrderedDict()
         single_level_fidelities = OrderedDict()
@@ -1040,7 +1047,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
 
         logging.debug("###### Starting Analysis to find qutrit f_RO ######")
 
-        while self.update_sigma(avg_fidelities, sigmas, freqs,
+        while ResonatorSpectroscopy_v2.update_sigma(avg_fidelities, sigmas, freqs,
                                 optimal_frequency, n_iter, **kw):
             logging.debug("Iteration {}".format(n_iter))
             sigma = sigmas[-1]
@@ -1048,7 +1055,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                 continue
             else:
                 avg_fidelity, single_level_fidelity = \
-                    self.evaluate_fidelity(spectra, sigma)
+                    ResonatorSpectroscopy_v2.three_gaussians_overlap(spectra, sigma)
                 avg_fidelities[sigma] = avg_fidelity
                 single_level_fidelities[sigma] = single_level_fidelity
                 n_iter += 1
@@ -1056,19 +1063,21 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                            single_level_fidelities=single_level_fidelities,
                            sigmas=sigmas, optimal_frequency=optimal_frequency)
         qutrit_key = "".join(list(spectra))
-        self.proc_data_dict["fit_raw_results"][qutrit_key] = \
-            raw_results
+
 
         logging.debug("###### Finished Analysis. Optimal f_RO: {} ######"
                       .format(optimal_frequency[-1]))
-        return optimal_frequency[-1]
 
-    def update_sigma(self, avg_fidelities, sigmas, freqs,
+        return optimal_frequency[-1], raw_results if return_full else \
+            optimal_frequency[-1]
+
+    @staticmethod
+    def update_sigma(avg_fidelities, sigmas, freqs,
                      optimal_frequency, n_iter, n_iter_max=20,
-                     target_fidelity=0.999, max_width_at_max_fid=0.2e6, **kw):
+                     target_fidelity=0.99, max_width_at_max_fid=0.2e6, **kw):
         continue_search = True
         if n_iter >= n_iter_max:
-            logging.warning("Could not converge to a proper RO frequency" \
+            log.warning("Could not converge to a proper RO frequency" \
                   "within {} iterations. Returning best frequency found so far. "
                   "Consider changing log_bounds".format(n_iter_max))
             continue_search = False
@@ -1081,10 +1090,11 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                 msg = "max_width_at_max_fid cannot be smaller than the " \
                       "difference between two frequency data points.\n" \
                       "max_width_at_max_fid: {}\nDelta freq: {}"
-                raise ValueError(msg.format(max_width_at_max_fid, delta_freq))
+                log.warning(msg.format(max_width_at_max_fid, delta_freq))
+                max_width_at_max_fid = delta_freq
 
             sigma_current = sigmas[-1]
-            fid, idx_width = self.fidelity_and_width(
+            fid, idx_width = ResonatorSpectroscopy_v2.fidelity_and_width(
                 avg_fidelities[sigma_current], target_fidelity)
             width = idx_width * delta_freq
             logging.debug("sigmas " + str(sigmas) + " width (MHz): "
@@ -1125,41 +1135,61 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
 
         return continue_search
 
-    def fidelity_and_width(self, avg_fidelity, target_fidelity):
+    @staticmethod
+    def fidelity_and_width(avg_fidelity, target_fidelity):
         avg_fidelity = np.array(avg_fidelity)
         max_fid = np.max(avg_fidelity)
         idx_width = np.sum(
             (avg_fidelity >= target_fidelity) * (avg_fidelity <= 1.))
         return max_fid, idx_width
 
-    def evaluate_fidelity(self, spectra, sigma):
+    @staticmethod
+    def _restricted_angle(angle):
+        entire_div = angle // (np.sign(angle) * np.pi)
+        return angle - np.sign(angle) * entire_div * 2 * np.pi
+
+    @staticmethod
+    def three_gaussians_overlap(spectrums, sigma):
+        """
+        Evaluates the overlap of 3 gaussian distributions for each complex
+        point given in spectrums.
+        Args:
+            spectrums: dict with resonnator response of each state
+            sigma: standard deviation of gaussians used for computing overlap
+
+        Returns:
+
+        """
         def g(x, d, sigma=0.1):
-            while (x < - np.pi or x > np.pi):
-                if x < np.pi:
-                    x += 2 * np.pi
-                elif x > np.pi:
-                    x -= 2 * np.pi
+            x = ResonatorSpectroscopy_v2._restricted_angle(x)
             return np.exp(-d ** 2 / np.cos(x) ** 2 / (2 * sigma ** 2))
 
-        def integral_part1(angle):
-            return integrate.quad(lambda x: 1 / (2 * np.pi),
-                                  angle - np.pi, angle)[0]
+        def f(gamma, val1=0, val2=1 / (2 * np.pi)):
+            gamma = ResonatorSpectroscopy_v2._restricted_angle(gamma)
+            return val1 if gamma > -np.pi / 2 and gamma < np.pi / 2 else val2
 
-        def integral_part2(angle, sigma):
+        def integral(angle, dist, sigma):
             const = 1 / (2 * np.pi)
-            return const * integrate.quad(lambda x: g(x, d1, sigma=sigma),
-                                          angle - np.pi, angle)[0]
+            p1 = const * \
+                 integrate.quad(lambda x: f(x, g(x, dist, sigma=sigma), 0),
+                                angle - np.pi,
+                                angle)[0]
+            return -p1 + integrate.quad(lambda x: f(x),
+                                        angle - np.pi, angle)[0] + \
+                         integrate.quad(lambda x: f(x, 1 / (2 * np.pi), 0),
+                                        angle - np.pi,
+                                        angle)[0]
 
-        assert len(spectra) == 3, "3 spectra required for qutrit F_RO " \
-                                  "analysis. Found {}".format((len(spectra)))
+        assert len(spectrums) == 3, "3 spectrums required for qutrit F_RO " \
+                                  "analysis. Found {}".format((len(spectrums)))
         i1s, i2s, i3s = [], [], []
         # in most cases, states will be ['g', 'e', 'f'] but to ensure not to
         # be dependent on labels we take indices of keys
-        states = list(spectra.keys())
-        for i in range(len(spectra[states[0]])):
-            pt1 = (spectra[states[0]][i].real, spectra[states[0]][i].imag)
-            pt2 = (spectra[states[1]][i].real, spectra[states[1]][i].imag)
-            pt3 = (spectra[states[2]][i].real, spectra[states[2]][i].imag)
+        states = list(spectrums.keys())
+        for i in range(len(spectrums[states[0]])):
+            pt1 = (spectrums[states[0]][i].real, spectrums[states[0]][i].imag)
+            pt2 = (spectrums[states[1]][i].real, spectrums[states[1]][i].imag)
+            pt3 = (spectrums[states[2]][i].real, spectrums[states[2]][i].imag)
             d1 = geo.distance(pt1, pt2) / 2
             d2 = geo.distance(pt2, pt3) / 2
             d3 = geo.distance(pt1, pt3) / 2
@@ -1171,19 +1201,23 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
             gamma1 = np.arccos(d1 / R)
             gamma2 = np.arccos(d2 / R)
             gamma3 = np.arccos(d3 / R)
-            i1 = integral_part1(gamma1) - integral_part2(gamma1, sigma)
-            i2 = integral_part1(gamma2) - integral_part2(gamma2, sigma)
-            i3 = integral_part1(gamma3) - integral_part2(gamma3, sigma)
+            i1 = integral(gamma1, d1, sigma)
+            i2 = integral(gamma2, d2, sigma)
+            i3 = integral(gamma3, d3, sigma)
             i1s.append(i1)
             i2s.append(i2)
             i3s.append(i3)
 
         i1s, i2s, i3s = np.array(i1s), np.array(i2s), np.array(i3s)
         total_area = 2 * i1s + 2 * i2s + 2 * i3s
+        # print(total_area)
         avg_fidelity = total_area / 3
         fid_state_0 = i1s + i3s
+        not0 = 1 - fid_state_0
         fid_state_1 = i1s + i2s
+        not1 = 1 - i1s + i2s
         fid_state_2 = i2s + i3s
+        not2 = 1 - fid_state_2
 
         single_level_fid = {states[0]: fid_state_0,
                             states[1]: fid_state_1,
@@ -1377,7 +1411,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                         ax3.plot([f_r["optimal_frequency"][-1]],
                                  [f_r["optimal_frequency"][-1]], "k--")
                         t_f = self.options_dict.get('qutrit_fit_options', dict())
-                        ax3.set_ylim()
+                        ax3.set_ylim([0.9, 1])
 
                     elif len(states) == 2:
                         c = "r--"

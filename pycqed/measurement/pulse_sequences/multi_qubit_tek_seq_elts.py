@@ -1453,8 +1453,8 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
     # return seq, seq_pulse_list
     return seq, el_list
 
-def n_qubit_reset(qubit_names, operation_dict, cal_points,
-                  prep_params=dict(),
+
+def n_qubit_reset(qubit_names, operation_dict, prep_params=dict(),
                   upload=True):
     """
 
@@ -1470,10 +1470,9 @@ def n_qubit_reset(qubit_names, operation_dict, cal_points,
     seq_name = '{}_reset_x{}_sequence'.format(','.join(qubit_names),
                                               prep_params.get('reset_reps',
                                                               '_default_n_reps'))
-    seq = sequence.Sequence(seq_name)
-
-    # add calibration segments
-    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+    pulses_with_prep = add_preparation_pulses([], operation_dict, qubit_names,
+                                              **prep_params)
+    seq = pulse_list_list_seq([pulses_with_prep], seq_name, upload=False)
 
     log.debug(seq)
     if upload:
@@ -1481,116 +1480,6 @@ def n_qubit_reset(qubit_names, operation_dict, cal_points,
 
     return seq, np.arange(seq.n_acq_elements())
 
-def n_qubit_reset_old(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
-                  return_seq=False, verbose=False, codeword_indices=None,
-                  upload=True):
-    """
-
-    Timing constraints:
-        The reset_cycle_time and the readout fixed point should be commensurate
-        with the UHFQC trigger grid and the granularity of the AWGs.
-
-        When the -ro_acq_marker_delay of the readout pulse is larger than
-        the drive pulse length, then it is important that its length is a
-        multiple of the granularity of the AWG.
-    """
-
-    n = len(qubit_names)
-    seq_name = '{}_reset_x{}_sequence'.format(','.join(qubit_names), nr_resets)
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-    operation_dict = deepcopy(operation_dict)
-
-    # set all qubit drive pulse delays to the maximum over the qubits
-    max_delay = float('-inf')
-    for qbn in qubit_names:
-        max_delay = max(max_delay, operation_dict['X180 ' + qbn]['pulse_delay'])
-    for qbn in qubit_names:
-        for op in ['X180 ', 'X180s ', 'I ', 'Is ']:
-            operation_dict[op + qbn]['pulse_delay'] = max_delay
-
-    # sort qubits by pulse length
-    pulse_lengths = []
-    for qbn in qubit_names:
-        pulse = operation_dict['X180 ' + qbn]
-        pulse_lengths.append(pulse['sigma']*pulse['nr_sigma'])
-    qubits_sorted = []
-    for idx in np.argsort(pulse_lengths):
-        qubits_sorted.append(qubit_names[idx])
-
-    # increase the readout pulse delay such that the trigger would just
-    # fit in the feedback element
-    mw_pulse = operation_dict['X180 ' + qubits_sorted[-1]]
-    ro_pulse = operation_dict['RO']
-    ro_pulse['pulse_delay'] = max(ro_pulse['pulse_delay'],
-                                  -ro_pulse['acq_marker_delay']
-                                  - mw_pulse['pulse_delay']
-                                  - mw_pulse['sigma']*mw_pulse['nr_sigma'])
-
-    # create the wait pulse such that the length of the reset element would be
-    # reset_cycle_time
-    wait_time = mw_pulse['pulse_delay'] + mw_pulse['sigma']*mw_pulse['nr_sigma']
-    wait_time += ro_pulse['pulse_delay'] + ro_pulse['length']
-    wait_time = reset_cycle_time - wait_time
-    wait_time -= station.pulsar.inter_element_spacing()
-    wait_pulse = {'pulse_type': 'SquarePulse',
-                  'channel': ro_pulse['acq_marker_channel'],
-                  'amplitude': 0.0,
-                  'length': wait_time,
-                  'pulse_delay': 0}
-    operation_dict.update({'I_fb': wait_pulse})
-
-    # create the state-preparation elements and the state reset elements
-    # the longest drive pulse is added last so that the readout does not overlap
-    # with the drive pulses.
-    qubit_order = np.arange(len(qubit_names))[np.argsort(pulse_lengths)]
-    for state in range(2 ** n):
-        pulses = []
-        for i, qbn in enumerate(qubits_sorted):
-            if state & (1 << qubit_names.index(qbn)):
-                if i == 0:
-                    pulses.append(operation_dict['X180 ' + qbn])
-                else:
-                    pulses.append(operation_dict['X180s ' + qbn])
-            else:
-                if i == 0:
-                    pulses.append(operation_dict['I ' + qbn])
-                else:
-                    pulses.append(operation_dict['Is ' + qbn])
-        pulses += [operation_dict['RO'], operation_dict['I_fb']]
-        statename = str(state).zfill(len(str(2 ** n - 1)))
-        el = multi_pulse_elt(state, station, pulses, name='prepare' + statename)
-        el_list.append(el)
-        el = multi_pulse_elt(state, station, pulses, name='reset' + statename,
-                             trigger=False)
-        el_list.append(el)
-
-    # Create the sequence
-    for state in range(2 ** n):
-        statename = str(state).zfill(len(str(2 ** n - 1)))
-        seq.insert('prepare'+statename, 'prepare'+statename, trigger_wait=True)
-        for i in range(nr_resets):
-            seq.insert('codeword' + statename + '_' + str(i), 'codeword',
-                       trigger_wait=False)
-
-    # Create the codeword table
-    if codeword_indices is None:
-        codeword_indices = np.arange(n)
-    for state in range(2 ** n):
-        statename = str(state).zfill(len(str(2 ** n - 1)))
-        codeword = 0
-        for qb_idx in range(n):
-            if state & (1 << qb_idx):
-                codeword |= (1 << codeword_indices[qb_idx])
-        seq.codewords[codeword] = 'reset' + statename
-
-    if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-
-    if return_seq:
-        return seq, el_list
-    else:
-        return seq_name
 
 def parity_correction_seq(
         qb1n, qb2n, qb3n, operation_dict, CZ_pulses, feedback_delay=900e-9,
@@ -2031,6 +1920,7 @@ def parity_correction_no_reset_seq(
     else:
         return seq_name
 
+
 def parity_single_round_seq(ancilla_qubit_name, data_qubit_names, CZ_map,
                             preps, cal_points, prep_params, operation_dict,
                             upload=True):
@@ -2085,6 +1975,7 @@ def parity_single_round_seq(ancilla_qubit_name, data_qubit_names, CZ_map,
        ps.Pulsar.get_instance().program_awgs(seq)
 
     return seq, np.arange(seq.n_acq_elements())
+
 
 
 def n_qubit_tomo_seq(
