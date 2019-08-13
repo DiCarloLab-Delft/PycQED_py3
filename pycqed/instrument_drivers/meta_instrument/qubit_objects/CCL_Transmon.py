@@ -19,8 +19,7 @@ from qcodes.instrument.parameter import (
     ManualParameter, InstrumentRefParameter)
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
-from pycqed.measurement.calibration_toolbox import (
-    mixer_carrier_cancellation)
+from pycqed.measurement import calibration_toolbox as cal_toolbox
 from pycqed.measurement.openql_experiments.openql_helpers import \
     load_range_of_oql_programs
 from pycqed.measurement import sweep_functions as swf
@@ -1619,7 +1618,8 @@ class CCLight_Transmon(Qubit):
         return opt_motzoi
 
     def calibrate_mixer_offsets_drive(self, mixer_channels=['G', 'D'],
-                                      update: bool =True, ftarget=-110)-> bool:
+                                      update: bool =True, ftarget=-110,
+                                      maxiter=300)-> bool:
         """
         Calibrates the mixer offset and updates the I and Q offsets in
         the qubit object.
@@ -1676,13 +1676,13 @@ class CCLight_Transmon(Qubit):
             if 'G' in mixer_channels:
                 VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 1.0)
                 VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0.1)
-                offset_I, offset_Q = mixer_carrier_cancellation(
+                offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
                     SH=self.instr_SH.get_instr(),
                     source=self.instr_LO_mw.get_instr(),
                     MC=self.instr_MC.get_instr(),
                     chI_par=chGI_par, chQ_par=chGQ_par,
                     label='Mixer_offsets_drive_G'+self.msmt_suffix,
-                    ftarget=ftarget)
+                    ftarget=ftarget, maxiter=maxiter)
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
@@ -1691,14 +1691,14 @@ class CCLight_Transmon(Qubit):
                 VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0.1)
                 VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 1.0)
 
-                offset_I, offset_Q = mixer_carrier_cancellation(
+                offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
                     SH=self.instr_SH.get_instr(),
                     source=self.instr_LO_mw.get_instr(),
                     MC=self.instr_MC.get_instr(),
                     chI_par=chDI_par,
                     chQ_par=chDQ_par,
                     label='Mixer_offsets_drive_D'+self.msmt_suffix,
-                    ftarget=ftarget)
+                    ftarget=ftarget, maxiter=maxiter)
                 if update:
                     self.mw_mixer_offs_DI(offset_I)
                     self.mw_mixer_offs_DQ(offset_Q)
@@ -1711,13 +1711,13 @@ class CCLight_Transmon(Qubit):
                 chI_par = QWG_MW.parameters['ch%s_offset' % chI]
                 chQ_par = QWG_MW.parameters['ch%s_offset' % chQ]
 
-                offset_I, offset_Q = mixer_carrier_cancellation(
+                offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
                     SH=self.instr_SH.get_instr(),
                     source=self.instr_LO_mw.get_instr(),
                     MC=self.instr_MC.get_instr(),
                     chI_par=chI_par,
                     chQ_par=chQ_par,
-                    ftarget=ftarget)
+                    ftarget=ftarget, maxiter=maxiter)
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
@@ -1729,13 +1729,13 @@ class CCLight_Transmon(Qubit):
                 AWG.set('sigouts_{}_on'.format(awg_ch+0), 1)
                 chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
                 chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
-                offset_I, offset_Q = mixer_carrier_cancellation(
+                offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
                     SH=self.instr_SH.get_instr(),
                     source=self.instr_LO_mw.get_instr(),
                     MC=self.instr_MC.get_instr(),
                     chI_par=chGI_par, chQ_par=chGQ_par,
                     label='Mixer_offsets_drive'+self.msmt_suffix,
-                    ftarget=ftarget)
+                    ftarget=ftarget, maxiter=maxiter)
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
@@ -1945,7 +1945,7 @@ class CCLight_Transmon(Qubit):
         chI_par = self.instr_acquisition.get_instr().sigouts_0_offset
         chQ_par = self.instr_acquisition.get_instr().sigouts_1_offset
 
-        offset_I, offset_Q = mixer_carrier_cancellation(
+        offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
             SH=self.instr_SH.get_instr(), source=self.instr_LO_ro.get_instr(),
             MC=self.instr_MC.get_instr(),
             chI_par=chI_par, chQ_par=chQ_par, x0=(0.05, 0.05),
@@ -1958,7 +1958,8 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_mw_pulses_basic(self, amps=np.linspace(0,1.6,31),
                            freq_steps=[1, 3, 10, 30, 100, 300, 1000],
-                           n_iter_flipping=2, soft_avg_allxy=3):
+                           n_iter_flipping=2, soft_avg_allxy=3, 
+                           cal_skewness=False, cal_offsets=True):
         """
         Performs a standard calibration of microwave pulses consisting of 
 
@@ -1973,8 +1974,10 @@ class CCLight_Transmon(Qubit):
         Note that this is a basic calibration and does not involve fine tuning
         to ~99.9% and only works if the qubit is well behaved. 
         """
-        self.calibrate_mixer_offsets_drive()
-        self.calibrate_mixer_skewness_drive() 
+        if cal_offsets:
+            self.calibrate_mixer_offsets_drive()
+        if cal_skewness:
+            self.calibrate_mixer_skewness_drive()
         
         self.calibrate_mw_pulse_amplitude_coarse(amps=amps)
         self.find_frequency('ramsey', steps=freq_steps)
