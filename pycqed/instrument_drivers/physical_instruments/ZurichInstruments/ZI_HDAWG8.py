@@ -304,17 +304,17 @@ while (1) {
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
-        if verbose: print("INFO   : Testing DIO activity for AWG {}".format(awg_nr))
+        if verbose: print("Testing DIO activity for AWG {}".format(awg_nr))
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
         cw_mask      = self.geti('awgs/{}/dio/mask/value'.format(awg_nr)) << self.geti('awgs/{}/dio/mask/shift'.format(awg_nr))
-        
+
         for i in range(timeout):
             valid = True
-            
+
             data = self.getv('raw/dios/0/data')
             if data is None:
                 raise zibase.ziValueError('Failed to get DIO snapshot!')
@@ -338,45 +338,118 @@ while (1) {
             if strb_slope != 0 and strb_activity != strb_mask:
                 print("Did not see valid bit toggle!")
                 valid = False
-                
+
             if valid:
                 return True
-        
+
         return False
 
-    def _find_valid_delays(self, awgs, repetitions=1, verbose=False):
-        """
-        Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
-        configured bits.
-        """
+    def _find_valid_delays(self, awgs_and_sequences, repetitions=1, verbose=False):
+        """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
+        configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
+        codewords are sampled incorrectly."""
         if verbose: print("  Finding valid delays")
         valid_delays= []
         for delay in range(16):
-            if verbose: print('    Testing delay {}'.format(delay))
+            if verbose: print('   Testing delay {}'.format(delay))
             self.setd('raw/dios/0/delays/*/value', delay)
             time.sleep(1)
-            valid_delay = True
-            for awg_nr in awgs:
-                if self.geti('awgs/' + str(awg_nr) + '/dio/error/timing') != 0:
-                    valid_delay = False
-                    break
+            valid_sequence = True
+            for awg, sequence in awgs_and_sequences:
+                if self.geti('awgs/' + str(awg) + '/dio/error/timing') == 0:
+                    ts, cws = self._get_awg_dio_data(awg)
+                    index = None
+                    last_index = None
+                    for n, cw in enumerate(cws):
+                        if n == 0:
+                            if cw not in sequence:
+                                if verbose: print("WARNING: Codeword {} with value {} not in expected sequence {}!".format(n, cw, sequence))
+                                if verbose: print("Detected codeword sequence: {}".format(cws))
+                                valid_sequence = False
+                                break
+                            else:
+                                index = sequence.index(cw)
+                        else:
+                            last_index = index
+                            index = (index + 1) % len(sequence)
+                            if cw != sequence[index]:
+                                if verbose: print("WARNING: Codeword {} with value {} not expected to follow codeword {} in expected sequence {}!".format(n, cw, sequence[last_index], sequence))
+                                if verbose: print("Detected codeword sequence: {}".format(cws))
+                                valid_sequence = False
+                                break
+                else:
+                    valid_sequence = False
 
-            if valid_delay:
+            if valid_sequence:
                 valid_delays.append(delay)
 
         return set(valid_delays)
 
-    def calibrate_dio_protocol(self, awgs=range(4), verbose=False, repetitions=1):
+    def calibrate_CCL_dio_protocol(self, CCL=None, verbose=False, repetitions=1):
+        log.info('Calibrating DIO delays')
         if verbose: print("Calibrating DIO delays")
-        
-        for awg_nr in awgs:
-            if not self._ensure_activity(awg_nr, verbose=verbose):
-                raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg_nr))
-            
-        valid_delays = self._find_valid_delays(awgs, repetitions, verbose=verbose)
+
+        if CCL is None:
+            CCL = qtccl.CCL('CCL', address='192.168.0.11', port=5025)
+
+        cs_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            'output', 'cs.txt')
+
+        opc_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            'output', 'qisa_opcodes.qmap')
+
+        # Configure CCL
+        CCL.control_store(cs_filepath)
+        CCL.qisa_opcode(opc_filepath)
+
+        if self.cfg_codeword_protocol() == 'flux':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','CCLight_example',
+                'qisa_test_assembly','calibration_cws_flux.qisa'))
+
+            sequence_length = 8
+            staircase_sequence = numpy.arange(1, sequence_length)
+            expected_sequence = [(0, list(staircase_sequence)), \
+                                 (1, list(staircase_sequence)), \
+                                 (2, list(staircase_sequence)), \
+                                 (3, list(staircase_sequence))]
+        elif self.cfg_codeword_protocol() == 'microwave':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..','examples','CCLight_example',
+                'qisa_test_assembly','calibration_cws_mw.qisa'))
+
+            sequence_length = 32
+            staircase_sequence = range(1, sequence_length)
+            expected_sequence = [(0, list(reversed(staircase_sequence))), \
+                                 (1, list(reversed(staircase_sequence))), \
+                                 (2, list(reversed(staircase_sequence))), \
+                                 (3, list(reversed(staircase_sequence)))]
+
+        else:
+            zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
+
+        # Start the CCL with the program configured above
+        CCL.eqasm_program(test_fp)
+        CCL.start()
+
+        # Make sure the configuration is up-to-date
+        self.assure_ext_clock()
+        self.upload_codeword_program()
+
+        for awg, sequence in expected_sequence:
+            if not self._ensure_activity(awg, verbose=verbose):
+                raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
+
+        valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
         if len(valid_delays) == 0:
-            raise ziDIOCalibrationError('DIO calibration failed!')
-        
+            raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
+            return
+
         min_valid_delay = min(valid_delays)
 
         # Print information
