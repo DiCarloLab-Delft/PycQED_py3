@@ -289,7 +289,10 @@ class MeasurementControl(Instrument):
 
         if self.adaptive_function == 'Powell':
             self.adaptive_function = fmin_powell
-        if issubclass(self.adaptive_function, BaseLearner):
+        # Added extra check to ensure self.adaptive_function is a class before checking for
+        # whether it is a subclass. Prevents Python from throwing an error if self.adaptive_function
+        # is not a class but a function
+        if isinstance(self.adaptive_function, type) and issubclass(self.adaptive_function, BaseLearner):
             Learner = self.adaptive_function
             self.learner = Learner(
                 self.optimization_function,
