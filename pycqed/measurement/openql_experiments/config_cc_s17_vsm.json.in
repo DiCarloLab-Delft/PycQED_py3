@@ -64,9 +64,9 @@
 
 
 	// FIXME: proposed header, not used
-	"file_type": "OpenQL-config",
-	"file_version": "0.3",
-	"min_version_openql": "0.7.0",
+	//"file_type": "OpenQL-config",
+	//"file_version": "0.3",
+	//"min_version_openql": "0.7.1",
 
 	"eqasm_compiler" : "eqasm_backend_cc",
 
@@ -403,6 +403,9 @@
         "cnot_park1 %0 %1 %2": ["ry90 %1", "cz %0 %1", "park_cz %2", "ry90 %1"],
         "cnot_park2 %0 %1 %2": ["ry90 %1", "cz_park %0 %1 %2", "ry90 %1"],
         "cz_park1 %0 %1 %2": ["cz %0 %1", "park_cz %2"]
+
+        // also possible
+//        "blabla q0 q1": ["foo q0", "foo q1", "foo q3"]
   	},
 
 
@@ -506,9 +509,6 @@
             }
         },
 
-        // CZ should handle:
-        // https://github.com/QE-Lab/OpenQL/issues/166
-        // https://github.com/QE-Lab/OpenQL/issues/180
         "cz": {
             "duration": @FLUX_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
@@ -544,7 +544,11 @@
         },
 
 		// additions from 'CC-software-implementation.docx'
-		// flux pulses, see issue #176:
+		// flux pulses, see:
+        // - https://github.com/QE-Lab/OpenQL/issues/176
+        // - https://github.com/QE-Lab/OpenQL/issues/224
+        // - https://github.com/QE-Lab/OpenQL/pull/238
+
 		"park_cz" : { // park signal with same length as cz gate
 			"duration" : @FLUX_DURATION@,
 			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
