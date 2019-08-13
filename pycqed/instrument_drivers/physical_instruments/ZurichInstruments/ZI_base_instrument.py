@@ -4,6 +4,7 @@ import time
 import numpy
 import matplotlib.pyplot as plt
 import logging
+import re
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators
@@ -194,7 +195,7 @@ class MockDAQServer():
     communicating with the instruments.
     WARNING: The mock version is not yet working!
     """
-    def __init__(self, server, port, apilevel):
+    def __init__(self, server, port, apilevel, verbose=False):
         self.server = server
         self.port = port
         self.apilevel = apilevel
@@ -202,7 +203,8 @@ class MockDAQServer():
         self.interface = None
         self.nodes = {'/zi/devices/connected': {'type': 'String', 'value': ''}}
         self.devtype = None
-        self.poll_data = None
+        self.poll_nodes = []
+        self.verbose = verbose
 
     def awgModule(self):
         return MockAwgModule(self)
@@ -240,17 +242,26 @@ class MockDAQServer():
 
         if self.devtype == 'UHFQA':
             self.nodes['/' + self.device + '/features/options'] = {'type': 'String', 'value':'QA\nAWG'}
-            self.nodes['/' + self.device + '/awgs/0/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+            for i in range(16):
+                self.nodes['/' + self.device + '/awgs/0/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+            for i in range(10):
+                self.nodes['/' + self.device + '/qas/0/integration/weights/' + str(i) + '/real'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+                self.nodes['/' + self.device + '/qas/0/integration/weights/' + str(i) + '/imag'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+                self.nodes['/' + self.device + '/qas/0/result/data/' + str(i) + '/wave'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
         elif self.devtype == 'HDAWG8':
             self.nodes['/' + self.device + '/features/options']        = {'type': 'String'      , 'value': 'PC\nME'}
             self.nodes['/' + self.device + '/raw/error/json/errors']   = {'type': 'String'      , 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
             self.nodes['/' + self.device + '/raw/error/blinkseverity'] = {'type': 'Integer'     , 'value': 0}
             self.nodes['/' + self.device + '/raw/error/blinkforever']  = {'type': 'Integer'     , 'value': 0}
             self.nodes['/' + self.device + '/raw/dios/0/extclk']       = {'type': 'Integer'     , 'value': 0}
-            self.nodes['/' + self.device + '/awgs/0/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
-            self.nodes['/' + self.device + '/awgs/1/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
-            self.nodes['/' + self.device + '/awgs/2/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
-            self.nodes['/' + self.device + '/awgs/3/waveform/waves/0'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+            for awg_nr in range(4):
+                for i in range(32):
+                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+            for sigout_nr in range(8):
+                self.nodes['/' + self.device + '/sigouts/' + str(sigout_nr) + '/precompensation/fir/coefficients'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
 
     def listNodesJSON(self, path):
         pass
@@ -267,6 +278,8 @@ class MockDAQServer():
     def getInt(self, path):
         if path not in self.nodes:
             raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+        
+        if self.verbose: print('getInt', path, int(self.nodes[path]['value']))
 
         return int(self.nodes[path]['value'])
 
@@ -274,18 +287,22 @@ class MockDAQServer():
         if path not in self.nodes:
             raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
 
+        if self.verbose: print('getDouble', path, float(self.nodes[path]['value']))
+
         return float(self.nodes[path]['value'])
 
     def setInt(self, path, value):
         if path not in self.nodes:
             raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
 
+        if self.verbose: print('setInt', path, value)
+
         self.nodes[path]['value'] = value
 
     def setDouble(self, path, value):
         if path not in self.nodes:
             raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
-
+        if self.verbose: print('setDouble', path, value)
         self.nodes[path]['value'] = value
 
     def setVector(self, path, value):
@@ -293,9 +310,29 @@ class MockDAQServer():
             raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
 
         if self.nodes[path]['type'] != 'ZIVectorData':
-            raise ziRuntimeError("Unable to set node '" + path + "' using setVector!")
+            raise ziRuntimeError("Unable to set node '" + path + "' of type " + self.nodes[path]['type'] + " using setVector!")
 
         self.nodes[path]['value'] = value
+
+    def setComplex(self, path, value):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+
+        if not self.nodes[path]['type'].startswith('Complex'):
+            raise ziRuntimeError("Unable to set node '" + path + "' of type " + self.nodes[path]['type'] + " using setComplex!")
+
+        if self.verbose: print('setComplex', path, value)
+        self.nodes[path]['value'] = value
+
+    def getComplex(self, path):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
+
+        if not self.nodes[path]['type'].startswith('Complex'):
+            raise ziRuntimeError("Unable to get node '" + path + "' of type " + self.nodes[path]['type'] + " using getComplex!")
+
+        if self.verbose: print('getComplex', path, self.nodes[path]['value'])
+        return self.nodes[path]['value']
 
     def get(self, path, flat, flags):
         if path not in self.nodes:
@@ -304,15 +341,43 @@ class MockDAQServer():
         return {path: [{'vector': self.nodes[path]['value']}]}
 
     def getAsEvent(self, path):
-        if path.endswith('/ready'):
-            self.poll_data = {path: {'value': [1]}}
-        else:
-            self.poll_data = {path: {'value': [0]}}
+        self.poll_nodes.append(path)
+        
 
     def poll(self, poll_time, timeout, flags, flat):
-        tmp = self.poll_data
-        self.poll_data = None
-        return tmp
+        poll_data = {}
+        
+        for path in self.poll_nodes:
+            if self.verbose: print('poll', path)
+            m = re.match(r'/(\w+)/qas/0/result/data/(\d+)/wave', path)
+            if m:
+                poll_data[path] = [{'vector': numpy.random.rand(self.getInt('/' + m.group(1) + '/qas/0/result/length'))}]
+                continue
+
+            m = re.match(r'/(\w+)/qas/0/monitor/inputs/(\d+)/wave', path)
+            if m:
+                poll_data[path] = [{'vector': numpy.random.rand(self.getInt('/' + m.group(1) + '/qas/0/monitor/length'))}]
+                continue
+
+            m = re.match(r'/(\w+)/awgs/(\d+)/ready', path)
+            if m:
+                poll_data[path] = {'value': [1]}
+                continue
+
+            poll_data[path] = {'value': [0]}
+        
+        return poll_data
+
+    def subscribe(self, path):
+        if self.verbose: print('subscribe', path)
+        
+        self.poll_nodes.append(path)
+        
+    def unsubscribe(self, path):
+        if self.verbose: print('unsubscribe', path)
+        
+        if path in self.poll_nodes:
+            self.poll_nodes.remove(path)
 
     def _load_parameter_file(self, filename: str):
         """
@@ -942,15 +1007,13 @@ class ZI_base_instrument(Instrument):
         """
         Configures an AWG with the program stored in the object in the self._awg_program[awg_nr] member.
         """
-        if self._awg_program[awg_nr] is None:
-            raise ziConfigurationError('No program defined for AWG {}!'.format(awg_nr))
-        
-        full_program = \
-            '// Start of automatically generated codeword table\n' + \
-            self._codeword_table_preamble(awg_nr) + \
-            '// End of automatically generated codeword table\n' + self._awg_program[awg_nr]
+        if self._awg_program[awg_nr] is not None:        
+            full_program = \
+                '// Start of automatically generated codeword table\n' + \
+                self._codeword_table_preamble(awg_nr) + \
+                '// End of automatically generated codeword table\n' + self._awg_program[awg_nr]
 
-        self.configure_awg_from_string(awg_nr, full_program)
+            self.configure_awg_from_string(awg_nr, full_program)
 
     ##########################################################################
     # Public methods
