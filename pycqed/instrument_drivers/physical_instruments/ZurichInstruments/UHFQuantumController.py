@@ -491,7 +491,7 @@ setUserReg(4, err_cnt);"""
         self.sigouts_1_enables_1(0)
 
     def clock_freq(self):
-        return 1.8e9/(2**self.awgs_0_time())
+        return 1.8e9
 
     def assure_ext_clock(self) -> None:
         """
@@ -562,12 +562,16 @@ setUserReg(4, err_cnt);"""
         # Define the channels to use and subscribe to them
         self._acquisition_nodes = []
 
+        # Loop counter of AWG
+        loop_cnt = samples
+
         # Make some checks on the configured AWG program
         if samples > 1 and not self._awg_program_features['loop_cnt']:
             raise ziUHFQCSeqCError('Trying to acquire {} samples using an AWG program that does not use \'loop_cnt\'.'.format(samples))
 
         if averages > 1 and not self._awg_program_features['avg_cnt']:
-            raise ziUHFQCSeqCError('Trying to acquire {} averages using an AWG program that does not use \'avg_cnt\'.'.format(averages))
+            # Adjust the AWG loop counter according to the configured program
+            loop_cnt *= averages
 
         if mode == 'rl':
             for c in channels:
@@ -592,12 +596,12 @@ setUserReg(4, err_cnt);"""
             self.qas_0_monitor_averages(averages)
             ro_mode = 1
 
-        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_LOOP_CNT), samples)     
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_LOOP_CNT), loop_cnt)     
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_RO_MODE), ro_mode)     
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_AVG_CNT), averages)
         if self.wait_dly() > 0 and not self._awg_program_features['wait_dly']:
             raise ziUHFQCSeqCError('Trying to use a delay of {} using an AWG program that does not use \'wait_dly\'.'.format(self.wait_dly()))
-
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), self.wait_dly())
         self.subs(self._get_full_path('auxins/0/sample'))
 
         # Generate more dummy data
@@ -633,7 +637,6 @@ setUserReg(4, err_cnt);"""
 
         while accumulated_time < self.timeout() and not all(gotem):
             dataset = self.poll(acquisition_time)
-
             for n, p in enumerate(self._acquisition_nodes):
                 if p in dataset:
                     for v in dataset[p]:
@@ -709,7 +712,7 @@ setUserReg(4, err_cnt);"""
                  numpy.array(cosI))
         self.set('qas_0_integration_weights_{}_imag'.format(weight_function_I),
                  numpy.array(sinI))
-        self.set('qas_0_rotations_{}'.format(weight_function_I), scaling_factor*(1.0* + 1.0j))
+        self.set('qas_0_rotations_{}'.format(weight_function_I), scaling_factor*(1.0 + 1.0j))
         if weight_function_Q != None:
             self.set('qas_0_integration_weights_{}_real'.format(weight_function_Q),
                      numpy.array(sinI))
@@ -752,7 +755,7 @@ setUserReg(4, err_cnt);"""
     ##########################################################################
 
     def awg_sequence_acquisition_and_DIO_triggered_pulse(
-            self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0, timeout=5) -> None:
+            self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0, timeout=5) -> None:        
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
         self.wait_dly(delay_samples)
