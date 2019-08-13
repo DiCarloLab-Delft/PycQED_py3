@@ -9,8 +9,9 @@ import itertools
 import matplotlib as mpl
 from collections import OrderedDict
 from pycqed.analysis import analysis_toolbox as a_tools
-import pycqed.analysis_v2.base_analysis as ba
+import pycqed.analysis_v3.base_analysis as ba3
 import pycqed.analysis_v2.readout_analysis as roa
+from pycqed.analysis_v3 import fitting_and_plotting as fit_plt
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from sklearn.mixture import GaussianMixture as GM
 from copy import deepcopy
@@ -91,7 +92,8 @@ def filter(data_dict, data_keys_in, data_keys_out, **params):
     :param data_keys_out: list of key names or dictionary keys paths in
                     data_dict for the processed data to be saved into
     :param params: keyword arguments:
-        data_filter (function, default: lambda data: data): filtering condition
+        data_filter (str, default: 'lambda x: x'): filtering condition passed
+            as a string that will be evaluated with eval.
 
     Assumptions:
         - len(data_keys_out) == len(data_keys_in)
@@ -110,14 +112,14 @@ def filter(data_dict, data_keys_in, data_keys_out, **params):
                 data[all_keys[i]] = OrderedDict()
             else:
                 data = data[all_keys[i]]
-        data[all_keys[-1]] = data_filter_func(data_to_proc_dict[keyi])
+        data[all_keys[-1]] = eval(data_filter_func)(data_to_proc_dict[keyi])
     return data_dict
 
 
 def classify_gm(data_dict, data_keys_in, data_keys_out, **params):
     """
     BROKEN
-    TODO: need to correctly handle channle tuples
+    TODO: need to correctly handle channel tuples
 
     Predict gaussian mixture posterior probabilities for single shots
     of different levels of a qudit. Data to be classified expected in the
@@ -495,6 +497,162 @@ def rotate_1d_array(data_dict, data_keys_in, data_keys_out, **params):
     return data_dict
 
 
+## Plotting nodes ##
+def get_cal_state_color(cal_state_label):
+    if cal_state_label == 'g' or cal_state_label == r'$|g\rangle$':
+        return 'k'
+    elif cal_state_label == 'e' or cal_state_label == r'$|e\rangle$':
+        return 'gray'
+    elif cal_state_label == 'f' or cal_state_label == r'$|f\rangle$':
+        return 'C8'
+    else:
+        return 'C4'
+
+
+def get_latex_prob_label(prob_label):
+    if '$' in prob_label:
+        return prob_label
+    elif 'p' in prob_label.lower():
+        return r'$|{}\rangle$'.format(prob_label[prob_label.index('p')+1])
+    else:
+        return r'$|{}\rangle$'.format(prob_label)
+
+
+def prepare_1d_plot(data_dict, data_keys_in, fig_name, **params):
+
+    data_to_proc_dict = get_data_to_process(data_dict, data_keys_in)
+    cp = get_param('cal_points', data_dict, **params)
+    if cp is not None:
+        cp = eval(cp)
+    qb_channel_map = get_param('qb_channel_map', data_dict, **params)
+    if qb_channel_map is None:
+        qb_channel_map = get_qb_channel_map_from_file(
+            data_dict, data_keys_in,
+            qb_names=list(cp.get_states()), **params)
+
+    # get sweep points
+    # TODO: come up with a standard way sweep points are saved in metadata
+    # for now using sweep_points_dict in order to test existing measurements
+    sweep_points_dict = get_param('sweep_points_dict', data_dict,
+                                  **params)
+    sweep_points_dict = {k: cp.extend_sweep_points(v, k)
+                         for k, v in sweep_points_dict.items()}
+
+    data_axis_label = params.get('data_axis_label', None)
+    data_label = params.get('data_label', 'Data')
+    do_legend_data = params.get('do_legend_data', True)
+    do_legend_cal_states = params.get('do_legend_cal_states', True)
+    plot_name_suffix = params.get('plot_name_suffix', '')
+    title_suffix = params.get('title_suffix', '')
+
+    plotsize = fit_plt.get_default_plot_params(set=False)['figure.figsize']
+    plotsize = (plotsize[0], plotsize[0]/1.25)
+
+    plot_dicts = OrderedDict()
+    plot_names_cal = []
+    for i, keyi in enumerate(data_to_proc_dict):
+        qb_name = [k for k, v in qb_channel_map.items() if keyi == v[0]][0]
+        title_suffix = qb_name + title_suffix
+
+        msmt_data = data_to_proc_dict[keyi]
+        msmt_swpts = sweep_points_dict[qb_name]
+
+        if cp is not None:
+            if len(qb_channel_map) != len(cp.get_states()):
+                raise ValueError('qb_channel_map and cp_list do not have '
+                                 'the same length.')
+
+            msmt_data = cp.get_msmt_array(data_to_proc_dict[keyi], qb_name)
+            msmt_swpts = cp.get_msmt_array(sweep_points_dict[qb_name], qb_name)
+            cal_data = cp.get_cal_array(data_to_proc_dict[keyi], qb_name)
+            cal_swpts = cp.get_cal_array(sweep_points_dict[qb_name], qb_name)
+
+            qb_cal_indxs = cp.get_indices()[qb_name]
+            # plot cal points
+            for ii, cal_pts_idxs in enumerate(qb_cal_indxs.values()):
+                plot_dict_name_cal = list(qb_cal_indxs)[ii] + \
+                                     '_' + qb_name + '_' + plot_name_suffix
+                plot_names_cal += [plot_dict_name_cal]
+                plot_dicts[plot_dict_name_cal] = {
+                    'fig_id': fig_name,
+                    'plotfn': 'plot_line',
+                    'plotsize': plotsize,
+                    'xvals': cal_swpts[cal_pts_idxs],
+                    'yvals': cal_data[cal_pts_idxs],
+                    'setlabel': list(qb_cal_indxs)[ii],
+                    'do_legend': do_legend_cal_states,
+                    'legend_bbox_to_anchor': (1, 0.5),
+                    'legend_pos': 'center left',
+                    'linestyle': 'none',
+                    'line_kws': {'color': get_cal_state_color(
+                        list(qb_cal_indxs)[ii])}}
+
+                plot_dicts[plot_dict_name_cal+'_line'] = {
+                    'fig_id': fig_name,
+                    'plotsize': plotsize,
+                    'plotfn': 'plot_hlines',
+                    'y': np.mean(cal_data[cal_pts_idxs]),
+                    'xmin': sweep_points_dict[qb_name][0],
+                    'xmax': sweep_points_dict[qb_name][-1],
+                    'colors': 'gray'}
+
+        title = (data_dict['timestamp'] + ' ' + data_dict['measurementstring'])
+        if title_suffix is not None:
+            title += '\n' + title_suffix
+
+        plot_dict_name = fig_name + '_' + plot_name_suffix
+        # get x info (try for old sequences which do not have info in metadata
+        hard_sweep_params = get_param('hard_sweep_params', data_dict)
+        sweep_name = get_param('sweep_name', data_dict)
+        sweep_unit = get_param('sweep_unit', data_dict)
+        if hard_sweep_params is not None:
+            xlabel = list(hard_sweep_params)[0]
+            xunit = list(hard_sweep_params.values())[0][
+                'unit']
+        elif (sweep_name is not None) and (sweep_unit is not None):
+            xlabel = sweep_name
+            xunit = sweep_unit
+        else:
+            xlabel = data_dict['sweep_parameter_names']
+            xunit = data_dict['sweep_parameter_units']
+        if np.ndim(xunit) > 0:
+            xunit = xunit[0]
+
+        if data_axis_label is None:
+            data_axis_label = '{} state population'.format(
+                get_latex_prob_label(keyi))
+
+        plot_dicts[plot_dict_name] = {
+            'plotfn': 'plot_line',
+            'fig_id': fig_name,
+            'plotsize': plotsize,
+            'xvals': msmt_swpts,
+            'xlabel': xlabel,
+            'xunit': xunit,
+            'yvals': msmt_data,
+            'ylabel': data_axis_label,
+            'yunit': '',
+            'setlabel': data_label,
+            'title': title,
+            'linestyle': 'none',
+            'do_legend': do_legend_data,
+            'legend_bbox_to_anchor': (1, 0.5),
+            'legend_pos': 'center left'}
+
+    if len(plot_names_cal) > 0:
+        if do_legend_data and not do_legend_cal_states:
+            for plot_name in plot_names_cal:
+                plot_dict_cal = plot_dicts.pop(plot_name)
+                plot_dicts[plot_name] = plot_dict_cal
+
+    if 'plot_dicts' in data_dict:
+        data_dict['plot_dicts'].update(plot_dicts)
+    else:
+        data_dict['plot_dicts'] = plot_dicts
+
+
+## Nodes that are classes ##
+
 class RabiAnalysis(object):
     def __init__(self, data_dict, data_keys_in, **params):
         """
@@ -510,8 +668,19 @@ class RabiAnalysis(object):
         self.data_to_proc_dict = get_data_to_process(
             self.data_dict, self.data_keys_in)
 
-        if params.get('auto', False):
+        if params.get('auto', True):
             self.process_data(**params)
+            if params.get('do_fitting', True):
+                self.prepare_fitting()
+                getattr(fit_plt, 'run_fitting')(self.data_dict, **params)
+                self.analyze_fit_results()
+            if params.get('prepare_plots', True):
+                self.prepare_plots()
+            if params.get('do_plotting', True):
+                getattr(fit_plt, 'plot')(self.data_dict, **params)
+
+    def __call__(self, *args, **kwargs):
+        return self.data_dict
 
     def process_data(self, **params):
         self.cp = get_param('cal_points', self.data_dict, **params)
@@ -574,9 +743,16 @@ class RabiAnalysis(object):
                 'fit_yvals': {'data': data_fit},
                 'guess_pars': guess_pars}
 
-        self.data_dict['fit_dicts'] = fit_dicts
+        if 'fit_dicts' in self.data_dict:
+            self.data_dict['fit_dicts'].update(fit_dicts)
+        else:
+            self.data_dict['fit_dicts'] = fit_dicts
 
-    def analyze_fit_results(self, fit_dicts):
+    def analyze_fit_results(self):
+        if 'fit_dicts' in self.data_dict:
+            fit_dicts = self.data_dict['fit_dicts']
+        else:
+            raise KeyError('data_dict does not contain fit_dicts.')
         rabi_amplitudes = OrderedDict()
         for keyi in self.data_to_proc_dict:
             qb_name = [k for k, v in
@@ -586,20 +762,30 @@ class RabiAnalysis(object):
                                                 qb_name)
             rabi_amplitudes[qb_name] = self.get_amplitudes(
                 fit_res=fit_res, sweep_points=msmt_swpts)
-        self.data_dict['analysis_params_dict'] = rabi_amplitudes
 
-    def prepare_plots(self, fit_dicts):
+        if 'analysis_params_dict' in self.data_dict:
+            self.data_dict['analysis_params_dict'].update(rabi_amplitudes)
+        else:
+            self.data_dict['analysis_params_dict'] = rabi_amplitudes
+
+    def prepare_plots(self):
+        if 'fit_dicts' in self.data_dict:
+            fit_dicts = self.data_dict['fit_dicts']
+        else:
+            raise KeyError('data_dict does not contain fit_dicts.')
         plot_dicts = OrderedDict()
         for keyi, data in self.data_to_proc_dict.items():
             qb_name = [k for k, v in
                        self.qb_channel_map.items() if keyi == v[0]][0]
 
             base_plot_name = 'Rabi_' + qb_name
-            # self.prepare_projected_data_plot(
-            #     fig_name=base_plot_name,
-            #     data=data,
-            #     plot_name_suffix=qb_name+'fit',
-            #     qb_name=qb_name)
+            prepare_1d_plot(
+                data_dict=self.data_dict,
+                data_keys_in=[keyi],
+                fig_name=base_plot_name,
+                data=data,
+                plot_name_suffix=qb_name+'fit',
+                qb_name=qb_name)
 
             fit_res = fit_dicts['cos_fit_' + qb_name]['fit_res']
             plot_dicts['fit_' + qb_name] = {
@@ -694,12 +880,16 @@ class RabiAnalysis(object):
                 plot_dicts['text_msg_' + qb_name] = {
                     'fig_id': base_plot_name,
                     'ypos': -0.2,
-                    'xpos': 0,
+                    'xpos': -0.05,
                     'horizontalalignment': 'left',
                     'verticalalignment': 'top',
                     'plotfn': 'plot_text',
                     'text_string': textstr}
-        self.data_dict['plot_dicts'] = plot_dicts
+
+        if 'plot_dicts' in self.data_dict:
+            self.data_dict['plot_dicts'].update(plot_dicts)
+        else:
+            self.data_dict['plot_dicts'] = plot_dicts
 
     def get_amplitudes(self, fit_res, sweep_points):
         # Extract the best fitted frequency and phase.
@@ -803,10 +993,12 @@ class RabiAnalysis(object):
 
         return rabi_amplitudes
 
-    def calculate_pulse_stderr(self, f, phi, f_err, phi_err,
+    @staticmethod
+    def calculate_pulse_stderr(f, phi, f_err, phi_err,
                                period_num, cov=0):
         x = period_num + phi
         return np.sqrt((f_err*x/(2*np.pi*(f**2)))**2 +
                        (phi_err/(2*np.pi*f))**2 -
                        2*(cov**2)*x/((2*np.pi*(f**3))**2))[0]
+
 
