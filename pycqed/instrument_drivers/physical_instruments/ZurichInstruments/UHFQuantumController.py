@@ -3,9 +3,6 @@ To do:
 - split off application dependent code, as done for ZI_HDAWG8.py
 
 Notes:
-- this driver builds on zhinst.ziPython and zhinst.utils directly, whereas the HDAWG driver inserts zishell_NH and
-  ZI_base_instrument on top of these.
-- some code (get*, set*) in this driver resembles code in zishell_NH and ZI_base_instrument
 
 
 Changelog:
@@ -38,6 +35,14 @@ Changelog:
 
 20190618 WJV
 - merged branch 'develop' into 'feature/cc', changes:
+
+20190813 NH
+- merged branch 'develop' into 'feature/ZIupdateDrivers'
+- Updated driver to use new UHFQA nodes
+- Updated to support dynamic waveform upload properly. The AWG is configured when start() is called and the
+    driver then chooses whether it is necessary to recompile the AWG program. The program will be recompiled
+    if waveform lengths have changed. Otherwise, if waveforms have been updated they will just be downloaded
+    directly to the instrument.
 
 """
 
