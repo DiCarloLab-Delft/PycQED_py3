@@ -150,8 +150,8 @@ class UHFQC(zibase.ZI_base_instrument):
     """
 
     # Define minimum required revisions
-    FWREVISION = 63210
-    FPGAREVISION = 63133
+    MIN_FWREVISION = 63210
+    MIN_FPGAREVISION = 63133
 
     # Define user registers
     USER_REG_LOOP_CNT = 0
@@ -245,11 +245,11 @@ class UHFQC(zibase.ZI_base_instrument):
         """
         Checks that sufficient versions of the firmware are available.
         """
-        if self.geti('system/fwrevision') < UHFQC.FWREVISION:
-            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(UHFQC.FWREVISION, self.geti('system/fwrevision')))
+        if self.geti('system/fwrevision') < UHFQC.MIN_FWREVISION:
+            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(UHFQC.MIN_FWREVISION, self.geti('system/fwrevision')))
 
-        if self.geti('system/fpgarevision') < UHFQC.FPGAREVISION:
-            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(UHFQC.FPGAREVISION, self.geti('system/fpgarevision')))
+        if self.geti('system/fpgarevision') < UHFQC.MIN_FPGAREVISION:
+            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(UHFQC.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
 
     def _reset_awg_program_features(self):
         """
