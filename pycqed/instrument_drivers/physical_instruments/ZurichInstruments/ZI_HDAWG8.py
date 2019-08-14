@@ -65,9 +65,12 @@ import time
 import logging
 import numpy
 import re
+import os
+import pycqed
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
+import pycqed.instrument_drivers.physical_instruments.QuTech_CCL as qtccl
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
@@ -219,7 +222,7 @@ while (1) {
                 # CC-Light and CC.
                 # bits[0:3] for awg0_ch0, bits[4:6] for awg0_ch1 etc.
                 self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
-                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), awg_nr*6 + 3)
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), awg_nr*6)
 
                 mask_0 = 0b000111  # AWGx_ch0 uses lower bits for CW
                 mask_1 = 0b111000  # AWGx_ch1 uses higher bits for CW
@@ -300,7 +303,7 @@ while (1) {
             cw[n] = (d & ((1 << 10)-1))
         return (ts, cw)
 
-    def _ensure_activity(self, awg_nr, timeout=5, verbose=False):
+    def _ensure_activity(self, awg_nr, mask_value=None, timeout=5, verbose=False):
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
@@ -310,7 +313,11 @@ while (1) {
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
-        cw_mask      = self.geti('awgs/{}/dio/mask/value'.format(awg_nr)) << self.geti('awgs/{}/dio/mask/shift'.format(awg_nr))
+        
+        if mask_value is None:
+            mask_value = self.geti('awgs/{}/dio/mask/value'.format(awg_nr))
+
+        cw_mask      = mask_value << self.geti('awgs/{}/dio/mask/shift'.format(awg_nr))
 
         for i in range(timeout):
             valid = True
@@ -414,10 +421,10 @@ while (1) {
 
             sequence_length = 8
             staircase_sequence = numpy.arange(1, sequence_length)
-            expected_sequence = [(0, list(staircase_sequence)), \
-                                 (1, list(staircase_sequence)), \
-                                 (2, list(staircase_sequence)), \
-                                 (3, list(staircase_sequence))]
+            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (3, list(staircase_sequence)]
         elif self.cfg_codeword_protocol() == 'microwave':
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
                 '..','examples','CCLight_example',
@@ -442,7 +449,7 @@ while (1) {
         self.upload_codeword_program()
 
         for awg, sequence in expected_sequence:
-            if not self._ensure_activity(awg, verbose=verbose):
+            if not self._ensure_activity(awg, mask_value=numpy.bitwise_or.reduce(sequence), verbose=verbose):
                 raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
         valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
