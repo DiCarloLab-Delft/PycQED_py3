@@ -485,11 +485,17 @@ class QuTech_AWG_Module(SCPI):
                            label='Waveform list size',
                            unit='#',
                            get_cmd='wlist:size?',
-                           get_parser=int)
+                           get_parser=int,
+                           snapshot_exclude=True)
+        # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        self._params_exclude_snapshot.append('WlistSize')
 
         self.add_parameter('Wlist',
                            label='Waveform list',
-                           get_cmd=self._getWlist)
+                           get_cmd=self._getWlist,
+                           snapshot_exclude=True)
+        # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        self._params_exclude_snapshot.append('Wlist')
 
         self.add_parameter('get_system_status',
                            unit='JSON',
