@@ -168,29 +168,6 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         else:
             self._num_channels = 4
 
-    def _codeword_table_preamble(self, awg_nr):
-        """
-        Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
-        The generated code depends on the instrument type. For the HDAWG instruments, we use the seWaveDIO
-        function.
-        """
-        program = ''
-        
-        # because awg_channels come in pairs
-        ch = awg_nr*2           
-
-        for cw in range(self._num_codewords):
-            parnames = 2*['']
-            csvnames = 2*['']
-            # Every AWG drives two channels
-            for i in range(2):
-                parnames[i] = zibase.gen_waveform_name(ch+i, cw)  # NB: parameter naming identical to QWG
-                csvnames[i] = self.devname + '_' + parnames[i]
-            
-            program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(cw, csvnames[0], csvnames[1])
-
-        return program
-
     def load_default_settings(self):
         """
         bring device into known state
