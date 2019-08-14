@@ -232,7 +232,6 @@ class Base_MW_LutMan(Base_LutMan):
                         f_modulation=self.mw_modulation(),
                         sampling_rate=self.sampling_rate())
                 elif 'sq_amp' in self.parameters:
-                    print('Hello my friend!')
                     self._wave_dict[idx] = wf.mod_square(
                         amp=self.sq_amp(), length=self.mw_gauss_width()*4,
                         f_modulation=self.mw_modulation(),  phase=0,
