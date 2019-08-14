@@ -152,7 +152,7 @@ class QuTech_AWG_Module(SCPI):
                                set_cmd=triglev_cmd + ' {}',
                                vals=self.device_descriptor.mvals_trigger_level,
                                get_parser=float,
-                               snapshot_value=False)
+                               snapshot_exclude=True)
 
             # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
             self._params_exclude_snapshot.append(triglev_name)
@@ -325,7 +325,7 @@ class QuTech_AWG_Module(SCPI):
                                label=('DAC {}, set digital value').format(ch),
                                set_cmd=dac_digital_value_cmd + ' {}',
                                vals=vals.Ints(0, 4095),
-                               snapshot_value=False,
+                               snapshot_exclude=True,
                                docstring='FOR DEVELOPMENT ONLY: Set a digital value directly into the DAC\n'
                                + 'Used for testing the DACs.\n'
                                  + 'Notes:\n\tThis command will also set the '
@@ -422,7 +422,7 @@ class QuTech_AWG_Module(SCPI):
                                    get_cmd=cw_cmd+'?',
                                    set_cmd=cw_cmd+' "{:s}"',
                                    vals=vals.Strings(),
-                                   snapshot_value=False)
+                                   snapshot_exclude=True)
                 # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(cw_param)
 
@@ -501,7 +501,7 @@ class QuTech_AWG_Module(SCPI):
                         self._set_cw_waveform, ch, cw),
                     get_cmd=self._gen_ch_cw_get_func(
                         self._get_cw_waveform, ch, cw),
-                    snapshot_value=False,
+                    snapshot_exclude=True,
                     docstring=docst)
                 # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(parname)
