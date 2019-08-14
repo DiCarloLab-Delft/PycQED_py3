@@ -23,14 +23,22 @@ log = logging.getLogger(__name__)
 def gen_waveform_name(ch, cw):
     """
     Returns a standard waveform name based on channel and codeword number.
-    Note the use of 1-based indexing of the channels.
+    Note the use of 1-based indexing of the channels. To clarify, the 
+    'ch' argument to this function is 0-based, but the naming of the actual
+    waveforms as well as the signal outputs of the instruments are 1-based.
+    The function will map 'logical' channel 0 to physical channel 1, and so on.
+
     """
     return 'wave_ch{}_cw{:03}'.format(ch+1, cw)
 
 def gen_partner_waveform_name(ch, cw):
     """
     Returns a standard waveform name for the partner waveform of a dual-channel
-    waveform.
+    waveform. The physical channel indexing is 1-based where as the logical channel
+    indexing (i.e. the argument to this function) is 0-based. To clarify, the 
+    'ch' argument to this function is 0-based, but the naming of the actual
+    waveforms as well as the signal outputs of the instruments are 1-based.
+    The function will map 'logical' channel 0 to physical channel 1, and so on.
     """
     return gen_waveform_name(2*(ch//2) + ((ch + 1) % 2), cw)
 
@@ -43,36 +51,47 @@ def merge_waveforms(chan0=None, chan1=None, marker=None):
     chan0_uint  = None
     chan1_uint  = None
     marker_uint = None
-    mode = 0
+
+    # The 'array_format' variable is used internally in this function in order to
+    # control the order and number of uint16 words that we put together for each
+    # sample of the final array. The variable is essentially interpreted as a bit
+    # mask where each bit indicates which channels/marker values to include in
+    # the final array. Bit 0 for chan0 data, 1 for chan1 data and 2 for marker data.
+    array_format = 0
     
     if chan0 is not None:
         chan0_uint = numpy.array((numpy.power(2, 15)-1)*chan0, dtype=numpy.uint16)
-        mode += 1
+        array_format += 1
     if chan1 is not None:
         chan1_uint = numpy.array((numpy.power(2, 15)-1)*chan1, dtype=numpy.uint16)
-        mode += 2 
+        array_format += 2 
     if marker is not None:
         marker_uint = numpy.array(marker, dtype=numpy.uint16)
-        mode += 4
+        array_format += 4
     
-    if mode == 1:
+    if array_format == 1:
         return chan0_uint
-    elif mode == 2:
+    elif array_format == 2:
         return chan1_uint
-    elif mode == 3:
+    elif array_format == 3:
         return numpy.vstack((chan0_uint, chan1_uint)).reshape((-2,),order='F')
-    elif mode == 4:
+    elif array_format == 4:
         return marker_uint
-    elif mode == 5:
+    elif array_format == 5:
         return numpy.vstack((chan0_uint, marker_uint)).reshape((-2,),order='F')
-    elif mode == 6:
+    elif array_format == 6:
         return numpy.vstack((chan1_uint, marker_uint)).reshape((-2,),order='F')
-    elif mode == 7:
+    elif array_format == 7:
         return numpy.vstack((chan0_uint, chan1_uint, marker_uint)).reshape((-2,),order='F')
     else:
         return []
 
 def plot_timing_diagram(data, bits, line_length=30):
+    """
+    Takes list of 32-bit integer values as read from the 'raw/dios/0/data' device nodes and creates
+    a timing diagram of the result. The timing diagram can be used for verifying that e.g. the
+    strobe signal (A.K.A the toggle signal) is periodic.
+    """
     def _plot_lines(ax, pos, *args, **kwargs):
         if ax == 'x':
             for p in pos:
@@ -110,6 +129,12 @@ def plot_timing_diagram(data, bits, line_length=30):
         _plot_timing_diagram(d, bits)
 
 def plot_codeword_diagram(ts, cws, range=None):
+    """
+    Takes a list of timestamps (X) and codewords (Y) and produces a simple 'stem' plot of the two.
+    The plot is useful for visually checking that the codewords are detected at regular intervals.
+    Can also be used for visual verification of standard codeword patterns such as the staircase used
+    for calibration.
+    """
     plt.figure(figsize=(20, 10))
     plt.stem((numpy.array(ts)-ts[0])*10.0/3, numpy.array(cws))
     if range is not None:
@@ -192,8 +217,15 @@ class ziConfigurationError(Exception):
 class MockDAQServer():
     """
     This class implements a mock version of the DAQ object used for
-    communicating with the instruments.
-    WARNING: The mock version is not yet working!
+    communicating with the instruments. It contains dummy declarations of
+    the most important methods implemented by the server and used by
+    the instrument drivers.
+
+    Important: The Mock server creates some default 'nodes' (basically
+    just entries in a 'dict') based on the device name that is used when
+    connecting to a device. These nodes differ depending on the instrument
+    type, which is determined by the number in the device name: dev2XXX are
+    UHFQA instruments and dev8XXX are HDAWG8 instruments.
     """
     def __init__(self, server, port, apilevel, verbose=False):
         self.server = server
@@ -403,7 +435,12 @@ class MockDAQServer():
 class MockAwgModule():
     """
     This class implements a mock version of the awgModule object used for
-    compiling and uploading AWG programs.
+    compiling and uploading AWG programs. It doesn't actually compile anything, but
+    only maintains a counter of how often the compilation method has been executed.
+
+    For the future, the class could be updated to allow the user to select whether
+    the next compilation should be successful or not in order to enable more
+    flexibility in the unit tests of the actual drivers.
     """
     def __init__(self, daq):
         self._daq = daq
@@ -463,6 +500,21 @@ class MockAwgModule():
 class ZI_base_instrument(Instrument):
     """
     This is a base class for Zurich Instruments instrument drivers.
+    It includes functionality that is common to all instruments. It maintains
+    a list of available nodes as JSON files in the 'zi_parameter_files'
+    subfolder. The parameter files should be regenerated when newer versions
+    of the firmware are installed on the instrument.
+
+    The base class also manages waveforms for the instruments. The waveforms
+    are kept in a table, which is kept synchronized with CSV files in the
+    awg/waves folder belonging to LabOne. The base class will select whether
+    to compile and configure an instrument based on changes to the waveforms
+    and to the requested AWG program. Basically, if a waveform changes length
+    or if the AWG program changes, then the program will be compiled and
+    uploaded the next time the user executes the 'start' method. If a waveform
+    has changed, but the length is the same, then the waveform will simply
+    be updated on the instrument using a a fast waveform upload technique. Again,
+    this is triggered when the 'start' method is called.
     """
 
     ##########################################################################
@@ -485,6 +537,7 @@ class ZI_base_instrument(Instrument):
             interface       (str) the name of the interface to use ('1GbE' or 'USB')
             server          (str) the host where the ziDataServer is running
             port            (int) the port to connect to for the ziDataServer (don't change)
+            apilevel        (int) the API version level to use (don't change unless you know what you're doing)
             num_codewords   (int) the number of codeword-based waveforms to prepare
         """
         t0 = time.time()
@@ -571,6 +624,9 @@ class ZI_base_instrument(Instrument):
     ##########################################################################
 
     def _check_devtype(self):
+        """
+        Checks that the driver is used with the correct device-type.
+        """
         raise NotImplementedError('Virtual method with no implementation!')
 
     def _check_options(self):
@@ -811,6 +867,9 @@ class ZI_base_instrument(Instrument):
         return paths
 
     def _get_awg_directory(self):
+        """
+        Returns the AWG directory where waveforms should be stored.
+        """
         return os.path.join(self._awgModule.get('awgModule/directory')['directory'][0], 'awg')
 
     def _initialize_waveform_to_zeros(self):
@@ -1121,8 +1180,12 @@ class ZI_base_instrument(Instrument):
     def close(self) -> None:
         try:
             if self._is_device_connected(self.devname):
-                # Stop all AWG's
-                self.stop()
+                # Stop all AWG's. In case errors are flagged we demote them
+                # to warnings.
+                try:
+                    self.stop()
+                except ziRuntimeError as err:
+                    log.error(str(err))
                 # Disconnect device from server
                 self.daq.disconnectDevice(self.devname)
             # Disconnect application server
