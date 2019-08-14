@@ -113,6 +113,74 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         """
         super().__init__(name=name, device=device, interface=interface, server=server, port=port, num_codewords=num_codewords, **kw)
 
+        # Ensure snapshot is fairly small for HDAWGs 
+        self._snapshot_whitelist = {
+            'IDN', 
+            'clockbase', 
+            'system_clocks_referenceclock_source', 
+            'system_clocks_referenceclock_status', 
+            'system_clocks_referenceclock_freq'}
+        for i in range(4): 
+            self._snapshot_whitelist.update({
+                'awgs_{}_enable'.format(i), 
+                'awgs_{}_outputs_0_amplitude'.format(i), 
+                'awgs_{}_outputs_1_amplitude'.format(i), 
+                'awgs_{}_sequencer_program_crc32_hash'.format(i)})
+
+        for i in range(8): 
+            self._snapshot_whitelist.update({
+                'sigouts_{}_direct'.format(i), 'sigouts_{}_offset'.format(i),
+                'sigouts_{}_on'.format(i) , 'sigouts_{}_range'.format(i)})
+
+        self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
+        
+    def snapshot_base(self, update: bool=False,
+                      params_to_skip_update =None, 
+                      params_to_exclude = None ):
+        """
+        State of the instrument as a JSON-compatible dict.
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+        Returns:
+            dict: base snapshot
+        """
+
+
+        if params_to_exclude is None: 
+            params_to_exclude = self._params_to_exclude
+
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                pass 
+            elif params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+                try:
+                    snap['parameters'][name] = param.snapshot(update=update_par)
+                except:
+                    logging.info("Snapshot: Could not update parameter: {}".format(name))
+                    snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
+        return snap
+
     ##########################################################################
     # 'public' functions: application specific/codeword support
     ##########################################################################
@@ -145,6 +213,33 @@ while (1) {
     playWaveDIO();
 }'''
             self._awg_needs_configuration[awg_nr] = True
+
+    ##########################################################################
+    # 'private' functions: application specific/codeword support
+    ##########################################################################
+
+    def _codeword_table_preamble(self, awg_nr):
+        """
+        Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
+        The generated code depends on the instrument type. For the HDAWG instruments, we use the seWaveDIO
+        function.
+        """
+        program = ''
+        
+        # because awg_channels come in pairs
+        ch = awg_nr*2           
+
+        for cw in range(self._num_codewords):
+            parnames = 2*['']
+            csvnames = 2*['']
+            # Every AWG drives two channels
+            for i in range(2):
+                parnames[i] = zibase.gen_waveform_name(ch+i, cw)  # NB: parameter naming identical to QWG
+                csvnames[i] = self.devname + '_' + parnames[i]
+            
+            program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(cw, csvnames[0], csvnames[1])
+
+        return program
 
     # FIXME: should probably be private as it works in tandem with upload_codeword_program
     def _configure_codeword_protocol(self, default_dio_timing: bool=False):
@@ -424,7 +519,7 @@ while (1) {
             expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
                                  (1, list(staircase_sequence + (staircase_sequence << 3))), \
                                  (2, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (3, list(staircase_sequence)]
+                                 (3, list(staircase_sequence))]
         elif self.cfg_codeword_protocol() == 'microwave':
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
                 '..','examples','CCLight_example',
