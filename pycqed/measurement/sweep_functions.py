@@ -1142,7 +1142,7 @@ class two_par_joint_sweep(Soft_Sweep):
 
 class FLsweep(Soft_Sweep):
     """
-    Special sweep function for AWG8 flux pulses.
+    Special sweep function for AWG8 and QWG flux pulses.
     """
     def __init__(self, lm, par, waveform_name):
         super().__init__()
@@ -1154,50 +1154,32 @@ class FLsweep(Soft_Sweep):
         self.name = par.name
 
 
-        AWG = self.lm.AWG.get_instr()
-        awg_unit = self.lm.cfg_awg_channel()//2
-        self.AWG_ready_par = AWG.parameters['awgs_{}_ready'.format(awg_unit)]
+        self.AWG = self.lm.AWG.get_instr()
+        self.awg_model_QWG = self.AWG.IDN()['model'] == 'QWG'
 
-    def set_parameter(self, val):
+
+    def set_parameter(self, val): 
+        if self.awg_model_QWG: 
+            self.set_parameter_QWG(val)
+        else: 
+            self.set_parameter_HDAWG(val)
+
+    def set_parameter_HDAWG(self, val):
+
+
         self.par(val)
         self.lm.load_waveform_realtime(self.waveform_name,
                                        regenerate_waveforms=True)
         return 
 
-
-
-
-
-class FLsweep_QWG(Soft_Sweep):
-    """
-    Special sweep function for QWG flux pulses.
-    """
-    def __init__(self, lm, par, waveform_name, realtime_loading=True,
-                 other_waveform=None, **kw):
-        super().__init__(**kw)
-        self.lm = lm
-        self.par = par
-        self.waveform_name = waveform_name
-        self.parameter_name = par.name
-        self.unit = par.unit
-        self.name = par.name
-        self.realtime_loading = realtime_loading
-        self.other_waveform = other_waveform
-
-    def prepare(self, **kw):
-        awg = self.lm.AWG.get_instr()
-        awg.stop()
-        self.lm.load_waveform_onto_AWG_lookuptable(
-            self.waveform_name, regenerate_waveforms=True)
-        awg.start()
-
-    def set_parameter(self, val):
+    def set_parameter_QWG(self, val): 
         self.par(val)
-        awg = self.lm.AWG.get_instr()
-        awg.stop()
+        self.AWG.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
             self.waveform_name, regenerate_waveforms=True)
-        awg.start()
+        self.AWG.start()
+        self.AWG.getOperationComplete()
+
 
 
 class Nested_resonator_tracker(Soft_Sweep):

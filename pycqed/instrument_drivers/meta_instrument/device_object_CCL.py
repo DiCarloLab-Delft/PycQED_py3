@@ -1446,15 +1446,11 @@ class DeviceCCL(Instrument):
             self.prepare_for_timedomain(qubits=[q0, q_spec])
 
         awg = fl_lutman.AWG.get_instr()
-        using_QWG = (awg.__class__.__name__ == 'QuTech_AWG_Module')
+        using_QWG = self.find_instrument(q0)._using_QWG()
 
         if using_QWG:
             awg_ch = fl_lutman.cfg_awg_channel()
             amp_par = awg.parameters['ch{}_amp'.format(awg_ch)]
-            sw = swf.FLsweep_QWG(fl_lutman, length_par,
-                                 realtime_loading=True,
-                                 waveform_name=waveform_name)
-
         else:
             awg_ch = fl_lutman.cfg_awg_channel()-1  # -1 is to account for starting at 1
             ch_pair = awg_ch % 2
@@ -1462,8 +1458,9 @@ class DeviceCCL(Instrument):
 
             amp_par = awg.parameters['awgs_{}_outputs_{}_amplitude'.format(
                 awg_nr, ch_pair)]
-            sw = swf.FLsweep(fl_lutman, length_par,
-                             waveform_name=waveform_name)
+
+        sw = swf.FLsweep(fl_lutman, length_par,
+                         waveform_name=waveform_name)
 
         p = mqo.Chevron(q0idx, q_specidx, buffer_time=40e-9,
                         buffer_time2=max(lengths)+40e-9,
@@ -1768,6 +1765,7 @@ class DeviceCCL(Instrument):
         p = sqo.FluxTimingCalibration(q0idx,
                               times=[40e-9],
                               platf_cfg=self.cfg_openql_platform_fn(),
+                              flux_cw='fl_cw_06', 
                               cal_points=False)
         CC.eqasm_program(p.filename)
 
