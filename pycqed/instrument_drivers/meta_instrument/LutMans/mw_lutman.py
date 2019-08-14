@@ -734,10 +734,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         M_D = wf.mixer_predistortion_matrix(self.D_mixer_alpha(),
                                             self.D_mixer_phi())
 
-        print(self.LutMap())
-
         for key, val in wave_dict.items():
-            print(key, len(val))
             GI, GQ = np.dot(M_G, val[0:2])  # Mixer correction Gaussian comp.
             DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
             wave_dict[key] = GI, GQ, DI, DQ
