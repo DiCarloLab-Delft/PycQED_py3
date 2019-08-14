@@ -1,7 +1,7 @@
 import json
 import os
 import time
-import numpy
+import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import re
@@ -60,13 +60,13 @@ def merge_waveforms(chan0=None, chan1=None, marker=None):
     array_format = 0
     
     if chan0 is not None:
-        chan0_uint = numpy.array((numpy.power(2, 15)-1)*chan0, dtype=numpy.uint16)
+        chan0_uint = np.array((np.power(2, 15)-1)*chan0, dtype=np.uint16)
         array_format += 1
     if chan1 is not None:
-        chan1_uint = numpy.array((numpy.power(2, 15)-1)*chan1, dtype=numpy.uint16)
+        chan1_uint = np.array((np.power(2, 15)-1)*chan1, dtype=np.uint16)
         array_format += 2 
     if marker is not None:
-        marker_uint = numpy.array(marker, dtype=numpy.uint16)
+        marker_uint = np.array(marker, dtype=np.uint16)
         array_format += 4
     
     if array_format == 1:
@@ -74,15 +74,15 @@ def merge_waveforms(chan0=None, chan1=None, marker=None):
     elif array_format == 2:
         return chan1_uint
     elif array_format == 3:
-        return numpy.vstack((chan0_uint, chan1_uint)).reshape((-2,),order='F')
+        return np.vstack((chan0_uint, chan1_uint)).reshape((-2,),order='F')
     elif array_format == 4:
         return marker_uint
     elif array_format == 5:
-        return numpy.vstack((chan0_uint, marker_uint)).reshape((-2,),order='F')
+        return np.vstack((chan0_uint, marker_uint)).reshape((-2,),order='F')
     elif array_format == 6:
-        return numpy.vstack((chan1_uint, marker_uint)).reshape((-2,),order='F')
+        return np.vstack((chan1_uint, marker_uint)).reshape((-2,),order='F')
     elif array_format == 7:
-        return numpy.vstack((chan0_uint, chan1_uint, marker_uint)).reshape((-2,),order='F')
+        return np.vstack((chan0_uint, chan1_uint, marker_uint)).reshape((-2,),order='F')
     else:
         return []
 
@@ -103,13 +103,13 @@ def plot_timing_diagram(data, bits, line_length=30):
     def _plot_timing_diagram(data, bits):
         plt.figure(figsize=(20, 0.5*len(bits)))
 
-        t = numpy.arange(len(data))
-        _plot_lines('y', 2*numpy.arange(len(bits)), color='.5', linewidth=2)
+        t = np.arange(len(data))
+        _plot_lines('y', 2*np.arange(len(bits)), color='.5', linewidth=2)
         _plot_lines('x', t[0:-1:2], color='.5', linewidth=0.5)
 
         for n, i in enumerate(reversed(bits)):
             line = [((x >> i) & 1) for x in data]
-            plt.step(t, numpy.array(line) + 2*n, 'r', linewidth = 2, where='post')
+            plt.step(t, np.array(line) + 2*n, 'r', linewidth = 2, where='post')
             plt.text(-0.5, 2*n, str(i))
 
         plt.xlim([t[0], t[-1]])
@@ -136,10 +136,10 @@ def plot_codeword_diagram(ts, cws, range=None):
     for calibration.
     """
     plt.figure(figsize=(20, 10))
-    plt.stem((numpy.array(ts)-ts[0])*10.0/3, numpy.array(cws))
+    plt.stem((np.array(ts)-ts[0])*10.0/3, np.array(cws))
     if range is not None:
         plt.xlim(range[0], range[1])
-        xticks = numpy.arange(range[0], range[1], step=20)
+        xticks = np.arange(range[0], range[1], step=20)
         while len(xticks) > 20:
             xticks = xticks[::2]
         plt.xticks(xticks)
@@ -275,11 +275,11 @@ class MockDAQServer():
         if self.devtype == 'UHFQA':
             self.nodes['/' + self.device + '/features/options'] = {'type': 'String', 'value':'QA\nAWG'}
             for i in range(16):
-                self.nodes['/' + self.device + '/awgs/0/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+                self.nodes['/' + self.device + '/awgs/0/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': np.array([])}
             for i in range(10):
-                self.nodes['/' + self.device + '/qas/0/integration/weights/' + str(i) + '/real'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
-                self.nodes['/' + self.device + '/qas/0/integration/weights/' + str(i) + '/imag'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
-                self.nodes['/' + self.device + '/qas/0/result/data/' + str(i) + '/wave'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+                self.nodes['/' + self.device + '/qas/0/integration/weights/' + str(i) + '/real'] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes['/' + self.device + '/qas/0/integration/weights/' + str(i) + '/imag'] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes['/' + self.device + '/qas/0/result/data/' + str(i) + '/wave'] = {'type': 'ZIVectorData', 'value': np.array([])}
         elif self.devtype == 'HDAWG8':
             self.nodes['/' + self.device + '/features/options']        = {'type': 'String'      , 'value': 'PC\nME'}
             self.nodes['/' + self.device + '/raw/error/json/errors']   = {'type': 'String'      , 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
@@ -288,12 +288,12 @@ class MockDAQServer():
             self.nodes['/' + self.device + '/raw/dios/0/extclk']       = {'type': 'Integer'     , 'value': 0}
             for awg_nr in range(4):
                 for i in range(32):
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': np.array([])}
+                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': np.array([])}
+                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': np.array([])}
+                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {'type': 'ZIVectorData', 'value': np.array([])}
             for sigout_nr in range(8):
-                self.nodes['/' + self.device + '/sigouts/' + str(sigout_nr) + '/precompensation/fir/coefficients'] = {'type': 'ZIVectorData', 'value': numpy.array([])}
+                self.nodes['/' + self.device + '/sigouts/' + str(sigout_nr) + '/precompensation/fir/coefficients'] = {'type': 'ZIVectorData', 'value': np.array([])}
 
     def listNodesJSON(self, path):
         pass
@@ -383,12 +383,12 @@ class MockDAQServer():
             if self.verbose: print('poll', path)
             m = re.match(r'/(\w+)/qas/0/result/data/(\d+)/wave', path)
             if m:
-                poll_data[path] = [{'vector': numpy.random.rand(self.getInt('/' + m.group(1) + '/qas/0/result/length'))}]
+                poll_data[path] = [{'vector': np.random.rand(self.getInt('/' + m.group(1) + '/qas/0/result/length'))}]
                 continue
 
             m = re.match(r'/(\w+)/qas/0/monitor/inputs/(\d+)/wave', path)
             if m:
-                poll_data[path] = [{'vector': numpy.random.rand(self.getInt('/' + m.group(1) + '/qas/0/monitor/length'))}]
+                poll_data[path] = [{'vector': np.random.rand(self.getInt('/' + m.group(1) + '/qas/0/monitor/length'))}]
                 continue
 
             m = re.match(r'/(\w+)/awgs/(\d+)/ready', path)
@@ -571,10 +571,6 @@ class ZI_base_instrument(Instrument):
         # Default waveform length used when initializing waveforms to zero
         self._default_waveform_length = 32
 
-        # Number of channels can now be updated
-        self._num_channels = 0
-        self._update_num_channels()
-
         # add qcodes parameters based on JSON parameter file
         # FIXME: we might want to skip/remove/(add  to _params_to_skip_update) entries like AWGS/*/ELF/DATA,
         #       AWGS/*/SEQUENCER/ASSEMBLY, AWGS/*/DIO/DATA
@@ -599,8 +595,8 @@ class ZI_base_instrument(Instrument):
         self._awg_waveforms = {}
 
         # Asserted when AWG needs to be reconfigured
-        self._awg_needs_configuration = [False]*(self._num_channels//2)
-        self._awg_program = [None]*(self._num_channels//2)
+        self._awg_needs_configuration = [False]*(self._num_channels()//2)
+        self._awg_program = [None]*(self._num_channels()//2)
 
         # Create waveform parameters
         self._num_codewords = 0
@@ -608,6 +604,13 @@ class ZI_base_instrument(Instrument):
 
         # Create other neat parameters
         self._add_extra_parameters()
+
+        # Structure for storing errors
+        self._errors = None
+        # Structure for storing errors that should be demoted to warnings
+        self._errors_to_ignore = []
+        # Make initial error check
+        self.check_errors()
 
         # Show some info
         serial = self.get('features_serial')
@@ -653,6 +656,9 @@ class ZI_base_instrument(Instrument):
     def _update_awg_waveforms(self):
         raise NotImplementedError('Virtual method with no implementation!')
 
+    def _num_channels(self):
+        raise NotImplementedError('Virtual method with no implementation!')
+
     def _add_extra_parameters(self) -> None:
         """
         Adds extra useful parameters to the instrument.
@@ -664,7 +670,7 @@ class ZI_base_instrument(Instrument):
             parameter_class=ManualParameter,
             vals=validators.Ints())
 
-        for i in range(self._num_channels//2):
+        for i in range(self._num_channels()//2):
             self.add_parameter(
                 'awgs_{}_sequencer_program_crc32_hash'.format(i),
                 parameter_class=ManualParameter,
@@ -683,7 +689,7 @@ class ZI_base_instrument(Instrument):
                  ' to the channel as indicated on the device (1 is lowest).')
 
         self._params_to_skip_update = []
-        for ch in range(self._num_channels):
+        for ch in range(self._num_channels()):
             for cw in range(max(num_codewords, self._num_codewords)):
                 wf_name = gen_waveform_name(ch, cw)  # NB: parameter naming identical to QWG
 
@@ -877,7 +883,7 @@ class ZI_base_instrument(Instrument):
         Generates all zeros waveforms for all codewords.
         """
         t0 = time.time()
-        wf = numpy.zeros(self._default_waveform_length)
+        wf = np.zeros(self._default_waveform_length)
         waveform_params = [value for key, value in self.parameters.items()
                            if 'wave_ch' in key.lower()]
         for par in waveform_params:
@@ -900,7 +906,7 @@ class ZI_base_instrument(Instrument):
             # The length of HDAWG waveforms should be a multiple of 8 samples.
             if (len(waveform) % 8) != 0:
                 extra_zeros = 8-(len(waveform) % 8)
-                waveform = numpy.concatenate([waveform, numpy.zeros(extra_zeros)])
+                waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
             
             # If the length has changed, we need to recompile the AWG program
             if len(waveform) != len(self._awg_waveforms[wf_name]['waveform']):
@@ -919,7 +925,7 @@ class ZI_base_instrument(Instrument):
         filename = os.path.join(
             self._get_awg_directory(), 'waves', 
             self.devname + '_' + wf_name + '.csv')
-        numpy.savetxt(filename, waveform, delimiter=",")
+        np.savetxt(filename, waveform, delimiter=",")
 
     def _gen_read_waveform(self, ch, cw):
         def read_func():
@@ -940,7 +946,7 @@ class ZI_base_instrument(Instrument):
                 # Check whether  we got something
                 if waveform is None:
                     # Nope, initialize to zeros
-                    waveform = numpy.zeros(32)
+                    waveform = np.zeros(32)
                     self._awg_waveforms[wf_name]['waveform'] = waveform
                     # write the CSV file
                     self._write_csv_waveform(ch, cw, wf_name, waveform)
@@ -959,7 +965,7 @@ class ZI_base_instrument(Instrument):
             self._get_awg_directory(), 'waves',
             self.devname + '_' + wf_name + '.csv')
         try:
-            return numpy.genfromtxt(filename, delimiter=',')
+            return np.genfromtxt(filename, delimiter=',')
         except OSError as e:
             # if the waveform does not exist yet dont raise exception
             log.warning(e)
@@ -981,13 +987,13 @@ class ZI_base_instrument(Instrument):
                 # Temporarily unset the readonly flag to be allowed to append zeros
                 readonly = self._awg_waveforms[wf_name]['readonly']
                 self._awg_waveforms[wf_name]['readonly'] = False
-                self.set(wf_name, numpy.concatenate((self._awg_waveforms[wf_name]['waveform'], numpy.zeros(len_other_wf-len_wf))))
+                self.set(wf_name, np.concatenate((self._awg_waveforms[wf_name]['waveform'], np.zeros(len_other_wf-len_wf))))
                 self._awg_waveforms[wf_name]['dirty'] = True
                 self._awg_waveforms[wf_name]['readonly'] = readonly
             elif len_other_wf < len_wf:
                 readonly = self._awg_waveforms[other_wf_name]['readonly']
                 self._awg_waveforms[other_wf_name]['readonly'] = False
-                self.set(other_wf_name, numpy.concatenate((self._awg_waveforms[other_wf_name]['waveform'], numpy.zeros(len_wf-len_other_wf))))
+                self.set(other_wf_name, np.concatenate((self._awg_waveforms[other_wf_name]['waveform'], np.zeros(len_wf-len_other_wf))))
                 self._awg_waveforms[other_wf_name]['dirty'] = True
                 self._awg_waveforms[other_wf_name]['readonly'] = readonly
 
@@ -1025,8 +1031,8 @@ class ZI_base_instrument(Instrument):
         if cw >= self._num_codewords:
             raise ziConfigurationError('Codeword {} is out of range of the configured number of codewords ({})!'.format(cw, self._num_codewords))
 
-        if ch >= self._num_channels:
-            raise ziConfigurationError('Channel {} is out of range of the configured number of channels ({})!'.format(ch, self._num_channels))
+        if ch >= self._num_channels():
+            raise ziConfigurationError('Channel {} is out of range of the configured number of channels ({})!'.format(ch, self._num_channels()))
 
         # Name of this waveform
         wf_name = gen_waveform_name(ch, cw)
@@ -1146,7 +1152,7 @@ class ZI_base_instrument(Instrument):
         self.check_errors()
 
         # Loop through each AWG and check whether to reconfigure it
-        for awg_nr in range(self._num_channels//2):
+        for awg_nr in range(self._num_channels()//2):
             self._length_match_waveforms(awg_nr)
 
             # If the reconfiguration flag is set, upload new program
@@ -1160,7 +1166,7 @@ class ZI_base_instrument(Instrument):
                 self._clear_dirty_waveforms(awg_nr)
 
         # Start all AWG's
-        for awg_nr in range(self._num_channels//2):
+        for awg_nr in range(self._num_channels()//2):
             # Skip AWG's without programs
             if self._awg_program[awg_nr] is None:
                 continue
@@ -1172,7 +1178,7 @@ class ZI_base_instrument(Instrument):
 
     def stop(self): 
         # Stop all AWG's
-        for awg_nr in range(self._num_channels//2):
+        for awg_nr in range(self._num_channels()//2):
             self.set('awgs_{}_enable'.format(awg_nr), 0)
 
         self.check_errors()
@@ -1208,7 +1214,7 @@ class ZI_base_instrument(Instrument):
         Generates all zeros waveforms for all codewords.
         """
         t0 = time.time()
-        wf = numpy.zeros(32)
+        wf = np.zeros(32)
         waveform_params = [value for key, value in self.parameters.items()
                            if 'wave_ch' in key.lower()]
         for par in waveform_params:
