@@ -1951,7 +1951,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
 
-        self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*(self.UHFQC.clock_freq())))
         self.set_up_correlation_weights()
         self.UHFQC.acquisition_initialize(samples=self.nr_sweep_points, averages=self.nr_averages, channels=self.channels, mode='rl')
 
@@ -1964,7 +1964,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
             correlation_channel = -1
 
-            # 9 is the (current) max number of weights in the UHFQC (release 19.05)
+            # 10 is the (current) max number of weights in the UHFQC (release 19.05)
             for ch in range(10):
                 if ch in self.channels:
                     # Disable correlation mode as this is used for normal
@@ -2144,7 +2144,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
     def get_values(self, arm=True):
         if self.always_prepare:
             # NB sweep_points argument not used in self.prepare
-            self.prepare(0)
+            self.prepare()
 
         if self.AWG is not None:
             self.AWG.stop()
@@ -2349,7 +2349,7 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
             nr_shots=nr_shots, 
             integration_length=integration_length, 
             channels=[channel], 
-            statemap=self.statemap_one2two_bit(statemap),
+            statemap=UHFQC_single_qubit_statistics_logging_det.statemap_one2two_bit(statemap),
             channel_names=[channel_name if channel_name is not None else 'ch{}'.format(channel)],
             normalize_counts=normalize_counts)
 
