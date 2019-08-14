@@ -67,18 +67,6 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
     MIN_SLAVEREVISION = 62659
 
     ##########################################################################
-    # Private methods
-    ##########################################################################
-
-    def _update_num_channels(self):
-        if self.devtype == 'HDAWG8':
-            self._num_channels = 8
-        elif self.devtype == 'HDAWG4':
-            self._num_channels = 4
-        else:
-            raise Exception("Unknown device type '{}'".format(self.devtype))
-
-    ##########################################################################
     # 'public' functions: device control
     ##########################################################################
 
@@ -110,13 +98,6 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
                  .format(self.devname, 'CMOS' if self.get('dios_0_interface') == 0 else 'LVDS')) # NB: mode is persistent across device restarts
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
-        
-        # Structure for storing errors
-        self._errors = None
-        # Structure for storing errors that should be demoted to warnings
-        self._errors_to_ignore = []
-        # Make initial error check
-        self.check_errors()
 
         # Configure instrument to blink forever
         self.seti('raw/error/blinkseverity', 1)
@@ -161,12 +142,13 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         if self.geti('system/slaverevision') < ZI_HDAWG_core.MIN_SLAVEREVISION:
             raise zibase.ziVersionError('Insufficient FPGA Slave revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_SLAVEREVISION, self.geti('system/slaverevision')))
 
-    def _update_num_channels(self):
-        # Add this point we know self.devtype is either 'HDAWG8' or 'HDAWG4'
+    def _num_channels(self):
         if self.devtype == 'HDAWG8':
-            self._num_channels = 8
+            return 8
+        elif self.devtype == 'HDAWG4':
+            return 4
         else:
-            self._num_channels = 4
+            raise Exception("Unknown device type '{}'".format(self.devtype))
 
     def load_default_settings(self):
         """
