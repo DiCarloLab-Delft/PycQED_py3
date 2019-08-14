@@ -1262,7 +1262,7 @@ class Qubit(Instrument):
 
 
 
-    def tune_freq_to_sweetspot(self, verbose = True ): 
+    def tune_freq_to_sweetspot(self, freqs=None, dac_values=None, verbose=True): 
         """
         Tunes the qubit to the sweetspot 
         """
@@ -1274,8 +1274,8 @@ class Qubit(Instrument):
             pass
 
         # Requires an estimate of V_per_phi0 (which should be a current)
-
-        freqs = self.freq_max() + np.arange(-80e6, +20e6, .5e6)
+        if freqs is None:
+            freqs = self.freq_max() + np.arange(-80e6, +20e6, .5e6)
 
         # Should be replaced by self.fl_dc_I() # which gets this automatically
         # self.fl_dc_I()
@@ -1283,7 +1283,8 @@ class Qubit(Instrument):
         current_dac_val = fluxcontrol.parameters[(self.fl_dc_ch())].get()
         
         dac_range  = 0.1 * self.fl_dc_I_per_phi0() # Should correspond to approx 50MHz around sweetspot.  
-        dac_values = current_dac_val + np.linspace(-dac_range/2, dac_range/2, 6)
+        if dac_values is None:
+            dac_values = current_dac_val + np.linspace(-dac_range/2, dac_range/2, 6)
 
         self.measure_qubit_frequency_dac_scan(freqs=freqs, dac_values=dac_values)
         
