@@ -6742,8 +6742,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     Possible kw parameters:
 
-        frequency_guess         (default=None)
+        frequency_guess         (default="max")
             manually set the initial guess for qubit frequency
+            options are
+                None -> uses the peak finder to use a peak or dip
+                max -> uses the maximally measured value to guess the freq
+                float -> specify a value as the guess
 
         analyze_ef              (default=False)
             whether to look for a second peak/dip, which would be the at f_gf/2
@@ -6830,11 +6834,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                          optimize=optimize,
                                          window_len=0)
 
+        # Determine the guess
         # extract highest peak -> ge transition
         if frequency_guess is not None:
-            if isinstance(frequency_guess,float):
+            if isinstance(frequency_guess, float):
                 f0 = frequency_guess
-            elif frequency_guess=='max':
+            elif frequency_guess == 'max':
                 f0 = self.sweep_points[np.argmax(data_dist_smooth)]
             kappa_guess = (max(self.sweep_points)-min(self.sweep_points))/20
             key = 'peak'
@@ -9973,7 +9978,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
     I1_no_demod = y1
     Q1_no_demod = y2
-    
+
     power1 = (I1 ** 2 + Q1 ** 2) / 50
 
     amps = np.sqrt((I1 - I0) ** 2 + (Q1 - Q0) ** 2)
@@ -9986,7 +9991,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     weight_I_no_demod = (I1_no_demod - I0_no_demod) / amp_max
     weight_Q_no_demod = (Q1_no_demod - Q0_no_demod) / amp_max
 
-    # Identical rescaling as is happening in the CCL transmon class 
+    # Identical rescaling as is happening in the CCL transmon class
     maxI_no_demod = np.max(np.abs(weight_I_no_demod))
     maxQ_no_demod = np.max(np.abs(weight_Q_no_demod))
     weight_scale_factor = 1./(4*np.max([maxI_no_demod, maxQ_no_demod]))
