@@ -62,9 +62,9 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
     """
 
     # Define minimum required revisions
-    FWREVISION = 62730
-    FPGAREVISION = 62832
-    SLAVEREVISION = 62659
+    MIN_FWREVISION = 62730
+    MIN_FPGAREVISION = 62832
+    MIN_SLAVEREVISION = 62659
 
     ##########################################################################
     # Private methods
@@ -152,14 +152,14 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         """
         Checks that sufficient versions of the firmware are available.
         """
-        if self.geti('system/fwrevision') < ZI_HDAWG_core.FWREVISION:
-            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.FWREVISION, self.geti('system/fwrevision')))
+        if self.geti('system/fwrevision') < ZI_HDAWG_core.MIN_FWREVISION:
+            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_FWREVISION, self.geti('system/fwrevision')))
 
-        if self.geti('system/fpgarevision') < ZI_HDAWG_core.FPGAREVISION:
-            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.FPGAREVISION, self.geti('system/fpgarevision')))
+        if self.geti('system/fpgarevision') < ZI_HDAWG_core.MIN_FPGAREVISION:
+            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
 
-        if self.geti('system/slaverevision') < ZI_HDAWG_core.SLAVEREVISION:
-            raise zibase.ziVersionError('Insufficient FPGA Slave revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.SLAVEREVISION, self.geti('system/slaverevision')))
+        if self.geti('system/slaverevision') < ZI_HDAWG_core.MIN_SLAVEREVISION:
+            raise zibase.ziVersionError('Insufficient FPGA Slave revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_SLAVEREVISION, self.geti('system/slaverevision')))
 
     def _update_num_channels(self):
         # Add this point we know self.devtype is either 'HDAWG8' or 'HDAWG4'
