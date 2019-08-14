@@ -132,6 +132,7 @@ class QuTech_AWG_Module(SCPI):
                           [6, 7, 8]],  # Ch4  # See limitation/fixme; will use ch 3's bitmap
         }
 
+        # Marker trigger protocol
         cw_protocol_mt = {
             # Name
             'MICROWAVE': [[0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
@@ -1085,7 +1086,8 @@ class QWGMultiDevices:
     from pycqed.instrument_drivers.physical_instruments import QuTech_CCL
 
     @staticmethod
-    def dio_calibration(ccl: QuTech_CCL, qwgs: List[QuTech_AWG_Module], verbose: bool = False):
+    def dio_calibration(ccl: QuTech_CCL, qwgs: List[QuTech_AWG_Module], 
+            verbose: bool = False):
         """
         Calibrate multiple QWG using a CCLight
         First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
@@ -1093,8 +1095,9 @@ class QWGMultiDevices:
         On failure of calibration an exception is raised.
         Will stop all QWGs before calibration
 
-        Note: Will use the QWG_DIO_Calibration.qisa file as calibration program by the CCLight. This qisa file should
-        be in the same folder as the QWG driver file.
+        Note: Will use the QWG_DIO_Calibration.qisa, cs.txt and qisa_opcodes.qmap 
+        files to assemble a  calibration program for the CCLight. These files
+        should be located in the _QWG subfolder in the path of this file. 
         :param ccl: CCLight device, connection has to be active
         :param qwgs: List of QWG which will be calibrated, all QWGs are expected to have an active connection
         :param verbose: Print the DIO calibration rapport of all QWGs
@@ -1109,8 +1112,25 @@ class QWGMultiDevices:
 
         if ccl.ask("QUTech:RUN?") == '1':
             ccl.stop()
-        qisa_qwg_dio_calibrate = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), 'QWG_DIO_Calibration.qisa'))
+
+        _qwg_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '_QWG'))
+        
+
+        qisa_qwg_dio_calibrate = os.path.join(_qwg_path, 
+            'QWG_DIO_Calibration.qisa')
+
+        cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
+
+        qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path, 
+            'qisa_opcodes.qmap')
+
+        old_cs = ccl.control_store()
+        old_qisa_opcode = ccl.qisa_opcode()
+
+        ccl.control_store(cs_qwg_dio_calibrate)
+        ccl.qisa_opcode(qisa_opcode_qwg_dio_calibrate)
+
         ccl.eqasm_program(qisa_qwg_dio_calibrate)
         ccl.start()
         ccl.getOperationComplete()
@@ -1139,6 +1159,11 @@ class QWGMultiDevices:
             for qwg in qwgs:
                 print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
         ccl.stop()
+
+        # Set the control store
+        ccl.control_store(old_cs)
+        ccl.qisa_opcode(old_qisa_opcode)
+
 
 
 class Mock_QWG(QuTech_AWG_Module):
