@@ -58,6 +58,7 @@ import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
+from pycqed.utilities.general import check_keyboard_interrupt
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +83,14 @@ class ziUHFQCHoldoffError(Exception):
 ##########################################################################
 
 def awg_sequence_acquisition_preamble():
+    """
+    This function defines a standard AWG program preamble, which is used
+    regardless of the specific acquisition mode. The preamble defines standard
+    functionality of the user registers, which are used for dynamically
+    controlling e.g. number of iterations in a loop, etc.
+    The preamble also defines a standard way of selecting between triggering
+    the readout units or the time-domain input monitor.
+    """
     preamble = """
 // Reset error counter
 setUserReg(4, 0);
@@ -108,28 +117,13 @@ def array2vect(array, name):
     # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
     # this is to avoid python crashes (was found to crash for vectors of
     # length> 1490)
-    string = 'vect('
-    join = False
-    n = 0
-    while n < len(array):
-        string += '{:.8f}'.format(array[n])
-        if ((n+1) % 1024 != 0) and n < len(array)-1:
-            string += ','
-
-        if ((n+1) % 1024 == 0):
-            string += ')'
-            if n < len(array)-1:
-                string += ',\nvect('
-                join = True
-        n += 1
-
-    string += ')'
-    if join:
-        string = 'wave ' + name + ' = join(' + string + ');\n'
+    if len(array) > 1024:
+        splitted_array = numpy.array_split(array, len(array)//1024)
+        string_array = ['\nvect(' + ','.join(['{:.8f}'.format(x) for x in sub_array]) + ')' for sub_array in splitted_array]
+        return 'wave ' + name + ' = join(' + ','.join(string_array) + ');\n'
     else:
-        string = 'wave ' + name + ' = ' + string + ';\n'
-    return string
-
+        return 'wave ' + name + ' = ' + 'vect(' + ','.join(['{:.8f}'.format(x) for x in array]) + ');\n'
+    
 ##########################################################################
 # Class
 ##########################################################################
@@ -642,6 +636,15 @@ setUserReg(4, err_cnt);"""
 
         while accumulated_time < self.timeout() and not all(gotem):
             dataset = self.poll(acquisition_time)
+            
+            # Enable the user to interrupt long (or buggy) acquisitions
+            try:
+                check_keyboard_interrupt()
+            except KeyboardInterrupt as e:
+                # Finalize acquisition before raising exception
+                self.acquisition_finalize()
+                raise e
+
             for n, p in enumerate(self._acquisition_nodes):
                 if p in dataset:
                     for v in dataset[p]:
