@@ -178,7 +178,7 @@ class UHFQC(zibase.ZI_base_instrument):
         Input arguments:
             name:           (str) name of the instrument
             device          (str) the name of the device e.g., "dev8008"
-            interface       (std) the name of the interface to use ('1GbE' or 'USB')
+            interface       (str) the name of the interface to use ('1GbE' or 'USB')
             address         (str) the host where the ziDataServer is running (for compatibility)
             port            (int) the port to connect to for the ziDataServer (don't change)
             use_dio         (bool) assert to enable the DIO interface
