@@ -298,21 +298,32 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         cal_points = self.get_param_value('cal_points')
         last_ge_pulses = self.get_param_value('last_ge_pulses',
                                               default_value=False)
-        self.cp = eval(cal_points)
+        try:
+            self.cp = eval(cal_points)
 
-        # for now assuming the same for all qubits.
-        self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
+            # for now assuming the same for all qubits.
+            self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
 
-        cal_states_rots = self.cp.get_rotations(last_ge_pulses,
-                self.qb_names[0])[self.qb_names[0]] if rotate else None
-        self.cal_states_rotations = self.get_param_value(
-            'cal_states_rotations', default_value=cal_states_rots)
+            cal_states_rots = self.cp.get_rotations(last_ge_pulses,
+                    self.qb_names[0])[self.qb_names[0]] if rotate else None
+            self.cal_states_rotations = self.get_param_value(
+                'cal_states_rotations', default_value=cal_states_rots)
+            sweep_points_w_calpts = \
+                {qbn: {'sweep_points': self.cp.extend_sweep_points(
+                    self.proc_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'], qbn)} for qbn in self.qb_names}
+            self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
+        except TypeError as e:
+            log.error(e)
+            log.warning("Failed retrieving cal point objects or states. "
+                        "Please update measurement to provide cal point object "
+                        "in metadata. Trying to get them using the old way ...")
+            self.cal_states_dict = self.options_dict.get(
+                'cal_states_dict', self.metadata.get('cal_states_dict', None))
+            self.cal_states_rotations = self.options_dict.get(
+                'cal_states_rotations', self.metadata.get(
+                    'cal_states_rotations', None))
 
-        sweep_points_w_calpts = \
-            {qbn: {'sweep_points': self.cp.extend_sweep_points(
-                self.proc_data_dict['sweep_points_dict'][qbn][
-                    'sweep_points'], qbn)} for qbn in self.qb_names}
-        self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
 
         # create projected_data_dict
         self.data_to_fit = self.get_param_value('data_to_fit')

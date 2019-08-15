@@ -24,7 +24,7 @@ importlib.reload(ba)
 
 class Spectroscopy(ba.BaseDataAnalysis):
 
-    def __init__(self, t_start: str,
+    def __init__(self, t_start: str = None,
                  t_stop: str = None,
                  options_dict: dict = None,
                  label: str = None,
@@ -1210,7 +1210,6 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
 
         i1s, i2s, i3s = np.array(i1s), np.array(i2s), np.array(i3s)
         total_area = 2 * i1s + 2 * i2s + 2 * i3s
-        # print(total_area)
         avg_fidelity = total_area / 3
         fid_state_0 = i1s + i3s
         not0 = 1 - fid_state_0
