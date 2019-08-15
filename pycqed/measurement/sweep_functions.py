@@ -275,6 +275,12 @@ class Hard_Sweep(Sweep_function):
     def set_parameter(self, value):
         logging.warning('set_parameter called for hardware sweep.')
 
+class Segment_Sweep(Hard_Sweep):
+    def __init__(self, **kw):
+        super().__init__()
+        self.parameter_name = 'Segment index'
+        self.name = 'Segment_Sweep'
+        self.unit = ''
 
 class OpenQL_Sweep(Hard_Sweep):
 

@@ -3003,18 +3003,17 @@ class RODynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
 class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
     def __init__(self, *args, **kwargs):
         options_dict = kwargs.pop('options_dict', {})
-        options_dict['TwoD'] = options_dict.get('TwoD', True)
+        auto = kwargs.pop('auto', True)
         super().__init__(*args, options_dict=options_dict, **kwargs)
         self.single_timestamp = True
         self.params_dict = {
             'value_names': 'value_names',
             'measured_values': 'measured_values',
             'sweep_points': 'sweep_points',
-            'sweep_points_2D': 'sweep_points_2D',
             'measurementstring': 'measurementstring',
             'exp_metadata': 'exp_metadata'}
         self.numeric_params = []
-        if kwargs.get('auto', True):
+        if auto:
             self.run_analysis()
 
     def process_data(self):
@@ -3031,30 +3030,35 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
 
         data_ch_indices = [i for i, ch in enumerate(rdd['value_names'])
                            if ch[-8:] == '_measure']
-        if len(data_ch_indices) == 1:
+        if len(rdd['measured_values']) == 1:
             # if only one weight function is used rotation is not required
-            pdd['corr_data_all'] = np.array([a_tools.normalize_data_v3(
-                    row, cal_zero_points=self.cal_points[0],
-                         cal_one_points=self.cal_points[1])
-                for row in rdd['measured_values'][data_ch_indices[0]].T]).T
+            pdd['corr_data_all'] = a_tools.normalize_data_v3(
+                    rdd['measured_values'], 
+                    cal_zero_points=self.cal_points[0],
+                    cal_one_points=self.cal_points[1])
         else:
-            pdd['corr_data_all'] = np.array([a_tools.rotate_and_normalize_data(
-                data=[dataI, dataQ],
+            pdd['corr_data_all'] = a_tools.rotate_and_normalize_data(
+                data=rdd['measured_values'],
                 zero_coord=None, one_coord=None,
                 cal_zero_points=self.cal_points[0],
-                cal_one_points=self.cal_points[1])[0] for dataI, dataQ in zip(
-                *[rdd['measured_values'][data_ch_indices[i]].T for i in [0, 1]]
-            )]).T
+                cal_one_points=self.cal_points[1])[0]
 
-        pdd['corr_data'] = np.array([pdd['corr_data_all'][i]
+        pdd['corr_data_flat'] = np.array([pdd['corr_data_all'][i]
                                      for i in range(len(pdd['corr_data_all']))
                                      if (i not in self.cal_points[0] and
                                          i not in self.cal_points[1])])
-        pdd['phases'] = np.array([rdd['sweep_points'][i]
-                                  for i in range(len(rdd['sweep_points']))
-                                  if (i not in self.cal_points[0] and
-                                      i not in self.cal_points[1])])
-        pdd['amplitudes'] = rdd['sweep_points_2D']
+        pdd['phases'] = self.metadata.get('phases', None)
+        pdd['phases'] = self.options_dict.get('phases', pdd['phases'])
+        pdd['ro_amp_scales'] = self.metadata.get('ro_amp_scales', None)
+        pdd['ro_amp_scales'] = self.options_dict.get('ro_amp_scales', 
+            pdd['ro_amp_scales'])
+        pdd['ref_amplitude'] = self.metadata.get('ref_amplitude', 1)
+        pdd['ref_amplitude'] = self.options_dict.get('ref_amplitude', 
+            pdd['ref_amplitude'])
+        pdd['amplitudes'] = pdd['ref_amplitude']*pdd['ro_amp_scales']
+        shape = (len(pdd['amplitudes']), len(pdd['phases']))
+        pdd['corr_data'] = np.reshape(pdd['corr_data_flat'], shape).T
+        
 
     def prepare_fitting(self):
         pdd = self.proc_data_dict
@@ -3065,7 +3069,7 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
         for i, data in enumerate(pdd['corr_data'].T):
             self.fit_dicts['cos_fit_{}'.format(i)] = {
                 'model': cos_mod,
-                'guess_dict': {'frequency': {'value': 1/2/np.pi,
+                'guess_dict': {'frequency': {'value': 1/360,
                                              'vary': False}},
                 'fit_xvals': {'t': pdd['phases']},
                 'fit_yvals': {'data': data}}
@@ -3123,9 +3127,9 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
             'yvals': pdd['amplitudes'],
             'zvals': pdd['corr_data'].T,
             'xlabel': r'Pulse phase, $\phi$',
-            'xunit': 'rad',
+            'xunit': 'deg',
             'ylabel': r'Readout pulse amplitude, $V_{RO}$',
-            'yunit': 'DAC unit',
+            'yunit': 'V',
             'zlabel': 'Excited state population',
         }
 
@@ -3141,7 +3145,7 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                 'xvals': pdd['phases'],
                 'yvals': pdd['corr_data'][:,i],
                 'xlabel': r'Pulse phase, $\phi$',
-                'xunit': 'rad',
+                'xunit': 'deg',
                 'ylabel': 'Excited state population',
                 'linestyle': '',
                 'color': color,
@@ -3172,7 +3176,7 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                 'xvals': pdd['amplitudes'],
                 'yvals': 200*pdd['phase_contrast'],
                 'xlabel': r'Readout pulse amplitude, $V_{RO}$',
-                'xunit': 'DAC unit',
+                'xunit': 'V',
                 'ylabel': 'Phase contrast',
                 'yunit': '%',
                 'linestyle': '',
@@ -3197,7 +3201,7 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                 'yvals': 200*pdd['phase_contrast'],
                 'marker': '',
                 'linestyle': '',
-                'setlabel': r'$\sigma = ({:.5f} \pm {:.5f})$ DAC unit'.
+                'setlabel': r'$\sigma = ({:.5f} \pm {:.5f})$ V'.
                     format(pdd['sigma'], pdd['sigma_err']),
                 'do_legend': True,
                 'legend_bbox_to_anchor': (1, 1),
@@ -3211,7 +3215,7 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                 'ax_id': 'phase_offset',
                 'plotfn': self.plot_line,
                 'xvals': pdd['amplitudes'],
-                'yvals': 180*pdd['phase_offset']/np.pi,
+                'yvals': pdd['phase_offset'],
                 'xlabel': r'Readout pulse amplitude, $V_{RO}$',
                 'xunit': 'DAC unit',
                 'ylabel': 'Phase offset',
@@ -3225,7 +3229,7 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                 'ax_id': 'phase_offset',
                 'plotfn': self.plot_line,
                 'xvals': pdd['amplitudes'],
-                'yvals': 180*self.fit_res['phase_offset_fit'].best_fit/np.pi,
+                'yvals': self.fit_res['phase_offset_fit'].best_fit,
                 'color': 'r',
                 'marker': '',
                 'setlabel': 'fit',
@@ -3235,13 +3239,13 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                 'ax_id': 'phase_offset',
                 'plotfn': self.plot_line,
                 'xvals': pdd['amplitudes'],
-                'yvals': 180*pdd['phase_contrast']/np.pi,
+                'yvals': pdd['phase_offset'],
                 'marker': '',
                 'linestyle': '',
-                'setlabel': r'$a = {:.0f} \pm {:.0f}$ deg/(DAC unit)${{}}^2$'.
-                    format(180*pdd['a']/np.pi, 180*pdd['a_err']/np.pi) + '\n' +
+                'setlabel': r'$a = {:.0f} \pm {:.0f}$ deg/V${{}}^2$'.
+                    format(pdd['a'], pdd['a_err']) + '\n' +
                             r'$c = {:.1f} \pm {:.1f}$ deg'.
-                    format(180*pdd['c']/np.pi, 180*pdd['c_err']/np.pi),
+                    format(pdd['c'], pdd['c_err']),
                 'do_legend': True,
                 'legend_bbox_to_anchor': (1, 1),
                 'legend_pos': 'upper left',

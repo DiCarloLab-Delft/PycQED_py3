@@ -321,9 +321,8 @@ class MeasurementControl(Instrument):
         else:
             old_vals = self.dset[start_idx:stop_idx,
                                  len(self.sweep_functions):]
-            new_vals = ((new_data + old_vals*self.soft_iteration) /
-                        (1+self.soft_iteration))
-
+            new_vals = ((new_data + old_vals * self.soft_iteration) /
+                        (1 + self.soft_iteration))
             self.dset[start_idx:stop_idx,
                       len(self.sweep_functions):] = new_vals
         sweep_len = len(self.get_sweep_points().T)
