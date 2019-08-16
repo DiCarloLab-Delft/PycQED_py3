@@ -26,7 +26,7 @@ from typing import List, Sequence, Dict
 from qcodes.instrument.parameter import Parameter
 from qcodes.instrument.parameter import Command
 import os
-
+import re
 
 # Note: the HandshakeParameter is a temporary param that should be replaced
 # once qcodes issue #236 is closed
@@ -106,11 +106,35 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
 
-        self._nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
-        self.device_descriptor.numMaxCwBits = int(self.ask(self._nr_cw_bits_cmd))
+        # Driver supported software version
+        major_min = 1
+        minor_min = 5
+        patch_min = 0
 
+        self._nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
         self._nr_cw_inp_cmd = "SYSTem:CODEwords:SELect?"
-        self.device_descriptor.numSelectCwInputs = int(self.ask(self._nr_cw_inp_cmd))
+
+        # Check for driver / QWG firmware/software compatibility
+        idn_firmware = self.get_idn()["firmware"]
+        regex = r"swVersion=(\d).(\d).(\d)"
+        sw_version = re.search(regex, idn_firmware)
+        major = int(sw_version.group(1))
+        minor = int(sw_version.group(2))
+        patch = int(sw_version.group(3))
+        driver_outdated = True
+
+        if sw_version and major >= major_min and minor >= minor_min and patch >= patch_min:
+            self.device_descriptor.numMaxCwBits = int(self.ask(self._nr_cw_bits_cmd))
+            self.device_descriptor.numSelectCwInputs = int(self.ask(self._nr_cw_inp_cmd))
+            driver_outdated = False
+        else:
+            logging.warning(f"Incompatible driver version of QWG ({self.name}); The version ({major}.{minor}.{patch}) "
+                            f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
+                            f"parameters will not operate and timeout. Please update the QWG software to "
+                            f"{major_min}.{minor_min}.{patch_min} or newer")
+            self.device_descriptor.numMaxCwBits = 7
+            self.device_descriptor.numSelectCwInputs = 7
+
         self.device_descriptor.numCodewords = pow(2, self.device_descriptor.numSelectCwInputs)
 
         # valid values
@@ -163,10 +187,10 @@ class QuTech_AWG_Module(SCPI):
         if run_mode:
             self.run_mode(run_mode)
 
-        if dio_mode:
+        if dio_mode and not driver_outdated:
             self.dio_mode(dio_mode)
 
-        if codeword_protocol:
+        if codeword_protocol and not driver_outdated:
             self.codeword_protocol(codeword_protocol)
 
     def add_parameters(self):
@@ -654,7 +678,7 @@ class QuTech_AWG_Module(SCPI):
             errMgs = []
             for i in range(errNr):
                 errMgs.append(self.getError())
-            raise RuntimeError(', '.join(errMgs))
+            raise RuntimeError(f'{repr(self)}: ' + ', '.join(errMgs))
 
     def JSON_parser(self, msg):
         """
