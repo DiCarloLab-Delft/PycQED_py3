@@ -70,11 +70,11 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
     # 'public' functions: device control
     ##########################################################################
 
-    def __init__(self, 
+    def __init__(self,
                  name: str,
                  device: str,
                  interface: str = '1GbE',
-                 server: str = 'localhost', 
+                 server: str = 'localhost',
                  port: int = 8004,
                  num_codewords: int = 32,
                  **kw) -> None:
@@ -105,7 +105,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
 
         t1 = time.time()
         print('Initialized ZI_HDAWG_core', self.devname, 'in %.2fs' % (t1-t0))
-    
+
     def _check_devtype(self):
         if self.devtype != 'HDAWG8' and self.devtype != 'HDAWG4':
             raise zibase.ziDeviceError('Device {} of type {} is not a HDAWG instrument!'.format(self.devname, self.devtype))
@@ -156,7 +156,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         """
 
         log.warning('{}: loading default settings (FIXME: still incomplete)'
-                    .format(self._devname))
+                    .format(self.devname))
 
         # clear output
 
@@ -224,7 +224,6 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         # First report if anything has changed
         if errors['new_errors'] > 0:
             log.warning('{}: Found {} new errors!'.format(self.devname, errors['new_errors']))
-            print('WARNING: Found {} new errors!'.format(errors['new_errors']))
 
         # Asserted in case errors were found
         found_errors = False
@@ -238,11 +237,10 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
 
             if not raise_exceptions:
                 self._errors[code] = {
-                    'count'   : count, 
+                    'count'   : count,
                     'severity': severity,
                     'message' : message}
                 log.warning('{}: Code {}: "{}" ({})'.format(self.devname, code, message, severity))
-                print('WARNING: {} ({}/{})'.format(message, code, severity))
             else:
                 # Optionally skip the error completely
                 if code in self._errors_to_ignore:
@@ -251,14 +249,13 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
                 # Check if there are new errors
                 if code not in self._errors or count > self._errors[code]['count']:
                     log.error('{}: {} ({}/{})'.format(self.devname, message, code, severity))
-                    print('ERROR: {} ({}/{})'.format(message, code, severity))
                     found_errors = True
 
                 if code in self._errors:
                     self._errors[code]['count'] = count
                 else:
                     self._errors[code] = {
-                        'count'   : count, 
+                        'count'   : count,
                         'severity': severity,
                         'message' : message}
 
@@ -320,14 +317,14 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def _set_dio_delay(self, delay):
-        """ 
+        """
         The function sets the DIO delay for the instrument. The valid delay range is
         0 to 15. The delays are applied to all bits of the DIO bus.
         """
         if delay < 0:
-            print('WARNING: Clamping delay to 0')
+            log.warning('{}: Clamping delay to 0'.format(self.devname))
         if delay > 15:
-            print('WARNING: Clamping delay to 15')
+            log.warning('{}: Clamping delay to 15'.format(self.devname))
             delay = 15
 
         self.seti('raw/dios/0/delays/*/value', delay)

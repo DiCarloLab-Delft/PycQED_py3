@@ -52,6 +52,7 @@ import os
 import logging
 import numpy as np
 import re
+import pycqed
 from fnmatch import fnmatch
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
@@ -67,7 +68,7 @@ log = logging.getLogger(__name__)
 ##########################################################################
 
 class ziUHFQCSeqCError(Exception):
-    """Exception raised when the configured SeqC program does 
+    """Exception raised when the configured SeqC program does
        not match the structure needed for a given measurement in terms
        of number of samples, number of averages or the use of a delay."""
     pass
@@ -123,7 +124,7 @@ def array2vect(array, name):
         return 'wave ' + name + ' = join(' + ','.join(string_array) + ');\n'
     else:
         return 'wave ' + name + ' = ' + 'vect(' + ','.join(['{:.8f}'.format(x) for x in array]) + ');\n'
-    
+
 ##########################################################################
 # Class
 ##########################################################################
@@ -155,14 +156,14 @@ class UHFQC(zibase.ZI_base_instrument):
     # 'public' functions: device control
     ##########################################################################
 
-    def __init__(self, 
-                 name, 
+    def __init__(self,
+                 name,
                  device:                  str,
                  interface:               str  = 'USB',
-                 address:                 str  = '127.0.0.1', 
+                 address:                 str  = '127.0.0.1',
                  port:                    int  = 8004,
                  use_dio:                 bool = True,
-                 nr_integration_channels: int  = 9, 
+                 nr_integration_channels: int  = 9,
                  server:                  str  = '',
                  **kw) -> None:
         """
@@ -185,13 +186,13 @@ class UHFQC(zibase.ZI_base_instrument):
         # save some parameters
         self._nr_integration_channels = nr_integration_channels
         self._use_dio = use_dio
-        
+
         # Used for keeping track of which nodes we are monitoring for data
         self._acquisition_nodes = []
 
         # The following members define the characteristics of the configured
         # AWG program
-        self._reset_awg_program_features()      
+        self._reset_awg_program_features()
 
         # The actual codeword cases used in a given program
         self._cases = None
@@ -380,7 +381,7 @@ repeat (loop_cnt) {"""
         for case in self._cases:
             self._awg_program[0] += """
         case 0x{:08x}: playWave({}, {});""".format(case << 17, zibase.gen_waveform_name(0, case), zibase.gen_waveform_name(1, case))
-        
+
         # Add a default for ensuring we see something when the other cases fail
         self._awg_program[0] += """
         default: playWave(ones(32), ones(32)); err_cnt += 1;
@@ -410,7 +411,7 @@ setUserReg(4, err_cnt);"""
         The generated code depends on the instrument type. For the UHF-QA we simply define the raw waveforms.
         """
         program = ''
-        
+
         # If the program doesn't need waveforms, just return here
         if not self._awg_program_features['waves']:
             return
@@ -420,7 +421,7 @@ setUserReg(4, err_cnt);"""
             raise zibase.ziConfigurationError('Missing definition of cases for AWG program!')
 
         # because awg_channels come in pairs
-        ch = awg_nr*2           
+        ch = awg_nr*2
 
         for cw in range(self._num_codewords):
             # Filter based on configured cases
@@ -616,10 +617,10 @@ setUserReg(4, err_cnt);"""
                 self.subs(path)
             # Enable automatic readout
             self.qas_0_result_reset(1)
-            self.qas_0_result_enable(1)   
+            self.qas_0_result_enable(1)
             self.qas_0_result_length(samples)
-            self.qas_0_result_averages(averages)   
-            ro_mode = 0     
+            self.qas_0_result_averages(averages)
+            ro_mode = 0
         else:
             for c in channels:
                 path = self._get_full_path('qas/0/monitor/inputs/{}/wave'.format(c))
@@ -632,8 +633,8 @@ setUserReg(4, err_cnt);"""
             self.qas_0_monitor_averages(averages)
             ro_mode = 1
 
-        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_LOOP_CNT), loop_cnt)     
-        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_RO_MODE), ro_mode)     
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_LOOP_CNT), loop_cnt)
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_RO_MODE), ro_mode)
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_AVG_CNT), averages)
         if self.wait_dly() > 0 and not self._awg_program_features['wait_dly']:
             raise ziUHFQCSeqCError('Trying to use a delay of {} using an AWG program that does not use \'wait_dly\'.'.format(self.wait_dly()))
@@ -673,7 +674,7 @@ setUserReg(4, err_cnt);"""
 
         while accumulated_time < self.timeout() and not all(gotem):
             dataset = self.poll(acquisition_time)
-            
+
             # Enable the user to interrupt long (or buggy) acquisitions
             try:
                 check_keyboard_interrupt()
@@ -761,11 +762,10 @@ setUserReg(4, err_cnt);"""
 
             if not raise_exceptions:
                 self._errors[code] = {
-                    'count'   : count, 
+                    'count'   : count,
                     'severity': severity,
                     'message' : message}
                 log.warning('{}: Code {}: "{}" ({})'.format(self.devname, code, message, severity))
-                print('WARNING: {} ({}/{})'.format(message, code, severity))
             else:
                 # Optionally skip the error completely
                 if code in self._errors_to_ignore:
@@ -774,14 +774,13 @@ setUserReg(4, err_cnt);"""
                 # Check if there are new errors
                 if code not in self._errors or count > self._errors[code]['count']:
                     log.error('{}: {} ({}/{})'.format(self.devname, message, code, severity))
-                    print('ERROR: {} ({}/{})'.format(message, code, severity))
                     found_errors = True
 
                 if code in self._errors:
                     self._errors[code]['count'] = count
                 else:
                     self._errors[code] = {
-                        'count'   : count, 
+                        'count'   : count,
                         'severity': severity,
                         'message' : message}
 
@@ -870,7 +869,7 @@ setUserReg(4, err_cnt);"""
     ##########################################################################
 
     def awg_sequence_acquisition_and_DIO_triggered_pulse(
-            self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0, timeout=5) -> None:        
+            self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0, timeout=5) -> None:
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
         self.wait_dly(delay_samples)
@@ -903,7 +902,7 @@ setUserReg(4, err_cnt);"""
                 if len(Iwave) > 16384:
                     raise KeyError(
                         "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-        
+
                 # Update waveform table
                 self.set(zibase.gen_waveform_name(0, cases[i]), Iwave)
 
@@ -931,7 +930,7 @@ setUserReg(4, err_cnt);"""
         self.cases(cases)
 
     def awg_sequence_acquisition_and_DIO_RED_test(
-            self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0, 
+            self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0,
             codewords=None, timeout=5):
 
         if codewords is None:
@@ -971,7 +970,7 @@ setUserReg(4, err_cnt);"""
                 if len(Iwave) > 16384:
                     raise KeyError(
                         "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-        
+
                 # Update waveform table
                 self.set(zibase.gen_waveform_name(0, cases[i]), Iwave)
 
@@ -1007,11 +1006,11 @@ setUserReg(4, err_cnt);"""
         if Qwave is not None and ( np.max(Qwave) > 1.0 or  np.min(Qwave) < -1.0):
             raise KeyError(
                 "exceeding AWG range for Q channel, all values should be within +/-1")
-        
+
         if Iwave is not None and (len(Iwave) > 16384):
             raise KeyError(
                 "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-        
+
         if Qwave is not None and (len(Qwave) > 16384):
             raise KeyError(
                 "exceeding max AWG wave length of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
@@ -1021,9 +1020,9 @@ setUserReg(4, err_cnt);"""
             raise zibase.ziConfigurationError('Insufficient number of codewords defined! Need at least 1 codeword.')
 
         # Configure the actual waveforms
-        if Iwave is not None: 
+        if Iwave is not None:
             self.set(zibase.gen_waveform_name(0, 0), Iwave)
-        
+
         if Qwave is not None:
             self.set(zibase.gen_waveform_name(1, 0), Qwave)
 
@@ -1073,7 +1072,7 @@ setTrigger(0);
     def awg_sequence_acquisition(self):
         self._reset_awg_program_features()
         self._awg_program_features['loop_cnt'] = True
-    
+
         self._awg_program[0] = awg_sequence_acquisition_preamble() + """
 repeat (loop_cnt) {
     waitDigTrigger(1, 1);
@@ -1112,11 +1111,11 @@ setTrigger(0);
             raise zibase.ziConfigurationError('Insufficient number of codewords defined! Need at least 1 codeword.')
 
         # Define number of samples
-        N = 16       
+        N = 16
 
         # Define alpha parameter
         alpha = 0.2
-        
+
         # Define support parameters
         a0 = (1-alpha)/2
         a1 = 1/2
@@ -1145,7 +1144,7 @@ repeat (avg_cnt) {
   var wait_time = 0;
 
   repeat(loop_cnt) {
-    wait_time = wait_time + 1;   
+    wait_time = wait_time + 1;
     setTrigger(ro_trig);
     setTrigger(ro_arm);
     wait(wait_time);
@@ -1208,7 +1207,7 @@ setTrigger(0);
         # Default settings copied
         self.qas_0_rotations_0(1.0 + 0.0j)
         self.qas_0_rotations_1(1.0 + 0.0j)
-        
+
         # setting to DSB by default
         self.qas_0_deskew_rows_0_cols_0(1.0)
         self.qas_0_deskew_rows_0_cols_1(0.0)
@@ -1218,3 +1217,39 @@ setTrigger(0);
         # switching off the modulation tone
         self.awgs_0_outputs_0_mode(0)
         self.awgs_0_outputs_1_mode(0)
+
+    def plot_dio_snapshot(self, bits=range(32)):
+        zibase.plot_timing_diagram(self.getv('awgs/0/dio/data'), bits, 64)
+
+    def calibrate_CCL_dio_protocol(self, CCL=None, verbose=False, repetitions=1):
+        log.info('Calibrating DIO delays')
+        if verbose: print("Calibrating DIO delays")
+
+        if CCL is None:
+            CCL = qtccl.CCL('CCL', address='192.168.0.11', port=5025)
+
+        cs_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            'output', 'cs.txt')
+
+        opc_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            'output', 'qisa_opcodes.qmap')
+
+        # Configure CCL
+        CCL.control_store(cs_filepath)
+        CCL.qisa_opcode(opc_filepath)
+
+        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+            '..',
+            'examples','CCLight_example',
+            'qisa_test_assembly','calibration_cws_ro.qisa'))
+
+        # Start the CCL with the program configured above
+        CCL.eqasm_program(test_fp)
+        CCL.start()
+
+        # Make sure the configuration is up-to-date
+        self.assure_ext_clock()
