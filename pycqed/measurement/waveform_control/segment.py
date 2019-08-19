@@ -138,7 +138,6 @@ class Segment:
         for pulse in pulses['segment_start']:
             if pulse.pulse_obj.name in pulses:
                 ref_points.append((pulse.pulse_obj.name, pulse))
-
             t0 = pulse.delay - pulse.ref_point_new * pulse.pulse_obj.length
             pulse.pulse_obj.algorithm_time(t0)
             visited_pulses.append((t0, i, pulse))

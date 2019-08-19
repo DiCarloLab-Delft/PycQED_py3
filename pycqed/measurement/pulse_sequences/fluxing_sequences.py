@@ -181,9 +181,6 @@ def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
     swept_pulses_with_prep = \
         [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)
          for p in swept_pulses]
-
-    from pprint import pprint
-    pprint(swept_pulses_with_prep)
     seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
 
     if cal_points is not None:
@@ -540,6 +537,7 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
         [final_rotations[0]['amplitude']*np.ones(hsl//2), np.zeros(hsl//2)])}
     params.update({f'cphase_final_pihalf_qbt.{k}': v['values']
                    for k, v in hard_sweep_dict.items()})
+
     ssl = len(list(soft_sweep_dict.values())[0]['values'])
     sequences = []
     for i in range(ssl):

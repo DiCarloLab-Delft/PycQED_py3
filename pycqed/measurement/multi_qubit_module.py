@@ -152,7 +152,7 @@ def get_operation_dict(qubits):
     return operation_dict
 
 
-def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
+def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                nr_shots=4095,
                                                used_channels=None,
                                                correlations=None,
@@ -181,7 +181,7 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
                 channels[uhf] += [qb.acq_Q_channel()]
 
         acq_classifier_params += [qb.acq_classifier_params()]
-        acq_state_prob_mtxs += [qb.acq_state_prob_mtx]
+        acq_state_prob_mtxs += [qb.acq_state_prob_mtx()]
 
     classif_det_get_values_kws = {
         'classifier_params': acq_classifier_params,
@@ -730,7 +730,7 @@ def measure_two_qubit_randomized_benchmarking(
         qb1, qb2, cliffords, nr_seeds, cz_pulse_name,
         character_rb=False, net_clifford=0,
         clifford_decomposition_name='HZ', interleaved_gate=None,
-        classified=False, n_cal_points_per_state=2, cal_states=(),
+        classified=False, n_cal_points_per_state=2, cal_states=tuple(),
         label=None, prep_params=None, upload=True, analyze_RB=True):
 
     qb1n = qb1.name
@@ -779,11 +779,12 @@ def measure_two_qubit_randomized_benchmarking(
     MC.set_sweep_points_2D(soft_sweep_points)
 
     if classified:
-        correlations = [(
-            (qb1.acq_I_channel(), qb1.acq_Q_channel()),
-            (qb2.acq_I_channel(), qb2.acq_Q_channel())
-        )]
-        det_name = 'int_avg_classif_corr_det'
+        correlations = []
+        # correlations = [(
+        #     (qb1.acq_I_channel(), qb1.acq_Q_channel()),
+        #     (qb2.acq_I_channel(), qb2.acq_Q_channel())
+        # )]
+        det_name = 'int_avg_classif_det'
     else:
         correlations = [(qb1.acq_I_channel(), qb2.acq_I_channel())]
         det_name = 'dig_corr_det'
@@ -1969,6 +1970,7 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
         qbt (QuDev_transmon): target qubit / non-fluxed qubit
     '''
     plot_all_traces = kw.get('plot_all_traces', True)
+    plot_all_probs = kw.get('plot_all_probs', True)
     classified = kw.get('classified', False)
     predictive_label = kw.pop('predictive_label', False)
 
@@ -2039,16 +2041,17 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                          'rotate': len(cal_states) != 0,
                          'cal_states_rotations':
                              {qbc.name: {'g': 0, 'f': 1},
-                              qbt.name: {'g': 0, 'e': 1}},
+                              qbt.name: {'g': 0, 'e': 1}} if
+                             len(cal_states) != 0 else None,
                          'data_to_fit': {qbc.name: 'pf', qbt.name: 'pe'},
                          'hard_sweep_params': hard_sweep_params,
                          'soft_sweep_params': soft_sweep_params})
     MC.run_2D(label, exp_metadata=exp_metadata)
-
     if analyze:
         flux_pulse_tdma = tda.CPhaseLeakageAnalysis(
             qb_names=[qbc.name, qbt.name],
-            options_dict={'TwoD': True, 'plot_all_traces': plot_all_traces})
+            options_dict={'TwoD': True, 'plot_all_traces': plot_all_traces,
+                          'plot_all_probs': plot_all_probs})
         cphases = flux_pulse_tdma.proc_data_dict[
             'analysis_params_dict']['cphase']['val']
         population_losses = flux_pulse_tdma.proc_data_dict[
