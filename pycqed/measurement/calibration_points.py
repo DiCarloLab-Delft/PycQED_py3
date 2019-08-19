@@ -191,14 +191,6 @@ class CalibrationPoints:
                                            for i in range(1, n_cal_pts + 1)]])
         return plot_sweep_points
 
-    def get_msmt_array(self, full_array, qb_name):
-        n_cal_pts = len(self.get_states(qb_name)[qb_name])
-        return full_array[:-n_cal_pts]
-
-    def get_cal_array(self, full_array, qb_name):
-        n_cal_pts = len(self.get_states(qb_name)[qb_name])
-        return full_array[-n_cal_pts:]
-
     def __str__(self):
         return "Calibration:\n    Qubits: {}\n    States: {}" \
             .format(self.qb_names, self.states)

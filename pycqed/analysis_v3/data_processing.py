@@ -9,7 +9,6 @@ import itertools
 import matplotlib as mpl
 from collections import OrderedDict
 from pycqed.analysis import analysis_toolbox as a_tools
-import pycqed.analysis_v3.base_analysis as ba3
 import pycqed.analysis_v2.readout_analysis as roa
 from pycqed.analysis_v3 import fitting_and_plotting as fit_plt
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
@@ -362,7 +361,7 @@ def rotate_iq(data_dict, data_keys_in, data_keys_out, **params):
     :param params: keyword arguments.:
         cal_points_list (list): list of CalibrationPoints objects.
         last_ge_pulses (list): list of booleans
-        qb_channel_map (dict): {qbn: [chs]}.
+        qb_value_names_map (dict): {qbn: [value_names]}.
 
     Assumptions:
         - data_keys_in is a list of tuples; each tuple has length 2 (IQ data)
@@ -373,10 +372,7 @@ def rotate_iq(data_dict, data_keys_in, data_keys_out, **params):
         - one CalibrationPoints object per keys in tuple
         - assumes the dicts returned by CalibrationPoints.get_indices(),
         CalibrationPoints.get_rotations() are keyed by qubit names
-        - If qb_channel_map is not passed, it will try to extracted it
-        from HDF5file if qb_names is found in params of metadata, and if
-        either folder is found in params/metadat or data_dict['folder'] exist.
-        - data_keys_in exists in qb_channel_map
+        - data_keys_in exists in qb_value_names_map
     """
     if len(data_keys_in) != len(data_keys_out):
         raise ValueError('data_keys_in and data_keys_out do not have '
@@ -393,10 +389,9 @@ def rotate_iq(data_dict, data_keys_in, data_keys_out, **params):
 
     last_ge_pulses = get_param('last_ge_pulses', data_dict, default_value=[],
                                **params)
-    qb_channel_map = get_param('qb_channel_map', data_dict, **params)
+    qb_value_names_map = get_param('qb_value_names_map', data_dict, **params)
     if qb_channel_map is None:
-        qb_channel_map = get_qb_channel_map_from_file(
-            data_dict, [ch for tup in data_keys_in for ch in tup], **params)
+        raise ValueError('Unknown qb_value_names_map.')
 
     for j, cp in enumerate(cp_list):
         data_to_proc_dict = get_data_to_process(data_dict, data_keys_in[j])
@@ -409,19 +404,22 @@ def rotate_iq(data_dict, data_keys_in, data_keys_out, **params):
             else:
                 data = data[all_keys[i]]
 
-        qbn = [k for k, v in qb_channel_map.items() if data_keys_in[j] == v][0]
+        qbn = [k for k, v in qb_value_names_map.items() if
+               data_keys_in[j] == v][0]
         rotations = cp.get_rotations(last_ge_pulses=last_ge_pulses)
         ordered_cal_states = []
         for ii in range(len(rotations[qbn])):
             ordered_cal_states += \
                 [k for k, idx in rotations[qbn].items() if idx == ii]
-        data[all_keys[-1]], _, _ = \
+        rotated_data, _, _ = \
             a_tools.rotate_and_normalize_data_IQ(
                 data=list(data_to_proc_dict.values()),
                 cal_zero_points=None if len(ordered_cal_states) == 0 else
                     cp.get_indices()[qbn][ordered_cal_states[0]],
                 cal_one_points=None if len(ordered_cal_states) == 0 else
                     cp.get_indices()[qbn][ordered_cal_states[0]])
+        data[all_keys[-1]+'_msmt'] = cp.get_msmt_array(rotated_data, qbn)
+        data[all_keys[-1]+'_cal'] = cp.get_cal_array(rotated_data, qbn)
     return data_dict
 
 
@@ -458,10 +456,9 @@ def rotate_1d_array(data_dict, data_keys_in, data_keys_out, **params):
 
     last_ge_pulses = get_param('last_ge_pulses', data_dict, default_value=[],
                                **params)
-    qb_channel_map = get_param('qb_channel_map', data_dict, **params)
-    if qb_channel_map is None:
-        qb_channel_map = get_qb_channel_map_from_file(
-            data_dict, [ch for tup in data_keys_in for ch in tup], **params)
+    qb_value_names_map = get_param('qb_value_names_map', data_dict, **params)
+    if qb_value_names_map is None:
+        raise ValueError('Unknown qb_value_names_map.')
 
     data_to_proc_dict = get_data_to_process(data_dict, data_keys_in)
     if len(data_keys_out) != len(data_to_proc_dict):
@@ -481,20 +478,72 @@ def rotate_1d_array(data_dict, data_keys_in, data_keys_out, **params):
                 data = data[all_keys[i]]
 
         cp = cp_list[j]
-        qbn = [k for k, v in qb_channel_map.items() if keyi == v][0]
+        qbn = [k for k, v in qb_value_names_map.items() if keyi == v][0]
         rotations = cp.get_rotations(last_ge_pulses=last_ge_pulses)
         ordered_cal_states = []
         for ii in range(len(rotations[qbn])):
             ordered_cal_states += \
                 [k for k, idx in rotations[qbn].items() if idx == ii]
-        data[all_keys[-1]] = \
+        rotated_data = \
             a_tools.rotate_and_normalize_data_1ch(
                 data=data_to_proc_dict[keyi],
                 cal_zero_points=None if len(ordered_cal_states) == 0 else
                     cp.get_indices()[qbn][ordered_cal_states[0]],
                 cal_one_points=None if len(ordered_cal_states) == 0 else
                     cp.get_indices()[qbn][ordered_cal_states[0]])
+        data[all_keys[-1]+'_msmt'] = cp.get_msmt_array(rotated_data, qbn)
+        data[all_keys[-1]+'_cal'] = cp.get_cal_array(rotated_data, qbn)
     return data_dict
+
+
+## Helper functions ##
+def get_msmt_data(all_data, cal_points, qb_name):
+    """
+    Extracts data points from all_data that correspond to the measurement
+    points (without calibration points data).
+    :param all_data: array containing both measurement and calibration
+                     points data
+    :param cal_points: CalibrationPoints instance or its repr
+    :param qb_name: qubit name
+    :return: measured data without calibration points data
+    """
+    if isinstance(cal_points, str):
+        cal_points = repr(cal_points)
+    n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
+    return deepcopy(all_data[:-n_cal_pts])
+
+
+def get_cal_data(all_data, cal_points, qb_name):
+    """
+    Extracts data points from all_data that correspond to the calibration points
+    data.
+    :param all_data: array containing both measurement and calibration
+                     points data
+    :param cal_points: CalibrationPoints instance or its repr
+    :param qb_name: qubit name
+    :return: Calibration points data
+    """
+    if isinstance(cal_points, str):
+        cal_points = repr(cal_points)
+    n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
+    return deepcopy(all_data[-n_cal_pts:])
+
+
+def get_cal_sweep_points(sweep_points_array, cal_points, qb_name):
+    """
+    Creates the sweep points corresponding to the calibration points data as
+    equally spaced number_of_cal_states points, with the spacing given by the
+    spacing in sweep_points_array.
+    :param sweep_points_array: array of physical sweep points
+    :param cal_points: CalibrationPoints instance or its repr
+    :param qb_name: qubit name
+    """
+    if isinstance(cal_points, str):
+        cal_points = repr(cal_points)
+    n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
+    step = np.abs(sweep_points_array[-1] - sweep_points_array[-2])
+    return np.array([sweep_points_array[-1] + i * step for
+                     i in range(1, n_cal_pts + 1)])
 
 
 ## Plotting nodes ##
@@ -521,22 +570,6 @@ def get_latex_prob_label(prob_label):
 def prepare_1d_plot(data_dict, data_keys_in, fig_name, **params):
 
     data_to_proc_dict = get_data_to_process(data_dict, data_keys_in)
-    cp = get_param('cal_points', data_dict, **params)
-    if cp is not None:
-        cp = eval(cp)
-    qb_channel_map = get_param('qb_channel_map', data_dict, **params)
-    if qb_channel_map is None:
-        qb_channel_map = get_qb_channel_map_from_file(
-            data_dict, data_keys_in,
-            qb_names=list(cp.get_states()), **params)
-
-    # get sweep points
-    # TODO: come up with a standard way sweep points are saved in metadata
-    # for now using sweep_points_dict in order to test existing measurements
-    sweep_points_dict = get_param('sweep_points_dict', data_dict,
-                                  **params)
-    sweep_points_dict = {k: cp.extend_sweep_points(v, k)
-                         for k, v in sweep_points_dict.items()}
 
     data_axis_label = params.get('data_axis_label', None)
     data_label = params.get('data_label', 'Data')
@@ -548,24 +581,25 @@ def prepare_1d_plot(data_dict, data_keys_in, fig_name, **params):
     plotsize = fit_plt.get_default_plot_params(set=False)['figure.figsize']
     plotsize = (plotsize[0], plotsize[0]/1.25)
 
+    cp = get_param('cal_points', data_dict, **params)
+    if cp is not None:
+        cp = eval(cp)
+        qb_name = params.get('qb_name', None)
+        if qb_name is None:
+            raise ValueError('Unknwn qb_name.')
+        title_suffix = qb_name + title_suffix
+    physical_swpts = params.get('physical_swpts', None)
+    if physical_swpts is None:
+        raise ValueError('physical_swpts not found.')
+
     plot_dicts = OrderedDict()
     plot_names_cal = []
     for i, keyi in enumerate(data_to_proc_dict):
-        qb_name = [k for k, v in qb_channel_map.items() if keyi == v[0]][0]
-        title_suffix = qb_name + title_suffix
-
-        msmt_data = data_to_proc_dict[keyi]
-        msmt_swpts = sweep_points_dict[qb_name]
-
+        data = data_to_proc_dict[keyi]
         if cp is not None:
-            if len(qb_channel_map) != len(cp.get_states()):
-                raise ValueError('qb_channel_map and cp_list do not have '
-                                 'the same length.')
-
-            msmt_data = cp.get_msmt_array(data_to_proc_dict[keyi], qb_name)
-            msmt_swpts = cp.get_msmt_array(sweep_points_dict[qb_name], qb_name)
-            cal_data = cp.get_cal_array(data_to_proc_dict[keyi], qb_name)
-            cal_swpts = cp.get_cal_array(sweep_points_dict[qb_name], qb_name)
+            cal_data = get_cal_data(data, cp, qb_name)
+            data = get_msmt_data(data, cp, qb_name)
+            cal_swpts = get_cal_sweep_points(physical_swpts, cp, qb_name)
 
             qb_cal_indxs = cp.get_indices()[qb_name]
             # plot cal points
@@ -592,8 +626,8 @@ def prepare_1d_plot(data_dict, data_keys_in, fig_name, **params):
                     'plotsize': plotsize,
                     'plotfn': 'plot_hlines',
                     'y': np.mean(cal_data[cal_pts_idxs]),
-                    'xmin': sweep_points_dict[qb_name][0],
-                    'xmax': sweep_points_dict[qb_name][-1],
+                    'xmin': physical_swpts[0],
+                    'xmax': cal_swpts[-1],
                     'colors': 'gray'}
 
         title = (data_dict['timestamp'] + ' ' + data_dict['measurementstring'])
@@ -626,10 +660,10 @@ def prepare_1d_plot(data_dict, data_keys_in, fig_name, **params):
             'plotfn': 'plot_line',
             'fig_id': fig_name,
             'plotsize': plotsize,
-            'xvals': msmt_swpts,
+            'xvals': physical_swpts,
             'xlabel': xlabel,
             'xunit': xunit,
-            'yvals': msmt_data,
+            'yvals': data,
             'ylabel': data_axis_label,
             'yunit': '',
             'setlabel': data_label,
@@ -654,6 +688,7 @@ def prepare_1d_plot(data_dict, data_keys_in, fig_name, **params):
 ## Nodes that are classes ##
 
 class RabiAnalysis(object):
+
     def __init__(self, data_dict, data_keys_in, **params):
         """
         Does Rabi analysis. Prepares fits and plot, and extracts
@@ -662,11 +697,17 @@ class RabiAnalysis(object):
                     processed data is to be stored
         :param data_keys_in: list of key names or dictionary keys paths in
                     data_dict for the data to be processed
+
+        Assumptions:
+            - cal_points, sweep_points, qb_sweep_points_map, qb_name exist in
+            metadata or params
+            - expects a 1d sweep, ie takes sweep_points[0][
+            qb_sweep_points_map[qb_name]][0] as sweep points
         """
         self.data_dict = data_dict
         self.data_keys_in = data_keys_in
-        self.data_to_proc_dict = get_data_to_process(
-            self.data_dict, self.data_keys_in)
+        self.data_to_proc_dict = get_data_to_process(self.data_dict,
+                                                     self.data_keys_in)
 
         if params.get('auto', True):
             self.process_data(**params)
@@ -683,28 +724,26 @@ class RabiAnalysis(object):
         return self.data_dict
 
     def process_data(self, **params):
+        self.qb_name = get_param('qubit_name', self.data_dict, **params)
+
         self.cp = get_param('cal_points', self.data_dict, **params)
         if self.cp is not None:
             self.cp = eval(self.cp)
         else:
-            raise ValueError('cal_points object not found.')
-        qb_channel_map = get_param('qb_channel_map', self.data_dict, **params)
-        if qb_channel_map is None:
-            qb_channel_map = get_qb_channel_map_from_file(
-                self.data_dict, self.data_keys_in,
-                qb_names=list(self.cp.get_states()), **params)
-        self.qb_channel_map = qb_channel_map
+            raise ValueError('cal_points not found.')
 
-        if len(self.qb_channel_map) != len(self.cp.get_states()):
-            raise ValueError('qb_channel_map and cp_list do not have '
-                             'the same length.')
-        # get sweep points
-        # TODO: come up with a standard way sweep points are saved in metadata
-        # for now using sweep_points_dict in order to test existing measurements
-        sweep_points_dict = get_param('sweep_points_dict', self.data_dict,
-                                      **params)
-        self.sweep_points_dict = {k: self.cp.extend_sweep_points(v, k)
-                                  for k, v in sweep_points_dict.items()}
+        self.sp = get_param('sweep_points', self.data_dict, **params)
+        if self.sp is None:
+            raise ValueError('sweep_points not found.')
+        if isinstance(self.sp, str):
+            self.sp = eval(self.sp)
+
+        self.qb_sweep_points_map = get_param('qb_sweep_points_map',
+                                             self.data_dict, **params)
+        if self.qb_sweep_points_map is None:
+            raise ValueError('qb_sweep_points_map not found.')
+        self.physical_swpts = self.sp[0][self.qb_sweep_points_map[
+            self.qb_name][0]][0]
 
         if 'folder' in self.data_dict:
             self.folder = self.data_dict['folder']
@@ -714,32 +753,23 @@ class RabiAnalysis(object):
             log.warning(r'Unspecified folder. Old $\pi$- and $\pi/2$-pulse '
                         r'amplitudes will not be extracted.')
 
-        if params.get('prepare_fits', True):
-            self.prepare_fitting()
-
-        return self.data_dict
-
     def prepare_fitting(self):
         fit_dicts = OrderedDict()
         for keyi, data in self.data_to_proc_dict.items():
-            qb_name = [k for k, v in
-                       self.qb_channel_map.items() if keyi == v[0]][0]
-            swpts_fit = self.cp.get_msmt_array(self.sweep_points_dict[qb_name],
-                                               qb_name)
-            data_fit = self.cp.get_msmt_array(data, qb_name)
+            data_fit = get_msmt_data(data, self.cp, self.qb_name)
             cos_mod = lmfit.Model(fit_mods.CosFunc)
             guess_pars = fit_mods.Cos_guess(
-                model=cos_mod, t=swpts_fit, data=data_fit)
+                model=cos_mod, t=self.physical_swpts, data=data_fit)
             guess_pars['amplitude'].vary = True
             guess_pars['amplitude'].min = -10
             guess_pars['offset'].vary = True
             guess_pars['frequency'].vary = True
             guess_pars['phase'].vary = True
 
-            key = 'cos_fit_' + qb_name
+            key = 'cos_fit_' + self.qb_name + keyi
             fit_dicts[key] = {
                 'fit_fn': fit_mods.CosFunc,
-                'fit_xvals': {'t': swpts_fit},
+                'fit_xvals': {'t': self.physical_swpts},
                 'fit_yvals': {'data': data_fit},
                 'guess_pars': guess_pars}
 
@@ -755,13 +785,9 @@ class RabiAnalysis(object):
             raise KeyError('data_dict does not contain fit_dicts.')
         rabi_amplitudes = OrderedDict()
         for keyi in self.data_to_proc_dict:
-            qb_name = [k for k, v in
-                       self.qb_channel_map.items() if keyi == v[0]][0]
-            fit_res = fit_dicts['cos_fit_' + qb_name]['fit_res']
-            msmt_swpts = self.cp.get_msmt_array(self.sweep_points_dict[qb_name],
-                                                qb_name)
-            rabi_amplitudes[qb_name] = self.get_amplitudes(
-                fit_res=fit_res, sweep_points=msmt_swpts)
+            fit_res = fit_dicts['cos_fit_' + self.qb_name + keyi]['fit_res']
+            rabi_amplitudes[self.qb_name] = self.get_amplitudes(
+                fit_res=fit_res, sweep_points=self.physical_swpts)
 
         if 'analysis_params_dict' in self.data_dict:
             self.data_dict['analysis_params_dict'].update(rabi_amplitudes)
@@ -775,20 +801,18 @@ class RabiAnalysis(object):
             raise KeyError('data_dict does not contain fit_dicts.')
         plot_dicts = OrderedDict()
         for keyi, data in self.data_to_proc_dict.items():
-            qb_name = [k for k, v in
-                       self.qb_channel_map.items() if keyi == v[0]][0]
-
-            base_plot_name = 'Rabi_' + qb_name
+            base_plot_name = 'Rabi_' + self.qb_name + keyi
             prepare_1d_plot(
                 data_dict=self.data_dict,
                 data_keys_in=[keyi],
+                physical_swpts=self.physical_swpts,
                 fig_name=base_plot_name,
                 data=data,
-                plot_name_suffix=qb_name+'fit',
-                qb_name=qb_name)
+                plot_name_suffix=self.qb_name+'fit',
+                qb_name=self.qb_name)
 
-            fit_res = fit_dicts['cos_fit_' + qb_name]['fit_res']
-            plot_dicts['fit_' + qb_name] = {
+            fit_res = fit_dicts['cos_fit_' + self.qb_name + keyi]['fit_res']
+            plot_dicts['fit_' + self.qb_name + keyi] = {
                 'fig_id': base_plot_name,
                 'plotfn': 'plot_fit',
                 'fit_res': fit_res,
@@ -800,12 +824,12 @@ class RabiAnalysis(object):
                 'legend_pos': 'upper right'}
 
             rabi_amplitudes = self.data_dict['analysis_params_dict']
-            plot_dicts['piamp_marker_' + qb_name] = {
+            plot_dicts['piamp_marker_' + self.qb_name + keyi] = {
                 'fig_id': base_plot_name,
                 'plotfn': 'plot_line',
-                'xvals': np.array([rabi_amplitudes[qb_name]['piPulse']]),
+                'xvals': np.array([rabi_amplitudes[self.qb_name]['piPulse']]),
                 'yvals': np.array([fit_res.model.func(
-                    rabi_amplitudes[qb_name]['piPulse'],
+                    rabi_amplitudes[self.qb_name]['piPulse'],
                     **fit_res.best_values)]),
                 'setlabel': '$\pi$-Pulse amp',
                 'color': 'r',
@@ -817,22 +841,23 @@ class RabiAnalysis(object):
                 'legend_bbox_to_anchor': (1, -0.15),
                 'legend_pos': 'upper right'}
 
-            plot_dicts['piamp_hline_' + qb_name] = {
+            plot_dicts['piamp_hline_' + self.qb_name + keyi] = {
                 'fig_id': base_plot_name,
                 'plotfn': 'plot_hlines',
                 'y': [fit_res.model.func(
-                    rabi_amplitudes[qb_name]['piPulse'],
+                    rabi_amplitudes[self.qb_name]['piPulse'],
                     **fit_res.best_values)],
-                'xmin': self.sweep_points_dict[qb_name][0],
-                'xmax': self.sweep_points_dict[qb_name][-1],
+                'xmin': self.physical_swpts[0],
+                'xmax': get_cal_sweep_points(self.physical_swpts, self.cp,
+                                             self.qb_name)[-1],
                 'colors': 'gray'}
 
-            plot_dicts['pihalfamp_marker_' + qb_name] = {
+            plot_dicts['pihalfamp_marker_' + self.qb_name + keyi] = {
                 'fig_id': base_plot_name,
                 'plotfn': 'plot_line',
-                'xvals': np.array([rabi_amplitudes[qb_name]['piHalfPulse']]),
+                'xvals': np.array([rabi_amplitudes[self.qb_name]['piHalfPulse']]),
                 'yvals': np.array([fit_res.model.func(
-                    rabi_amplitudes[qb_name]['piHalfPulse'],
+                    rabi_amplitudes[self.qb_name]['piHalfPulse'],
                     **fit_res.best_values)]),
                 'setlabel': '$\pi /2$-Pulse amp',
                 'color': 'm',
@@ -844,40 +869,41 @@ class RabiAnalysis(object):
                 'legend_bbox_to_anchor': (1, -0.15),
                 'legend_pos': 'upper right'}
 
-            plot_dicts['pihalfamp_hline_' + qb_name] = {
+            plot_dicts['pihalfamp_hline_' + self.qb_name + keyi] = {
                 'fig_id': base_plot_name,
                 'plotfn': 'plot_hlines',
                 'y': [fit_res.model.func(
-                    rabi_amplitudes[qb_name]['piHalfPulse'],
+                    rabi_amplitudes[self.qb_name]['piHalfPulse'],
                     **fit_res.best_values)],
-                'xmin': self.sweep_points_dict[qb_name][0],
-                'xmax': self.sweep_points_dict[qb_name][-1],
+                'xmin': self.physical_swpts[0],
+                'xmax': get_cal_sweep_points(self.physical_swpts, self.cp,
+                                             self.qb_name)[-1],
                 'colors': 'gray'}
 
             if self.folder is not None:
                 old_pipulse_val = a_tools.get_param_value_from_file(
-                    file_path=self.folder, instr_name=qb_name,
+                    file_path=self.folder, instr_name=self.qb_name,
                     param_name='{}_amp180'.format(
                         'ef' if 'f' in keyi else 'ge'))
                 old_pihalfpulse_val = old_pipulse_val * \
                     a_tools.get_param_value_from_file(
                       file_path=self.data_dict['folder'],
-                      instr_name=qb_name, param_name='{}_amp90_scale'.format(
+                      instr_name=self.qb_name, param_name='{}_amp90_scale'.format(
                           'ef' if 'f' in keyi else 'ge'))
 
                 textstr = ('  $\pi-Amp$ = {:.3f} V'.format(
-                    rabi_amplitudes[qb_name]['piPulse']) +
+                    rabi_amplitudes[self.qb_name]['piPulse']) +
                            ' $\pm$ {:.3f} V '.format(
-                               rabi_amplitudes[qb_name]['piPulse_stderr']) +
+                               rabi_amplitudes[self.qb_name]['piPulse_stderr']) +
                            '\n$\pi/2-Amp$ = {:.3f} V '.format(
-                               rabi_amplitudes[qb_name]['piHalfPulse']) +
+                               rabi_amplitudes[self.qb_name]['piHalfPulse']) +
                            ' $\pm$ {:.3f} V '.format(
-                               rabi_amplitudes[qb_name]['piHalfPulse_stderr']) +
+                               rabi_amplitudes[self.qb_name]['piHalfPulse_stderr']) +
                            '\n  $\pi-Amp_{old}$ = ' + '{:.3f} V '.format(
                             old_pipulse_val) +
                            '\n$\pi/2-Amp_{old}$ = ' + '{:.3f} V '.format(
                             old_pihalfpulse_val))
-                plot_dicts['text_msg_' + qb_name] = {
+                plot_dicts['text_msg_' + self.qb_name] = {
                     'fig_id': base_plot_name,
                     'ypos': -0.2,
                     'xpos': -0.05,

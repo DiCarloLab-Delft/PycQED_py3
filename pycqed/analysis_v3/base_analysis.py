@@ -53,7 +53,8 @@ class BaseDataAnalysis(object):
     Dictionary containing fitting results
     '''
 
-    def __init__(self, t_start: str = None, t_stop: str = None,
+    def __init__(self, data_dict: dict = None,
+                 t_start: str = None, t_stop: str = None,
                  label: str = '', data_file_path: str = None,
                  close_figs: bool = True, options_dict: dict = None,
                  extract_only: bool = False, do_fitting: bool = True,
@@ -117,11 +118,10 @@ class BaseDataAnalysis(object):
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
         '''
+        self.data_dict = data_dict
         self.params_dict = params_dict
         self.numeric_params = numeric_params
 
-        # initialize an empty dict to store results of analysis
-        self.proc_data_dict = OrderedDict()
         if options_dict is None:
             self.options_dict = OrderedDict()
         else:
@@ -152,26 +152,6 @@ class BaseDataAnalysis(object):
         if self.timestamps is None or len(self.timestamps) == 0:
             raise ValueError('No data file found.')
 
-
-        ########################################
-        # These options relate to the plotting #
-        ########################################
-        self.options_dict['save_figs'] = self.options_dict.get(
-            'save_figs', True)
-        self.options_dict['close_figs'] = self.options_dict.get(
-            'close_figs', close_figs)
-        ####################################################
-        # These options relate to what analysis to perform #
-        ####################################################
-        self.extract_only = extract_only
-        self.do_fitting = do_fitting
-
-        self.verbose = self.options_dict.get('verbose', False)
-        self.auto_keys = self.options_dict.get('auto_keys', None)
-
-        if type(self.auto_keys) is str:
-            self.auto_keys = [self.auto_keys]
-
         if auto:
             self.run_analysis()
 
@@ -180,19 +160,9 @@ class BaseDataAnalysis(object):
         This function is at the core of all analysis and defines the flow.
         This function is typically called after the __init__.
         """
-        self.extract_data()  # extract data specified in params dict
+        if self.data_dict is None:
+            self.extract_data()  # extract data specified in params dict
         self.process_data()  # binning, filtering etc
-        # if self.do_fitting:
-        #     self.run_fitting()  # fitting to models
-        #     self.analyze_fit_results()
-        #
-        # if not self.extract_only:
-        #     self.prepare_plots()
-        #     self.plot(key_list='auto')  # make the plots
-        #
-        # if self.options_dict.get('save_figs', False):
-        #     self.save_figures(close_figs=self.options_dict.get(
-        #         'close_figs', False))
 
     def extract_data(self):
         """
@@ -358,13 +328,7 @@ class BaseDataAnalysis(object):
         for node_dict in self.processing_pipe:
             try:
                 node = getattr(dat_proc, node_dict["node_type"])
-                if isinstance(node, type):
-                    # node is a class
-                    proc_obj = node(self.data_dict, **node_dict)
-                    self.data_dict = proc_obj.process_data()
-                else:
-                    # node is a function
-                    self.data_dict = node(self.data_dict, **node_dict)
+                node(self.data_dict, **node_dict)
             except AttributeError:
                 raise KeyError(f'Processing node "{node_dict["node_type"]}" '
                                f'not recognized')
