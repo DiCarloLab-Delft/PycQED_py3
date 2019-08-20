@@ -362,7 +362,7 @@ def measure_multiplexed_readout(qubits, liveplot=False,
         [qb.name for qb in qubits])))
 
     if analyse and thresholds is not None:
-        channel_map = {qb.name: qb.int_log_det.value_names[0] for qb in qubits}
+        channel_map = {qb.name: qb.int_log_det.value_names[0]+' '+qb.instr_uhf() for qb in qubits}
         print('MRO channel map ', channel_map)
         ra.Multiplexed_Readout_Analysis(options_dict=dict(
             n_readouts=(2 if preselection else 1) * 2 ** len(qubits),
@@ -591,6 +591,105 @@ def measure_parity_single_round(ancilla_qubit, data_qubits, CZ_map,
          'hard_sweep_params': {'preps': {'values': np.arange(0, len(preps)),
                                          'unit': ''}}
         })
+
+    MC.run(label, exp_metadata=exp_metadata)
+
+    if analyze:
+        channel_map = {
+            qb.name: qb.int_log_det.value_names[0] + ' ' + qb.instr_uhf() for qb in
+            qubits}
+        tda.MultiQubit_TimeDomain_Analysis(qb_names=qb_names, options_dict=dict(
+                channel_map=channel_map
+            ))
+
+
+def measure_multi_parity_multi_round(ancilla_qubits, data_qubits,
+                                     parity_map, CZ_map,
+                                     prep=None, upload=True, prep_params=None,
+                                     mode='tomo',
+                                     parity_seperation=1100e-9,
+                                     rots_basis=('I', 'Y90', 'X90'),
+                                     parity_loops = 1,
+                                     cal_points=None, analyze=True,
+                                     exp_metadata=None, label=None,
+                                     detector='int_log_det'):
+    """
+
+    :param ancilla_qubit:
+    :param data_qubits:
+    :param CZ_map: example:
+        {'CZ qb1 qb2': ['Y90 qb1', 'CX qb1 qb2', 'mY90 qb1'],
+         'CZ qb3 qb4': ['CZ qb4 qb3']}
+    :param preps:
+    :param upload:
+    :param prep_params:
+    :param cal_points:
+    :param analyze:
+    :param exp_metadata:
+    :param label:
+    :param detector:
+    :return:
+    """
+
+    qubits = ancilla_qubits + data_qubits
+    qb_names = [qb.name for qb in qubits]
+    for qb in qubits:
+        qb.prepare(drive='timedomain')
+
+    if label is None:
+        label = 'S7-rounds_' + str(parity_loops) + '_' + '-'.join(rots_basis) + \
+                '_' + '-'.join([qb.name for qb in qubits])
+
+    if prep_params is None:
+        prep_params = ancilla_qubits[0].preparation_params()
+
+    # if cal_points is None:
+    #     cal_points = CalibrationPoints.multi_qubit(qb_names, 'ge')
+
+    if prep is None:
+        prep = 'g'*len(data_qubits)
+
+    MC = ancilla_qubits[0].instr_mc.get_instr()
+
+    seq, sweep_points = mqs.multi_parity_multi_round_seq(
+                                 [qb.name for qb in ancilla_qubits],
+                                 [qb.name for qb in data_qubits],
+                                 parity_map,
+                                 CZ_map,
+                                 prep,
+                                 operation_dict = get_operation_dict(qubits),
+                                 mode=mode,
+                                 parity_seperation=parity_seperation,
+                                 rots_basis=rots_basis,
+                                 parity_loops=parity_loops,
+                                 cal_points=cal_points,
+                                 prep_params=prep_params,
+                                 upload=False)
+
+    MC.set_sweep_function(awg_swf.SegmentHardSweep(
+        sequence=seq, upload=upload, parameter_name='Tomography'))
+    MC.set_sweep_points(sweep_points)
+
+    rounds = 0
+    for k in range(len(parity_map)):
+        if parity_map[k]['round'] > rounds:
+            rounds = parity_map[k]['round']
+    rounds += 1
+
+    MC.set_detector_function(
+        get_multiplexed_readout_detector_functions(
+            qubits,
+            nr_averages=ancilla_qubits[0].acq_averages(),
+            nr_shots=ancilla_qubits[0].acq_shots(),
+        )[detector])
+    if exp_metadata is None:
+        exp_metadata = {}
+    exp_metadata.update(
+        {'sweep_name': 'Tomography',
+         'preparation_params': prep_params,
+         'hard_sweep_params': {'tomo': {'values': np.arange(0, len(sweep_points)),
+                                         'unit': ''}}
+         })
 
     MC.run(label, exp_metadata=exp_metadata)
 
@@ -2048,10 +2147,13 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                          'soft_sweep_params': soft_sweep_params})
     MC.run_2D(label, exp_metadata=exp_metadata)
     if analyze:
+        channel_map = {qb.name: qb.int_log_det.value_names[0]+' '+qb.instr_uhf()
+                       for qb in [qbc, qbt]}
         flux_pulse_tdma = tda.CPhaseLeakageAnalysis(
             qb_names=[qbc.name, qbt.name],
             options_dict={'TwoD': True, 'plot_all_traces': plot_all_traces,
-                          'plot_all_probs': plot_all_probs})
+                          'plot_all_probs': plot_all_probs,
+                          'channel_map': channel_map})
         cphases = flux_pulse_tdma.proc_data_dict[
             'analysis_params_dict']['cphase']['val']
         population_losses = flux_pulse_tdma.proc_data_dict[
@@ -2068,7 +2170,8 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
                            analyze=True, upload=True, n_cal_points_per_state=1,
                            cal_states='auto', prep_params=None,
                            exp_metadata=None, classified=False, update=False,
-                           reset_phases_before_measurement=True):
+                           reset_phases_before_measurement=True,
+                           basis_rot_par=None):
 
     if qubits_to_measure is None:
         qubits_to_measure = [qbc, qbt]
@@ -2078,9 +2181,12 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
                 'values': np.tile(np.linspace(0, 2*np.pi, 6)*180/np.pi, 2),
                 'unit': 'deg'}}
 
+    if basis_rot_par is None:
+        basis_rot_par = 'CZ_{}_basis_rotation'.format(qbt.name)
+
     if reset_phases_before_measurement:
         dyn_phases = {qb.name: 0 for qb in qubits_to_measure}
-        qbc.set('CZ_{}_basis_rotation'.format(qbt.name), dyn_phases)
+        qbc.set(basis_rot_par, dyn_phases)
     else:
         dyn_phases = qbc.get('CZ_{}_basis_rotation'.format(qbt.name))
     for qb in qubits_to_measure:
@@ -2100,7 +2206,7 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
         seq, hard_sweep_points = \
             fsqs.dynamic_phase_seq(
                 qb_name=qb.name, hard_sweep_dict=hard_sweep_params,
-                operation_dict=get_operation_dict([qbc, qbt]),
+                operation_dict=get_operation_dict(qubits_to_measure),
                 cz_pulse_name=cz_pulse_name, cal_points=cp,
                 upload=False, prep_params=prep_params)
 
@@ -2128,16 +2234,16 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
         if analyze:
             flux_pulse_amp = None
             if 'amplitude' in qbc.get_operation_dict()[cz_pulse_name]:
-                flux_pulse_amp = qbc.get('CZ_{}_pulse_length'.format(qbt.name))
+                flux_pulse_amp = qbc.get_operation_dict()[cz_pulse_name]['amplitude']
             MA = tda.CZDynamicPhaseAnalysis(qb_names=[qb.name], options_dict={
-                'flux_pulse_length': qbc.get(
-                    'CZ_{}_pulse_length'.format(qbt.name)),
+                'flux_pulse_length': qbc.get_operation_dict()[cz_pulse_name][
+                    'pulse_length'],
                 'flux_pulse_amp': flux_pulse_amp})
             dyn_phases[qb.name] = \
                 MA.proc_data_dict['analysis_params_dict'][qb.name][
                     'dynamic_phase']['val']*180/np.pi
     if update and reset_phases_before_measurement:
-        qbc.set('CZ_{}_basis_rotation'.format(qbt.name), dyn_phases)
+        qbc.set(basis_rot_par, dyn_phases)
     return dyn_phases
 
 

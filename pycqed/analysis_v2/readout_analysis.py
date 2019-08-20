@@ -1330,8 +1330,9 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
         for qubit, channel in self.channel_map.items():
             shots_cont = np.array(
-                self.raw_data_dict['measured_values_ord_dict'][channel])
-            shots_thresh[qubit] = (shots_cont > self.thresholds[qubit])[0]
+                self.raw_data_dict['measured_data'][channel])
+
+            shots_thresh[qubit] = (shots_cont > self.thresholds[qubit])
         self.proc_data_dict['shots_thresholded'] = shots_thresh
 
         logging.info("Calculating observables")
@@ -1340,6 +1341,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                 list(self.observables.values()),
                 self.n_readouts
         )
+
 
     @staticmethod
     def probability_table(shots_of_qubits, observables, n_readouts):
@@ -1374,9 +1376,12 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         res_e = {}
         res_g = {}
 
+
         n_shots = next(iter(shots_of_qubits.values())).shape[0]
 
         table = np.zeros((n_readouts, len(observables)))
+
+        print(observables)
 
         for qubit, results in shots_of_qubits.items():
             res_e[qubit] = np.array(results).reshape((n_readouts, -1),

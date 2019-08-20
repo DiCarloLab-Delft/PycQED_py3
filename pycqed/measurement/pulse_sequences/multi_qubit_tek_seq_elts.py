@@ -844,6 +844,229 @@ def parity_single_round_seq(ancilla_qubit_name, data_qubit_names, CZ_map,
     return seq, np.arange(seq.n_acq_elements())
 
 
+def multi_parity_multi_round_seq(ancilla_qubit_names,
+                                 data_qubit_names,
+                                 parity_map,
+                                 CZ_map,
+                                 prep,
+                                 operation_dict,
+                                 mode='tomo',
+                                 parity_seperation=800e-9,
+                                 rots_basis=('I', 'Y90', 'X90'),
+                                 parity_loops=1,
+                                 cal_points=None,
+                                 prep_params=None,
+                                 upload=True):
+    seq_name = 'Multi_Parity_{}_round_sequence'.format(parity_loops)
+    qb_names = ancilla_qubit_names + data_qubit_names
+
+    # LOL what is this hack?!?!?
+    # 10 points if you can figure out why it is here
+    # 100 points for a general solution where this is not needed
+    dummy_ro_1 = {'pulse_type': 'GaussFilteredCosIQPulse',
+                 'I_channel': 'UHF1_ch1',
+                 'Q_channel': 'UHF1_ch2',
+                 'amplitude': 0.00001,
+                 'pulse_length': 50e-09,
+                 'pulse_delay': 0,
+                 'mod_frequency': 900.0e6,
+                 'phase': 0,
+                 'phi_skew': 0,
+                 'alpha': 1,
+                 'gaussian_filter_sigma': 1e-09,
+                 'nr_sigma': 2,
+                 'phase_lock': True,
+                 'basis_rotation': {},
+                 'operation_type': 'RO'}
+    dummy_ro_2 = {'pulse_type': 'GaussFilteredCosIQPulse',
+                 'I_channel': 'UHF2_ch1',
+                 'Q_channel': 'UHF2_ch2',
+                 'amplitude': 0.00001,
+                 'pulse_length': 50e-09,
+                 'pulse_delay': 0,
+                 'mod_frequency': 900.0e6,
+                 'phase': 0,
+                 'phi_skew': 0,
+                 'alpha': 1,
+                 'gaussian_filter_sigma': 1e-09,
+                 'nr_sigma': 2,
+                 'phase_lock': True,
+                 'basis_rotation': {},
+                 'operation_type': 'RO'}
+
+    parity_ops_list = []
+    for i in range(len(parity_map)):
+        parity_ops = []
+        anc_name = parity_map[i]['ancilla']
+
+        basis_op = 'I'
+
+        if parity_map[i]['type'] == 'Z':
+            basis_op = 'I'
+        elif parity_map[i]['type'] == 'X':
+            basis_op = 'Y90'
+        elif parity_map[i]['type'] == 'Y':
+            basis_op = 'X90'
+
+        for n, dqb in enumerate(parity_map[i]['data']):
+            if dqb in data_qubit_names:
+                op = basis_op + ('' if n==0 else 's') + ' ' + dqb
+                parity_ops.append(op)
+        parity_ops.append('Y90 ' + anc_name)
+
+        for dqb in parity_map[i]['data']:
+            op = 'CZ ' + anc_name + ' ' + dqb
+            op = CZ_map.get(op, [op])
+            ops = parity_ops+op
+            parity_ops = ops
+
+        parity_ops.append('mY90 ' + anc_name)
+
+        for n, dqb in enumerate(parity_map[i]['data']):
+            if dqb in data_qubit_names:
+                op = ('m' if basis_op is not 'I' else '') + basis_op + ('' if n==0
+                                                                        else
+                's') + ' ' + dqb
+                parity_ops.append(op)
+        parity_ops.append('RO ' + anc_name)
+        parity_ops_list.append(parity_ops)
+
+
+
+    prep_ops = [{'g': 'I ', 'e': 'X180 ', '+': 'Y90 ', '-': 'mY90 '}[s] \
+             + dqn for s, dqn in zip(prep, data_qubit_names)]
+
+    end_sequence = []
+    if mode=='tomo':
+        end_sequences = get_tomography_pulses(*data_qubit_names,
+                                              basis_pulses=rots_basis)
+    else:
+        end_sequences = ['I ' + data_qubit_names[0]]
+
+    first_readout = dict()
+    rounds = 0
+    for k in range(len(parity_map)):
+        first_readout[parity_map[k]['round']] = True
+        if parity_map[k]['round'] > rounds:
+            rounds = parity_map[k]['round']
+
+    all_pulsess = []
+    for t, end_sequence in enumerate(end_sequences):
+        all_pulses = []
+
+        prep_pulses = [deepcopy(operation_dict[op]) for op in prep_ops]
+        for pulse in prep_pulses:
+            pulse['element_name'] = f'prep_tomo_{t}'
+            pulse['ref_pulse'] = 'segment_start'
+            pulse['pulse_delay'] = -pulse['sigma']*pulse['nr_sigma']
+        all_pulses += prep_pulses
+
+        for m in range(parity_loops):
+            for round in first_readout.keys():
+                first_readout[round] = True
+
+            for k in range(len(parity_map)):
+                round = parity_map[k]['round']
+                for i, op in enumerate(parity_ops_list[k]):
+                    all_pulses.append(deepcopy(operation_dict[op]))
+                    if i == 0:
+                        all_pulses[-1]['ref_pulse'] = 'segment_start'
+                        all_pulses[-1]['pulse_delay'] = round*parity_seperation \
+                                                        + (1+rounds)*\
+                                                        m*parity_seperation
+                    if 'CZ' not in op and 'RO' not in op:
+                        all_pulses[-1]['element_name'] = f'drive_tomo_{t}'
+                        # all_pulses[-1]['element_name'] = f'drive_{round}_loop' + \
+                        #                                  f'_{m}_tomo_{t}'
+                    elif 'CZ' in op:
+                        all_pulses[-1]['element_name'] = f'flux_tomo_{t}'
+                    if 'RO' in op:
+                        all_pulses[-1]['element_name'] = f'ro_{round}_loop' + \
+                                                         f'_{m}_tomo_{t}'
+                        if first_readout[round] is True:
+                            all_pulses[-1]['name'] = f'first_ro_{round}_loop' + \
+                                f'_{m}_tomo_{t}'
+                        else:
+                            all_pulses[-1]['ref_pulse'] = f'first_ro_{round}' + \
+                                f'_loop_{m}_tomo_{t}'
+                            all_pulses[-1]['ref_point'] = 'start'
+
+                        first_readout[round] = False
+
+                # HAHA here is more hacking
+                all_pulses.append(deepcopy(dummy_ro_1))
+                all_pulses[-1]['element_name'] = f'ro_{round}_loop' + \
+                                                 f'_{m}_tomo_{t}'
+                all_pulses[-1]['ref_pulse'] = f'first_ro_{round}' + \
+                                              f'_loop_{m}_tomo_{t}'
+                all_pulses[-1]['ref_point'] = 'start'
+
+                all_pulses.append(deepcopy(dummy_ro_2))
+                all_pulses[-1]['element_name'] = f'ro_{round}_loop' + \
+                                                 f'_{m}_tomo_{t}'
+                all_pulses[-1]['ref_pulse'] = f'first_ro_{round}' + \
+                                              f'_loop_{m}_tomo_{t}'
+                all_pulses[-1]['ref_point'] = 'start'
+
+        end_pulses = [deepcopy(operation_dict[op]) for op in end_sequence]
+
+        for pulse in end_pulses:
+            pulse['ref_pulse'] = f'first_ro_{rounds}' + \
+                                 f'_loop_{parity_loops-1}_tomo_{t}'
+            pulse['pulse_delay'] = 300e-9
+            pulse['ref_point'] = 'end'
+        all_pulses += end_pulses
+        all_pulses += generate_mux_ro_pulse_list(qb_names, operation_dict)
+        all_pulsess.append(all_pulses)
+        if t==0:
+            from pprint import pprint
+            # pprint(all_pulses)
+
+
+
+    if prep_params is not None:
+        all_pulsess_with_prep = \
+            [add_preparation_pulses(seg, operation_dict, qb_names, **prep_params)
+             for seg in all_pulsess]
+    else:
+        all_pulsess_with_prep = all_pulsess
+
+    seq = pulse_list_list_seq(all_pulsess_with_prep, seq_name, upload=False)
+
+    # add calibration segments
+    if cal_points is not None:
+        seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+
+    # This is very hacky!
+    # We need to find a more general way of doing this!!!
+    uhfs_used = dict()
+    for parity in parity_map:
+        anc_name = parity['ancilla']
+        anc_ro = operation_dict['RO '+anc_name]
+        uhf = anc_ro['I_channel'][:4]
+        if uhf not in uhfs_used.keys():
+            uhfs_used[uhf] = []
+        uhfs_used[uhf].append(parity['round'])
+
+    repeat_dict = {}
+    ROs_dict = {}
+    for uhf in uhfs_used:
+        ROs_dict[uhf] = len(np.unique(uhfs_used[uhf]))
+    ROs = np.max(list(ROs_dict.values()))
+    for uhf in uhfs_used:
+        repeat_dict[uhf] = (len(end_sequences),
+                 (parity_loops, ROs), 1
+                 )
+    print(repeat_dict)
+
+    if upload:
+        ps.Pulsar.get_instance().program_awgs(seq, repeat_dict=repeat_dict)
+
+
+    print('sweep_points: ', seq.n_acq_elements())
+    return seq, np.arange(seq.n_acq_elements())
+
+
 def n_qubit_tomo_seq(
         qubit_names, operation_dict, prep_sequence=None,
         prep_name=None,
