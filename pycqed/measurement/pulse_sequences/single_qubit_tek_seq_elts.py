@@ -1114,12 +1114,13 @@ def get_pulse_dict_from_pars(pulse_pars):
     pulses.update(pulses_sim)
 
     # Software Z-gate: apply phase offset to all subsequent X and Y pulses
-    target_qubit = pulse_pars.get('target_qubit', None)
+    target_qubit = pulse_pars.get('basis', None)
     if target_qubit is not None:
         Z180 = {'pulse_type': 'Z_pulse',
                 'basis_rotation': {target_qubit: 0},
-                'target_qubit': target_qubit,
+                'basis': target_qubit,
                 'operation_type': 'Virtual',
+                'pulse_length': 0,
                 'pulse_delay': 0}
         pulses.update({'Z180': Z180,
                        'mZ180': deepcopy(Z180),

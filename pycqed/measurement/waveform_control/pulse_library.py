@@ -568,3 +568,21 @@ class GaussFilteredCosIQPulse(Pulse):
             *self.algorithm_time()
         hashlist += [self.alpha, self.phi_skew, phase]
         return hashlist
+
+
+class Z_pulse(Pulse):
+    def __init__(self, name, element_name,  **kw):
+        super().__init__(name, element_name)
+        self.codeword = kw.pop('codeword', 'no_codeword')
+        self.pulse_length = kw.pop('pulse_length', 0)
+        self.length = self.pulse_length
+        self.phase = kw.get('phase', 0)
+
+    def __call__(self, **kw):
+        return self
+
+    def chan_wf(self, chan, tvals):
+        return
+
+    def hashables(self, tstart, channel):
+        return []

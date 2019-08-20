@@ -1046,7 +1046,7 @@ class QuDev_transmon(Qubit):
                 close_fig=close_fig)
 
 
-    def measure_ramsey(self, times, artificial_detunings=0, label=None,
+    def measure_ramsey(self, times, artificial_detunings=None, label=None,
                        analyze=True, close_fig=True,
                        cal_states="auto", n_cal_points_per_state=2,
                        n=1, upload=True, last_ge_pulse=True, for_ef=False,
@@ -2022,7 +2022,8 @@ class QuDev_transmon(Qubit):
                 upload=upload,
                 preselection=preselection,
                 RO_spacing=RO_spacing))
-            MC.set_sweep_points(np.arange(4 if preselection else 2))
+            MC.set_sweep_points(np.arange(self.acq_shots() *
+                                          (4 if preselection else 2)))
             MC.set_detector_function(det_func)
             with temporary_value(MC.soft_avg, 1):
                 MC.run(name=label + self.msmt_suffix)
@@ -2560,7 +2561,7 @@ class QuDev_transmon(Qubit):
                     qb_name=self.name,
                     gate_decomp=gate_decomposition)
 
-    def find_frequency_T2_ramsey(self, times, artificial_detunings=0,
+    def find_frequency_T2_ramsey(self, times, artificial_detunings=None,
                                  upload=True, label=None, n=1,
                                  cal_states="auto", n_cal_points_per_state=2,
                                  analyze=True, update=False, for_ef=False,
@@ -2618,7 +2619,7 @@ class QuDev_transmon(Qubit):
             log.warning("Does not automatically update the qubit frequency "
                             "and T2_star parameters. "
                             "Set update=True if you want this!")
-        if artificial_detunings == None:
+        if artificial_detunings is None:
             log.warning('Artificial_detuning is None; qubit driven at "%s" '
                         'estimated with spectroscopy' %self.f_qubit())
         if np.any(np.asarray(np.abs(artificial_detunings)) < 1e3):
