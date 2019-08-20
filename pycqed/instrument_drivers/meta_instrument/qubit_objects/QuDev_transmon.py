@@ -1317,7 +1317,7 @@ class QuDev_transmon(Qubit):
             {'node_type': 'SingleQubitRBAnalysis',
              'std_keys': [e+'_std' for e in det_func.value_names],
              'data_keys_in': [e+'_avg' for e in det_func.value_names],
-             'qubit_name': self.name, **kw}]
+             'meas_obj_name': self.name, **kw}]
 
         # create sweep points
         sp = SweepPoints('nr_seeds', np.arange(nr_seeds), '', 'Nr. Seeds')
@@ -1329,9 +1329,9 @@ class QuDev_transmon(Qubit):
         exp_metadata.update({'preparation_params': prep_params,
                              'cal_points': repr(cp),
                              'sweep_points': sp,
-                             'qb_sweep_points_map': sp.get_sweep_points_map(
-                                 [self.name]),
-                             'qb_value_names_map': {
+                             'meas_obj_sweep_points_map':
+                                 sp.get_sweep_points_map([self.name]),
+                             'meas_obj_value_names_map': {
                                  self.name: det_func.value_names},
                              'processing_pipe': data_processing_pipe})
         MC.run_2D(label, exp_metadata=exp_metadata)
