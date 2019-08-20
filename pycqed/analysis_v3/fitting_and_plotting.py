@@ -54,6 +54,7 @@ def run_fitting(data_dict, **params):
                 if fit_guess_fn is None and fit_dict.get('fit_guess', True):
                     fit_guess_fn = model.guess
 
+                fit_kwargs = fit_dicts.get('fit_kwargs', {})
                 if guess_pars is None:
                     if fit_guess_fn is not None:
                         # a fit function should return lmfit parameter
@@ -81,7 +82,7 @@ def run_fitting(data_dict, **params):
                             model.set_param_hint(key, **val)
                         guess_pars = model.make_params()
                 fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
-                                                params=guess_pars)
+                                                params=guess_pars, **fit_kwargs)
                 fit_res_dict[key] = fit_dict['fit_res']
 
     if params.get('save_fit_results', True):

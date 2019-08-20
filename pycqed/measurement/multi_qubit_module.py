@@ -755,7 +755,7 @@ def measure_two_qubit_randomized_benchmarking(
         prep_params = qb1.preparation_params()
 
     cal_states = CalibrationPoints.guess_cal_states(cal_states)
-    cp = CalibrationPoints.single_qubit(qb1.name, cal_states,
+    cp = CalibrationPoints.multi_qubit([qb1.name, qb2.name], cal_states,
                                         n_per_state=n_cal_points_per_state)
 
     operation_dict = get_operation_dict(qubits)

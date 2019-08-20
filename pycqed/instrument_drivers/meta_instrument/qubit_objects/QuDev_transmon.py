@@ -12,9 +12,11 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf2
 from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement.sweep_points import SweepPoints
 from pycqed.measurement.calibration_points import CalibrationPoints
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
+from pycqed.analysis_v3 import base_analysis as ba3
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import timedomain_analysis as tda
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
@@ -1242,7 +1244,8 @@ class QuDev_transmon(Qubit):
             gate_decomp='HZ', interleaved_gate=None,
             n_cal_points_per_state=2, cal_states='auto',
             classified_ro=False, thresholded=True, label=None,
-            upload=True, analyze=True, prep_params=None, exp_metadata=None):
+            upload=True, analyze=True, prep_params=None,
+            exp_metadata=None, **kw):
         '''
         Performs a randomized benchmarking experiment on 1 qubit.
         '''
@@ -1290,29 +1293,54 @@ class QuDev_transmon(Qubit):
             hard_sweep_func, sequences, 'Nr. Seeds', ''))
         MC.set_sweep_points_2D(soft_sweep_points)
 
+        data_processing_pipe = []
         if thresholded:
-            MC.set_detector_function(self.dig_avg_det)
+            det_func = self.dig_avg_det
         elif classified_ro:
-            MC.set_detector_function(self.int_avg_classif_det)
+            det_func = self.int_avg_classif_det
         else:
-            MC.set_detector_function(self.int_avg_det)
+            det_func = self.int_avg_det
+        MC.set_detector_function(det_func)
+
+        data_processing_pipe += [
+            # average data
+            {'node_type': 'average',
+             'num_bins': len(cliffords),
+             'data_keys_in': det_func.value_names,
+             'data_keys_out': [e+'_avg' for e in det_func.value_names], **kw},
+            # std for each clifford sequence
+            {'node_type': 'get_std_deviation',
+             'num_bins': len(cliffords),
+             'data_keys_in': det_func.value_names,
+             'data_keys_out': [e+'_std' for e in det_func.value_names], **kw},
+            # do SgQbRB
+            {'node_type': 'SingleQubitRBAnalysis',
+             'std_keys': [e+'_std' for e in det_func.value_names],
+             'data_keys_in': [e+'_avg' for e in det_func.value_names],
+             'qubit_name': self.name, **kw}]
+
+        # create sweep points
+        sp = SweepPoints('nr_seeds', np.arange(nr_seeds), '', 'Nr. Seeds')
+        sp.add_sweep_dimension()
+        sp.add_sweep_parameter('cliffords', cliffords, '',
+                               'Number of applied Cliffords, $m$')
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'preparation_params': prep_params,
                              'cal_points': repr(cp),
-                             'rotate': len(cp.states) != 0,
-                             'data_to_fit': {self.name: 'pe'},
-                             'hard_sweep_params':
-                                 {'nr_seeds': {'values': np.arange(nr_seeds),
-                                               'unit': ''}},
-                             'soft_sweep_params':
-                                 {'cliffords': {'values': cliffords,
-                                                'unit': ''}}})
+                             'sweep_points': sp,
+                             'qb_sweep_points_map': sp.get_sweep_points_map(
+                                 [self.name]),
+                             'qb_value_names_map': {
+                                 self.name: det_func.value_names},
+                             'processing_pipe': data_processing_pipe})
         MC.run_2D(label, exp_metadata=exp_metadata)
 
         if analyze:
-            tda.MultiQubit_TimeDomain_Analysis(
-                qb_names=[self.name], options_dict={'TwoD': True})
+            if classified_ro:
+                ba3.BaseDataAnalysis()
+            else:
+                print('Currently only classified ro is supported.')
 
     def measure_transients(self, states=('g', 'e'), upload=True,
                            analyze=True, acq_length=4097/1.8e9,

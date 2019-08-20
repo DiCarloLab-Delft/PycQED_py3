@@ -56,10 +56,8 @@ class BaseDataAnalysis(object):
     def __init__(self, data_dict: dict = None,
                  t_start: str = None, t_stop: str = None,
                  label: str = '', data_file_path: str = None,
-                 close_figs: bool = True, options_dict: dict = None,
-                 extract_only: bool = False, do_fitting: bool = True,
-                 auto=True, params_dict=dict(), numeric_params=dict(),
-                 **kwargs):
+                 options_dict: dict = None, auto=True, params_dict=dict(),
+                 numeric_params=dict(), **kwargs):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -226,7 +224,6 @@ class BaseDataAnalysis(object):
 
     def get_data_from_timestamp_list(self):
         raw_data_dict = []
-        print(self.timestamps)
         for timestamp in self.timestamps:
             raw_data_dict_ts = OrderedDict([(param, []) for param in
                                            self.params_dict])
@@ -294,8 +291,10 @@ class BaseDataAnalysis(object):
             data = measured_data[-len(raw_data_dict['value_names']):]
             if data.shape[0] != len(raw_data_dict['value_names']):
                 raise ValueError('Shape mismatch between data and ro channels.')
+
+            TD = dat_proc.get_param('TwoD', raw_data_dict, default_value=False)
             for i, ro_ch in enumerate(raw_data_dict['value_names']):
-                if 'soft_sweep_points' in raw_data_dict:
+                if 'soft_sweep_points' in raw_data_dict and TD:
                     hsl = len(raw_data_dict['hard_sweep_points'])
                     ssl = len(raw_data_dict['soft_sweep_points'])
                     measured_data = np.reshape(data[i], (ssl, hsl)).T
