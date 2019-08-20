@@ -664,10 +664,10 @@ def measure_multi_parity_multi_round(ancilla_qubits, data_qubits,
                                  parity_loops=parity_loops,
                                  cal_points=cal_points,
                                  prep_params=prep_params,
-                                 upload=False)
+                                 upload=upload)
 
     MC.set_sweep_function(awg_swf.SegmentHardSweep(
-        sequence=seq, upload=upload, parameter_name='Tomography'))
+        sequence=seq, upload=False, parameter_name='Tomography'))
     MC.set_sweep_points(sweep_points)
 
     rounds = 0

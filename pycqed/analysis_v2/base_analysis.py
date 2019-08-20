@@ -295,17 +295,24 @@ class BaseDataAnalysis(object):
                 'value_names' in raw_data_dict:
             measured_data = raw_data_dict.pop('measured_data')
             raw_data_dict['measured_data'] = OrderedDict()
-            sweep_points = measured_data[:-len(raw_data_dict['value_names'])]
+
+            value_names = raw_data_dict['value_names']
+            if not isinstance(value_names, list):
+                value_names = [value_names]
+
+            sweep_points = measured_data[:-len(value_names)]
+
+
             if sweep_points.shape[0] > 1:
                 raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
                 raw_data_dict['soft_sweep_points'] = np.unique(sweep_points[1:])
             else:
                 raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
 
-            data = measured_data[-len(raw_data_dict['value_names']):]
-            if data.shape[0] != len(raw_data_dict['value_names']):
+            data = measured_data[-len(value_names):]
+            if data.shape[0] != len(value_names):
                 raise ValueError('Shape mismatch between data and ro channels.')
-            for i, ro_ch in enumerate(raw_data_dict['value_names']):
+            for i, ro_ch in enumerate(value_names):
                 if 'soft_sweep_points' in raw_data_dict:
                     hsl = len(raw_data_dict['hard_sweep_points'])
                     ssl = len(raw_data_dict['soft_sweep_points'])

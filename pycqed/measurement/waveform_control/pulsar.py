@@ -1136,7 +1136,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         for awg in used_awgs:
             self._stop_awg(awg)
     
-    def program_awgs(self, sequence, awgs='all', repeat_dict = dict()):
+    def program_awgs(self, sequence, awgs='all', repeat_dict=dict()):
 
         # Stores the last uploaded sequence for easy access and plotting
         self.last_sequence = sequence
