@@ -354,7 +354,7 @@ class NZBufferedCZPulse(Pulse):
         pulse_length = self.pulse_length
         l1 = self.length1
         if chan != self.channel:
-            amp1 = self.aux_channels_dict[chan]
+            amp1 = self.aux_channels_dict[chan]*amp1
             amp2 = -amp1*self.alpha
             buffer_start -= self.extra_buffer_aux_pulse
             buffer_end -= self.extra_buffer_aux_pulse
