@@ -718,7 +718,7 @@ def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None,
 
 
 def randomized_renchmarking_seqs(
-        qb_name, operation_dict, cliffords, nr_seeds, net_clifford=0,
+        qb_name, operation_dict, cliffords, nr_seeds, uhf_name, net_clifford=0,
         gate_decomposition='HZ', interleaved_gate=None, upload=True,
         cal_points=None, prep_params=dict()):
 
@@ -733,10 +733,11 @@ def randomized_renchmarking_seqs(
                 interleaved_gate=interleaved_gate)
             pulse_keys = rb.decompose_clifford_seq(
                 cl_seq, gate_decomp=gate_decomposition)
+            pulse_keys = ['I'] + pulse_keys #to avoid having only virtual gates in segment
             pulse_list = [operation_dict[x + ' ' + qb_name] for x in pulse_keys]
             pulse_list += [operation_dict['RO ' + qb_name]]
-            pulse_list_w_prep = [add_preparation_pulses(
-                pulse_list, operation_dict, [qb_name], **prep_params)]
+            pulse_list_w_prep = add_preparation_pulses(
+                pulse_list, operation_dict, [qb_name], **prep_params)
             pulse_list_list_all.append(pulse_list_w_prep)
         seq = pulse_list_list_seq(pulse_list_list_all, seq_name+f'_{nCl}',
                                   upload=False)
@@ -745,11 +746,13 @@ def randomized_renchmarking_seqs(
                                                   **prep_params))
         sequences.append(seq)
 
+    repeat_dict = {uhf_name: (sequences[0].n_acq_elements(), 1)}
     if upload:
-        ps.Pulsar.get_instance().program_awgs(sequences[0])
+        ps.Pulsar.get_instance().program_awgs(sequences[0],
+                                              repeat_dict=repeat_dict)
 
     return sequences, np.arange(sequences[0].n_acq_elements()), \
-           np.arange(cliffords)
+           np.arange(len(cliffords))
 
 
 def qscale_active_reset(qscales, qb_name, operation_dict, cal_points,
@@ -916,7 +919,9 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
     state_ops = dict(g=["I "], e=["X180 "], f=["X180_ef ", "X180 "])
 
     if 'ref_pulse' not in pulse_list[0]:
-        pulse_list[0]['ref_pulse'] = 'segment_start'
+        first_pulse = deepcopy(pulse_list[0])
+        first_pulse['ref_pulse'] = 'segment_start'
+        pulse_list[0] = first_pulse
 
     if preparation_type == 'wait':
         return pulse_list

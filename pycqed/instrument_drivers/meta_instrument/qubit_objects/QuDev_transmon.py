@@ -210,6 +210,11 @@ class QuDev_transmon(Qubit):
                            docstring=("Used for double weighted integration "
                                       "during qutrit readout"),
                            parameter_class=ManualParameter)
+        self.add_parameter('acq_weights_basis', vals=vals.Lists(),
+                           label="weight basis used",
+                           docstring=("Used to log the weights basis for integration "
+                                      "during qutrit readout"),
+                           parameter_class=ManualParameter)
         self.add_parameter('acq_classifier_params', vals=vals.Dict(),
                            label='Parameters for the qutrit classifier.',
                            docstring=("Used in the int_avg_classif_det to "
@@ -792,6 +797,7 @@ class QuDev_transmon(Qubit):
                                 self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'},
+                             'rotate': True,
                              'use_cal_points': cal_points})
         MC.run(label, exp_metadata=exp_metadata)
 
@@ -1242,7 +1248,7 @@ class QuDev_transmon(Qubit):
     def measure_randomized_benchmarking(
             self, cliffords, nr_seeds,
             gate_decomp='HZ', interleaved_gate=None,
-            n_cal_points_per_state=2, cal_states='auto',
+            n_cal_points_per_state=2, cal_states=(),
             classified_ro=False, thresholded=True, label=None,
             upload=True, analyze=True, prep_params=None,
             exp_metadata=None, **kw):
@@ -1270,18 +1276,19 @@ class QuDev_transmon(Qubit):
         cp = CalibrationPoints.single_qubit(self.name, cal_states,
                                             n_per_state=n_cal_points_per_state)
 
-        if thresholded or classified_ro:
+        if thresholded:
             if self.instr_uhf.get_instr().get('quex_thres_{}_level'.format(
-                    self.acq_weights_I())) == 0.0:
+                    self.acq_I_channel())) == 0.0:
                 raise ValueError('The threshold value is not set.')
 
         sequences, hard_sweep_points, soft_sweep_points = \
             sq.randomized_renchmarking_seqs(
                 qb_name=self.name, operation_dict=self.get_operation_dict(),
                 cliffords=cliffords, nr_seeds=np.arange(nr_seeds),
-                gate_decomposition=self.gate_decomposition,
-                interleaved_gate=self.interleaved_gate, upload=False,
-                cal_points=self.cal_points, prep_params=prep_params)
+                uhf_name=self.instr_uhf.get_instr().name,
+                gate_decomposition=gate_decomp,
+                interleaved_gate=interleaved_gate, upload=False,
+                cal_points=cp, prep_params=prep_params)
 
         hard_sweep_func = awg_swf.SegmentHardSweep(
             sequence=sequences[0], upload=upload,
@@ -1305,12 +1312,12 @@ class QuDev_transmon(Qubit):
         data_processing_pipe += [
             # average data
             {'node_type': 'average',
-             'num_bins': len(cliffords),
+             'num_bins': [len(cliffords)]*len(det_func.value_names),
              'data_keys_in': det_func.value_names,
              'data_keys_out': [e+'_avg' for e in det_func.value_names], **kw},
             # std for each clifford sequence
             {'node_type': 'get_std_deviation',
-             'num_bins': len(cliffords),
+             'num_bins': [len(cliffords)]*len(det_func.value_names),
              'data_keys_in': det_func.value_names,
              'data_keys_out': [e+'_std' for e in det_func.value_names], **kw},
             # do SgQbRB
@@ -1890,6 +1897,7 @@ class QuDev_transmon(Qubit):
                 self.acq_weights_Q(final_basis[0].imag)
                 self.acq_weights_I2(final_basis[1].real)
                 self.acq_weights_Q2(final_basis[1].imag)
+                self.acq_weights_basis(final_basis_labels)
             else:
                 wre = np.real(iq_traces['e'] - iq_traces['g'])
                 wim = np.imag(iq_traces['e'] - iq_traces['g'])
@@ -2500,10 +2508,10 @@ class QuDev_transmon(Qubit):
 
         return
 
-    def find_RB_gate_fidelity(self, cliffords, nr_seeds, label=None,
+    def find_rb_gate_fidelity(self, cliffords, nr_seeds, label=None,
                               gate_decomposition='HZ', interleaved_gate=None,
                               thresholded=True, classified_ro=False,
-                              n_cal_points_per_state=2, cal_states='auto',
+                              n_cal_points_per_state=2, cal_states=(),
                               upload=True, analyze=True,
                               prep_params=None, exp_metadata=None, **kw):
 
@@ -2548,12 +2556,11 @@ class QuDev_transmon(Qubit):
 
         #Analysis
         if analyze:
-            pulse_length = self.gauss_sigma() * self.nr_sigma()
             if interleaved_gate is None:
-                rbma.RandomizedBenchmarking_Analysis(label=label,
-                                 qb_name=self.name,
-                                 T1=T1, T2=T2, pulse_length=pulse_length,
-                                 gate_decomp=gate_decomposition)
+                if classified_ro:
+                    ba3.BaseDataAnalysis()
+                else:
+                    print('Currently only classified ro is supported.')
             else:
                 rbma.Interleaved_RB_Analysis(
                     folders_dict={interleaved_gate:
@@ -2947,7 +2954,7 @@ class QuDev_transmon(Qubit):
         if self.f_ef_qubit() == 0:
             log.warning('f_ef = 0. Run qubit spectroscopy or Ramsey.')
 
-        anharmonicity = self.f_ef_qubit() - self.f_qubit()
+        anharmonicity = self.ef_freq() - self.ge_freq()
 
         if update:
             self.anharmonicity(anharmonicity)

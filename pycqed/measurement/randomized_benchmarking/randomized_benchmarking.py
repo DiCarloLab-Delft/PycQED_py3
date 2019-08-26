@@ -177,7 +177,6 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
     else:
         rng_seed = np.random.RandomState(seed)
         rb_cliffords = rng_seed.randint(0, 24, int(n_cl))
-
     if interleaved_gate is not None:
         rb_cliffords = np.repeat(rb_cliffords, 2)
         try:

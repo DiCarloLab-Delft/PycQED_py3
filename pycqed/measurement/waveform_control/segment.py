@@ -8,6 +8,7 @@
 import numpy as np
 import math
 import logging
+log = logging.getLogger(__name__)
 from copy import deepcopy
 import pycqed.measurement.waveform_control.pulse_library as pl
 import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
@@ -199,7 +200,6 @@ class Segment:
         Adds charge compensation pulse to channels with pulsar parameter
         charge_buildup_compensation.
         """
-
         t_end = -float('inf')
         pulse_area = {}
         compensation_chan = set()
