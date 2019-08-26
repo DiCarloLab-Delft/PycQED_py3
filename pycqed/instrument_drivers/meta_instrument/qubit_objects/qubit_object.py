@@ -1262,7 +1262,8 @@ class Qubit(Instrument):
 
 
 
-    def tune_freq_to_sweetspot(self, freqs=None, dac_values=None, verbose=True): 
+    def tune_freq_to_sweetspot(self, freqs=None, dac_values=None, verbose=True,
+                               fit_phase=False, use_dips=False): 
         """
         Tunes the qubit to the sweetspot
         """
@@ -1274,8 +1275,8 @@ class Qubit(Instrument):
             pass
 
         # Requires an estimate of I_per_phi0 (which should be a current)
-
-        freqs = self.freq_max() + np.arange(-80e6, +20e6, .5e6)
+        if freqs is None:
+            freqs = self.freq_max() + np.arange(-80e6, +20e6, .5e6)
 
         # Should be replaced by self.fl_dc_I() # which gets this automatically
         # self.fl_dc_I()
@@ -1291,7 +1292,12 @@ class Qubit(Instrument):
         analysis_obj = ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=True)
         freqs = analysis_obj.sweep_points
         dac_vals = analysis_obj.sweep_points_2D
-        signal_magn = analysis_obj.measured_values[0]
+        if fit_phase:
+            signal_magn = analysis_obj.measured_values[1]
+        else:
+            signal_magn = analysis_obj.measured_values[0]
+            if use_dips:
+                signal_magn = -signal_magn
 
 
         # FIXME: This function should be moved out of the qubit object upon cleanup.
