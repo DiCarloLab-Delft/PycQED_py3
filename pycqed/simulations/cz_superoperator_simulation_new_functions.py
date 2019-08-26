@@ -876,9 +876,9 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
                 sensitivity[i] = 0.1
         inverse_sensitivity = 1/sensitivity
         T2_q0_vec=linear_with_offset(inverse_sensitivity,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1])
-        for i in range(len(sensitivity)):    # manual fix for the TLS coupled at the sweetspot for Niels' Purcell device
-            if sensitivity[i] <= 0.2:
-                T2_q0_vec[i]=linear_with_offset(inverse_sensitivity[i],0,2e-6)
+        #for i in range(len(sensitivity)):    # manual fix for the TLS coupled at the sweetspot for Niels' Purcell device
+        #    if sensitivity[i] <= 0.2:
+        #        T2_q0_vec[i]=linear_with_offset(inverse_sensitivity[i],0,2e-6)
 
         # plot(x_plot_vec=[f_pulse_final/1e9],
         #                   y_plot_vec=[T2_q0_vec*1e6],
