@@ -464,6 +464,7 @@ def residual_coupling_sequence(times, q0: int, q1: int, platf_cfg: str):
 
 def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
               flux_cw: str='fl_cw_02',
+              twoq_pair=[2, 0],
               platf_cfg: str=''):
     """
     Single qubit Ramsey sequence.
@@ -487,7 +488,7 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate(flux_cw, [2, 0])
+    k.gate(flux_cw, twoq_pair)
     #k.gate(flux_cw, [10, 8])
     
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
@@ -501,7 +502,7 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate(flux_cw, [2, 0])
+    k.gate(flux_cw, twoq_pair)
     #k.gate(flux_cw, [10, 8])
     
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
@@ -705,7 +706,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
 
     # For CCLight
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
+    k.gate('fl_cw_{:02}'.format(flux_cw), [2,0])
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
 
 
