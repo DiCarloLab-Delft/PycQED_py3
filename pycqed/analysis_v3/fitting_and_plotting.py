@@ -28,66 +28,79 @@ import sys
 this_mod = sys.modules[__name__]
 
 
-def run_fitting(data_dict, **params):
-    '''
-    Fits based on the information in proc_dat_dict[pipe_name]['fit_dicts']
-    for each pipe_name, if 'fit_dicts' exists.
+def run_fitting(data_dict, keys_in='all', **params):
+    """
+    Fits the data dicts in dat_dict['fit_dicts'] specified by keys_in.
     Only model fitting is implemented here. Minimizing fitting should
     be implemented here.
-    '''
+    """
     fit_res_dict = {}
-    for key in data_dict:
-        if key == 'fit_dicts':
-            fit_dicts = data_dict['fit_dicts']
-            for key, fit_dict in fit_dicts.items():
-                guess_dict = fit_dict.get('guess_dict', None)
-                guess_pars = fit_dict.get('guess_pars', None)
-                guessfn_pars = fit_dict.get('guessfn_pars', {})
-                fit_yvals = fit_dict['fit_yvals']
-                fit_xvals = fit_dict['fit_xvals']
+    if 'fit_dicts' not in data_dict:
+        raise ValueError('fit_dicts not found in data_dict.')
 
-                model = fit_dict.get('model', None)
-                if model is None:
-                    fit_fn = fit_dict.get('fit_fn', None)
-                    model = fit_dict.get('model', lmfit.Model(fit_fn))
-                fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-                if fit_guess_fn is None and fit_dict.get('fit_guess', True):
-                    fit_guess_fn = model.guess
+    if keys_in == 'all':
+        fit_dicts = data_dict['fit_dicts']
+    else:
+        fit_dicts = {fk: fd for fk, fd in data_dict['fit_dicts'].items() if
+                     fk in keys_in}
 
-                fit_kwargs = fit_dicts.get('fit_kwargs', {})
-                if guess_pars is None:
-                    if fit_guess_fn is not None:
-                        # a fit function should return lmfit parameter
-                        # objects but can also work by returning a
-                        # dictionary of guesses
-                        guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals,
-                                                  **guessfn_pars)
-                        if not isinstance(guess_pars, lmfit.Parameters):
-                            for gd_key, val in list(guess_pars.items()):
-                                model.set_param_hint(gd_key, **val)
-                            guess_pars = model.make_params()
-
-                        if guess_dict is not None:
-                            for gd_key, val in guess_dict.items():
-                                for attr, attr_val in val.items():
-                                    # e.g. setattr(guess_pars['frequency'],
-                                    # 'value', 20e6)
-                                    setattr(guess_pars[gd_key], attr,
-                                            attr_val)
-                        # A guess can also be specified as a dictionary.
-                        # additionally this can be used to overwrite values
-                        # from the guess functions.
-                    elif guess_dict is not None:
-                        for key, val in list(guess_dict.items()):
-                            model.set_param_hint(key, **val)
-                        guess_pars = model.make_params()
-                fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
-                                                params=guess_pars, **fit_kwargs)
-                fit_res_dict[key] = fit_dict['fit_res']
+    for fit_key, fit_dict in fit_dicts.items():
+        fit_one_dict(fit_dict)
+        fit_res_dict[fit_key] = fit_dict['fit_res']
 
     if params.get('save_fit_results', True):
         getattr(save_mod, 'save_fit_results')(data_dict, fit_res_dict,
                                               **params)
+
+
+def fit_one_dict(fit_dict, **params):
+    """
+    Does fitting to one fit_dict. Updates the fit_dict with the entry 'fit_res.'
+    """
+    guess_dict = fit_dict.get('guess_dict', None)
+    guess_pars = fit_dict.get('guess_pars', None)
+    guessfn_pars = fit_dict.get('guessfn_pars', {})
+    fit_yvals = fit_dict['fit_yvals']
+    fit_xvals = fit_dict['fit_xvals']
+
+    model = fit_dict.get('model', None)
+    if model is None:
+        fit_fn = fit_dict.get('fit_fn', None)
+        model = fit_dict.get('model', lmfit.Model(fit_fn))
+    fit_guess_fn = fit_dict.get('fit_guess_fn', None)
+    if fit_guess_fn is None and fit_dict.get('fit_guess', True):
+        fit_guess_fn = model.guess
+
+    fit_kwargs = fit_dict.get('fit_kwargs', {})
+    if guess_pars is None:
+        if fit_guess_fn is not None:
+            # a fit function should return lmfit parameter
+            # objects but can also work by returning a
+            # dictionary of guesses
+            guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals,
+                                      **guessfn_pars)
+            if not isinstance(guess_pars, lmfit.Parameters):
+                for gd_key, val in list(guess_pars.items()):
+                    model.set_param_hint(gd_key, **val)
+                guess_pars = model.make_params()
+
+            if guess_dict is not None:
+                for gd_key, val in guess_dict.items():
+                    for attr, attr_val in val.items():
+                        # e.g. setattr(guess_pars['frequency'],
+                        # 'value', 20e6)
+                        setattr(guess_pars[gd_key], attr,
+                                attr_val)
+            # A guess can also be specified as a dictionary.
+            # additionally this can be used to overwrite values
+            # from the guess functions.
+        elif guess_dict is not None:
+            for gd_key, val in list(guess_dict.items()):
+                model.set_param_hint(gd_key, **val)
+            guess_pars = model.make_params()
+    fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
+                                    params=guess_pars, **fit_kwargs)
+
 
 
 #####################################
@@ -139,7 +152,7 @@ def get_default_plot_params(set_pars=True, **kwargs):
     return params
 
 
-def plot(data_dict, key_list='auto', axs_dict=None, **params):
+def plot(data_dict, keys_in='all', axs_dict=None, **params):
     """
     Fits based on the information in proc_dat_dict[pipe_name]['fit_dicts']
     for each pipe_name, if 'fit_dicts' exists.
@@ -156,12 +169,12 @@ def plot(data_dict, key_list='auto', axs_dict=None, **params):
     if axs_dict is not None:
         for key, val in list(axs_dict.items()):
             axs[key] = val
-    if key_list is 'auto':
-        key_list = plot_dicts.keys()
-    if type(key_list) is str:
-        key_list = [key_list]
+    if keys_in is 'all':
+        keys_in = plot_dicts.keys()
+    if type(keys_in) is str:
+        keys_in = [keys_in]
 
-    for key in key_list:
+    for key in keys_in:
         # go over all the plot_dicts
         pdict = plot_dicts[key]
         pdict['no_label'] = no_label
@@ -195,9 +208,9 @@ def plot(data_dict, key_list='auto', axs_dict=None, **params):
             figs[pdict['fig_id']].patch.set_alpha(0)
 
     if presentation_mode:
-        plot_for_presentation(key_list=key_list, no_label=no_label)
+        plot_for_presentation(key_list=keys_in, no_label=no_label)
     else:
-        for key in key_list:
+        for key in keys_in:
             pdict = plot_dicts[key]
             plot_touching = pdict.get('touching', False)
 
@@ -245,9 +258,11 @@ def plot(data_dict, key_list='auto', axs_dict=None, **params):
                 raise ValueError(
                     f'"{plotfn}" is not a valid plot function')
 
-        format_datetime_xaxes(data_dict, key_list, axs)
+        format_datetime_xaxes(data_dict, keys_in, axs)
     if params.get('save_figs', True):
-        getattr(save_mod, 'save_figures')(data_dict, figs, **params)
+        getattr(save_mod, 'save_figures')(data_dict, figs, keys_in=keys_in,
+                                          **params)
+
 
 def plot_vlines_auto(pdict, axs):
     xs = pdict.get('xdata')

@@ -160,7 +160,10 @@ class BaseDataAnalysis(object):
         """
         if self.data_dict is None:
             self.extract_data()  # extract data specified in params dict
-        self.process_data()  # binning, filtering etc
+        if len(self.processing_pipe) > 0:
+            self.process_data()  # binning, filtering etc
+        else:
+            print('There is no data processing pipe.')
 
     def extract_data(self):
         """
@@ -264,7 +267,9 @@ class BaseDataAnalysis(object):
                                 {}, data_file[group_name][par_name])
                 if isinstance(raw_data_dict_ts[save_par], list) and \
                         len(raw_data_dict_ts[save_par]) == 1:
-                    raw_data_dict_ts[save_par] = raw_data_dict_ts[save_par][0]
+                    if save_par not in ['value_names', 'value_units']:
+                        raw_data_dict_ts[save_par] = raw_data_dict_ts[
+                            save_par][0]
             raw_data_dict.append(raw_data_dict_ts)
 
         if len(raw_data_dict) == 1:
@@ -277,24 +282,21 @@ class BaseDataAnalysis(object):
     @staticmethod
     def add_measured_data(raw_data_dict):
         if 'measured_data' in raw_data_dict and \
-                'value_names' in raw_data_dict:
+                'value_names' in raw_data_dict and \
+                'sweep_points' in raw_data_dict['exp_metadata']:
             measured_data = raw_data_dict.pop('measured_data')
+            sweep_points = raw_data_dict['exp_metadata']['sweep_points']
             raw_data_dict['measured_data'] = OrderedDict()
-            sweep_points = measured_data[:-len(raw_data_dict['value_names'])]
-            if sweep_points.shape[0] > 1:
-                raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
-                raw_data_dict['soft_sweep_points'] = np.unique(sweep_points[1:])
-            else:
-                raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
 
-            data = measured_data[-len(raw_data_dict['value_names']):]
+            data = measured_data[len(sweep_points):]
             if data.shape[0] != len(raw_data_dict['value_names']):
-                raise ValueError('Shape mismatch between data and ro channels.')
+                raise ValueError('Shape mismatch between data and '
+                                 'ro channels.')
             TD = dat_proc.get_param('TwoD', raw_data_dict, default_value=False)
             for i, ro_ch in enumerate(raw_data_dict['value_names']):
                 if 'soft_sweep_points' in raw_data_dict and TD:
-                    hsl = len(raw_data_dict['hard_sweep_points'])
-                    ssl = len(raw_data_dict['soft_sweep_points'])
+                    hsl = len(sweep_points[0][list(sweep_points[0])[0]][0])
+                    ssl = len(sweep_points[1][list(sweep_points[0])[0]][0])
                     measured_data = np.reshape(data[i], (ssl, hsl)).T
                 else:
                     measured_data = data[i]
