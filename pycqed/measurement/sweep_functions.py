@@ -1178,7 +1178,6 @@ class FLsweep(Soft_Sweep):
         self.lm.load_waveform_onto_AWG_lookuptable(
             self.waveform_name, regenerate_waveforms=True)
         self.AWG.start()
-        self.AWG.getOperationComplete()
 
 
 
@@ -1220,6 +1219,8 @@ class tim_flux_latency_sweep(Soft_Sweep):
         self.dev.tim_flux_latency_1(val)
         self.dev.tim_flux_latency_2(val)
         self.dev.prepare_timing()
+
+        time.sleep(.5)
         return val
 
 class tim_ro_latency_sweep(Soft_Sweep):
@@ -1235,6 +1236,9 @@ class tim_ro_latency_sweep(Soft_Sweep):
         self.dev.tim_ro_latency_1(val)
         self.dev.tim_ro_latency_2(val)
         self.dev.prepare_timing()
+
+
+        time.sleep(.5)
         return val
 
 class tim_mw_latency_sweep(Soft_Sweep):
@@ -1249,4 +1253,6 @@ class tim_mw_latency_sweep(Soft_Sweep):
         self.dev.tim_mw_latency_0(val)
         self.dev.tim_mw_latency_1(val)
         self.dev.prepare_timing()
+        
+        time.sleep(.5)
         return val
