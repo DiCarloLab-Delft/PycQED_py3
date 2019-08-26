@@ -746,16 +746,36 @@ class ZI_HDAWG8(ZI_base_instrument):
                 elif awg_nr in [2, 3]:
                     self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 9)
 
+            # NEW
+            # Proper use of flux AWG to allow independent trigerring of flux
+            # bits[0:2] for awg0_ch0, bits[3:5] for awg0_ch1, 
+            # bits[6:8] for awg0_ch2, bits[9:11] for awg0_ch3, 
+            # bits[16:18] for awg0_ch4, bits[19:21] for awg0_ch5,
+            # bits[22:24] for awg0_ch6, bits[25:27] for awg0_ch7
             elif self.cfg_codeword_protocol() == 'flux':
-                # bits[0:3] for awg0_ch0, bits[4:6] for awg0_ch1 etc.
-                # self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
-                # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), awg_nr*6)
-
-                # FIXME: this is a protocol that does identical flux pulses
-                # on each channel.
+               # bits[0:3] for awg0_ch0, bits[4:6] for awg0_ch1 etc.
+               # self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
+               # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), awg_nr*6)
+               # FIXME: this is a protocol that does identical flux pulses
+               # on each channel.
+                """
                 self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
-                # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
+               # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                """
+                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
+
+                if awg_nr == 0:
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                elif awg_nr == 1:
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 6)
+                elif awg_nr == 2:
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
+                elif awg_nr == 3:
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 22)
+
+                # self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
+                # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
 
         ####################################################
         # Turn on device

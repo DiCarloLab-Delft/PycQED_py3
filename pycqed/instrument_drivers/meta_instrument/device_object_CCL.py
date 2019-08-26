@@ -39,6 +39,9 @@ except ImportError:
 from pycqed.analysis import tomography as tomo
 
 from collections import defaultdict
+# Imported for a type check
+from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
+    import QuTech_AWG_Module
 
 
 class DeviceCCL(Instrument):
@@ -1363,6 +1366,7 @@ class DeviceCCL(Instrument):
                         adaptive_sampling=False,
                         adaptive_sampling_pts=None,
                         prepare_for_timedomain=True, MC=None,
+                        freq_tone = 6e9, pow_tone = -10, spec_tone=False,
                         target_qubit_sequence: str='ramsey',
                         waveform_name='square'):
         """
@@ -1370,7 +1374,7 @@ class DeviceCCL(Instrument):
         of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
         close to the interaction zone using (usually) a rectangular pulse.
         Meanwhile q1 is prepared in 0, 1 or superposition state. If it is in 0
-        state flipping between 01-10 can be observed. It if is in 1 state flipping
+    state flipping between 01-10 can be observed. It if is in 1 state flipping
         between 11-20 as well as 11-02 show up. In superpostion everything is visible.
 
         Args:
@@ -1446,8 +1450,8 @@ class DeviceCCL(Instrument):
             self.prepare_for_timedomain(qubits=[q0, q_spec])
 
         awg = fl_lutman.AWG.get_instr()
-        using_QWG = self.find_instrument(q0)._using_QWG()
-
+        AWG = fl_lutman.AWG.get_instr()
+        using_QWG =  isinstance(AWG, QuTech_AWG_Module)
         if using_QWG:
             awg_ch = fl_lutman.cfg_awg_channel()
             amp_par = awg.parameters['ch{}_amp'.format(awg_ch)]
@@ -1472,6 +1476,16 @@ class DeviceCCL(Instrument):
 
         d = self.get_correlation_detector(qubits=[q0, q_spec], single_int_avg=True,
                                           seg_per_point=1)
+
+        # if we want to add a spec tone
+        if spec_tone:
+            spec_source = self.find_instrument(q0).instr_spec_source.get_instr()
+            spec_source.pulsemod_state(False)
+            spec_source.power(pow_tone)
+            spec_source.frequency(freq_tone)
+            spec_source.on()
+
+
 
         MC.set_sweep_function(amp_par)
         MC.set_sweep_function_2D(sw)
@@ -1558,6 +1572,8 @@ class DeviceCCL(Instrument):
                           label='Cryoscope',
                           waveform_name: str='square',
                           max_delay: float='auto',
+                          twoq_pair=[2,0],
+                          init_buffer=0,
                           prepare_for_timedomain: bool=True):
         """
         Performs a cryoscope experiment to measure the shape of a flux pulse.
@@ -1612,9 +1628,10 @@ class DeviceCCL(Instrument):
             raise ValueError('waveform_name "{}" should be either '
                              '"square" or "custom_wf"'.format(waveform_name))
 
-        p = mqo.Cryoscope(q0idx, buffer_time1=0,
+        p = mqo.Cryoscope(q0idx, buffer_time1=init_buffer,
                           buffer_time2=max_delay,
                           flux_cw=flux_cw,
+                          twoq_pair=twoq_pair,
                           platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
@@ -1726,6 +1743,7 @@ class DeviceCCL(Instrument):
 
     def measure_timing_diagram(self, q0, flux_latencies, microwave_latencies,
                        MC=None,  label='timing_{}_{}',
+                       qotheridx=2,
                        prepare_for_timedomain: bool=True):
         """
         Measure the ramsey-like sequence with the 40 ns flux pulses played between
@@ -1765,7 +1783,8 @@ class DeviceCCL(Instrument):
         p = sqo.FluxTimingCalibration(q0idx,
                               times=[40e-9],
                               platf_cfg=self.cfg_openql_platform_fn(),
-                              flux_cw='fl_cw_06', 
+                              flux_cw='fl_cw_06',
+                              qubit_other_idx=qotheridx,
                               cal_points=False)
         CC.eqasm_program(p.filename)
 
