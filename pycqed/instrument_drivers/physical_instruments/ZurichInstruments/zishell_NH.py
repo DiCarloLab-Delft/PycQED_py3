@@ -1116,13 +1116,15 @@ class ziShellDevice:
                 print('\n')
                 raise ziShellCompilationError(comp_msg)
 
-
             # This check (and while loop) is added as a workaround for #9
-            if self.geti('awgs/'+str(awg_nr)+'/ready')!= 1:
-                logging.warning('AWG not ready')
-                success_and_ready = False
-            else:
-                success_and_ready = True
+            for i in range(10):
+                if self.geti('awgs/'+str(awg_nr)+'/ready', True)!= 1:
+                    logging.warning('AWG not ready')
+                    success_and_ready = False
+                    time.sleep(0.1)
+                else:
+                    success_and_ready = True
+                    break
 
         # print('AWG {} ready: {}'.format(awg_nr,
         #                              self.geti('awgs/'+str(awg_nr)+'/ready')))

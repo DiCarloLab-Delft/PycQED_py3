@@ -114,7 +114,7 @@ class ZI_HDAWG8(ZI_base_instrument):
 
         self.add_parameter(
             'cfg_codeword_protocol', initial_value='identical',
-            vals=vals.Enum('identical', 'microwave', 'flux'), docstring=(
+            vals=vals.Enum('identical', 'microwave', 'new_microwave', 'new_novsm_microwave', 'flux'), docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
@@ -611,13 +611,15 @@ class ZI_HDAWG8(ZI_base_instrument):
                 mask_0 = 0b000111  # AWGx_ch0 uses lower bits for CW
                 mask_1 = 0b111000  # AWGx_ch1 uses higher bits for CW
 
-                # for cw in range(2**6):
-                for cw in range(8):
+                for cw in range(2**6):
+                # FIXME2: Removed to allow per-channel flux control
+                # for cw in range(8):
                     cw0 = cw & mask_0
                     cw1 = (cw & mask_1) >> 3
                 # FIXME: this is a hack because not all AWG8 channels support
                 # amp mode. It forces all AWG8's of a pair to behave identical.
-                    cw1 = cw0
+                # FIXME2: Removed to allow per-channel flux control
+                    # cw1 = cw0
                     # if both wfs are triggered play both
                     if (cw0 != 0) and (cw1 != 0):
                         # if both waveforms exist, upload
@@ -747,22 +749,34 @@ class ZI_HDAWG8(ZI_base_instrument):
                     self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 9)
 
             # NEW
+            # In the new mw protocol bits [0:7] -> CW0 and bits [23:16] -> CW1
+            elif self.cfg_codeword_protocol() == 'new_microwave':
+                if awg_nr in [0, 1]:
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                elif awg_nr in [2, 3]:
+         
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
+
+            # NEW
+            # In the NO-VSM mw protocol bits [0:6] -> CW0, bits [13, 7] -> CW1,
+            # bits [22:16] -> CW2 and bits [29:23] -> CW4
+            elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
+                if awg_nr == 0:
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                elif awg_nr == 1:
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 7)
+                elif awg_nr == 2:
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
+                elif awg_nr == 3:
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 23)
+
+            # NEW
             # Proper use of flux AWG to allow independent trigerring of flux
             # bits[0:2] for awg0_ch0, bits[3:5] for awg0_ch1, 
             # bits[6:8] for awg0_ch2, bits[9:11] for awg0_ch3, 
             # bits[16:18] for awg0_ch4, bits[19:21] for awg0_ch5,
             # bits[22:24] for awg0_ch6, bits[25:27] for awg0_ch7
             elif self.cfg_codeword_protocol() == 'flux':
-               # bits[0:3] for awg0_ch0, bits[4:6] for awg0_ch1 etc.
-               # self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
-               # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), awg_nr*6)
-               # FIXME: this is a protocol that does identical flux pulses
-               # on each channel.
-                """
-                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
-               # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
-                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                """
                 self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
 
                 if awg_nr == 0:
@@ -776,7 +790,6 @@ class ZI_HDAWG8(ZI_base_instrument):
 
                 # self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
                 # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-
         ####################################################
         # Turn on device
         ####################################################
