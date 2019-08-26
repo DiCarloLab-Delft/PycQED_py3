@@ -850,7 +850,8 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
         super(ResonatorSpectroscopy_v2, self).process_data()
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
-        n_spectra = len(self.raw_data_dict['timestamps'])
+        # now assumes the raw data dict is a tuple due to aa1ed4cdf546
+        n_spectra = len(self.raw_data_dict)
         self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         if self.options_dict.get('ref_state', None) is None:
             default_ref_state = 'g'
@@ -858,7 +859,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                       "was passed. Assuming timestamp[0]: {} is the " \
                       "timestamp of reference state with label {}"
             log.warning(
-                message.format(n_spectra, self.raw_data_dict['timestamps'][0],
+                message.format(n_spectra, self.raw_data_dict[0]['timestamp'],
                                default_ref_state))
             self.ref_state = default_ref_state
         else:
@@ -868,9 +869,9 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
             self.options_dict.get("spectra_mapping",
                                   self._default_spectra_mapping())
 
-        spectra = {state: self.raw_data_dict["amp"][i] *
+        spectra = {state: self.raw_data_dict[i]["measured_data"]['Magn'] *
                       np.exp(1j * np.pi *
-                           self.raw_data_dict["phase"][i] / 180.)
+                           self.raw_data_dict[i]["measured_data"]['Phase'] / 180.)
                     for i, state in enumerate(spectra_mapping.keys())}
 
         iq_distance = {state + self.ref_state:
@@ -893,7 +894,8 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
 
     def _default_spectra_mapping(self):
         default_levels_order = ('g', 'e', 'f')
-        tts = self.raw_data_dict['timestamps']
+        # assumes raw_data_dict is tuple
+        tts = [d['timestamp'] for d in self.raw_data_dict]
         spectra_mapping = {default_levels_order[i]: tt
                            for i, tt in enumerate(tts)}
         msg = "Assuming following mapping templates of spectra: {}." \
@@ -943,7 +945,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
             fit_fn = fit_mods.HangerFuncComplex
             # TODO HangerFuncComplexGuess
         elif fitting_model == 'hanger_with_pf':
-            if len(self.raw_data_dict['timestamps']) == 1:
+            if not isinstance(self.raw_data_dict, tuple):
                 # single fit
                 fit_fn = fit_mods.hanger_with_pf
                 fit_temp = fit_mods.fit_hanger_with_pf(
@@ -956,50 +958,49 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                     fit_temp.params
                 fit_guess_fn = None
             else:
+                pass
                 # comparative fit to reference state
                 # FIXME: Nathan: I guess here only fit dicts should be created
                 #  and then passed to run_fitting() of basis class but this is
-                #  not done here. Instead, fitting seems to be done here.
-                ref_spectrum = self.proc_data_dict['spectra'][self.ref_state]
-                for state, spectrum in self.proc_data_dict['spectra'].items():
-                    if state == self.ref_state:
-                        continue
-                    key = self.ref_state + state
-                    fit_fn = fit_mods.simultan_hanger_with_pf
-                    fit_results = fit_mods.fit_hanger_with_pf(
-                        fit_mods.SimHangerWithPfModel, [
-                            np.transpose(
-                                [self.proc_data_dict['plot_frequency'][0],
-                                 np.abs(ref_spectrum)]),
-                            np.transpose(
-                                [self.proc_data_dict['plot_frequency'][0],
-                                 np.abs(spectrum)])],
-                        simultan=True)
-                    self.proc_data_dict['fit_raw_results'][key] = fit_results
-
-
-                    guess_pars = None
-                    fit_guess_fn = None
-
-                    chi = (fit_results[1].params['omega_ro'].value -
-                                fit_results[0].params['omega_ro'].value) / 2
-                    f_RO_res = (fit_results[0].params['omega_ro'].value +
-                                     fit_results[1].params['omega_ro'].value) / 2
-                    f_PF = fit_results[0].params['omega_pf'].value
-                    kappa = fit_results[0].params['kappa_pf'].value
-                    J_ = fit_results[0].params['J'].value
-                    f_RO = self.find_f_RO([self.ref_state, state])
-                    self.fit_res[key] = \
-                        dict(chi=chi, f_RO_res=f_RO_res, f_PF=f_PF,
-                             kappa=kappa, J_=J_, f_RO=f_RO)
-
-        if (len(self.raw_data_dict['timestamps']) == 1):
-            self.fit_dicts['reso_fit'] = {
-                'fit_fn': fit_fn,
-                'fit_guess_fn': fit_guess_fn,
-                'guess_pars': guess_pars,
-                'fit_yvals': {'data': self.proc_data_dict['plot_amp']},
-                'fit_xvals': { 'f': self.proc_data_dict['plot_frequency']}}
+        #         #  not done here. Instead, fitting seems to be done here.
+        #         ref_spectrum = self.proc_data_dict['spectra'][self.ref_state]
+        #         for state, spectrum in self.proc_data_dict['spectra'].items():
+        #             if state == self.ref_state:
+        #                 continue
+        #             key = self.ref_state + state
+        #             fit_fn = fit_mods.simultan_hanger_with_pf
+        #             fit_results = fit_mods.fit_hanger_with_pf(
+        #                 fit_mods.SimHangerWithPfModel, [
+        #                     np.transpose(
+        #                         [self.proc_data_dict['plot_frequency'][0],
+        #                          np.abs(ref_spectrum)]),
+        #                     np.transpose(
+        #                         [self.proc_data_dict['plot_frequency'][0],
+        #                          np.abs(spectrum)])],
+        #                 simultan=True)
+        #             self.proc_data_dict['fit_raw_results'][key] = fit_results
+        #             guess_pars = None
+        #             fit_guess_fn = None
+        #
+        #             chi = (fit_results[1].params['omega_ro'].value -
+        #                         fit_results[0].params['omega_ro'].value) / 2
+        #             f_RO_res = (fit_results[0].params['omega_ro'].value +
+        #                              fit_results[1].params['omega_ro'].value) / 2
+        #             f_PF = fit_results[0].params['omega_pf'].value
+        #             kappa = fit_results[0].params['kappa_pf'].value
+        #             J_ = fit_results[0].params['J'].value
+        #             f_RO = self.find_f_RO([self.ref_state, state])
+        #             self.fit_res[key] = \
+        #                 dict(chi=chi, f_RO_res=f_RO_res, f_PF=f_PF,
+        #                      kappa=kappa, J_=J_, f_RO=f_RO)
+        #
+        # if not isinstance(self.raw_data_dict, tuple ):
+        #     self.fit_dicts['reso_fit'] = {
+        #         'fit_fn': fit_fn,
+        #         'fit_guess_fn': fit_guess_fn,
+        #         'guess_pars': guess_pars,
+        #         'fit_yvals': {'data': self.proc_data_dict['plot_amp']},
+        #         'fit_xvals': { 'f': self.proc_data_dict['plot_frequency']}}
 
     def find_f_RO(self, states):
         """
@@ -1236,70 +1237,13 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
             self.fit_res["".join(states)] = dict(f_RO=f_RO_qutrit)
 
 
-    def do_subtract_background(self, thres=None, back_dict=None, ):
-        if len(self.raw_data_dict['timestamps']) == 1:
-            pass
-        else:
-            x_filtered = []
-            y_filtered = []
-            for tt in range(len(self.raw_data_dict['timestamps'])):
-                y = np.squeeze(self.plot_amp[tt])
-                x = np.squeeze(self.plot_frequency)[tt]
-                # print(self.plot_frequency)
-                # [print(x.shape) for x in self.plot_frequency]
-                # print(x)
-                # print(y)
-                # print(len(x),len(y))
-                guess_dict = SlopedHangerFuncAmplitudeGuess(y, x)
-                Q = guess_dict['Q']['value']
-                f0 = guess_dict['f0']['value']
-                df = 2 * f0 / Q
-                fmin = f0 - df
-                fmax = f0 + df
-                indices = np.logical_or(x < fmin * 1e9, x > fmax * 1e9)
-
-                x_filtered.append(x[indices])
-                y_filtered.append(y[indices])
-            self.background = pd.concat([pd.Series(y_filtered[tt], index=x_filtered[tt])
-                                         for tt in
-                                         range(len(self.raw_data_dict['timestamps']))],
-                                        axis=1).mean(axis=1)
-            background_vals = self.background.reset_index().values
-            freq = background_vals[:, 0]
-            amp = background_vals[:, 1]
-            # thres = 0.0065
-            indices = amp < thres
-            freq = freq[indices] * 1e-9
-            amp = amp[indices]
-            fit_fn = double_cos_linear_offset
-            model = lmfit.Model(fit_fn)
-            fit_yvals = amp
-            fit_xvals = {'t': freq}
-            # fit_guess_fn = double_cos_linear_offset_guess
-            # guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
-            for key, val in list(back_dict.items()):
-                model.set_param_hint(key, **val)
-            params = model.make_params()
-            print(fit_xvals)
-            fit_res = model.fit(fit_yvals,
-                                params=params,
-                                **fit_xvals)
-            self.background_fit = fit_res
-
-            for tt in range(len(self.raw_data_dict['timestamps'])):
-                divide_vals = fit_fn(np.squeeze(self.plot_frequency)[tt] * 1e-9,
-                                     **fit_res.best_values)
-                self.plot_amp[tt] = np.array(
-                    [np.array([np.divide(np.squeeze(self.plot_amp[tt]),
-                                         divide_vals)])]).transpose()
-
     def prepare_plots(self):
         self.get_default_plot_params(set_pars=True)
         proc_data_dict = self.proc_data_dict
         spectra = proc_data_dict['spectra']
         plotsize = self.options_dict.get('plotsize')
         plot_fn = self.plot_line
-        for state, spectrum in spectra.items():
+        for i, (state, spectrum) in enumerate(spectra.items()):
             all_freqs = proc_data_dict['plot_frequency']
             freqs = all_freqs if np.ndim(all_freqs) == 1 else all_freqs[0]
             self.plot_dicts['amp_{}'
@@ -1310,8 +1254,8 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                 'yvals': np.abs(spectrum),
                 'title': 'Spectroscopy amplitude: \n'
                         '%s-%s' % (
-                            self.raw_data_dict['measurementstring'][0],
-                            self.timestamps[0]),
+                            self.raw_data_dict[i]['measurementstring'],
+                            self.raw_data_dict[i]['timestamp']),
                 'xlabel': proc_data_dict['freq_label'],
                 'xunit': 'Hz',
                 'ylabel': proc_data_dict['amp_label'],
@@ -1338,6 +1282,12 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                     'markersize': 5,
                     'setlabel': label,
                     'do_legend': True}
+            fig = self.plot_difference_iq_plane()
+            self.figs['difference_iq_plane'] = fig
+            fig2 = self.plot_gaussian_overlap()
+            self.figs['gaussian_overlap'] = fig2
+            fig3 = self.plot_max_area()
+            self.figs['area_in_iq_plane'] = fig3
 
     def plot_fitting(self):
         fit_options = self.options_dict.get('fit_options', None)
@@ -1346,7 +1296,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
         else:
             fitting_model = fit_options['model']
 
-        if len(self.raw_data_dict['timestamps']) == 1:
+        if not isinstance(self.raw_data_dict, tuple):
             fit_results = self.fit_dict['fit_res']
         else:
             fit_results = self.proc_data_dict['fit_raw_results']
@@ -1390,7 +1340,8 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                     f_r = fit_results[states]
                     if len(states) == 3:
                         ax.plot([params["f_RO"], params["f_RO"]],
-                                [0, np.max(self.raw_data_dict['amp'])],
+                                [0, np.max(np.abs(np.asarray(
+                                    list(self.proc_data_dict['spectra'].values()))))],
                                 'm--', linewidth=1.5, label="F_RO_{}"
                                 .format(states))
                         ax2 = ax.twinx()
@@ -1414,14 +1365,15 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
 
                     elif len(states) == 2:
                         c = "r--"
+                        c2 = "k--"
                         ax.plot(freqs, f_r[0].eval(f_r[0].params, f=freqs),
                                 c, label=label.format(states[0], "fit"),
                                 linewidth=1.5)
                         ax.plot(freqs, f_r[1].eval(f_r[1].params, f=freqs),
-                                c, label=label.format(states[1], "fit"),
+                                c2, label=label.format(states[1], "fit"),
                                 linewidth=1.5)
                         ax.plot([params['f_RO'], params['f_RO']],
-                                [0, np.max(self.raw_data_dict['amp'])],
+                                [0, np.max(np.abs(np.asarray(list(self.proc_data_dict['spectra'].values()))))],
                                 'r--', linewidth=2)
 
                         params_str = 'states: {}' \
@@ -1436,12 +1388,108 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                             (f_r[1].params['omega_ro'].value -
                              f_r[0].params['omega_ro'].value) / 2 * 1e-6,
                             f_r[0].params['omega_pf'].value * 1e-9,
+
                             states[0], f_r[0].params['omega_ro'].value * 1e-9,
                             states[1], f_r[1].params['omega_ro'].value * 1e-9,
                             params['f_RO'] * 1e-9)
                         ax.plot([],[], 'w', label=params_str)
             ax.legend(loc='upper left', bbox_to_anchor=[1.1, 1])
 
+    def plot_difference_iq_plane(self, fig=None):
+        spectrums = self.proc_data_dict['spectra']
+        all_freqs = self.proc_data_dict['plot_frequency']
+        freqs = all_freqs if np.ndim(all_freqs) == 1 else all_freqs[0]
+        total_dist = np.abs(spectrums['e'] - spectrums['g']) + \
+                     np.abs(spectrums['f'] - spectrums['g']) + \
+                     np.abs(spectrums['f'] - spectrums['e'])
+        fmax = freqs[np.argmax(total_dist)]
+        # FIXME: just as debug plotting for now
+        if fig is None:
+            fig, ax = plt.subplots(2, figsize=(10,14))
+        else:
+            ax = fig.get_axes()
+        ax[0].plot(freqs, np.abs(spectrums['g']), label='g')
+        ax[0].plot(freqs, np.abs(spectrums['e']), label='e')
+        ax[0].plot(freqs, np.abs(spectrums['f']), label='f')
+        ax[0].set_ylabel('Amplitude')
+        ax[0].legend()
+        ax[1].plot(freqs, np.abs(spectrums['e'] - spectrums['g']), label='eg')
+        ax[1].plot(freqs, np.abs(spectrums['f'] - spectrums['g']), label='fg')
+        ax[1].plot(freqs, np.abs(spectrums['e'] - spectrums['f']), label='ef')
+        ax[1].plot(freqs, total_dist, label='total distance')
+        ax[1].set_xlabel("Freq. [Hz]")
+        ax[1].set_ylabel('Distance in IQ plane')
+        ax[0].set_title(f"Max Diff Freq: {fmax*1e-9} GHz")
+        ax[1].legend(loc=[1.01, 0])
+        return fig
+
+    def plot_gaussian_overlap(self, fig=None):
+        states = list(self.proc_data_dict['spectra'])
+        all_freqs = self.proc_data_dict['plot_frequency']
+        freqs = all_freqs if np.ndim(all_freqs) == 1 else all_freqs[0]
+        if len(states) == 3:
+            f_RO_qutrit = self.find_f_RO(states)
+            f_r = self.proc_data_dict["fit_raw_results"]["".join(states)]
+            if fig is None:
+                fig, ax = plt.subplots(2, figsize=(10,14))
+            else:
+                ax = fig.get_axes()
+            ax[0].plot([f_RO_qutrit, f_RO_qutrit],
+                    [0, 1],
+                    'm--', linewidth=1.5, label="F_RO_{}"
+                    .format(states))
+
+            last_fit_key = list(f_r["avg_fidelities"].keys())[-1]
+            ax[0].scatter(freqs, f_r["avg_fidelities"][last_fit_key],
+                        color='c',
+                        label="{} fidelity".format(states),
+                        marker='.')
+            ax[0].set_ylabel("Expected Fidelity")
+            label = "f_RO_{} = {:.6f} GHz".format(states,
+                                                  f_RO_qutrit * 1e-9)
+            ax[0].plot([], [], label=label)
+            ax[0].legend()
+
+            for sigma, avg_fid in f_r['avg_fidelities'].items():
+                ax[1].plot(self.proc_data_dict['plot_frequency'][0],
+                         avg_fid, label=sigma)
+
+            ax[1].axvline(f_r["optimal_frequency"][-1],linestyle="--", )
+            #ax.set_ylim([0.9, 1])
+            return fig
+
+    def plot_max_area(self, fig=None):
+        spectrums = self.proc_data_dict['spectra']
+        states = list(self.proc_data_dict['spectra'])
+        all_freqs = self.proc_data_dict['plot_frequency']
+        freqs = all_freqs if np.ndim(all_freqs) == 1 else all_freqs[0]
+        if len(states) == 3:
+            # Area of triangle in IQ plane using Heron formula
+            s1, s2, s3 = np.abs(spectrums['e'] - spectrums['g']), \
+                         np.abs(spectrums['f'] - spectrums['g']),\
+                         np.abs(spectrums['f'] - spectrums['e'])
+            s = (s1 + s2 + s3)/2
+            qutrit_triangle_area = np.sqrt(s * (s - s1) * (s - s2) * (s - s3))
+            f_max_area = freqs[np.argmax(qutrit_triangle_area)]
+            if fig is None:
+                fig, ax = plt.subplots(1, figsize=(14, 8))
+            else:
+                ax = fig.get_axes()
+            ax.plot([f_max_area, f_max_area],
+                       [0, np.max(qutrit_triangle_area)],
+                       'm--', linewidth=1.5, label="F_RO_{}"
+                       .format(states))
+
+
+            ax.scatter(freqs, qutrit_triangle_area,
+                          label="{} area in IQ".format(states))
+            ax.set_ylabel("qutrit area in IQ")
+            ax.set_xlabel("Frequency (Hz)")
+            ax.set_title( "f_RO_{}_area = {:.6f} GHz".format(states,
+                                                  f_max_area * 1e-9))
+
+        return fig
+            # ax.set_ylim([0.9, 1])
 
     def plot(self, key_list=None, axs_dict=None, presentation_mode=None, no_label=False):
         super(ResonatorSpectroscopy_v2, self).plot(key_list=key_list,

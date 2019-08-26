@@ -27,7 +27,7 @@ from pycqed.measurement.hdf5_data import write_dict_to_hdf5
 from pycqed.measurement.hdf5_data import read_dict_from_hdf5
 import copy
 import logging
-log = logging.getLogger()
+log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler())
 
 
@@ -491,7 +491,8 @@ class BaseDataAnalysis(object):
         Only model fitting is implemented here. Minimizing fitting should
         be implemented here.
         '''
-        self.fit_res = {}
+        if self.fit_res is None:
+            self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
