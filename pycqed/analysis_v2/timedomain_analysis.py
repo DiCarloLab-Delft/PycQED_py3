@@ -321,13 +321,12 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         "Please update measurement to provide cal point object "
                         "in metadata. Trying to get them using the old way ...")
             if rotate:
-                cal_states_rots = self.cp.get_rotations(
-                    last_ge_pulses, self.qb_names[0])[self.qb_names[0]] if \
-                    rotate else None
                 self.cal_states_rotations = self.get_param_value(
-                    'cal_states_rotations', default_value=cal_states_rots)
+                    'cal_states_rotations', default_value=None)
             else:
                 self.cal_states_rotations = None
+            self.cal_states_dict = self.get_param_value('cal_states_dict',
+                                                         default_value={})
 
 
         # create projected_data_dict
@@ -514,7 +513,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                                for k in correct_keys])
                         rotated_data_dict[qb_name][ro_suf], \
                         _, _ = \
-                            a_tools.rotate_and_normalize_data(
+                            a_tools.rotate_and_normalize_data_IQ(
                                 data=data_array,
                                 cal_zero_points=cal_zero_points,
                                 cal_one_points=cal_one_points)
@@ -553,7 +552,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         [v[:, col] for v in meas_res_dict.values()])
                     rotated_data_dict[qb_name][
                             data_to_fit[qb_name]][col], _, _ = \
-                        a_tools.rotate_and_normalize_data(
+                        a_tools.rotate_and_normalize_data_IQ(
                             data=data_array,
                             cal_zero_points=cal_zero_points,
                             cal_one_points=cal_one_points)
