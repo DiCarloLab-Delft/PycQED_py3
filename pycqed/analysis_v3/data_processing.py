@@ -443,7 +443,7 @@ def average(data_dict, data_keys_in, data_keys_out, **params):
                 data = data[all_keys[i]]
         averages = len(data_to_proc_dict[keyi]) // num_bins[k]
         data[all_keys[-1]] = np.mean(np.reshape(
-            data_to_proc_dict[keyi], (averages, num_bins[k])), axis=0)
+            data_to_proc_dict[keyi], (num_bins[k], averages)), axis=-1)
     return data_dict
 
 

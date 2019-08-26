@@ -183,7 +183,6 @@ class BaseDataAnalysis(object):
              'exp_metadata':
                  'Experimental Data.Experimental Metadata'})
 
-
         self.data_dict = self.get_data_from_timestamp_list()
         if len(self.timestamps) == 1:
             self.data_dict = self.add_measured_data(
@@ -291,7 +290,6 @@ class BaseDataAnalysis(object):
             data = measured_data[-len(raw_data_dict['value_names']):]
             if data.shape[0] != len(raw_data_dict['value_names']):
                 raise ValueError('Shape mismatch between data and ro channels.')
-
             TD = dat_proc.get_param('TwoD', raw_data_dict, default_value=False)
             for i, ro_ch in enumerate(raw_data_dict['value_names']):
                 if 'soft_sweep_points' in raw_data_dict and TD:
