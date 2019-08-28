@@ -150,7 +150,8 @@ def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
 
     ge_half_start = deepcopy(operation_dict['X90 ' + qb_name])
     ge_half_start['name'] = 'pi_half_start'
-    ge_half_start['element_name'] = 'pi_half_start_el'
+    # ge_half_start['element_name'] = 'pi_half_start_el'
+    ge_half_start['element_name'] = 'pi'
 
     flux_pulse = deepcopy(operation_dict[cz_pulse_name])
     flux_pulse['name'] = 'flux'
@@ -158,7 +159,8 @@ def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
 
     ge_half_end = deepcopy(operation_dict['X90 ' + qb_name])
     ge_half_end['name'] = 'pi_half_end'
-    ge_half_end['element_name'] = 'pi_half_end_el'
+    # ge_half_end['element_name'] = 'pi_half_end_el'
+    ge_half_end['element_name'] = 'pi'
 
     ro_pulse = deepcopy(operation_dict['RO ' + qb_name])
 
@@ -177,6 +179,9 @@ def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
     params.update({f'pi_half_end.{k}': v['values']
                    for k, v in hard_sweep_dict.items()})
     swept_pulses = sweep_pulse_params(pulse_list, params)
+    for k, p in enumerate(swept_pulses):
+        fp = p[1]
+        fp['element_name'] = 'flux_el_{}'.format(k)
 
     swept_pulses_with_prep = \
         [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)

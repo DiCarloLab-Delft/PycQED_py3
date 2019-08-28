@@ -1238,11 +1238,13 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             if w1 is None and w2 is not None:
                 # This hack is needed due to a bug on the HDAWG. 
                 # Remove this if case once the bug is fixed.
-                playback_string.append(
-                    f'prefetch(zeros(1) + marker(1, 0), {w2});')
+                if not acq:
+                    playback_string.append(
+                        f'prefetch(zeros(1) + marker(1, 0), {w2});')
             elif w1 is not None or w2 is not None:
-                playback_string.append('prefetch({});'.format(', '.join(
-                        [wn for wn in [w1, w2] if wn is not None])))
+                if not acq:
+                    playback_string.append('prefetch({});'.format(', '.join(
+                            [wn for wn in [w1, w2] if wn is not None])))
         playback_string.append(
             'waitDigTrigger(1{});'.format(', 1' if device == 'uhf' else ''))
         if codeword:

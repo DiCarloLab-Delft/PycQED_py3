@@ -74,8 +74,20 @@ def n_qubit_off_on(pulse_pars_list, RO_pars_list, return_seq=False,
         seg = segment.Segment('segment_{}'.format(i), pulses)
         seg_list.append(seg)
         seq.add(seg)
+
+    uhfs_used = dict()
+    for RO_pars in RO_pars_list:
+        uhf = RO_pars['I_channel'][:4]
+        if uhf not in uhfs_used.keys():
+            uhfs_used[uhf] = []
+        uhfs_used[uhf].append(1)
+
+    repeat_dict = {}
+    for uhf in uhfs_used:
+        repeat_dict[uhf] = ((1.0 + int(preselection))*len(pulse_combinations),1)
+
     if upload:
-        ps.Pulsar.get_instance().program_awgs(seq)
+        ps.Pulsar.get_instance().program_awgs(seq, repeat_dict=repeat_dict)
     if return_seq:
         return seq, seg_list
     else:
@@ -914,21 +926,30 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
                 parity_ops.append(op)
         parity_ops.append('Y90 ' + anc_name)
 
-        for dqb in parity_map[i]['data']:
+        for m, dqb in enumerate(parity_map[i]['data']):
             op = 'CZ ' + anc_name + ' ' + dqb
             op = CZ_map.get(op, [op])
             ops = parity_ops+op
             parity_ops = ops
+            # if m != len(parity_map[i]['data']) - 1:
+            #     parity_ops += ['Y180 ' + anc_name]
 
+        # if len(parity_map[i]['data']) % 2 == 0:
+        #     parity_ops += ['Y90 ' + anc_name]
+        # else:
+        #     parity_ops += ['mY90 ' + anc_name]
         parity_ops.append('mY90 ' + anc_name)
 
         for n, dqb in enumerate(parity_map[i]['data']):
             if dqb in data_qubit_names:
-                op = ('m' if basis_op is not 'I' else '') + basis_op + ('' if n==0
-                                                                        else
-                's') + ' ' + dqb
+                op = ('m' if basis_op
+                             is not 'I'
+                      else '') + basis_op + ('' if dqb==data_qubit_names[0]
+                                             else 's') + ' ' + dqb
                 parity_ops.append(op)
         parity_ops.append('RO ' + anc_name)
+        # for dqb in data_qubit_names:
+        #     parity_ops.append('RO ' + dqb)
         parity_ops_list.append(parity_ops)
 
 
@@ -940,6 +961,10 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
     if mode=='tomo':
         end_sequences = get_tomography_pulses(*data_qubit_names,
                                               basis_pulses=rots_basis)
+    elif mode=='onoff':
+        end_sequences = [[rot+('' if (dqb==data_qubit_names[0]) else
+                               's')+' '+dqb for dqb in data_qubit_names]
+                         for rot in rots_basis]
     else:
         end_sequences = ['I ' + data_qubit_names[0]]
 
@@ -986,6 +1011,11 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
                         if first_readout[round] is True:
                             all_pulses[-1]['name'] = f'first_ro_{round}_loop' + \
                                 f'_{m}_tomo_{t}'
+                            # all_pulses[-1]['ref_pulse'] = 'segment_start'
+                            # all_pulses[-1]['pulse_delay'] = round*parity_seperation \
+                            #                                 + (1+rounds)*\
+                            #                                 m*parity_seperation +\
+                            #                                 (16/2.4)*150e-9
                         else:
                             all_pulses[-1]['ref_pulse'] = f'first_ro_{round}' + \
                                 f'_loop_{m}_tomo_{t}'
@@ -1011,17 +1041,16 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
         end_pulses = [deepcopy(operation_dict[op]) for op in end_sequence]
 
         for pulse in end_pulses:
+            # if parity_loops > 0:
             pulse['ref_pulse'] = f'first_ro_{rounds}' + \
                                  f'_loop_{parity_loops-1}_tomo_{t}'
-            pulse['pulse_delay'] = 300e-9
-            pulse['ref_point'] = 'end'
+            pulse['pulse_delay'] = (16/2.4)*168e-9 - \
+                                   pulse['sigma']*pulse['nr_sigma']
+            pulse['ref_point'] = 'start'
         all_pulses += end_pulses
-        all_pulses += generate_mux_ro_pulse_list(qb_names, operation_dict)
+        ro_list = generate_mux_ro_pulse_list(qb_names, operation_dict)
+        all_pulses += ro_list
         all_pulsess.append(all_pulses)
-        if t==0:
-            from pprint import pprint
-            # pprint(all_pulses)
-
 
 
     if prep_params is not None:
@@ -1055,7 +1084,8 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
     ROs = np.max(list(ROs_dict.values()))
     for uhf in uhfs_used:
         repeat_dict[uhf] = (len(end_sequences),
-                 (parity_loops, ROs), 1
+                 (parity_loops, ROs),
+                 1
                  )
     print(repeat_dict)
 
@@ -1746,8 +1776,8 @@ def pygsti_seq(qb_names, pygsti_listOfExperiments, operation_dict,
         return seq_name
 
 
-def ro_dynamic_phase_seq(qbp_name, qbr_names,
-                         phases, operation_dict,
+def ro_dynamic_phase_seq(hard_sweep_dict, qbp_name, qbr_names,
+                         operation_dict,
                          pulse_separation, init_state,
                          verbose=False, cal_points=True,
                          upload=True, return_seq=False):

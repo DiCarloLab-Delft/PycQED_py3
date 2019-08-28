@@ -2203,6 +2203,8 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
 
         if prep_params is None:
             prep_params = qb.preparation_params()
+
+        print(get_operation_dict(qubits_to_measure)[cz_pulse_name])
         seq, hard_sweep_points = \
             fsqs.dynamic_phase_seq(
                 qb_name=qb.name, hard_sweep_dict=hard_sweep_params,
@@ -2226,9 +2228,7 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
                              'data_to_fit': {qb.name: 'pe'},
                              'cal_states_rotations':
                                  {qb.name: {'g': 0, 'e': 1}},
-                             'hard_sweep_params': hard_sweep_params,
-                             'leakage_qbname': qbc.name,
-                             'cphase_qbname': qbt.name})
+                             'hard_sweep_params': hard_sweep_params})
         MC.run(label, exp_metadata=exp_metadata)
 
         if analyze:
@@ -2646,61 +2646,64 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
     return MC
 
 
-def measure_ro_dynamic_phases(pulsed_qubit, measured_qubits, phases,
-                              f_LO, pulse_separation=None, init_state='g',
-                              upload=True, cal_points=True,
-                              MC=None, UHFQC=None, pulsar=None):
+def measure_ro_dynamic_phases(pulsed_qubit, measured_qubits, hard_sweep_params,
+                              pulse_separation=None, init_state='g',
+                              upload=True, n_cal_points_per_state=1,
+                              cal_states='auto', classified=False):
     if not hasattr(measured_qubits, '__iter__'):
         measured_qubits = [measured_qubits]
     qubits = measured_qubits + [pulsed_qubit]
 
     if pulse_separation is None:
-        pulse_separation = max([qb.RO_acq_integration_length()
-                                for qb in qubits])
-    if MC is None:
-        MC = measured_qubits[0].MC
-    if UHFQC is None:
-        UHFQC = measured_qubits[0].UHFQC
-    if pulsar is None:
-        pulsar = measured_qubits[0].AWG
+        pulse_separation = max([qb.acq_length() for qb in qubits])
+
+    for qb in qubits:
+        MC = qb.instr_mc.get_instr()
+        qb.prepare(drive='timedomain')
+
+    cal_states = CalibrationPoints.guess_cal_states(cal_states,
+                                                    for_ef=for_ef)
+    cp = CalibrationPoints.multi_qubit([qb for qb in measured_qubits], cal_states,
+                                       n_per_state=n_cal_points_per_state)
+
+    if prep_params is None:
+        prep_params = measured_qubits[0].preparation_params()
     operation_dict = get_operation_dict(qubits)
-    operation_dict['RO mux'] = get_multiplexed_readout_pulse_dictionary(
-        measured_qubits)
+    sequences, hard_sweep_points = \
+        mqs.ro_dynamic_phase_seq(
+            hard_sweep_dict=hard_sweep_params,
+            qbp_name=pulsed_qubit.name, qbr_names=[qb.name for qb in
+                                                   measured_qubits],
+            operation_dict=operation_dict,
+            pulse_separation=pulse_separation,
+            init_state = init_state,
+            cal_points=cp, upload=False,
+            prep_params=prep_params)
 
-    for qb in qubits:
-        qb.prepare_for_timedomain(multiplexed=True)
-    multiplexed_pulse([[pulsed_qubit], measured_qubits, measured_qubits],
-                      f_LO, upload=True)
+    hard_sweep_func = awg_swf.SegmentHardSweep(
+        sequence=sequences[0], upload=upload,
+        parameter_name=list(hard_sweep_params)[0],
+        unit=list(hard_sweep_params.values())[0]['unit'])
+    MC.set_sweep_function(hard_sweep_func)
+    MC.set_sweep_points(hard_sweep_points)
 
-    channels = []
-    for qb in qubits:
-        channels += [qb.RO_acq_weight_function_I()]
-        if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
-            if qb.RO_acq_weight_function_Q() is not None:
-                channels += [qb.RO_acq_weight_function_Q()]
-    df = det.UHFQC_integrated_average_detector(
-        UHFQC=UHFQC, AWG=pulsar, channels=channels,
-        integration_length=pulse_separation,
-        nr_averages=max([qb.RO_acq_averages() for qb in qubits]),
-        values_per_point=3,
-        values_per_point_suffex=['_probe', '_measure', '_ref_measure'])
+    det_name = 'int_avg{}_det'.format('_classif' if classified else '')
+    det_func = get_multiplexed_readout_detector_functions(
+        measured_qubits, nr_averages=max(qb.acq_averages() for qb in measured_qubits)
+    )[det_name]
+    MC.set_detector_function(det_func)
 
-    qbr_names = [qbr.name for qbr in measured_qubits]
-    sf = awg_swf2.RO_dynamic_phase_swf(
-        qbp_name=pulsed_qubit.name,
-        qbr_names=qbr_names,
-        phases=phases,
-        operation_dict=operation_dict,
-        pulse_separation=pulse_separation,
-        init_state=init_state,
-        cal_points=cal_points,
-        upload=upload)
-    MC.set_sweep_function(sf)
-    MC.set_sweep_points(phases)
-    MC.set_detector_function(df)
-    exp_metadata = {'pulse_separation': pulse_separation,
-                    'cal_points': cal_points,
-                    'f_LO': f_LO}
+    if exp_metadata is None:
+        exp_metadata = {}
+    exp_metadata.update({'qbnames': [qb.name for qb in qubits],
+                         'preparation_params': prep_params,
+                         'cal_points': repr(cp),
+                         'rotate': len(cal_states) != 0,
+                         'cal_states_rotations':
+                             {qb.name: {'g': 0, 'f': 1} for qb in qubits} if
+                             len(cal_states) != 0 else None,
+                         'data_to_fit': {qb.name: 'pe' for qb in qubits},
+                         'hard_sweep_params': hard_sweep_params})
     MC.run('RO_DynamicPhase_{}{}'.format(
         pulsed_qubit.name, ''.join(qbr_names)),
         exp_metadata=exp_metadata)
