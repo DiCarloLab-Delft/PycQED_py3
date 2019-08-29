@@ -1362,6 +1362,7 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
                 np.linalg.inv(state_prob_mtx).T @ classified_data.T
             log.info('Data corrected based on state_prob_mtx.')
         else:
+            print('not correcting data')
             classified_data = classified_data.T
 
         return classified_data

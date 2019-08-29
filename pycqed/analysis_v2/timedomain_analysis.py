@@ -4377,7 +4377,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
         amps_errs[amps_errs == None] = 0.0
 
         population_loss = np.abs(amps[0::2] - amps[1::2])/amps[1::2]
-        x = amps[0::2] - amps[1::2]
+        x   = amps[0::2] - amps[1::2]
         x_err = np.array(amps_errs[0::2]**2 + amps_errs[1::2]**2,
                          dtype=np.float64)
         y = amps[1::2]

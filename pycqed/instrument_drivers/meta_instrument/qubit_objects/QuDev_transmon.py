@@ -2049,7 +2049,7 @@ class QuDev_transmon(Qubit):
                     Singleshot_Readout_Analysis_Qutrit(label=labels,
                                                        options_dict=options)
                 state_prob_mtx = ssqtro.proc_data_dict[
-                           'analysis_params']['state_prob_mtx']
+                           'analysis_params']['state_prob_mtx_masked']
                 classifier_params = ssqtro.proc_data_dict[
                            'analysis_params'].get('classifier_params', None)
                 if update:
@@ -2949,9 +2949,9 @@ class QuDev_transmon(Qubit):
                             "anharmonicity parameter. "
                             "Set update=True if you want this!")
 
-        if self.f_qubit() == 0:
+        if self.ge_freq() == 0:
             log.warning('f_ge = 0. Run qubit spectroscopy or Ramsey.')
-        if self.f_ef_qubit() == 0:
+        if self.ef_freq() == 0:
             log.warning('f_ef = 0. Run qubit spectroscopy or Ramsey.')
 
         anharmonicity = self.ef_freq() - self.ge_freq()
@@ -3600,7 +3600,8 @@ def add_CZ_pulse(qbc, qbt):
                                 initial_value='BufferedCZPulse',
                                 vals=vals.Enum('BufferedSquarePulse',
                                                'BufferedCZPulse',
-                                               'NZBufferedCZPulse'))
+                                               'NZBufferedCZPulse',
+                                               'BufferedCZPulseEffectiveTime'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
         qbc.add_pulse_parameter(op_name, ps_name + '_aux_channels_dict',
@@ -3635,6 +3636,12 @@ def add_CZ_pulse(qbc, qbt):
         qbc.add_pulse_parameter(op_name, ps_name + '_gaussian_filter_sigma',
                                 'gaussian_filter_sigma', initial_value=2e-9,
                                 vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_chevron_func',
+                                'chevron_func', initial_value=None,
+                                vals=vals.Callable(),
+                                docstring="Callable required when using "
+                                          "effective time CZ pulse to "
+                                          "straighten Chevron.")
 
 
 def add_CZ_MG_pulse(qbc, qbt):
