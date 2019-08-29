@@ -308,13 +308,13 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         self.qb_names[0])[self.qb_names[0]] if rotate else None
                 self.cal_states_rotations = self.get_param_value(
                     'cal_states_rotations', default_value=cal_states_rots)
-                sweep_points_w_calpts = \
-                    {qbn: {'sweep_points': self.cp.extend_sweep_points(
-                        self.proc_data_dict['sweep_points_dict'][qbn][
-                            'sweep_points'], qbn)} for qbn in self.qb_names}
-                self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
             else:
                 self.cal_states_rotations = None
+            sweep_points_w_calpts = \
+                {qbn: {'sweep_points': self.cp.extend_sweep_points(
+                    self.proc_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'], qbn)} for qbn in self.qb_names}
+            self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
         except TypeError as e:
             log.error(e)
             log.warning("Failed retrieving cal point objects or states. "

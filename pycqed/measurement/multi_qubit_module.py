@@ -2137,18 +2137,22 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                          'cphase_qbname': qbt.name,
                          'preparation_params': prep_params,
                          'cal_points': repr(cp),
-                         'rotate': len(cal_states) != 0,
+                         'rotate': len(cal_states) != 0 and not classified,
                          'cal_states_rotations':
                              {qbc.name: {'g': 0, 'f': 1},
                               qbt.name: {'g': 0, 'e': 1}} if
-                             len(cal_states) != 0 else None,
+                             (len(cal_states) != 0 and not classified) else None,
                          'data_to_fit': {qbc.name: 'pf', qbt.name: 'pe'},
                          'hard_sweep_params': hard_sweep_params,
                          'soft_sweep_params': soft_sweep_params})
     MC.run_2D(label, exp_metadata=exp_metadata)
     if analyze:
-        channel_map = {qb.name: qb.int_log_det.value_names[0]+' '+qb.instr_uhf()
-                       for qb in [qbc, qbt]}
+        if classified:
+            channel_map = {qb.name: qb.int_avg_classif_det.value_names
+                           for qb in [qbc, qbt]}
+        else:
+            channel_map = {qb.name: qb.int_avg_det.value_names
+                           for qb in [qbc, qbt]}
         flux_pulse_tdma = tda.CPhaseLeakageAnalysis(
             qb_names=[qbc.name, qbt.name],
             options_dict={'TwoD': True, 'plot_all_traces': plot_all_traces,
