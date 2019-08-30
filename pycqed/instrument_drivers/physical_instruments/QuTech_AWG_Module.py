@@ -107,9 +107,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numTriggers = 8
 
         # Driver supported software version
-        major_min = 1
-        minor_min = 5
-        patch_min = 0
+        version_min = (1, 5, 0)  # Major, minor, patch
 
         self._nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
         self._nr_cw_inp_cmd = "SYSTem:CODEwords:SELect?"
@@ -118,20 +116,19 @@ class QuTech_AWG_Module(SCPI):
         idn_firmware = self.get_idn()["firmware"]
         regex = r"swVersion=(\d).(\d).(\d)"
         sw_version = re.search(regex, idn_firmware)
-        major = int(sw_version.group(1))
-        minor = int(sw_version.group(2))
-        patch = int(sw_version.group(3))
+        version_cur = (int(sw_version.group(1)), int(sw_version.group(2)), int(sw_version.group(3)))
         driver_outdated = True
 
-        if sw_version and major >= major_min and minor >= minor_min and patch >= patch_min:
+        if sw_version and version_cur >= version_min:
             self.device_descriptor.numMaxCwBits = int(self.ask(self._nr_cw_bits_cmd))
             self.device_descriptor.numSelectCwInputs = int(self.ask(self._nr_cw_inp_cmd))
             driver_outdated = False
         else:
-            logging.warning(f"Incompatible driver version of QWG ({self.name}); The version ({major}.{minor}.{patch}) "
+            logging.warning(f"Incompatible driver version of QWG ({self.name}); The version ({version_cur[0]}."
+                            f"{version_cur[1]}.{version_cur[2]}) "
                             f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
                             f"parameters will not operate and timeout. Please update the QWG software to "
-                            f"{major_min}.{minor_min}.{patch_min} or newer")
+                            f"{version_min[0]}.{version_min[1]}.{version_min[2]} or newer")
             self.device_descriptor.numMaxCwBits = 7
             self.device_descriptor.numSelectCwInputs = 7
 
