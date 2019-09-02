@@ -2276,7 +2276,8 @@ class CCLight_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn(),
-                trigger_idx=0)
+                spec_instr='sf_square',
+                trigger_idx=15)
         else:
             p = sqo.pulsed_spec_seq(
                 qubit_idx=self.cfg_qubit_nr(),
@@ -2453,7 +2454,8 @@ class CCLight_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
-            trigger_idx=0)
+            spec_instr='sf_square',
+            trigger_idx=15)
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
@@ -3368,6 +3370,7 @@ class CCLight_Transmon(Qubit):
                                   disable_metadata: bool=False,
                                   nr_shots_per_case: int =2**13,
                                   post_select: bool = False,
+                                  averages: int=2**15,
                                   post_select_threshold: float = None,
                                   )->bool:
         """
@@ -3397,7 +3400,7 @@ class CCLight_Transmon(Qubit):
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.ro_acq_averages()
 
-        self.ro_acq_averages(2**15)
+        self.ro_acq_averages(averages)
         if measure_transients_CCL_switched:
             transients = self.measure_transients_CCL_switched(MC=MC,
                                                               analyze=analyze,
@@ -3438,7 +3441,7 @@ class CCLight_Transmon(Qubit):
                 self._prep_ro_instantiate_detectors()
                 ssro_dict = self.measure_ssro(
                     no_figs=no_figs, update=update,
-                    prepare=False, disable_metadata=disable_metadata,
+                    prepare=True, disable_metadata=disable_metadata,
                     nr_shots_per_case=nr_shots_per_case,
                     post_select=post_select,
                     post_select_threshold=post_select_threshold)
