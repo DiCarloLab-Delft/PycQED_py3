@@ -1,9 +1,11 @@
 import numpy as np
 import pytest
 
-import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 from pycqed.instrument_drivers.meta_instrument import lfilt_kernel_object as lko
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
+from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import get_wf_idx_from_name
+
 
 
 class TestMultiQubitFluxLutMan:
@@ -11,7 +13,7 @@ class TestMultiQubitFluxLutMan:
     @classmethod
     def setup_class(cls):
         # gets called at initialization of test class
-        cls.AWG = v8.VirtualAWG8('DummyAWG8')
+        cls.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
 
         cls.fluxlutman = flm.HDAWG_Flux_LutMan('fluxlutman_main')
         cls.k0 = lko.LinDistortionKernel('k0')
@@ -122,9 +124,11 @@ class TestMultiQubitFluxLutMan:
         self.fluxlutman.sq_amp(.3)
         self.fluxlutman_partner.sq_amp(.5)
         self.k0.reset_kernels()
-        self.fluxlutman.load_waveform_realtime('square')
-        np.testing.assert_allclose(self.AWG._realtime_w0[0], [.3])
-        np.testing.assert_allclose(self.AWG._realtime_w1[0], [.5])
+        self.fluxlutman.load_waveform_onto_AWG_lookuptable(waveform_name='square', regenerate_waveforms=True)
+        self.fluxlutman_partner.load_waveform_onto_AWG_lookuptable(waveform_name='square', regenerate_waveforms=True)
+        cw = self.fluxlutman._get_cw_from_wf_name('square')
+        np.testing.assert_allclose(self.AWG.get('wave_ch{}_cw{:03}'.format(1, cw))[0], [.3])
+        np.testing.assert_allclose(self.AWG.get('wave_ch{}_cw{:03}'.format(2, cw))[0], [.5])
 
     def test_plot_level_diagram(self):
         self.AWG.awgs_0_outputs_0_amplitude(.73)
@@ -393,7 +397,7 @@ class TestLegacyFluxLutMan:
     @classmethod
     def setup_class(cls):
         # gets called at initialization of test class
-        cls.AWG = v8.VirtualAWG8('DummyAWG8')
+        cls.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
 
         cls.fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman_main')
         cls.k0 = lko.LinDistortionKernel('k0')
@@ -508,9 +512,18 @@ class TestLegacyFluxLutMan:
         self.fluxlutman.sq_amp(.3)
         self.fluxlutman_partner.sq_amp(.5)
         self.k0.reset_kernels()
-        self.fluxlutman.load_waveform_realtime(waveform_name='square')
-        np.testing.assert_allclose(self.AWG._realtime_w0[0], [.3])
-        np.testing.assert_allclose(self.AWG._realtime_w1[0], [.5])
+        self.fluxlutman.load_waveform_onto_AWG_lookuptable(waveform_name='square', regenerate_waveforms=True)
+        self.fluxlutman_partner.load_waveform_onto_AWG_lookuptable(waveform_name='square', regenerate_waveforms=True)
+
+        cw = None
+        for idx, key in enumerate(self.fluxlutman.LutMap().keys()):
+            if key == 'square':
+                cw = idx
+                break
+        assert cw is not None
+
+        np.testing.assert_allclose(self.AWG.get('wave_ch{}_cw{:03}'.format(1, cw))[0], [.3])
+        np.testing.assert_allclose(self.AWG.get('wave_ch{}_cw{:03}'.format(2, cw))[0], [.5])
 
     def test_plot_level_diagram(self):
         self.AWG.awgs_0_outputs_0_amplitude(.73)
