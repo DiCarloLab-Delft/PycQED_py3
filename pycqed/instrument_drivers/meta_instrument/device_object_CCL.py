@@ -118,6 +118,12 @@ class DeviceCCL(Instrument):
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_AWG_mw_1',
                            parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_AWG_mw_2',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_AWG_mw_3',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_AWG_mw_4',
+                           parameter_class=InstrumentRefParameter)
 
         self.add_parameter('instr_AWG_flux_0',
                            parameter_class=InstrumentRefParameter)
@@ -205,6 +211,24 @@ class DeviceCCL(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=0,
                            vals=vals.Numbers())
+        self.add_parameter('tim_mw_latency_2',
+                           unit='s',
+                           label='Microwave latency 2',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_mw_latency_3',
+                           unit='s',
+                           label='Microwave latency 3',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_mw_latency_4',
+                           unit='s',
+                           label='Microwave latency 4',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
 
         self.add_parameter('dio_map',
                            docstring='Returns the map between DIO'
@@ -228,6 +252,9 @@ class DeviceCCL(Instrument):
                        'flux_0': 6,
                        'flux_1': 7,
                        'flux_2': 8,
+                       'mw_2': 9,
+                       'mw_3': 10,
+                       'mw_4': 11
                        }
         else:
             return ValueError('CC type not recognized')
@@ -267,7 +294,10 @@ class DeviceCCL(Instrument):
                                  ('mw_1', self.tim_mw_latency_1()),
                                  ('flux_0', self.tim_flux_latency_0()),
                                  ('flux_1', self.tim_flux_latency_1()),
-                                 ('flux_2', self.tim_flux_latency_2())]
+                                 ('flux_2', self.tim_flux_latency_2()),
+                                 ('mw_2', self.tim_mw_latency_2()),
+                                 ('mw_3', self.tim_mw_latency_3()),
+                                 ('mw_4', self.tim_mw_latency_4())]
                                  )
 
         # Substract lowest value to ensure minimal latency is used.
@@ -318,13 +348,15 @@ class DeviceCCL(Instrument):
         self._prep_ro_integration_weights(qubits=qubits)
         self._prep_ro_instantiate_detectors(qubits=qubits)
 
-    def prepare_fluxing(self):
-        for q in self.qubits(): 
+    def prepare_fluxing(self, qubits):
+        for qb_name in qubits:
+            qb = self.find_instrument(qb_name)
             try: 
-                fl_lutman = self.find_instrument(q).instr_LutMan_Flux.get_instr()
+                fl_lutman = qb.instr_LutMan_Flux.get_instr()
                 fl_lutman.load_waveforms_onto_AWG_lookuptable()
             except Exception as e: 
-                warnings.warn("Could not load flux pulses for {}".format(q))
+                warnings.warn("Could not load flux pulses for {}".format(qb))
+                warnings.warn("Exception {}".format(e))
 
     def _prep_ro_setup_qubits(self, qubits):
         """
@@ -701,7 +733,7 @@ class DeviceCCL(Instrument):
         """
         self.prepare_readout(qubits=qubits)
         if self.find_instrument(qubits[0]).instr_LutMan_Flux() != None:
-            self.prepare_fluxing()
+            self.prepare_fluxing(qubits=qubits)
         self.prepare_timing()
 
         for qb_name in qubits:
@@ -1368,7 +1400,8 @@ class DeviceCCL(Instrument):
                         prepare_for_timedomain=True, MC=None,
                         freq_tone = 6e9, pow_tone = -10, spec_tone=False,
                         target_qubit_sequence: str='ramsey',
-                        waveform_name='square'):
+                        waveform_name='square',
+                        single_qubit_chevron=False):
         """
         Measure a chevron patter of esulting from swapping of the excitations
         of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
@@ -1470,12 +1503,20 @@ class DeviceCCL(Instrument):
                         buffer_time2=max(lengths)+40e-9,
                         flux_cw=flux_cw,
                         platf_cfg=self.cfg_openql_platform_fn(),
-                        target_qubit_sequence=target_qubit_sequence)
+                        target_qubit_sequence=target_qubit_sequence,
+                        cc=self.instr_CC.get_instr().name)
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
-        d = self.get_correlation_detector(qubits=[q0, q_spec], single_int_avg=True,
-                                          seg_per_point=1)
+        if single_qubit_chevron:
+            d = self.get_int_avg_det(qubits=[q0],
+                                     values_per_point=1,
+                                     single_int_avg=True,
+                                     always_prepare=True)
+        else:
+            d = self.get_correlation_detector(qubits=[q0, q_spec],
+                single_int_avg=True,
+                seg_per_point=1)
 
         # if we want to add a spec tone
         if spec_tone:
@@ -1632,16 +1673,17 @@ class DeviceCCL(Instrument):
                           buffer_time2=max_delay,
                           flux_cw=flux_cw,
                           twoq_pair=twoq_pair,
-                          platf_cfg=self.cfg_openql_platform_fn())
+                          platf_cfg=self.cfg_openql_platform_fn(),
+                          cc=self.instr_CC.get_instr().name)
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
         MC.set_sweep_function(sw)
         MC.set_sweep_points(times)
         d = self.get_int_avg_det(qubits=[q0], values_per_point=2,
-                                 values_per_point_suffex=['cos', 'sin'],
-                                 single_int_avg=True,
-                                 always_prepare=True)
+                                values_per_point_suffex=['cos', 'sin'],
+                                single_int_avg=True,
+                                always_prepare=True)
         MC.set_detector_function(d)
         MC.run(label)
         ma2.Basic1DAnalysis()
