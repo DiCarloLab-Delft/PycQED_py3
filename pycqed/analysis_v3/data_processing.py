@@ -457,7 +457,7 @@ def average(data_dict, keys_in, keys_out, **params):
     for k, keyi in enumerate(data_to_proc_dict):
         if len(data_to_proc_dict[keyi]) % num_bins[k] != 0:
             raise ValueError(f'{num_bins[k]} does not exactly divide '
-                             f'len(data_dict[{keyi}]).')
+                             f'len(data_dict[{keyi}])={len(data_dict[keyi])}.')
         data = data_dict
         all_keys = keys_out[k].split('.')
         for i in range(len(all_keys)-1):
@@ -1453,9 +1453,9 @@ class SingleQubitRBAnalysis(object):
                     self.gate_decomp)
                 clfs_fine = np.linspace(self.cliffords[0], self.cliffords[-1],
                                         1000)
-                T1_limited_curve = fit_dicts['rb_fit_' + self.mobjn + keyi][
-                    'fit_fn'](clfs_fine, fit_res.best_values['Amplitude'], p_T1,
-                    fit_res.best_values['offset'])
+                T1_limited_curve = fit_res.model.func(
+                    clfs_fine, fit_res.best_values['Amplitude'], p_T1,
+                              fit_res.best_values['offset'])
                 plot_dicts['t1Lim_' + self.mobjn + keyi] = {
                     'fig_id': base_plot_name,
                     'plotfn': 'plot_line',

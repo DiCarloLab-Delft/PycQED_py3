@@ -163,7 +163,6 @@ def plot(data_dict, keys_in='all', axs_dict=None, **params):
     axs = OrderedDict()
     figs = OrderedDict()
     plot_dicts = data_dict['plot_dicts']
-
     presentation_mode = params.get('presentation_mode', False)
     no_label = params.get('no_label', False)
     if axs_dict is not None:
@@ -260,7 +259,7 @@ def plot(data_dict, keys_in='all', axs_dict=None, **params):
 
         format_datetime_xaxes(data_dict, keys_in, axs)
     if params.get('save_figs', True):
-        getattr(save_mod, 'save_figures')(data_dict, figs, keys_in=keys_in,
+        getattr(save_mod, 'save_figures')(data_dict, figs, keys_in=list(figs),
                                           **params)
 
 
@@ -994,7 +993,6 @@ def plot_fit(pdict, axs):
                                 **{independent_var: pdict['xvals']})
     if not hasattr(pdict['yvals'], '__iter__'):
         pdict['yvals'] = np.array([pdict['yvals']])
-        print('here', type(pdict['yvals']))
     plot_line(pdict, axs)
 
     if plot_init:

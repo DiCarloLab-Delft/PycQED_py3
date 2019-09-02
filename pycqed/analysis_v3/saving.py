@@ -191,7 +191,7 @@ def save_figures(data_dict, figs, **params):
         tstag = ''
 
     if keys_in == 'auto' or keys_in is None:
-        key_list = figs.keys()
+        keys_in = figs.keys()
 
     try:
         os.mkdir(savedir)
