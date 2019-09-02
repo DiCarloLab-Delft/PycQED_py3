@@ -1087,7 +1087,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool = True, stop_start: bool = True,
-            force_load_sequencer_program: bool = False):
+            force_load_sequencer_program: bool = False, use_realtime_upload: bool = True):
         """
         Loads all waveforms specified in the LutMap to an AWG for both this
         LutMap and the partner LutMap.
@@ -1139,9 +1139,21 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                     # idx 0 is hardcoded to not play a wave. 
                     # it still exists in the LutMap for redundant combinations. 
                     continue 
-                self.load_waveform_realtime(
-                    waveform_name=waveform['name'],
-                    wf_nr=None, regenerate_waveforms=False)
+                if use_realtime_upload:
+                    self.load_waveform_realtime(
+                        waveform_name=waveform['name'],
+                        wf_nr=None, regenerate_waveforms=False)
+                else:
+                    if self.cfg_distort():
+                        waveform = self.distort_waveform(waveform,
+                          max_wf_length=waveform['max_wf_length'])
+                        wave = self._wave_dict_dist[waveform_name]
+                    else:
+                        waveform = self._append_zero_samples(waveform)
+                        wave = self._wave_dict_dist[waveform_name]
+                    self.AWG.get_instr().set('wave_ch{}_cw{:03}'.format(
+                                  self.cfg_awg_channel(), codeword),
+                                  wave)
         else:
             # Only load one waveform and do it in realtime.
             cw_idx = int(self.cfg_operating_mode()[-2:])
