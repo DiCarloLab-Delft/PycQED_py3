@@ -448,23 +448,23 @@ def generate_config(filename: str,
                 "cc_light_instr_type": "single_qubit_gate",
                 "cc_light_instr": "fl_cw_{:02}".format(cw_flux),
                 "cc_light_codeword": cw_flux,
-                "cc_light_opcode": 128+cw_flux
+                "cc_light_opcode": 60+cw_flux
             }
 
     # Prepare 20 ns special parking operation
-    for flux_q in range(17):
-            cfg["instructions"]["sf_sp_park q{}".format(flux_q)] = {
-                "duration": flux_pulse_duration/2,
-                "latency": fl_latency,
-                "qubits": ['q{}'.format(flux_q)],
-                "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-                "disable_optimization": True,
-                "type": "flux",
-                "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "fl_cw_05",
-                "cc_light_codeword": 5,
-                "cc_light_opcode": 133
-            }
+    # for flux_q in range(17):
+    #         cfg["instructions"]["sf_sp_park q{}".format(flux_q)] = {
+    #             "duration": flux_pulse_duration/2,
+    #             "latency": fl_latency,
+    #             "qubits": ['q{}'.format(flux_q)],
+    #             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+    #             "disable_optimization": True,
+    #             "type": "flux",
+    #             "cc_light_instr_type": "single_qubit_gate",
+    #             "cc_light_instr": "fl_cw_05",
+    #             "cc_light_codeword": 5,
+    #             "cc_light_opcode": 65
+    #         }
 
     with open(filename, 'w') as f:
         json.dump(cfg, f, indent=4)
