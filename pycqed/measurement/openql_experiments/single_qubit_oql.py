@@ -92,7 +92,8 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     return p
 
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
-                           platf_cfg: str, trigger_idx: int):
+                           platf_cfg: str, trigger_idx: int,
+                           spec_instr: float='spec'):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
     this one triggers the 0th trigger port of the CCLight and usus the zeroth
@@ -107,7 +108,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     for i in range(nr_clocks):
         # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
         # control works. By repeating it the duration can be controlled.
-        k.gate('spec', [trigger_idx])
+        k.gate(spec_instr, [trigger_idx])
     if trigger_idx != qubit_idx:    
         k.wait([trigger_idx, qubit_idx], 0)
         
@@ -751,7 +752,8 @@ def Ram_Z(qubit_name,
 
 
 def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
-                          flux_cw: str='fl_cw_02', 
+                          flux_cw: str='fl_cw_02',
+                          qubit_other_idx=0,
                           cal_points: bool=True):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
@@ -766,11 +768,13 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         k = oqh.create_kernel('pi_flux_pi', p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
-        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-        k.gate(flux_cw, [2, 0])
-        # k.gate(flux_cw, [10, 8])
+        # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 0) #alignment workaround
+        # k.gate(flux_cw, [2, 0])
+        k.gate('sf_square', [qubit_idx])
         if t_nanoseconds > 10:
-            k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
+            # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
+            k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], t_nanoseconds) #alignment workaround
             # k.gate("wait", [qubit_idx], t_nanoseconds)
         k.gate('rx90', [qubit_idx])
         k.measure(qubit_idx)
