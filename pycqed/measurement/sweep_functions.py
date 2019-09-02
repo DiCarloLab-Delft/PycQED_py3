@@ -1176,7 +1176,8 @@ class FLsweep(Soft_Sweep):
         self.par(val)
         self.AWG.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
-            self.waveform_name, regenerate_waveforms=True)
+            self.waveform_name, regenerate_waveforms=True,
+            force_load_sequencer_program=True)
         self.AWG.start()
 
 
@@ -1252,6 +1253,9 @@ class tim_mw_latency_sweep(Soft_Sweep):
     def set_parameter(self, val):
         self.dev.tim_mw_latency_0(val)
         self.dev.tim_mw_latency_1(val)
+        self.dev.tim_mw_latency_2(val)
+        self.dev.tim_mw_latency_3(val)
+        self.dev.tim_mw_latency_4(val)
         self.dev.prepare_timing()
         
         time.sleep(.5)
