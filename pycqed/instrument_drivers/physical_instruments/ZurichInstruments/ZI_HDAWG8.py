@@ -112,8 +112,14 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
             port            (int) the port to connect to
             num_codewords   (int) the number of codeword-based waveforms to prepare
         """
+        t0 = time.time()
         super().__init__(name=name, device=device, interface=interface, server=server, port=port, num_codewords=num_codewords, **kw)
+        # Set default waveform length to 20 ns at 2.4 GSa/s
+        self._default_waveform_length = 48
 
+         # show some info
+        log.info('{}: DIO interface found in mode {}'
+                 .format(self.devname, 'CMOS' if self.get('dios_0_interface') == 0 else 'LVDS')) # NB: mode is persistent across device restarts
         # Ensure snapshot is fairly small for HDAWGs 
         self._snapshot_whitelist = {
             'IDN', 
@@ -135,7 +141,14 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
 
         self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
 
-        self.connect_message(begin_time=t0)
+
+         # NB: we don't want to load defaults automatically, but leave it up to the user
+         # Configure instrument to blink forever
+        self.seti('raw/error/blinkseverity', 1)
+        self.seti('raw/error/blinkforever', 1)
+
+        t1 = time.time()
+        print('Initialized ZI_HDAWG_core', self.devname, 'in %.2fs' % (t1-t0))
 
     def _add_extra_parameters(self):
         self.add_parameter('timeout', unit='s',
