@@ -889,8 +889,8 @@ class UHFQC(Instrument):
             timeout = 0
             while p not in values and timeout < 5:
                 try:
-                    self.daq.getAsEvent(p)
-                    tmp = self.daq.poll(0.5, 500, 4, True)
+                    self._daq.getAsEvent(p)
+                    tmp = self._daq.poll(0.5, 500, 4, True)
                     values[p] = tmp[p]
                 except:
                     print("Unexpected error:", sys.exc_info()[0])
@@ -933,7 +933,7 @@ class UHFQC(Instrument):
             'var wait_delay = getUserReg(2);\n' +
             'var RO_TRIG;\n' +
             'if(getUserReg(1)){\n' +
-            ' RO_TRIG=IAVG_TRIG;\n' +
+            ' RO_TRIG=IAVG_TRIG+WINT_TRIG;\n' +
             '}else{\n' +
             ' RO_TRIG=WINT_TRIG;\n' +
             '}\n' +
@@ -968,7 +968,7 @@ class UHFQC(Instrument):
             ' waitDIOTrigger();\n' +
             ' var dio = getDIOTriggered();\n' +
             # now hardcoded for 7 bits (cc-light)
-            ' cw = (dio >> 17) & 0x1f;\n' +
+            ' cw = (dio >> 17) & 0x1ff;\n' +
             '  switch(cw) {\n')
         # adding the case statements
         for i in range(len(Iwaves)):
