@@ -3,7 +3,7 @@ import openql.openql as ql
 import pycqed.measurement.openql_experiments.openql_helpers as oqh
 from pycqed.utilities.general import int2base, suppress_stdout
 from os.path import join
-
+from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_lm as _def_lm_flux
 
 def single_flux_pulse_seq(qubit_indices: tuple,
                           platf_cfg: str):
@@ -465,7 +465,7 @@ def residual_coupling_sequence(times, q0: int, q1: int, platf_cfg: str):
 def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
               flux_cw: str='fl_cw_02',
               twoq_pair=[2, 0],
-              platf_cfg: str=''):
+              platf_cfg: str='', cc: str='CCL'):
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -483,15 +483,27 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
 
+    if cc=='CCL':
+        wait_list = [0, 1, 2, 3, 4, 5, 6]
+        flux_target = twoq_pair
+    elif cc=='QCC':
+        wait_list = list(np.arange(17))
+        flux_target = [qubit_idx]
+        cw_idx = int(flux_cw[-2:])
+        flux_cw = 'sf_{}'.format(_def_lm_flux[cw_idx]['name'].lower())
+    else:
+        raise ValuerError('CC type not understood: {}'.format(cc))
+
+
     k = oqh.create_kernel("RamZ_X", p)
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate(flux_cw, twoq_pair)
+    k.gate("wait", wait_list, 0) #alignment workaround
+    k.gate(flux_cw, flux_target)
     #k.gate(flux_cw, [10, 8])
     
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    k.gate("wait", wait_list, 0) #alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('rx90', [qubit_idx])
     k.measure(qubit_idx)
@@ -501,11 +513,11 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate(flux_cw, twoq_pair)
+    k.gate("wait", wait_list, 0) #alignment workaround
+    k.gate(flux_cw, flux_target)
     #k.gate(flux_cw, [10, 8])
     
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    k.gate("wait", wait_list, 0) #alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('ry90', [qubit_idx])
     k.measure(qubit_idx)
@@ -650,7 +662,7 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
 
 def Chevron(qubit_idx: int, qubit_idx_spec: int,
             buffer_time, buffer_time2, flux_cw: int, platf_cfg: str,
-            target_qubit_sequence: str='ramsey'):
+            target_qubit_sequence: str='ramsey', cc: str='CCL'):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -686,6 +698,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
     if flux_cw is None:
         flux_cw = 2
+    flux_cw_name = _def_lm_flux[flux_cw]['name'].lower()
 
     k = oqh.create_kernel("Chevron", p)
     k.prepz(qubit_idx)
@@ -705,9 +718,16 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
 
     # For CCLight
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate('fl_cw_{:02}'.format(flux_cw), [2,0])
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    if cc=='CCL':
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+        k.gate('fl_cw_{:02}'.format(flux_cw), [2,0])
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    elif cc=='QCC':
+        k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+        k.gate('sf_{}'.format(flux_cw_name), [qubit_idx])
+        k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+    else:
+        raise ValuerError('CC type not understood: {}'.format(cc))
 
 
     if buffer_nanoseconds2 > 0:
