@@ -203,7 +203,9 @@ class UHFQC(zibase.ZI_base_instrument):
         # Our base class includes all the functionality needed to initialize the parameters
         # of the object. Those parameters are read from instrument-specific JSON files stored
         # in the zi_parameter_files folder.
-        super().__init__(name=name, device=device, interface=interface, server=server, port=port, **kw)
+        super().__init__(name=name, device=device, interface=interface, 
+            server=server, port=port, num_codewords=2**nr_integration_channels, 
+            **kw)
 
         # Set default waveform length to 20 ns at 1.8 GSa/s
         self._default_waveform_length = 32

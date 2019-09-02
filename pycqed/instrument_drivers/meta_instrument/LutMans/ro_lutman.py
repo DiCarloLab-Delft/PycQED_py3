@@ -63,12 +63,10 @@ class Base_RO_LutMan(Base_LutMan):
         #capping the resonator bit mapping in case a limited number of resonators is used
         self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[:self._num_res]
         # Initial values on parameters that otherwise depend on each other
-        self._resonator_combinations = [[0]]
+        self._resonator_combinations = [[self._resonator_codeword_bit_mapping[0]]]
         self._pulse_type = 'M_simple'
         super().__init__(name, **kw)
 
-        # Initialize LutMap with default values
-        self.set_default_lutmap()
 
     def _set_resonator_combinations(self, value):
         self._resonator_combinations = value
@@ -200,7 +198,13 @@ class Base_RO_LutMan(Base_LutMan):
                 wavename = self._pulse_type
                 for resonator in resonator_combination:
                     wavename += '_R' + str(resonator)
-                    case += 2**self._resonator_codeword_bit_mapping.index(resonator)
+                    try: 
+                        case += 2**self._resonator_codeword_bit_mapping.index(resonator)
+                    except ValueError: 
+                        # The allowed resonators is determined by the feedline
+                        raise ValueError(
+                            "{} not in allowed resonators ({}).".format(
+                            resonator, self._resonator_codeword_bit_mapping))
 
             lm[case] = {'name': wavename, 'resonators': resonator_combination}
 
@@ -454,7 +458,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             self, 
             regenerate_waveforms: bool=True,
             stop_start: bool = True,
-            force_load_sequencer_program: bool=False):
+            # FIXME, force load should be False but is here now to hack around the _upload_updated_waveforms 
+            force_load_sequencer_program: bool=True): 
         # Uploading the codeword program (again) is needed to if the user
         # has changed the mode of the instrument.
         if self._program_hash_differs() or force_load_sequencer_program:
@@ -463,7 +468,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                     acquisition_delay=self.acquisition_delay())
             else:
                 self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
-                    cases=list(self.LutMap().keys()), acquisition_delay=self.acquisition_delay(), timeout=self.timeout())
+                    cases=list(self.LutMap().keys()), 
+                    acquisition_delay=self.acquisition_delay(), timeout=self.timeout())
     
         super().load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=regenerate_waveforms,
