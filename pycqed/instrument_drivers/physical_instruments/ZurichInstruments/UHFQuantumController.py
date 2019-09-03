@@ -932,31 +932,31 @@ setUserReg(4, err_cnt);"""
         self.cases(cases)
 
 
-    def getv(self, paths):
-        if type(paths) is not list:
-            paths = [paths]
-            single = 1
-        else:
-            single = 0
+    # def getv(self, paths):
+    #     if type(paths) is not list:
+    #         paths = [paths]
+    #         single = 1
+    #     else:
+    #         single = 0
 
-        paths = [self._make_full_path(p) for p in paths]
-        values = {}
+    #     paths = [self._make_full_path(p) for p in paths]
+    #     values = {}
 
-        for p in paths:
-            timeout = 0
-            while p not in values and timeout < 5:
-                try:
-                    self._daq.getAsEvent(p)
-                    tmp = self._daq.poll(0.5, 500, 4, True)
-                    values[p] = tmp[p]
-                except:
-                    print("Unexpected error:", sys.exc_info()[0])
-                    timeout += 1
+    #     for p in paths:
+    #         timeout = 0
+    #         while p not in values and timeout < 5:
+    #             try:
+    #                 self._daq.getAsEvent(p)
+    #                 tmp = self._daq.poll(0.5, 500, 4, True)
+    #                 values[p] = tmp[p]
+    #             except:
+    #                 print("Unexpected error:", sys.exc_info()[0])
+    #                 timeout += 1
 
-        if single:
-            return values[paths[0]]
-        else:
-            return values
+    #     if single:
+    #         return values[paths[0]]
+    #     else:
+    #         return values
 
     def awg_sequence_acquisition_and_DIO_RED_test(
             self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0,

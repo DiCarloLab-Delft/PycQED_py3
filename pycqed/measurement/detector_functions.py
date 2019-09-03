@@ -2001,11 +2001,9 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             # Duplicate source channel to the correlation channel and select
             # second channel as channel to correlate with.
             copy_int_weights_real = \
-                self.UHFQC.get('qas_0_integration_weights_{}_real'.format(corr[0]))[
-                    0]['vector']
+                self.UHFQC.get('qas_0_integration_weights_{}_real'.format(corr[0]))            
             copy_int_weights_imag = \
-                self.UHFQC.get('qas_0_integration_weights_{}_imag'.format(corr[0]))[
-                    0]['vector']
+                self.UHFQC.get('qas_0_integration_weights_{}_imag'.format(corr[0]))            
             self.UHFQC.set(
                 'qas_0_integration_weights_{}_real'.format(correlation_channel),
                 copy_int_weights_real)
