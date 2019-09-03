@@ -866,19 +866,19 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             parameter_class=ManualParameter, initial_value=None,
             vals=vals.Ints())
 
-        self.add_parameter(
-            'cfg_operating_mode',
-            initial_value='Codeword_normal',
-            vals=vals.Enum('Codeword_normal'),
-            # 'CW_single_01', 'CW_single_02',
-            # 'CW_single_03', 'CW_single_04',
-            # 'CW_single_05', 'CW_single_06'),
-            docstring='Used to determine what program to load in the AWG8. '
-            'If set to "Codeword_normal" it does codeword triggering, '
-            'other modes exist to play only a specific single waveform.',
-            set_cmd=self._set_cfg_operating_mode,
-            get_cmd=self._get_cfg_operating_mode)
-        self._cfg_operating_mode = 'Codeword_normal'
+        # self.add_parameter(
+        #     'cfg_operating_mode',
+        #     initial_value='Codeword_normal',
+        #     vals=vals.Enum('Codeword_normal'),
+        #     # 'CW_single_01', 'CW_single_02',
+        #     # 'CW_single_03', 'CW_single_04',
+        #     # 'CW_single_05', 'CW_single_06'),
+        #     docstring='Used to determine what program to load in the AWG8. '
+        #     'If set to "Codeword_normal" it does codeword triggering, '
+        #     'other modes exist to play only a specific single waveform.',
+        #     set_cmd=self._set_cfg_operating_mode,
+        #     get_cmd=self._get_cfg_operating_mode)
+        # self._cfg_operating_mode = 'Codeword_normal'
 
         self.add_parameter('cfg_max_wf_length',
                            parameter_class=ManualParameter,
@@ -894,13 +894,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            set_cmd=self._set_awg_channel_amplitude,
                            unit='a.u.', vals=vals.Numbers(0, 1))
 
-    def _set_cfg_operating_mode(self, val):
-        self._cfg_operating_mode = val
-        # this is to ensure changing the mode requires reuploading the program
-        self._awgs_fl_sequencer_program_expected_hash(101)
+    # def _set_cfg_operating_mode(self, val):
+    #     self._cfg_operating_mode = val
+    #     # this is to ensure changing the mode requires reuploading the program
+    #     self._awgs_fl_sequencer_program_expected_hash(101)
 
-    def _get_cfg_operating_mode(self):
-        return self._cfg_operating_mode
+    # def _get_cfg_operating_mode(self):
+    #     return self._cfg_operating_mode
 
     def get_dac_val_to_amp_scalefactor(self):
         """
@@ -1061,10 +1061,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
                 self._wave_dict[waveform_name] = gen_wf_func()
 
-
-            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
-            self._wave_dict[waveform_name] = gen_wf_func()
-
         waveform = self._wave_dict[waveform_name]
         codeword_str = 'wave_ch{}_cw{:03}'.format(
             self.cfg_awg_channel(), codeword)
@@ -1086,8 +1082,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self.AWG.get_instr().set(codeword_str, waveform)
 
     def load_waveforms_onto_AWG_lookuptable(
-            self, regenerate_waveforms: bool = True, stop_start: bool = True,
-            force_load_sequencer_program: bool = False, use_realtime_upload: bool = True):
+            self, regenerate_waveforms: bool = True, stop_start: bool = True):
         """
         Loads all waveforms specified in the LutMap to an AWG for both this
         LutMap and the partner LutMap.
@@ -1096,68 +1091,24 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             regenerate_waveforms (bool): if True calls
                 generate_standard_waveforms before uploading.
             stop_start           (bool): if True stops and starts the AWG.
-            force_load_sequencer_program (bool): if True forces a new compilation
-                and upload of the program on the sequencer.
+
         """
 
+        AWG = self.AWG.get_instr()
+
         if stop_start:
-            self.AWG.get_instr().stop()
+            AWG.stop()
 
-        # Generate the waveforms and link them to the AWG8 parameters
-        lutmans = [self]
-        # If statement is here because it should be possible to function
-        # independently
-        if self.instr_partner_lutman() is None:
-            logging.warning('No partner_lutman specified')
-        else:
-            lutmans += [self.instr_partner_lutman.get_instr()]
+        for idx, waveform in self.LutMap().items():
+            self.load_waveform_onto_AWG_lookuptable(
+                wave_id=idx,
+                regenerate_waveforms=regenerate_waveforms)
 
-        # Uploading the codeword program if required
-        if self._program_hash_differs() or force_load_sequencer_program:
-            # FIXME: List of conditions in which reloading is required
-            # - program hash differs
-            # - max waveform length has changed
-            # N.B. these other conditions need to be included here.
-            # This ensures only the channels that are relevant get reconfigured
-            awg_nr = (self.cfg_awg_channel()-1)//2
-            self._upload_codeword_program(awg_nr)
-
-        if self.cfg_operating_mode() == 'Codeword_normal':
-            for idx, waveform in lm.LutMap().items():
-                if idx == 0: 
-                    # idx 0 is hardcoded to not play a wave. 
-                    # it still exists in the LutMap for redundant combinations. 
-                    continue 
-                if use_realtime_upload:
-                    self.load_waveform_realtime(
-                        waveform_name=waveform['name'],
-                        wf_nr=None, regenerate_waveforms=False)
-                else:
-                    if self.cfg_distort():
-                        waveform = self.distort_waveform(waveform,
-                          max_wf_length=waveform['max_wf_length'])
-                        wave = self._wave_dict_dist[waveform_name]
-                    else:
-                        waveform = self._append_zero_samples(waveform)
-                        wave = self._wave_dict_dist[waveform_name]
-                    self.AWG.get_instr().set('wave_ch{}_cw{:03}'.format(
-                                  self.cfg_awg_channel(), codeword),
-                                  wave)
-        else:
-            # Only load one waveform and do it in realtime.
-            cw_idx = int(self.cfg_operating_mode()[-2:])
-            waveform_name = self._get_wf_name_from_cw(cw_idx)
-            self.load_waveform_realtime(
-                waveform_name=waveform_name,
-                wf_nr=None, regenerate_waveforms=regenerate_waveforms_realtime)
-        # updating channel amplitude and range
         self.cfg_awg_channel_amplitude()
         self.cfg_awg_channel_range()
 
         if stop_start:
-            self.AWG.get_instr().start()
-
-        self._update_expected_program_hash()
+            AWG.start()
 
     def _append_zero_samples(self, waveform):
         """
@@ -1172,73 +1123,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             y_sig = waveform[:extra_samples]
         return y_sig
 
-    def _update_expected_program_hash(self):
-        """
-        Updates the expected AWG sequencer program hash with the current
-        hash of the sequencer program. This is intended to be called after
-        setting the hash.
-        """
-        awg_nr = (self.cfg_awg_channel()-1)//2
-        hash = self.AWG.get_instr().get(
-            'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
-        self._awgs_fl_sequencer_program_expected_hash(hash)
-
-    def _program_hash_differs(self)-> bool:
-        """
-        Args:
-            --
-        Returns:
-            hash_different (bool): returns True if one of the hashes does not
-                correspond to the expected hash.
-
-        Compares current AWG sequencer program hash for the relevant channels
-        with the expected program hash and, returns True if one ore more
-        hashes do not match, indicating that uploading the programs is
-        required.
-        """
-        awg_nr = (self.cfg_awg_channel()-1)//2
-        hash = self.AWG.get_instr().get(
-            'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
-        expected_hash = self._awgs_fl_sequencer_program_expected_hash()
-        hash_differs = (hash != expected_hash)
-
-        return hash_differs
-
-    def load_composite_waveform_onto_AWG_lookuptable(
-        self,
-            primitive_waveform_name: str,
-            time_tuples: list,
-            codeword: int):
-        """
-        Creates a composite waveform based on time_tuples extracted from a qisa
-        file.
-        """
-        waveform_name = 'comp_{}_cw{:03}'.format(primitive_waveform_name,
-                                                 codeword)
-
-        # assigning for post loading rendering purposes
-        self._wave_dict[waveform_name] = self._gen_composite_wf(
-            primitive_waveform_name,  time_tuples)
-        waveform = self._wave_dict[waveform_name]
-
-        codeword = 'wave_ch{}_cw{:03}'.format(self.cfg_awg_channel(),
-                                              codeword)
-
-        if self.cfg_append_compensation():
-            waveform = self.add_compensation_pulses(waveform)
-
-        if self.cfg_distort():
-            # This is where the fixed length waveform is
-            # set to cfg_max_wf_length
-            waveform = self.distort_waveform(waveform)
-            self._wave_dict_dist[waveform_name] = waveform
-        else:
-            # This is where the fixed length waveform is
-            # set to cfg_max_wf_length
-            waveform = self._append_zero_samples(waveform)
-            self._wave_dict_dist[waveform_name] = waveform
-
-        self.AWG.get_instr().set(codeword, waveform)
 
     def add_compensation_pulses(self, waveform):
         """
