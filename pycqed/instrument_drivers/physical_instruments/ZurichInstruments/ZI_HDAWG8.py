@@ -246,6 +246,8 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
 
         # Type conversion to ensure lists do not produce weird results
         awgs = numpy.array(awgs)
+        if awgs.shape == ():
+            awgs = numpy.array([awgs])
     
         for awg_nr in awgs:
             self._awg_program[awg_nr] = '''
@@ -397,8 +399,10 @@ while (1) {
         # Turn on device
         ####################################################
         time.sleep(.05)
-        self._dev.daq.setInt('/' + self._dev.device +
+        self.daq.setInt('/' + self.devname +
                              '/awgs/*/enable', 1)
+        # self._dev.daq.setInt('/' + self._dev.device +
+        #                      '/awgs/*/enable', 1)
 
         # Disable all function generators
         for param in [key for key in self.parameters.keys() if re.match(r'sines_\d+_enables_\d+', key)]:
@@ -544,12 +548,85 @@ while (1) {
 
         return set(valid_delays)
 
-    def calibrate_CCL_dio_protocol(self, CCL=None, verbose=False, repetitions=1):
+
+    def _prepare_QCC_dio_calibration(self, QCC, verbose=False): 
+        """
+        Prepares the appropriate program to calibrate DIO and returns 
+        expected sequence. 
+
+        N.B. only works for microwave on DIO4 and for Flux on DIO3 
+            (TODO add support for microwave on DIO5)
+        """
         log.info('Calibrating DIO delays')
         if verbose: print("Calibrating DIO delays")
 
-        if CCL is None:
-            CCL = qtccl.CCL('CCL', address='192.168.0.11', port=5025)
+        cs_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            's17', 'cs.txt')
+
+        opc_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            's17', 'qisa_opcodes.qmap')
+
+        # Configure QCC
+        QCC.control_store(cs_filepath)
+        QCC.qisa_opcode(opc_filepath)
+
+        if self.cfg_codeword_protocol() == 'flux':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','QCC_example',
+                'qisa_test_assembly','flux_calibration.qisa'))
+
+            sequence_length = 8
+            staircase_sequence = numpy.arange(1, sequence_length)
+            # expected sequence should be ([9, 18, 27, 36, 45, 54, 63])
+            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (3, list(staircase_sequence+ (staircase_sequence << 3)))]
+
+
+        elif self.cfg_codeword_protocol() == 'microwave':
+            raise zibase.ziConfigurationError('old_microwave DIO scheme not supported on QCC.')
+
+        elif self.cfg_codeword_protocol() == 'new_microwave': 
+            raise NotImplementedError() 
+
+
+        elif self.cfg_codeword_protocol() == 'new_novsm_microwave': 
+            raise NotImplementedError()
+            # test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+            #     '..','examples','QCC_example',
+            #     'qisa_test_assembly','calibration_cws_mw.qisa'))
+
+            # sequence_length = 32
+            # staircase_sequence = range(1, sequence_length)
+            # expected_sequence = [(0, list(reversed(staircase_sequence))), \
+            #                      (1, list(reversed(staircase_sequence))), \
+            #                      (2, list(reversed(staircase_sequence))), \
+            #                      (3, list(reversed(staircase_sequence)))]
+
+        else:
+            zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
+
+        # Start the QCC with the program configured above
+        QCC.eqasm_program(test_fp)
+        QCC.start()
+        return expected_sequence
+
+    def _prepare_CCL_dio_calibration(self, CCL, verbose=False): 
+        """
+        Prepares the appropriate program to calibrate DIO and returns 
+        expected sequence. 
+
+        N.B. only works for microwave on DIO4 and for Flux on DIO3 
+            (TODO add support for microwave on DIO5)
+        """
+        log.info('Calibrating DIO delays')
+        if verbose: print("Calibrating DIO delays")
 
         cs_filepath = os.path.join(pycqed.__path__[0],
             'measurement',
@@ -595,6 +672,28 @@ while (1) {
         # Start the CCL with the program configured above
         CCL.eqasm_program(test_fp)
         CCL.start()
+        return expected_sequence
+
+
+    def calibrate_CC_dio_protocol(self, CC, verbose=False, repetitions=1):
+        """
+        Calibrates the DIO communication between CC and HDAWG. 
+
+        Arguments:
+            CC (instr) : an instance of a CCL or QCC 
+            verbose (bool): if True prints to stdout 
+        """
+
+        CC_model = CC.IDN()['Model'] 
+        if 'QCC' in CC_model: 
+            expected_sequence = self._prepare_QCC_dio_calibration(
+                QCC=CC, verbose=verbose) 
+        elif 'CCL' in CC_model: 
+            expected_sequence = self._prepare_CCL_dio_calibration(
+                CCL=CC, verbose=verbose)
+        else: 
+            raise ValueError('CC model ({}) not recognized.'.format(CC_model))
+
 
         # Make sure the configuration is up-to-date
         self.assure_ext_clock()
@@ -617,3 +716,5 @@ while (1) {
 
         # And configure the delays
         self.setd('raw/dios/0/delays/*', min_valid_delay)
+        # If succesful return True   
+        return True
