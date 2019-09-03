@@ -263,6 +263,48 @@ while (1) {
     # 'private' functions: application specific/codeword support
     ##########################################################################
 
+    def reset_waveforms_zeros(self): 
+        """
+        Sets all waveforms to an array of 40 zeros. 
+        """
+        for awg_nr in range(4): 
+            wf_table = self._get_waveform_table(awg_nr)
+            for wf_l, wf_r in wf_table: 
+                self.set(wf_l, np.zeros(40))
+                self.set(wf_r, np.zeros(40))
+
+
+    def _get_waveform_table(self, awg_nr: int) -> list: 
+        """
+        Returns the waveform table. 
+
+        The waveform table determines the mapping of waveforms to DIO codewords.
+        The index of the table corresponds to the DIO codeword. 
+        The entry is a tuple of waveform names. 
+
+        Example: 
+            ["wave_ch7_cw000", "wave_ch8_cw000",
+            "wave_ch7_cw001", "wave_ch8_cw001", 
+            "wave_ch7_cw002", "wave_ch8_cw002"]
+
+        The waveform table generated depends on the awg_nr and the codeword 
+        protocol. 
+        """
+        ch = awg_nr*2 
+        wf_table = [] 
+        if 'flux' in self.cfg_codeword_protocol(): 
+            for cw_r in range(8):  
+                for cw_l in range(8):
+                    wf_table.append((zibase.gen_waveform_name(ch, cw_l),  
+                                     zibase.gen_waveform_name(ch+1, cw_r)))
+        else:
+            for dio_cw in range(self._num_codewords): 
+                wf_table.append((zibase.gen_waveform_name(ch, dio_cw),  
+                                 zibase.gen_waveform_name(ch+1, dio_cw)))
+        return wf_table
+
+
+
     def _codeword_table_preamble(self, awg_nr):
         """
         Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
@@ -270,19 +312,14 @@ while (1) {
         function.
         """
         program = ''
-        
-        # because awg_channels come in pairs
-        ch = awg_nr*2           
 
-        for cw in range(self._num_codewords):
-            parnames = 2*['']
-            csvnames = 2*['']
-            # Every AWG drives two channels
-            for i in range(2):
-                parnames[i] = zibase.gen_waveform_name(ch+i, cw)  # NB: parameter naming identical to QWG
-                csvnames[i] = self.devname + '_' + parnames[i]
+        wf_table = self._get_waveform_table(awg_nr=awg_nr)
+        for dio_cw, (wf_l, wf_r) in enumerate(wf_table):
+            csvname_l = self.devname + '_' + wf_l
+            csvname_r = self.devname + '_' + wf_r
             
-            program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(cw, csvnames[0], csvnames[1])
+            program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
+                dio_cw, csvname_l, csvname_r) 
 
         return program
 
@@ -716,5 +753,5 @@ while (1) {
 
         # And configure the delays
         self.setd('raw/dios/0/delays/*', min_valid_delay)
-        # If succesful return True   
+        # If succesful return True    
         return True
