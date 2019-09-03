@@ -384,7 +384,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 self.proc_data_dict['sweep_points_2D_dict'] = \
                     {qbn: list(soft_sweep_params.values())[0]['values']
                      for qbn in self.qb_names}
-                print(self.proc_data_dict['sweep_points_2D_dict'])
             else:
                 self.proc_data_dict['sweep_points_2D_dict'] = \
                     {qbn: self.raw_data_dict['soft_sweep_points'][0] for
@@ -4769,7 +4768,7 @@ class CZDynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                         textstr += '\n length: {:.2f} ns'.format(fpl*1e9)
                     fpa = self.get_param_value('flux_pulse_amp')
                     if fpa is not None:
-                        textstr += '\n amp: {:.2f} V'.format(fpa)
+                        textstr += '\n amp: {:.4f} V'.format(fpa)
 
                     self.plot_dicts['text_msg_' + qbn] = {
                         'fig_id': base_plot_name,

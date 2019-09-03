@@ -317,7 +317,8 @@ class QuDev_transmon(Qubit):
         DEFAULT_PREP_PARAMS = dict(preparation_type='wait',
                                    post_ro_wait=1e-6, reset_reps=1,
                                    final_reset_pulse=True,
-                                   threshold_mapping={0: 'g', 1: 'e'})
+                                   threshold_mapping={
+                                       self.name: {0: 'g', 1: 'e'}})
 
         self.add_parameter('preparation_params', parameter_class=ManualParameter,
                             initial_value=DEFAULT_PREP_PARAMS, vals=vals.Dict())
@@ -697,12 +698,20 @@ class QuDev_transmon(Qubit):
             n               the number of times the drive pulses with the same
                             amplitude should be repeated in each measurement
         """
-        # Define the measurement label
-        if label is None:
-            label = 'Rabi-n{}'.format(n) + self.msmt_suffix
-
         if prep_params is None:
             prep_params = self.preparation_params()
+
+        # Define the measurement label
+        if label is None:
+            label = 'Rabi_ef' if for_ef else 'Rabi'
+            if n != 1:
+                label += f'-n{n}'
+            if classified_ro:
+                label += '_classified'
+            if 'active' in prep_params['preparation_type']:
+                label += '_reset'
+            label += self.msmt_suffix
+
         # Prepare the physical instruments for a time domain measurement
         self.prepare(drive='timedomain')
 
@@ -754,23 +763,31 @@ class QuDev_transmon(Qubit):
 
     def measure_T1(self, times=None, analyze=True, upload=True,
                    last_ge_pulse=False, n_cal_points_per_state=2,
-                    cal_states='auto', for_ef=False, classified_ro=False,
-                    prep_params=None, label=None,
+                   cal_states='auto', for_ef=False, classified_ro=False,
+                   prep_params=None, label=None,
                    exp_metadata=None):
 
         if times is None:
             raise ValueError("Unspecified times for measure_T1")
-        if np.any(times>1e-3):
+        if np.any(times > 1e-3):
             log.warning('The values in the times array might be too large.'
-                            'The units should be seconds.')
+                        'The units should be seconds.')
 
         self.prepare(drive='timedomain')
 
         MC = self.instr_mc.get_instr()
 
+        if prep_params is None:
+            prep_params = self.preparation_params()
+
         # Define the measurement label
         if label is None:
-            label = f'T1{"_ef" if for_ef else ""}' + self.msmt_suffix
+            label = f'T1{"_ef" if for_ef else ""}'
+            if classified_ro:
+                label += '_classified'
+            if 'active' in prep_params['preparation_type']:
+                label += '_reset'
+            label += self.msmt_suffix
 
         cal_states = CalibrationPoints.guess_cal_states(cal_states, for_ef)
         cp = CalibrationPoints.single_qubit(self.name, cal_states,
@@ -789,10 +806,10 @@ class QuDev_transmon(Qubit):
 
         if exp_metadata is None:
             exp_metadata = {}
-        exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
+        exp_metadata.update({'sweep_points_dict': {self.name: times},
                              'preparation_params': prep_params,
                              'cal_points': repr(cp),
-                             'rotate': len(cp.states) != 0,
+                             'rotate': False,
                              'last_ge_pulses': [last_ge_pulse],
                              'data_to_fit': {self.name: 'pf' if for_ef else 'pe'},
                              "sweep_name": "Time",
@@ -805,7 +822,7 @@ class QuDev_transmon(Qubit):
 
     def measure_qscale(self, qscales=None, analyze=True, upload=True, label=None,
                        cal_states="auto", n_cal_points_per_state=2,
-                       last_ge_pulse=True, for_ef=False, classified_ro=False,
+                       last_ge_pulse=False, for_ef=False, classified_ro=False,
                        prep_params=None, exp_metadata=None):
         if qscales is None:
             raise ValueError("Unspecified qscale values for measure_qscale")
@@ -814,12 +831,18 @@ class QuDev_transmon(Qubit):
             raise ValueError("The values in the qscales array are not repeated "
                              "3 times.")
 
-        if label is None:
-            label = f'Qscale{"_ef" if for_ef else ""}' + self.msmt_suffix
-
         if prep_params is None:
             prep_params = self.preparation_params()
             log.debug(f"Preparation Parameters:\n{prep_params}")
+
+        # Define the measurement label
+        if label is None:
+            label = f'Qscale{"_ef" if for_ef else ""}'
+            if classified_ro:
+                label += '_classified'
+            if 'active' in prep_params['preparation_type']:
+                label += '_reset'
+            label += self.msmt_suffix
 
         MC = self.instr_mc.get_instr()
 
@@ -980,14 +1003,20 @@ class QuDev_transmon(Qubit):
     def measure_ramsey(self, times, artificial_detunings=None, label=None,
                        analyze=True, close_fig=True,
                        cal_states="auto", n_cal_points_per_state=2,
-                       n=1, upload=True, last_ge_pulse=True, for_ef=False,
+                       n=1, upload=True, last_ge_pulse=False, for_ef=False,
                        classified_ro=False, prep_params=None, exp_metadata=None):
-
-        if label is None:
-            label = f'Ramsey{"_ef" if for_ef else ""}' + self.msmt_suffix
 
         if prep_params is None:
             prep_params = self.preparation_params()
+
+        # Define the measurement label
+        if label is None:
+            label = f'Ramsey{"_ef" if for_ef else ""}'
+            if classified_ro:
+                label += '_classified'
+            if 'active' in prep_params['preparation_type']:
+                label += '_reset'
+            label += self.msmt_suffix
 
         MC = self.instr_mc.get_instr()
         self.prepare(drive='timedomain')
@@ -1079,7 +1108,7 @@ class QuDev_transmon(Qubit):
     def measure_echo_2nd_exc(self, times=None, artificial_detuning=None,
                              label=None, analyze=True,
                              cal_points=True, no_cal_points=6, upload=True,
-                             last_ge_pulse=True, exp_metadata=None):
+                             last_ge_pulse=False, exp_metadata=None):
 
         if times is None:
             raise ValueError("Unspecified times for measure_ramsey")
@@ -2188,7 +2217,7 @@ class QuDev_transmon(Qubit):
 
     def find_amplitudes(self, rabi_amps=None, label=None, for_ef=False,
                         n_cal_points_per_state=2, cal_states='auto',
-                        upload=True, last_ge_pulse=True, classified_ro=False,
+                        upload=True, last_ge_pulse=False, classified_ro=False,
                         prep_params=None, analyze=True, update=False,
                         exp_metadata=None, **kw):
         """
@@ -2274,17 +2303,6 @@ class QuDev_transmon(Qubit):
         if rabi_amps is None:
             raise ValueError('rabi_amps is None.')
 
-        if label is None:
-            if for_ef:
-                label = 'Rabi_ef'
-            else:
-                label = 'Rabi'
-
-            if n != 1:
-                label += '-n{}'.format(n)
-
-            label += self.msmt_suffix
-
         #Perform Rabi
         self.measure_rabi(amps=rabi_amps, analyze=False,
                           upload=upload, label=label, n=n,
@@ -2310,7 +2328,7 @@ class QuDev_transmon(Qubit):
 
 
     def find_T1(self, times, n_cal_points_per_state=2, cal_states='auto',
-                upload=True, last_ge_pulse=True, classified_ro=False,
+                upload=True, last_ge_pulse=False, classified_ro=False,
                 prep_params=None, analyze=True, update=False, label=None,
                 for_ef=False, exp_metadata=None, **kw):
 
@@ -2373,12 +2391,6 @@ class QuDev_transmon(Qubit):
         if np.any(times>1e-3):
             raise ValueError('Some of the values in the times array might be too '
                             'large. The units should be seconds.')
-
-        if label is None:
-            if for_ef:
-                label = 'T1_ef' + self.msmt_suffix
-            else:
-                label = 'T1' + self.msmt_suffix
 
         if times is None:
             times_span = kw.get('times_span', 10e-6)
@@ -2540,9 +2552,6 @@ class QuDev_transmon(Qubit):
         if np.any(times > 1e-3):
             log.warning('The values in the times array might be too large.')
 
-        if label is None:
-            label = f'Ramsey{"_ef" if for_ef else ""}' + self.msmt_suffix
-
         self.measure_ramsey(times, artificial_detunings=artificial_detunings,
                             label=label, cal_states=cal_states, n=n,
                             n_cal_points_per_state=n_cal_points_per_state,
@@ -2669,8 +2678,6 @@ class QuDev_transmon(Qubit):
         if not cal_points:
             no_cal_points = 0
 
-        MC = self.instr_mc.get_instr()
-
         if label is None:
             if for_ef:
                 label = 'Echo_ef' + self.msmt_suffix
@@ -2724,7 +2731,7 @@ class QuDev_transmon(Qubit):
         return
 
     def find_qscale(self, qscales, label=None, for_ef=False,
-                    last_ge_pulse=True, upload=True, analyze=True,
+                    last_ge_pulse=False, upload=True, analyze=True,
                     cal_states="auto", n_cal_points_per_state=2,
                     classified_ro=False, prep_params=None,
                     exp_metadata=None, update=False, **kw):
@@ -2814,9 +2821,6 @@ class QuDev_transmon(Qubit):
             log.warning("Does not automatically update the qubit qscale "
                             "parameter. "
                             "Set update=True if you want this!")
-
-        if label is None:
-            label = f'Qscale{"_ef" if for_ef else ""}' + self.msmt_suffix
 
         qscales = np.repeat(qscales, 3)
 
