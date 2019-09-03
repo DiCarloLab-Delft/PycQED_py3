@@ -63,7 +63,7 @@ Changelog:
 
 import time
 import logging
-import numpy
+import numpy as np
 import re
 import os
 import pycqed
@@ -228,7 +228,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
     # 'public' functions: application specific/codeword support
     ##########################################################################
 
-    def upload_codeword_program(self, awgs=numpy.arange(4), cfg_num_codewords=None, cfg_codeword_protocol=None):
+    def upload_codeword_program(self, awgs=np.arange(4), cfg_num_codewords=None, cfg_codeword_protocol=None):
         """
         Generates a program that plays the codeword waves for each channel.
 
@@ -245,9 +245,9 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         self._configure_codeword_protocol()
 
         # Type conversion to ensure lists do not produce weird results
-        awgs = numpy.array(awgs)
+        awgs = np.array(awgs)
         if awgs.shape == ():
-            awgs = numpy.array([awgs])
+            awgs = np.array([awgs])
     
         for awg_nr in awgs:
             self._awg_program[awg_nr] = '''
@@ -265,13 +265,13 @@ while (1) {
 
     def reset_waveforms_zeros(self): 
         """
-        Sets all waveforms to an array of 40 zeros. 
+        Sets all waveforms to an array of 48 zeros. 
         """
         for awg_nr in range(4): 
             wf_table = self._get_waveform_table(awg_nr)
             for wf_l, wf_r in wf_table: 
-                self.set(wf_l, np.zeros(40))
-                self.set(wf_r, np.zeros(40))
+                self.set(wf_l, np.zeros(48))
+                self.set(wf_r, np.zeros(48))
 
 
     def _get_waveform_table(self, awg_nr: int) -> list: 
@@ -367,7 +367,7 @@ while (1) {
             # the mask determines how many bits will be used in the protocol
             # e.g., mask 3 will mask the bits with bin(3) = 00000011 using
             # only the 2 Least Significant Bits.
-            num_codewords = int(2**numpy.ceil(numpy.log2(self._num_codewords)))
+            num_codewords = int(2**np.ceil(np.log2(self._num_codewords)))
 
             self.set('awgs_{}_dio_mask_value'.format(awg_nr), num_codewords-1)
 
@@ -618,7 +618,7 @@ while (1) {
                 'qisa_test_assembly','flux_calibration.qisa'))
 
             sequence_length = 8
-            staircase_sequence = numpy.arange(1, sequence_length)
+            staircase_sequence = np.arange(1, sequence_length)
             # expected sequence should be ([9, 18, 27, 36, 45, 54, 63])
             expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
                                  (1, list(staircase_sequence + (staircase_sequence << 3))), \
@@ -686,7 +686,7 @@ while (1) {
                 'qisa_test_assembly','calibration_cws_flux.qisa'))
 
             sequence_length = 8
-            staircase_sequence = numpy.arange(1, sequence_length)
+            staircase_sequence = np.arange(1, sequence_length)
             expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
                                  (1, list(staircase_sequence + (staircase_sequence << 3))), \
                                  (2, list(staircase_sequence + (staircase_sequence << 3))), \
@@ -737,7 +737,7 @@ while (1) {
         self.upload_codeword_program()
 
         for awg, sequence in expected_sequence:
-            if not self._ensure_activity(awg, mask_value=numpy.bitwise_or.reduce(sequence), verbose=verbose):
+            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence), verbose=verbose):
                 raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
         valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
