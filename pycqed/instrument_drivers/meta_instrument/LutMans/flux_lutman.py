@@ -5,7 +5,7 @@ from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
-import warnings 
+import warnings
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 try:
@@ -484,7 +484,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             CZ_theta = wfl.martinis_flux_pulse(
                 cz_length, theta_i=theta_i,
                 theta_f=np.deg2rad(cz_theta_f),
-                lambda_2=cz_lambda_2, lambda_3=cz_lambda_3, 
+                lambda_2=cz_lambda_2, lambda_3=cz_lambda_3,
                 sampling_rate=self.sampling_rate())
             CZ_eps = wfl.theta_to_eps(CZ_theta, g=q_J2)
             CZ_amp = self.calc_eps_to_amp(CZ_eps, state_A='11',
@@ -715,7 +715,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         ch_pair = awg_ch % 2
         channel_amp = AWG.set('awgs_{}_outputs_{}_amplitude'.format(
             awg_nr, ch_pair), val)
-    
+
 
     def _get_awg_channel_range(self):
         AWG = self.AWG.get_instr()
@@ -1039,12 +1039,12 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Loads a specific waveform to the AWG
         """
 
-        # Here we are ductyping to determine if the waveform name or the 
-        # codeword was specified. 
-        if type(wave_id) == str: 
+        # Here we are ductyping to determine if the waveform name or the
+        # codeword was specified.
+        if type(wave_id) == str:
             waveform_name = wave_id
             codeword = get_wf_idx_from_name(wave_id, self.LutMap())
-        else: 
+        else:
             waveform_name = self.LutMap()[wave_id]['name']
             codeword = wave_id
 
@@ -1053,10 +1053,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             # only regenerate the one waveform that is desired
             if 'cz' in waveform_name:
                 # CZ gates contain information on which pair (NE, SE, SW, NW)
-                # the gate is performed with this is specified in which_gate. 
+                # the gate is performed with this is specified in which_gate.
                 gen_wf_func = getattr(self, '_gen_cz')
                 self._wave_dict[waveform_name] = gen_wf_func(
-                    which_gate=waveform_name[3:])              
+                    which_gate=waveform_name[3:])
             else:
                 gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
                 self._wave_dict[waveform_name] = gen_wf_func()
@@ -1330,10 +1330,10 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
 
      def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool = True, stop_start: bool = True):
-        # We inherit from the HDAWG LutMan but do not require the fancy 
-        # loading because the QWG is a simple device! 
+        # We inherit from the HDAWG LutMan but do not require the fancy
+        # loading because the QWG is a simple device!
         return Base_Flux_LutMan.load_waveforms_onto_AWG_lookuptable(
-            self, regenerate_waveforms=regenerate_waveforms, 
+            self, regenerate_waveforms=regenerate_waveforms,
             stop_start=stop_start)
 
      def _get_awg_channel_amplitude(self):
