@@ -106,8 +106,8 @@ var ro_trig;
 
 // Configure readout mode
 if (ro_mode) {
-  ro_arm  = 0;
-  ro_trig = AWG_MONITOR_TRIGGER;
+  ro_arm  = AWG_INTEGRATION_ARM;
+  ro_trig = AWG_MONITOR_TRIGGER + AWG_INTEGRATION_ARM + AWG_INTEGRATION_TRIGGER;
 } else {
   ro_arm  = AWG_INTEGRATION_ARM;
   ro_trig = AWG_INTEGRATION_ARM + AWG_INTEGRATION_TRIGGER;
@@ -406,6 +406,32 @@ setUserReg(4, err_cnt);"""
 
     def _get_cases(self):
         return self._cases
+
+
+    def _get_waveform_table(self, awg_nr: int) -> list: 
+        """
+        Returns the waveform table. 
+
+        The waveform table determines the mapping of waveforms to DIO codewords.
+        The index of the table corresponds to the DIO codeword. 
+        The entry is a tuple of waveform names. 
+
+        Example: 
+            ["wave_ch7_cw000", "wave_ch8_cw000",
+            "wave_ch7_cw001", "wave_ch8_cw001", 
+            "wave_ch7_cw002", "wave_ch8_cw002"]
+
+        The waveform table generated depends on the awg_nr and the codeword 
+        protocol. 
+        """
+        ch = awg_nr*2 
+        wf_table = [] 
+        # FIXME: this should only be doing the acutally used combinations
+        for dio_cw in range(self._num_codewords): 
+            wf_table.append((zibase.gen_waveform_name(ch, dio_cw),  
+                             zibase.gen_waveform_name(ch+1, dio_cw)))
+        return wf_table
+
 
     def _codeword_table_preamble(self, awg_nr):
         """

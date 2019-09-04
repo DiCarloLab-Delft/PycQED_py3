@@ -1168,8 +1168,10 @@ class FLsweep(Soft_Sweep):
 
 
         self.par(val)
-        self.lm.load_waveform_realtime(self.waveform_name,
-                                       regenerate_waveforms=True)
+        self.AWG.stop()
+        self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name,
+                                                   regenerate_waveforms=True)
+        self.AWG.start()
         return 
 
     def set_parameter_QWG(self, val): 
