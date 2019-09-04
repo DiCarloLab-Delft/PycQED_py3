@@ -893,6 +893,8 @@ class ZI_base_instrument(Instrument):
 
     def _gen_write_waveform(self, ch, cw):
         def write_func(waveform):
+            log.info("Writing waveform (l{}) to ch{} cw{}".format(
+                len(waveform), ch, cw))
             # Determine which AWG this waveform belongs to
             awg_nr = ch//2
 
@@ -901,22 +903,32 @@ class ZI_base_instrument(Instrument):
 
             # Check that we're allowed to modify this waveform
             if self._awg_waveforms[wf_name]['readonly']:
-                raise ziConfigurationError('Trying to modify read-only waveform on codeword {}, channel {}'.format(cw, ch))
+                raise ziConfigurationError(
+                    'Trying to modify read-only waveform on '
+                    'codeword {}, channel {}'.format(cw, ch))
 
             # The length of HDAWG waveforms should be a multiple of 8 samples.
             if (len(waveform) % 8) != 0:
+                log.debug("waveform is not a multiple of "
+                          "8 samples, appending zeros.")
                 extra_zeros = 8-(len(waveform) % 8)
                 waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
             
             # If the length has changed, we need to recompile the AWG program
             if len(waveform) != len(self._awg_waveforms[wf_name]['waveform']):
+                log.debug("Length of waveform has changed. "
+                          "Flagging awg as requiring recompilation. ")
                 self._awg_needs_configuration[awg_nr] = True
 
             # Update the associated CSV file
-            self._write_csv_waveform(ch=ch, cw=cw, wf_name=wf_name, waveform=waveform)
+            log.debug("Updating csv "
+                "waveform {}, for ch{}, cw{}".format(wf_name, ch, cw))           
+            self._write_csv_waveform(ch=ch, cw=cw, wf_name=wf_name, 
+                waveform=waveform)
 
             # And the entry in our table and mark it for update
             self._awg_waveforms[wf_name]['waveform'] = waveform
+            log.debug("Marking waveform as dirty.")
             self._awg_waveforms[wf_name]['dirty']   = True
 
         return write_func
@@ -934,17 +946,21 @@ class ZI_base_instrument(Instrument):
 
             # Name of this waveform
             wf_name = gen_waveform_name(ch, cw)
-            
+            log.info("Reading waveform {} for ch{} cw{}".format(
+                len(wf_name), ch, cw))
             # Check if the waveform data is in our dictionary
             if wf_name not in self._awg_waveforms:
+                log.debug("Waveform not in self._awg_waveforms reading from csv file.")
                 # Initialize elements
                 self._awg_waveforms[wf_name] = {'waveform': None, 'dirty': False, 'readonly': False}
                 # Make sure everything gets recompiled
+                log.debug("Flagging awg as requiring recompilation.")
                 self._awg_needs_configuration[awg_nr] = True
                 # It isn't, so try to read the data from CSV
                 waveform = self._read_csv_waveform(ch, cw, wf_name)
                 # Check whether  we got something
                 if waveform is None:
+                    log.debug("Waveform CSV does not exist, initializing to zeros.")
                     # Nope, initialize to zeros
                     waveform = np.zeros(32)
                     self._awg_waveforms[wf_name]['waveform'] = waveform
@@ -976,32 +992,49 @@ class ZI_base_instrument(Instrument):
         Adjust the length of a codeword waveform such that each individual
         waveform of the pair has the same length
         """
-        for cw in range(self._num_codewords):
-            wf_name = gen_waveform_name(2*awg_nr+0, cw)
-            len_wf = len(self._awg_waveforms[wf_name]['waveform'])
-            other_wf_name = gen_waveform_name(2*awg_nr+1, cw)
-            len_other_wf = len(self._awg_waveforms[other_wf_name]['waveform'])
+        log.info('Length matching waveforms for dynamic waveform upload.')
+        wf_table = self._get_waveform_table(awg_nr)
 
-            # First one is shorter
-            if len_wf < len_other_wf:
-                # Temporarily unset the readonly flag to be allowed to append zeros
-                readonly = self._awg_waveforms[wf_name]['readonly']
-                self._awg_waveforms[wf_name]['readonly'] = False
-                self.set(wf_name, np.concatenate((self._awg_waveforms[wf_name]['waveform'], np.zeros(len_other_wf-len_wf))))
-                self._awg_waveforms[wf_name]['dirty'] = True
-                self._awg_waveforms[wf_name]['readonly'] = readonly
-            elif len_other_wf < len_wf:
-                readonly = self._awg_waveforms[other_wf_name]['readonly']
-                self._awg_waveforms[other_wf_name]['readonly'] = False
-                self.set(other_wf_name, np.concatenate((self._awg_waveforms[other_wf_name]['waveform'], np.zeros(len_wf-len_other_wf))))
-                self._awg_waveforms[other_wf_name]['dirty'] = True
-                self._awg_waveforms[other_wf_name]['readonly'] = readonly
+        matching_updated=False
+        iter_id = 0
+        # We iterate over the waveform table 
+        while(matching_updated or iter_id == 0):
+
+            iter_id += 1
+            if iter_id > 10: 
+                raise StopIteration
+            log.info('Length matching iteration {}.'.format(iter_id))
+            matching_updated = False
+
+            for wf_name, other_wf_name in wf_table:
+                len_wf = len(self._awg_waveforms[wf_name]['waveform'])
+                len_other_wf = len(self._awg_waveforms[other_wf_name]['waveform'])
+
+                # First one is shorter
+                if len_wf < len_other_wf:
+                    log.info('Modifying {} for length matching.'.format(wf_name))
+                    # Temporarily unset the readonly flag to be allowed to append zeros
+                    readonly = self._awg_waveforms[wf_name]['readonly']
+                    self._awg_waveforms[wf_name]['readonly'] = False
+                    self.set(wf_name, np.concatenate((self._awg_waveforms[wf_name]['waveform'], np.zeros(len_other_wf-len_wf))))
+                    self._awg_waveforms[wf_name]['dirty'] = True
+                    self._awg_waveforms[wf_name]['readonly'] = readonly
+                    matching_updated=True
+                elif len_other_wf < len_wf:
+                    log.info('Modifying {} for length matching.'.format(other_wf_name))
+                    readonly = self._awg_waveforms[other_wf_name]['readonly']
+                    self._awg_waveforms[other_wf_name]['readonly'] = False
+                    self.set(other_wf_name, np.concatenate((self._awg_waveforms[other_wf_name]['waveform'], np.zeros(len_wf-len_other_wf))))
+                    self._awg_waveforms[other_wf_name]['dirty'] = True
+                    self._awg_waveforms[other_wf_name]['readonly'] = readonly
+                    matching_updated=True
 
     def _clear_dirty_waveforms(self, awg_nr):
         """
         Adjust the length of a codeword waveform such that each individual
         waveform of the pair has the same length
         """
+        log.info('Clearing dirty waveform tag for awg_nr {}'.format(awg_nr))
         for cw in range(self._num_codewords):
             wf_name = gen_waveform_name(2*awg_nr+0, cw)
             self._awg_waveforms[wf_name]['dirty'] = False
@@ -1048,17 +1081,20 @@ class ZI_base_instrument(Instrument):
         Loop through all configured waveforms and use dynamic waveform uploading
         to update changed waveforms on the instrument as needed.
         """
-        # Upload waveform for each codeword
-        for cw in range(self._num_codewords):
-            # Loop through all AWG's
-            wf_name = gen_waveform_name(2*awg_nr+0, cw)
-            other_wf_name = gen_waveform_name(2*awg_nr+1, cw)
+        # Fixme. the _get_waveform_table should also be implemented for the UFH
+        log.info("Using dynamic waveform update for awg_nr {}.".format(awg_nr))
+        wf_table = self._get_waveform_table(awg_nr)
+
+        for dio_cw, (wf_name, other_wf_name) in enumerate(wf_table): 
             if self._awg_waveforms[wf_name]['dirty'] or self._awg_waveforms[other_wf_name]['dirty']:
                 # Combine the waveforms and upload
                 wf_data = merge_waveforms(self._awg_waveforms[wf_name]['waveform'], 
                                             self._awg_waveforms[other_wf_name]['waveform'])
                 # Write the new waveform
-                self.setv('awgs/{}/waveform/waves/{}'.format(awg_nr, cw), wf_data)
+                self.setv('awgs/{}/waveform/waves/{}'.format(awg_nr, dio_cw), wf_data)
+
+
+
     
     def _codeword_table_preamble(self, awg_nr):
         """
@@ -1072,6 +1108,7 @@ class ZI_base_instrument(Instrument):
         """
         Configures an AWG with the program stored in the object in the self._awg_program[awg_nr] member.
         """
+        log.info('Configuring awg_nr {} with predefined codeword program'.format(awg_nr))
         if self._awg_program[awg_nr] is not None:        
             full_program = \
                 '// Start of automatically generated codeword table\n' + \
@@ -1079,6 +1116,8 @@ class ZI_base_instrument(Instrument):
                 '// End of automatically generated codeword table\n' + self._awg_program[awg_nr]
 
             self.configure_awg_from_string(awg_nr, full_program)
+        else: 
+            logging.warning('No program configured for awg_nr {}.'.format(awg_nr))
 
     ##########################################################################
     # Public methods
@@ -1149,6 +1188,7 @@ class ZI_base_instrument(Instrument):
         self.daq.sync()
 
     def start(self):
+        log.info('Starting {}'.format(self.name))
         self.check_errors()
 
         # Loop through each AWG and check whether to reconfigure it
@@ -1157,10 +1197,15 @@ class ZI_base_instrument(Instrument):
 
             # If the reconfiguration flag is set, upload new program
             if self._awg_needs_configuration[awg_nr]:
+                log.debug('Detected awg configuration tag '
+                    'for awg {}.'.format(awg_nr))
                 self._configure_awg_from_variable(awg_nr)
                 self._awg_needs_configuration[awg_nr] = False
                 self._clear_dirty_waveforms(awg_nr)
             else:
+
+                log.debug('Not detected awg configuration tag '
+                    'for awg {}.'.format(awg_nr))
                 # Loop through all waveforms and update accordingly
                 self._upload_updated_waveforms(awg_nr)
                 self._clear_dirty_waveforms(awg_nr)
@@ -1169,6 +1214,9 @@ class ZI_base_instrument(Instrument):
         for awg_nr in range(self._num_channels()//2):
             # Skip AWG's without programs
             if self._awg_program[awg_nr] is None:
+                # to configure all awgs use "upload_codeword_program" or specify
+                # another program
+                logging.warning("Not starting awg_nr {}.".format(awg_nr))
                 continue
             # Check that the AWG is ready
             if not self.get('awgs_{}_ready'.format(awg_nr)):
@@ -1222,14 +1270,15 @@ class ZI_base_instrument(Instrument):
         t1 = time.time()
         print('Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
 
-    def configure_awg_from_string(self, awg_nr: int, program_string: str, timeout: float=15):
+    def configure_awg_from_string(self, awg_nr: int, program_string: str, 
+            timeout: float=15):
         """
         Uploads a program string to one of the AWGs in a UHF-QA or AWG-8.
 
         This function is tested to work and give the correct error messages
         when compilation fails.
         """
-
+        log.info('Configuring awg_nr {} from string.'.format(awg_nr))
         # Check that awg_nr is set in accordance with devtype
         self._check_awg_nr(awg_nr)
 
