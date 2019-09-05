@@ -371,7 +371,7 @@ class UHFQC(zibase.ZI_base_instrument):
         self._awg_program[0] = \
             awg_sequence_acquisition_preamble() + """
 // Mask for selecting our codeword bits
-const CW_MASK = (0x1ff << 17);
+const CW_MASK = (0x1f << 17);
 // Counts wrong codewords
 var err_cnt = 0;
 """
@@ -909,7 +909,26 @@ setUserReg(4, err_cnt);"""
         return matrix
 
     ##########################################################################
-    # 'public' functions: sequencer functions
+    """
+    'public' functions: sequencer functions
+    Before acquisition can take place one of "awg_sequence_acquisition_and_"
+    has to be called. These take care that the right program is uploaded.
+    The variants are:
+        awg_sequence_acquisition
+            start acquisition after receiving a trigger, play no pulse
+        awg_sequence_acquisition_and_pulse
+            start acquisition after receiving a trigger,
+            play the specified pulse
+        awg_sequence_acquisition_and_pulse_SSB
+            start acquisition after receiving a trigger,
+            play an SSB pulse based on specified parameters
+        awg_sequence_acquisition_and_DIO_triggered_pulse
+            start acquisition after receiving a DIO trigger,
+            play the pulse specified by the received DIO codeword
+            cases argument specifies what codewords are supported.
+        awg_sequence_acquisition_and_DIO_RED_test
+            special DIO acquisition for testing real time error correction.
+    """
     ##########################################################################
 
     def awg_sequence_acquisition_and_DIO_triggered_pulse(
