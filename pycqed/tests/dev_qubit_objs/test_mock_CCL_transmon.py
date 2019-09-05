@@ -54,7 +54,8 @@ class Test_Mock_CCL(unittest.TestCase):
         self.MW2 = vmw.VirtualMWsource('MW2')
         self.MW3 = vmw.VirtualMWsource('MW3')
         self.SH = sh.virtual_SignalHound_USB_SA124B('SH')
-        self.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator', num_codewords=32, device='dev2109', interface='1GbE')
+        self.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator',
+                               device='dev2109', interface='1GbE')
 
         self.CCL = dummy_CCL('CCL')
         # self.VSM = Dummy_Duplexer('VSM')
