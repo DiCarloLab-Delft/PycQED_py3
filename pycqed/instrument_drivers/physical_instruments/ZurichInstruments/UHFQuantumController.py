@@ -47,13 +47,10 @@ Changelog:
 """
 
 import time
-import json
 import os
 import logging
 import numpy as np
-import re
 import pycqed
-from fnmatch import fnmatch
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 
@@ -203,8 +200,8 @@ class UHFQC(zibase.ZI_base_instrument):
         # Our base class includes all the functionality needed to initialize the parameters
         # of the object. Those parameters are read from instrument-specific JSON files stored
         # in the zi_parameter_files folder.
-        super().__init__(name=name, device=device, interface=interface, 
-            server=server, port=port, num_codewords=2**nr_integration_channels, 
+        super().__init__(name=name, device=device, interface=interface,
+            server=server, port=port, num_codewords=2**nr_integration_channels,
             **kw)
 
         # Set default waveform length to 20 ns at 1.8 GSa/s
@@ -408,27 +405,27 @@ setUserReg(4, err_cnt);"""
         return self._cases
 
 
-    def _get_waveform_table(self, awg_nr: int) -> list: 
+    def _get_waveform_table(self, awg_nr: int) -> list:
         """
-        Returns the waveform table. 
+        Returns the waveform table.
 
         The waveform table determines the mapping of waveforms to DIO codewords.
-        The index of the table corresponds to the DIO codeword. 
-        The entry is a tuple of waveform names. 
+        The index of the table corresponds to the DIO codeword.
+        The entry is a tuple of waveform names.
 
-        Example: 
+        Example:
             ["wave_ch7_cw000", "wave_ch8_cw000",
-            "wave_ch7_cw001", "wave_ch8_cw001", 
+            "wave_ch7_cw001", "wave_ch8_cw001",
             "wave_ch7_cw002", "wave_ch8_cw002"]
 
-        The waveform table generated depends on the awg_nr and the codeword 
-        protocol. 
+        The waveform table generated depends on the awg_nr and the codeword
+        protocol.
         """
-        ch = awg_nr*2 
-        wf_table = [] 
+        ch = awg_nr*2
+        wf_table = []
         # FIXME: this should only be doing the acutally used combinations
-        for dio_cw in range(self._num_codewords): 
-            wf_table.append((zibase.gen_waveform_name(ch, dio_cw),  
+        for dio_cw in range(self._num_codewords):
+            wf_table.append((zibase.gen_waveform_name(ch, dio_cw),
                              zibase.gen_waveform_name(ch+1, dio_cw)))
         return wf_table
 
