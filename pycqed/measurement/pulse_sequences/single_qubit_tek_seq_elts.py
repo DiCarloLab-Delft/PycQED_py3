@@ -958,7 +958,7 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
                            preparation_type='wait', post_ro_wait=1e-6,
                            ro_separation=1.5e-6,
                            reset_reps=3, final_reset_pulse=True,
-                           threshold_mapping={0: 'g', 1: 'e'}):
+                           threshold_mapping=None):
     """
     Prepends to pulse_list the preparation pulses corresponding to preparation
 
@@ -968,9 +968,10 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
         for preselection: ('preselection', nr_readouts)
     """
 
+    if threshold_mapping is None:
+        threshold_mapping = {qbn: {0: 'g', 1: 'e'} for qbn in qb_names}
+
     # Calculate the length of a ge pulse, assumed the same for all qubits
-    ge_pulse = operation_dict['X180 ' + qb_names[0]]
-    ge_length = ge_pulse['nr_sigma']*ge_pulse['sigma']
     state_ops = dict(g=["I "], e=["X180 "], f=["X180_ef ", "X180 "])
 
     if 'ref_pulse' not in pulse_list[0]:
@@ -982,31 +983,31 @@ def add_preparation_pulses(pulse_list, operation_dict, qb_names,
         return pulse_list
     elif 'active_reset' in preparation_type:
         reset_ro_pulses = []
+        ops_and_codewords = {}
         for i, qbn in enumerate(qb_names):
             reset_ro_pulses.append(deepcopy(operation_dict['RO ' + qbn]))
             reset_ro_pulses[-1]['ref_point'] = 'start' if i != 0 else 'end'
 
-        if preparation_type == 'active_reset_e':
-            ops_and_codewords = [(state_ops[threshold_mapping[0]], 0),
-                                 (state_ops[threshold_mapping[1]], 1)]
-            ef_length = 0
-        elif preparation_type == 'active_reset_ef':
-            assert len(threshold_mapping) == 4, \
-                "Active reset for the f-level requires a mapping of length 4" \
-                f" but only {len(threshold_mapping)} were given: " \
-                f"{threshold_mapping}"
-            ops_and_codewords = [(state_ops[threshold_mapping[0]], 0),
-                                 (state_ops[threshold_mapping[1]], 1),
-                                 (state_ops[threshold_mapping[2]], 2),
-                                 (state_ops[threshold_mapping[3]], 3)]
-            ef_pulse = operation_dict['X180_ef ' + qb_names[0]]
-            ef_length = ef_pulse['nr_sigma'] * ef_pulse['sigma']
-        else:
-            raise ValueError(f'Invalid preparation type {preparation_type}')
+            if preparation_type == 'active_reset_e':
+                ops_and_codewords[qbn] = [
+                    (state_ops[threshold_mapping[qbn][0]], 0),
+                    (state_ops[threshold_mapping[qbn][1]], 1)]
+            elif preparation_type == 'active_reset_ef':
+                assert len(threshold_mapping[qbn]) == 4, \
+                    "Active reset for the f-level requires a mapping of length 4" \
+                    f" but only {len(threshold_mapping)} were given: " \
+                    f"{threshold_mapping}"
+                ops_and_codewords[qbn] = [
+                    (state_ops[threshold_mapping[qbn][0]], 0),
+                    (state_ops[threshold_mapping[qbn][1]], 1),
+                    (state_ops[threshold_mapping[qbn][2]], 2),
+                    (state_ops[threshold_mapping[qbn][3]], 3)]
+            else:
+                raise ValueError(f'Invalid preparation type {preparation_type}')
 
         reset_pulses = []
         for i, qbn in enumerate(qb_names):
-            for ops, codeword in ops_and_codewords:
+            for ops, codeword in ops_and_codewords[qbn]:
                 for j, op in enumerate(ops):
                     reset_pulses.append(deepcopy(operation_dict[op + qbn]))
                     reset_pulses[-1]['codeword'] = codeword

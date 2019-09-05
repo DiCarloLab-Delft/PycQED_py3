@@ -305,7 +305,6 @@ class MeasurementControl(Instrument):
 
         datasetshape = self.dset.shape
         start_idx, stop_idx = self.get_datawriting_indices_update_ctr(new_data)
-
         new_datasetshape = (np.max([datasetshape[0], stop_idx]),
                             datasetshape[1])
         self.dset.resize(new_datasetshape)
@@ -1261,7 +1260,8 @@ class MeasurementControl(Instrument):
             max_sweep_points = np.shape(self.get_sweep_points())[0]
 
         start_idx = int(self.total_nr_acquired_values % max_sweep_points)
-
+        print('total_nr_acquired_values ', self.total_nr_acquired_values)
+        print('max_sweep_points ', max_sweep_points)
         self.soft_iteration = int(
             self.total_nr_acquired_values//max_sweep_points)
 
