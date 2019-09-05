@@ -11,7 +11,7 @@ class Test_UHFQC(unittest.TestCase):
     @classmethod
     def setup_class(cls):
         cls.uhf = UHF.UHFQC(name='MOCK_UHF', server='emulator',
-                            num_codewords=32, device='dev2109', interface='1GbE')
+         device='dev2109', interface='1GbE')
 
     @classmethod
     def teardown_class(cls):
