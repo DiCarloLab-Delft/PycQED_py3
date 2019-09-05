@@ -2175,7 +2175,7 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
                            cal_states='auto', prep_params=None,
                            exp_metadata=None, classified=False, update=False,
                            reset_phases_before_measurement=True,
-                           basis_rot_par=None):
+                           basis_rot_par=None, prepend_n_cz=0):
 
     if qubits_to_measure is None:
         qubits_to_measure = [qbc, qbt]
@@ -2212,6 +2212,7 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
                 qb_name=qb.name, hard_sweep_dict=hard_sweep_params,
                 operation_dict=get_operation_dict(qubits_to_measure),
                 cz_pulse_name=cz_pulse_name, cal_points=cp,
+                prepend_n_cz=prepend_n_cz,
                 upload=False, prep_params=prep_params)
 
         MC.set_sweep_function(awg_swf.SegmentHardSweep(
