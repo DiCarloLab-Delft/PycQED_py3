@@ -371,7 +371,7 @@ class UHFQC(zibase.ZI_base_instrument):
         self._awg_program[0] = \
             awg_sequence_acquisition_preamble() + """
 // Mask for selecting our codeword bits
-const CW_MASK = (0x1f << 17);
+const CW_MASK = (0x1ff << 17);
 // Counts wrong codewords
 var err_cnt = 0;
 """
