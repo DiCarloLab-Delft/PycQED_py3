@@ -850,7 +850,7 @@ class Qubit(Instrument):
 
         return True
 
-    def find_resonator_frequency(self, use_min=False,
+    def  find_resonator_frequency(self, use_min=False,
                                  update=True,
                                  freqs=None,
                                  MC=None, close_fig=True):

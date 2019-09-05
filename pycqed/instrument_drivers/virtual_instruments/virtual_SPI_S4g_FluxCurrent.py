@@ -57,6 +57,27 @@ class virtual_SPI_S4g_FluxCurrent(Instrument):
                 ch_name, ch_map[0], ch_map[1], scale_fac*I, unit)
         print(msg)
 
+    def set_dacs_zero(self):
+        """
+        Set the current for all modules to zero.
+
+        Includes dacs that are not controlled by this instrument (this is
+         intentional).
+        """
+        # First set all "parameters" to zero.
+        # this ensures that the safe slow rampdown is used and that the
+        # correct values are known to the instrument.
+        for ch in self.channel_map:
+            self.set(ch, 0)
+
+        # "brute-set" all sources in known modules to zero, this is because
+        # this is also a safety method that should ensure we are in an all
+        # zero state.
+        for s in self.current_sources.values():
+            for dac in range(4):
+                s.set_current(dac, 0.0)
+
+
     def close(self):
         super().close()
 

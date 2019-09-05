@@ -1,6 +1,7 @@
 from .CCL_Transmon import CCLight_Transmon
 import os
 import time
+import warnings
 import numpy as np
 import logging
 from pycqed.measurement import sweep_functions as swf
@@ -443,8 +444,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # Find all resonator frequencies:
         power = 20*np.log10(self.ro_pulse_amp_CW())
         dips = []
-        try:
+        if self.instr_device() != None:
             device = self.instr_device.get_instr()
+            if self.name not in device.qubits(): 
+                warnings.warn('{} not in device.'.format(self.name))
             qubit_names = device.qubits()
             for name in qubit_names:
                 if name != 'fakequbit':
@@ -452,14 +455,16 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                     freq, dip = qubit.calculate_mock_resonator_response(power,
                                                                         freqs)
                     dips.append(dip)
-        except AttributeError:
+        if dips == []: 
+            # If the 
             logging.warning('No device found! Using this mock only for for '
                             'resonator frequencies')
-            freq, dips = self.calculate_mock_resonator_response(power,
+            freq, dip = self.calculate_mock_resonator_response(power,
                                                                 freqs)
+            dips.append(dip)
 
         h = 10**(power/20)*10e-3
-
+        print('dips', dips)
         mocked_values = h
         for dip in dips:
             mocked_values += dip
@@ -543,7 +548,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                                         label='Qubit_dac_scan' +
                                                               self.msmt_suffix)
             timestamp = timestamp[0]
-            ma2.da.DAC_analysis(timestamp=timestamp)
+            a = ma2.da.DAC_analysis(timestamp=timestamp)
+            return a.fit_dac_arc()
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, fluxChan,
                                              pulsed=True, MC=None,
@@ -1060,6 +1066,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             res_qubit_dip = res_qubit_dip/Q_decrease
 
             res_qubit_dip += h
+            print(res_qubit_dip)
             # Add some extra noise
             for i, value in enumerate(res_qubit_dip):
                 d = np.abs(value - h)
