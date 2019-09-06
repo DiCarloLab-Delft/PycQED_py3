@@ -1441,6 +1441,20 @@ class DeviceCCL(Instrument):
                 prepared in the 0 state ('ground'), 1 state ('extited') or
                 in superposition ('ramsey')
 
+            spec_tone (bool):
+                uses the spectroscopy source (in CW mode) of the qubit to produce
+                a fake chevron.
+
+            freq_tone (float):
+                When spec_tone = True, controls the frequency of the spec source
+
+            pow_tone (float):
+                When spec_tone = True, controls the power of the spec source
+
+            single_qubit_chevron (bool):
+                Uses only the readout channel from q0, useful for fake chevron
+                when we do not care for reading out the other qubit (q_spec).
+
         Circuit:
             q0    -x180-flux-x180-RO-
             qspec --x90-----------RO- (target_qubit_sequence='ramsey')
