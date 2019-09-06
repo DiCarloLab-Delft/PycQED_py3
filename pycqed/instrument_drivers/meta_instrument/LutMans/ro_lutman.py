@@ -5,9 +5,10 @@ from qcodes.utils import validators as vals
 import numpy as np
 import copy as copy
 
-def create_pulse(shape: str, 
-                 amplitude: float, 
-                 length: float, 
+
+def create_pulse(shape: str,
+                 amplitude: float,
+                 length: float,
                  phase: float,
                  delay: float=0,
                  sampling_rate: float=1.8e9):
@@ -22,51 +23,56 @@ def create_pulse(shape: str,
         kw['nr_sigma'] = nr_sigma
     else:
         raise NotImplementedError('Primitive pulse shape ' +
-            shape +
-            ' not implemented.')
+                                  shape +
+                                  ' not implemented.')
 
     return shape_function(amp=amplitude,
                           sampling_rate=sampling_rate,
                           delay=delay,
                           phase=phase, **kw)
-    
+
+
 class Base_RO_LutMan(Base_LutMan):
 
-    def __init__(self, name, num_res=2, feedline_number: int=0, 
-                feedline_map='S7', **kw):
+    def __init__(self, name, num_res=2, feedline_number: int=0,
+                 feedline_map='S7', **kw):
         if num_res > 10:
             raise ValueError('At most 10 resonators can be read out.')
         self._num_res = num_res
         self._feedline_number = feedline_number
-        if feedline_map == 'S7': 
-          if self._feedline_number == 0:
-              self._resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]
-          elif self._feedline_number == 1:
-              self._resonator_codeword_bit_mapping = [1, 4]
-          else:
-              raise NotImplementedError(
-                'Hardcoded for feedline 0 and 1 of Surface-7')
-        elif feedline_map == 'S17': 
+        if feedline_map == 'S7':
+            if self._feedline_number == 0:
+                self._resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]
+            elif self._feedline_number == 1:
+                self._resonator_codeword_bit_mapping = [1, 4]
+            else:
+                raise NotImplementedError(
+                    'Hardcoded for feedline 0 and 1 of Surface-7')
+        elif feedline_map == 'S17':
 
             if self._feedline_number == 0:
                 self._resonator_codeword_bit_mapping = [13, 16]
             elif self._feedline_number == 1:
-                self._resonator_codeword_bit_mapping = [1, 4, 5, 7, 8, 10, 11, 14, 15]
-            elif self._feedline_number == 2: 
-                self._resonator_codeword_bit_mapping = [0, 2, 3, 6, 9, 12]                
+                self._resonator_codeword_bit_mapping = [
+                    1, 4, 5, 7, 8, 10, 11, 14, 15]
+            elif self._feedline_number == 2:
+                self._resonator_codeword_bit_mapping = [0, 2, 3, 6, 9, 12]
             else:
-                raise NotImplementedError('Hardcoded for feedline 0, 1 and 2 of Surface-17') # FIXME: copy/paste error
+                # FIXME: copy/paste error
+                raise NotImplementedError(
+                    'Hardcoded for feedline 0, 1 and 2 of Surface-17')
 
-        else: 
+        else:
             raise ValueError('Feedline map not in {"S7", "S17"}.')
-          
-        #capping the resonator bit mapping in case a limited number of resonators is used
-        self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[:self._num_res]
+
+        # capping the resonator bit mapping in case a limited number of resonators is used
+        self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[
+            :self._num_res]
         # Initial values on parameters that otherwise depend on each other
-        self._resonator_combinations = [[self._resonator_codeword_bit_mapping[0]]]
+        self._resonator_combinations = [
+            [self._resonator_codeword_bit_mapping[0]]]
         self._pulse_type = 'M_simple'
         super().__init__(name, **kw)
-
 
     def _set_resonator_combinations(self, value):
         self._resonator_combinations = value
@@ -112,7 +118,7 @@ class Base_RO_LutMan(Base_LutMan):
             'e.g. [[0], [2], [0, 2]] specifies that pulses for readout'
             'of resonator 0, 2, and a pulse for mux readout on both should be'
             'uploaded.')
-        self.add_parameter('resonator_combinations', 
+        self.add_parameter('resonator_combinations',
                            vals=vals.Lists(),
                            docstring=comb_msg,
                            set_cmd=self._set_resonator_combinations,
@@ -198,13 +204,14 @@ class Base_RO_LutMan(Base_LutMan):
                 wavename = self._pulse_type
                 for resonator in resonator_combination:
                     wavename += '_R' + str(resonator)
-                    try: 
-                        case += 2**self._resonator_codeword_bit_mapping.index(resonator)
-                    except ValueError: 
+                    try:
+                        case += 2**self._resonator_codeword_bit_mapping.index(
+                            resonator)
+                    except ValueError:
                         # The allowed resonators is determined by the feedline
                         raise ValueError(
                             "{} not in allowed resonators ({}).".format(
-                            resonator, self._resonator_codeword_bit_mapping))
+                                resonator, self._resonator_codeword_bit_mapping))
 
             lm[case] = {'name': wavename, 'resonators': resonator_combination}
 
@@ -224,13 +231,14 @@ class Base_RO_LutMan(Base_LutMan):
                 print("Warning: recommend to set pulse_primitive_shape to " +
                       "'square' when using gaussian_convolution.")
             sigma = self.gaussian_convolution_sigma()
+
             def norm_gauss(x, mu, sigma):
                 n = 1/(sigma*np.sqrt(2*np.pi))
                 return n*np.exp((-((x-mu)/sigma)**2)/2)
 
-            gauss_length = 6*sigma# in units of time
-            hgsl = int(gauss_length*sampling_rate/2)# half no. of samples
-            gauss_sample_length = hgsl*2# no. of samples
+            gauss_length = 6*sigma  # in units of time
+            hgsl = int(gauss_length*sampling_rate/2)  # half no. of samples
+            gauss_sample_length = hgsl*2  # no. of samples
             gauss_samples = np.arange(0, gauss_sample_length, 1)/sampling_rate
             norm_gauss_p = norm_gauss(x=gauss_samples,
                                       mu=gauss_length/2, sigma=sigma)
@@ -242,7 +250,7 @@ class Base_RO_LutMan(Base_LutMan):
         for res in self._resonator_codeword_bit_mapping:
             res_wave_dict = {}
             # 1. Generate Pulse envelopes
-            ## Simple pulse
+            # Simple pulse
             up_len = self.get('M_length_R{}'.format(res))-gauss_length
             M = create_pulse(shape=self.pulse_primitive_shape(),
                              amplitude=self.get('M_amp_R{}'.format(res)),
@@ -252,46 +260,56 @@ class Base_RO_LutMan(Base_LutMan):
                              sampling_rate=sampling_rate)
             res_wave_dict['M_simple_R{}'.format(res)] = M
 
-            ## 3-step RO pulse with ramp-up and double depletion
+            # 3-step RO pulse with ramp-up and double depletion
             up_len = self.get('M_length_R{}'.format(res))-gauss_length/2
             M_up = create_pulse(shape=self.pulse_primitive_shape(),
                                 amplitude=self.get('M_amp_R{}'.format(res)),
-                                length=up_len, 
+                                length=up_len,
                                 delay=0,
                                 phase=self.get('M_phi_R{}'.format(res)),
                                 sampling_rate=sampling_rate)
 
             M_down0 = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get('M_down_amp0_R{}'.format(res)),
-                                   length=self.get('M_down_length0_R{}'.format(res)),  # ns
+                                   amplitude=self.get(
+                                       'M_down_amp0_R{}'.format(res)),
+                                   length=self.get(
+                                       'M_down_length0_R{}'.format(res)),  # ns
                                    delay=0,
-                                   phase=self.get('M_down_phi0_R{}'.format(res)),
+                                   phase=self.get(
+                                       'M_down_phi0_R{}'.format(res)),
                                    sampling_rate=sampling_rate)
 
-            down1_len = self.get('M_down_length1_R{}'.format(res))-gauss_length/2
+            down1_len = self.get(
+                'M_down_length1_R{}'.format(res))-gauss_length/2
             M_down1 = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get('M_down_amp1_R{}'.format(res)),
-                                   length=down1_len, 
+                                   amplitude=self.get(
+                                       'M_down_amp1_R{}'.format(res)),
+                                   length=down1_len,
                                    delay=0,
-                                   phase=self.get('M_down_phi1_R{}'.format(res)),
+                                   phase=self.get(
+                                       'M_down_phi1_R{}'.format(res)),
                                    sampling_rate=sampling_rate)
 
             M_up_down_down = (np.concatenate((M_up[0], M_down0[0], M_down1[0])),
                               np.concatenate((M_up[1], M_down0[1], M_down1[1])))
             res_wave_dict['M_up_down_down_R{}'.format(res)] = M_up_down_down
 
-            ## pulse with up, down, down depletion with an additional final
-            ## strong measurement at some delay
+            # pulse with up, down, down depletion with an additional final
+            # strong measurement at some delay
             M_final = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get('M_final_amp_R{}'.format(res)),
-                                   length=self.get('M_final_length_R{}'.format(res)),  # ns
-                                   delay=self.get('M_final_delay_R{}'.format(res)),
+                                   amplitude=self.get(
+                                       'M_final_amp_R{}'.format(res)),
+                                   length=self.get(
+                                       'M_final_length_R{}'.format(res)),  # ns
+                                   delay=self.get(
+                                       'M_final_delay_R{}'.format(res)),
                                    phase=self.get('M_phi_R{}'.format(res)),
                                    sampling_rate=sampling_rate)
 
             M_up_down_down_final = (np.concatenate((M_up_down_down[0], M_final[0])),
                                     np.concatenate((M_up_down_down[1], M_final[1])))
-            res_wave_dict['M_up_down_down_final_R{}'.format(res)] = M_up_down_down_final
+            res_wave_dict['M_up_down_down_final_R{}'.format(
+                res)] = M_up_down_down_final
 
             # 2. convolve with gaussian (if desired)
             if self.gaussian_convolution():
@@ -300,13 +318,15 @@ class Base_RO_LutMan(Base_LutMan):
                     M_conv1 = np.convolve(val[1], norm_gauss_p)
                     #M_conv0 = M_conv0[hgsl: -hgsl+1]
                     #M_conv1 = M_conv1[hgsl: -hgsl+1]
-                    res_wave_dict[key] = (M_conv0/sampling_rate, M_conv1/sampling_rate)
+                    res_wave_dict[key] = (
+                        M_conv0/sampling_rate, M_conv1/sampling_rate)
 
             # 3. modulation with base frequency
             for key, val in res_wave_dict.items():
                 res_wave_dict[key] = wf.mod_pulse(pulse_I=val[0], pulse_Q=val[1],
-                                        f_modulation=self.get('M_modulation_R{}'.format(res)),
-                                        sampling_rate=self.get('sampling_rate'))
+                                                  f_modulation=self.get(
+                                                      'M_modulation_R{}'.format(res)),
+                                                  sampling_rate=self.get('sampling_rate'))
 
             # 4. apply mixer predistortion
             if self.mixer_apply_predistortion_matrix():
@@ -319,7 +339,8 @@ class Base_RO_LutMan(Base_LutMan):
             self._wave_dict.update(**res_wave_dict)
 
         return self._wave_dict
-        
+
+
 class UHFQC_RO_LutMan(Base_RO_LutMan):
 
     def __init__(self, name, num_res: int=1, **kw):
@@ -341,7 +362,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             ' After the first program is uploaded, the value is set.',
             parameter_class=ManualParameter, initial_value=None,
             vals=vals.Ints())
-        
+
         # Set to a default because box is not expected to change
         self._voltage_min = -1.0
         self._voltage_max = 1.0-1.0/2**13
@@ -360,11 +381,13 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         '''
         wf_idx = get_wf_idx_from_name(pulse_name, self.LutMap())
         if not wf_idx:
-            raise KeyError('Waveform named "{}" does not exist in the LutMap! Make sure that "pulse_type" "resonator_combinations" is set correctly.')
+            raise KeyError(
+                'Waveform named "{}" does not exist in the LutMap! Make sure that "pulse_type" "resonator_combinations" is set correctly.')
 
         self._mode = 'single_pulse'
         self._single_pulse_name = pulse_name
-        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=regenerate_waveforms)
+        self.load_waveforms_onto_AWG_lookuptable(
+            regenerate_waveforms=regenerate_waveforms)
 
     def load_DIO_triggered_sequence_onto_UHFQC(self,
                                                regenerate_waveforms=True,
@@ -374,7 +397,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         '''
         self._mode = 'DIO_triggered'
         self.timeout(timeout)
-        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=regenerate_waveforms)
+        self.load_waveforms_onto_AWG_lookuptable(
+            regenerate_waveforms=regenerate_waveforms)
 
     def set_mixer_offsets(self):
         UHFQC = self.AWG.get_instr()
@@ -398,7 +422,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         expected_hash = self.get('_awgs_ro_sequencer_program_expected_hash')
 
         return hash != expected_hash
-    
+
     def _update_expected_program_hash(self):
         """
         Updates the expected AWG sequencer program hash with the current
@@ -409,7 +433,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self.set('_awgs_ro_sequencer_program_expected_hash', hash)
 
     def load_waveform_onto_AWG_lookuptable(
-        self, wave_id: str, regenerate_waveforms: bool=False):
+            self, wave_id: str, regenerate_waveforms: bool=False):
         """
         Load a waveform into the AWG.
 
@@ -451,15 +475,17 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                 self.AWG.get_instr().set('wave_ch1_cw000', I_wave)
                 self.AWG.get_instr().set('wave_ch2_cw000', Q_wave)
         else:
-            self.AWG.get_instr().set('wave_ch1_cw{:03}'.format(wave_id), I_wave)
-            self.AWG.get_instr().set('wave_ch2_cw{:03}'.format(wave_id), Q_wave)
+            self.AWG.get_instr().set(
+                'wave_ch1_cw{:03}'.format(wave_id), I_wave)
+            self.AWG.get_instr().set(
+                'wave_ch2_cw{:03}'.format(wave_id), Q_wave)
 
     def load_waveforms_onto_AWG_lookuptable(
-            self, 
+            self,
             regenerate_waveforms: bool=True,
             stop_start: bool = True,
-            # FIXME, force load should be False but is here now to hack around the _upload_updated_waveforms 
-            force_load_sequencer_program: bool=True): 
+            # FIXME, force load should be False but is here now to hack around the _upload_updated_waveforms
+            force_load_sequencer_program: bool=True):
         # Uploading the codeword program (again) is needed to if the user
         # has changed the mode of the instrument.
         if self._program_hash_differs() or force_load_sequencer_program:
@@ -468,14 +494,15 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                     acquisition_delay=self.acquisition_delay())
             else:
                 self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
-                    cases=list(self.LutMap().keys()), 
+                    cases=list(self.LutMap().keys()),
                     acquisition_delay=self.acquisition_delay(), timeout=self.timeout())
-    
+
         super().load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=regenerate_waveforms,
             stop_start=stop_start)
-            
+
         self._update_expected_program_hash()
+
 
 def add_waves_different_length(a, b):
     """

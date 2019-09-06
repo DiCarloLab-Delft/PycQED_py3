@@ -19,11 +19,11 @@ log = logging.getLogger(__name__)
 ##########################################################################
 # Module level functions
 ##########################################################################
-    
+
 def gen_waveform_name(ch, cw):
     """
     Returns a standard waveform name based on channel and codeword number.
-    Note the use of 1-based indexing of the channels. To clarify, the 
+    Note the use of 1-based indexing of the channels. To clarify, the
     'ch' argument to this function is 0-based, but the naming of the actual
     waveforms as well as the signal outputs of the instruments are 1-based.
     The function will map 'logical' channel 0 to physical channel 1, and so on.
@@ -35,7 +35,7 @@ def gen_partner_waveform_name(ch, cw):
     """
     Returns a standard waveform name for the partner waveform of a dual-channel
     waveform. The physical channel indexing is 1-based where as the logical channel
-    indexing (i.e. the argument to this function) is 0-based. To clarify, the 
+    indexing (i.e. the argument to this function) is 0-based. To clarify, the
     'ch' argument to this function is 0-based, but the naming of the actual
     waveforms as well as the signal outputs of the instruments are 1-based.
     The function will map 'logical' channel 0 to physical channel 1, and so on.
@@ -58,17 +58,17 @@ def merge_waveforms(chan0=None, chan1=None, marker=None):
     # mask where each bit indicates which channels/marker values to include in
     # the final array. Bit 0 for chan0 data, 1 for chan1 data and 2 for marker data.
     array_format = 0
-    
+
     if chan0 is not None:
         chan0_uint = np.array((np.power(2, 15)-1)*chan0, dtype=np.uint16)
         array_format += 1
     if chan1 is not None:
         chan1_uint = np.array((np.power(2, 15)-1)*chan1, dtype=np.uint16)
-        array_format += 2 
+        array_format += 2
     if marker is not None:
         marker_uint = np.array(marker, dtype=np.uint16)
         array_format += 4
-    
+
     if array_format == 1:
         return chan0_uint
     elif array_format == 2:
@@ -310,7 +310,7 @@ class MockDAQServer():
     def getInt(self, path):
         if path not in self.nodes:
             raise ziRuntimeError("Unknown node '" + path + "' used with mocked server and device!")
-        
+
         if self.verbose: print('getInt', path, int(self.nodes[path]['value']))
 
         return int(self.nodes[path]['value'])
@@ -374,11 +374,11 @@ class MockDAQServer():
 
     def getAsEvent(self, path):
         self.poll_nodes.append(path)
-        
+
 
     def poll(self, poll_time, timeout, flags, flat):
         poll_data = {}
-        
+
         for path in self.poll_nodes:
             if self.verbose: print('poll', path)
             m = re.match(r'/(\w+)/qas/0/result/data/(\d+)/wave', path)
@@ -397,17 +397,17 @@ class MockDAQServer():
                 continue
 
             poll_data[path] = {'value': [0]}
-        
+
         return poll_data
 
     def subscribe(self, path):
         if self.verbose: print('subscribe', path)
-        
+
         self.poll_nodes.append(path)
-        
+
     def unsubscribe(self, path):
         if self.verbose: print('unsubscribe', path)
-        
+
         if path in self.poll_nodes:
             self.poll_nodes.remove(path)
 
@@ -465,6 +465,8 @@ class MockAwgModule():
             if self._index not in self._compilation_count:
                 self._compilation_count[self._index] = 0
         elif path == 'awgModule/compiler/sourcestring':
+            # The compiled program is stored in _sourcestring
+            self._sourcestring = value
             if self._index not in self._compilation_count:
                 raise ziModuleError('Trying to compile AWG program, but no AWG index has been configured!')
 
@@ -473,7 +475,7 @@ class MockAwgModule():
 
             self._compilation_count[self._index] += 1
             self._daq.setInt('/' + self._device + '/' + 'awgs/' + str(self._index) + '/ready', 1)
-            
+
     def get(self, path):
         if path == 'awgModule/device':
             value = [self._device]
@@ -487,7 +489,7 @@ class MockAwgModule():
         for elem in reversed(path.split('/')[1:]):
             rv = {elem: value}
             value = rv
-        
+
         return rv
 
     def execute(self):
@@ -521,14 +523,14 @@ class ZI_base_instrument(Instrument):
     # Constructor
     ##########################################################################
 
-    def __init__(self          , 
-                 name          : str, 
-                 device        : str, 
-                 interface     : str= '1GbE', 
-                 server        : str= 'localhost', 
-                 port          : int= 8004, 
-                 apilevel      : int= 5, 
-                 num_codewords : int= 0, 
+    def __init__(self          ,
+                 name          : str,
+                 device        : str,
+                 interface     : str= '1GbE',
+                 server        : str= 'localhost',
+                 port          : int= 8004,
+                 apilevel      : int= 5,
+                 num_codewords : int= 0,
                  **kw) -> None:
         """
         Input arguments:
@@ -621,7 +623,7 @@ class ZI_base_instrument(Instrument):
                  .format(self.devname, serial, options.replace('\n','|'), fw_revision, fpga_revision))
 
         self.connect_message(begin_time=t0)
-    
+
     ##########################################################################
     # Private methods
     ##########################################################################
@@ -664,7 +666,7 @@ class ZI_base_instrument(Instrument):
         Adds extra useful parameters to the instrument.
         """
         self.add_parameter(
-            'timeout', 
+            'timeout',
             unit='s',
             initial_value=30,
             parameter_class=ManualParameter,
@@ -674,7 +676,7 @@ class ZI_base_instrument(Instrument):
             self.add_parameter(
                 'awgs_{}_sequencer_program_crc32_hash'.format(i),
                 parameter_class=ManualParameter,
-                initial_value=0, 
+                initial_value=0,
                 vals=validators.Ints())
 
     def _add_codeword_waveform_parameters(self, num_codewords) -> None:
@@ -711,7 +713,7 @@ class ZI_base_instrument(Instrument):
                     if wf_name in self.parameters:
                         self.parameters.pop(wf_name)
                         self._awg_waveforms.pop(wf_name)
-        
+
         # Update the number of codewords
         self._num_codewords = num_codewords
 
@@ -798,12 +800,12 @@ class ZI_base_instrument(Instrument):
                 par_kw['get_cmd'] = None  # Not implemented
                 par_kw['set_cmd'] = None  # Not implemented
                 par_kw['vals'] = None # Not implemented
-            
+
             elif par['Type'] == 'ZIAuxInSample':
                 par_kw['get_cmd'] = None  # Not implemented
                 par_kw['set_cmd'] = None  # Not implemented
                 par_kw['vals'] = None # Not implemented
-            
+
             elif par['Type'] == 'ZIScopeWave':
                 par_kw['get_cmd'] = None  # Not implemented
                 par_kw['set_cmd'] = None  # Not implemented
@@ -831,9 +833,9 @@ class ZI_base_instrument(Instrument):
         """
         # Get all interesting nodes
         nodes = json.loads(self.daq.listNodesJSON('/' + self.devname))
-        
+
         modified_nodes = {}
-       
+
         # Do some name mangling
         for name, node in nodes.items():
             name = name.replace('/' + self.devname.upper() + '/', '')
@@ -913,7 +915,7 @@ class ZI_base_instrument(Instrument):
                           "8 samples, appending zeros.")
                 extra_zeros = 8-(len(waveform) % 8)
                 waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
-            
+
             # If the length has changed, we need to recompile the AWG program
             if len(waveform) != len(self._awg_waveforms[wf_name]['waveform']):
                 log.debug("Length of waveform has changed. "
@@ -922,8 +924,8 @@ class ZI_base_instrument(Instrument):
 
             # Update the associated CSV file
             log.debug("Updating csv "
-                "waveform {}, for ch{}, cw{}".format(wf_name, ch, cw))           
-            self._write_csv_waveform(ch=ch, cw=cw, wf_name=wf_name, 
+                "waveform {}, for ch{}, cw{}".format(wf_name, ch, cw))
+            self._write_csv_waveform(ch=ch, cw=cw, wf_name=wf_name,
                 waveform=waveform)
 
             # And the entry in our table and mark it for update
@@ -935,7 +937,7 @@ class ZI_base_instrument(Instrument):
 
     def _write_csv_waveform(self, ch:int, cw: int, wf_name: str, waveform) -> None:
         filename = os.path.join(
-            self._get_awg_directory(), 'waves', 
+            self._get_awg_directory(), 'waves',
             self.devname + '_' + wf_name + '.csv')
         np.savetxt(filename, waveform, delimiter=",")
 
@@ -997,11 +999,11 @@ class ZI_base_instrument(Instrument):
 
         matching_updated=False
         iter_id = 0
-        # We iterate over the waveform table 
+        # We iterate over the waveform table
         while(matching_updated or iter_id == 0):
 
             iter_id += 1
-            if iter_id > 10: 
+            if iter_id > 10:
                 raise StopIteration
             log.info('Length matching iteration {}.'.format(iter_id))
             matching_updated = False
@@ -1044,7 +1046,7 @@ class ZI_base_instrument(Instrument):
 
     def _clear_readonly_waveforms(self, awg_nr):
         """
-        Clear the read-only flag of all configured waveforms. Typically used when switching 
+        Clear the read-only flag of all configured waveforms. Typically used when switching
         configurations (i.e. programs).
         """
         for cw in range(self._num_codewords):
@@ -1069,7 +1071,7 @@ class ZI_base_instrument(Instrument):
 
         # Name of this waveform
         wf_name = gen_waveform_name(ch, cw)
-        
+
         # Check if the waveform data is in our dictionary
         if wf_name not in self._awg_waveforms:
             raise ziConfigurationError('Trying to mark waveform {} as read-only, but the waveform has not been configured yet!'.format(wf_name))
@@ -1085,17 +1087,17 @@ class ZI_base_instrument(Instrument):
         log.info("Using dynamic waveform update for awg_nr {}.".format(awg_nr))
         wf_table = self._get_waveform_table(awg_nr)
 
-        for dio_cw, (wf_name, other_wf_name) in enumerate(wf_table): 
+        for dio_cw, (wf_name, other_wf_name) in enumerate(wf_table):
             if self._awg_waveforms[wf_name]['dirty'] or self._awg_waveforms[other_wf_name]['dirty']:
                 # Combine the waveforms and upload
-                wf_data = merge_waveforms(self._awg_waveforms[wf_name]['waveform'], 
+                wf_data = merge_waveforms(self._awg_waveforms[wf_name]['waveform'],
                                             self._awg_waveforms[other_wf_name]['waveform'])
                 # Write the new waveform
                 self.setv('awgs/{}/waveform/waves/{}'.format(awg_nr, dio_cw), wf_data)
 
 
 
-    
+
     def _codeword_table_preamble(self, awg_nr):
         """
         Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
@@ -1109,14 +1111,14 @@ class ZI_base_instrument(Instrument):
         Configures an AWG with the program stored in the object in the self._awg_program[awg_nr] member.
         """
         log.info('Configuring awg_nr {} with predefined codeword program'.format(awg_nr))
-        if self._awg_program[awg_nr] is not None:        
+        if self._awg_program[awg_nr] is not None:
             full_program = \
                 '// Start of automatically generated codeword table\n' + \
                 self._codeword_table_preamble(awg_nr) + \
                 '// End of automatically generated codeword table\n' + self._awg_program[awg_nr]
 
             self.configure_awg_from_string(awg_nr, full_program)
-        else: 
+        else:
             logging.warning('No program configured for awg_nr {}.'.format(awg_nr))
 
     ##########################################################################
@@ -1164,7 +1166,7 @@ class ZI_base_instrument(Instrument):
 
     def getdeep(self, path, timeout=5.0):
         path = self._get_full_path(path)
-        
+
         self.daq.getAsEvent(path)
         while timeout > 0.0:
             value = self.daq.poll(0.01, 500, 4, True)
@@ -1172,7 +1174,7 @@ class ZI_base_instrument(Instrument):
                 return value[path]
             else:
                 timeout -= 0.01
-  
+
         return None
 
     def subs(self, path) -> None:
@@ -1180,7 +1182,7 @@ class ZI_base_instrument(Instrument):
 
     def unsubs(self, path) -> None:
         self.daq.unsubscribe(self._get_full_path(path))
-        
+
     def poll(self, poll_time=0.1):
         return self.daq.poll(poll_time, 500, 4, True)
 
@@ -1224,7 +1226,7 @@ class ZI_base_instrument(Instrument):
             # Enable it
             self.set('awgs_{}_enable'.format(awg_nr), 1)
 
-    def stop(self): 
+    def stop(self):
         # Stop all AWG's
         for awg_nr in range(self._num_channels()//2):
             self.set('awgs_{}_enable'.format(awg_nr), 0)
@@ -1270,7 +1272,7 @@ class ZI_base_instrument(Instrument):
         t1 = time.time()
         print('Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
 
-    def configure_awg_from_string(self, awg_nr: int, program_string: str, 
+    def configure_awg_from_string(self, awg_nr: int, program_string: str,
             timeout: float=15):
         """
         Uploads a program string to one of the AWGs in a UHF-QA or AWG-8.
@@ -1300,7 +1302,7 @@ class ZI_base_instrument(Instrument):
             while len(self._awgModule.get('awgModule/compiler/sourcestring')
                       ['compiler']['sourcestring'][0]) > 0:
                 time.sleep(0.01)
-                
+
                 if (time.time()-t0 >= timeout):
                     success = False
                     # print('Timeout encountered during compilation.')
@@ -1349,7 +1351,7 @@ class ZI_base_instrument(Instrument):
         raise NotImplementedError('Virtual method with no implementation!')
 
     def plot_awg_codewords(self, awg_nr=0, range=None):
-        raise NotImplementedError('Virtual method with no implementation!')        
+        raise NotImplementedError('Virtual method with no implementation!')
 
     def get_idn(self) -> dict:
         idn_dict = {}
@@ -1358,7 +1360,7 @@ class ZI_base_instrument(Instrument):
         idn_dict['serial']        = self.devname
         idn_dict['firmware']      = self.geti('system/fwrevision')
         idn_dict['fpga_firmware'] = self.geti('system/fpgarevision')
-        
+
         return idn_dict
 
     def load_default_settings(self):
