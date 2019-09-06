@@ -7,17 +7,17 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 
 
 default_mw_lutmap = {
-    0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"}, 
-    1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0 , "type" : "ge"}, 
-    2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90, "type" : "ge"}, 
-    3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0 , "type" : "ge"}, 
-    4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90, "type" : "ge"}, 
-    5  : {"name" : "rXm90" , "theta" : -90      , "phi" : 0 , "type" : "ge"}, 
-    6  : {"name" : "rYm90" , "theta" : -90      , "phi" : 90, "type" : "ge"}, 
-    7  : {"name" : "rPhi90", "theta" : 90       , "phi" : 0 , "type" : "ge"}, 
-    8  : {"name" : "spec"  , "type"  : "spec"}  , 
-    9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0 , "type" : "ef"}, 
-    10 : {"name" : "square", "type"  : "square"}, 
+    0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
+    1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0 , "type" : "ge"},
+    2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90, "type" : "ge"},
+    3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0 , "type" : "ge"},
+    4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90, "type" : "ge"},
+    5  : {"name" : "rXm90" , "theta" : -90      , "phi" : 0 , "type" : "ge"},
+    6  : {"name" : "rYm90" , "theta" : -90      , "phi" : 90, "type" : "ge"},
+    7  : {"name" : "rPhi90", "theta" : 90       , "phi" : 0 , "type" : "ge"},
+    8  : {"name" : "spec"  , "type"  : "spec"}  ,
+    9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0 , "type" : "ef"},
+    10 : {"name" : "square", "type"  : "square"},
 
 }
 
@@ -444,10 +444,10 @@ class QWG_MW_LutMan(Base_MW_LutMan):
 
         self.AWG.get_instr().set(
             'ch_pair{}_transform_matrix'.format(self.channel_I()), M)
-        # in the QWG the predistortion matrix is implemented in hardware 
-        # and does not modify the actual wave dict. 
-        # the wave dict is still returned unmodified to preserve the 
-        # call signature as required for HDAWG compatibility. 
+        # in the QWG the predistortion matrix is implemented in hardware
+        # and does not modify the actual wave dict.
+        # the wave dict is still returned unmodified to preserve the
+        # call signature as required for HDAWG compatibility.
 
         return wave_dict
 
@@ -468,15 +468,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                        'parameter to allow rabi-type experiments without'
                        'wave reloading. Should not be using VSM'))
 
-        self.add_parameter(
-            '_awgs_mw_sequencer_program_expected_hash',
-            docstring='crc32 hash of the awg8 sequencer program. '
-            'This parameter is used to dynamically determine '
-            'if the program needs to be uploaded. The initial_value is'
-            ' None, indicating that the program needs to be uploaded.'
-            ' After the first program is uploaded, the value is set.',
-            parameter_class=ManualParameter, initial_value=None,
-            vals=vals.Ints())
 
     def _add_waveform_parameters(self):
         super()._add_waveform_parameters()
@@ -542,78 +533,18 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         """
         # Uploading the codeword program (again) is needed to link the new
         # waveforms in case the user has changed the codeword mode.
-        if self._program_hash_differs() or force_load_sequencer_program:
+        if force_load_sequencer_program:
             # This ensures only the channels that are relevant get reconfigured
             if 'channel_GI' in self.parameters:
                 awgs = [self.channel_GI()//2, self.channel_DI()//2]
             else:
                 awgs = [self.channel_I()//2]
 
-            # FIXME: Add if statement based on the hash here
             self.AWG.get_instr().upload_codeword_program(awgs=awgs)
-            
+
         super().load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=regenerate_waveforms,
             stop_start=stop_start)
-                
-        # Hash only updated after AWG is started!
-        self._update_expected_program_hash()
-
-    def _program_hash_differs(self)-> bool:
-        """
-        Args:
-            --
-        Returns:
-            hash_different (bool): returns True if one of the hashes does not
-                correspond to the expected hash.
-
-        Compares current AWG sequencer program hash for the relevant channels
-        with the expected program hash and, returns True if one ore more
-        hashes do not match, indicating that uploading the programs is
-        required.
-        """
-        hash_differs = False
-        if 'channel_GI' in self.parameters:
-            for ch in ['G', 'D']:
-                awg_nr = self.get('channel_{}I'.format(ch))//2
-                hash = self.AWG.get_instr().get(
-                    'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
-                expected_hash = self.get(
-                    '_awgs_mw{}_sequencer_program_expected_hash'.format(ch))
-                if hash != expected_hash:
-                    hash_differs = True
-
-        else:
-            awg_nr = self.channel_I()//2
-            hash = self.AWG.get_instr().get(
-                'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
-            expected_hash = self.get(
-                '_awgs_mw_sequencer_program_expected_hash')
-            if hash != expected_hash:
-                hash_differs = True
-        return hash_differs
-
-    def _update_expected_program_hash(self):
-        """
-        Updates the expected AWG sequencer program hash with the current
-        hash of the sequencer program. This is intended to be called after
-        setting the hash.
-        """
-        if 'channel_GI' in self.parameters:
-            for ch in ['G', 'D']:
-                awg_nr = self.get('channel_{}I'.format(ch))//2
-                hash = self.AWG.get_instr().get(
-                    'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
-                self.set(
-                    '_awgs_mw{}_sequencer_program_expected_hash'.format(ch),
-                    hash)
-        else:
-            awg_nr = self.channel_I()//2
-            hash = self.AWG.get_instr().get(
-                'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
-            self.set(
-                '_awgs_mw_sequencer_program_expected_hash',
-                hash)
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
@@ -647,17 +578,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             self.add_parameter(
                 'channel_{}'.format(ch), parameter_class=ManualParameter,
                 vals=vals.Numbers(1, self._num_channels))
-
-        for ch in ['G', 'D']:
-            self.add_parameter(
-                '_awgs_mw{}_sequencer_program_expected_hash'.format(ch),
-                docstring='crc32 hash of the awg8 sequencer program. '
-                'This parameter is used to dynamically determine '
-                'if the program needs to be uploaded. The initial_value is'
-                ' None, indicating that the program needs to be uploaded.'
-                ' After the first program is uploaded, the value is set.',
-                parameter_class=ManualParameter, initial_value=None,
-                vals=vals.Ints())
 
     def load_waveform_onto_AWG_lookuptable(
         self, wave_id: str, regenerate_waveforms: bool=False):

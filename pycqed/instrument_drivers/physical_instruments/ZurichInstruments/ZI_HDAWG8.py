@@ -96,11 +96,11 @@ class ziDIOCalibrationError(Exception):
 
 class ZI_HDAWG8(zicore.ZI_HDAWG_core):
 
-    def __init__(self, 
+    def __init__(self,
                  name: str,
                  device: str,
                  interface: str = '1GbE',
-                 server: str = 'localhost', 
+                 server: str = 'localhost',
                  port = 8004,
                  num_codewords: int = 32, **kw) -> None:
         """
@@ -120,21 +120,20 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
          # show some info
         log.info('{}: DIO interface found in mode {}'
                  .format(self.devname, 'CMOS' if self.get('dios_0_interface') == 0 else 'LVDS')) # NB: mode is persistent across device restarts
-        # Ensure snapshot is fairly small for HDAWGs 
+        # Ensure snapshot is fairly small for HDAWGs
         self._snapshot_whitelist = {
-            'IDN', 
-            'clockbase', 
-            'system_clocks_referenceclock_source', 
-            'system_clocks_referenceclock_status', 
+            'IDN',
+            'clockbase',
+            'system_clocks_referenceclock_source',
+            'system_clocks_referenceclock_status',
             'system_clocks_referenceclock_freq'}
-        for i in range(4): 
+        for i in range(4):
             self._snapshot_whitelist.update({
-                'awgs_{}_enable'.format(i), 
-                'awgs_{}_outputs_0_amplitude'.format(i), 
-                'awgs_{}_outputs_1_amplitude'.format(i), 
-                'awgs_{}_sequencer_program_crc32_hash'.format(i)})
+                'awgs_{}_enable'.format(i),
+                'awgs_{}_outputs_0_amplitude'.format(i),
+                'awgs_{}_outputs_1_amplitude'.format(i)})
 
-        for i in range(8): 
+        for i in range(8):
             self._snapshot_whitelist.update({
                 'sigouts_{}_direct'.format(i), 'sigouts_{}_offset'.format(i),
                 'sigouts_{}_on'.format(i) , 'sigouts_{}_range'.format(i)})
@@ -178,7 +177,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
                 initial_value=0, vals=vals.Ints())
 
     def snapshot_base(self, update: bool=False,
-                      params_to_skip_update =None, 
+                      params_to_skip_update =None,
                       params_to_exclude = None ):
         """
         State of the instrument as a JSON-compatible dict.
@@ -194,7 +193,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         """
 
 
-        if params_to_exclude is None: 
+        if params_to_exclude is None:
             params_to_exclude = self._params_to_exclude
 
         snap = {
@@ -208,7 +207,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         snap['parameters'] = {}
         for name, param in self.parameters.items():
             if params_to_exclude and name in params_to_exclude:
-                pass 
+                pass
             elif params_to_skip_update and name in params_to_skip_update:
                 update_par = False
             else:
@@ -248,7 +247,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         awgs = np.array(awgs)
         if awgs.shape == ():
             awgs = np.array([awgs])
-    
+
         for awg_nr in awgs:
             self._awg_program[awg_nr] = '''
 while (1) {
@@ -263,43 +262,43 @@ while (1) {
     # 'private' functions: application specific/codeword support
     ##########################################################################
 
-    def reset_waveforms_zeros(self): 
+    def reset_waveforms_zeros(self):
         """
-        Sets all waveforms to an array of 48 zeros. 
+        Sets all waveforms to an array of 48 zeros.
         """
-        for awg_nr in range(4): 
+        for awg_nr in range(4):
             wf_table = self._get_waveform_table(awg_nr)
-            for wf_l, wf_r in wf_table: 
+            for wf_l, wf_r in wf_table:
                 self.set(wf_l, np.zeros(48))
                 self.set(wf_r, np.zeros(48))
 
 
-    def _get_waveform_table(self, awg_nr: int) -> list: 
+    def _get_waveform_table(self, awg_nr: int) -> list:
         """
-        Returns the waveform table. 
+        Returns the waveform table.
 
         The waveform table determines the mapping of waveforms to DIO codewords.
-        The index of the table corresponds to the DIO codeword. 
-        The entry is a tuple of waveform names. 
+        The index of the table corresponds to the DIO codeword.
+        The entry is a tuple of waveform names.
 
-        Example: 
+        Example:
             ["wave_ch7_cw000", "wave_ch8_cw000",
-            "wave_ch7_cw001", "wave_ch8_cw001", 
+            "wave_ch7_cw001", "wave_ch8_cw001",
             "wave_ch7_cw002", "wave_ch8_cw002"]
 
-        The waveform table generated depends on the awg_nr and the codeword 
-        protocol. 
+        The waveform table generated depends on the awg_nr and the codeword
+        protocol.
         """
-        ch = awg_nr*2 
-        wf_table = [] 
-        if 'flux' in self.cfg_codeword_protocol(): 
-            for cw_r in range(8):  
+        ch = awg_nr*2
+        wf_table = []
+        if 'flux' in self.cfg_codeword_protocol():
+            for cw_r in range(8):
                 for cw_l in range(8):
-                    wf_table.append((zibase.gen_waveform_name(ch, cw_l),  
+                    wf_table.append((zibase.gen_waveform_name(ch, cw_l),
                                      zibase.gen_waveform_name(ch+1, cw_r)))
         else:
-            for dio_cw in range(self._num_codewords): 
-                wf_table.append((zibase.gen_waveform_name(ch, dio_cw),  
+            for dio_cw in range(self._num_codewords):
+                wf_table.append((zibase.gen_waveform_name(ch, dio_cw),
                                  zibase.gen_waveform_name(ch+1, dio_cw)))
         return wf_table
 
@@ -317,9 +316,9 @@ while (1) {
         for dio_cw, (wf_l, wf_r) in enumerate(wf_table):
             csvname_l = self.devname + '_' + wf_l
             csvname_r = self.devname + '_' + wf_r
-            
+
             program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
-                dio_cw, csvname_l, csvname_r) 
+                dio_cw, csvname_l, csvname_r)
 
         return program
 
@@ -396,7 +395,7 @@ while (1) {
                 if awg_nr in [0, 1]:
                     self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
                 elif awg_nr in [2, 3]:
-         
+
                     self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
 
             # NEW
@@ -414,8 +413,8 @@ while (1) {
 
             # NEW
             # Proper use of flux AWG to allow independent trigerring of flux
-            # bits[0:2] for awg0_ch0, bits[3:5] for awg0_ch1, 
-            # bits[6:8] for awg0_ch2, bits[9:11] for awg0_ch3, 
+            # bits[0:2] for awg0_ch0, bits[3:5] for awg0_ch1,
+            # bits[6:8] for awg0_ch2, bits[9:11] for awg0_ch3,
             # bits[16:18] for awg0_ch4, bits[19:21] for awg0_ch5,
             # bits[22:24] for awg0_ch6, bits[25:27] for awg0_ch7
             elif self.cfg_codeword_protocol() == 'flux':
@@ -436,15 +435,13 @@ while (1) {
         # Turn on device
         ####################################################
         time.sleep(.05)
-        self.daq.setInt('/' + self.devname +
-                             '/awgs/*/enable', 1)
-        # self._dev.daq.setInt('/' + self._dev.device +
-        #                      '/awgs/*/enable', 1)
+        self.daq.setInt('/' + self.devname + '/awgs/*/enable', 1)
 
         # Disable all function generators
-        for param in [key for key in self.parameters.keys() if re.match(r'sines_\d+_enables_\d+', key)]:
+        for param in [key for key in self.parameters.keys() if
+                      re.match(r'sines_\d+_enables_\d+', key)]:
             self.set(param, 0)
-        
+
         # Set amp or direct mode
         if self.cfg_codeword_protocol() == 'flux':
             # when doing flux pulses, set everything to amp mode
@@ -506,7 +503,7 @@ while (1) {
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
-        
+
         if mask_value is None:
             mask_value = self.geti('awgs/{}/dio/mask/value'.format(awg_nr))
 
@@ -586,12 +583,12 @@ while (1) {
         return set(valid_delays)
 
 
-    def _prepare_QCC_dio_calibration(self, QCC, verbose=False): 
+    def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
         """
-        Prepares the appropriate program to calibrate DIO and returns 
-        expected sequence. 
+        Prepares the appropriate program to calibrate DIO and returns
+        expected sequence.
 
-        N.B. only works for microwave on DIO4 and for Flux on DIO3 
+        N.B. only works for microwave on DIO4 and for Flux on DIO3
             (TODO add support for microwave on DIO5)
         """
         log.info('Calibrating DIO delays')
@@ -629,11 +626,11 @@ while (1) {
         elif self.cfg_codeword_protocol() == 'microwave':
             raise zibase.ziConfigurationError('old_microwave DIO scheme not supported on QCC.')
 
-        elif self.cfg_codeword_protocol() == 'new_microwave': 
-            raise NotImplementedError() 
+        elif self.cfg_codeword_protocol() == 'new_microwave':
+            raise NotImplementedError()
 
 
-        elif self.cfg_codeword_protocol() == 'new_novsm_microwave': 
+        elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
             raise NotImplementedError()
             # test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
             #     '..','examples','QCC_example',
@@ -654,12 +651,12 @@ while (1) {
         QCC.start()
         return expected_sequence
 
-    def _prepare_CCL_dio_calibration(self, CCL, verbose=False): 
+    def _prepare_CCL_dio_calibration(self, CCL, verbose=False):
         """
-        Prepares the appropriate program to calibrate DIO and returns 
-        expected sequence. 
+        Prepares the appropriate program to calibrate DIO and returns
+        expected sequence.
 
-        N.B. only works for microwave on DIO4 and for Flux on DIO3 
+        N.B. only works for microwave on DIO4 and for Flux on DIO3
             (TODO add support for microwave on DIO5)
         """
         log.info('Calibrating DIO delays')
@@ -714,21 +711,21 @@ while (1) {
 
     def calibrate_CC_dio_protocol(self, CC, verbose=False, repetitions=1):
         """
-        Calibrates the DIO communication between CC and HDAWG. 
+        Calibrates the DIO communication between CC and HDAWG.
 
         Arguments:
-            CC (instr) : an instance of a CCL or QCC 
-            verbose (bool): if True prints to stdout 
+            CC (instr) : an instance of a CCL or QCC
+            verbose (bool): if True prints to stdout
         """
 
-        CC_model = CC.IDN()['Model'] 
-        if 'QCC' in CC_model: 
+        CC_model = CC.IDN()['Model']
+        if 'QCC' in CC_model:
             expected_sequence = self._prepare_QCC_dio_calibration(
-                QCC=CC, verbose=verbose) 
-        elif 'CCL' in CC_model: 
+                QCC=CC, verbose=verbose)
+        elif 'CCL' in CC_model:
             expected_sequence = self._prepare_CCL_dio_calibration(
                 CCL=CC, verbose=verbose)
-        else: 
+        else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
 
@@ -753,5 +750,5 @@ while (1) {
 
         # And configure the delays
         self.setd('raw/dios/0/delays/*', min_valid_delay)
-        # If succesful return True    
+        # If succesful return True
         return True
