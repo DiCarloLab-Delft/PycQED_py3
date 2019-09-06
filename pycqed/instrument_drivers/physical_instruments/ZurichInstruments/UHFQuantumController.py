@@ -810,6 +810,8 @@ setUserReg(4, err_cnt);"""
             else:
                 # Optionally skip the error completely
                 if code in self._errors_to_ignore:
+                    log.warning('{}: {} ({}/{})'.format(
+                        self.devname, message, code, severity))
                     continue
 
                 # Check if there are new errors

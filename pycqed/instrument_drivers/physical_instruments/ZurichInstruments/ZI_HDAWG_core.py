@@ -244,6 +244,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
             else:
                 # Optionally skip the error completely
                 if code in self._errors_to_ignore:
+                    log.warning('{}: {} ({}/{})'.format(self.devname, message, code, severity))
                     continue
 
                 # Check if there are new errors
@@ -264,9 +265,6 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
 
     def clear_errors(self):
         self.seti('raw/error/clear', 1)
-
-    def demote_error(self, code):
-        self._errors_to_ignore.append(code)
 
     def get_idn(self) -> dict:
         idn_dict = super().get_idn()

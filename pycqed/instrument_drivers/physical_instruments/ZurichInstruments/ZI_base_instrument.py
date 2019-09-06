@@ -1256,8 +1256,19 @@ class ZI_base_instrument(Instrument):
     def clear_errors(self) -> None:
         raise NotImplementedError('Virtual method with no implementation!')
 
-    def demote_error(self, code):
-        raise NotImplementedError('Virtual method with no implementation!')
+
+    def demote_error(self, code:str):
+        """
+        Demote a ZIRuntime error to a warning. 
+
+        Arguments 
+            code (str) 
+            The error code of the exception to ignore. 
+            The error code gets logged as an error before the exception 
+            is raised. The code is a string like "DIOCWCASE". 
+        """
+        self._errors_to_ignore.append(code)
+
 
     def initialize_all_waveforms_to_zeros(self):  # FIXME: typo, but used in some Notebooks
         """
