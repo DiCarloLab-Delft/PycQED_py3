@@ -1342,3 +1342,94 @@ setTrigger(0);
 
         # Make sure the configuration is up-to-date
         self.assure_ext_clock()
+
+    ##########################################################################
+    # 'public' functions: print overview helpers
+    ##########################################################################
+
+    def print_correlation_overview(self):
+        msg = '\tCorrelations overview \n'
+        for i in range(10):
+            enabled = self.get('qas_0_correlations_{}_enable'.format(i))
+            source = self.get('qas_0_correlations_{}_source'.format(i))
+            msg += "Correlations {}, enabled: {} \tsource: {}\n".format(
+                i, enabled, source)
+        msg += '\n\tThresholded correlations overview \n'
+        for i in range(10):
+            enabled = self.get(
+                'qas_0_thresholds_{}_correlation_enable'.format(i))
+            source = self.get(
+                'qas_0_thresholds_{}_correlation_source'.format(i))
+            msg += "Thresholds correlation {}, enabled: {} \tsource: {}\n".format(
+                i, enabled, source)
+        print(msg)
+
+    def print_deskew_overview(self):
+        msg = '\tDeskew overview \n'
+
+        deskew_mat = np.zeros((2, 2))
+        for i in range(2):
+            for j in range(2):
+                deskew_mat[i, j] = self.get(
+                    'qas_0_deskew_rows_{}_cols_{}'.format(i, j))
+        msg += 'Deskew matrix: \n'
+        msg += str(deskew_mat)
+        print(msg)
+
+    def print_crosstalk_overview(self):
+        msg = '\tCrosstalk overview \n'
+        msg += 'Bypass crosstalk: {} \n'.format(self.qas_0_crosstalk_bypass())
+
+        crosstalk_mat = np.zeros((10, 10))
+        for i in range(10):
+            for j in range(10):
+                crosstalk_mat[i, j] = self.get(
+                    'qas_0_crosstalk_rows_{}_cols_{}'.format(i, j))
+        msg += 'Crosstalk matrix: \n'
+        print(msg)
+        print(crosstalk_mat)
+
+    def print_integration_overview(self):
+        msg = '\tIntegration overview \n'
+        msg += 'Integration mode: {} \n'.format(
+            self.qas_0_integration_mode())
+        for i in range(10):
+            msg += 'Integration source {}: {}\n'.format(
+                i, self.get('qas_0_integration_sources_{}'.format(i)))
+        print(msg)
+
+    def print_rotations_overview(self):
+        msg = '\tRotations overview \n'
+        for i in range(10):
+            msg += 'Rotations {}: {}\n'.format(
+                i, self.get('qas_0_rotations_{}'.format(i)))
+        print(msg)
+
+    def print_thresholds_overview(self):
+        msg = '\t Thresholds overview \n'
+        for i in range(10):
+            msg += 'Threshold {}: {}\n'.format(
+                i, self.get('qas_0_thresholds_{}_level'.format(i)))
+        print(msg)
+
+    def print_user_regs_overview(self):
+        msg = '\t User registers overview \n'
+        for i in range(16):
+            msg += 'User reg {}: \t{}\n'.format(i,
+                                                self.get('awgs_0_userregs_{}'.format(i)))
+        print(msg)
+
+    def print_overview(self):
+        """
+        Print a readable overview of relevant parameters of the UHFQC.
+
+        N.B. This overview is not complete, but combines different
+        print helpers
+        """
+        self.print_correlation_overview()
+        self.print_crosstalk_overview()
+        self.print_deskew_overview()
+        self.print_integration_overview()
+        self.print_rotations_overview()
+        self.print_thresholds_overview()
+        self.print_user_regs_overview()

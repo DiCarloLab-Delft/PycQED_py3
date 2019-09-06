@@ -46,7 +46,7 @@ class Test_UHFQC(unittest.TestCase):
 
     def test_waveform_table_generation(self):
         self.uhf.awg_sequence_acquisition_and_DIO_triggered_pulse(
-            cases=[0, 2,14])
+            cases=[0, 2, 14])
         assert self.uhf.cases() == [0, 2, 14]
         wf_table = self.uhf._get_waveform_table(0)
         assert wf_table == [('wave_ch1_cw000', 'wave_ch2_cw000'),
@@ -84,3 +84,27 @@ class Test_UHFQC(unittest.TestCase):
 
         # Now the compilation must have been executed again
         self.assertEqual(Test_UHFQC.uhf._awgModule.get_compilation_count(0), 2)
+
+    def test_print_correlation_overview(self):
+        self.uhf.print_correlation_overview()
+
+    def test_print_deskew_overview(self):
+        self.uhf.print_deskew_overview()
+
+    def test_print_crosstalk_overview(self):
+        self.uhf.print_crosstalk_overview()
+
+    def test_print_integration_overview(self):
+        self.uhf.print_integration_overview()
+
+    def test_print_rotations_overview(self):
+        self.uhf.print_rotations_overview()
+
+    def test_print_thresholds_overview(self):
+        self.uhf.print_thresholds_overview()
+
+    def test_print_user_regs_overview(self):
+        self.uhf.print_user_regs_overview()
+
+    def test_print_overview(self):
+        self.uhf.print_overview()
