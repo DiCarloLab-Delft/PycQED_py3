@@ -351,10 +351,10 @@ class DeviceCCL(Instrument):
     def prepare_fluxing(self, qubits):
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)
-            try: 
+            try:
                 fl_lutman = qb.instr_LutMan_Flux.get_instr()
                 fl_lutman.load_waveforms_onto_AWG_lookuptable()
-            except Exception as e: 
+            except Exception as e:
                 warnings.warn("Could not load flux pulses for {}".format(qb))
                 warnings.warn("Exception {}".format(e))
 
@@ -1206,27 +1206,27 @@ class DeviceCCL(Instrument):
                                shots_per_meas: int=2**16,
                                MC=None):
         """
-        Perform a simultaneous ssro experiment on 2 qubits. 
+        Perform a simultaneous ssro experiment on 2 qubits.
 
-        Args: 
-            qubits (list of str) 
-                list of qubit names 
+        Args:
+            qubits (list of str)
+                list of qubit names
             nr_shots_per_case (int):
                 total number of measurements for each case under consideration
-                    e.g., n*|00> , n*|01>, n*|10> , n*|11> 
+                    e.g., n*|00> , n*|01>, n*|10> , n*|11>
 
             shots_per_meas (int):
                 number of single shot measurements per single
                 acquisition with UHFQC
 
 
-        FIXME: should be abstracted to measure multi qubit SSRO 
+        FIXME: should be abstracted to measure multi qubit SSRO
         """
 
 
         # off and on, not including post selection init measurements yet
-        nr_cases = 4 #  00, 01 ,10 and 11 
-        nr_shots=nr_shots_per_case*nr_cases 
+        nr_cases = 4 #  00, 01 ,10 and 11
+        nr_shots=nr_shots_per_case*nr_cases
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits)
@@ -1690,7 +1690,7 @@ class DeviceCCL(Instrument):
 
 
 
-    def measure_cryoscope_vs_amp(self, q0: str, amps,  
+    def measure_cryoscope_vs_amp(self, q0: str, amps,
                                  duration: float=100e-9,
                                  amp_parameter: str='channel',
                                  MC=None,
@@ -1708,13 +1708,13 @@ class DeviceCCL(Instrument):
             amps   (array):
                 array of square pulse amplitudes
 
-            amps_paramater (str): 
+            amps_paramater (str):
                 The parameter through which the amplitude is changed either
                     {"channel",  "dac"}
-                    channel : uses the AWG channel amplitude parameter 
-                    to rescale all waveforms 
-                    dac : uploads a new waveform with a different amlitude 
-                    for each data point. 
+                    channel : uses the AWG channel amplitude parameter
+                    to rescale all waveforms
+                    dac : uploads a new waveform with a different amlitude
+                    for each data point.
 
             label (str):
                 used to label the experiment
@@ -2664,7 +2664,9 @@ class DeviceCCL(Instrument):
             for i in range(10):
                 UHFQC.set('qas_0_trans_offset_weightfunction_{}'.format(i), 0)
 
-            UHFQC.upload_transformation_matrix(np.eye(10))
+            # This resets the crosstalk correction matrix
+            UHFQC.upload_crosstalk_matrix(np.eye(10))
+
             q0.calibrate_optimal_weights(
                 analyze=True, verify=verify_optimal_weights)
             q1.calibrate_optimal_weights(
@@ -2672,21 +2674,22 @@ class DeviceCCL(Instrument):
 
         self.measure_two_qubit_ssro([q1.name, q0.name],
                                     result_logging_mode='lin_trans')
-        if update_cross_talk_matrix:
-            res_dict = mra.two_qubit_ssro_fidelity(
-                label='{}_{}'.format(q0.name, q1.name),
-                qubit_labels=[q0.name, q1.name])
-            V_offset_cor = res_dict['V_offset_cor']
 
-            # weights 0 and 1 are the correct indices because I set the numbering
-            # at the start of this calibration script.
-            UHFQC.qas_trans_offset_weightfunction_0(V_offset_cor[0])
-            UHFQC.qas_trans_offset_weightfunction_1(V_offset_cor[1])
+        res_dict = mra.two_qubit_ssro_fidelity(
+            label='{}_{}'.format(q0.name, q1.name),
+            qubit_labels=[q0.name, q1.name])
+        V_offset_cor = res_dict['V_offset_cor']
 
-            # Does not work because axes are not normalized
-            matrix_normalized = res_dict['mu_matrix_inv']
-            matrix_rescaled = matrix_normalized/abs(matrix_normalized).max()
-            UHFQC.upload_transformation_matrix(matrix_rescaled)
+        # N.B. no crosstalk parameters are assigned
+        # # weights 0 and 1 are the correct indices because I set the numbering
+        # # at the start of this calibration script.
+        # UHFQC.qas_trans_offset_weightfunction_0(V_offset_cor[0])
+        # UHFQC.qas_trans_offset_weightfunction_1(V_offset_cor[1])
+
+        # # Does not work because axes are not normalized
+        # matrix_normalized = res_dict['mu_matrix_inv']
+        # matrix_rescaled = matrix_normalized/abs(matrix_normalized).max()
+        # UHFQC.upload_transformation_matrix(matrix_rescaled)
 
         # a = self.check_mux_RO(update=update, update_threshold=update_threshold)
         return True

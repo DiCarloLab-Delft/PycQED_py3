@@ -622,8 +622,10 @@ class ZI_base_instrument(Instrument):
 
         # Decide which server to use based on name
         if server == 'emulator':
+            log.info('Connecting to mock DAQ server')
             self.daq = MockDAQServer(server, port, apilevel)
         else:
+            log.info('Connecting to DAQ server')
             self.daq = zi.ziDAQServer(server, port, apilevel)
 
         if not self.daq:
@@ -636,6 +638,7 @@ class ZI_base_instrument(Instrument):
 
         # Connect a device (if not already connected)
         if not self._is_device_connected(device):
+            log.info('Connecting to device')
             self.daq.connectDevice(device, interface)
         self.devname = device
         self.devtype = self.gets('features/devtype')
@@ -654,12 +657,14 @@ class ZI_base_instrument(Instrument):
         filename = os.path.join(os.path.dirname(os.path.abspath(
             __file__)), 'zi_parameter_files', 'node_doc_{}.json'.format(self.devtype))
         if not os.path.isfile(filename):
+            log.info('Parameter file not found, creating new parameter file')
             log.info("{}: creating parameter file {}".format(
                 self.devname, filename))
             self._create_parameter_file(filename=filename)
 
         try:
             # NB: defined in parent class
+            log.info('Loading parameter file')
             self._load_parameter_file(filename=filename)
         except FileNotFoundError:
             # Should never happen as we just created the file above
@@ -681,8 +686,9 @@ class ZI_base_instrument(Instrument):
 
         # Create waveform parameters
         self._num_codewords = 0
+        log.info('Adding codeword waveform parameters')
         self._add_codeword_waveform_parameters(num_codewords)
-
+        log.info('Adding codeword waveform parameters')
         # Create other neat parameters
         self._add_extra_parameters()
 
@@ -763,6 +769,7 @@ class ZI_base_instrument(Instrument):
                  ' to the channel as indicated on the device (1 is lowest).')
 
         self._params_to_skip_update = []
+        log.info('Adding codeword waveform parameters')
         for ch in range(self._num_channels()):
             for cw in range(max(num_codewords, self._num_codewords)):
                 # NB: parameter naming identical to QWG
@@ -969,7 +976,7 @@ class ZI_base_instrument(Instrument):
 
     def _gen_write_waveform(self, ch, cw):
         def write_func(waveform):
-            log.info("Writing waveform (l{}) to ch{} cw{}".format(
+            log.debug("Writing waveform (len {}) to ch{} cw{}".format(
                 len(waveform), ch, cw))
             # Determine which AWG this waveform belongs to
             awg_nr = ch//2
@@ -1022,8 +1029,8 @@ class ZI_base_instrument(Instrument):
 
             # Name of this waveform
             wf_name = gen_waveform_name(ch, cw)
-            log.info("Reading waveform {} for ch{} cw{}".format(
-                len(wf_name), ch, cw))
+            log.debug("Reading waveform {} for ch{} cw{}".format(
+                wf_name, ch, cw))
             # Check if the waveform data is in our dictionary
             if wf_name not in self._awg_waveforms:
                 log.debug(
@@ -1060,6 +1067,7 @@ class ZI_base_instrument(Instrument):
             self._get_awg_directory(), 'waves',
             self.devname + '_' + wf_name + '.csv')
         try:
+            log.debug('reading waveform from csv {}'.format(filename))
             return np.genfromtxt(filename, delimiter=',')
         except OSError as e:
             # if the waveform does not exist yet dont raise exception
@@ -1354,19 +1362,21 @@ class ZI_base_instrument(Instrument):
         """
         self._errors_to_ignore.append(code)
 
-    # FIXME: typo, but used in some Notebooks
-    def initialize_all_waveforms_to_zeros(self):
+
+    def reset_waveforms_zeros(self):
         """
-        Generates all zeros waveforms for all codewords.
+        Sets all waveforms to an array of 48 zeros.
         """
         t0 = time.time()
-        wf = np.zeros(32)
+
+        wf = np.zeros(48)
         waveform_params = [value for key, value in self.parameters.items()
                            if 'wave_ch' in key.lower()]
         for par in waveform_params:
             par(wf)
+
         t1 = time.time()
-        print('Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
+        log.info('Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
 
     def configure_awg_from_string(self, awg_nr: int, program_string: str,
                                   timeout: float=15):

@@ -262,17 +262,6 @@ while (1) {
     # 'private' functions: application specific/codeword support
     ##########################################################################
 
-    def reset_waveforms_zeros(self):
-        """
-        Sets all waveforms to an array of 48 zeros.
-        """
-        for awg_nr in range(4):
-            wf_table = self._get_waveform_table(awg_nr)
-            for wf_l, wf_r in wf_table:
-                self.set(wf_l, np.zeros(48))
-                self.set(wf_r, np.zeros(48))
-
-
     def _get_waveform_table(self, awg_nr: int) -> list:
         """
         Returns the waveform table.

@@ -1,7 +1,7 @@
-import unittest
-import numpy
 
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibi
+import unittest
+import numpy as np
+
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 
 
@@ -10,6 +10,8 @@ class Test_UHFQC(unittest.TestCase):
     def setup_class(cls):
         cls.uhf = UHF.UHFQC(name='MOCK_UHF', server='emulator',
                             device='dev2109', interface='1GbE')
+
+        cls.uhf.reset_waveforms_zeros()
 
     @classmethod
     def teardown_class(cls):
@@ -54,6 +56,9 @@ class Test_UHFQC(unittest.TestCase):
                             ('wave_ch1_cw014', 'wave_ch2_cw014')]
 
     def test_dynamic_waveform_upload(self):
+
+        Test_UHFQC.uhf.wave_ch1_cw000(np.ones(48))
+
         # resetting the compilation count to ensure test is self contained
         Test_UHFQC.uhf._awgModule._compilation_count[0] = 0
         Test_UHFQC.uhf.awg_sequence_acquisition_and_pulse()
@@ -74,7 +79,7 @@ class Test_UHFQC(unittest.TestCase):
         self.assertEqual(Test_UHFQC.uhf._awgModule.get_compilation_count(0), 1)
 
         # Change the length of a waveform
-        w0 = numpy.concatenate(
+        w0 = np.concatenate(
             (Test_UHFQC.uhf.wave_ch1_cw000(), Test_UHFQC.uhf.wave_ch1_cw000()))
         Test_UHFQC.uhf.wave_ch1_cw000(w0)
 
@@ -84,6 +89,12 @@ class Test_UHFQC(unittest.TestCase):
 
         # Now the compilation must have been executed again
         self.assertEqual(Test_UHFQC.uhf._awgModule.get_compilation_count(0), 2)
+
+    def test_reset_waveforms_zeros(self):
+        self.uhf.wave_ch1_cw003(np.ones(80))
+        assert np.allclose(self.uhf.wave_ch1_cw003(), np.ones(80))
+        self.uhf.reset_waveforms_zeros()
+        assert np.allclose(self.uhf.wave_ch1_cw003(), np.zeros(48))
 
     def test_print_correlation_overview(self):
         self.uhf.print_correlation_overview()
@@ -108,3 +119,21 @@ class Test_UHFQC(unittest.TestCase):
 
     def test_print_overview(self):
         self.uhf.print_overview()
+
+    def test_reset_acquisition_params(self):
+        self.uhf.awgs_0_userregs_0(100)
+        self.uhf.awgs_0_userregs_15(153)
+
+        self.uhf.reset_acquisition_params()
+        assert self.uhf.awgs_0_userregs_0() == 0
+        assert self.uhf.awgs_0_userregs_15() == 0
+
+    def test_crosstalk_matrix(self):
+        mat = np.random.random((10, 10))
+        self.uhf.upload_crosstalk_matrix(mat)
+        new_mat = self.uhf.download_crosstalk_matrix()
+        assert np.allclose(mat, new_mat)
+
+        self.uhf.reset_crosstalk_matrix()
+        reset_mat = self.uhf.download_crosstalk_matrix()
+        assert np.allclose(np.eye(10), reset_mat)
