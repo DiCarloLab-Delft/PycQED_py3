@@ -350,15 +350,6 @@ class DeviceCCL(Instrument):
                             check_keyboard_interrupt()
 
 
-    def prepare_readout(self, qubits):
-        log.info('Configuring readout for {}'.format(qubits))
-        self._prep_ro_setup_qubits(qubits=qubits)
-        self._prep_ro_sources(qubits=qubits)
-        # commented out because it conflicts with setting in the qubit object
-        self._prep_ro_pulses(qubits=qubits)
-        self._prep_ro_integration_weights(qubits=qubits)
-        self._prep_ro_instantiate_detectors(qubits=qubits)
-
     def prepare_fluxing(self, qubits):
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)
@@ -369,16 +360,46 @@ class DeviceCCL(Instrument):
                 warnings.warn("Could not load flux pulses for {}".format(qb))
                 warnings.warn("Exception {}".format(e))
 
+    def prepare_readout(self, qubits):
+        """
+        Configures readout for specified qubits.
+
+        Args:
+            qubits (list of str):
+                list of qubit names that have to be prepared
+        """
+        log.info('Configuring readout for {}'.format(qubits))
+        self._prep_ro_sources(qubits=qubits)
+        self._prep_ro_setup_qubits(qubits=qubits)
+        # commented out because it conflicts with setting in the qubit object
+        self._prep_ro_pulses(qubits=qubits)
+        self._prep_ro_integration_weights(qubits=qubits)
+        self._prep_ro_instantiate_detectors(qubits=qubits)
+
+
+    def _prep_ro_sources(self, qubits):
+        """
+        turn on and configure the RO LO's of all qubits to be measured.
+        """
+
+        for qb_name in qubits:
+            LO = self.find_instrument(qb_name).instr_LO_ro.get_instr()
+            LO.frequency.set(self.ro_lo_freq())
+            LO.power(self.ro_pow_LO())
+            LO.on()
+
     def _prep_ro_setup_qubits(self, qubits):
         """
         set the parameters of the individual qubits to be compatible
         with multiplexed readout.
         """
-        log.info('')
+        log.info('Setting up acquisition channels')
 
         if self.ro_acq_weight_type() == 'optimal':
+            log.debug('ro_acq_weight_type = "optimal" using 1 ch per qubit')
             nr_of_acquisition_channels_per_qubit = 1
         else:
+            log.debug('Using 2 ch per qubit')
             nr_of_acquisition_channels_per_qubit = 2
 
         used_acq_channels = defaultdict(int)
@@ -612,16 +633,7 @@ class DeviceCCL(Instrument):
         int_avg_det = det.Multi_Detector_UHF(detectors=int_avg_dets)
         return int_avg_det
 
-    def _prep_ro_sources(self, qubits):
-        """
-        turn on and configure the RO LO's of all qubits to be measured.
-        """
 
-        for qb_name in qubits:
-            LO = self.find_instrument(qb_name).instr_LO_ro.get_instr()
-            LO.frequency.set(self.ro_lo_freq())
-            LO.power(self.ro_pow_LO())
-            LO.on()
 
     def _prep_ro_pulses(self, qubits):
         """
