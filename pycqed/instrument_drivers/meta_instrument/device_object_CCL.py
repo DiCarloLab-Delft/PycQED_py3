@@ -20,6 +20,9 @@ from importlib import reload
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
 
+
+log = logging.getLogger(__name__)
+
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
@@ -30,7 +33,7 @@ try:
     reload(cl_oql)
     reload(oqh)
 except ImportError:
-    logging.warning('Could not import OpenQL')
+    log.warning('Could not import OpenQL')
     mqo = None
     sqo = None
     cl_oql = None
@@ -348,6 +351,7 @@ class DeviceCCL(Instrument):
 
 
     def prepare_readout(self, qubits):
+        log.info('Configuring readout for {}'.format(qubits))
         self._prep_ro_setup_qubits(qubits=qubits)
         self._prep_ro_sources(qubits=qubits)
         # commented out because it conflicts with setting in the qubit object
@@ -370,6 +374,7 @@ class DeviceCCL(Instrument):
         set the parameters of the individual qubits to be compatible
         with multiplexed readout.
         """
+        log.info('')
 
         if self.ro_acq_weight_type() == 'optimal':
             nr_of_acquisition_channels_per_qubit = 1
@@ -1283,6 +1288,88 @@ class DeviceCCL(Instrument):
             a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
             a = ma2.Multiplexed_Readout_Analysis()
         return a
+
+
+    def measure_ssro_multi_qubit(
+            self, qubits: list, nr_shots_per_case: int = 2**13, # 8192
+            prepare_for_timedomain: bool =True,
+            result_logging_mode='raw',
+            initialize: bool=False, analyze=True, shots_per_meas: int=2**16,
+            MC=None):
+        """
+        Perform a simultaneous ssro experiment on multiple qubits.
+
+        Args:
+            qubits (list of str)
+                list of qubit names
+            nr_shots_per_case (int):
+                total number of measurements for each case under consideration
+                    e.g., n*|00> , n*|01>, n*|10> , n*|11> for two qubits
+
+            shots_per_meas (int):
+                number of single shot measurements per single
+                acquisition with UHFQC
+
+        """
+        log.warning('This method is a WIP')
+        log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
+            self.name, qubits))
+
+
+        # off and on, not including post selection init measurements yet
+        nr_cases = 4 #  00, 01 ,10 and 11
+        nr_shots=nr_shots_per_case*nr_cases
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # count from back because q0 is the least significant qubit
+        q0 = qubits[-1]
+        q1 = qubits[-2]
+
+        assert q0 in self.qubits()
+        assert q1 in self.qubits()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q1idx = self.find_instrument(q1).cfg_qubit_nr()
+        p = mqo.multi_qubit_off_on([q1idx, q0idx],
+                                   initialize=initialize,
+                                   second_excited_state=False,
+                                   platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+
+        # right is LSQ
+        d = self.get_int_logging_detector(qubits,
+                                          result_logging_mode=result_logging_mode)
+
+        shots_per_meas = int(np.floor(
+            np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
+
+        d.set_child_attr('nr_shots', shots_per_meas)
+
+
+
+        old_soft_avg = MC.soft_avg()
+        old_live_plot_enabled = MC.live_plot_enabled()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        MC.run('SSRO_{}_{}_{}'.format(q1, q0, self.msmt_suffix))
+
+        MC.soft_avg(old_soft_avg)
+        MC.live_plot_enabled(old_live_plot_enabled)
+        if analyze:
+            a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
+            a = ma2.Multiplexed_Readout_Analysis()
+        return a
+
+
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
