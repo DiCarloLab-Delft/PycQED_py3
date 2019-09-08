@@ -1,4 +1,5 @@
 import unittest
+import pytest
 import numpy as np
 import os
 import pycqed as pq
@@ -264,16 +265,66 @@ class Test_Device_obj(unittest.TestCase):
 
         # MW1 is specified as the readout LO source
         assert self.MW1.frequency() == 6e9
-        for q in self.qubits():
+        for qname in qubits:
+            q = self.device.find_instrument(qname)
             6e9 + q.ro_freq_mod() == q.ro_freq()
 
         self.device.ro_lo_freq(5.8e9)
         self.device.prepare_readout(qubits=qubits)
 
         # MW1 is specified as the readout LO source
-        assert self.MW1.frequency() == 5.8
-        for q in self.qubits():
-            5.8 + q.ro_freq_mod() == q.ro_freq()
+        assert self.MW1.frequency() == 5.8e9
+        for qname in qubits:
+            q = self.device.find_instrument(qname)
+            5.8e9 + q.ro_freq_mod() == q.ro_freq()
+
+        q = self.device.find_instrument('q5')
+        q.instr_LO_ro(self.MW3.name)
+        with pytest.raises(ValueError):
+            self.device.prepare_readout(qubits=qubits)
+        q.instr_LO_ro(self.MW1.name)
+
+    def test_prepare_readout_assign_weights(self):
+        self.device.ro_lo_freq(6e9)
+
+        self.device.ro_acq_weight_type('optimal')
+        qubits = self.device.qubits()
+        self.device.prepare_readout(qubits=qubits)
+        exp_ch_map = {
+            'UHFQC_0': {'q13': 0, 'q16': 1},
+            'UHFQC_1': {'q1': 0, 'q4': 1, 'q5': 2, 'q7': 3, 'q8': 4,
+                        'q10': 5, 'q11': 6, 'q14': 7, 'q15': 8},
+            'UHFQC_2': {'q0': 0, 'q2': 1, 'q3': 2, 'q6': 3, 'q9': 4, 'q12': 5}}
+        assert exp_ch_map == self.device._acq_ch_map
+
+        qb = self.device.find_instrument('q12')
+        assert qb.ro_acq_weight_chI() == 5
+        assert qb.ro_acq_weight_chQ() == 6
+
+    def test_prepare_readout_assign_weights_order_matters(self):
+        # Test that the order of the channels is as in the order iterated over
+        qubits = ['q2', 'q3', 'q0']
+        self.device.ro_acq_weight_type('optimal')
+        self.device.prepare_readout(qubits=qubits)
+        exp_ch_map = {
+            'UHFQC_2': {'q0': 2, 'q2': 0, 'q3': 1}}
+        assert exp_ch_map == self.device._acq_ch_map
+        qb = self.device.find_instrument('q3')
+        assert qb.ro_acq_weight_chI() == 1
+        assert qb.ro_acq_weight_chQ() == 2
+
+    def test_prepare_readout_assign_weights_IQ_counts_double(self):
+        qubits = ['q2', 'q3', 'q0', 'q13', 'q16']
+        self.device.ro_acq_weight_type('SSB')
+        self.device.prepare_readout(qubits=qubits)
+        exp_ch_map = {
+            'UHFQC_0': {'q13': 0, 'q16': 2},
+            'UHFQC_2': {'q0': 4, 'q2': 0, 'q3': 2}}
+        assert exp_ch_map == self.device._acq_ch_map
+        qb = self.device.find_instrument('q16')
+        assert qb.ro_acq_weight_chI() == 2
+        assert qb.ro_acq_weight_chQ() == 3
+
 
 
 

@@ -370,37 +370,86 @@ class DeviceCCL(Instrument):
         """
         log.info('Configuring readout for {}'.format(qubits))
         self._prep_ro_sources(qubits=qubits)
-        self._prep_ro_setup_qubits(qubits=qubits)
+        self._prep_ro_assign_weights(qubits=qubits)
         # commented out because it conflicts with setting in the qubit object
-        self._prep_ro_pulses(qubits=qubits)
-        self._prep_ro_integration_weights(qubits=qubits)
-        self._prep_ro_instantiate_detectors(qubits=qubits)
+        # self._prep_ro_pulses(qubits=qubits)
+        # self._prep_ro_integration_weights(qubits=qubits)
+        # self._prep_ro_instantiate_detectors(qubits=qubits)
 
 
     def _prep_ro_sources(self, qubits):
         """
-        turn on and configure the RO LO's of all qubits to be measured.
+        turn on and configure the RO LO's of all qubits to be measured and
+        update the modulation frequency of all qubits.
         """
-
+        # This device object works under the assumption that a single LO
+        # is used to drive all readout lines.
+        LO = self.find_instrument(qubits[0]).instr_LO_ro.get_instr()
+        LO.frequency.set(self.ro_lo_freq())
+        LO.power(self.ro_pow_LO())
+        LO.on()
         for qb_name in qubits:
-            LO = self.find_instrument(qb_name).instr_LO_ro.get_instr()
-            LO.frequency.set(self.ro_lo_freq())
-            LO.power(self.ro_pow_LO())
-            LO.on()
+            qb = self.find_instrument(qb_name)
+            # set RO modulation to use common LO frequency
+            qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
 
-    def _prep_ro_setup_qubits(self, qubits):
+            LO_q = qb.instr_LO_ro.get_instr()
+            if LO_q is not LO:
+                raise ValueError("Expect a single LO to drive all feedlines")
+
+    def _prep_ro_assign_weights(self, qubits):
         """
         set the parameters of the individual qubits to be compatible
         with multiplexed readout.
         """
         log.info('Setting up acquisition channels')
-
         if self.ro_acq_weight_type() == 'optimal':
             log.debug('ro_acq_weight_type = "optimal" using 1 ch per qubit')
-            nr_of_acquisition_channels_per_qubit = 1
+            nr_of_acq_ch_per_qubit = 1
         else:
             log.debug('Using 2 ch per qubit')
-            nr_of_acquisition_channels_per_qubit = 2
+            nr_of_acq_ch_per_qubit = 2
+
+        acq_ch_map = {}
+        for qb_name in qubits:
+            qb = self.find_instrument(qb_name)
+            acq_instr = qb.instr_acquisition()
+            if not acq_instr in acq_ch_map.keys():
+                acq_ch_map[acq_instr] = {}
+
+            assigned_weight = (len(acq_ch_map[acq_instr]) *
+                               nr_of_acq_ch_per_qubit)
+            log.info('Assigning {} w{} to qubit {}'.format(
+                acq_instr, assigned_weight, qb_name))
+            acq_ch_map[acq_instr][qb_name] = assigned_weight
+
+            qb.ro_acq_weight_chI(assigned_weight)
+            # even if the mode does not use Q weight, we still assign this
+            # this is for when switching back to the qubit itself
+            qb.ro_acq_weight_chQ(assigned_weight+1)
+
+        # Stored as a private attribute for debug purposes.
+        self._acq_ch_map = acq_ch_map
+
+        log.info("acq_channel_map: {}".format(acq_ch_map))
+
+
+    def _prep_ro_pulses(self, qubits):
+        for qb_name in qubits:
+            qb = self.find_instrument(qb_name)
+            qb._prep_ro_pulse(upload=False)
+
+        # only call it once with upload after setting all pulses.
+        # FIXME: This obviously fails if there are multiple feedlines
+        qb._prep_ro_pulse(upload=True)
+
+
+
+
+
+
+
+
 
         used_acq_channels = defaultdict(int)
 
@@ -423,13 +472,11 @@ class DeviceCCL(Instrument):
             qb.ro_acq_weight_chI(index)
 
             # use next available channel as Q if needed
-            if nr_of_acquisition_channels_per_qubit > 1:
+            if nr_of_acq_ch_per_qubit > 1:
                 index = used_acq_channels[acq_device]
                 used_acq_channels[acq_device] += 1
                 qb.ro_acq_weight_chQ(index)
 
-            # set RO modulation to use common LO frequency
-            qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
             qb._prep_ro_pulse(upload=False)
         # only call it once with upload after setting all pulses.
         #qb._prep_ro_pulse(upload=True)
