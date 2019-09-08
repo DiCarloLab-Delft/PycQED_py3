@@ -48,37 +48,7 @@ class Test_MW_LutMan(unittest.TestCase):
         self.QWG_MW_LutMan.channel_I(1)
         self.QWG_MW_LutMan.channel_Q(2)
 
-    def test_program_hash_differs_AWG8_lutman(self):
 
-        # set to a random value to ensure different
-        self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
-        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
-        self.assertTrue(hash_differs)
-
-        self.AWG8_MW_LutMan._update_expected_program_hash()
-        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
-        self.assertFalse(hash_differs)
-
-    def test_program_hash_differs_AWG8_VSM_lutman(self):
-
-        # set to a random value to ensure different
-        self.AWG8_VSM_MW_LutMan._awgs_mwG_sequencer_program_expected_hash(
-            351340)
-        hash_differs = self.AWG8_VSM_MW_LutMan._program_hash_differs()
-        self.assertTrue(hash_differs)
-
-        self.AWG8_VSM_MW_LutMan._update_expected_program_hash()
-        hash_differs = self.AWG8_VSM_MW_LutMan._program_hash_differs()
-        self.assertFalse(hash_differs)
-
-    def test_program_hash_updated_when_loading_program(self):
-        self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
-        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
-        self.assertTrue(hash_differs)
-
-        self.AWG8_MW_LutMan.load_waveforms_onto_AWG_lookuptable()
-        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
-        self.assertFalse(hash_differs)
 
     def test_uploading_standard_pulses(self):
         # Tests that all waveforms are present and no error is raised.
@@ -101,7 +71,7 @@ class Test_MW_LutMan(unittest.TestCase):
             amp=self.AWG8_MW_LutMan.spec_amp(),
             sampling_rate=self.AWG8_MW_LutMan.sampling_rate(),
             delay=0, phase=0)[0]
-        
+
         expected_wf_spec = adjust_array_len(expected_wf_spec, 8)
         uploaded_wf = self.AWG.get('wave_ch1_cw008')
         np.testing.assert_array_almost_equal(expected_wf_spec, uploaded_wf)

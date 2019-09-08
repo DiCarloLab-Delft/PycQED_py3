@@ -353,15 +353,6 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                            vals=vals.Numbers(min_value=0), unit='s',
                            parameter_class=ManualParameter,
                            initial_value=5)
-        self.add_parameter(
-            '_awgs_ro_sequencer_program_expected_hash',
-            docstring='crc32 hash of the UHF-QA sequencer program. '
-            'This parameter is used to dynamically determine '
-            'if the program needs to be uploaded. The initial_value is'
-            ' None, indicating that the program needs to be uploaded.'
-            ' After the first program is uploaded, the value is set.',
-            parameter_class=ManualParameter, initial_value=None,
-            vals=vals.Ints())
 
         # Set to a default because box is not expected to change
         self._voltage_min = -1.0
@@ -405,32 +396,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         UHFQC.sigouts_0_offset(self.mixer_offs_I())
         UHFQC.sigouts_1_offset(self.mixer_offs_Q())
 
-    def _program_hash_differs(self)-> bool:
-        """
-        Args:
-            --
-        Returns:
-            hash_different (bool): returns True if one of the hashes does not
-                correspond to the expected hash.
 
-        Compares current AWG sequencer program hash for the relevant channels
-        with the expected program hash and, returns True if one or more
-        hashes do not match, indicating that uploading the programs is
-        required.
-        """
-        hash = self.AWG.get_instr().get('awgs_0_sequencer_program_crc32_hash')
-        expected_hash = self.get('_awgs_ro_sequencer_program_expected_hash')
 
-        return hash != expected_hash
-
-    def _update_expected_program_hash(self):
-        """
-        Updates the expected AWG sequencer program hash with the current
-        hash of the sequencer program. This is intended to be called after
-        setting the hash.
-        """
-        hash = self.AWG.get_instr().get('awgs_0_sequencer_program_crc32_hash')
-        self.set('_awgs_ro_sequencer_program_expected_hash', hash)
 
     def load_waveform_onto_AWG_lookuptable(
             self, wave_id: str, regenerate_waveforms: bool=False):
@@ -488,20 +455,19 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             force_load_sequencer_program: bool=True):
         # Uploading the codeword program (again) is needed to if the user
         # has changed the mode of the instrument.
-        if self._program_hash_differs() or force_load_sequencer_program:
+        if force_load_sequencer_program:
             if self._mode == 'single_pulse':
                 self.AWG.get_instr().awg_sequence_acquisition_and_pulse(
                     acquisition_delay=self.acquisition_delay())
             else:
                 self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
                     cases=list(self.LutMap().keys()),
-                    acquisition_delay=self.acquisition_delay(), timeout=self.timeout())
+                    acquisition_delay=self.acquisition_delay(),
+                    timeout=self.timeout())
 
         super().load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=regenerate_waveforms,
             stop_start=stop_start)
-
-        self._update_expected_program_hash()
 
 
 def add_waves_different_length(a, b):

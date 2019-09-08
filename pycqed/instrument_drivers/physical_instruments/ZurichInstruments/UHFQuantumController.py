@@ -591,6 +591,19 @@ setUserReg(4, err_cnt);"""
         print('\nDone')
 
     ##########################################################################
+    # 'public' functions: utility
+    ##########################################################################
+
+    def reset_acquisition_params(self):
+        log.info('Setting user registers to 0')
+        for i in range(16):
+            self.set('awgs_0_userregs_{}'.format(i), 0)
+
+    def reset_crosstalk_matrix(self):
+        self.upload_crosstalk_matrix(np.eye(10))
+
+
+    ##########################################################################
     # 'public' functions: generic AWG/waveform support
     ##########################################################################
 
@@ -629,7 +642,8 @@ setUserReg(4, err_cnt);"""
 
         return data
 
-    def acquisition_initialize(self, samples, averages, channels=(0, 1), mode='rl') -> None:
+    def acquisition_initialize(self, samples, averages, channels=(0, 1),
+                               mode='rl') -> None:
         # Define the channels to use and subscribe to them
         self._acquisition_nodes = []
 
@@ -810,8 +824,6 @@ setUserReg(4, err_cnt);"""
             else:
                 # Optionally skip the error completely
                 if code in self._errors_to_ignore:
-                    log.warning('{}: {} ({}/{})'.format(
-                        self.devname, message, code, severity))
                     continue
 
                 # Check if there are new errors
@@ -893,16 +905,23 @@ setUserReg(4, err_cnt);"""
         self.set('qas_0_rotations_{}'.format(weight_function_I), 2.0 + 0.0j)
         self.set('qas_0_rotations_{}'.format(weight_function_Q), 2.0 + 0.0j)
 
-    def upload_transformation_matrix(self, matrix) -> None:
+    def upload_crosstalk_matrix(self, matrix) -> None:
+        """
+        Upload parameters for the 10*10 crosstalk suppression matrix.
+
+        This method uses the 'qas_0_crosstalk_rows_*_cols_*' nodes.
+        """
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
                 self.set('qas_0_crosstalk_rows_{}_cols_{}'.format(
                     j, i), matrix[i][j])
 
-    def download_transformation_matrix(self, nr_rows=None, nr_cols=None):
-        if not nr_rows or not nr_cols:
-            nr_rows = self._nr_integration_channels
-            nr_cols = self._nr_integration_channels
+    def download_crosstalk_matrix(self, nr_rows=10, nr_cols=10):
+        """
+        Upload parameters for the 10*10 crosstalk suppression matrix.
+
+        This method uses the 'qas_0_crosstalk_rows_*_cols_*' nodes.
+        """
         matrix = np.zeros([nr_rows, nr_cols])
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
@@ -1416,9 +1435,16 @@ setTrigger(0);
 
     def print_user_regs_overview(self):
         msg = '\t User registers overview \n'
+        user_reg_funcs = ['']*16
+        user_reg_funcs[0] = 'Loop count'
+        user_reg_funcs[1] = 'Readout mode'
+        user_reg_funcs[2] = 'Wait delay'
+        user_reg_funcs[3] = 'Average count'
+        user_reg_funcs[4] = 'Error count'
+
         for i in range(16):
-            msg += 'User reg {}: \t{}\n'.format(i,
-                                                self.get('awgs_0_userregs_{}'.format(i)))
+            msg += 'User reg {}: \t{}\t({})\n'.format(
+                i, self.get('awgs_0_userregs_{}'.format(i)), user_reg_funcs[i])
         print(msg)
 
     def print_overview(self):
@@ -1435,3 +1461,5 @@ setTrigger(0);
         self.print_rotations_overview()
         self.print_thresholds_overview()
         self.print_user_regs_overview()
+
+
