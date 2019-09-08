@@ -335,9 +335,16 @@ class DeviceCCL(Instrument):
                     using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
                     if not using_QWG:
                         # All channels are set globally from the device object.
+                        AWG.stop()
                         for i in range(8): # assumes the AWG is an HDAWG
                             AWG.set('sigouts_{}_delay'.format(i), lat_fine)
-
+                        AWG.start()
+                        ch_not_ready = 8
+                        while(ch_not_ready>0):
+                            ch_not_ready = 0
+                            for i in range(8):
+                                ch_not_ready += AWG.geti('sigouts/{}/busy'.format(i))
+                            check_keyboard_interrupt()
 
 
     def prepare_readout(self, qubits):
