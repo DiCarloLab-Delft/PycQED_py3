@@ -371,6 +371,7 @@ class DeviceCCL(Instrument):
         self._prep_ro_sources(qubits=qubits)
         acq_ch_map = self._prep_ro_assign_weights(qubits=qubits)
         self._prep_ro_integration_weights(qubits=qubits)
+        self._prep_ro_pulses(qubits=qubits)
 
         # TODO: Set thresholds
         # commented out because it conflicts with setting in the qubit object
@@ -406,12 +407,11 @@ class DeviceCCL(Instrument):
         """
         Assign acquisition weight channels to the different qubits.
 
-
         Args:
             qubits (list of str):
                 list of qubit names that have to be prepared
 
-        Returns:
+        Returns
             acq_ch_map (dict)
                 a mapping of acquisition instruments and channels used
                 for each qubit.
@@ -453,8 +453,6 @@ class DeviceCCL(Instrument):
             # this is for when switching back to the qubit itself
             qb.ro_acq_weight_chQ(assigned_weight+1)
 
-
-
         log.info("acq_channel_map: \n\t{}".format(acq_ch_map))
 
         log.info('Clearing UHF correlation settings')
@@ -468,7 +466,7 @@ class DeviceCCL(Instrument):
 
     def _prep_ro_integration_weights(self, qubits):
         """
-        Set the acquisition integration weights on each channel
+        Set the acquisition integration weights on each channel.
 
         Args:
             qubits (list of str):
@@ -529,52 +527,148 @@ class DeviceCCL(Instrument):
             #         'qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
 
+    # def _prep_ro_pulses(self, qubits):
+    #     for qb_name in qubits:
+    #         qb = self.find_instrument(qb_name)
+    #         qb._prep_ro_pulse(upload=False)
+
+    #     # only call it once with upload after setting all pulses.
+    #     # FIXME: This obviously fails if there are multiple feedlines
+    #     qb._prep_ro_pulse(upload=True)
+
+    #     used_acq_channels = defaultdict(int)
+
+    #     for qb_name in qubits:
+    #         qb = self.find_instrument(qb_name)
+
+    #         # all qubits use the same acquisition type
+    #         qb.ro_acq_weight_type(self.ro_acq_weight_type())
+    #         qb.ro_acq_integration_length(self.ro_acq_integration_length())
+    #         qb.ro_acq_digitized(self.ro_acq_digitized())
+    #         # hardcoded because UHFLI is not stable for arbitrary values
+    #         qb.ro_acq_input_average_length(4096/1.8e9)
+
+    #         acq_device = qb.instr_acquisition()
+
+    #         # allocate different acquisition channels
+    #         # use next available channel as I
+    #         index = used_acq_channels[acq_device]
+    #         used_acq_channels[acq_device] += 1
+    #         qb.ro_acq_weight_chI(index)
+
+    #         # use next available channel as Q if needed
+    #         if nr_of_acq_ch_per_qubit > 1:
+    #             index = used_acq_channels[acq_device]
+    #             used_acq_channels[acq_device] += 1
+    #             qb.ro_acq_weight_chQ(index)
+
+    #         qb._prep_ro_pulse(upload=False)
+    #     # only call it once with upload after setting all pulses.
+    #     #qb._prep_ro_pulse(upload=True)
+
+
     def _prep_ro_pulses(self, qubits):
-        for qb_name in qubits:
-            qb = self.find_instrument(qb_name)
-            qb._prep_ro_pulse(upload=False)
+        """
+        Configure the ro lutmans.
 
-        # only call it once with upload after setting all pulses.
-        # FIXME: This obviously fails if there are multiple feedlines
-        qb._prep_ro_pulse(upload=True)
+        The configuration includes
+            - setting the right parameters for all readout pulses
+            - uploading the waveforms to the UHFQC
+            - setting the "resonator_combinations" that determine allowed pulses
+                N.B. by convention we support all individual readouts and
+                the readout all qubits instruction.
+        """
 
+        ro_lms = []
 
-
-
-
-
-
-
-
-        used_acq_channels = defaultdict(int)
+        resonators_in_lm = {}
 
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)
+            res_nr = qb.cfg_qubit_nr() # qubit and resonator number are identical
+            acq_instr = qb.instr_acquisition.get_instr()
+            ro_lm = qb.instr_LutMan_RO.get_instr()
 
-            # all qubits use the same acquisition type
-            qb.ro_acq_weight_type(self.ro_acq_weight_type())
-            qb.ro_acq_integration_length(self.ro_acq_integration_length())
-            qb.ro_acq_digitized(self.ro_acq_digitized())
-            # hardcoded because UHFLI is not stable for arbitrary values
-            qb.ro_acq_input_average_length(4096/1.8e9)
+            if ro_lm not in ro_lms:
+                ro_lms.append(ro_lm)
+                resonators_in_lm[ro_lm.name] = []
 
-            acq_device = qb.instr_acquisition()
+            resonators_in_lm[ro_lm.name].append(res_nr)
 
-            # allocate different acquisition channels
-            # use next available channel as I
-            index = used_acq_channels[acq_device]
-            used_acq_channels[acq_device] += 1
-            qb.ro_acq_weight_chI(index)
+        for ro_lm in ro_lms:
+            # list comprehension should result in a list with each
+            # individual resonator + the combination of all simultaneously
+            resonator_combs = [[r] for r in resonators_in_lm[ro_lm.name]] + \
+                [resonators_in_lm[ro_lm.name]]
+            log.info('Setting resonator combinations for {} to {}'.format(
+                ro_lm.name, resonator_combs))
+            ro_lm.resonator_combinations(resonator_combs)
 
-            # use next available channel as Q if needed
-            if nr_of_acq_ch_per_qubit > 1:
-                index = used_acq_channels[acq_device]
-                used_acq_channels[acq_device] += 1
-                qb.ro_acq_weight_chQ(index)
+        # lutmans_to_configure = {}
 
-            qb._prep_ro_pulse(upload=False)
-        # only call it once with upload after setting all pulses.
-        #qb._prep_ro_pulse(upload=True)
+        # # calculate the combinations that each ro_lutman should be able to do
+        # combs = defaultdict(lambda: [[]])
+
+        # for qb_name in ro_qb_list:
+        #     qb = self.find_instrument(qb_name)
+
+        #     ro_lm = qb.instr_LutMan_RO.get_instr()
+        #     lutmans_to_configure[ro_lm.name] = ro_lm
+        #     res_nr = qb.cfg_qubit_nr()
+
+        #     # extend the list of combinations to be set for the lutman
+
+        #     combs[ro_lm.name] = (combs[ro_lm.name] +
+        #                          [c + [res_nr]
+        #                           for c in combs[ro_lm.name]])
+
+        #     # These parameters affect all resonators.
+        #     # Should not be part of individual qubits
+
+        #     ro_lm.set('pulse_type', 'M_' + qb.ro_pulse_type())
+        #     ro_lm.set('mixer_alpha',
+        #               qb.ro_pulse_mixer_alpha())
+        #     ro_lm.set('mixer_phi',
+        #               qb.ro_pulse_mixer_phi())
+        #     ro_lm.set('mixer_offs_I', qb.ro_pulse_mixer_offs_I())
+        #     ro_lm.set('mixer_offs_Q', qb.ro_pulse_mixer_offs_Q())
+        #     ro_lm.acquisition_delay(qb.ro_acq_delay())
+
+        #     # configure the lutman settings for the pulse on the resonator
+        #     # of this qubit
+
+        #     ro_lm.set('M_modulation_R{}'.format(res_nr), qb.ro_freq_mod())
+        #     ro_lm.set('M_length_R{}'.format(res_nr),
+        #               qb.ro_pulse_length())
+        #     ro_lm.set('M_amp_R{}'.format(res_nr),
+        #               qb.ro_pulse_amp())
+        #     ro_lm.set('M_phi_R{}'.format(res_nr),
+        #               qb.ro_pulse_phi())
+        #     ro_lm.set('M_down_length0_R{}'.format(res_nr),
+        #               qb.ro_pulse_down_length0())
+        #     ro_lm.set('M_down_amp0_R{}'.format(res_nr),
+        #               qb.ro_pulse_down_amp0())
+        #     ro_lm.set('M_down_phi0_R{}'.format(res_nr),
+        #               qb.ro_pulse_down_phi0())
+        #     ro_lm.set('M_down_length1_R{}'.format(res_nr),
+        #               qb.ro_pulse_down_length1())
+        #     ro_lm.set('M_down_amp1_R{}'.format(res_nr),
+        #               qb.ro_pulse_down_amp1())
+        #     ro_lm.set('M_down_phi1_R{}'.format(res_nr),
+        #               qb.ro_pulse_down_phi1())
+        # print('lm to configure',lutmans_to_configure)
+
+        # for ro_lm_name, ro_lm in lutmans_to_configure.items():
+        #     if self.ro_always_all():
+        #         all_qubit_idx_list = combs[ro_lm_name][-1]
+        #         no_of_pulses = len(combs[ro_lm_name])
+        #         combs[ro_lm_name] = [all_qubit_idx_list]*no_of_pulses
+        #         ro_lm.hardcode_cases(
+        #             list(range(1, no_of_pulses)))
+
+        #     ro_lm.resonator_combinations(combs[ro_lm_name][1:])
+        #     ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
+        #     ro_lm.set_mixer_offsets()
 
 
 
@@ -757,81 +851,6 @@ class DeviceCCL(Instrument):
 
 
 
-    def _prep_ro_pulses(self, qubits):
-        """
-        configure lutmans to measure the qubits and
-        let the lutman configure the readout AWGs.
-        """
-        # these are the qubits that should be possible to read out
-        ro_qb_list = qubits
-        if ro_qb_list == []:
-            ro_qb_list = self.qubits()
-
-        lutmans_to_configure = {}
-
-        # calculate the combinations that each ro_lutman should be able to do
-        combs = defaultdict(lambda: [[]])
-
-        for qb_name in ro_qb_list:
-            qb = self.find_instrument(qb_name)
-
-            ro_lm = qb.instr_LutMan_RO.get_instr()
-            lutmans_to_configure[ro_lm.name] = ro_lm
-            res_nr = qb.cfg_qubit_nr()
-
-            # extend the list of combinations to be set for the lutman
-
-            combs[ro_lm.name] = (combs[ro_lm.name] +
-                                 [c + [res_nr]
-                                  for c in combs[ro_lm.name]])
-
-            # These parameters affect all resonators.
-            # Should not be part of individual qubits
-
-            ro_lm.set('pulse_type', 'M_' + qb.ro_pulse_type())
-            ro_lm.set('mixer_alpha',
-                      qb.ro_pulse_mixer_alpha())
-            ro_lm.set('mixer_phi',
-                      qb.ro_pulse_mixer_phi())
-            ro_lm.set('mixer_offs_I', qb.ro_pulse_mixer_offs_I())
-            ro_lm.set('mixer_offs_Q', qb.ro_pulse_mixer_offs_Q())
-            ro_lm.acquisition_delay(qb.ro_acq_delay())
-
-            # configure the lutman settings for the pulse on the resonator
-            # of this qubit
-
-            ro_lm.set('M_modulation_R{}'.format(res_nr), qb.ro_freq_mod())
-            ro_lm.set('M_length_R{}'.format(res_nr),
-                      qb.ro_pulse_length())
-            ro_lm.set('M_amp_R{}'.format(res_nr),
-                      qb.ro_pulse_amp())
-            ro_lm.set('M_phi_R{}'.format(res_nr),
-                      qb.ro_pulse_phi())
-            ro_lm.set('M_down_length0_R{}'.format(res_nr),
-                      qb.ro_pulse_down_length0())
-            ro_lm.set('M_down_amp0_R{}'.format(res_nr),
-                      qb.ro_pulse_down_amp0())
-            ro_lm.set('M_down_phi0_R{}'.format(res_nr),
-                      qb.ro_pulse_down_phi0())
-            ro_lm.set('M_down_length1_R{}'.format(res_nr),
-                      qb.ro_pulse_down_length1())
-            ro_lm.set('M_down_amp1_R{}'.format(res_nr),
-                      qb.ro_pulse_down_amp1())
-            ro_lm.set('M_down_phi1_R{}'.format(res_nr),
-                      qb.ro_pulse_down_phi1())
-        print('lm to configure',lutmans_to_configure)
-
-        for ro_lm_name, ro_lm in lutmans_to_configure.items():
-            if self.ro_always_all():
-                all_qubit_idx_list = combs[ro_lm_name][-1]
-                no_of_pulses = len(combs[ro_lm_name])
-                combs[ro_lm_name] = [all_qubit_idx_list]*no_of_pulses
-                ro_lm.hardcode_cases(
-                    list(range(1, no_of_pulses)))
-
-            ro_lm.resonator_combinations(combs[ro_lm_name][1:])
-            ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
-            ro_lm.set_mixer_offsets()
 
     def _prep_td_configure_VSM(self):
         """

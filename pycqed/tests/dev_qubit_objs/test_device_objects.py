@@ -352,6 +352,22 @@ class Test_Device_obj(unittest.TestCase):
         assert uhf.qas_0_thresholds_5_correlation_source() == 0
 
 
+    def test_prepare_ro_pulses_resonator_combinations(self):
+        # because not all combinations are supported the default is to
+        # support
+
+        qubits = ['q2', 'q3', 'q0', 'q13', 'q16']
+        self.device.prepare_readout(qubits=qubits)
+
+        # Combinations are based on qubit number
+        res_combs0 = self.ro_lutman_0.resonator_combinations()
+        exp_res_combs0 = [[13], [16], [13, 16]]
+        assert res_combs0 == exp_res_combs0
+
+        res_combs2 = self.ro_lutman_2.resonator_combinations()
+        exp_res_combs2 = [[2], [3], [0], [2, 3, 0]]
+        assert res_combs2 == exp_res_combs2
+
 
 
     @classmethod

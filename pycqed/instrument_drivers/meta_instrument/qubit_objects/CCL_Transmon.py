@@ -959,9 +959,9 @@ class CCLight_Transmon(Qubit):
 
         """
         if CW:
-            ro_amp=self.ro_pulse_amp_CW()
+            ro_amp = self.ro_pulse_amp_CW()
         else:
-            ro_amp=self.ro_pulse_amp()
+            ro_amp = self.ro_pulse_amp()
 
         if 'UHFQC' not in self.instr_acquisition():
             raise NotImplementedError()
