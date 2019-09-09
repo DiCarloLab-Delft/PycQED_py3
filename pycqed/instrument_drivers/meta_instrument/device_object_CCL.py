@@ -399,8 +399,14 @@ class DeviceCCL(Instrument):
 
     def _prep_ro_assign_weights(self, qubits):
         """
-        set the parameters of the individual qubits to be compatible
-        with multiplexed readout.
+        Assign acquisition weight channels to the different qubits.
+
+        The assignment is done based on  the acq_instr used for each qubit
+        and the number of channels used per qubit. N.B. This method of mapping
+        has no implicit feedline or UHFQC contraint built in.
+
+        The mapping of acq_channels to qubits is stored in self._acq_ch_map
+        for debugging purposes.
         """
         log.info('Setting up acquisition channels')
         if self.ro_acq_weight_type() == 'optimal':
@@ -422,6 +428,10 @@ class DeviceCCL(Instrument):
             log.info('Assigning {} w{} to qubit {}'.format(
                 acq_instr, assigned_weight, qb_name))
             acq_ch_map[acq_instr][qb_name] = assigned_weight
+            if assigned_weight > 9:
+                # There are only 10 acq_weight_channels per UHF.
+                # use optimal ro weights or read out less qubits.
+                raise ValueError('Trying to assign too many acquisition weights')
 
             qb.ro_acq_weight_chI(assigned_weight)
             # even if the mode does not use Q weight, we still assign this
@@ -431,7 +441,11 @@ class DeviceCCL(Instrument):
         # Stored as a private attribute for debug purposes.
         self._acq_ch_map = acq_ch_map
 
-        log.info("acq_channel_map: {}".format(acq_ch_map))
+        log.info("acq_channel_map: \n\t{}".format(acq_ch_map))
+
+        log.info('Clearing UHF correlation settings')
+        for acq_instr_name in acq_ch_map.keys():
+            self.find_instrument(acq_instr).reset_correlation_params()
 
 
     def _prep_ro_pulses(self, qubits):

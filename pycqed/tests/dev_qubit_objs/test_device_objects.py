@@ -105,7 +105,6 @@ class Test_Device_obj(unittest.TestCase):
             'ro_lutman_2', feedline_number=2, feedline_map='S17', num_res=9)
         self.ro_lutman_2.AWG(self.UHFQC_2.name)
 
-
         # Assign instruments
         qubits = []
         for q_idx in range(17):
@@ -258,6 +257,7 @@ class Test_Device_obj(unittest.TestCase):
     def test_prepare_readout_lo_freqs_config(self):
         # Test that the modulation frequencies of all qubits
         # are set correctly.
+        self.device.ro_acq_weight_type('optimal')
         qubits = self.device.qubits()
 
         self.device.ro_lo_freq(6e9)
@@ -325,7 +325,31 @@ class Test_Device_obj(unittest.TestCase):
         assert qb.ro_acq_weight_chI() == 2
         assert qb.ro_acq_weight_chQ() == 3
 
+    def test_prepare_readout_assign_weights_too_many_raises(self):
+        qubits = self.device.qubits()
+        self.device.ro_acq_weight_type('SSB')
+        with pytest.raises(ValueError):
+            self.device.prepare_readout(qubits=qubits)
 
+    def test_prepare_readout_resets_UHF(self):
+        uhf = self.device.find_instrument('UHFQC_2')
+
+        uhf.qas_0_correlations_5_enable(1)
+        uhf.qas_0_correlations_5_source(3)
+        uhf.qas_0_thresholds_5_correlation_enable(1)
+        uhf.qas_0_thresholds_5_correlation_source(3)
+
+        assert uhf.qas_0_correlations_5_enable() == 1
+        assert uhf.qas_0_correlations_5_source() == 3
+        assert uhf.qas_0_thresholds_5_correlation_enable() == 1
+        assert uhf.qas_0_thresholds_5_correlation_source() == 3
+
+        self.device.prepare_readout(qubits=['q0'])
+
+        assert uhf.qas_0_correlations_5_enable() == 0
+        assert uhf.qas_0_correlations_5_source() == 0
+        assert uhf.qas_0_thresholds_5_correlation_enable() == 0
+        assert uhf.qas_0_thresholds_5_correlation_source() == 0
 
 
     @classmethod
