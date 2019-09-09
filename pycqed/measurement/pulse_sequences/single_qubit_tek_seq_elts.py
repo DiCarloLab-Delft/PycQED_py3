@@ -112,49 +112,62 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points,
     return seq, np.arange(seq.n_acq_elements())
 
 
-def T1_seq(times, pulse_pars, RO_pars,
-           cal_points=True, upload=True, return_seq=False):
+def t1_active_reset(times, qb_name, operation_dict, cal_points,
+                    upload=True, for_ef=False, last_ge_pulse=False,
+                    prep_params=dict()):
     '''
-    Rabi sequence for a single qubit using the tektronix.
+    T1 sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modulation used for RO
     Input pars:
         times:       array of times to wait after the initial pi-pulse
         pulse_pars:  dict containing the pulse parameters
         RO_pars:     dict containing the RO parameters
     '''
+
     if np.any(times>1e-3):
         logging.warning('The values in the times array might be too large.'
                         'The units should be seconds.')
     seq_name = 'T1_sequence'
-    seq = sequence.Sequence(seq_name)
-    seg_list = []
-    RO_pulse_delay = RO_pars['pulse_delay']
-    RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
-    pulses = get_pulse_dict_from_pars(pulse_pars)
 
-    for i, tau in enumerate(times):  # seq has to have at least 2 elts
-        RO_pars['pulse_delay'] = RO_pulse_delay + tau
-        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
-            RO_pars['pulse_delay'] = RO_pulse_delay
-            seg = segment.Segment('segment_{}'.format(i),
-                                  [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
-            RO_pars['pulse_delay'] = RO_pulse_delay
-            seg = segment.Segment('segment_{}'.format(i),
-                                  [pulses['X180'], RO_pars])
-        else:
-            seg = segment.Segment('segment_{}'.format(i),
-                                  [pulses['X180'], RO_pars])
-        seg_list.append(seg)
-        seq.add(seg)
+    #Operations
+    if for_ef:
+        ops = ["X180", "X180_ef"]
+        if last_ge_pulse:
+            ops += ["X180"]
+    else:
+        ops = ["X180"]
+    ops += ["RO"]
+    ops = add_suffix(ops, " " + qb_name)
+    pulses = [deepcopy(operation_dict[op]) for op in ops]
+
+    # name delayed pulse: last ge pulse if for_ef and last_ge_pulse
+    # otherwise readout pulse
+    if for_ef and last_ge_pulse:
+        delayed_pulse = -2 # last_ge_pulse
+        delays = np.array(times)
+    else:
+        delayed_pulse = -1 # readout pulse
+        delays = np.array(times) + pulses[-1]["pulse_delay"]
+
+    pulses[delayed_pulse]['name'] = "Delayed_pulse"
+
+    # vary delay of readout pulse or last ge pulse
+    swept_pulses = sweep_pulse_params(pulses, {'Delayed_pulse.pulse_delay': delays})
+
+    # add preparation pulses
+    swept_pulses_with_prep = \
+        [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)
+         for p in swept_pulses]
+    seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
+
+    # add calibration segments
+    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 
-    if return_seq:
-        return seq, seg_list
-    else:
-        return seq_name
+    return seq, np.arange(seq.n_acq_elements())
+
 
 
 def ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,

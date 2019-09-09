@@ -1278,6 +1278,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                          extract_only=extract_only, do_fitting=do_fitting)
 
         self.n_readouts = options_dict['n_readouts']
+        self.kept_shots = 0
         self.thresholds = options_dict['thresholds']
         self.channel_map = options_dict['channel_map']
         self.use_preselection = options_dict.get('use_preselection', False)
@@ -1381,7 +1382,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
         table = np.zeros((n_readouts, len(observables)))
 
-        print(observables)
+        # print(observables)
 
         for qubit, results in shots_of_qubits.items():
             res_e[qubit] = np.array(results).reshape((n_readouts, -1),

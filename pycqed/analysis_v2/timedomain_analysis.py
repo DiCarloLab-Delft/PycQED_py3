@@ -298,39 +298,51 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         cal_points = self.get_param_value('cal_points')
         last_ge_pulses = self.get_param_value('last_ge_pulses',
                                               default_value=False)
-        self.cp = eval(cal_points)
+        try:
+            self.cp = eval(cal_points)
 
-        # for now assuming the same for all qubits.
-        self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
-
-        if rotate:
-            cal_states_rots = self.cp.get_rotations(last_ge_pulses,
-                    self.qb_names[0])[self.qb_names[0]]
-            self.cal_states_rotations = self.get_param_value(
-                'cal_states_rotations', default_value=cal_states_rots)
-        else:
-            self.cal_states_rotations = None
-
-        sweep_points_w_calpts = \
-            {qbn: {'sweep_points': self.cp.extend_sweep_points(
-                self.proc_data_dict['sweep_points_dict'][qbn][
-                    'sweep_points'], qbn)} for qbn in self.qb_names}
-        self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
+            # for now assuming the same for all qubits.
+            self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
+            if rotate:
+                cal_states_rots = self.cp.get_rotations(last_ge_pulses,
+                        self.qb_names[0])[self.qb_names[0]] if rotate else None
+                self.cal_states_rotations = self.get_param_value(
+                    'cal_states_rotations', default_value=cal_states_rots)
+            else:
+                self.cal_states_rotations = None
+            sweep_points_w_calpts = \
+                {qbn: {'sweep_points': self.cp.extend_sweep_points(
+                    self.proc_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'], qbn)} for qbn in self.qb_names}
+            self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
+        except TypeError as e:
+            log.error(e)
+            log.warning("Failed retrieving cal point objects or states. "
+                        "Please update measurement to provide cal point object "
+                        "in metadata. Trying to get them using the old way ...")
+            if rotate:
+                self.cal_states_rotations = self.get_param_value(
+                    'cal_states_rotations', default_value=None)
+            else:
+                self.cal_states_rotations = None
+            self.cal_states_dict = self.get_param_value('cal_states_dict',
+                                                         default_value={})
 
         # create projected_data_dict
         self.data_to_fit = self.get_param_value('data_to_fit')
         if self.cal_states_rotations is not None:
-            print('here')
             self.cal_states_analysis()
         else:
+            # this assumes data obetained with classifier detector!
+            # ie pg, pe, pf are expected to be in the value_names
             self.proc_data_dict['projected_data_dict'] = OrderedDict()
             for qbn, data_dict in self.proc_data_dict[
                     'meas_results_per_qb'].items():
                 self.proc_data_dict['projected_data_dict'][qbn] = OrderedDict()
                 for state_prob in ['pg', 'pe', 'pf']:
                     self.proc_data_dict['projected_data_dict'][qbn].update(
-                        {state_prob: data for key, data in data_dict.items() if
-                         state_prob in key})
+                        {state_prob: data for key, data in data_dict.items()
+                         if state_prob in key})
             if self.cal_states_dict is None:
                 self.cal_states_dict = {}
             self.num_cal_points = np.array(list(
@@ -465,11 +477,16 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             rotated_data_dict[qb_name] = OrderedDict()
             if len(meas_res_dict) == 1:
                 # one RO channel per qubit
-                rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
-                    a_tools.normalize_data_v3(
-                        data=meas_res_dict[list(meas_res_dict)[0]],
-                        cal_zero_points=cal_zero_points,
-                        cal_one_points=cal_one_points)
+                if cal_zero_points is None and cal_one_points is None:
+                    data = meas_res_dict[list(meas_res_dict)[0]]
+                    rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
+                        (data - np.min(data))/(np.max(data) - np.min(data))
+                else:
+                    rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
+                        a_tools.normalize_data_v3(
+                            data=meas_res_dict[list(meas_res_dict)[0]],
+                            cal_zero_points=cal_zero_points,
+                            cal_one_points=cal_one_points)
             elif list(meas_res_dict) == channel_map[qb_name]:
                 # two RO channels per qubit
                 rotated_data_dict[qb_name][data_to_fit[qb_name]], _, _ = \

@@ -10,7 +10,7 @@ from pycqed.measurement.pulse_sequences.standard_elements import \
 import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
-    get_pulse_dict_from_pars, add_preparation_pulses, pulse_list_list_seq
+    get_pulse_dict_from_pars, add_preparation_pulses, pulse_list_list_seq, sweep_pulse_params
 from pycqed.measurement.gate_set_tomography.gate_set_tomography import \
     create_experiment_list_pyGSTi_qudev as get_exp_list
 from pycqed.measurement.waveform_control import pulsar as ps
@@ -1779,8 +1779,8 @@ def pygsti_seq(qb_names, pygsti_listOfExperiments, operation_dict,
 def ro_dynamic_phase_seq(hard_sweep_dict, qbp_name, qbr_names,
                          operation_dict,
                          pulse_separation, init_state,
-                         verbose=False, cal_points=True,
-                         upload=True, return_seq=False):
+                         cal_points=True, prep_params=dict(),
+                         upload=True):
 
     """
     RO cross-dephasing measurement sequence. Measures the dynamic phase induced
@@ -1798,81 +1798,102 @@ def ro_dynamic_phase_seq(hard_sweep_dict, qbp_name, qbr_names,
     """
 
     seq_name = 'ro_dynamic_phase_sequence'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
+    dummy_ro_1 = {'pulse_type': 'GaussFilteredCosIQPulse',
+                  'I_channel': 'UHF1_ch1',
+                  'Q_channel': 'UHF1_ch2',
+                  'amplitude': 0.00001,
+                  'pulse_length': 50e-09,
+                  'pulse_delay': 0,
+                  'mod_frequency': 900.0e6,
+                  'phase': 0,
+                  'phi_skew': 0,
+                  'alpha': 1,
+                  'gaussian_filter_sigma': 1e-09,
+                  'nr_sigma': 2,
+                  'phase_lock': True,
+                  'basis_rotation': {},
+                  'operation_type': 'RO'}
+    dummy_ro_2 = {'pulse_type': 'GaussFilteredCosIQPulse',
+                  'I_channel': 'UHF2_ch1',
+                  'Q_channel': 'UHF2_ch2',
+                  'amplitude': 0.00001,
+                  'pulse_length': 50e-09,
+                  'pulse_delay': 0,
+                  'mod_frequency': 900.0e6,
+                  'phase': 0,
+                  'phi_skew': 0,
+                  'alpha': 1,
+                  'gaussian_filter_sigma': 1e-09,
+                  'nr_sigma': 2,
+                  'phase_lock': True,
+                  'basis_rotation': {},
+                  'operation_type': 'RO'}
+
+
+
+
 
     # put together n-qubit calibration point pulse lists
     # put together n-qubit ramsey pulse lists
-    cal_I_pulses = []
-    cal_X_pulses = []
-    x90_1_pulses = []  # first ramsey pulse
-    x90_2a_pulses = []  # with readout pulse
-    x90_2b_pulses = []  # without readout pulse
+    pulse_list = []
     for j, qbr_name in enumerate(qbr_names):
-        if j == 0:
-            cal_I_pulses.append(deepcopy(operation_dict['I ' + qbr_name]))
-            cal_X_pulses.append(deepcopy(operation_dict['X180 ' + qbr_name]))
-            x90_1_pulses.append(deepcopy(operation_dict['X90 ' + qbr_name]))
-            x90_2a_pulses.append(deepcopy(operation_dict['X90 ' + qbr_name]))
-            x90_2b_pulses.append(deepcopy(operation_dict['X90 ' + qbr_name]))
-            x90_2a_pulses[-1]['pulse_delay'] = pulse_separation
-            x90_2a_pulses[-1]['refpoint'] = 'start'
-            x90_2b_pulses[-1]['pulse_delay'] = pulse_separation
-        else:
-            cal_I_pulses.append(deepcopy(operation_dict['Is ' + qbr_name]))
-            cal_X_pulses.append(deepcopy(operation_dict['X180s ' + qbr_name]))
-            x90_1_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
-            x90_2a_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
-            x90_2b_pulses.append(deepcopy(operation_dict['X90s ' + qbr_name]))
+        pulse_list.append(deepcopy(operation_dict['X90 ' + qbr_name]))
+        pulse_list[-1]['name'] = f'x1_{qbr_name}'
+        pulse_list[-1]['ref_pulse'] = 'segment_start'
+        pulse_list[-1]['refpoint'] = 'start'
+
+    ro_probe = deepcopy(operation_dict['RO ' + qbp_name])
+    pulse_list.append(ro_probe)
+    pulse_list[-1]['name'] = f'ro_probe'
+    pulse_list[-1]['element_name'] = f'ro_probe'
+    pulse_list.append(dummy_ro_1)
+    pulse_list[-1]['refpoint'] = 'start'
+    pulse_list[-1]['element_name'] = f'ro_probe'
+    pulse_list.append(dummy_ro_2)
+    pulse_list[-1]['refpoint'] = 'start'
+    pulse_list[-1]['element_name'] = f'ro_probe'
+
+    for j, qbr_name in enumerate(qbr_names):
+        pulse_list.append(deepcopy(operation_dict['X90 ' + qbr_name]))
+        pulse_list[-1]['name'] = f'x2_{qbr_name}'
+        pulse_list[-1]['ref_pulse'] = 'segment_start'
+        pulse_list[-1]['refpoint'] = 'start'
+        pulse_list[-1]['pulse_delay'] = pulse_separation
+
+    ro_list = generate_mux_ro_pulse_list(qbr_names+[qbp_name], operation_dict)
+    pulse_list += ro_list
+
     if init_state == 'e':
-        x90_1_pulses.append(deepcopy(operation_dict['X180 ' + qbp_name]))
-    cal_I_pulses.append(operation_dict['RO mux'])
-    cal_X_pulses.append(operation_dict['RO mux'])
+        pulse_list.append(deepcopy(operation_dict['X180 ' + qbp_name]))
+        pulse_list[-1]['ref_pulse'] = 'segment_start'
+        pulse_list[-1]['refpoint'] = 'start'
+        pulse_list[-1]['pulse_delay'] = -100e-9
 
-    for i, theta in enumerate(phases):
-        if cal_points and (i == (len(phases)-4) or i == (len(phases)-3)):
-            pulse_list = [operation_dict['I ' + qbp_name],
-                          operation_dict['RO ' + qbp_name]]
-            el = multi_pulse_elt(3*i, station, pulse_list)
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
-            for j in range(1, 3):
-                el = multi_pulse_elt(3*i + j, station, cal_I_pulses)
-                el_list.append(el)
-                seq.append_element(el, trigger_wait=True)
-        elif cal_points and (i == (len(phases)-2) or i == (len(phases)-1)):
-            pulse_list = [operation_dict['X180 ' + qbp_name],
-                          operation_dict['RO ' + qbp_name]]
-            el = multi_pulse_elt(3*i, station, pulse_list)
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
-            for j in range(1, 3):
-                el = multi_pulse_elt(3*i + j, station, cal_X_pulses)
-                el_list.append(el)
-                seq.append_element(el, trigger_wait=True)
-        else:
-            for qbr_X90_pulse in x90_2a_pulses + x90_2b_pulses:
-                qbr_X90_pulse['phase'] = theta*180/np.pi
+    params = {f'x2_{qbr_name}.{k}': v['values']
+                   for k, v in hard_sweep_dict.items() for qbr_name in qbr_names}
+    hsl = len(list(hard_sweep_dict.values())[0]['values'])
+    params.update({f'ro_probe.amplitude': np.concatenate(
+        [ro_probe['amplitude'] * np.ones(hsl // 2), np.zeros(hsl // 2)])})
 
-            pulse_list = x90_1_pulses + [operation_dict['RO ' + qbp_name]] + \
-                         x90_2a_pulses + [operation_dict['RO mux']]
-            el = multi_pulse_elt(3*i, station, pulse_list)
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
+    print(params)
+    swept_pulses = sweep_pulse_params(pulse_list, params)
 
-            pulse_list = x90_1_pulses + x90_2b_pulses + \
-                         [operation_dict['RO mux']]
-            el = multi_pulse_elt(3*i + 1, station, pulse_list)
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
+    swept_pulses_with_prep = \
+        [add_preparation_pulses(p, operation_dict, [qbp_name], **prep_params)
+         for p in swept_pulses]
+    seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
 
+    if cal_points is not None:
+        # add calibration segments
+        seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+
+    log.debug(seq)
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        ps.Pulsar.get_instance().program_awgs(seq)
 
-    if return_seq:
-        return seq, el_list
-    else:
-        return seq_name
+    print(seq.n_acq_elements())
+
+    return seq, np.arange(seq.n_acq_elements())
 
 
 def generate_mux_ro_pulse_list(qubit_names, operation_dict, element_name='RO',
