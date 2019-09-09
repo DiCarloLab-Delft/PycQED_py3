@@ -709,51 +709,57 @@ class DeviceCCL(Instrument):
         self.int_log_det.value_names = value_names
         return self.int_log_det
 
-    def _get_ro_channels_and_labels(self, qubits):
+    # def _get_ro_channels_and_labels(self, qubits):
+    #     """
+    #     Returns
+    #         acq_instruments     : list of acquisition instruments
+    #         ro_ch_idx           : channel indices for acquisition
+    #         value_names         : convenient labels
+    #     """
+
+
+    #     channels_list = []  # tuples (instrumentname, channel, description)
+
+    #     for qb_name in reversed(qubits):
+    #         # ensures that the LSQ (last one) get's assigned the lowest ch_idx
+    #         qb = self.find_instrument(qb_name)
+    #         acq_instr_name = qb.instr_acquisition()
+
+    #         # one channel per qb
+    #         if self.ro_acq_weight_type() == 'optimal':
+    #             ch_idx = qb.ro_acq_weight_chI()
+    #             channels_list.append((acq_instr_name, ch_idx,
+    #                                   'w{} {}'.format(ch_idx, qb_name)))
+    #         else:
+    #             ch_idx = qb.ro_acq_weight_chI()
+    #             channels_list.append((acq_instr_name, ch_idx,
+    #                                   'w{} {} I'.format(ch_idx, qb_name)))
+    #             ch_idx = qb.ro_acq_weight_chQ()
+    #             channels_list.append((acq_instr_name, ch_idx,
+    #                                   'w{} {} Q'.format(ch_idx, qb_name)))
+
+    #     # for now, implement only working with one UHFLI
+    #     # acq_instruments = list(set([inst for inst, _, _ in channels_list]))
+    #     # if len(acq_instruments) != 1:
+    #     #     raise NotImplementedError("Only one acquisition"
+    #     #                               "instrument supported so far")
+    #     acq_instruments = [inst for inst, _, _ in channels_list]
+    #     ro_ch_idx = [ch for _, ch, _ in channels_list]
+    #     value_names = [n for _, _, n in channels_list]
+
+    #     return acq_instruments, ro_ch_idx, value_names
+
+    def _prep_ro_instantiate_detectors(self, qubits, acq_ch_map):
         """
-        Returns
-            acq_instruments     : list of acquisition instruments
-            ro_ch_idx           : channel indices for acquisition
-            value_names         : convenient labels
+        Instantiate acquisition detectors.
+
+        Args:
+            qubits (list of str):
+                list of qubit names that have to be prepared
+            acq_ch_map (dict)
+                dict specifying the mapping
         """
-        channels_list = []  # tuples (instrumentname, channel, description)
-
-        for qb_name in reversed(qubits):
-            # ensures that the LSQ (last one) get's assigned the lowest ch_idx
-            qb = self.find_instrument(qb_name)
-            acq_instr_name = qb.instr_acquisition()
-
-            # one channel per qb
-            if self.ro_acq_weight_type() == 'optimal':
-                ch_idx = qb.ro_acq_weight_chI()
-                channels_list.append((acq_instr_name, ch_idx,
-                                      'w{} {}'.format(ch_idx, qb_name)))
-            else:
-                ch_idx = qb.ro_acq_weight_chI()
-                channels_list.append((acq_instr_name, ch_idx,
-                                      'w{} {} I'.format(ch_idx, qb_name)))
-                ch_idx = qb.ro_acq_weight_chQ()
-                channels_list.append((acq_instr_name, ch_idx,
-                                      'w{} {} Q'.format(ch_idx, qb_name)))
-
-        # for now, implement only working with one UHFLI
-        # acq_instruments = list(set([inst for inst, _, _ in channels_list]))
-        # if len(acq_instruments) != 1:
-        #     raise NotImplementedError("Only one acquisition"
-        #                               "instrument supported so far")
-        acq_instruments = [inst for inst, _, _ in channels_list]
-        ro_ch_idx = [ch for _, ch, _ in channels_list]
-        value_names = [n for _, _, n in channels_list]
-
-        return acq_instruments, ro_ch_idx, value_names
-
-    def _prep_ro_instantiate_detectors(self, qubits):
-        """
-        collect which channels are being used for which qubit and make
-        detectors.
-        """
-        acq_instruments, ro_ch_idx, value_names = \
-            self._get_ro_channels_and_labels(qubits)
+        log.info('Instantiating readout detectors')
 
         if self.ro_acq_weight_type() == 'optimal':
             # todo: digitized mode

@@ -382,14 +382,26 @@ class Test_Device_obj(unittest.TestCase):
         ro_amp = self.ro_lutman_1.M_amp_R5()
         assert ro_amp == .2
 
+    # def test_get_ro_channels_and_labels(self):
+    #     qubits = ['q2', 'q3', 'q0', 'q13', 'q16']
+    #     self.device.ro_acq_weight_type('optimal')
+    #     self.device.prepare_readout(qubits=qubits)
+    #     # acq_ch_map = self.device._acq_ch_map
+
+
+
+
+
     def test_prepare_readout_mixer_settings(self):
         pass
 
+
+
     @classmethod
     def tearDownClass(self):
-        for inststr in list(self.device._all_instruments):
+        for instr_name in list(self.device._all_instruments):
             try:
-                inst = self.device.find_instrument(inststr)
+                inst = self.device.find_instrument(instr_name)
                 inst.close()
             except KeyError:
                 pass
