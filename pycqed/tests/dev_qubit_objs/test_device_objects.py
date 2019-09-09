@@ -77,12 +77,15 @@ class Test_Device_obj(unittest.TestCase):
         a_tools.datadir = self.MC.datadir()
 
         self.AWG_mw_0 = HDAWG.ZI_HDAWG8(
-            name='AWG_mw_0', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
+            name='AWG_mw_0', server='emulator', num_codewords=32,
+            device='dev8026', interface='1GbE')
 
         self.AWG_mw_1 = HDAWG.ZI_HDAWG8(
-            name='AWG_mw_1', server='emulator', num_codewords=32, device='dev8027', interface='1GbE')
+            name='AWG_mw_1', server='emulator', num_codewords=32,
+            device='dev8027', interface='1GbE')
         self.AWG_flux_0 = HDAWG.ZI_HDAWG8(
-            name='AWG_flux_0', server='emulator', num_codewords=32, device='dev8028', interface='1GbE')
+            name='AWG_flux_0', server='emulator', num_codewords=32,
+            device='dev8028', interface='1GbE')
 
         self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
         self.AWG8_VSM_MW_LutMan.AWG(self.AWG_mw_0.name)
@@ -351,7 +354,6 @@ class Test_Device_obj(unittest.TestCase):
         assert uhf.qas_0_thresholds_5_correlation_enable() == 0
         assert uhf.qas_0_thresholds_5_correlation_source() == 0
 
-
     def test_prepare_ro_pulses_resonator_combinations(self):
         # because not all combinations are supported the default is to
         # support
@@ -368,7 +370,20 @@ class Test_Device_obj(unittest.TestCase):
         exp_res_combs2 = [[2], [3], [0], [2, 3, 0]]
         assert res_combs2 == exp_res_combs2
 
+    def test_prepare_ro_pulses_lutman_pars_updated(self):
+        q = self.device.find_instrument('q5')
+        q.ro_pulse_amp(.4)
+        self.device.prepare_readout(['q5'])
+        ro_amp = self.ro_lutman_1.M_amp_R5()
+        assert ro_amp == .4
 
+        q.ro_pulse_amp(.2)
+        self.device.prepare_readout(['q5'])
+        ro_amp = self.ro_lutman_1.M_amp_R5()
+        assert ro_amp == .2
+
+    def test_prepare_readout_mixer_settings(self):
+        pass
 
     @classmethod
     def tearDownClass(self):

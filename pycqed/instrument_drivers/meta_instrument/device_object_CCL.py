@@ -373,10 +373,36 @@ class DeviceCCL(Instrument):
         self._prep_ro_integration_weights(qubits=qubits)
         self._prep_ro_pulses(qubits=qubits)
 
-        # TODO: Set thresholds
-        # commented out because it conflicts with setting in the qubit object
-        # self._prep_ro_pulses(qubits=qubits)
         # self._prep_ro_instantiate_detectors(qubits=qubits)
+
+
+        # TODO:
+        # - Set thresholds
+        # - Set correlation
+        # - update global readout parameters (relating to mixer settings)
+        #  the pulse mixer
+        #       - ro_mixer_alpha, ro_mixer_phi
+        #       - ro_mixer_offs_I, ro_mixer_offs_Q
+        #       - ro_acq_delay
+        #  the acquisition mixer
+        # commented out because it conflicts with setting in the qubit object
+
+
+
+
+                #     # These parameters affect all resonators.
+        #     # Should not be part of individual qubits
+
+        #     ro_lm.set('pulse_type', 'M_' + qb.ro_pulse_type())
+        #     ro_lm.set('mixer_alpha',
+        #               qb.ro_pulse_mixer_alpha())
+        #     ro_lm.set('mixer_phi',
+        #               qb.ro_pulse_mixer_phi())
+        #     ro_lm.set('mixer_offs_I', qb.ro_pulse_mixer_offs_I())
+        #     ro_lm.set('mixer_offs_Q', qb.ro_pulse_mixer_offs_Q())
+        #     ro_lm.acquisition_delay(qb.ro_acq_delay())
+
+        #     ro_lm.set_mixer_offsets()
 
 
     def _prep_ro_sources(self, qubits):
@@ -585,15 +611,40 @@ class DeviceCCL(Instrument):
 
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)
-            res_nr = qb.cfg_qubit_nr() # qubit and resonator number are identical
-            acq_instr = qb.instr_acquisition.get_instr()
+            # qubit and resonator number are identical
+            res_nr = qb.cfg_qubit_nr()
             ro_lm = qb.instr_LutMan_RO.get_instr()
 
+            # Add resonator to list of resonators in lm
             if ro_lm not in ro_lms:
                 ro_lms.append(ro_lm)
                 resonators_in_lm[ro_lm.name] = []
-
             resonators_in_lm[ro_lm.name].append(res_nr)
+
+            # update parameters of RO pulse in ro lutman
+
+
+            # ro_freq_mod was updated in self._prep_ro_sources
+            ro_lm.set('M_modulation_R{}'.format(res_nr), qb.ro_freq_mod())
+
+            ro_lm.set('M_length_R{}'.format(res_nr),
+                      qb.ro_pulse_length())
+            ro_lm.set('M_amp_R{}'.format(res_nr),
+                      qb.ro_pulse_amp())
+            ro_lm.set('M_phi_R{}'.format(res_nr),
+                      qb.ro_pulse_phi())
+            ro_lm.set('M_down_length0_R{}'.format(res_nr),
+                      qb.ro_pulse_down_length0())
+            ro_lm.set('M_down_amp0_R{}'.format(res_nr),
+                      qb.ro_pulse_down_amp0())
+            ro_lm.set('M_down_phi0_R{}'.format(res_nr),
+                      qb.ro_pulse_down_phi0())
+            ro_lm.set('M_down_length1_R{}'.format(res_nr),
+                      qb.ro_pulse_down_length1())
+            ro_lm.set('M_down_amp1_R{}'.format(res_nr),
+                      qb.ro_pulse_down_amp1())
+            ro_lm.set('M_down_phi1_R{}'.format(res_nr),
+                      qb.ro_pulse_down_phi1())
 
         for ro_lm in ro_lms:
             # list comprehension should result in a list with each
@@ -603,72 +654,7 @@ class DeviceCCL(Instrument):
             log.info('Setting resonator combinations for {} to {}'.format(
                 ro_lm.name, resonator_combs))
             ro_lm.resonator_combinations(resonator_combs)
-
-        # lutmans_to_configure = {}
-
-        # # calculate the combinations that each ro_lutman should be able to do
-        # combs = defaultdict(lambda: [[]])
-
-        # for qb_name in ro_qb_list:
-        #     qb = self.find_instrument(qb_name)
-
-        #     ro_lm = qb.instr_LutMan_RO.get_instr()
-        #     lutmans_to_configure[ro_lm.name] = ro_lm
-        #     res_nr = qb.cfg_qubit_nr()
-
-        #     # extend the list of combinations to be set for the lutman
-
-        #     combs[ro_lm.name] = (combs[ro_lm.name] +
-        #                          [c + [res_nr]
-        #                           for c in combs[ro_lm.name]])
-
-        #     # These parameters affect all resonators.
-        #     # Should not be part of individual qubits
-
-        #     ro_lm.set('pulse_type', 'M_' + qb.ro_pulse_type())
-        #     ro_lm.set('mixer_alpha',
-        #               qb.ro_pulse_mixer_alpha())
-        #     ro_lm.set('mixer_phi',
-        #               qb.ro_pulse_mixer_phi())
-        #     ro_lm.set('mixer_offs_I', qb.ro_pulse_mixer_offs_I())
-        #     ro_lm.set('mixer_offs_Q', qb.ro_pulse_mixer_offs_Q())
-        #     ro_lm.acquisition_delay(qb.ro_acq_delay())
-
-        #     # configure the lutman settings for the pulse on the resonator
-        #     # of this qubit
-
-        #     ro_lm.set('M_modulation_R{}'.format(res_nr), qb.ro_freq_mod())
-        #     ro_lm.set('M_length_R{}'.format(res_nr),
-        #               qb.ro_pulse_length())
-        #     ro_lm.set('M_amp_R{}'.format(res_nr),
-        #               qb.ro_pulse_amp())
-        #     ro_lm.set('M_phi_R{}'.format(res_nr),
-        #               qb.ro_pulse_phi())
-        #     ro_lm.set('M_down_length0_R{}'.format(res_nr),
-        #               qb.ro_pulse_down_length0())
-        #     ro_lm.set('M_down_amp0_R{}'.format(res_nr),
-        #               qb.ro_pulse_down_amp0())
-        #     ro_lm.set('M_down_phi0_R{}'.format(res_nr),
-        #               qb.ro_pulse_down_phi0())
-        #     ro_lm.set('M_down_length1_R{}'.format(res_nr),
-        #               qb.ro_pulse_down_length1())
-        #     ro_lm.set('M_down_amp1_R{}'.format(res_nr),
-        #               qb.ro_pulse_down_amp1())
-        #     ro_lm.set('M_down_phi1_R{}'.format(res_nr),
-        #               qb.ro_pulse_down_phi1())
-        # print('lm to configure',lutmans_to_configure)
-
-        # for ro_lm_name, ro_lm in lutmans_to_configure.items():
-        #     if self.ro_always_all():
-        #         all_qubit_idx_list = combs[ro_lm_name][-1]
-        #         no_of_pulses = len(combs[ro_lm_name])
-        #         combs[ro_lm_name] = [all_qubit_idx_list]*no_of_pulses
-        #         ro_lm.hardcode_cases(
-        #             list(range(1, no_of_pulses)))
-
-        #     ro_lm.resonator_combinations(combs[ro_lm_name][1:])
-        #     ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
-        #     ro_lm.set_mixer_offsets()
+            ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
 
 
