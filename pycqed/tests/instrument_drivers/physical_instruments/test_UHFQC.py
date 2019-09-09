@@ -155,3 +155,8 @@ class Test_UHFQC(unittest.TestCase):
         assert self.uhf.qas_0_correlations_5_source() == 0
         assert self.uhf.qas_0_thresholds_5_correlation_enable() == 0
         assert self.uhf.qas_0_thresholds_5_correlation_source() == 0
+
+    def test_reset_rotation_params(self):
+        self.uhf.qas_0_rotations_3(1-1j)
+        assert self.uhf.qas_0_rotations_3() == (1-1j)
+        self.uhf.reset_rotation_params

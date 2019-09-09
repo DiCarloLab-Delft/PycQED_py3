@@ -601,6 +601,7 @@ setUserReg(4, err_cnt);"""
 
         self.reset_crosstalk_matrix()
         self.reset_correlation_params()
+        self.reset_rotation_params()
 
     def reset_crosstalk_matrix(self):
         self.upload_crosstalk_matrix(np.eye(10))
@@ -613,6 +614,10 @@ setUserReg(4, err_cnt);"""
             self.set('qas_0_thresholds_{}_correlation_enable'.format(i), 0)
             self.set('qas_0_thresholds_{}_correlation_source'.format(i), 0)
 
+    def reset_rotation_params(self):
+
+        for i in range(10):
+            self.set('qas_0_rotations_{}'.format(i), 1+1j)
 
     ##########################################################################
     # 'public' functions: generic AWG/waveform support

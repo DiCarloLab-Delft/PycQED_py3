@@ -140,13 +140,12 @@ class DeviceCCL(Instrument):
         ro_acq_docstr = (
             'Determines what type of integration weights to use: '
             '\n\t SSB: Single sideband demodulation\n\t'
-            'DSB: Double sideband demodulation\n\t'
             'optimal: waveforms specified in "RO_acq_weight_func_I" '
             '\n\tand "RO_acq_weight_func_Q"')
 
         self.add_parameter('ro_acq_weight_type',
                            initial_value='SSB',
-                           vals=vals.Enum('SSB', 'DSB', 'optimal'),
+                           vals=vals.Enum('SSB', 'optimal'),
                            docstring=ro_acq_docstr,
                            parameter_class=ManualParameter)
 
@@ -370,10 +369,12 @@ class DeviceCCL(Instrument):
         """
         log.info('Configuring readout for {}'.format(qubits))
         self._prep_ro_sources(qubits=qubits)
-        self._prep_ro_assign_weights(qubits=qubits)
+        acq_ch_map = self._prep_ro_assign_weights(qubits=qubits)
+        self._prep_ro_integration_weights(qubits=qubits)
+
+        # TODO: Set thresholds
         # commented out because it conflicts with setting in the qubit object
         # self._prep_ro_pulses(qubits=qubits)
-        # self._prep_ro_integration_weights(qubits=qubits)
         # self._prep_ro_instantiate_detectors(qubits=qubits)
 
 
@@ -388,10 +389,14 @@ class DeviceCCL(Instrument):
         LO.frequency.set(self.ro_lo_freq())
         LO.power(self.ro_pow_LO())
         LO.on()
+
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)
             # set RO modulation to use common LO frequency
-            qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
+            mod_freq = qb.ro_freq() - self.ro_lo_freq()
+            log.info('Setting modulation freq of {} to {}'.format(
+                qb_name, mod_freq))
+            qb.ro_freq_mod(mod_freq)
 
             LO_q = qb.instr_LO_ro.get_instr()
             if LO_q is not LO:
@@ -400,6 +405,16 @@ class DeviceCCL(Instrument):
     def _prep_ro_assign_weights(self, qubits):
         """
         Assign acquisition weight channels to the different qubits.
+
+
+        Args:
+            qubits (list of str):
+                list of qubit names that have to be prepared
+
+        Returns:
+            acq_ch_map (dict)
+                a mapping of acquisition instruments and channels used
+                for each qubit.
 
         The assignment is done based on  the acq_instr used for each qubit
         and the number of channels used per qubit. N.B. This method of mapping
@@ -438,14 +453,80 @@ class DeviceCCL(Instrument):
             # this is for when switching back to the qubit itself
             qb.ro_acq_weight_chQ(assigned_weight+1)
 
-        # Stored as a private attribute for debug purposes.
-        self._acq_ch_map = acq_ch_map
+
 
         log.info("acq_channel_map: \n\t{}".format(acq_ch_map))
 
         log.info('Clearing UHF correlation settings')
         for acq_instr_name in acq_ch_map.keys():
             self.find_instrument(acq_instr).reset_correlation_params()
+
+        # Stored as a private attribute for debugging purposes.
+        self._acq_ch_map = acq_ch_map
+
+        return acq_ch_map
+
+    def _prep_ro_integration_weights(self, qubits):
+        """
+        Set the acquisition integration weights on each channel
+
+        Args:
+            qubits (list of str):
+                list of qubit names that have to be prepared
+        """
+        log.info('Setting integration weights')
+
+        if self.ro_acq_weight_type() == 'SSB':
+            log.info('using SSB weights')
+            for qb_name in qubits:
+                qb = self.find_instrument(qb_name)
+                acq_instr = qb.instr_acquisition.get_instr()
+
+                acq_instr.prepare_SSB_weight_and_rotation(
+                    IF=qb.ro_freq_mod(),
+                    weight_function_I=qb.ro_acq_weight_chI(),
+                    weight_function_Q=qb.ro_acq_weight_chQ())
+
+        elif self.ro_acq_weight_type() == 'optimal':
+            log.info('using optimal weights')
+            for qb_name in qubits:
+                qb = self.find_instrument(qb_name)
+                acq_instr = qb.instr_acquisition.get_instr()
+                opt_WI = qb.ro_acq_weight_func_I()
+                opt_WQ = qb.ro_acq_weight_func_Q()
+                # N.B. no support for "delay samples" relating to #63
+                if opt_WI is None or opt_WQ is None:
+                    # do not raise an exception as it should be possible to
+                    # run input avg experiments to calibrate the optimal weights.
+                    logging.warning('No optimal weights defined for'
+                                    ' {}, not updating weights'.format(qb_name))
+                else:
+                    acq_instr.set('qas_0_integration_weights_{}_real'.format(
+                                  self.ro_acq_weight_chI()), opt_WI)
+                    acq_instr.set('qas_0_integration_weights_{}_imag'.format(
+                                  self.ro_acq_weight_chI()), opt_WQ)
+                    acq_instr.set('qas_0_rotations_{}'.format(
+                                  self.ro_acq_weight_chI()), 1.0 - 1.0j)
+
+            # Note, no support for optimal IQ in mux RO
+            # Note, no support for ro_cq_rotated_SSB_when_optimal
+        else:
+            raise NotImplementedError('ro_acq_weight_type "{}" not supported'.format(
+                self.ro_acq_weight_type()))
+
+            # if self.ro_acq_digitized():
+            #     # Update the RO theshold
+            #     if (qb.ro_acq_rotated_SSB_when_optimal() and
+            #             abs(qb.ro_acq_threshold())>32):
+            #         threshold = 32
+            #         # working around the limitation of threshold in UHFQC
+            #         # which cannot be >abs(32).
+            #         # See also self._prep_ro_integration_weights scaling the weights
+            #     else:
+            #         threshold = qb.ro_acq_threshold()
+
+            #     qb.instr_acquisition.get_instr().set(
+            #         'qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
 
     def _prep_ro_pulses(self, qubits):
@@ -495,27 +576,7 @@ class DeviceCCL(Instrument):
         # only call it once with upload after setting all pulses.
         #qb._prep_ro_pulse(upload=True)
 
-    def _prep_ro_integration_weights(self, qubits):
-        """
-        Set the acquisition integration weights on each channel
-        """
-        for qb_name in qubits:
-            qb = self.find_instrument(qb_name)
-            qb._prep_ro_integration_weights()
 
-            if self.ro_acq_digitized():
-                # Update the RO theshold
-                if (qb.ro_acq_rotated_SSB_when_optimal() and
-                        abs(qb.ro_acq_threshold())>32):
-                    threshold = 32
-                    # working around the limitation of threshold in UHFQC
-                    # which cannot be >abs(32).
-                    # See also self._prep_ro_integration_weights scaling the weights
-                else:
-                    threshold = qb.ro_acq_threshold()
-                acq_ch = qb.ro_acq_weight_chI()
-                qb.instr_acquisition.get_instr().set(
-                    'qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
     def get_correlation_detector(self, qubits: list, single_int_avg: bool =False,
                                  seg_per_point: int=1):
