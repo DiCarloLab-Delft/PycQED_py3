@@ -599,8 +599,19 @@ setUserReg(4, err_cnt);"""
         for i in range(16):
             self.set('awgs_0_userregs_{}'.format(i), 0)
 
+        self.reset_crosstalk_matrix()
+        self.reset_correlation_params()
+
     def reset_crosstalk_matrix(self):
         self.upload_crosstalk_matrix(np.eye(10))
+
+    def reset_correlation_params(self):
+        for i in range(10):
+            self.set('qas_0_correlations_{}_enable'.format(i), 0)
+            self.set('qas_0_correlations_{}_source'.format(i), 0)
+        for i in range(10):
+            self.set('qas_0_thresholds_{}_correlation_enable'.format(i), 0)
+            self.set('qas_0_thresholds_{}_correlation_source'.format(i), 0)
 
 
     ##########################################################################

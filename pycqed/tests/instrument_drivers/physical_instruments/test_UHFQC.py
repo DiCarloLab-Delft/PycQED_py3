@@ -137,3 +137,21 @@ class Test_UHFQC(unittest.TestCase):
         self.uhf.reset_crosstalk_matrix()
         reset_mat = self.uhf.download_crosstalk_matrix()
         assert np.allclose(np.eye(10), reset_mat)
+
+    def test_reset_correlation_settings(self):
+        self.uhf.qas_0_correlations_5_enable(1)
+        self.uhf.qas_0_correlations_5_source(3)
+        self.uhf.qas_0_thresholds_5_correlation_enable(1)
+        self.uhf.qas_0_thresholds_5_correlation_source(3)
+
+        assert self.uhf.qas_0_correlations_5_enable() == 1
+        assert self.uhf.qas_0_correlations_5_source() == 3
+        assert self.uhf.qas_0_thresholds_5_correlation_enable() == 1
+        assert self.uhf.qas_0_thresholds_5_correlation_source() == 3
+
+        self.uhf.reset_correlation_params()
+
+        assert self.uhf.qas_0_correlations_5_enable() == 0
+        assert self.uhf.qas_0_correlations_5_source() == 0
+        assert self.uhf.qas_0_thresholds_5_correlation_enable() == 0
+        assert self.uhf.qas_0_thresholds_5_correlation_source() == 0
