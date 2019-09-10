@@ -387,7 +387,6 @@ class Test_Device_obj(unittest.TestCase):
         ro_amp = self.ro_lutman_1.M_amp_R5()
         assert ro_amp == .2
 
-
     def test_prep_ro_input_avg_det(self):
         qubits = self.device.qubits()
         self.device.ro_acq_weight_type('optimal')
@@ -426,7 +425,6 @@ class Test_Device_obj(unittest.TestCase):
             'UHFQC_1 w0 q1', 'UHFQC_1 w1 q5',
             'UHFQC_2 w0 q0']
 
-
         qubits = ['q13', 'q16', 'q1', 'q5', 'q0']
         self.device.ro_acq_weight_type('SSB')
         self.device.prepare_readout(qubits=qubits)
@@ -444,12 +442,8 @@ class Test_Device_obj(unittest.TestCase):
             'UHFQC_1 w2 q5 I', 'UHFQC_1 w3 q5 Q',
             'UHFQC_2 w0 q0 I', 'UHFQC_2 w1 q0 Q']
 
-
-
         # Note that the order of channels gets ordered per feedline
         # because of the way the multi detector works
-
-
 
     def test_prepare_ro_instantiate_detectors_int_logging(self):
         qubits = ['q13', 'q16', 'q1', 'q5', 'q0']
@@ -466,7 +460,6 @@ class Test_Device_obj(unittest.TestCase):
             'UHFQC_0 w0 q13', 'UHFQC_0 w1 q16',
             'UHFQC_1 w0 q1', 'UHFQC_1 w1 q5',
             'UHFQC_2 w0 q0']
-
 
         qubits = self.device.qubits()
         qubits = ['q13', 'q16', 'q1', 'q5', 'q0']
@@ -486,13 +479,8 @@ class Test_Device_obj(unittest.TestCase):
             'UHFQC_1 w2 q5 I', 'UHFQC_1 w3 q5 Q',
             'UHFQC_2 w0 q0 I', 'UHFQC_2 w1 q0 Q']
 
-
-
-
     def test_prepare_readout_mixer_settings(self):
         pass
-
-
 
     @classmethod
     def tearDownClass(self):
@@ -504,7 +492,7 @@ class Test_Device_obj(unittest.TestCase):
                 pass
 
 
-def test__acq_ch_map_to_IQ_ch_map():
+def test_acq_ch_map_to_IQ_ch_map():
 
     ch_map = {
         'UHFQC_0': {'q13': 0, 'q16': 2},
@@ -512,11 +500,10 @@ def test__acq_ch_map_to_IQ_ch_map():
         'UHFQC_2': {'q0': 0, 'q3': 2, 'q6': 4}}
 
     IQ_ch_map = do._acq_ch_map_to_IQ_ch_map(ch_map)
-    exp_IQ_ch_map ={
+    exp_IQ_ch_map = {
         'UHFQC_0': {'q13 I': 0, 'q13 Q': 1, 'q16 I': 2, 'q16 Q': 3},
         'UHFQC_1': {'q1 I': 0, 'q1 Q': 1, 'q4 I': 4, 'q4 Q': 5},
         'UHFQC_2': {'q0 I': 0, 'q0 Q': 1, 'q3 I': 2, 'q3 Q': 3,
-            'q6 I': 4, 'q6 Q': 5}}
+                    'q6 I': 4, 'q6 Q': 5}}
 
     assert IQ_ch_map == exp_IQ_ch_map
-

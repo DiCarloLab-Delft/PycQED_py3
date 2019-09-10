@@ -374,8 +374,7 @@ class DeviceCCL(Instrument):
                                             acq_ch_map=acq_ch_map)
 
         # TODO:
-        # - Set thresholds
-        # - Set correlation
+
         # - update global readout parameters (relating to mixer settings)
         #  the pulse mixer
         #       - ro_mixer_alpha, ro_mixer_phi
@@ -386,7 +385,6 @@ class DeviceCCL(Instrument):
 
         #     # These parameters affect all resonators.
         #     # Should not be part of individual qubits
-
         #     ro_lm.set('pulse_type', 'M_' + qb.ro_pulse_type())
         #     ro_lm.set('mixer_alpha',
         #               qb.ro_pulse_mixer_alpha())
@@ -397,6 +395,7 @@ class DeviceCCL(Instrument):
         #     ro_lm.acquisition_delay(qb.ro_acq_delay())
 
         #     ro_lm.set_mixer_offsets()
+
 
     def _prep_ro_sources(self, qubits):
         """
@@ -478,6 +477,7 @@ class DeviceCCL(Instrument):
         log.info('Clearing UHF correlation settings')
         for acq_instr_name in acq_ch_map.keys():
             self.find_instrument(acq_instr).reset_correlation_params()
+            self.find_instrument(acq_instr).reset_crosstalk_matrix()
 
         # Stored as a private attribute for debugging purposes.
         self._acq_ch_map = acq_ch_map
@@ -516,7 +516,7 @@ class DeviceCCL(Instrument):
                 if opt_WI is None or opt_WQ is None:
                     # do not raise an exception as it should be possible to
                     # run input avg experiments to calibrate the optimal weights.
-                    logging.warning('No optimal weights defined for'
+                    log.warning('No optimal weights defined for'
                                     ' {}, not updating weights'.format(qb_name))
                 else:
                     acq_instr.set('qas_0_integration_weights_{}_real'.format(
@@ -525,6 +525,23 @@ class DeviceCCL(Instrument):
                                   self.ro_acq_weight_chI()), opt_WQ)
                     acq_instr.set('qas_0_rotations_{}'.format(
                                   self.ro_acq_weight_chI()), 1.0 - 1.0j)
+                if self.ro_acq_digitized():
+                    # Update the RO theshold
+                    if (qb.ro_acq_rotated_SSB_when_optimal() and
+                            abs(qb.ro_acq_threshold())>32):
+                        threshold = 32
+                        log.warning("Clipping ro_acq threshold of {} to 32".format(qb.name))
+                        # working around the limitation of threshold in UHFQC
+                        # which cannot be >abs(32).
+                        # See also self._prep_ro_integration_weights scaling the weights
+                    else:
+                        threshold = qb.ro_acq_threshold()
+
+                    qb.instr_acquisition.get_instr().set(
+                        'qas_0_thresholds_{}_level'.format(
+                        qb.ro_acq_weight_chI()), threshold)
+                    log.info('Setting threshold of {} to {}'.format(
+                             qb.name, threshold))
 
             # Note, no support for optimal IQ in mux RO
             # Note, no support for ro_cq_rotated_SSB_when_optimal
@@ -532,58 +549,6 @@ class DeviceCCL(Instrument):
             raise NotImplementedError('ro_acq_weight_type "{}" not supported'.format(
                 self.ro_acq_weight_type()))
 
-            # if self.ro_acq_digitized():
-            #     # Update the RO theshold
-            #     if (qb.ro_acq_rotated_SSB_when_optimal() and
-            #             abs(qb.ro_acq_threshold())>32):
-            #         threshold = 32
-            #         # working around the limitation of threshold in UHFQC
-            #         # which cannot be >abs(32).
-            #         # See also self._prep_ro_integration_weights scaling the weights
-            #     else:
-            #         threshold = qb.ro_acq_threshold()
-
-            #     qb.instr_acquisition.get_instr().set(
-            #         'qas_0_thresholds_{}_level'.format(acq_ch), threshold)
-
-    # def _prep_ro_pulses(self, qubits):
-    #     for qb_name in qubits:
-    #         qb = self.find_instrument(qb_name)
-    #         qb._prep_ro_pulse(upload=False)
-
-    #     # only call it once with upload after setting all pulses.
-    #     # FIXME: This obviously fails if there are multiple feedlines
-    #     qb._prep_ro_pulse(upload=True)
-
-    #     used_acq_channels = defaultdict(int)
-
-    #     for qb_name in qubits:
-    #         qb = self.find_instrument(qb_name)
-
-    #         # all qubits use the same acquisition type
-    #         qb.ro_acq_weight_type(self.ro_acq_weight_type())
-    #         qb.ro_acq_integration_length(self.ro_acq_integration_length())
-    #         qb.ro_acq_digitized(self.ro_acq_digitized())
-    #         # hardcoded because UHFLI is not stable for arbitrary values
-    #         qb.ro_acq_input_average_length(4096/1.8e9)
-
-    #         acq_device = qb.instr_acquisition()
-
-    #         # allocate different acquisition channels
-    #         # use next available channel as I
-    #         index = used_acq_channels[acq_device]
-    #         used_acq_channels[acq_device] += 1
-    #         qb.ro_acq_weight_chI(index)
-
-    #         # use next available channel as Q if needed
-    #         if nr_of_acq_ch_per_qubit > 1:
-    #             index = used_acq_channels[acq_device]
-    #             used_acq_channels[acq_device] += 1
-    #             qb.ro_acq_weight_chQ(index)
-
-    #         qb._prep_ro_pulse(upload=False)
-    #     # only call it once with upload after setting all pulses.
-    #     #qb._prep_ro_pulse(upload=True)
 
     def _prep_ro_pulses(self, qubits):
         """
@@ -647,9 +612,15 @@ class DeviceCCL(Instrument):
             ro_lm.resonator_combinations(resonator_combs)
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
-    def get_correlation_detector(self, qubits: list, single_int_avg: bool =False,
+    def get_correlation_detector(self, qubits: list,
+                                 single_int_avg: bool =False,
                                  seg_per_point: int=1):
-
+        if len(qubits) != 2:
+            raise ValueError("Not possible to define correlation "
+                             "detector for more than two qubits")
+        if self.ro_acq_weight_type() != 'optimal':
+            raise ValueError('Correlation detector only works '
+                             'with optimal weights')
         q0 = self.find_instrument(qubits[0])
         q1 = self.find_instrument(qubits[1])
 
@@ -666,10 +637,11 @@ class DeviceCCL(Instrument):
                 integration_length=q0.ro_acq_integration_length(),
                 single_int_avg=single_int_avg,
                 seg_per_point=seg_per_point)
-            d.value_names = ['{} ch{}'.format(qubits[0], w0),
-                             '{} ch{}'.format(qubits[1], w1),
+            d.value_names = ['{} w{}'.format(qubits[0], w0),
+                             '{} w{}'.format(qubits[1], w1),
                              'Corr ({}, {})'.format(qubits[0], qubits[1])]
         else:
+            # This should raise a ValueError but exists for legacy reasons.
             d = self.get_int_avg_det(qubits=qubits)
 
         return d
@@ -714,7 +686,6 @@ class DeviceCCL(Instrument):
 
         return int_log_det
 
-
     def _prep_ro_instantiate_detectors(self, qubits, acq_ch_map):
         """
         Instantiate acquisition detectors.
@@ -731,8 +702,10 @@ class DeviceCCL(Instrument):
         self.int_avg_det = self.get_int_avg_det()
         self.int_avg_det_single = self.get_int_avg_det(single_int_avg=True)
         self.int_log_det = self.get_int_logging_detector()
-
-        # self.corr_det =
+        if len(qubits) == 2 and self.ro_acq_weight_type() == 'optimal':
+            self.corr_det = self.get_correlation_detector(qubits=qubits)
+        else:
+            self.corr_det = None
 
     def get_input_avg_det(self, **kw):
         """
@@ -767,7 +740,7 @@ class DeviceCCL(Instrument):
         """
         """
         if qubits is not None:
-            logging.warning('qubits is deprecated')
+            log.warning('qubits is deprecated')
 
         if self.ro_acq_weight_type() == 'SSB':
             result_logging_mode = 'raw'
@@ -820,6 +793,7 @@ class DeviceCCL(Instrument):
         # turn the desired channels on
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
+            log
 
             # Configure VSM
             # N.B. This configure VSM block is geared specifically to the
