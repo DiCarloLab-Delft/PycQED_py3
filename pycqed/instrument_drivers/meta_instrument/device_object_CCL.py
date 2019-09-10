@@ -112,8 +112,7 @@ class DeviceCCL(Instrument):
                        ' future will be the CC_Light.'),
             parameter_class=InstrumentRefParameter)
 
-
-        for i in range(3): # S17 has 3 feedlines
+        for i in range(3):  # S17 has 3 feedlines
             self.add_parameter('instr_acq_{}'.format(i),
                                parameter_class=InstrumentRefParameter)
         # Two microwave AWGs are used for S17
@@ -134,8 +133,6 @@ class DeviceCCL(Instrument):
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_AWG_flux_2',
                            parameter_class=InstrumentRefParameter)
-
-
 
         ro_acq_docstr = (
             'Determines what type of integration weights to use: '
@@ -300,7 +297,7 @@ class DeviceCCL(Instrument):
                                  ('mw_2', self.tim_mw_latency_2()),
                                  ('mw_3', self.tim_mw_latency_3()),
                                  ('mw_4', self.tim_mw_latency_4())]
-                                 )
+                                )
 
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
@@ -338,16 +335,16 @@ class DeviceCCL(Instrument):
                     if not using_QWG:
                         # All channels are set globally from the device object.
                         AWG.stop()
-                        for i in range(8): # assumes the AWG is an HDAWG
+                        for i in range(8):  # assumes the AWG is an HDAWG
                             AWG.set('sigouts_{}_delay'.format(i), lat_fine)
                         AWG.start()
                         ch_not_ready = 8
-                        while(ch_not_ready>0):
+                        while(ch_not_ready > 0):
                             ch_not_ready = 0
                             for i in range(8):
-                                ch_not_ready += AWG.geti('sigouts/{}/busy'.format(i))
+                                ch_not_ready += AWG.geti(
+                                    'sigouts/{}/busy'.format(i))
                             check_keyboard_interrupt()
-
 
     def prepare_fluxing(self, qubits):
         for qb_name in qubits:
@@ -376,7 +373,6 @@ class DeviceCCL(Instrument):
         self._prep_ro_instantiate_detectors(qubits=qubits,
                                             acq_ch_map=acq_ch_map)
 
-
         # TODO:
         # - Set thresholds
         # - Set correlation
@@ -388,10 +384,7 @@ class DeviceCCL(Instrument):
         #  the acquisition mixer
         # commented out because it conflicts with setting in the qubit object
 
-
-
-
-                #     # These parameters affect all resonators.
+        #     # These parameters affect all resonators.
         #     # Should not be part of individual qubits
 
         #     ro_lm.set('pulse_type', 'M_' + qb.ro_pulse_type())
@@ -404,7 +397,6 @@ class DeviceCCL(Instrument):
         #     ro_lm.acquisition_delay(qb.ro_acq_delay())
 
         #     ro_lm.set_mixer_offsets()
-
 
     def _prep_ro_sources(self, qubits):
         """
@@ -473,7 +465,8 @@ class DeviceCCL(Instrument):
             if assigned_weight > 9:
                 # There are only 10 acq_weight_channels per UHF.
                 # use optimal ro weights or read out less qubits.
-                raise ValueError('Trying to assign too many acquisition weights')
+                raise ValueError(
+                    'Trying to assign too many acquisition weights')
 
             qb.ro_acq_weight_chI(assigned_weight)
             # even if the mode does not use Q weight, we still assign this
@@ -553,7 +546,6 @@ class DeviceCCL(Instrument):
             #     qb.instr_acquisition.get_instr().set(
             #         'qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
-
     # def _prep_ro_pulses(self, qubits):
     #     for qb_name in qubits:
     #         qb = self.find_instrument(qb_name)
@@ -593,7 +585,6 @@ class DeviceCCL(Instrument):
     #     # only call it once with upload after setting all pulses.
     #     #qb._prep_ro_pulse(upload=True)
 
-
     def _prep_ro_pulses(self, qubits):
         """
         Configure the ro lutmans.
@@ -623,7 +614,6 @@ class DeviceCCL(Instrument):
             resonators_in_lm[ro_lm.name].append(res_nr)
 
             # update parameters of RO pulse in ro lutman
-
 
             # ro_freq_mod was updated in self._prep_ro_sources
             ro_lm.set('M_modulation_R{}'.format(res_nr), qb.ro_freq_mod())
@@ -657,8 +647,6 @@ class DeviceCCL(Instrument):
             ro_lm.resonator_combinations(resonator_combs)
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
-
-
     def get_correlation_detector(self, qubits: list, single_int_avg: bool =False,
                                  seg_per_point: int=1):
 
@@ -668,7 +656,7 @@ class DeviceCCL(Instrument):
         w0 = q0.ro_acq_weight_chI()
         w1 = q1.ro_acq_weight_chI()
 
-        if q0.instr_acquisition.get_instr()==q1.instr_acquisition.get_instr():
+        if q0.instr_acquisition.get_instr() == q1.instr_acquisition.get_instr():
             d = det.UHFQC_correlation_detector(
                 UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
                 thresholding=self.ro_acq_digitized(),
@@ -682,73 +670,43 @@ class DeviceCCL(Instrument):
                              '{} ch{}'.format(qubits[1], w1),
                              'Corr ({}, {})'.format(qubits[0], qubits[1])]
         else:
-            d=self.get_int_avg_det(qubits=qubits)
+            d = self.get_int_avg_det(qubits=qubits)
 
         return d
 
-    def get_int_logging_detector(self, qubits,
+    def get_int_logging_detector(self, qubits=None,
                                  result_logging_mode='raw'):
-        acq_instruments, ro_ch_idx, value_names = \
-            self._get_ro_channels_and_labels(qubits)
-        int_log_dets=[]
-        for j, acq_instrument in enumerate(np.unique(acq_instruments)):
-            #selecting the readout channesl for  each acq instrument
-            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]
-            ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
-            if j == 0:
-                CC=self.instr_CC.get_instr()
+
+        if self.ro_acq_weight_type() == 'SSB':
+            result_logging_mode = 'raw'
+        elif self.ro_acq_weight_type() == 'optimal':
+            # lin_trans includes
+            result_logging_mode = 'lin_trans'
+            if self.ro_acq_digitized():
+                result_logging_mode = 'digitized'
+
+        log.info('Setting result logging mode to {}'.format(
+            result_logging_mode))
+
+        int_log_dets = []
+        for i, acq_instr_name in enumerate(self._acq_ch_map.keys()):
+            if i == 0:
+                CC = self.instr_CC.get_instr()
             else:
                 CC = None
 
-            UHFQC = self.find_instrument(acq_instrument)
+            UHFQC = self.find_instrument(acq_instr_name)
             int_log_dets.append(det.UHFQC_integration_logging_det(
                 UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-                channels=ro_ch_idx_instr,
+                channels=self._acq_ch_map[acq_instr_name],
                 result_logging_mode=result_logging_mode,
                 integration_length=self.ro_acq_integration_length()))
-        self.int_log_det = det.Multi_Detector_UHF(detectors=int_log_dets)
-        self.int_log_det.value_names = value_names
-        return self.int_log_det
 
-    # def _get_ro_channels_and_labels(self, qubits):
-    #     """
-    #     Returns
-    #         acq_instruments     : list of acquisition instruments
-    #         ro_ch_idx           : channel indices for acquisition
-    #         value_names         : convenient labels
-    #     """
+        int_log_det = det.Multi_Detector_UHF(
+            detectors=int_log_dets,
+            detector_labels=list(self._acq_ch_map.keys()))
+        return int_log_det
 
-
-    #     channels_list = []  # tuples (instrumentname, channel, description)
-
-    #     for qb_name in reversed(qubits):
-    #         # ensures that the LSQ (last one) get's assigned the lowest ch_idx
-    #         qb = self.find_instrument(qb_name)
-    #         acq_instr_name = qb.instr_acquisition()
-
-    #         # one channel per qb
-    #         if self.ro_acq_weight_type() == 'optimal':
-    #             ch_idx = qb.ro_acq_weight_chI()
-    #             channels_list.append((acq_instr_name, ch_idx,
-    #                                   'w{} {}'.format(ch_idx, qb_name)))
-    #         else:
-    #             ch_idx = qb.ro_acq_weight_chI()
-    #             channels_list.append((acq_instr_name, ch_idx,
-    #                                   'w{} {} I'.format(ch_idx, qb_name)))
-    #             ch_idx = qb.ro_acq_weight_chQ()
-    #             channels_list.append((acq_instr_name, ch_idx,
-    #                                   'w{} {} Q'.format(ch_idx, qb_name)))
-
-    #     # for now, implement only working with one UHFLI
-    #     # acq_instruments = list(set([inst for inst, _, _ in channels_list]))
-    #     # if len(acq_instruments) != 1:
-    #     #     raise NotImplementedError("Only one acquisition"
-    #     #                               "instrument supported so far")
-    #     acq_instruments = [inst for inst, _, _ in channels_list]
-    #     ro_ch_idx = [ch for _, ch, _ in channels_list]
-    #     value_names = [n for _, _, n in channels_list]
-
-    #     return acq_instruments, ro_ch_idx, value_names
 
     def _prep_ro_instantiate_detectors(self, qubits, acq_ch_map):
         """
@@ -762,18 +720,23 @@ class DeviceCCL(Instrument):
         """
         log.info('Instantiating readout detectors')
 
-        if self.ro_acq_weight_type() == 'optimal':
-            # todo: digitized mode
-            result_logging_mode = 'lin_trans'
-            if self.ro_acq_digitized():
-                result_logging_mode = 'digitized'
-        else:
-            result_logging_mode = 'raw'
+        self.input_average_detector = self.get_input_avg_det()
+        self.int_avg_det = self.get_int_avg_det()
+        self.int_avg_det_single = self.get_int_avg_det(single_int_avg=True)
+        self.int_log_det = self.get_int_logging_detector()
 
+        # self.corr_det =
+
+    def get_input_avg_det(self, **kw):
+        """
+        Create an input average multi detector based.
+
+        The input average multi detector is based on the self._acq_ch_map
+        that gets set when calling self.prepare_readout(qubits).
+        """
         input_average_detectors = []
-        int_avg_det_singles = []
 
-        for i, acq_instr_name in enumerate(acq_ch_map.keys()):
+        for i, acq_instr_name in enumerate(self._acq_ch_map.keys()):
             if i == 0:
                 CC = self.instr_CC.get_instr()
             else:
@@ -783,70 +746,52 @@ class DeviceCCL(Instrument):
             input_average_detectors.append(det.UHFQC_input_average_detector(
                 UHFQC=UHFQC,
                 AWG=CC,
-                # channels
-                # value_names
                 nr_averages=self.ro_acq_averages(),
-                nr_samples=int(self.ro_acq_integration_length()*1.8e9)))
+                nr_samples=int(self.ro_acq_integration_length()*1.8e9)),
+                **kw)
 
-        #     int_avg_det_singles.append(det.UHFQC_integrated_average_detector(
-        #         UHFQC=UHFQC, AWG=CC,
-        #         channels= ro_ch_idx_instr,
-        #         result_logging_mode=result_logging_mode,
-        #         nr_averages=self.ro_acq_averages(),
-        #         real_imag=True, single_int_avg=True,
-        #         integration_length=self.ro_acq_integration_length()))
-
-        self.input_average_detector = det.Multi_Detector_UHF(
+        input_average_detector = det.Multi_Detector_UHF(
             detectors=input_average_detectors,
-            detector_labels=list(acq_ch_map.keys()))
-        # self.int_avg_det_single = det.Multi_Detector_UHF(detectors=int_avg_det_singles)
+            detector_labels=list(self._acq_ch_map.keys()))
 
-        # self.int_avg_det = self.get_int_avg_det(qubits=qubits)
-        # self.int_avg_det.value_names = value_names
-        # self.int_avg_det_single.value_names = value_names
+        return input_average_detector
 
-        # self.int_log_det
-
-    def get_int_avg_det(self, qubits, **kw):
+    def get_int_avg_det(self, qubits=None, **kw):
         """
-        Instantiates an integration average detector using parameters from
-        the qubit object. **kw get passed on to the class when instantiating
-        the detector function.
         """
-        if self.ro_acq_weight_type() == 'optimal':
+        if qubits is not None:
+            logging.warning('qubits is deprecated')
+
+        if self.ro_acq_weight_type() == 'SSB':
+            result_logging_mode = 'raw'
+        elif self.ro_acq_weight_type() == 'optimal':
+            # lin_trans includes
+            result_logging_mode = 'lin_trans'
             if self.ro_acq_digitized():
                 result_logging_mode = 'digitized'
-            else:
-                result_logging_mode = 'lin_trans'
-        else:
-            result_logging_mode = 'raw'
 
-        acq_instruments, ro_ch_idx, value_names = \
-            self._get_ro_channels_and_labels(qubits=qubits)
+        log.info('Setting result logging mode to {}'.format(
+            result_logging_mode))
 
-        int_avg_dets=[]
-
-        for j, acq_instrument in enumerate(np.unique(acq_instruments)):
-            #selecting the readout channesl for  each acq instrument
-            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]
-            ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
-            if j == 0:
-                CC=self.instr_CC.get_instr()
+        int_avg_dets = []
+        for i, acq_instr_name in enumerate(self._acq_ch_map.keys()):
+            if i == 0:
+                CC = self.instr_CC.get_instr()
             else:
                 CC = None
-
             int_avg_dets.append(det.UHFQC_integrated_average_detector(
-                channels=ro_ch_idx_instr,
-                UHFQC=self.find_instrument(acq_instrument),
+                channels=list(self._acq_ch_map[acq_instr_name].values()),
+                UHFQC=self.find_instrument(acq_instr_name),
                 AWG=CC,
                 result_logging_mode=result_logging_mode,
+                value_names=list(self._acq_ch_map[acq_instr_name].keys()),
                 nr_averages=self.ro_acq_averages(),
                 integration_length=self.ro_acq_integration_length(), **kw))
-        int_avg_det = det.Multi_Detector_UHF(detectors=int_avg_dets)
-        return int_avg_det
 
-
-
+        int_average_detector = det.Multi_Detector_UHF(
+            detectors=int_avg_dets,
+            detector_labels=list(self._acq_ch_map.keys()))
+        return int_average_detector
 
     def _prep_td_configure_VSM(self):
         """
@@ -1155,7 +1100,7 @@ class DeviceCCL(Instrument):
         if detector == 'correl':
             d = self.get_correlation_detector([q0, q1])
         elif detector == 'int_avg':
-            d = self.get_int_avg_det(qubits=[q0,q1])
+            d = self.get_int_avg_det(qubits=[q0, q1])
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
@@ -1359,7 +1304,7 @@ class DeviceCCL(Instrument):
 
     def measure_two_qubit_ssro(self,
                                qubits: list,
-                               nr_shots_per_case: int = 2**13, # 8192
+                               nr_shots_per_case: int = 2**13,  # 8192
                                prepare_for_timedomain: bool =True,
                                result_logging_mode='raw',
                                initialize: bool=False,
@@ -1384,10 +1329,9 @@ class DeviceCCL(Instrument):
         FIXME: should be abstracted to measure multi qubit SSRO
         """
 
-
         # off and on, not including post selection init measurements yet
-        nr_cases = 4 #  00, 01 ,10 and 11
-        nr_shots=nr_shots_per_case*nr_cases
+        nr_cases = 4  # 00, 01 ,10 and 11
+        nr_shots = nr_shots_per_case*nr_cases
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits)
@@ -1419,8 +1363,6 @@ class DeviceCCL(Instrument):
 
         d.set_child_attr('nr_shots', shots_per_meas)
 
-
-
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
         MC.soft_avg(1)
@@ -1438,9 +1380,8 @@ class DeviceCCL(Instrument):
             a = ma2.Multiplexed_Readout_Analysis()
         return a
 
-
     def measure_ssro_multi_qubit(
-            self, qubits: list, nr_shots_per_case: int = 2**13, # 8192
+            self, qubits: list, nr_shots_per_case: int = 2**13,  # 8192
             prepare_for_timedomain: bool =True,
             result_logging_mode='raw',
             initialize: bool=False, analyze=True, shots_per_meas: int=2**16,
@@ -1464,10 +1405,9 @@ class DeviceCCL(Instrument):
         log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
             self.name, qubits))
 
-
         # off and on, not including post selection init measurements yet
-        nr_cases = 4 #  00, 01 ,10 and 11
-        nr_shots=nr_shots_per_case*nr_cases
+        nr_cases = 4  # 00, 01 ,10 and 11
+        nr_shots = nr_shots_per_case*nr_cases
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits)
@@ -1499,8 +1439,6 @@ class DeviceCCL(Instrument):
 
         d.set_child_attr('nr_shots', shots_per_meas)
 
-
-
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
         MC.soft_avg(1)
@@ -1517,8 +1455,6 @@ class DeviceCCL(Instrument):
             a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
             a = ma2.Multiplexed_Readout_Analysis()
         return a
-
-
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
@@ -1641,7 +1577,7 @@ class DeviceCCL(Instrument):
                         adaptive_sampling=False,
                         adaptive_sampling_pts=None,
                         prepare_for_timedomain=True, MC=None,
-                        freq_tone = 6e9, pow_tone = -10, spec_tone=False,
+                        freq_tone=6e9, pow_tone=-10, spec_tone=False,
                         target_qubit_sequence: str='ramsey',
                         waveform_name='square',
                         single_qubit_chevron=False):
@@ -1741,7 +1677,7 @@ class DeviceCCL(Instrument):
 
         awg = fl_lutman.AWG.get_instr()
         AWG = fl_lutman.AWG.get_instr()
-        using_QWG =  isinstance(AWG, QuTech_AWG_Module)
+        using_QWG = isinstance(AWG, QuTech_AWG_Module)
         if using_QWG:
             awg_ch = fl_lutman.cfg_awg_channel()
             amp_par = awg.parameters['ch{}_amp'.format(awg_ch)]
@@ -1772,18 +1708,17 @@ class DeviceCCL(Instrument):
                                      always_prepare=True)
         else:
             d = self.get_correlation_detector(qubits=[q0, q_spec],
-                single_int_avg=True,
-                seg_per_point=1)
+                                              single_int_avg=True,
+                                              seg_per_point=1)
 
         # if we want to add a spec tone
         if spec_tone:
-            spec_source = self.find_instrument(q0).instr_spec_source.get_instr()
+            spec_source = self.find_instrument(
+                q0).instr_spec_source.get_instr()
             spec_source.pulsemod_state(False)
             spec_source.power(pow_tone)
             spec_source.frequency(freq_tone)
             spec_source.on()
-
-
 
         MC.set_sweep_function(amp_par)
         MC.set_sweep_function_2D(sw)
@@ -1870,7 +1805,7 @@ class DeviceCCL(Instrument):
                           label='Cryoscope',
                           waveform_name: str='square',
                           max_delay: float='auto',
-                          twoq_pair=[2,0],
+                          twoq_pair=[2, 0],
                           init_buffer=0,
                           prepare_for_timedomain: bool=True):
         """
@@ -1938,14 +1873,12 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(sw)
         MC.set_sweep_points(times)
         d = self.get_int_avg_det(qubits=[q0], values_per_point=2,
-                                values_per_point_suffex=['cos', 'sin'],
-                                single_int_avg=True,
-                                always_prepare=True)
+                                 values_per_point_suffex=['cos', 'sin'],
+                                 single_int_avg=True,
+                                 always_prepare=True)
         MC.set_detector_function(d)
         MC.run(label)
         ma2.Basic1DAnalysis()
-
-
 
     def measure_cryoscope_vs_amp(self, q0: str, amps,
                                  duration: float=100e-9,
@@ -2000,12 +1933,8 @@ class DeviceCCL(Instrument):
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0])
 
-
         if max_delay == 'auto':
             max_delay = duration + 40e-9
-
-
-
 
         if amp_parameter == 'channel':
             sw = fl_lutman.cfg_awg_channel_amplitude
@@ -2037,13 +1966,10 @@ class DeviceCCL(Instrument):
         MC.run(label)
         ma2.Basic1DAnalysis()
 
-
-
-
     def measure_timing_diagram(self, q0, flux_latencies, microwave_latencies,
-                       MC=None,  label='timing_{}_{}',
-                       qotheridx=2,
-                       prepare_for_timedomain: bool=True):
+                               MC=None,  label='timing_{}_{}',
+                               qotheridx=2,
+                               prepare_for_timedomain: bool=True):
         """
         Measure the ramsey-like sequence with the 40 ns flux pulses played between
         the two pi/2. While playing this sequence the delay of flux and microwave pulses
@@ -2075,16 +2001,15 @@ class DeviceCCL(Instrument):
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         fl_lutman.sq_length(40e-9)
 
-
         CC = self.instr_CC.get_instr()
 
         # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 80ns
         p = sqo.FluxTimingCalibration(q0idx,
-                              times=[40e-9],
-                              platf_cfg=self.cfg_openql_platform_fn(),
-                              flux_cw='fl_cw_06',
-                              qubit_other_idx=qotheridx,
-                              cal_points=False)
+                                      times=[40e-9],
+                                      platf_cfg=self.cfg_openql_platform_fn(),
+                                      flux_cw='fl_cw_06',
+                                      qubit_other_idx=qotheridx,
+                                      cal_points=False)
         CC.eqasm_program(p.filename)
 
         d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
@@ -2092,7 +2017,7 @@ class DeviceCCL(Instrument):
 
         s = swf.tim_flux_latency_sweep(self)
         s2 = swf.tim_mw_latency_sweep(self)
-        MC.set_sweep_functions([s,s2])
+        MC.set_sweep_functions([s, s2])
 
         MC.set_sweep_points(flux_latencies)
         MC.set_sweep_points_2D(microwave_latencies)
@@ -2100,11 +2025,10 @@ class DeviceCCL(Instrument):
 
         # This is the analysis that should be run but with custom delays
         ma2.Timing_Cal_Flux_Fine(ch_idx=0, close_figs=False,
-                               ro_latency=-100e-9,
-                               flux_latency=0,
-                               flux_pulse_duration=10e-9,
-                               mw_pulse_separation=80e-9)
-
+                                 ro_latency=-100e-9,
+                                 flux_latency=0,
+                                 flux_pulse_duration=10e-9,
+                                 mw_pulse_separation=80e-9)
 
     def measure_ramsey_with_flux_pulse(self, q0: str, times,
                                        MC=None,
@@ -2344,7 +2268,6 @@ class DeviceCCL(Instrument):
             interleaving_cliffords=[None], label='TwoQubit_RB_{}seeds_icl{}_{}_{}',
             recompile: bool ='as needed', cal_points=True,
             flux_codeword='fl_cw_01'):
-
         '''
         Measures two qubit randomized benchmarking, including
         the leakage estimate.
@@ -2507,8 +2430,6 @@ class DeviceCCL(Instrument):
         ma2.InterleavedRandomizedBenchmarkingAnalysis(
             ts_base=None, ts_int=None,
             label_base='icl[None]', label_int='icl[-4368]')
-
-
 
     def measure_two_qubit_purity_benchmarking(
             self, qubits, MC,
@@ -2859,8 +2780,6 @@ class DeviceCCL(Instrument):
         else:
             sweep_points = np.repeat(nr_cliffords, 2)
 
-
-
         counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
             'counter_param': counter_param,
@@ -3029,9 +2948,6 @@ class DeviceCCL(Instrument):
                 self.find_instrument(
                     q_osc).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
-
-
-
 
     def create_dep_graph(self):
         dags = []

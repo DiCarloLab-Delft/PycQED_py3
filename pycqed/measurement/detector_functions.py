@@ -1661,6 +1661,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                  channels: list=(0, 1, 2, 3),
                  result_logging_mode: str='raw',
                  real_imag: bool=True,
+                 value_names:list = None,
                  seg_per_point: int =1, single_int_avg: bool =False,
                  chunk_size: int=None,
                  values_per_point: int=1, values_per_point_suffex: list=None,
@@ -1719,8 +1720,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.channels = channels
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            self.value_names[i] = '{} w{}'.format(result_logging_mode,
-                                                  channel)
+            if value_names is None:
+                self.value_names[i] = '{} w{}'.format(result_logging_mode,
+                                                      channel)
+            else:
+                self.value_names[i] = 'w{} {}'.format(channel,
+                                                      value_names[i])
         if result_logging_mode == 'raw':
             # Units are only valid when using SSB or DSB demodulation.
             # value corrsponds to the peak voltage of a cosine with the
