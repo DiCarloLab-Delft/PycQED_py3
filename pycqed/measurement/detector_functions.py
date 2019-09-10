@@ -1661,7 +1661,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                  channels: list=(0, 1, 2, 3),
                  result_logging_mode: str='raw',
                  real_imag: bool=True,
-                 value_names:list = None,
+                 value_names: list = None,
                  seg_per_point: int =1, single_int_avg: bool =False,
                  chunk_size: int=None,
                  values_per_point: int=1, values_per_point_suffex: list=None,
@@ -2090,6 +2090,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                  nr_shots: int=4094,
                  channels: list=(0, 1),
                  result_logging_mode: str='raw',
+                 value_names: list = None,
                  always_prepare: bool=False,
                  prepare_function=None,
                  prepare_function_kwargs: dict=None,
@@ -2125,8 +2126,13 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            self.value_names[i] = '{} w{}'.format(result_logging_mode,
-                                                  channel)
+            if value_names is None:
+                self.value_names[i] = '{} w{}'.format(result_logging_mode,
+                                                      channel)
+            else:
+                self.value_names[i] = 'w{} {}'.format(channel,
+                                                      value_names[i])
+
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
             self.scaling_factor = 1  # /(1.8e9*integration_length)

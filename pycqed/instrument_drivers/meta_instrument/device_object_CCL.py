@@ -688,6 +688,11 @@ class DeviceCCL(Instrument):
         log.info('Setting result logging mode to {}'.format(
             result_logging_mode))
 
+        if self.ro_acq_weight_type() == 'SSB':
+            acq_ch_map = _acq_ch_map_to_IQ_ch_map(self._acq_ch_map)
+        else:
+            acq_ch_map = self._acq_ch_map
+
         int_log_dets = []
         for i, acq_instr_name in enumerate(self._acq_ch_map.keys()):
             if i == 0:
@@ -697,14 +702,16 @@ class DeviceCCL(Instrument):
 
             UHFQC = self.find_instrument(acq_instr_name)
             int_log_dets.append(det.UHFQC_integration_logging_det(
-                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-                channels=self._acq_ch_map[acq_instr_name],
+                channels=list(acq_ch_map[acq_instr_name].values()),
+                value_names=list(acq_ch_map[acq_instr_name].keys()),
+                UHFQC=UHFQC, AWG=CC,
                 result_logging_mode=result_logging_mode,
                 integration_length=self.ro_acq_integration_length()))
 
         int_log_det = det.Multi_Detector_UHF(
             detectors=int_log_dets,
             detector_labels=list(self._acq_ch_map.keys()))
+
         return int_log_det
 
 
@@ -786,10 +793,10 @@ class DeviceCCL(Instrument):
                 CC = None
             int_avg_dets.append(det.UHFQC_integrated_average_detector(
                 channels=list(acq_ch_map[acq_instr_name].values()),
+                value_names=list(acq_ch_map[acq_instr_name].keys()),
                 UHFQC=self.find_instrument(acq_instr_name),
                 AWG=CC,
                 result_logging_mode=result_logging_mode,
-                value_names=list(acq_ch_map[acq_instr_name].keys()),
                 nr_averages=self.ro_acq_averages(),
                 integration_length=self.ro_acq_integration_length(), **kw))
 

@@ -34,7 +34,8 @@ from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
 
 from pycqed.measurement.detector_functions import Multi_Detector_UHF, \
-    UHFQC_input_average_detector, UHFQC_integrated_average_detector
+    UHFQC_input_average_detector, UHFQC_integrated_average_detector, \
+    UHFQC_integration_logging_det
 
 try:
     import openql
@@ -409,8 +410,7 @@ class Test_Device_obj(unittest.TestCase):
             'UHFQC_1 ch0', 'UHFQC_1 ch1',
             'UHFQC_0 ch0', 'UHFQC_0 ch1']
 
-    def test_prep_ro_instantiate_detectors_int_avg(self):
-        qubits = self.device.qubits()
+    def test_prepare_ro_instantiate_detectors_int_avg(self):
         qubits = ['q13', 'q16', 'q1', 'q5', 'q0']
         self.device.ro_acq_weight_type('optimal')
         self.device.prepare_readout(qubits=qubits)
@@ -427,7 +427,6 @@ class Test_Device_obj(unittest.TestCase):
             'UHFQC_2 w0 q0']
 
 
-        qubits = self.device.qubits()
         qubits = ['q13', 'q16', 'q1', 'q5', 'q0']
         self.device.ro_acq_weight_type('SSB')
         self.device.prepare_readout(qubits=qubits)
@@ -452,43 +451,40 @@ class Test_Device_obj(unittest.TestCase):
 
 
 
-    def test_prep_ro_instantiate_detectors_int_logging(self):
-        pass
+    def test_prepare_ro_instantiate_detectors_int_logging(self):
+        qubits = ['q13', 'q16', 'q1', 'q5', 'q0']
+        self.device.ro_acq_weight_type('optimal')
+        self.device.prepare_readout(qubits=qubits)
+
+        int_log_det = self.device.int_log_det
+        assert isinstance(int_log_det, Multi_Detector_UHF)
+        assert len(int_log_det.detectors) == 3
+        for ch_det in int_log_det.detectors:
+            assert isinstance(ch_det, UHFQC_integration_logging_det)
+        # Note that UHFQC_2 is first because q0 is the first in device.qubits
+        assert int_log_det.value_names == [
+            'UHFQC_0 w0 q13', 'UHFQC_0 w1 q16',
+            'UHFQC_1 w0 q1', 'UHFQC_1 w1 q5',
+            'UHFQC_2 w0 q0']
 
 
+        qubits = self.device.qubits()
+        qubits = ['q13', 'q16', 'q1', 'q5', 'q0']
+        self.device.ro_acq_weight_type('SSB')
+        self.device.prepare_readout(qubits=qubits)
 
-    def test_prep_ro_get_int_logging_detector(self):
-        pass
-    # def test_prep_ro_instantiate_detectors_int_avg(self):
-    #     qubits = self.device.qubits()
-    #     self.device.ro_acq_weight_type('optimal')
-    #     self.device.prepare_readout(qubits=qubits)
-
-    #     exp_ch_map = {
-    #         'UHFQC_0': {'q13': 0, 'q16': 1},
-    #         'UHFQC_1': {'q1': 0, 'q4': 1, 'q5': 2, 'q7': 3, 'q8': 4,
-    #                     'q10': 5, 'q11': 6, 'q14': 7, 'q15': 8},
-    #         'UHFQC_2': {'q0': 0, 'q2': 1, 'q3': 2, 'q6': 3, 'q9': 4, 'q12': 5}}
-
-    #     inp_avg_det = self.device.input_average_detector
-    #     assert isinstance(inp_avg_det, Multi_Detector_UHF)
-    #     assert len(inp_avg_det.detectors) == 3
-    #     for ch_det in inp_avg_det.detectors:
-    #         assert isinstance(ch_det, UHFQC_input_average_detector)
-    #     # Note taht UHFQC_2 is first because q0 is the first in device.qubits
-    #     assert inp_avg_det.value_names == [
-    #         'UHFQC_2 ch0', 'UHFQC_2 ch1',
-    #         'UHFQC_1 ch0', 'UHFQC_1 ch1',
-    #         'UHFQC_0 ch0', 'UHFQC_0 ch1']
-
-
-
-        # assert isinstance(self.device.int_avg_detector, Multi_Detector_UHF)
-        # assert isinstance(self.device.int_avg_det_single, Multi_Detector_UHF)
-
-
-    #     # acq_ch_map = self.device._acq_ch_map
-
+        int_log_det = self.device.int_log_det
+        assert isinstance(int_log_det, Multi_Detector_UHF)
+        assert len(int_log_det.detectors) == 3
+        for ch_det in int_log_det.detectors:
+            assert isinstance(ch_det, UHFQC_integration_logging_det)
+        # Note that UHFQC_2 is first because q0 is the first in device.qubits
+        assert int_log_det.value_names == [
+            'UHFQC_0 w0 q13 I', 'UHFQC_0 w1 q13 Q',
+            'UHFQC_0 w2 q16 I', 'UHFQC_0 w3 q16 Q',
+            'UHFQC_1 w0 q1 I', 'UHFQC_1 w1 q1 Q',
+            'UHFQC_1 w2 q5 I', 'UHFQC_1 w3 q5 Q',
+            'UHFQC_2 w0 q0 I', 'UHFQC_2 w1 q0 Q']
 
 
 
