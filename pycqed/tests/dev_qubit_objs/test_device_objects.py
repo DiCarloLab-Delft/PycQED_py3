@@ -32,6 +32,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC,
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
+
 from pycqed.measurement.detector_functions import Multi_Detector_UHF, \
     UHFQC_input_average_detector, UHFQC_integrated_average_detector
 
@@ -505,3 +506,21 @@ class Test_Device_obj(unittest.TestCase):
                 inst.close()
             except KeyError:
                 pass
+
+
+def test__acq_ch_map_to_IQ_ch_map():
+
+    ch_map = {
+        'UHFQC_0': {'q13': 0, 'q16': 2},
+        'UHFQC_1': {'q1': 0, 'q4': 4},
+        'UHFQC_2': {'q0': 0, 'q3': 2, 'q6': 4}}
+
+    IQ_ch_map = do._acq_ch_map_to_IQ_ch_map(ch_map)
+    exp_IQ_ch_map ={
+        'UHFQC_0': {'q13 I': 0, 'q13 Q': 1, 'q16 I': 2, 'q16 Q': 3},
+        'UHFQC_1': {'q1 I': 0, 'q1 Q': 1, 'q4 I': 4, 'q4 Q': 5},
+        'UHFQC_2': {'q0 I': 0, 'q0 Q': 1, 'q3 I': 2, 'q3 Q': 3,
+            'q6 I': 4, 'q6 Q': 5}}
+
+    assert IQ_ch_map == exp_IQ_ch_map
+

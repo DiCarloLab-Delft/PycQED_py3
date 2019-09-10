@@ -773,18 +773,23 @@ class DeviceCCL(Instrument):
         log.info('Setting result logging mode to {}'.format(
             result_logging_mode))
 
+        if self.ro_acq_weight_type() == 'SSB':
+            acq_ch_map = _acq_ch_map_to_IQ_ch_map(self._acq_ch_map)
+        else:
+            acq_ch_map = self._acq_ch_map
+
         int_avg_dets = []
-        for i, acq_instr_name in enumerate(self._acq_ch_map.keys()):
+        for i, acq_instr_name in enumerate(acq_ch_map.keys()):
             if i == 0:
                 CC = self.instr_CC.get_instr()
             else:
                 CC = None
             int_avg_dets.append(det.UHFQC_integrated_average_detector(
-                channels=list(self._acq_ch_map[acq_instr_name].values()),
+                channels=list(acq_ch_map[acq_instr_name].values()),
                 UHFQC=self.find_instrument(acq_instr_name),
                 AWG=CC,
                 result_logging_mode=result_logging_mode,
-                value_names=list(self._acq_ch_map[acq_instr_name].keys()),
+                value_names=list(acq_ch_map[acq_instr_name].keys()),
                 nr_averages=self.ro_acq_averages(),
                 integration_length=self.ro_acq_integration_length(), **kw))
 
@@ -3029,3 +3034,13 @@ class DeviceCCL(Instrument):
 
         self._dag = dag
         return dag
+
+
+def _acq_ch_map_to_IQ_ch_map(acq_ch_map):
+    acq_ch_map_IQ = {}
+    for acq_instr, ch_map in acq_ch_map.items():
+        acq_ch_map_IQ[acq_instr] = {}
+        for qubit, ch in ch_map.items():
+            acq_ch_map_IQ[acq_instr]['{} I'.format(qubit)] = ch
+            acq_ch_map_IQ[acq_instr]['{} Q'.format(qubit)] = ch + 1
+    return acq_ch_map_IQ
