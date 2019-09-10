@@ -32,7 +32,8 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC,
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
-
+from pycqed.measurement.detector_functions import Multi_Detector_UHF, \
+    UHFQC_input_average_detector
 
 try:
     import openql
@@ -162,6 +163,8 @@ class Test_Device_obj(unittest.TestCase):
         self.device.instr_AWG_mw_0(self.AWG_mw_0.name)
         self.device.instr_AWG_mw_1(self.AWG_mw_1.name)
         self.device.instr_AWG_flux_0(self.AWG_flux_0.name)
+
+        self.device.ro_lo_freq(6e9)
 
     def test_get_dio_map(self):
         self.device.instr_CC(self.CCL.name)
@@ -382,10 +385,67 @@ class Test_Device_obj(unittest.TestCase):
         ro_amp = self.ro_lutman_1.M_amp_R5()
         assert ro_amp == .2
 
-    # def test_get_ro_channels_and_labels(self):
-    #     qubits = ['q2', 'q3', 'q0', 'q13', 'q16']
+    def test_prep_ro_instantiate_detectors_int_logging(self):
+        pass
+
+
+
+    def test_prep_ro_instantiate_detectors_int_avg(self):
+        pass
+
+    def test_prep_ro_get_int_logging_detector(self):
+        pass
+
+    def test_prep_ro_input_avg_det(self):
+        qubits = self.device.qubits()
+        self.device.ro_acq_weight_type('optimal')
+        self.device.prepare_readout(qubits=qubits)
+
+        exp_ch_map = {
+            'UHFQC_0': {'q13': 0, 'q16': 1},
+            'UHFQC_1': {'q1': 0, 'q4': 1, 'q5': 2, 'q7': 3, 'q8': 4,
+                        'q10': 5, 'q11': 6, 'q14': 7, 'q15': 8},
+            'UHFQC_2': {'q0': 0, 'q2': 1, 'q3': 2, 'q6': 3, 'q9': 4, 'q12': 5}}
+
+        inp_avg_det = self.device.input_average_detector
+        assert isinstance(inp_avg_det, Multi_Detector_UHF)
+        assert len(inp_avg_det.detectors) == 3
+        for ch_det in inp_avg_det.detectors:
+            assert isinstance(ch_det, UHFQC_input_average_detector)
+        # Note taht UHFQC_2 is first because q0 is the first in device.qubits
+        assert inp_avg_det.value_names == [
+            'UHFQC_2 ch0', 'UHFQC_2 ch1',
+            'UHFQC_1 ch0', 'UHFQC_1 ch1',
+            'UHFQC_0 ch0', 'UHFQC_0 ch1']
+
+    # def test_prep_ro_instantiate_detectors_int_avg(self):
+    #     qubits = self.device.qubits()
     #     self.device.ro_acq_weight_type('optimal')
     #     self.device.prepare_readout(qubits=qubits)
+
+    #     exp_ch_map = {
+    #         'UHFQC_0': {'q13': 0, 'q16': 1},
+    #         'UHFQC_1': {'q1': 0, 'q4': 1, 'q5': 2, 'q7': 3, 'q8': 4,
+    #                     'q10': 5, 'q11': 6, 'q14': 7, 'q15': 8},
+    #         'UHFQC_2': {'q0': 0, 'q2': 1, 'q3': 2, 'q6': 3, 'q9': 4, 'q12': 5}}
+
+    #     inp_avg_det = self.device.input_average_detector
+    #     assert isinstance(inp_avg_det, Multi_Detector_UHF)
+    #     assert len(inp_avg_det.detectors) == 3
+    #     for ch_det in inp_avg_det.detectors:
+    #         assert isinstance(ch_det, UHFQC_input_average_detector)
+    #     # Note taht UHFQC_2 is first because q0 is the first in device.qubits
+    #     assert inp_avg_det.value_names == [
+    #         'UHFQC_2 ch0', 'UHFQC_2 ch1',
+    #         'UHFQC_1 ch0', 'UHFQC_1 ch1',
+    #         'UHFQC_0 ch0', 'UHFQC_0 ch1']
+
+
+
+        # assert isinstance(self.device.int_avg_detector, Multi_Detector_UHF)
+        # assert isinstance(self.device.int_avg_det_single, Multi_Detector_UHF)
+
+
     #     # acq_ch_map = self.device._acq_ch_map
 
 

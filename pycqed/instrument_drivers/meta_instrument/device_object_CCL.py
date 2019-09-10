@@ -373,7 +373,8 @@ class DeviceCCL(Instrument):
         self._prep_ro_integration_weights(qubits=qubits)
         self._prep_ro_pulses(qubits=qubits)
 
-        # self._prep_ro_instantiate_detectors(qubits=qubits)
+        self._prep_ro_instantiate_detectors(qubits=qubits,
+                                            acq_ch_map=acq_ch_map)
 
 
         # TODO:
@@ -769,39 +770,42 @@ class DeviceCCL(Instrument):
         else:
             result_logging_mode = 'raw'
 
-        input_average_detectors=[]
-        int_avg_det_singles=[]
+        input_average_detectors = []
+        int_avg_det_singles = []
 
-        for j, acq_instrument in enumerate(np.unique(acq_instruments)):
-            #selecting the readout channesl for  each acq instrument
-            indexes=[i for i in range(len(ro_ch_idx)) if acq_instruments[i]==acq_instrument]
-            ro_ch_idx_instr=np.array(ro_ch_idx)[indexes]
-            if j == 0:
-                CC=self.instr_CC.get_instr()
+        for i, acq_instr_name in enumerate(acq_ch_map.keys()):
+            if i == 0:
+                CC = self.instr_CC.get_instr()
             else:
                 CC = None
+            UHFQC = self.find_instrument(acq_instr_name)
 
-            UHFQC = self.find_instrument(acq_instrument)
             input_average_detectors.append(det.UHFQC_input_average_detector(
                 UHFQC=UHFQC,
                 AWG=CC,
+                # channels
+                # value_names
                 nr_averages=self.ro_acq_averages(),
                 nr_samples=int(self.ro_acq_integration_length()*1.8e9)))
 
-            int_avg_det_singles.append(det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC, AWG=CC,
-                channels= ro_ch_idx_instr,
-                result_logging_mode=result_logging_mode,
-                nr_averages=self.ro_acq_averages(),
-                real_imag=True, single_int_avg=True,
-                integration_length=self.ro_acq_integration_length()))
+        #     int_avg_det_singles.append(det.UHFQC_integrated_average_detector(
+        #         UHFQC=UHFQC, AWG=CC,
+        #         channels= ro_ch_idx_instr,
+        #         result_logging_mode=result_logging_mode,
+        #         nr_averages=self.ro_acq_averages(),
+        #         real_imag=True, single_int_avg=True,
+        #         integration_length=self.ro_acq_integration_length()))
 
-        self.input_average_detector = det.Multi_Detector_UHF(detectors=input_average_detectors)
-        self.int_avg_det_single = det.Multi_Detector_UHF(detectors=int_avg_det_singles)
+        self.input_average_detector = det.Multi_Detector_UHF(
+            detectors=input_average_detectors,
+            detector_labels=list(acq_ch_map.keys()))
+        # self.int_avg_det_single = det.Multi_Detector_UHF(detectors=int_avg_det_singles)
 
-        self.int_avg_det = self.get_int_avg_det(qubits=qubits)
-        self.int_avg_det.value_names = value_names
-        self.int_avg_det_single.value_names = value_names
+        # self.int_avg_det = self.get_int_avg_det(qubits=qubits)
+        # self.int_avg_det.value_names = value_names
+        # self.int_avg_det_single.value_names = value_names
+
+        # self.int_log_det
 
     def get_int_avg_det(self, qubits, **kw):
         """
