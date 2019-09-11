@@ -2769,7 +2769,7 @@ class DeviceCCL(Instrument):
         if calibrate_optimal_weights:
             # Important that this happens before calibrating the weights
             # 10 is the number of channels in the UHFQC
-            for i in range(10):
+            for i in range(9):
                 UHFQC.set('qas_0_trans_offset_weightfunction_{}'.format(i), 0)
 
             # This resets the crosstalk correction matrix
@@ -2804,7 +2804,7 @@ class DeviceCCL(Instrument):
 
     def calibrate_cz_single_q_phase(self, q_osc: str, q_spec: str,
                                     amps,
-                                    waveform='cz_z',
+                                    waveform='cz_NE',
                                     update: bool = True,
                                     prepare_for_timedomain: bool=True, MC=None):
         """
@@ -2840,13 +2840,19 @@ class DeviceCCL(Instrument):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
+        which_gate = waveform[-2:]
+        flux_codeword = waveform[:-3]
+
         q0idx = self.find_instrument(q_osc).cfg_qubit_nr()
         q1idx = self.find_instrument(q_spec).cfg_qubit_nr()
         fl_lutman_q0 = self.find_instrument(
             q_osc).instr_LutMan_Flux.get_instr()
 
+        phase_par = fl_lutman_q0.parameters['cz_phase_corr_amp_{}'.format(which_gate)]
+
         p = mqo.conditional_oscillation_seq(
             q0idx, q1idx,
+            flux_codeword=flux_codeword,
             platf_cfg=self.cfg_openql_platform_fn(),
             CZ_disabled=False, add_cal_points=False,
             angles=[90])
@@ -2855,9 +2861,8 @@ class DeviceCCL(Instrument):
         CC.eqasm_program(p.filename)
         CC.start()
 
-        s = swf.FLsweep(fl_lutman_q0, fl_lutman_q0.cz_phase_corr_amp,
+        s = swf.FLsweep(fl_lutman_q0, phase_par,
                         waveform)
-
         d = self.get_correlation_detector(qubits=[q_osc, q_spec],
                                           single_int_avg=True, seg_per_point=2)
         d.detector_control = 'hard'
@@ -2877,8 +2882,7 @@ class DeviceCCL(Instrument):
             return False
         else:
             if update:
-                self.find_instrument(
-                    q_osc).fl_cz_phase_corr_amp(phase_corr_amp)
+                phase_par(phase_corr_amp)
             return True
 
 
