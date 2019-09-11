@@ -548,6 +548,7 @@ setUserReg(4, err_cnt);"""
         # Configure the result logger to not do any averaging
         self.qas_0_result_length(1000)
         self.qas_0_result_averages(pow(2, LOG2_AVG_CNT))
+        # result_logging_mode 2 => raw (IQ)
         self.qas_0_result_source(2)
 
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
@@ -599,9 +600,25 @@ setUserReg(4, err_cnt);"""
         for i in range(16):
             self.set('awgs_0_userregs_{}'.format(i), 0)
 
+        self.reset_crosstalk_matrix()
+        self.reset_correlation_params()
+        self.reset_rotation_params()
+
     def reset_crosstalk_matrix(self):
         self.upload_crosstalk_matrix(np.eye(10))
 
+    def reset_correlation_params(self):
+        for i in range(10):
+            self.set('qas_0_correlations_{}_enable'.format(i), 0)
+            self.set('qas_0_correlations_{}_source'.format(i), 0)
+        for i in range(10):
+            self.set('qas_0_thresholds_{}_correlation_enable'.format(i), 0)
+            self.set('qas_0_thresholds_{}_correlation_source'.format(i), 0)
+
+    def reset_rotation_params(self):
+
+        for i in range(10):
+            self.set('qas_0_rotations_{}'.format(i), 1+1j)
 
     ##########################################################################
     # 'public' functions: generic AWG/waveform support
@@ -1302,6 +1319,7 @@ setTrigger(0);
             self.set('qas_0_thresholds_{}_level'.format(i), 0.01)
 
         # Also adder by us
+        # result_source 0 => lin_trans readout(includes crosstalk corr)
         self.qas_0_result_source(0)
         self.qas_0_result_enable(1)
         self.qas_0_result_statistics_enable(0)

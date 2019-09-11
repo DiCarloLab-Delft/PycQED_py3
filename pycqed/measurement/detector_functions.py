@@ -117,11 +117,16 @@ class Multi_Detector(Detector_Function):
     """
 
     def __init__(self, detectors: list,
-                 det_idx_suffix: bool=True, **kw):
+                 detector_labels: list=None,
+                 det_idx_prefix: bool=True, **kw):
         """
-        detectors     (list): a list of detectors to combine.
-        det_idx_suffix(bool): if True suffixes the value names with
-                "_det{idx}" where idx refers to the relevant detector.
+        detectors     (list):
+            a list of detectors to combine.
+        det_idx_prefix(bool):
+            if True suffixes the value names with
+        detector_labels (list):
+            if not None, will be used instead instead of
+            "det{idx}_" as a prefix for the different channels
         """
         self.detectors = detectors
         self.name = 'Multi_detector'
@@ -129,9 +134,13 @@ class Multi_Detector(Detector_Function):
         self.value_units = []
         for i, detector in enumerate(detectors):
             for detector_value_name in detector.value_names:
-                if det_idx_suffix:
-                    detector_value_name += '_det{}'.format(i)
-                self.value_names.append(detector_value_name)
+                if det_idx_prefix:
+                    if detector_labels is None:
+                        val_name = 'det{} '.format(i) + detector_value_name
+                    else:
+                        val_name = detector_labels[i] + \
+                            ' ' + detector_value_name
+                self.value_names.append(val_name)
             for detector_value_unit in detector.value_units:
                 self.value_units.append(detector_value_unit)
 
@@ -1266,14 +1275,14 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         if self.prepare_for_each_point:
             self.prepare()
         time.sleep(self.delay)
-        if qc.__version__ < '0.1.11': 
+        if qc.__version__ < '0.1.11':
             return self.SH.get_power_at_freq(Navg=self.Navg)
-        else: 
+        else:
             self.SH.avg(self.Navg)
             return self.SH.power()
 
     def prepare(self, **kw):
-        if qc.__version__ < '0.1.11': 
+        if qc.__version__ < '0.1.11':
             self.SH.prepare_for_measurement()
         if self.prepare_function is not None:
             self.prepare_function(**self.prepare_function_kwargs)
@@ -1575,7 +1584,9 @@ class UHFQC_input_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
         self.nr_sweep_points = self.nr_samples
-        self.UHFQC.acquisition_initialize(samples=self.nr_samples, averages=self.nr_averages, channels=self.channels, mode='iavg')
+        self.UHFQC.acquisition_initialize(
+            samples=self.nr_samples, averages=self.nr_averages,
+            channels=self.channels, mode='iavg')
 
     def finish(self):
         self.UHFQC.acquisition_finalize()
@@ -1647,8 +1658,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     def __init__(self, UHFQC, AWG=None,
                  integration_length: float=1e-6, nr_averages: int=1024,
-                 channels: list=(0, 1, 2, 3), result_logging_mode: str='raw',
+                 channels: list=(0, 1, 2, 3),
+                 result_logging_mode: str='raw',
                  real_imag: bool=True,
+                 value_names: list = None,
                  seg_per_point: int =1, single_int_avg: bool =False,
                  chunk_size: int=None,
                  values_per_point: int=1, values_per_point_suffex: list=None,
@@ -1707,8 +1720,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.channels = channels
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            self.value_names[i] = '{} w{}'.format(result_logging_mode,
-                                                  channel)
+            if value_names is None:
+                self.value_names[i] = '{} w{}'.format(result_logging_mode,
+                                                      channel)
+            else:
+                self.value_names[i] = 'w{} {}'.format(channel,
+                                                      value_names[i])
         if result_logging_mode == 'raw':
             # Units are only valid when using SSB or DSB demodulation.
             # value corrsponds to the peak voltage of a cosine with the
@@ -2001,9 +2018,9 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             # Duplicate source channel to the correlation channel and select
             # second channel as channel to correlate with.
             copy_int_weights_real = \
-                self.UHFQC.get('qas_0_integration_weights_{}_real'.format(corr[0]))            
+                self.UHFQC.get('qas_0_integration_weights_{}_real'.format(corr[0]))
             copy_int_weights_imag = \
-                self.UHFQC.get('qas_0_integration_weights_{}_imag'.format(corr[0]))            
+                self.UHFQC.get('qas_0_integration_weights_{}_imag'.format(corr[0]))
             self.UHFQC.set(
                 'qas_0_integration_weights_{}_real'.format(correlation_channel),
                 copy_int_weights_real)
@@ -2073,6 +2090,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                  nr_shots: int=4094,
                  channels: list=(0, 1),
                  result_logging_mode: str='raw',
+                 value_names: list = None,
                  always_prepare: bool=False,
                  prepare_function=None,
                  prepare_function_kwargs: dict=None,
@@ -2108,8 +2126,13 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            self.value_names[i] = '{} w{}'.format(result_logging_mode,
-                                                  channel)
+            if value_names is None:
+                self.value_names[i] = '{} w{}'.format(result_logging_mode,
+                                                      channel)
+            else:
+                self.value_names[i] = 'w{} {}'.format(channel,
+                                                      value_names[i])
+
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
             self.scaling_factor = 1  # /(1.8e9*integration_length)
@@ -2309,7 +2332,7 @@ class UHFQC_statistics_logging_det(Soft_Detector):
 
         # Add total number of state errors at the end
         stateerrors = self.UHFQC.get('qas_0_result_statistics_stateerrors')
-        data = np.concatenate((data, np.array([stateerrors])))                     
+        data = np.concatenate((data, np.array([stateerrors])))
 
         if self.normalize_counts:
             return data/(self.nr_shots)
@@ -2342,11 +2365,11 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
 
         """
         super().__init__(
-            UHFQC=UHFQC, 
-            AWG=AWG, 
-            nr_shots=nr_shots, 
-            integration_length=integration_length, 
-            channels=[channel], 
+            UHFQC=UHFQC,
+            AWG=AWG,
+            nr_shots=nr_shots,
+            integration_length=integration_length,
+            channels=[channel],
             statemap=UHFQC_single_qubit_statistics_logging_det.statemap_one2two_bit(statemap),
             channel_names=[channel_name if channel_name is not None else 'ch{}'.format(channel)],
             normalize_counts=normalize_counts)

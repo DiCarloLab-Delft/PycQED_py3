@@ -1319,8 +1319,10 @@ class ZI_base_instrument(Instrument):
                     'Tried to start AWG {} that is not ready!'.format(awg_nr))
             # Enable it
             self.set('awgs_{}_enable'.format(awg_nr), 1)
+        log.info('Started {}'.format(self.name))
 
     def stop(self):
+        log.info('Stopping {}'.format(self.name))
         # Stop all AWG's
         for awg_nr in range(self._num_channels()//2):
             self.set('awgs_{}_enable'.format(awg_nr), 0)

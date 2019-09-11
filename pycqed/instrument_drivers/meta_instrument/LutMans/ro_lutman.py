@@ -343,8 +343,11 @@ class Base_RO_LutMan(Base_LutMan):
 
 class UHFQC_RO_LutMan(Base_RO_LutMan):
 
-    def __init__(self, name, num_res: int=1, **kw):
-        super().__init__(name, num_res=num_res, **kw)
+    def __init__(self, name, num_res: int=1, feedline_number: int=0,
+                 feedline_map='S7', **kw):
+        super().__init__(name, num_res=num_res,
+                         feedline_number=feedline_number,
+                         feedline_map=feedline_map, **kw)
         self.add_parameter('acquisition_delay',
                            vals=vals.Numbers(min_value=0), unit='s',
                            parameter_class=ManualParameter,
@@ -395,9 +398,6 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         UHFQC = self.AWG.get_instr()
         UHFQC.sigouts_0_offset(self.mixer_offs_I())
         UHFQC.sigouts_1_offset(self.mixer_offs_Q())
-
-
-
 
     def load_waveform_onto_AWG_lookuptable(
             self, wave_id: str, regenerate_waveforms: bool=False):

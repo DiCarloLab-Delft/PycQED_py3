@@ -7,7 +7,6 @@ import openql
 import warnings
 import pycqed.analysis.analysis_toolbox as a_tools
 
-import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
@@ -379,6 +378,7 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.ro_acq_input_average_length(2e-6)
         self.CCL_qubit.measure_transients()
 
+    @unittest.skip('OpenQL bug for CCL config')
     def test_qubit_spec(self):
         freqs = np.linspace(6e9, 6.5e9, 31)
         # Data cannot be analyzed as dummy data is just random numbers
