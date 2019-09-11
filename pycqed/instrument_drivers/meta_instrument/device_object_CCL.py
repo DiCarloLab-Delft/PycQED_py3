@@ -520,11 +520,11 @@ class DeviceCCL(Instrument):
                                     ' {}, not updating weights'.format(qb_name))
                 else:
                     acq_instr.set('qas_0_integration_weights_{}_real'.format(
-                                  self.ro_acq_weight_chI()), opt_WI)
+                                  qb.ro_acq_weight_chI()), opt_WI)
                     acq_instr.set('qas_0_integration_weights_{}_imag'.format(
-                                  self.ro_acq_weight_chI()), opt_WQ)
+                                  qb.ro_acq_weight_chI()), opt_WQ)
                     acq_instr.set('qas_0_rotations_{}'.format(
-                                  self.ro_acq_weight_chI()), 1.0 - 1.0j)
+                                  qb.ro_acq_weight_chI()), 1.0 - 1.0j)
                 if self.ro_acq_digitized():
                     # Update the RO theshold
                     if (qb.ro_acq_rotated_SSB_when_optimal() and

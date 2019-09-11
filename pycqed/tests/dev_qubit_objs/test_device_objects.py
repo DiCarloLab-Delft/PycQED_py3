@@ -297,6 +297,12 @@ class Test_Device_obj(unittest.TestCase):
 
         self.device.ro_acq_weight_type('optimal')
         qubits = self.device.qubits()
+
+        q13 = self.device.find_instrument('q13')
+        q13.ro_acq_weight_func_I(np.ones(128))
+        q13.ro_acq_weight_func_Q(np.ones(128)*.5)
+
+
         self.device.prepare_readout(qubits=qubits)
         exp_ch_map = {
             'UHFQC_0': {'q13': 0, 'q16': 1},
