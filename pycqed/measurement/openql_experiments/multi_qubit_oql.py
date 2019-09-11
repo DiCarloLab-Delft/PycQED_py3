@@ -851,9 +851,9 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate(prep_pulse_q1, [q1])
             # FIXME hardcoded edge because of
             # brainless "directed edge recources" in compiler
-            k.gate("wait", [0, 1, 2, 3, 4, 5, 6],  0) #alignment workaround
-            k.gate('fl_cw_01', [2, 0])
-            k.gate("wait", [0, 1, 2, 3, 4, 5, 6],  0) #alignment workaround
+            k.gate("wait", list(np.arange(17)),  0) #alignment workaround
+            k.gate('cz', [q0, q1])
+            k.gate("wait", list(np.arange(17)),  0) #alignment workaround
             # after-rotations
             k.gate(after_pulse_q1, [q1])
             # possibly wait
@@ -1308,6 +1308,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
         wait_time_after   (int): wait time in ns after triggering all flux
             pulses
     '''
+    print('generating Cond oscilation sequence with flux codeword {}'.format(flux_codeword))
     p = oqh.create_program("conditional_oscillation_seq", platf_cfg)
     # These angles correspond to special pi/2 pulses in the lutman
     for i, angle in enumerate(angles):

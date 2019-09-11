@@ -171,7 +171,8 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                     # FIXME: This is a hack because we cannot
                                     # properly trigger CZ gates.
                                     k.gate("wait",  list(qubit_map.values()), 0)
-                                    k.gate(flux_codeword, [2, 0]) #hardcoded sandwhiched with wait 0's for alignment
+                                    k.gate(flux_codeword, list(qubit_map.values()),) # fix for QCC
+                                    # k.gate(flux_codeword, [2, 0]) #hardcoded sandwhiched with wait 0's for alignment
                                     k.gate("wait",  list(qubit_map.values()), 0)
 
 
