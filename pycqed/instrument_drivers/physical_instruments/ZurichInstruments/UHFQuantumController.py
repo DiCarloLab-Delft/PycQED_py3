@@ -532,19 +532,11 @@ setUserReg(4, err_cnt);"""
             self.set('qas_0_trans_offset_weightfunction_{}'.format(i), 0.0)
 
         # No cross-coupling in the matrix multiplication (identity matrix)
-        for i in range(0, self._nr_integration_channels):
-            for j in range(0, self._nr_integration_channels):
-                if i == j:
-                    self.set(
-                        'qas_0_crosstalk_rows_{0}_cols_{1}'.format(i, j), 1)
-                else:
-                    self.set(
-                        'qas_0_crosstalk_rows_{0}_cols_{1}'.format(i, j), 0)
+        self.reset_crosstalk_matrix()
 
         # disable correlation mode on all channels
-        for i in range(0, self._nr_integration_channels):
-            self.set('qas_0_correlations_{0}_enable'.format(i), 0)
-
+        self.reset_correlation_params()
+        
         # Configure the result logger to not do any averaging
         self.qas_0_result_length(1000)
         self.qas_0_result_averages(pow(2, LOG2_AVG_CNT))

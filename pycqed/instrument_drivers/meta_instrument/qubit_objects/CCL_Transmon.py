@@ -3388,6 +3388,7 @@ class CCLight_Transmon(Qubit):
             update (bool):
                 specifies whether to update the weights in the qubit object
         """
+        log.info('Calibrating optimal weights for {}'.format(self.name))
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare:

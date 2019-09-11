@@ -15,8 +15,9 @@ from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
-
 import numpy.fft as fft
+
+log = logging.getLogger(__name__)
 
 
 class Detector_Function(object):
@@ -351,7 +352,7 @@ class QX_Hard_Detector(Hard_Detector):
             self.value_units.append('|1>')
 
         # load files
-        logging.info("QX_RB_Hard_Detector : loading qasm files...")
+        log.info("QX_RB_Hard_Detector : loading qasm files...")
         for i, file_name in enumerate(qasm_filenames):
             t1 = time.time()
             qasm = ql.qasm_loader(file_name, qxc.get_nr_qubits())
@@ -365,7 +366,7 @@ class QX_Hard_Detector(Hard_Detector):
                 circuit_name = c[0] + "{}".format(i)
                 self.__qxc.create_circuit(circuit_name, c[1])
             t2 = time.time()
-            logging.info("[+] qasm loading time :", t2-t1)
+            log.info("[+] qasm loading time :", t2-t1)
 
     def prepare(self, sweep_points):
         self.sweep_points = sweep_points
@@ -571,8 +572,8 @@ class CBox_integrated_average_detector(Hard_Detector):
                 data = self.CBox.get_integrated_avg_results()
                 succes = True
             except Exception as e:
-                logging.warning('Exception caught retrying')
-                logging.warning(e)
+                log.warning('Exception caught retrying')
+                log.warning(e)
                 self.CBox.set('acquisition_mode', 'idle')
                 if self.AWG is not None:
                     self.AWG.stop()
@@ -658,8 +659,8 @@ class CBox_single_integration_average_det(Soft_Detector):
                 data = self.CBox.get_integrated_avg_results()
                 success = True
             except Exception as e:
-                logging.warning(e)
-                logging.warning('Exception caught retrying')
+                log.warning(e)
+                log.warning('Exception caught retrying')
             self.CBox.acquisition_mode('idle')
             i += 1
             if i > 10:
@@ -739,7 +740,7 @@ class CBox_integration_logging_det(Hard_Detector):
                     d = self._get_values()
                     success = True
                 except Exception as e:
-                    logging.warning(
+                    log.warning(
                         'Exception {} caught, retaking data'.format(e))
                     i += 1
         else:
@@ -803,7 +804,7 @@ class CBox_integration_logging_det_shots(Hard_Detector):
                         d = self._get_values()
                         success = True
                     except Exception as e:
-                        logging.warning(
+                        log.warning(
                             'Exception {} caught, retaking data'.format(e))
                         i += 1
             else:
@@ -858,7 +859,7 @@ class CBox_state_counters_det(Soft_Detector):
                 data = self._get_values()
                 success = True
             except Exception as e:
-                logging.warning('Exception {} caught, retaking data'.format(e))
+                log.warning('Exception {} caught, retaking data'.format(e))
                 i += 1
         return data
 
@@ -1426,8 +1427,8 @@ class CBox_v3_integrated_average_detector(Hard_Detector):
                 data = self.CBox.get_integrated_avg_results()
                 succes = True
             except Exception as e:
-                logging.warning('Exception caught retrying')
-                logging.warning(e)
+                log.warning('Exception caught retrying')
+                log.warning(e)
                 self.CBox.set('acquisition_mode', 'idle')
                 self.CBox.set('acquisition_mode', 'integration averaging mode')
             i += 1
@@ -1481,8 +1482,8 @@ class CBox_v3_single_integration_average_det(Soft_Detector):
                 print("detector function, data", data)
                 success = True
             except Exception as e:
-                logging.warning(e)
-                logging.warning('Exception caught retrying')
+                log.warning(e)
+                log.warning('Exception caught retrying')
             self.CBox.set('acquisition_mode', 'idle')
             i += 1
             if i > 20:
@@ -1731,10 +1732,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             # value corrsponds to the peak voltage of a cosine with the
             # demodulation frequency.
             self.value_units = ['Vpeak']*len(self.channels)
-            self.scaling_factor = 1/(1.8e9*integration_length*nr_averages)
+            self.scaling_factor = 1/(1.8e9*integration_length)
         elif result_logging_mode == 'lin_trans':
             self.value_units = ['a.u.']*len(self.channels)
-            self.scaling_factor = 1/nr_averages
+            self.scaling_factor = 1
 
         elif result_logging_mode == 'digitized':
             self.value_units = ['frac']*len(self.channels)
@@ -1758,7 +1759,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         rounded_nr_averages = 2**int(np.log2(nr_averages))
         if rounded_nr_averages != nr_averages:
-            logging.warning("nr_averages must be a power of 2, rounded to {} (from {}) ".format(
+            log.warning("nr_averages must be a power of 2, rounded to {} (from {}) ".format(
                 rounded_nr_averages, nr_averages))
 
         self.nr_averages = rounded_nr_averages
@@ -1935,12 +1936,11 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             nr_averages=nr_averages, real_imag=real_imag,
             channels=channels,
             seg_per_point=seg_per_point, single_int_avg=single_int_avg,
-            result_logging_mode='raw',  # FIXME -> do the proper thing (MAR)
+            result_logging_mode='lin_trans',
             **kw)
         self.correlations = correlations
         self.thresholding = thresholding
-        print('DEBUG:')
-        print(self.channels)
+
         if value_names is None:
             self.value_names = []
             for ch in channels:
@@ -1948,10 +1948,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         else:
             self.value_names = value_names
 
-        # Note that V^2 is in brackets to prevent confusion with unit prefixes
+
         if not thresholding:
-            self.value_units = ['V']*len(self.value_names) + \
-                               ['(V^2)']*len(self.correlations)
+            # N.B. units set to a.u. as the lin_trans matrix and optimal weights
+            # are always on for the correlation mode to work. 
+            self.value_units = ['a.u.']*len(self.value_names) + \
+                               ['a.u.']*len(self.correlations)
         else:
             self.value_units = ['fraction']*len(self.value_names) + \
                                ['normalized']*len(self.correlations)
@@ -2009,14 +2011,24 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             # correlations mode after threshold
             # NOTE: thresholds need to be set outside the detctor object.
             self.UHFQC.qas_0_result_source(5)
+            log.info('Setting {} result source to 5 (corr threshold)'.format(
+                self.UHFQC.name))
         else:
             # correlations mode before threshold
             self.UHFQC.qas_0_result_source(4)
+            log.info('Setting {} result source to 4 (corr no threshold)'.format(
+                self.UHFQC.name))
         # Configure correlation mode
         for correlation_channel, corr in zip(self.correlation_channels,
                                              self.correlations):
             # Duplicate source channel to the correlation channel and select
             # second channel as channel to correlate with.
+            log.info('Setting w{} on {} as correlation weight for w{}'.format(
+                correlation_channel, self.UHFQC.name, corr))
+
+            log.debug('Coppying weights of w{} to w{}'.format(
+                corr[0], correlation_channel))
+
             copy_int_weights_real = \
                 self.UHFQC.get('qas_0_integration_weights_{}_real'.format(corr[0]))
             copy_int_weights_imag = \
@@ -2032,6 +2044,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set('qas_0_rotations_{}'.format(correlation_channel),
                            copy_rot)
 
+            log.debug('Setting correlation source of w{} to w{}'.format(
+                correlation_channel, corr[1]))
             # Enable correlation mode one the correlation output channel and
             # set the source to the second source channel
             self.UHFQC.set('qas_0_correlations_{}_enable'.format(correlation_channel), 1)
@@ -2041,6 +2055,10 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             # If thresholding is enabled, set the threshold for the correlation
             # channel.
             if self.thresholding:
+                # Becasue correlation happens after threshold, the threshold
+                # has to be set to whatever the weight function is set to. 
+                log.debug('Copying threshold for w{} to w{}'.format(
+                    corr[0],  correlation_channel))
                 thresh_level = \
                     self.UHFQC.get('qas_0_thresholds_{}_level'.format(corr[0]))
                 self.UHFQC.set(
@@ -2048,8 +2066,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                     thresh_level)
 
     def get_values(self):
-        # Slightly different way to deal with scaling factor
-        self.scaling_factor = 1  # / (1.8e9*self.integration_length)
 
         if self.AWG is not None:
             self.AWG.stop()
@@ -2063,17 +2079,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                                                acquisition_time=0.01)
 
         data = []
-        if self.thresholding:
-            for key in sorted(data_raw.keys()):
-                data.append(np.array(data_raw[key]))
-        else:
-            for key in sorted(data_raw.keys()):
-                if key in self.correlation_channels:
-                    data.append(np.array(data_raw[key]) *
-                                (self.scaling_factor**2 / self.nr_averages))
-                else:
-                    data.append(np.array(data_raw[key]) *
-                                (self.scaling_factor / self.nr_averages))
+
+        for key in sorted(data_raw.keys()):
+            data.append(np.array(data_raw[key]))
+        # Scale factor for correlation mode is always 1. 
+        # The correlation mode only supports use in optimal weights, 
+        # in which case we do not scale by the integration length. 
 
         return data
 
@@ -2135,7 +2146,13 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
-            self.scaling_factor = 1  # /(1.8e9*integration_length)
+            self.scaling_factor = 1 /(1.8e9*integration_length)
+            # N.B. this ensures correct units of Volt but beware that 
+            # to set the acq threshold one needs to correct for this 
+            # scaling factor. Note that this should never be needed as 
+            # digitized mode is supposed to work with optimal weights. 
+            log.debug('Setting scale factor for int log to {}'.format(
+                self.scaling_factor))
         else:
             self.value_units = ['']*len(self.channels)
             self.scaling_factor = 1
@@ -2733,7 +2750,7 @@ class Function_Detector_list(Soft_Detector):
 
     def __init__(self, sweep_function, result_keys, value_names=None,
                  value_unit=None, msmt_kw=None, **kw):
-        logging.warning("Deprecation warning. Function_Detector_list "
+        log.warning("Deprecation warning. Function_Detector_list "
                         "is deprecated, use Function_Detector")
         super(Function_Detector_list, self).__init__()
         self.sweep_function = sweep_function

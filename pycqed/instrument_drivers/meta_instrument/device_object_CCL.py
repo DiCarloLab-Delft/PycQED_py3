@@ -615,6 +615,8 @@ class DeviceCCL(Instrument):
     def get_correlation_detector(self, qubits: list,
                                  single_int_avg: bool =False,
                                  seg_per_point: int=1):
+        if self.ro_acq_digitized(): 
+            log.warning('Digitized mode gives bad results')
         if len(qubits) != 2:
             raise ValueError("Not possible to define correlation "
                              "detector for more than two qubits")
@@ -1392,7 +1394,7 @@ class DeviceCCL(Instrument):
             self.name, qubits))
 
         # off and on, not including post selection init measurements yet
-        nr_cases = 4  # 00, 01 ,10 and 11
+        nr_cases = 2**len(qubits) # e.g., 00, 01 ,10 and 11 in the case of 2q
         nr_shots = nr_shots_per_case*nr_cases
 
         if prepare_for_timedomain:
@@ -1400,16 +1402,10 @@ class DeviceCCL(Instrument):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # count from back because q0 is the least significant qubit
-        q0 = qubits[-1]
-        q1 = qubits[-2]
+        qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr() 
+            for qn in qubits]
 
-        assert q0 in self.qubits()
-        assert q1 in self.qubits()
-
-        q0idx = self.find_instrument(q0).cfg_qubit_nr()
-        q1idx = self.find_instrument(q1).cfg_qubit_nr()
-        p = mqo.multi_qubit_off_on([q1idx, q0idx],
+        p = mqo.multi_qubit_off_on(qubit_idxs,
                                    initialize=initialize,
                                    second_excited_state=False,
                                    platf_cfg=self.cfg_openql_platform_fn())
@@ -1433,13 +1429,14 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        MC.run('SSRO_{}_{}_{}'.format(q1, q0, self.msmt_suffix))
+        MC.run('Mux_SSRO_{}_{}'.format(qubits, self.msmt_suffix))
 
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
-            a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
-            a = ma2.Multiplexed_Readout_Analysis()
+            # a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
+            # a = ma2.Multiplexed_Readout_Analysis()
+            print('Hello!')
         return a
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
@@ -2801,12 +2798,20 @@ class DeviceCCL(Instrument):
     def calibrate_mux_RO(self,
                          qubits,
                          calibrate_optimal_weights=True,
-                         verify_optimal_weights=False,
+                         calibrate_threshold=True,
                          # option should be here but is currently not implementd
                          # update_threshold: bool=True,
                          update_cross_talk_matrix: bool=False)-> bool:
         """
         Calibrates multiplexed Readout.
+
+        Multiplexed readout is calibrated by 
+            - iterating over all qubits and calibrating optimal weights. 
+                This steps involves measuring the transients 
+                Measuring single qubit SSRO to determine the threshold and 
+                updating it. 
+            - Measuring multi qubit SSRO using the optimal weights. 
+
         N.B. Currently only works for 2 qubits
         """
 
@@ -2818,6 +2823,7 @@ class DeviceCCL(Instrument):
 
         UHFQC = q0.instr_acquisition.get_instr()
         self.ro_acq_weight_type('optimal')
+        log.info("Setting ro acq weight type to Optimal")
         self.prepare_for_timedomain(qubits)
 
         if calibrate_optimal_weights:
@@ -2829,13 +2835,25 @@ class DeviceCCL(Instrument):
             # This resets the crosstalk correction matrix
             UHFQC.upload_crosstalk_matrix(np.eye(10))
 
-            q0.calibrate_optimal_weights(
-                analyze=True, verify=verify_optimal_weights)
-            q1.calibrate_optimal_weights(
-                analyze=True, verify=verify_optimal_weights)
+            for q_name in qubits:
+                q = self.find_instrument(q_name) 
+                # The optimal weights are calibrated for each individual qubit
+                # verify = True -> measure SSRO aftewards to determin the 
+                # acquisition threshold. 
+                if calibrate_optimal_weights: 
+                    q.calibrate_optimal_weights(
+                        analyze=True, verify=False, update=True)
+                if calibrate_optimal_weights and not calibrate_threshold: 
+                    log.warning('Updated acq weights but not updating threshold')
+                if calibrate_threshold: 
+                    q.measure_ssro(update=True, nr_shots_per_case=2**13)
 
         self.measure_two_qubit_ssro([q1.name, q0.name],
                                     result_logging_mode='lin_trans')
+
+
+        if len (qubits)> 2: 
+            raise NotImplementedError
 
         res_dict = mra.two_qubit_ssro_fidelity(
             label='{}_{}'.format(q0.name, q1.name),
