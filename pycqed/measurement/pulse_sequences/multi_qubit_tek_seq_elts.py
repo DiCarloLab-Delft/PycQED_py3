@@ -10,7 +10,7 @@ from pycqed.measurement.pulse_sequences.standard_elements import \
 import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
-    get_pulse_dict_from_pars, add_preparation_pulses, pulse_list_list_seq
+    get_pulse_dict_from_pars, add_preparation_pulses, pulse_list_list_seq, prepend_pulses
 from pycqed.measurement.gate_set_tomography.gate_set_tomography import \
     create_experiment_list_pyGSTi_qudev as get_exp_list
 from pycqed.measurement.waveform_control import pulsar as ps
@@ -319,29 +319,51 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
         return seq_name
 
 
-def n_qubit_reset(qubit_names, operation_dict, cal_points,
-                  prep_params=dict(),
-                  upload=True):
+def n_qubit_reset(qb_names, operation_dict, prep_params=dict(), upload=True,
+                  states=('g','e',)):
+    """
+    :param qb_names: list of qb_names to perform simultaneous reset upon
+    :param states (tuple): ('g','e',) for active reset e, ('g','f',) for active
+    reset f and ('g', 'e', 'f') for both.
+    :param prep_params (dict): preparation parameters. Note: should be
+        multi_qb_preparation_params, ie. threshold mapping should be of the
+        form:  {qbi: thresh_map_qbi for qbi in qb_names}
+
+    :return:
     """
 
-    Timing constraints:
-        The reset_cycle_time and the readout fixed point should be commensurate
-        with the UHFQC trigger grid and the granularity of the AWGs.
-
-        When the -ro_acq_marker_delay of the readout pulse is larger than
-        the drive pulse length, then it is important that its length is a
-        multiple of the granularity of the AWG.
-    """
-
-    seq_name = '{}_reset_x{}_sequence'.format(','.join(qubit_names),
+    seq_name = '{}_reset_x{}_sequence'.format(qb_names,
                                               prep_params.get('reset_reps',
                                                               '_default_n_reps'))
-    seq = sequence.Sequence(seq_name)
 
-    # add calibration segments
-    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
+    pulses = generate_mux_ro_pulse_list(qb_names, operation_dict)
+    reset_and_last_ro_pulses = \
+        add_preparation_pulses(pulses, operation_dict, qb_names, **prep_params)
+    swept_pulses = []
+
+    state_ops = dict(g=['I '], e=['X180 '], f=['X180 ', 'X180_ef '])
+    for s in states:
+        pulses = deepcopy(reset_and_last_ro_pulses)
+        state_pulses = []
+        segment_pulses = []
+        # generate one sub list for each qubit, with qb pulse naming
+        for qbn in qb_names:
+            qb_state_pulses  = [deepcopy(operation_dict[op + qbn]) for op in
+                            state_ops[s]]
+            for op, p in zip(state_ops[s], qb_state_pulses):
+                p['name'] = op + qbn
+            state_pulses += [qb_state_pulses]
+        # reference end of state pulse to start of first reset pulse,
+        # to effectively prepend the state pulse
+
+        for qb_state_pulses in state_pulses:
+            segment_pulses += prepend_pulses(pulses, qb_state_pulses)[:len(qb_state_pulses)]
+        swept_pulses.append(segment_pulses + pulses)
+
+    seq = pulse_list_list_seq(swept_pulses, seq_name, upload=False)
     log.debug(seq)
+
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 

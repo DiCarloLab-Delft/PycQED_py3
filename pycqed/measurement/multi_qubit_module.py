@@ -9,6 +9,9 @@ import lmfit
 from copy import deepcopy
 import pygsti
 import logging
+
+from pycqed.utilities.general import temporary_value
+
 log = logging.getLogger()
 log.addHandler(logging.StreamHandler())
 
@@ -383,46 +386,45 @@ def measure_multiplexed_readout(qubits, liveplot=False,
         ))
 
 
-def measure_active_reset(qubits, nreps=1, shots=5000,
-                         qutrit=False, upload=True):
+def measure_active_reset(qubits, shots=5000,
+                         qutrit=False, upload=True, repetition_rate='auto'):
     MC = qubits[0].instr_mc.get_instr()
+    trig = qubits[0].instr_trigger.get_instr()
 
-    exp_metadata = {'reset_cycle_time':
-                        qubits[0].preparation_params()['post_ro_wait'],
-                    'nr_resets': qubits[0].preparation_params()['reset_reps'],
-                    'shots': shots}
+    # combine operations and preparation dictionaries
+    operation_dict = get_operation_dict(qubits)
+    qb_names = [qb.name for qb in qubits]
+    prep_params = \
+        get_multi_qubit_prep_params([qb.preparation_params() for qb in qubits])
 
-    operation_dict = {}
-    qb_names = []
-    for qb in qubits:
-        qb_names.append(qb.name)
-        operation_dict.update(qb.get_operation_dict())
+    # sequence
+    seq, swp = mqs.n_qubit_reset(qb_names, operation_dict, prep_params,
+                                upload=False, states='gef' if qutrit else 'ge')
+    # create sweep points
+    sp = SweepPoints('reset_reps', swp[:-1], '', 'Nr. Reset Repetitions')
 
-    seq, swp = one_qubit_reset(qb_names[0], operation_dict,
-                               qubits[0].preparation_params(), upload=False,
-                               states='gef' if qutrit else 'ge')
     df = get_multiplexed_readout_detector_functions(qubits,
                                                     nr_shots=shots)['int_log_det']
-    prev_avg = MC.soft_avg()
-    MC.soft_avg(1)
 
     for qb in qubits:
         qb.prepare(drive='timedomain')
 
     MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq, upload=upload))
     MC.set_sweep_points(swp)
-    MC.set_sweep_function_2D(swf.None_Sweep())
-    MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
 
     label = 'active_reset_{}_x{}_{}'.format('ef' if qutrit else 'e',
-                                            qubits[0].preparation_params()[
-                                                'reset_reps'], ','.join(qb_names))
-
-    MC.run_2D(name=label,
-              exp_metadata=exp_metadata)
-
-    MC.soft_avg(prev_avg)
+                                            prep_params['reset_reps'],
+                                            ','.join(qb_names))
+    exp_metadata = {'preparation_params': prep_params,
+                    'sweep_points': "swp",
+                    'repetition_rate':  repetition_rate,
+                    'shots': shots}
+    temp_values = [(qb.acq_shots, shots) for qb in qubits]
+    temp_values += [(MC.soft_avg, 1),
+                    (trig.pulse_period, repetition_rate)]
+    with temporary_value(*temp_values):
+        MC.run(name=label,  exp_metadata=exp_metadata)
 
 
 def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
