@@ -588,7 +588,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                 [v[:, col] for k, v in meas_res_dict.items()
                                  if ro_suf in k])
                             rotated_data_dict[qb_name][ro_suf][col], _, _ = \
-                                a_tools.rotate_and_normalize_data(
+                                a_tools.rotate_and_normalize_data_IQ(
                                     data=data_array,
                                     cal_zero_points=cal_zero_points,
                                     cal_one_points=cal_one_points)
@@ -3050,7 +3050,7 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                     cal_zero_points=self.cal_points[0],
                     cal_one_points=self.cal_points[1])
         else:
-            pdd['corr_data_all'] = a_tools.rotate_and_normalize_data(
+            pdd['corr_data_all'] = a_tools.rotate_and_normalize_data_IQ(
                 data=rdd['measured_values'],
                 zero_coord=None, one_coord=None,
                 cal_zero_points=self.cal_points[0],

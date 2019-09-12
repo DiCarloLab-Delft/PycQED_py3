@@ -1025,7 +1025,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                          color="white" if fm[i, j] > thresh else "black")
         plt.tight_layout()
         ax.set_ylabel('Prepared State')
-        ax.set_xlabel('Predicted State\n$\mathcal{{F}}_{{avg}}$={:0.2f} %'
+        ax.set_xlabel('Assigned State\n$\mathcal{{F}}_{{avg}}$={:0.2f} %'
                       .format(fidelity_avg * 100))
         if show:
             plt.show()

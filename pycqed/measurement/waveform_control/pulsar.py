@@ -31,6 +31,8 @@ except Exception:
 try:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.\
         UHFQuantumController import UHFQC
+    from pycqed.instrument_drivers.physical_instruments.ZurichInstruments. \
+        dummy_UHFQC import dummy_UHFQC
 except Exception:
     UHFQC = type(None)
 try:
@@ -40,13 +42,15 @@ except Exception:
     ZI_HDAWG8 = type(None)
 log = logging.getLogger(__name__)
 
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments. \
+        dummy_UHFQC import dummy_UHFQC
 
 class UHFQCPulsar:
     """
     Defines the Zurich Instruments UHFQC specific functionality for the Pulsar
     class
     """
-    _supportedAWGtypes = (UHFQC,)
+    _supportedAWGtypes = (UHFQC, dummy_UHFQC)
     
     _uhf_sequence_string_template = (
         "const WINT_EN   = 0x01ff0000;\n"
