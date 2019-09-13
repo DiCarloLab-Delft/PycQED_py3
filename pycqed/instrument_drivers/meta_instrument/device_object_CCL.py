@@ -614,7 +614,8 @@ class DeviceCCL(Instrument):
 
     def get_correlation_detector(self, qubits: list,
                                  single_int_avg: bool =False,
-                                 seg_per_point: int=1):
+                                 seg_per_point: int=1, 
+                                 always_prepare: bool = False):
         if self.ro_acq_digitized(): 
             log.warning('Digitized mode gives bad results')
         if len(qubits) != 2:
@@ -638,13 +639,17 @@ class DeviceCCL(Instrument):
                 nr_averages=self.ro_acq_averages(),
                 integration_length=q0.ro_acq_integration_length(),
                 single_int_avg=single_int_avg,
-                seg_per_point=seg_per_point)
+                seg_per_point=seg_per_point, 
+                always_prepare=always_prepare)
             d.value_names = ['{} w{}'.format(qubits[0], w0),
                              '{} w{}'.format(qubits[1], w1),
                              'Corr ({}, {})'.format(qubits[0], qubits[1])]
         else:
             # This should raise a ValueError but exists for legacy reasons.
-            d = self.get_int_avg_det(qubits=qubits)
+            d = self.get_int_avg_det(qubits=qubits, 
+                single_int_avg=single_int_avg, 
+                seg_per_point=seg_per_point, 
+                always_prepare=always_prepare)
 
         return d
 
@@ -841,18 +846,15 @@ class DeviceCCL(Instrument):
     # Measurement methods
     ########################################################
 
-    def measure_conditional_oscillation(self, q0: str, q1: str,
-                                        prepare_for_timedomain=True, MC=None,
-                                        CZ_disabled: bool=False,
-                                        wait_time_ns: int=0,
-                                        label='',
-                                        flux_codeword='fl_cw_01',
-                                        q2: str=None,
-                                        flux_codeword2: str='fl_cw_03',
-                                        q2_excited: bool=False,
-                                        nr_of_repeated_gates: int =1,
-                                        verbose=True, disable_metadata=False,
-                                        extract_only=False):
+    def measure_conditional_oscillation(
+        self, q0: str, q1: str, 
+        q2: int=None, q3: int=None, 
+        flux_codeword='cz',
+        flux_codeword_park=None,
+        prepare_for_timedomain=True, MC=None,
+        CZ_disabled: bool=False,
+        wait_time_ns: int=0, label='',
+        verbose=True, disable_metadata=False, extract_only=False):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
@@ -873,7 +875,13 @@ class DeviceCCL(Instrument):
 
             q1 (str):
                 control qubit name (i.e. the qubit remaining in 0 or 1 state)
-
+            q2, q3 (str): 
+                names of optional extra qubit to either park or apply a CZ to. 
+            flux_codeword (str): 
+                the gate to be applied to the qubit pair q0, q1
+            flux_codeword_park (str): 
+                optionally park qubits q2 (and q3) with either a 'park' pulse 
+                (single qubit operation on q2) or a 'cz' pulse on q2-q3. 
             prepare_for_timedomain (bool):
                 should the insruments be reconfigured for time domain measurement
 
@@ -883,13 +891,6 @@ class DeviceCCL(Instrument):
             wait_time_ns (int):
                 additional waiting time (in ns) after the flux pulse, before
                 the final afterrotations
-
-            flux_codeword (str):
-                codeword corrpinding to Cphase gate
-
-            nr_of_repeated_gates (int):
-                number of times the flux pulse is to be executed
-                to amplify the small tuneup errors (c.f. measure_flipping)
         """
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
@@ -918,21 +919,23 @@ class DeviceCCL(Instrument):
             q2idx = None
         else:
             q2idx = self.find_instrument(q2).cfg_qubit_nr()
+        if q3 is None:
+            q3idx = None
+        else:
+            q3idx = self.find_instrument(q3).cfg_qubit_nr()
+
 
         # These are hardcoded angles in the mw_lutman for the AWG8
-        angles = np.concatenate(
-            [np.arange(0, 101, 20), np.arange(140, 341, 20)])  # avoid CW15, issue
-        # angles = np.arange(0, 341, 20))
+        angles = np.arange(0, 341, 20)
 
         p = mqo.conditional_oscillation_seq(
-            q0idx, q1idx, platf_cfg=self.cfg_openql_platform_fn(),
+            q0idx, q1idx, q2idx, q3idx,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            CZ_disabled=CZ_disabled, 
             angles=angles, wait_time_after=wait_time_ns,
             flux_codeword=flux_codeword,
-            nr_of_repeated_gates=nr_of_repeated_gates,
-            CZ_disabled=CZ_disabled,
-            q2=q2idx,
-            flux_codeword2=flux_codeword2,
-            q2_excited=q2_excited)
+            flux_codeword_park=flux_codeword_park)
+
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Phase', unit='deg')
@@ -1555,15 +1558,15 @@ class DeviceCCL(Instrument):
                                             qubit_labels=qarr,
                                             options_dict=options_dict)
 
-    def measure_chevron(self, q0: str, q_spec: str,
-                        amps, lengths,
+    def measure_chevron(self, q0: str, q_spec: str, q_park: str=None,
+                        amps=np.arange(0, 1, .05), 
+                        lengths= np.arange(5e-9, 51e-9, 5e-9),
                         adaptive_sampling=False,
                         adaptive_sampling_pts=None,
                         prepare_for_timedomain=True, MC=None,
                         freq_tone=6e9, pow_tone=-10, spec_tone=False,
                         target_qubit_sequence: str='ramsey',
-                        waveform_name='square',
-                        single_qubit_chevron=False):
+                        waveform_name='square'):
         """
         Measure a chevron patter of esulting from swapping of the excitations
         of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
@@ -1575,9 +1578,13 @@ class DeviceCCL(Instrument):
         Args:
             q0 (str):
                 flux-pulsed qubit (prepared in 1 state at the beginning)
-
             q_spec (str):
                 stationary qubit (in 0, 1 or superposition)
+            q_park (str): 
+                qubit to move out of the interaction zone by applying a 
+                square flux pulse. Note that this is optional. Not specifying 
+                this means no extra pulses are applied. 
+                Note that this qubit is not read out. 
 
             amps (array):
                 amplitudes of the applied flux pulse controlled via the amplitude
@@ -1613,10 +1620,6 @@ class DeviceCCL(Instrument):
             pow_tone (float):
                 When spec_tone = True, controls the power of the spec source
 
-            single_qubit_chevron (bool):
-                Uses only the readout channel from q0, useful for fake chevron
-                when we do not care for reading out the other qubit (q_spec).
-
         Circuit:
             q0    -x180-flux-x180-RO-
             qspec --x90-----------RO- (target_qubit_sequence='ramsey')
@@ -1635,6 +1638,17 @@ class DeviceCCL(Instrument):
 
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
+        if q_park is not None: 
+            q_park_idx = self.find_instrument(q_park).cfg_qubit_nr()
+            fl_lutman_park = self.find_instrument(
+                q_park).instr_LutMan_Flux.get_instr()
+            fl_lutman_park.sq_length(np.max(lengths))
+            if fl_lutman_park.sq_amp() < .1: 
+                # This can cause weird behaviour if not paid attention to. 
+                log.warning('Square amp for park pulse < 0.1')
+
+        else: 
+            q_park_idx = None
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         fl_lutman_spec = self.find_instrument(
@@ -1643,15 +1657,9 @@ class DeviceCCL(Instrument):
         if waveform_name == 'square':
             length_par = fl_lutman.sq_length
             flux_cw = 6
-            # fl_lutman.cfg_operating_mode('CW_single_02')
-            # fl_lutman_spec.cfg_operating_mode('CW_single_02')
-
         elif 'cz' in waveform_name:
             length_par = fl_lutman.cz_length
             flux_cw = fl_lutman._get_cw_from_wf_name(waveform_name)
-            # fl_lutman.cfg_operating_mode('CW_single_01')
-            # fl_lutman_spec.cfg_operating_mode('CW_single_01')
-
         else:
             raise ValueError('Waveform shape not understood')
 
@@ -1659,8 +1667,7 @@ class DeviceCCL(Instrument):
             self.prepare_for_timedomain(qubits=[q0, q_spec])
 
         awg = fl_lutman.AWG.get_instr()
-        AWG = fl_lutman.AWG.get_instr()
-        using_QWG = isinstance(AWG, QuTech_AWG_Module)
+        using_QWG = isinstance(awg, QuTech_AWG_Module)
         if using_QWG:
             awg_ch = fl_lutman.cfg_awg_channel()
             amp_par = awg.parameters['ch{}_amp'.format(awg_ch)]
@@ -1675,7 +1682,8 @@ class DeviceCCL(Instrument):
         sw = swf.FLsweep(fl_lutman, length_par,
                          waveform_name=waveform_name)
 
-        p = mqo.Chevron(q0idx, q_specidx, buffer_time=40e-9,
+        p = mqo.Chevron(q0idx, q_specidx, q_park_idx,
+                        buffer_time=40e-9,
                         buffer_time2=max(lengths)+40e-9,
                         flux_cw=flux_cw,
                         platf_cfg=self.cfg_openql_platform_fn(),
@@ -1684,15 +1692,10 @@ class DeviceCCL(Instrument):
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
-        if single_qubit_chevron:
-            d = self.get_int_avg_det(qubits=[q0],
-                                     values_per_point=1,
-                                     single_int_avg=True,
-                                     always_prepare=True)
-        else:
-            d = self.get_correlation_detector(qubits=[q0, q_spec],
-                                              single_int_avg=True,
-                                              seg_per_point=1)
+        d = self.get_correlation_detector(qubits=[q0, q_spec],
+                                          single_int_avg=True,
+                                          seg_per_point=1, 
+                                          always_prepare=True)
 
         # if we want to add a spec tone
         if spec_tone:
@@ -2392,7 +2395,7 @@ class DeviceCCL(Instrument):
             nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
                                    15., 20., 25., 30., 50.]), nr_seeds=100,
             recompile: bool ='as needed',
-            flux_codeword='fl_cw_01'):
+            flux_codeword='cz'):
         """
         Perform two qubit interleaved randomized benchmarking with an
         interleaved CZ gate.
@@ -2795,7 +2798,7 @@ class DeviceCCL(Instrument):
     # Calibration methods
     ########################################################
 
-    def calibrate_mux_RO(self,
+    def calibrate_mux_ro(self,
                          qubits,
                          calibrate_optimal_weights=True,
                          calibrate_threshold=True,
@@ -2848,8 +2851,8 @@ class DeviceCCL(Instrument):
                 if calibrate_threshold: 
                     q.measure_ssro(update=True, nr_shots_per_case=2**13)
 
-        self.measure_two_qubit_ssro([q1.name, q0.name],
-                                    result_logging_mode='lin_trans')
+        self.measure_ssro_multi_qubit(qubits,
+            result_logging_mode='lin_trans')
 
 
         if len (qubits)> 2: 

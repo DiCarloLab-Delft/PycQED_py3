@@ -226,79 +226,160 @@ def generate_config(filename: str,
             "mx90 %0": ["rxm90 %0"],
 
             # Decomposition of two qubit flux interations as single-qubit flux
-            # operations with parking pulses
+            # operations without parking pulses
             # Edge 0/24
-            "cz q0, q2": ['sf_cz_ne q2', 'sf_cz_sw q0', 'sf_park q3'],
-            "cz q2, q0": ['sf_cz_ne q2', 'sf_cz_sw q0', 'sf_park q3'],
+            "cz q0, q2": ['sf_cz_ne q2', 'sf_cz_sw q0'],
+            "cz q2, q0": ['sf_cz_ne q2', 'sf_cz_sw q0'],
+
             # Edge 1/25
-            "cz q0, q3": ['sf_cz_nw q3', 'sf_cz_se q0', 'sf_park q2'],
-            "cz q3, q0": ['sf_cz_nw q3', 'sf_cz_se q0', 'sf_park q2'],
+            "cz q0, q3": ['sf_cz_nw q3', 'sf_cz_se q0'],
+            "cz q3, q0": ['sf_cz_nw q3', 'sf_cz_se q0'],
             # Edge 5/29
-            "cz q2, q6": ['sf_cz_nw q6', 'sf_cz_se q2', 'sf_park q3'],
-            "cz q6, q2": ['sf_cz_nw q6', 'sf_cz_se q2', 'sf_park q3'],
+            "cz q2, q6": ['sf_cz_nw q6', 'sf_cz_se q2'],
+            "cz q6, q2": ['sf_cz_nw q6', 'sf_cz_se q2'],
             # Edge 6/30
-            "cz q3, q6": ['sf_cz_ne q6', 'sf_cz_sw q3', 'sf_park q2'],
-            "cz q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3', 'sf_park q2'], 
+            "cz q3, q6": ['sf_cz_ne q6', 'sf_cz_sw q3'],
+            "cz q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3'], 
             # Edge 2/26
             "cz q1, q4": ['sf_cz_ne q4', 'sf_cz_sw q1'],
             "cz q4, q1": ['sf_cz_ne q4', 'sf_cz_sw q1'], 
             # Edge 3/27
-            "cz q1, q5": ['sf_cz_nw q5', 'sf_cz_se q1', 'sf_park q2'],
-            "cz q5, q1": ['sf_cz_nw q5', 'sf_cz_se q1', 'sf_park q2'],
+            "cz q1, q5": ['sf_cz_nw q5', 'sf_cz_se q1'],
+            "cz q5, q1": ['sf_cz_nw q5', 'sf_cz_se q1'],
             # Edge 4/28
-            "cz q2, q5": ['sf_cz_ne q5', 'sf_cz_sw q2', 'sf_park q1'],
-            "cz q5, q2": ['sf_cz_ne q5', 'sf_cz_sw q2', 'sf_park q1'],
+            "cz q2, q5": ['sf_cz_ne q5', 'sf_cz_sw q2'],
+            "cz q5, q2": ['sf_cz_ne q5', 'sf_cz_sw q2'],
             # Edge 7/31
-            "cz q4, q7": ['sf_cz_nw q7', 'sf_cz_se q4', 'sf_park q5'],
-            "cz q7, q4": ['sf_cz_nw q7', 'sf_cz_se q4', 'sf_park q5'],
+            "cz q4, q7": ['sf_cz_nw q7', 'sf_cz_se q4'],
+            "cz q7, q4": ['sf_cz_nw q7', 'sf_cz_se q4'],
             # Edge 8/32
-            "cz q5, q7": ['sf_cz_ne q7', 'sf_cz_sw q5', 'sf_park q4'],
-            "cz q7, q5": ['sf_cz_ne q7', 'sf_cz_sw q5', 'sf_park q4'],
+            "cz q5, q7": ['sf_cz_ne q7', 'sf_cz_sw q5'],
+            "cz q7, q5": ['sf_cz_ne q7', 'sf_cz_sw q5'],
             # Edge 9/33
-            "cz q5, q8": ['sf_cz_nw q8', 'sf_cz_se q5', 'sf_park q6', 'sf_park q10', 'sf_park q11'],
-            "cz q8, q5": ['sf_cz_nw q8', 'sf_cz_se q5', 'sf_park q6', 'sf_park q10', 'sf_park q11'],
+            "cz q5, q8": ['sf_cz_nw q8', 'sf_cz_se q5'],
+            "cz q8, q5": ['sf_cz_nw q8', 'sf_cz_se q5'],
             # Edge 10/34
-            "cz q6, q8": ['sf_cz_ne q8', 'sf_cz_sw q6', 'sf_park q5', 'sf_park q10', 'sf_park q11'],
-            "cz q8, q6": ['sf_cz_ne q8', 'sf_cz_sw q6', 'sf_park q5', 'sf_park q10', 'sf_park q11'],
+            "cz q6, q8": ['sf_cz_ne q8', 'sf_cz_sw q6'],
+            "cz q8, q6": ['sf_cz_ne q8', 'sf_cz_sw q6'],
             # Edge 11/35
-            "cz q6, q9": ['sf_cz_nw q9', 'sf_cz_se q6', 'sf_park q11', 'sf_park q12'],
-            "cz q9, q6": ['sf_cz_nw q9', 'sf_cz_se q6', 'sf_park q11', 'sf_park q12'],
+            "cz q6, q9": ['sf_cz_nw q9', 'sf_cz_se q6'],
+            "cz q9, q6": ['sf_cz_nw q9', 'sf_cz_se q6'],
             # Edge 12/36
-            "cz q7, q10": ['sf_cz_nw q10', 'sf_cz_se q7', 'sf_park q4', 'sf_park q5'],
-            "cz q10, q7": ['sf_cz_nw q10', 'sf_cz_se q7', 'sf_park q4', 'sf_park q5'],
+            "cz q7, q10": ['sf_cz_nw q10', 'sf_cz_se q7'],
+            "cz q10, q7": ['sf_cz_nw q10', 'sf_cz_se q7'],
             # Edge 13/37
-            "cz q8, q10": ['sf_cz_ne q10', 'sf_cz_sw q8', 'sf_park q5', 'sf_park q6', 'sf_park q11'],
-            "cz q10, q8": ['sf_cz_ne q10', 'sf_cz_sw q8', 'sf_park q5', 'sf_park q6', 'sf_park q11'],
+            "cz q8, q10": ['sf_cz_ne q10', 'sf_cz_sw q8'],
+            "cz q10, q8": ['sf_cz_ne q10', 'sf_cz_sw q8'],
             # Edge 14/38
-            "cz q8, q11": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q5', 'sf_park q6', 'sf_park q10'],
-            "cz q11, q8": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q5', 'sf_park q6', 'sf_park q10'],
+            "cz q8, q11": ['sf_cz_nw q11', 'sf_cz_se q8'],
+            "cz q11, q8": ['sf_cz_nw q11', 'sf_cz_se q8'],
             # Edge 15/39
-            "cz q9, q11": ['sf_cz_ne q11', 'sf_cz_sw q9', 'sf_park q6', 'sf_park q12'],
-            "cz q11, q9": ['sf_cz_ne q11', 'sf_cz_sw q9', 'sf_park q6', 'sf_park q12'],
+            "cz q9, q11": ['sf_cz_ne q11', 'sf_cz_sw q9'],
+            "cz q11, q9": ['sf_cz_ne q11', 'sf_cz_sw q9'],
             # Edge 16/40
-            "cz q9, q12": ['sf_cz_nw q12', 'sf_cz_se q9', 'sf_park q6', 'sf_park q11'],
-            "cz q12, q9": ['sf_cz_nw q12', 'sf_cz_se q9', 'sf_park q6', 'sf_park q11'],
+            "cz q9, q12": ['sf_cz_nw q12', 'sf_cz_se q9'],
+            "cz q12, q9": ['sf_cz_nw q12', 'sf_cz_se q9'],
             # Edge 17/41
-            "cz q10, q13": ['sf_cz_ne q13', 'sf_cz_sw q10', 'sf_park q14'],
-            "cz q13, q10": ['sf_cz_ne q13', 'sf_cz_sw q10', 'sf_park q14'],
+            "cz q10, q13": ['sf_cz_ne q13', 'sf_cz_sw q10'],
+            "cz q13, q10": ['sf_cz_ne q13', 'sf_cz_sw q10'],
             # Edge 18/42
-            "cz q10, q14": ['sf_cz_nw q14', 'sf_cz_se q10', 'sf_park q13'],
-            "cz q14, q10": ['sf_cz_nw q14', 'sf_cz_se q10', 'sf_park q13'],
+            "cz q10, q14": ['sf_cz_nw q14', 'sf_cz_se q10'],
+            "cz q14, q10": ['sf_cz_nw q14', 'sf_cz_se q10'],
             # Edge 19/43
-            "cz q11, q14": ['sf_cz_ne q14', 'sf_cz_sw q11', 'sf_park q15'],
-            "cz q14, q11": ['sf_cz_ne q14', 'sf_cz_sw q11', 'sf_park q15'],
+            "cz q11, q14": ['sf_cz_ne q14', 'sf_cz_sw q11'],
+            "cz q14, q11": ['sf_cz_ne q14', 'sf_cz_sw q11'],
             # Edge 20/44
-            "cz q11, q15": ['sf_cz_nw q15', 'sf_cz_se q11', 'sf_park q14'],
-            "cz q15, q11": ['sf_cz_nw q15', 'sf_cz_se q11', 'sf_park q14'],
+            "cz q11, q15": ['sf_cz_nw q15', 'sf_cz_se q11'],
+            "cz q15, q11": ['sf_cz_nw q15', 'sf_cz_se q11'],
             # Edge 21/45
             "cz q12, q15": ['sf_cz_ne q15', 'sf_cz_sw q12'],
             "cz q15, q12": ['sf_cz_ne q15', 'sf_cz_sw q12'],
             # Edge 22/46
-            "cz q13, q16": ['sf_cz_nw q16', 'sf_cz_se q13', 'sf_park q14'],
-            "cz q16, q13": ['sf_cz_nw q16', 'sf_cz_se q13', 'sf_park q14'],
+            "cz q13, q16": ['sf_cz_nw q16', 'sf_cz_se q13'],
+            "cz q16, q13": ['sf_cz_nw q16', 'sf_cz_se q13'],
             # Edge 23/47
-            "cz q14, q16": ['sf_cz_ne q16', 'sf_cz_sw q14', 'sf_park q13'],
-            "cz q16, q14": ['sf_cz_ne q16', 'sf_cz_sw q14', 'sf_park q13'],
+            "cz q14, q16": ['sf_cz_ne q16', 'sf_cz_sw q14'],
+            "cz q16, q14": ['sf_cz_ne q16', 'sf_cz_sw q14'],
+
+            ######################################################
+            # Decomposition of two qubit flux interations as single-qubit flux
+            # operations with parking pulses
+            ######################################################
+
+            # Edge 0/24
+            "cz_park q0, q2": ['sf_cz_ne q2', 'sf_cz_sw q0', 'sf_park q3'],
+            "cz_park q2, q0": ['sf_cz_ne q2', 'sf_cz_sw q0', 'sf_park q3'],
+
+            # Edge 1/25
+            "cz_park q0, q3": ['sf_cz_nw q3', 'sf_cz_se q0', 'sf_park q2'],
+            "cz_park q3, q0": ['sf_cz_nw q3', 'sf_cz_se q0', 'sf_park q2'],
+            # Edge 5/29
+            "cz_park q2, q6": ['sf_cz_nw q6', 'sf_cz_se q2', 'sf_park q3'],
+            "cz_park q6, q2": ['sf_cz_nw q6', 'sf_cz_se q2', 'sf_park q3'],
+            # Edge 6/30
+            "cz_park q3, q6": ['sf_cz_ne q6', 'sf_cz_sw q3', 'sf_park q2'],
+            "cz_park q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3', 'sf_park q2'], 
+            # Edge 2/26
+            "cz_park q1, q4": ['sf_cz_ne q4', 'sf_cz_sw q1'],
+            "cz_park q4, q1": ['sf_cz_ne q4', 'sf_cz_sw q1'], 
+            # Edge 3/27
+            "cz_park q1, q5": ['sf_cz_nw q5', 'sf_cz_se q1', 'sf_park q2'],
+            "cz_park q5, q1": ['sf_cz_nw q5', 'sf_cz_se q1', 'sf_park q2'],
+            # Edge 4/28
+            "cz_park q2, q5": ['sf_cz_ne q5', 'sf_cz_sw q2', 'sf_park q1'],
+            "cz_park q5, q2": ['sf_cz_ne q5', 'sf_cz_sw q2', 'sf_park q1'],
+            # Edge 7/31
+            "cz_park q4, q7": ['sf_cz_nw q7', 'sf_cz_se q4', 'sf_park q5'],
+            "cz_park q7, q4": ['sf_cz_nw q7', 'sf_cz_se q4', 'sf_park q5'],
+            # Edge 8/32
+            "cz_park q5, q7": ['sf_cz_ne q7', 'sf_cz_sw q5', 'sf_park q4'],
+            "cz_park q7, q5": ['sf_cz_ne q7', 'sf_cz_sw q5', 'sf_park q4'],
+            # Edge 9/33
+            "cz_park q5, q8": ['sf_cz_nw q8', 'sf_cz_se q5', 'sf_park q6', 'sf_park q10', 'sf_park q11'],
+            "cz_park q8, q5": ['sf_cz_nw q8', 'sf_cz_se q5', 'sf_park q6', 'sf_park q10', 'sf_park q11'],
+            # Edge 10/34
+            "cz_park q6, q8": ['sf_cz_ne q8', 'sf_cz_sw q6', 'sf_park q5', 'sf_park q10', 'sf_park q11'],
+            "cz_park q8, q6": ['sf_cz_ne q8', 'sf_cz_sw q6', 'sf_park q5', 'sf_park q10', 'sf_park q11'],
+            # Edge 11/35
+            "cz_park q6, q9": ['sf_cz_nw q9', 'sf_cz_se q6', 'sf_park q11', 'sf_park q12'],
+            "cz_park q9, q6": ['sf_cz_nw q9', 'sf_cz_se q6', 'sf_park q11', 'sf_park q12'],
+            # Edge 12/36
+            "cz_park q7, q10": ['sf_cz_nw q10', 'sf_cz_se q7', 'sf_park q4', 'sf_park q5'],
+            "cz_park q10, q7": ['sf_cz_nw q10', 'sf_cz_se q7', 'sf_park q4', 'sf_park q5'],
+            # Edge 13/37
+            "cz_park q8, q10": ['sf_cz_ne q10', 'sf_cz_sw q8', 'sf_park q5', 'sf_park q6', 'sf_park q11'],
+            "cz_park q10, q8": ['sf_cz_ne q10', 'sf_cz_sw q8', 'sf_park q5', 'sf_park q6', 'sf_park q11'],
+            # Edge 14/38
+            "cz_park q8, q11": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q5', 'sf_park q6', 'sf_park q10'],
+            "cz_park q11, q8": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q5', 'sf_park q6', 'sf_park q10'],
+            # Edge 15/39
+            "cz_park q9, q11": ['sf_cz_ne q11', 'sf_cz_sw q9', 'sf_park q6', 'sf_park q12'],
+            "cz_park q11, q9": ['sf_cz_ne q11', 'sf_cz_sw q9', 'sf_park q6', 'sf_park q12'],
+            # Edge 16/40
+            "cz_park q9, q12": ['sf_cz_nw q12', 'sf_cz_se q9', 'sf_park q6', 'sf_park q11'],
+            "cz_park q12, q9": ['sf_cz_nw q12', 'sf_cz_se q9', 'sf_park q6', 'sf_park q11'],
+            # Edge 17/41
+            "cz_park q10, q13": ['sf_cz_ne q13', 'sf_cz_sw q10', 'sf_park q14'],
+            "cz_park q13, q10": ['sf_cz_ne q13', 'sf_cz_sw q10', 'sf_park q14'],
+            # Edge 18/42
+            "cz_park q10, q14": ['sf_cz_nw q14', 'sf_cz_se q10', 'sf_park q13'],
+            "cz_park q14, q10": ['sf_cz_nw q14', 'sf_cz_se q10', 'sf_park q13'],
+            # Edge 19/43
+            "cz_park q11, q14": ['sf_cz_ne q14', 'sf_cz_sw q11', 'sf_park q15'],
+            "cz_park q14, q11": ['sf_cz_ne q14', 'sf_cz_sw q11', 'sf_park q15'],
+            # Edge 20/44
+            "cz_park q11, q15": ['sf_cz_nw q15', 'sf_cz_se q11', 'sf_park q14'],
+            "cz_park q15, q11": ['sf_cz_nw q15', 'sf_cz_se q11', 'sf_park q14'],
+            # Edge 21/45
+            "cz_park q12, q15": ['sf_cz_ne q15', 'sf_cz_sw q12'],
+            "cz_park q15, q12": ['sf_cz_ne q15', 'sf_cz_sw q12'],
+            # Edge 22/46
+            "cz_park q13, q16": ['sf_cz_nw q16', 'sf_cz_se q13', 'sf_park q14'],
+            "cz_park q16, q13": ['sf_cz_nw q16', 'sf_cz_se q13', 'sf_park q14'],
+            # Edge 23/47
+            "cz_park q14, q16": ['sf_cz_ne q16', 'sf_cz_sw q14', 'sf_park q13'],
+            "cz_park q16, q14": ['sf_cz_ne q16', 'sf_cz_sw q14', 'sf_park q13'],
+
 
             # Clifford decomposition per Eptstein et al. Phys. Rev. A 89, 062321
             # (2014)
