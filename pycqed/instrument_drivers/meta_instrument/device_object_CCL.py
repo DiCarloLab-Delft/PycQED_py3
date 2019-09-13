@@ -1565,6 +1565,7 @@ class DeviceCCL(Instrument):
                         adaptive_sampling_pts=None,
                         prepare_for_timedomain=True, MC=None,
                         freq_tone=6e9, pow_tone=-10, spec_tone=False,
+                        measure_parked_qubit=False,
                         target_qubit_sequence: str='ramsey',
                         waveform_name='square'):
         """
@@ -1642,11 +1643,11 @@ class DeviceCCL(Instrument):
             q_park_idx = self.find_instrument(q_park).cfg_qubit_nr()
             fl_lutman_park = self.find_instrument(
                 q_park).instr_LutMan_Flux.get_instr()
-            fl_lutman_park.sq_length(np.max(lengths))
             if fl_lutman_park.sq_amp() < .1: 
                 # This can cause weird behaviour if not paid attention to. 
                 log.warning('Square amp for park pulse < 0.1')
-
+            if fl_lutman_park.sq_length()< np.max(lengths): 
+                log.warning('Square length shorter than max Chevron length') 
         else: 
             q_park_idx = None
 
@@ -1664,7 +1665,10 @@ class DeviceCCL(Instrument):
             raise ValueError('Waveform shape not understood')
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0, q_spec])
+            if measure_parked_qubit:
+                self.prepare_for_timedomain(qubits=[q0, q_spec,q_park])
+            else:
+                self.prepare_for_timedomain(qubits=[q0, q_spec])
 
         awg = fl_lutman.AWG.get_instr()
         using_QWG = isinstance(awg, QuTech_AWG_Module)
@@ -1686,16 +1690,23 @@ class DeviceCCL(Instrument):
                         buffer_time=40e-9,
                         buffer_time2=max(lengths)+40e-9,
                         flux_cw=flux_cw,
+                        measure_parked_qubit=measure_parked_qubit,
                         platf_cfg=self.cfg_openql_platform_fn(),
                         target_qubit_sequence=target_qubit_sequence,
                         cc=self.instr_CC.get_instr().name)
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
-        d = self.get_correlation_detector(qubits=[q0, q_spec],
-                                          single_int_avg=True,
-                                          seg_per_point=1, 
-                                          always_prepare=True)
+        if measure_parked_qubit:
+            d = self.get_int_avg_det(qubits=[q0, q_spec, q_park],
+                                     single_int_avg=True,
+                                     seg_per_point=1, 
+                                     always_prepare=True)
+        else:
+            d = self.get_correlation_detector(qubits=[q0, q_spec],
+                                              single_int_avg=True,
+                                              seg_per_point=1, 
+                                              always_prepare=True)
 
         # if we want to add a spec tone
         if spec_tone:
