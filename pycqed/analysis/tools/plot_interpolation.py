@@ -68,13 +68,28 @@ def interpolate_heatmap(x, y, z, n: int=None, interp_method:str='linear'):
             logging.warning('n: {} larger than 500'.format(n))
             n=500
 
-    if interp_method == "nearest":
+    x_lin = y_lin = np.linspace(-0.5, 0.5, n)
+
+    if interp_method == 'linear':
+        z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
+    elif interp_method == "nearest":
         ip = interpolate.NearestNDInterpolator(
             scale(points, xy_mean=xy_mean, xy_scale=xy_scale), z)
+        z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
+    elif interp_method == "deg":
+        phases=np.deg2rad(z)
+        newdata_cos=np.cos(phases)
+        newdata_sin=np.sin(phases)
 
-    x_lin = y_lin = np.linspace(-0.5, 0.5, n)
-    # Interpolation is evaulated linearly in the domain for interpolation
-    z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
+        ip_cos = interpolate.LinearNDInterpolator(
+            scale(points, xy_mean=xy_mean, xy_scale=xy_scale), newdata_cos)
+        newdata_cos = ip_cos(x_lin[:, None], y_lin[None, :]).squeeze()
+
+        ip_sin = interpolate.LinearNDInterpolator(
+            scale(points, xy_mean=xy_mean, xy_scale=xy_scale), newdata_sin)
+        newdata_sin = ip_sin(x_lin[:, None], y_lin[None, :]).squeeze()
+
+        z_grid = (np.rad2deg(np.arctan2(newdata_sin, newdata_cos)) % 360).squeeze()
 
     # x and y grid points need to be rescaled from the linearly chosen points
     points_grid = unscale(list(zip(x_lin, y_lin)),
