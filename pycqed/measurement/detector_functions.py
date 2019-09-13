@@ -242,7 +242,12 @@ class Multi_Detector_UHF(Multi_Detector):
         values = np.concatenate(values_list)
         return values
 
-
+    def acquire_data_point(self):
+        # N.B. get_values and acquire_data point are virtually identical.
+        # the only reason for their existence is a historical distinction
+        # between hard and soft detectors that leads to some confusing data
+        # shape related problems, hence the append vs concatenate
+        return self.get_values().flatten()
 
 ###############################################################################
 ###############################################################################
