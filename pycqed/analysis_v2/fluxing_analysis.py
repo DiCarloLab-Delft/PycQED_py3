@@ -282,6 +282,9 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             if self.proc_data_dict['value_units'][i] == 'deg':
                 self.plot_dicts[val_name]['cmap_chosen'] = anglemap
 
+            if self.proc_data_dict['value_names'][i] == 'L1':
+                self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
+
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
 
