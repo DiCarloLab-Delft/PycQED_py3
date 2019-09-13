@@ -217,13 +217,13 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['quantities_of_interest'] = {}
         qoi = self.proc_data_dict['quantities_of_interest']
         qoi['eps_simple'] = ufloat(fr_rb_simple['eps'].value,
-                                   fr_rb_simple['eps'].stderr)
+                                   fr_rb_simple['eps'].stderr or np.NaN)
         qoi['eps_X1'] = ufloat(fr_rb['eps'].value,
-                               fr_rb['eps'].stderr)
+                               fr_rb['eps'].stderr or np.NaN)
         qoi['L1'] = ufloat(fr_dec['L1'].value,
-                           fr_dec['L1'].stderr)
+                           fr_dec['L1'].stderr or np.NaN)
         qoi['L2'] = ufloat(fr_dec['L2'].value,
-                           fr_dec['L2'].stderr)
+                           fr_dec['L2'].stderr or np.NaN)
 
     def fit_rb_decay(self, lambda_1: float, L1: float, simple: bool=False):
         """

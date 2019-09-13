@@ -8,7 +8,6 @@ import openql
 import warnings
 import pycqed.analysis.analysis_toolbox as a_tools
 
-import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
@@ -16,7 +15,8 @@ import pycqed.instrument_drivers.meta_instrument.qubit_objects.mock_CCL_Transmon
 from pycqed.measurement import measurement_control
 from qcodes import station
 
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQC import dummy_UHFQC
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
 from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
@@ -54,7 +54,8 @@ class Test_Mock_CCL(unittest.TestCase):
         self.MW2 = vmw.VirtualMWsource('MW2')
         self.MW3 = vmw.VirtualMWsource('MW3')
         self.SH = sh.virtual_SignalHound_USB_SA124B('SH')
-        self.UHFQC = dummy_UHFQC('UHFQC')
+        self.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator',
+                               device='dev2109', interface='1GbE')
 
         self.CCL = dummy_CCL('CCL')
         # self.VSM = Dummy_Duplexer('VSM')
@@ -70,7 +71,7 @@ class Test_Mock_CCL(unittest.TestCase):
         self.MC.datadir(test_datadir)
         a_tools.datadir = self.MC.datadir()
 
-        self.AWG = v8.VirtualAWG8('DummyAWG8')
+        self.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
         self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
         self.AWG8_VSM_MW_LutMan.AWG(self.AWG.name)
         self.AWG8_VSM_MW_LutMan.channel_GI(1)
@@ -189,27 +190,33 @@ class Test_Mock_CCL(unittest.TestCase):
     # Test find qubit sweetspot
     ###########################################################
     def test_find_qubit_sweetspot(self):
+        assert self.CCL_qubit.mock_fl_dc_ch() == 'FBL_Q1'
+        self.CCL_qubit.fl_dc_ch(self.CCL_qubit.mock_fl_dc_ch())
+
         self.CCL_qubit.mock_sweetspot_phi_over_phi0(0.01343)
-        current = 0.01343*self.CCL_qubit.mock_fl_dc_V_per_phi0()[
-                        self.CCL_qubit.mock_cfg_dc_flux_ch()]
-        self.CCL_qubit.fl_dc_V0(current)
+        current = 0.01343*self.CCL_qubit.mock_fl_dc_I_per_phi0()[
+                        self.CCL_qubit.mock_fl_dc_ch()]
+        self.CCL_qubit.fl_dc_I0(current)
 
         fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
-        fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+        fluxcurrent[self.CCL_qubit.mock_fl_dc_ch()](current)
+
+        assert self.CCL_qubit.mock_fl_dc_ch() == 'FBL_Q1'
 
         f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
         self.CCL_qubit.freq_qubit(f_qubit)
-        self.CCL_qubit.cfg_dc_flux_ch(self.CCL_qubit.mock_cfg_dc_flux_ch())
+
         self.CCL_qubit.freq_res(self.CCL_qubit.calculate_mock_resonator_frequency())
 
+        assert self.CCL_qubit.mock_fl_dc_ch() == 'FBL_Q1'
+        assert self.CCL_qubit.fl_dc_ch() == 'FBL_Q1'
         freq_res = self.CCL_qubit.calculate_mock_resonator_frequency()
         self.CCL_qubit.ro_freq(freq_res)
-        
-        
 
+        assert self.CCL_qubit.mock_fl_dc_ch() == 'FBL_Q1'
         self.CCL_qubit.find_qubit_sweetspot()
 
-        assert self.CCL_qubit.fl_dc_V0() == pytest.approx(
+        assert self.CCL_qubit.fl_dc_I0() == pytest.approx(
                                     current,
                                     abs=30e-6)
 
@@ -288,7 +295,7 @@ class Test_Mock_CCL(unittest.TestCase):
         fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
         current = self.CCL_qubit.mock_sweetspot_phi_over_phi0()
 
-        fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
+        fluxcurrent[self.CCL_qubit.mock_fl_dc_ch()](current)
 
         f_qubit = self.CCL_qubit.calculate_mock_qubit_frequency()
         self.CCL_qubit.freq_qubit(f_qubit)

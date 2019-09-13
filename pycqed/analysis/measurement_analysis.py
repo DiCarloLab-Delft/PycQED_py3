@@ -23,13 +23,13 @@ from scipy.ndimage.filters import gaussian_filter
 import imp
 import math
 
-try:
-    import pygsti
-except ImportError as e:
-    if str(e).find('pygsti') >= 0:
-        logging.warning('Could not import pygsti')
-    else:
-        raise
+# try:
+#     import pygsti
+# except ImportError as e:
+#     if str(e).find('pygsti') >= 0:
+#         logging.warning('Could not import pygsti')
+#     else:
+#         raise
 
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
@@ -49,14 +49,14 @@ except:
     pass
 from pycqed.analysis import composite_analysis as ca
 
-try:
-    import qutip as qtp
+# try:
+#     import qutip as qtp
 
-except ImportError as e:
-    if str(e).find('qutip') >= 0:
-        logging.warning('Could not import qutip')
-    else:
-        raise
+# except ImportError as e:
+#     if str(e).find('qutip') >= 0:
+#         logging.warning('Could not import qutip')
+#     else:
+#         raise
 
 imp.reload(dm_tools)
 
@@ -6742,8 +6742,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     Possible kw parameters:
 
-        frequency_guess         (default=None)
+        frequency_guess         (default="max")
             manually set the initial guess for qubit frequency
+            options are
+                None -> uses the peak finder to use a peak or dip
+                max -> uses the maximally measured value to guess the freq
+                float -> specify a value as the guess
 
         analyze_ef              (default=False)
             whether to look for a second peak/dip, which would be the at f_gf/2
@@ -6795,7 +6799,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def fit_data(self, analyze_ef=False, **kw):
 
-        frequency_guess = kw.get('frequency_guess', None)
+        frequency_guess = kw.get('frequency_guess', 'max')
         percentile = kw.get('percentile', 20)
         num_sigma_threshold = kw.get('num_sigma_threshold', 5)
         window_len_filter = kw.get('window_len_filter', 3)
@@ -6830,9 +6834,13 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                          optimize=optimize,
                                          window_len=0)
 
+        # Determine the guess
         # extract highest peak -> ge transition
         if frequency_guess is not None:
-            f0 = frequency_guess
+            if isinstance(frequency_guess, float):
+                f0 = frequency_guess
+            elif frequency_guess == 'max':
+                f0 = self.sweep_points[np.argmax(data_dist_smooth)]
             kappa_guess = (max(self.sweep_points)-min(self.sweep_points))/20
             key = 'peak'
         elif self.peaks['dip'] is None:
@@ -7415,12 +7423,10 @@ class TwoD_Analysis(MeasurementAnalysis):
         self.ax_array = []
 
         for i, meas_vals in enumerate(self.measured_values):
-            kw["zlabel"] = kw.get("zlabel", self.value_names[i])
-            kw["z_unit"] = kw.get("zlabel", self.value_units[i])
+            # kw["zlabel"] = kw.get("zlabel", self.value_names[i])
+            # kw["z_unit"] = kw.get("z_unit", self.value_units[i])
 
             if filtered:
-                # print(self.measured_values)
-                # print(self.value_names)
                 if self.value_names[i] == 'Phase':
                     self.measured_values[i] = dm_tools.filter_resonator_visibility(
                         x=self.sweep_points,
@@ -7446,7 +7452,6 @@ class TwoD_Analysis(MeasurementAnalysis):
                                      y_name=self.parameter_names[1],
                                      y_unit=self.parameter_units[1],
                                      log=linecut_log,
-                                     # zlabel=self.zlabels[i],
                                      fig=fig, ax=ax, **kw)
                 ax.set_title(fig_title)
                 set_xlabel(ax, self.parameter_names[0],
@@ -7464,23 +7469,12 @@ class TwoD_Analysis(MeasurementAnalysis):
             self.ax_array.append(ax)
             if normalize:
                 print("normalize on")
-            # print "unransposed",meas_vals
-            # print "transposed", meas_vals.transpose()
+
             self.ax_array.append(ax)
             savename = 'Heatmap_{}'.format(self.value_names[i])
             fig_title = '{} {} \n{}'.format(
                 self.timestamp_string, self.measurementstring,
                 self.value_names[i])
-
-            if "xlabel" not in kw:
-                kw["xlabel"] = self.parameter_names[0]
-            if "ylabel" not in kw:
-                kw["ylabel"] = self.parameter_names[1]
-
-            if "xunit" not in kw:
-                kw["xunit"] = self.parameter_units[0]
-            if "yunit" not in kw:
-                kw["yunit"] = self.parameter_units[1]
 
             # subtract mean from each row/column if demanded
             plot_zvals = meas_vals.transpose()
@@ -7492,15 +7486,16 @@ class TwoD_Analysis(MeasurementAnalysis):
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=plot_zvals,
-                               # zlabel=self.zlabels[i],
+                               zlabel=self.value_names[i],
+                               z_unit=self.value_units[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
                                transpose=transpose,
                                normalize=normalize,
                                **kw)
 
-            # set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
-            # set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
+            set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+            set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
 
             if save_fig:
                 self.save_fig(fig, figname=savename, **kw)
@@ -8537,7 +8532,6 @@ class DoubleFrequency(TD_Analysis):
         y2 = a_tools.normalize_data_v3(self.measured_values[0])
 
         y=y2
-        #TODO:Include the calibration points
         #TODO: implement prony's method and see if it's better
         y[:-4] = y1
         fit_res = self.fit(x[:-4], y[:-4])
@@ -8567,18 +8561,21 @@ class DoubleFrequency(TD_Analysis):
                    r'$\tau _1$: {:.2f} $\mu$s'.format(self.tau1 * 1e6) +
                    '  \t' + r'$\tau _2$: {:.2f}$\mu$s'.format(self.tau2 * 1e6))
 
-        ax.text(0.4, 0.95, textstr,
+        self.ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-        plot_x = x
+        plot_x = np.linspace(self.sweep_points[0],
+                        self.sweep_points[-self.NoCalPoints - 1],
+                        len(self.sweep_points) * 100)
 
-        ax.set_ylabel(r'$F |1\rangle$')
-        ax.set_title('%s: Double Frequency analysis' % self.timestamp)
-        ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x * 1e6, y, 'o-')
-        ax.plot(plot_x[:-4] * 1e6, self.fit_plot, '-')
-        fig.tight_layout()
-        self.save_fig(fig, **kw)
+        best_vals = fit_res.best_values
+        plot_y = fit_mods.DoubleExpDampOscFunc(
+            plot_x, **best_vals)
+
+        self.ax.set_title('%s: Double Frequency analysis' % self.timestamp)
+        self.ax.plot(plot_x, plot_y, '-')
+        self.fig.tight_layout()
+        self.save_fig(self.fig, **kw)
         self.data_file.close()
         return self.fit_res
 
@@ -8677,7 +8674,7 @@ class DoubleFrequency(TD_Analysis):
         Double_Cos_Model.set_param_hint(
             'freq_1', value=freq_guess[0], min=0)
         Double_Cos_Model.set_param_hint('phase_1', value=phi_guess[0])
-        Double_Cos_Model.set_param_hint('osc_offset', value=0.5, min=0, max=1)
+        Double_Cos_Model.set_param_hint('osc_offset', value=np.mean(measured_values), min=0, max=1)
         if (only_one_peak):
             Double_Cos_Model.set_param_hint(
                 'tau_2', value=0, vary=False, min=0)
@@ -8695,17 +8692,15 @@ class DoubleFrequency(TD_Analysis):
             Double_Cos_Model.set_param_hint(
                 'freq_2', value=freq_guess[1], min=0)
             Double_Cos_Model.set_param_hint('phase_2', value=phi_guess[1])
-
             Double_Cos_Model.set_param_hint(
-                'amp_1', value=amp_guess[0], min=0.05, max=1.1, vary=True)
+                'amp_1', value=amp_guess[0], min=0.05, max=2*amp_guess[0], vary=True)
             Double_Cos_Model.set_param_hint(
-                'amp_2', value=amp_guess[1], min=0.05, max=1.1, vary=True)
+                'amp_2', value=amp_guess[1], min=0.05, max=2*amp_guess[1], vary=True)
 
         params = Double_Cos_Model.make_params()
         fit_res = Double_Cos_Model.fit(data=measured_values,
                                        t=sweep_values,
                                        params=params)
-        self.fit_plot = fit_res.model.func(sweep_values, **fit_res.best_values)
         return fit_res
 
     def save_fig(self, fig, figname='_DoubleFreq_', xlabel='x', ylabel='y',
@@ -8945,7 +8940,11 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         peaks = np.zeros((len(self.X), 2))
         for i in range(len(self.X)):
             p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i], **kw)
-            peaks[i, :] = np.sort(p_dict[:2])
+            try:
+                peaks[i, :] = np.sort(p_dict[:2])
+            except Exception as e:
+                logging.warning(e)
+                peaks[i, :] = np.array([np.NaN, np.NaN])
 
         peaks_low = peaks[:, 0]
         peaks_high = peaks[:, 1]
@@ -9954,6 +9953,10 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     print('offset I {}, offset Q {}'.format(offset_I, offset_Q))
     y1 = data_file.measured_values[0] - offset_I
     y2 = data_file.measured_values[1] - offset_Q
+
+    I0_no_demod = y1
+    Q0_no_demod = y2
+
     I0, Q0 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
                        Q_o=Q_o, IF=IF, predistort=predistort)
     power0 = (I0 ** 2 + Q0 ** 2) / 50
@@ -9972,6 +9975,10 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     y2 = data_file.measured_values[1] - offset_Q
     I1, Q1 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
                        Q_o=Q_o, IF=IF, predistort=predistort)
+
+    I1_no_demod = y1
+    Q1_no_demod = y2
+
     power1 = (I1 ** 2 + Q1 ** 2) / 50
 
     amps = np.sqrt((I1 - I0) ** 2 + (Q1 - Q0) ** 2)
@@ -9979,6 +9986,21 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     # defining weight functions for postrotation
     weight_I = (I1 - I0) / amp_max
     weight_Q = (Q1 - Q0) / amp_max
+
+
+    weight_I_no_demod = (I1_no_demod - I0_no_demod) / amp_max
+    weight_Q_no_demod = (Q1_no_demod - Q0_no_demod) / amp_max
+
+    # Identical rescaling as is happening in the CCL transmon class
+    maxI_no_demod = np.max(np.abs(weight_I_no_demod))
+    maxQ_no_demod = np.max(np.abs(weight_Q_no_demod))
+    weight_scale_factor = 1./(4*np.max([maxI_no_demod, maxQ_no_demod]))
+    weight_I_no_demod = np.array(
+        weight_scale_factor*weight_I_no_demod)
+    weight_Q_no_demod = np.array(
+        weight_scale_factor*weight_Q_no_demod)
+
+
 
     if post_rotation_angle == None:
         arg_max = np.argmax(amps)
@@ -10099,9 +10121,17 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     f_axis_o, PSD1Q_o = func.PSD(A1Q[-1024:], 1 / Fs)
 
     n_spurious = int(round(2 * len(A0I) * abs(IF) / Fs))
-    f_spurious = f_axis[n_spurious]
+    if n_spurious>len(f_axis):
+        logging.warning('Calibrate_optimal_weights ANALYSIS: Spurious frequency not in range')
+        f_spurious = 0
+    else:
+        f_spurious = f_axis[n_spurious]
     n_offset = int(round(len(A0I[-1024:]) * abs(IF) / Fs))
-    f_offset = f_axis_o[n_offset]
+    if n_offset>len(f_axis_o):
+        logging.warning('Calibrate_optimal_weights ANALYSIS: offset frequency not in range')
+        f_offset = 0
+    else:
+        f_offset = f_axis_o[n_offset]
 
     # print('f_spurious', f_spurious)
     # print('f_offset', f_offset)
@@ -10112,8 +10142,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     cost_offset = 0
 
     for i in range(samples):
-        n_s = int(n_spurious - samples / 2 + i)
-        n_o = int(n_offset - samples / 2 + i)
+        n_s = np.clip(int(n_spurious - samples / 2 + i),0,len(PSD0I)-1)
+        n_o = np.clip(int(n_offset - samples / 2 + i),0,len(PSD0I_o)-1)
 
         cost_skew = cost_skew + \
             np.abs(PSD0I[n_s]) + np.abs(PSD1I[n_s]) + \
@@ -10210,6 +10240,26 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.legend()
     plt.xlabel('time (ns)')
     plt.ylabel('Integration weight (V)')
+    plt.title('demodulated weight functions_' + data_file.timestamp_string)
+    plt.axhline(0, linestyle='--')
+    edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
+    ax.set_xlim(0, plot_max_time*1e9)
+    plt.savefig(data_file.folder + '\\' + 'demodulated_weight_functions.' +
+                fig_format, format=fig_format)
+    plt.close()
+
+
+    fig, ax = plt.subplots()
+    plt.plot(time, weight_I_no_demod, label='weight I')
+    plt.plot(time, weight_Q_no_demod, label='weight Q')
+    if optimization_window != None:
+        plt.axvline((optimization_start - shift_w) * 1e9, linestyle='--',
+                    color='k', label='depletion optimization window')
+        plt.axvline((optimization_stop - shift_w) *
+                    1e9, linestyle='--', color='k')
+    plt.legend()
+    plt.xlabel('time (ns)')
+    plt.ylabel('Integration weight (V)')
     plt.title('weight functions_' + data_file.timestamp_string)
     plt.axhline(0, linestyle='--')
     edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
@@ -10217,6 +10267,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.savefig(data_file.folder + '\\' + 'weight_functions.' +
                 fig_format, format=fig_format)
     plt.close()
+
+
 
     # should return a dict for the function detector
     # return cost_skew, cost_offset, depletion_cost, x, y1, y2, I0, Q0, I1, Q1

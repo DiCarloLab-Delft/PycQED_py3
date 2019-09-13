@@ -1,5 +1,5 @@
 import json
-
+from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_lm as _flux_lutmap
 
 def generate_config(filename: str,
                     mw_pulse_duration: int = 20,
@@ -31,7 +31,6 @@ def generate_config(filename: str,
     in the JSON. The details of what can be specified are given in the OpenQL
     documentation under "configuration_specification".
     """
-
     qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10',
              'q11', 'q12', 'q13', 'q14', 'q15', 'q16']
     lut_map = ['i {}', 'rx180 {}', 'ry180 {}', 'rx90 {}', 'ry90 {}',
@@ -84,12 +83,26 @@ def generate_config(filename: str,
         "instructions": {},
         "resources":
             {"qubits": {"count": 17},
-             "qwgs": {"count": 3,
+             "qwgs": {"count": 17,
                       "connection_map":
                       {
-                          "0": [7, 8, 9],
-                          "1": [1, 2, 3, 13, 14, 15],
-                          "2": [0, 4, 5, 6, 10, 11, 12, 16]
+                          "0": [0],
+                          "1": [1],
+                          "2": [2],
+                          "3": [3],
+                          "4": [4],
+                          "5": [5],
+                          "6": [6],
+                          "7": [7],
+                          "8": [8],
+                          "9": [9],
+                          "10": [10],
+                          "11": [11],
+                          "12": [12],
+                          "13": [13],
+                          "14": [14],
+                          "15": [15],
+                          "16": [16]
                       }
                       },
              "meas_units": {"count": 17,
@@ -203,7 +216,6 @@ def generate_config(filename: str,
             "x %0": ["rx180 %0"],
             "y %0": ["ry180 %0"],
             "roty90 %0": ["ry90 %0"],
-            "cnot %0,%1": ["ry90 %1", "cz %0,%1", "ry90 %1"],
 
             # To support other forms of writing the same gates
             "x180 %0": ["rx180 %0"],
@@ -212,6 +224,162 @@ def generate_config(filename: str,
             "x90 %0": ["rx90 %0"],
             "my90 %0": ["rym90 %0"],
             "mx90 %0": ["rxm90 %0"],
+
+            # Decomposition of two qubit flux interations as single-qubit flux
+            # operations without parking pulses
+            # Edge 0/24
+            "cz q0, q2": ['sf_cz_ne q2', 'sf_cz_sw q0'],
+            "cz q2, q0": ['sf_cz_ne q2', 'sf_cz_sw q0'],
+
+            # Edge 1/25
+            "cz q0, q3": ['sf_cz_nw q3', 'sf_cz_se q0'],
+            "cz q3, q0": ['sf_cz_nw q3', 'sf_cz_se q0'],
+            # Edge 5/29
+            "cz q2, q6": ['sf_cz_nw q6', 'sf_cz_se q2'],
+            "cz q6, q2": ['sf_cz_nw q6', 'sf_cz_se q2'],
+            # Edge 6/30
+            "cz q3, q6": ['sf_cz_ne q6', 'sf_cz_sw q3'],
+            "cz q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3'], 
+            # Edge 2/26
+            "cz q1, q4": ['sf_cz_ne q4', 'sf_cz_sw q1'],
+            "cz q4, q1": ['sf_cz_ne q4', 'sf_cz_sw q1'], 
+            # Edge 3/27
+            "cz q1, q5": ['sf_cz_nw q5', 'sf_cz_se q1'],
+            "cz q5, q1": ['sf_cz_nw q5', 'sf_cz_se q1'],
+            # Edge 4/28
+            "cz q2, q5": ['sf_cz_ne q5', 'sf_cz_sw q2'],
+            "cz q5, q2": ['sf_cz_ne q5', 'sf_cz_sw q2'],
+            # Edge 7/31
+            "cz q4, q7": ['sf_cz_nw q7', 'sf_cz_se q4'],
+            "cz q7, q4": ['sf_cz_nw q7', 'sf_cz_se q4'],
+            # Edge 8/32
+            "cz q5, q7": ['sf_cz_ne q7', 'sf_cz_sw q5'],
+            "cz q7, q5": ['sf_cz_ne q7', 'sf_cz_sw q5'],
+            # Edge 9/33
+            "cz q5, q8": ['sf_cz_nw q8', 'sf_cz_se q5'],
+            "cz q8, q5": ['sf_cz_nw q8', 'sf_cz_se q5'],
+            # Edge 10/34
+            "cz q6, q8": ['sf_cz_ne q8', 'sf_cz_sw q6'],
+            "cz q8, q6": ['sf_cz_ne q8', 'sf_cz_sw q6'],
+            # Edge 11/35
+            "cz q6, q9": ['sf_cz_nw q9', 'sf_cz_se q6'],
+            "cz q9, q6": ['sf_cz_nw q9', 'sf_cz_se q6'],
+            # Edge 12/36
+            "cz q7, q10": ['sf_cz_nw q10', 'sf_cz_se q7'],
+            "cz q10, q7": ['sf_cz_nw q10', 'sf_cz_se q7'],
+            # Edge 13/37
+            "cz q8, q10": ['sf_cz_ne q10', 'sf_cz_sw q8'],
+            "cz q10, q8": ['sf_cz_ne q10', 'sf_cz_sw q8'],
+            # Edge 14/38
+            "cz q8, q11": ['sf_cz_nw q11', 'sf_cz_se q8'],
+            "cz q11, q8": ['sf_cz_nw q11', 'sf_cz_se q8'],
+            # Edge 15/39
+            "cz q9, q11": ['sf_cz_ne q11', 'sf_cz_sw q9'],
+            "cz q11, q9": ['sf_cz_ne q11', 'sf_cz_sw q9'],
+            # Edge 16/40
+            "cz q9, q12": ['sf_cz_nw q12', 'sf_cz_se q9'],
+            "cz q12, q9": ['sf_cz_nw q12', 'sf_cz_se q9'],
+            # Edge 17/41
+            "cz q10, q13": ['sf_cz_ne q13', 'sf_cz_sw q10'],
+            "cz q13, q10": ['sf_cz_ne q13', 'sf_cz_sw q10'],
+            # Edge 18/42
+            "cz q10, q14": ['sf_cz_nw q14', 'sf_cz_se q10'],
+            "cz q14, q10": ['sf_cz_nw q14', 'sf_cz_se q10'],
+            # Edge 19/43
+            "cz q11, q14": ['sf_cz_ne q14', 'sf_cz_sw q11'],
+            "cz q14, q11": ['sf_cz_ne q14', 'sf_cz_sw q11'],
+            # Edge 20/44
+            "cz q11, q15": ['sf_cz_nw q15', 'sf_cz_se q11'],
+            "cz q15, q11": ['sf_cz_nw q15', 'sf_cz_se q11'],
+            # Edge 21/45
+            "cz q12, q15": ['sf_cz_ne q15', 'sf_cz_sw q12'],
+            "cz q15, q12": ['sf_cz_ne q15', 'sf_cz_sw q12'],
+            # Edge 22/46
+            "cz q13, q16": ['sf_cz_nw q16', 'sf_cz_se q13'],
+            "cz q16, q13": ['sf_cz_nw q16', 'sf_cz_se q13'],
+            # Edge 23/47
+            "cz q14, q16": ['sf_cz_ne q16', 'sf_cz_sw q14'],
+            "cz q16, q14": ['sf_cz_ne q16', 'sf_cz_sw q14'],
+
+            ######################################################
+            # Decomposition of two qubit flux interations as single-qubit flux
+            # operations with parking pulses
+            ######################################################
+
+            # Edge 0/24
+            "cz_park q0, q2": ['sf_cz_ne q2', 'sf_cz_sw q0', 'sf_park q3'],
+            "cz_park q2, q0": ['sf_cz_ne q2', 'sf_cz_sw q0', 'sf_park q3'],
+
+            # Edge 1/25
+            "cz_park q0, q3": ['sf_cz_nw q3', 'sf_cz_se q0', 'sf_park q2'],
+            "cz_park q3, q0": ['sf_cz_nw q3', 'sf_cz_se q0', 'sf_park q2'],
+            # Edge 5/29
+            "cz_park q2, q6": ['sf_cz_nw q6', 'sf_cz_se q2', 'sf_park q3'],
+            "cz_park q6, q2": ['sf_cz_nw q6', 'sf_cz_se q2', 'sf_park q3'],
+            # Edge 6/30
+            "cz_park q3, q6": ['sf_cz_ne q6', 'sf_cz_sw q3', 'sf_park q2'],
+            "cz_park q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3', 'sf_park q2'], 
+            # Edge 2/26
+            "cz_park q1, q4": ['sf_cz_ne q4', 'sf_cz_sw q1'],
+            "cz_park q4, q1": ['sf_cz_ne q4', 'sf_cz_sw q1'], 
+            # Edge 3/27
+            "cz_park q1, q5": ['sf_cz_nw q5', 'sf_cz_se q1', 'sf_park q2'],
+            "cz_park q5, q1": ['sf_cz_nw q5', 'sf_cz_se q1', 'sf_park q2'],
+            # Edge 4/28
+            "cz_park q2, q5": ['sf_cz_ne q5', 'sf_cz_sw q2', 'sf_park q1'],
+            "cz_park q5, q2": ['sf_cz_ne q5', 'sf_cz_sw q2', 'sf_park q1'],
+            # Edge 7/31
+            "cz_park q4, q7": ['sf_cz_nw q7', 'sf_cz_se q4', 'sf_park q5'],
+            "cz_park q7, q4": ['sf_cz_nw q7', 'sf_cz_se q4', 'sf_park q5'],
+            # Edge 8/32
+            "cz_park q5, q7": ['sf_cz_ne q7', 'sf_cz_sw q5', 'sf_park q4'],
+            "cz_park q7, q5": ['sf_cz_ne q7', 'sf_cz_sw q5', 'sf_park q4'],
+            # Edge 9/33
+            "cz_park q5, q8": ['sf_cz_nw q8', 'sf_cz_se q5', 'sf_park q6', 'sf_park q10', 'sf_park q11'],
+            "cz_park q8, q5": ['sf_cz_nw q8', 'sf_cz_se q5', 'sf_park q6', 'sf_park q10', 'sf_park q11'],
+            # Edge 10/34
+            "cz_park q6, q8": ['sf_cz_ne q8', 'sf_cz_sw q6', 'sf_park q5', 'sf_park q10', 'sf_park q11'],
+            "cz_park q8, q6": ['sf_cz_ne q8', 'sf_cz_sw q6', 'sf_park q5', 'sf_park q10', 'sf_park q11'],
+            # Edge 11/35
+            "cz_park q6, q9": ['sf_cz_nw q9', 'sf_cz_se q6', 'sf_park q11', 'sf_park q12'],
+            "cz_park q9, q6": ['sf_cz_nw q9', 'sf_cz_se q6', 'sf_park q11', 'sf_park q12'],
+            # Edge 12/36
+            "cz_park q7, q10": ['sf_cz_nw q10', 'sf_cz_se q7', 'sf_park q4', 'sf_park q5'],
+            "cz_park q10, q7": ['sf_cz_nw q10', 'sf_cz_se q7', 'sf_park q4', 'sf_park q5'],
+            # Edge 13/37
+            "cz_park q8, q10": ['sf_cz_ne q10', 'sf_cz_sw q8', 'sf_park q5', 'sf_park q6', 'sf_park q11'],
+            "cz_park q10, q8": ['sf_cz_ne q10', 'sf_cz_sw q8', 'sf_park q5', 'sf_park q6', 'sf_park q11'],
+            # Edge 14/38
+            "cz_park q8, q11": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q5', 'sf_park q6', 'sf_park q10'],
+            "cz_park q11, q8": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q5', 'sf_park q6', 'sf_park q10'],
+            # Edge 15/39
+            "cz_park q9, q11": ['sf_cz_ne q11', 'sf_cz_sw q9', 'sf_park q6', 'sf_park q12'],
+            "cz_park q11, q9": ['sf_cz_ne q11', 'sf_cz_sw q9', 'sf_park q6', 'sf_park q12'],
+            # Edge 16/40
+            "cz_park q9, q12": ['sf_cz_nw q12', 'sf_cz_se q9', 'sf_park q6', 'sf_park q11'],
+            "cz_park q12, q9": ['sf_cz_nw q12', 'sf_cz_se q9', 'sf_park q6', 'sf_park q11'],
+            # Edge 17/41
+            "cz_park q10, q13": ['sf_cz_ne q13', 'sf_cz_sw q10', 'sf_park q14'],
+            "cz_park q13, q10": ['sf_cz_ne q13', 'sf_cz_sw q10', 'sf_park q14'],
+            # Edge 18/42
+            "cz_park q10, q14": ['sf_cz_nw q14', 'sf_cz_se q10', 'sf_park q13'],
+            "cz_park q14, q10": ['sf_cz_nw q14', 'sf_cz_se q10', 'sf_park q13'],
+            # Edge 19/43
+            "cz_park q11, q14": ['sf_cz_ne q14', 'sf_cz_sw q11', 'sf_park q15'],
+            "cz_park q14, q11": ['sf_cz_ne q14', 'sf_cz_sw q11', 'sf_park q15'],
+            # Edge 20/44
+            "cz_park q11, q15": ['sf_cz_nw q15', 'sf_cz_se q11', 'sf_park q14'],
+            "cz_park q15, q11": ['sf_cz_nw q15', 'sf_cz_se q11', 'sf_park q14'],
+            # Edge 21/45
+            "cz_park q12, q15": ['sf_cz_ne q15', 'sf_cz_sw q12'],
+            "cz_park q15, q12": ['sf_cz_ne q15', 'sf_cz_sw q12'],
+            # Edge 22/46
+            "cz_park q13, q16": ['sf_cz_nw q16', 'sf_cz_se q13', 'sf_park q14'],
+            "cz_park q16, q13": ['sf_cz_nw q16', 'sf_cz_se q13', 'sf_park q14'],
+            # Edge 23/47
+            "cz_park q14, q16": ['sf_cz_ne q16', 'sf_cz_sw q14', 'sf_park q13'],
+            "cz_park q16, q14": ['sf_cz_ne q16', 'sf_cz_sw q14', 'sf_park q13'],
+
 
             # Clifford decomposition per Eptstein et al. Phys. Rev. A 89, 062321
             # (2014)
@@ -243,6 +411,7 @@ def generate_config(filename: str,
         },
     }
 
+    # Create a prepare Z operation for all 17 qubits
     for q in qubits:
         cfg["instructions"]["prepz {}".format(q)] = {
             "duration": init_duration,
@@ -257,6 +426,7 @@ def generate_config(filename: str,
             "cc_light_opcode": 2
         }
 
+    # Create a measurement operation for all 17 qubits
     for q in qubits:
         cfg["instructions"]["measure {}".format(q)] = {
             "duration": ro_duration,
@@ -271,6 +441,9 @@ def generate_config(filename: str,
             "cc_light_opcode": 4
         }
 
+    # Prepare, for all 17 qubits, the 11 different mw combinations defined below
+    # 'i {}', 'rx180 {}', 'ry180 {}', 'rx90 {}', 'ry90 {}','rxm90 {}', 'rym90 {}', 'rphi90 {}',
+    # 'spec {}', 'rx12 {}', 'square {}'
     for CW in range(len(lut_map)):
         for q in qubits:
             cfg["instructions"][lut_map[CW].format(q)] = {
@@ -284,7 +457,8 @@ def generate_config(filename: str,
                 "cc_light_instr": "cw_{:02}".format(CW),
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
-
+    # Additionaly, prepare also 2*17*32 associated with codewords similar to above, but conditioned\
+    # on either HW COND 1 (do if last meas == 1) or HW COND 2 (do if last meas == 0)
             cfg["instructions"]['c1'+lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": mw_latency,
@@ -297,7 +471,6 @@ def generate_config(filename: str,
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 32+8+CW,
                 "cc_light_cond": 1}  # 1 means : do if last meas. == 1
-
 
             cfg["instructions"]['c0'+lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
@@ -312,7 +485,7 @@ def generate_config(filename: str,
                 "cc_light_opcode": 32+16+CW,
                 "cc_light_cond": 2}  # 2 means : do if last meas. == 0
 
-
+    # Prepare, for all 17 qubits, 32 simple codewords to be triggered.
     for CW in range(32):
         for q in qubits:
             cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
@@ -327,6 +500,7 @@ def generate_config(filename: str,
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
 
+    # Microwave compensate introction definition
     for q in qubits:
         cfg["instructions"]["compensate {}".format(q)] = {
             "duration": mw_pulse_duration,
@@ -340,40 +514,38 @@ def generate_config(filename: str,
             "cc_light_codeword": 0,
             "cc_light_opcode": 8+0}
 
-    # N.B. The codewords for CZ pulses need to be further specified.
-    # I do not expect this to be correct for now.
-    for ft in flux_tuples:
-        # FIXME add space back in
-        cfg["instructions"]["cz {},{}".format(ft[0], ft[1])] = {
-            "duration": flux_pulse_duration,
-            "latency": fl_latency,
-            "qubits": [ft[0], ft[1]],
-            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-            "disable_optimization": True,
-            "type": "flux",
-            "cc_light_instr_type": "two_qubit_gate",
-            "cc_light_instr": "fl_cw_{:02}".format(1),
-            "cc_light_right_codeword": 1,
-            "cc_light_left_codeword": 1,
-            "cc_light_opcode": 128+1
-        }
-
+    # Flux operation definition
     for cw_flux in range(8):
-        for ft in flux_tuples:
-            cfg["instructions"]["fl_cw_{:02} {},{}".format(cw_flux,
-                                                           ft[0], ft[1])] = {
+        op_flux = _flux_lutmap[cw_flux]['name']
+        for flux_q in range(17):
+            cfg["instructions"]["sf_{} q{}".format(op_flux.lower(),
+                                                           flux_q)] = {
                 "duration": flux_pulse_duration,
                 "latency": fl_latency,
-                "qubits": [ft[0], ft[1]],
+                "qubits": ['q{}'.format(flux_q)],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": True,
                 "type": "flux",
-                "cc_light_instr_type": "two_qubit_gate",
+                "cc_light_instr_type": "single_qubit_gate",
                 "cc_light_instr": "fl_cw_{:02}".format(cw_flux),
-                "cc_light_right_codeword": cw_flux,
-                "cc_light_left_codeword": cw_flux,
-                "cc_light_opcode": 128+cw_flux
+                "cc_light_codeword": cw_flux,
+                "cc_light_opcode": 60+cw_flux
             }
+
+    # Prepare 20 ns special parking operation
+    # for flux_q in range(17):
+    #         cfg["instructions"]["sf_sp_park q{}".format(flux_q)] = {
+    #             "duration": flux_pulse_duration/2,
+    #             "latency": fl_latency,
+    #             "qubits": ['q{}'.format(flux_q)],
+    #             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+    #             "disable_optimization": True,
+    #             "type": "flux",
+    #             "cc_light_instr_type": "single_qubit_gate",
+    #             "cc_light_instr": "fl_cw_05",
+    #             "cc_light_codeword": 5,
+    #             "cc_light_opcode": 65
+    #         }
 
     with open(filename, 'w') as f:
         json.dump(cfg, f, indent=4)

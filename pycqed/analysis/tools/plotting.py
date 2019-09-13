@@ -9,7 +9,7 @@ from matplotlib import cm
 import numpy as np
 import matplotlib.colors as col
 import hsluv
-
+import logging
 
 def set_xlabel(axis, label, unit=None, **kw):
     """
@@ -79,7 +79,6 @@ def set_cbarlabel(cbar, label, unit=None, **kw):
         cbar.set_ticks(zticks)
         cbar.set_ticklabels(zticks*scale_factor)
         cbar.set_label(label + ' ({})'.format(unit))
-        
 
     else:
         cbar.set_label(label, **kw)
@@ -89,7 +88,7 @@ SI_PREFIXES = dict(zip(range(-24, 25, 3), 'yzafpnμm kMGTPEZY'))
 SI_PREFIXES[0] = ""
 
 # N.B. not all of these are SI units, however, all of these support SI prefixes
-SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms,$\Phi_0$'.split(
+SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms,$\Phi_0$,A/s'.split(
     ',')
 
 
@@ -382,6 +381,15 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     two sweep points.
     zvals should be a list of arrays with the measured values with shape
     (len(yvals), len(xvals)).
+
+    **grid-orientation**
+        The grid orientation for the zvals is the same as is used in
+        ax.pcolormesh.
+        Note that the column index corresponds to the x-coordinate,
+        and the row index corresponds to y.
+        This can be counterintuitive: zvals(y_idx, x_idx)
+        and can be inconsistent with some arrays of zvals
+        (such as a 2D histogram from numpy).
     """
 
     xvals = np.array(xvals)

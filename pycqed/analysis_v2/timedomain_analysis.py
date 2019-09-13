@@ -315,9 +315,9 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         # and ensures that any over/under rotation is absorbed in the
         # frequency
         guess_pars['amplitude'].value = 0.5
-        guess_pars['amplitude'].vary = False
+        guess_pars['amplitude'].vary = True
         guess_pars['offset'].value = 0.5
-        guess_pars['offset'].vary = False
+        guess_pars['offset'].vary = True
 
         self.fit_dicts['cos_fit'] = {
             'fit_fn': fit_mods.CosFunc,
@@ -335,7 +335,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                                     data=self.proc_data_dict['corr_data'][:-4])
         # Constraining the line ensures that it will only give a good fit
         # if the small angle approximation holds
-        guess_pars['c0'].vary = False
+        guess_pars['c0'].vary = True
         guess_pars['c0'].value = 0.5
 
         self.fit_dicts['line_fit'] = {
