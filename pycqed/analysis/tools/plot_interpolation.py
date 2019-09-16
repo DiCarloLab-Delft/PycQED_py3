@@ -26,7 +26,7 @@ def interpolate_heatmap(x, y, z, n: int=None, interp_method:str='linear'):
         z   (array): z data points
         n     (int): number of points for each dimension on the interpolated
             grid
-        interp_method {"linear", "nearest"} determines what interpolation
+        interp_method {"linear", "nearest", "deg"} determines what interpolation
             method is used.
 
     Returns:
@@ -77,6 +77,7 @@ def interpolate_heatmap(x, y, z, n: int=None, interp_method:str='linear'):
             scale(points, xy_mean=xy_mean, xy_scale=xy_scale), z)
         z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
     elif interp_method == "deg":
+        # Circular interpolation in deg units
         phases=np.deg2rad(z)
         newdata_cos=np.cos(phases)
         newdata_sin=np.sin(phases)
