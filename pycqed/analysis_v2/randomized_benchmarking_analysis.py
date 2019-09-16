@@ -394,7 +394,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         RandomizedBenchmarking_SingleQubit_Analysis):
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
                  options_dict: dict=None, auto=True, close_figs=True,
-                 classification_method='rates', rates_ch_idxs: list =[0, 2],
+                 classification_method='rates', rates_ch_idxs: list =[2, 0],
                  ignore_f_cal_pts: bool=False, extract_only: bool = False,
                  ):
         if options_dict is None:
@@ -1153,7 +1153,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
     def __init__(self, ts_base: str, ts_int: str,
                  label_base: str='', label_int: str='',
                  options_dict: dict={}, auto=True, close_figs=True,
-                 ch_idxs: list =[0, 2],
+                 ch_idxs: list =[2, 0],
                  ignore_f_cal_pts: bool=False, plot_label=''):
         super().__init__(do_fitting=True, close_figs=close_figs,
                          options_dict=options_dict)

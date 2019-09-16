@@ -2264,7 +2264,7 @@ class DeviceCCL(Instrument):
                                    15., 20., 25., 30., 50.]), nr_seeds=100,
             interleaving_cliffords=[None], label='TwoQubit_RB_{}seeds_icl{}_{}_{}',
             recompile: bool ='as needed', cal_points=True,
-            flux_codeword='fl_cw_01'):
+            flux_codeword='cz', sim_cz_qubits:list =None):
         '''
         Measures two qubit randomized benchmarking, including
         the leakage estimate.
@@ -2304,6 +2304,11 @@ class DeviceCCL(Instrument):
 
             flux_codeword (str):
                 flux codeword corresponding to the Cphase gate
+            sim_cz_qubits (list):
+                A list of qubit names on which a simultaneous cz 
+                instruction must be applied. This is for characterizing
+                CZ gates that are intended to be performed in parallel 
+                with other CZ gates.
         '''
 
         # Settings that have to be preserved, change is required for
@@ -2332,6 +2337,9 @@ class DeviceCCL(Instrument):
         t0 = time.time()
         print('Generating {} RB programs'.format(nr_seeds))
         qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+        if sim_cz_qubits is not None: 
+            sim_cz_qubits_idxs = [self.find_instrument(q).cfg_qubit_nr() 
+                for q in sim_cz_qubits]
         for i in range(nr_seeds):
             # check for keyboard interrupt q because generating can be slow
             check_keyboard_interrupt()
@@ -2355,7 +2363,8 @@ class DeviceCCL(Instrument):
                 cal_points=cal_points,
                 net_cliffords=net_cliffords,  # measures with and without inverting
                 f_state_cal_pts=True,
-                recompile=recompile)
+                recompile=recompile, 
+                sim_cz_qubits=sim_cz_qubits_idxs)
             p.sweep_points = sweep_points
             programs.append(p)
             print('Generated {} RB programs in {:.1f}s'.format(
@@ -2402,11 +2411,12 @@ class DeviceCCL(Instrument):
         ma2.RandomizedBenchmarking_TwoQubit_Analysis()
 
     def measure_two_qubit_interleaved_randomized_benchmarking(
-            self, qubits, MC,
+            self, qubits: list, MC,
             nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
                                    15., 20., 25., 30., 50.]), nr_seeds=100,
             recompile: bool ='as needed',
-            flux_codeword='cz'):
+            flux_codeword='cz', 
+            sim_cz_qubits: list=None):
         """
         Perform two qubit interleaved randomized benchmarking with an
         interleaved CZ gate.
@@ -2416,13 +2426,15 @@ class DeviceCCL(Instrument):
         self.measure_two_qubit_randomized_benchmarking(
             qubits=qubits, MC=MC, nr_cliffords=nr_cliffords,
             interleaving_cliffords=[None], recompile=recompile,
-            flux_codeword=flux_codeword, nr_seeds=nr_seeds)
+            flux_codeword=flux_codeword, nr_seeds=nr_seeds, 
+            sim_cz_qubits=sim_cz_qubits)
 
         # Perform two-qubit RB with CZ interleaved
         self.measure_two_qubit_randomized_benchmarking(
             qubits=qubits, MC=MC, nr_cliffords=nr_cliffords,
             interleaving_cliffords=[-4368], recompile=recompile,
-            flux_codeword=flux_codeword, nr_seeds=nr_seeds)
+            flux_codeword=flux_codeword, nr_seeds=nr_seeds, 
+            sim_cz_qubits=sim_cz_qubits)
 
         ma2.InterleavedRandomizedBenchmarkingAnalysis(
             ts_base=None, ts_int=None,
