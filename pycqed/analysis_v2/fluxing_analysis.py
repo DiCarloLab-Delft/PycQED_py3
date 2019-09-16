@@ -260,7 +260,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         black = '#000000'
         red = '#ff0000'
         blue = '#0000ff'
-        anglemap = colors.LinearSegmentedColormap.from_list('anglemap', [black, red, white, blue, black], N=256, gamma=1)
+        anglemap = colors.LinearSegmentedColormap.from_list('anglemap', 
+            [black, red, white, blue, black], N=256, gamma=1)
 
         for i, val_name in enumerate(self.proc_data_dict['value_names']):
 
@@ -282,7 +283,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             if self.proc_data_dict['value_units'][i] == 'deg':
                 self.plot_dicts[val_name]['cmap_chosen'] = anglemap
 
-            if self.proc_data_dict['value_names'][i] == 'L1':
+            if self.proc_data_dict['value_names'][i] in {'L1', 'missing fraction', 
+                    'offset difference'}:
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
     def process_data(self):

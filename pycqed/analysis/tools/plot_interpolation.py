@@ -62,7 +62,9 @@ def interpolate_heatmap(x, y, z, n: int=None, interp_method:str='linear'):
     if n is None:
         # Calculate how many grid points are needed.
         # factor from A=√3/4 * a² (equilateral triangle)
-        n = int(0.658 / np.sqrt(areas(ip).min()))
+        # N.B. a factor 4 was added as there were to few points for uniform 
+        # grid otherwise. 
+        n = int(0.658 / np.sqrt(areas(ip).min()))*4
         n = max(n, 10)
         if n > 500:
             logging.warning('n: {} larger than 500'.format(n))
