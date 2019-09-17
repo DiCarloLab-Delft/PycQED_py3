@@ -1,174 +1,19 @@
 import logging
 log = logging.getLogger()
 log.addHandler(logging.StreamHandler())
-import os
-import h5py
 import lmfit
 import numpy as np
 import scipy as sp
 from collections import OrderedDict
 from pycqed.analysis import analysis_toolbox as a_tools
-from pycqed.measurement.hdf5_data import read_dict_from_hdf5
-from pycqed.analysis_v3 import fitting_and_plotting as fit_plt
+from pycqed.analysis_v3 import fitting as fit_module
+from pycqed.analysis_v3 import plotting as plot_module
+from pycqed.analysis_v3 import helper_functions as help_func_mod
 from sklearn.mixture import GaussianMixture as GM
 from copy import deepcopy
 
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.measurement.calibration_points import CalibrationPoints
-
-
-def get_hdf_param_value(group, param_name):
-    '''
-    Returns an attribute "key" of the group "Experimental Data"
-    in the hdf5 datafile.
-    '''
-    s = group.attrs[param_name]
-    # converts byte type to string because of h5py datasaving
-    if type(s) == bytes:
-        s = s.decode('utf-8')
-    # If it is an array of value decodes individual entries
-    if type(s) == np.ndarray:
-        s = [s.decode('utf-8') for s in s]
-    return s
-
-
-def get_params_from_hdf_file(data_dict, **params):
-    params_dict = get_param('params_dict', data_dict, **params)
-    numeric_params = get_param('numeric_params', data_dict,
-                               default_value=[], **params)
-    if params_dict is None:
-        raise ValueError('params_dict was not specified.')
-
-    raw_data_dict = []
-    raw_data_dict_ts = OrderedDict([(param, []) for param in
-                                    params_dict])
-
-    folder = params.get('folder', data_dict.get('folder', None))
-    if folder is None:
-        raise ValueError('No folder was found.')
-    h5mode = get_param('h5mode', data_dict, default_value='r+', **params)
-    h5filepath = a_tools.measurement_filename(folder)
-    data_file = h5py.File(h5filepath, h5mode)
-
-    if 'measurementstring' in raw_data_dict_ts:
-        raw_data_dict_ts['measurementstring'] = \
-            os.path.split(folder)[1][7:]
-    if 'measured_data' in raw_data_dict_ts:
-        raw_data_dict_ts['measured_data'] = \
-            np.array(data_file['Experimental Data']['Data']).T
-
-    for save_par, file_par in params_dict.items():
-        if len(file_par.split('.')) == 1:
-            par_name = file_par.split('.')[0]
-            for group_name in data_file.keys():
-                if par_name in list(data_file[group_name].attrs):
-                    raw_data_dict_ts[save_par] = \
-                        get_hdf_param_value(data_file[group_name], par_name)
-        else:
-            group_name = '/'.join(file_par.split('.')[:-1])
-            par_name = file_par.split('.')[-1]
-            if group_name in data_file:
-                if par_name in list(data_file[group_name].attrs):
-                    raw_data_dict_ts[save_par] = \
-                        get_hdf_param_value(data_file[group_name], par_name)
-                elif par_name in list(data_file[group_name].keys()):
-                    raw_data_dict_ts[save_par] = read_dict_from_hdf5(
-                        {}, data_file[group_name][par_name])
-        if isinstance(raw_data_dict_ts[save_par], list) and \
-                len(raw_data_dict_ts[save_par]) == 1:
-            raw_data_dict_ts[save_par] = raw_data_dict_ts[save_par][0]
-    raw_data_dict.append(raw_data_dict_ts)
-
-    if len(raw_data_dict) == 1:
-        raw_data_dict = raw_data_dict[0]
-    for par_name in raw_data_dict:
-        if par_name in numeric_params:
-            raw_data_dict[par_name] = np.double(raw_data_dict[par_name])
-    data_dict.update(raw_data_dict)
-    return data_dict
-
-
-def get_data_to_process(data_dict, keys_in=None):
-    """
-    Finds data to be processed in unproc_data_dict based on keys_in.
-
-    :param unproc_data_dict: OrderedDict containing data to be processed
-    :param keys_in: list of channel names or dictionary paths leading to
-            data to be processed. For example: measured_data.raw w0.
-    :return:
-        data_to_proc_dict: dictionary {ch_in: data_ch_in}
-    """
-    if keys_in is None:
-        if 'measured_data' in data_dict:
-            keys_in = list(data_dict['measured_data'])
-        else:
-            raise ValueError('"keys_in" were not specified.')
-
-    data_to_proc_dict = OrderedDict()
-    key_found = True
-    for keyi in keys_in:
-        all_keys = keyi.split('.')
-        if len(all_keys) == 1:
-            try:
-                if isinstance(data_dict[all_keys[0]], dict):
-                    data_to_proc_dict.update(data_dict[all_keys[0]])
-                else:
-                    data_to_proc_dict[keyi] = data_dict[all_keys[0]]
-            except KeyError:
-                try:
-                    data_to_proc_dict[keyi] = data_dict[
-                        'measured_data'][keyi]
-                except KeyError:
-                    key_found = False
-        else:
-            try:
-                data = deepcopy(data_dict)
-                for k in all_keys:
-                    data = data[k]
-                if isinstance(data, dict):
-                    data_to_proc_dict.update({k: data[k] for k in data})
-                else:
-                    data_to_proc_dict[all_keys[-1]] = data
-            except KeyError:
-                key_found = False
-        if not key_found:
-            raise ValueError(f'Channel {keyi} was not found.')
-    return data_to_proc_dict
-
-
-def get_param(name, data_dict, default_value=None, raise_error=False, **params):
-    value = params.get(name,
-                          data_dict.get('exp_metadata',
-                                        dict()).get(name,
-                                                    default_value))
-    if raise_error and value is None:
-        raise ValueError(f'{name} was not found in either exp_metadata or '
-                         f'input params.')
-    return value
-
-
-def get_cp_sp_spmap_measobjn(data_dict, **params):
-    """
-    Extracts cal_points, sweep_points, meas_obj_sweep_points_map and
-    meas_obj_name from experiment metadata or from params.
-    :param data_dict: OrderedDict containing experiment metadata (exp_metadata)
-    :param params: keyword arguments
-    :return: cal_points, sweep_points, meas_obj_sweep_points_map and
-    meas_obj_name
-
-    Assumptions:
-        - if cp or sp are strings, then it assumes they can be evaluated
-    """
-    cp = get_param('cal_points', data_dict, raise_error=True, **params)
-    if isinstance(cp, str):
-        cp = eval(cp)
-    sp = get_param('sweep_points', data_dict, raise_error=True, **params)
-    if isinstance(sp, str):
-        sp = eval(sp)
-    meas_obj_sweep_points_map = get_param('meas_obj_sweep_points_map',
-                                          data_dict, raise_error=True, **params)
-    mobjn = get_param('meas_obj_name', data_dict, raise_error=True, **params)
-    return cp, sp, meas_obj_sweep_points_map, mobjn
 
 
 def filter_data(data_dict, keys_out, keys_in=None, **params):
@@ -193,11 +38,11 @@ def filter_data(data_dict, keys_out, keys_in=None, **params):
     Assumptions:
         - len(keys_out) == len(keys_in)
     """
-    data_to_proc_dict = get_data_to_process(data_dict, keys_in)
+    data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
     if len(keys_out) != len(data_to_proc_dict):
         raise ValueError('keys_out and keys_in do not have '
                          'the same length.')
-    data_filter_func = get_param('data_filter', data_dict,
+    data_filter_func = help_func_mod.get_param('data_filter', data_dict,
                                   default_value=lambda data: data, **params)
     for keyo, keyi in zip(keys_out, list(data_to_proc_dict)):
         data = data_dict
@@ -235,8 +80,8 @@ def get_std_deviation(data_dict, keys_out, keys_in=None, **params):
         - num_bins[i] exactly divides data_dict[keys_in[i]]
         - len(keys_in) == len(num_bins)
     """
-    data_to_proc_dict = get_data_to_process(data_dict, keys_in)
-    num_bins = get_param('num_bins', data_dict, **params)
+    data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
+    num_bins = help_func_mod.get_param('num_bins', data_dict, **params)
     if num_bins is None:
         raise ValueError('num_avg_bins is not specified.')
     if len(keys_in) != len(num_bins):
@@ -364,15 +209,15 @@ def do_preselection(data_dict, classified_data, keys_out, **params):
                          'the same length.')
 
     keys_in = params.get('keys_in', None)
-    presel_ro_idxs = get_param('presel_ro_idxs', data_dict,
+    presel_ro_idxs = help_func_mod.get_param('presel_ro_idxs', data_dict,
                                default_value=lambda idx: idx % 2 == 0, **params)
-    presel_condition = get_param('presel_condition', data_dict,
+    presel_condition = help_func_mod.get_param('presel_condition', data_dict,
                                  default_value=0, **params)
     if keys_in is not None:
         if len(keys_in) != len(classified_data):
             raise ValueError('classified_data and keys_in do not have '
                              'the same length.')
-        data_to_proc_dict = get_data_to_process(data_dict, keys_in)
+        data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
         for i, keyi in enumerate(data_to_proc_dict):
             # Check if the entry in classified_data is an array or a string
             # denoting a key in the data_dict
@@ -444,8 +289,8 @@ def average(data_dict, keys_out, keys_in=None, **params):
         - num_bins[i] exactly divides data_dict[keys_in[i]]
         - len(keys_in) == len(num_bins)
     """
-    data_to_proc_dict = get_data_to_process(data_dict, keys_in)
-    num_bins = get_param('num_bins', data_dict, **params)
+    data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
+    num_bins = help_func_mod.get_param('num_bins', data_dict, **params)
     if num_bins is None:
         raise ValueError('num_avg_bins is not specified.')
     if len(keys_in) != len(num_bins):
@@ -469,29 +314,6 @@ def average(data_dict, keys_out, keys_in=None, **params):
         data[all_keys[-1]] = np.mean(np.reshape(
             data_to_proc_dict[keyi], (num_bins[k], averages)), axis=-1)
     return data_dict
-
-
-def get_qb_channel_map_from_file(data_dict, data_keys, **params):
-    file_type = params.get('file_type', 'hdf')
-    qb_names = get_param('qb_names', data_dict, **params)
-    if qb_names is None:
-        raise ValueError('Either channel_map or qb_names must be specified.')
-
-    folder = get_param('folder', data_dict, **params)
-    if folder is None:
-        if 'folder' in data_dict:
-            folder = data_dict['folder']
-        else:
-            raise ValueError('Path to file must be saved in '
-                             'data_dict[folder] in order to extract '
-                             'channel_map.')
-
-    if file_type == 'hdf':
-        qb_channel_map = a_tools.get_qb_channel_map_from_hdf(
-            qb_names, value_names=data_keys, file_path=folder)
-    else:
-        raise ValueError('Only "hdf" files supported at the moment.')
-    return qb_channel_map
 
 
 def rotate_iq(data_dict, keys_out, keys_in=None, **params):
@@ -536,9 +358,9 @@ def rotate_iq(data_dict, keys_out, keys_in=None, **params):
         raise ValueError('keys_in and keys_out do not have '
                          'the same length.')
 
-    cp_list = get_param('cal_points_list', data_dict, **params)
+    cp_list = help_func_mod.get_param('cal_points_list', data_dict, **params)
     if cp_list is None:
-        cp = get_param('cal_points', data_dict, **params)
+        cp = help_func_mod.get_param('cal_points', data_dict, **params)
         if cp is None:
             raise ValueError(
                 'Neither cal_points_list nor cal_points was found.')
@@ -550,12 +372,14 @@ def rotate_iq(data_dict, keys_out, keys_in=None, **params):
         raise ValueError('cal_points_list and keys_in do not have '
                          'the same length.')
 
-    last_ge_pulses = get_param('last_ge_pulses', data_dict, default_value=[],
-                               **params)
-    mobjn = get_param('meas_obj_name', data_dict, raise_error=True, **params)
+    last_ge_pulses = help_func_mod.get_param('last_ge_pulses', data_dict,
+                                             default_value=[], **params)
+    mobjn = help_func_mod.get_param('meas_obj_name', data_dict,
+                                    raise_error=True, **params)
 
     for j, cp in enumerate(cp_list):
-        data_to_proc_dict = get_data_to_process(data_dict, keys_in[j])
+        data_to_proc_dict = help_func_mod.get_data_to_process(
+            data_dict, keys_in[j])
 
         data = data_dict
         all_keys = keys_out[j].split('.')
@@ -606,12 +430,13 @@ def rotate_1d_array(data_dict, keys_out, keys_in=None, **params):
         CalibrationPoints.get_rotations() are keyed by channel number strings;
         ex: indices for ch 0: {'0': {'g': [-4, -3], 'e': [-2, -1]}}
     """
-    data_to_proc_dict = get_data_to_process(data_dict, keys_in)
+    data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
 
-    mobjn = get_param('meas_obj_name', data_dict, raise_error=True, **params)
-    cp_list = get_param('cal_points_list', data_dict, **params)
+    mobjn = help_func_mod.get_param('meas_obj_name', data_dict,
+                                    raise_error=True, **params)
+    cp_list = help_func_mod.get_param('cal_points_list', data_dict, **params)
     if cp_list is None:
-        cp = get_param('cal_points', data_dict, **params)
+        cp = help_func_mod.get_param('cal_points', data_dict, **params)
         if cp is None:
             raise ValueError(
                 'Neither cal_points_list nor cal_points was found.')
@@ -622,8 +447,8 @@ def rotate_1d_array(data_dict, keys_out, keys_in=None, **params):
     if len(cp_list) != len(keys_in):
         raise ValueError('cal_points_list and keys_in do not have '
                          'the same length.')
-    last_ge_pulses = get_param('last_ge_pulses', data_dict, default_value=[],
-                               **params)
+    last_ge_pulses = help_func_mod.get_param('last_ge_pulses', data_dict,
+                                             default_value=[], **params)
 
     if len(keys_out) != len(data_to_proc_dict):
         raise ValueError('keys_out and keys_in do not have '
@@ -655,85 +480,6 @@ def rotate_1d_array(data_dict, keys_out, keys_in=None, **params):
     return data_dict
 
 
-## Helper functions ##
-def get_msmt_data(all_data, cal_points, qb_name):
-    """
-    Extracts data points from all_data that correspond to the measurement
-    points (without calibration points data).
-    :param all_data: array containing both measurement and calibration
-                     points data
-    :param cal_points: CalibrationPoints instance or its repr
-    :param qb_name: qubit name
-    :return: measured data without calibration points data
-    """
-    if isinstance(cal_points, str):
-        cal_points = repr(cal_points)
-    n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
-    if n_cal_pts == 0:
-        return all_data
-    else:
-        return deepcopy(all_data[:-n_cal_pts])
-
-
-def get_cal_data(all_data, cal_points, qb_name):
-    """
-    Extracts data points from all_data that correspond to the calibration points
-    data.
-    :param all_data: array containing both measurement and calibration
-                     points data
-    :param cal_points: CalibrationPoints instance or its repr
-    :param qb_name: qubit name
-    :return: Calibration points data
-    """
-    if isinstance(cal_points, str):
-        cal_points = repr(cal_points)
-    n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
-    if n_cal_pts == 0:
-        return []
-    else:
-        return deepcopy(all_data[-n_cal_pts:])
-
-
-def get_cal_sweep_points(sweep_points_array, cal_points, qb_name):
-    """
-    Creates the sweep points corresponding to the calibration points data as
-    equally spaced number_of_cal_states points, with the spacing given by the
-    spacing in sweep_points_array.
-    :param sweep_points_array: array of physical sweep points
-    :param cal_points: CalibrationPoints instance or its repr
-    :param qb_name: qubit name
-    """
-    if isinstance(cal_points, str):
-        cal_points = repr(cal_points)
-    n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
-    if n_cal_pts == 0:
-        return []
-    else:
-        step = np.abs(sweep_points_array[-1] - sweep_points_array[-2])
-        return np.array([sweep_points_array[-1] + i * step for
-                         i in range(1, n_cal_pts + 1)])
-
-
-## Plotting nodes ##
-def get_cal_state_color(cal_state_label):
-    if cal_state_label == 'g' or cal_state_label == r'$|g\rangle$':
-        return 'k'
-    elif cal_state_label == 'e' or cal_state_label == r'$|e\rangle$':
-        return 'gray'
-    elif cal_state_label == 'f' or cal_state_label == r'$|f\rangle$':
-        return 'C8'
-    else:
-        return 'C4'
-
-
-def get_latex_prob_label(prob_label):
-    if 'p' in prob_label.lower():
-        return r'$|{}\rangle$ state population'.format(
-            prob_label[prob_label.index('p')+1])
-    else:
-        return prob_label
-
-
 def prepare_1d_plot(data_dict, fig_name, keys_in=None, **params):
     """
     Prepares a 1d plot
@@ -754,10 +500,14 @@ def prepare_1d_plot(data_dict, fig_name, keys_in=None, **params):
             label in the legend
         do_legend_cal_states (bool, default: True): whether to show the cal
             states in the legend
+        plot_nice_cal_states (bool, default: True): whether to make separate
+            plot dicts for cal_states
         plot_name_suffix (str, default: ''): suffix to be added to all the
             plot names in this function
         title_suffix (str, default: ''): suffix to be added to the figure
             title, which is by default meas_obj_name
+        ncols (int, default: 1): number of subplots along x
+        nrows (int, default: 1): number of subplots along y
 
     Assumptions:
         - cal_points, sweep_points, meas_obj_name
@@ -765,14 +515,17 @@ def prepare_1d_plot(data_dict, fig_name, keys_in=None, **params):
         - expects a 1d sweep
         - meas_obj_name is defined in cal_points
     """
-    data_to_proc_dict = get_data_to_process(data_dict, keys_in)
-    cp = get_param('cal_points', data_dict, raise_error=True, **params)
+    data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
+    cp = help_func_mod.get_param('cal_points', data_dict, raise_error=True,
+                                 **params)
     if isinstance(cp, str):
         cp = eval(cp)
-    sp = get_param('sweep_points', data_dict, raise_error=True, **params)
+    sp = help_func_mod.get_param('sweep_points', data_dict, raise_error=True,
+                                 **params)
     if isinstance(sp, str):
         sp = eval(sp)
-    mobjn = get_param('meas_obj_name', data_dict, raise_error=True, **params)
+    mobjn = help_func_mod.get_param('meas_obj_name', data_dict,
+                                    raise_error=True, **params)
 
     sp_name = params.get('sp_name', 'none')
     sweep_info = [v for d in sp for k, v in d.items() if sp_name == k]
@@ -787,21 +540,29 @@ def prepare_1d_plot(data_dict, fig_name, keys_in=None, **params):
     data_label = params.get('data_label', 'Data')
     do_legend_data = params.get('do_legend_data', True)
     do_legend_cal_states = params.get('do_legend_cal_states', True)
+    plot_nice_cal_states = params.get('plot_nice_cal_states', True)
     plot_name_suffix = params.get('plot_name_suffix', '')
     title_suffix = params.get('title_suffix', '')
     title_suffix = mobjn + title_suffix
 
-    plotsize = fit_plt.get_default_plot_params(set=False)['figure.figsize']
+    plotsize = plot_module.get_default_plot_params(set=False)['figure.figsize']
     plotsize = (plotsize[0], plotsize[0]/1.25)
+    ncols = params.get('ncols', 1)
+    nrows = params.get('nrows', 1)
+    axids = np.arange(ncols*nrows)
+    if len(axids) > 1:
+        if len(axids) < len(data_to_proc_dict):
+            raise ValueError('There are not enough subplots for all keys_in.')
 
     plot_dicts = OrderedDict()
     plot_names_cal = []
     for i, keyi in enumerate(data_to_proc_dict):
         data = data_to_proc_dict[keyi]
-        if len(cp.states) != 0:
-            cal_data = get_cal_data(data, cp, mobjn)
-            data = get_msmt_data(data, cp, mobjn)
-            cal_swpts = get_cal_sweep_points(physical_swpts, cp, mobjn)
+        if len(cp.states) != 0 and plot_nice_cal_states:
+            cal_data = help_func_mod.get_cal_data(data, cp, mobjn)
+            data = help_func_mod.get_msmt_data(data, cp, mobjn)
+            cal_swpts = help_func_mod.get_cal_sweep_points(physical_swpts,
+                                                           cp, mobjn)
 
             qb_cal_indxs = cp.get_indices()[mobjn]
             # plot cal points
@@ -820,7 +581,7 @@ def prepare_1d_plot(data_dict, fig_name, keys_in=None, **params):
                     'legend_bbox_to_anchor': (1, 0.5),
                     'legend_pos': 'center left',
                     'linestyle': 'none',
-                    'line_kws': {'color': get_cal_state_color(
+                    'line_kws': {'color': help_func_mod.get_cal_state_color(
                         list(qb_cal_indxs)[ii])}}
 
                 plot_dicts[plot_dict_name_cal+'_line'] = {
@@ -838,11 +599,12 @@ def prepare_1d_plot(data_dict, fig_name, keys_in=None, **params):
 
         plot_dict_name = fig_name + '_' + plot_name_suffix
         if ylabel is None:
-            ylabel = get_latex_prob_label(keyi)
+            ylabel = help_func_mod.get_latex_prob_label(keyi)
 
         plot_dicts[plot_dict_name] = {
             'plotfn': 'plot_line',
             'fig_id': fig_name,
+            'ax_id': None if len(axids) == 1 else axids[i],
             'plotsize': plotsize,
             'xvals': physical_swpts,
             'xlabel': xlabel,
@@ -850,6 +612,8 @@ def prepare_1d_plot(data_dict, fig_name, keys_in=None, **params):
             'yvals': data,
             'ylabel': ylabel,
             'yunit': yunit,
+            'numplotsx': ncols,
+            'numplotsy': nrows,
             'setlabel': data_label,
             'title': title,
             'linestyle': 'none',
@@ -869,9 +633,9 @@ def prepare_1d_plot(data_dict, fig_name, keys_in=None, **params):
         data_dict['plot_dicts'] = plot_dicts
 
     if params.get('do_plotting', True):
-        getattr(fit_plt, 'plot')(data_dict,
-                                 keys_in=[plot_dict_name] + plot_names_cal,
-                                 **params)
+        getattr(plot_module, 'plot')(data_dict,
+                                     keys_in=[plot_dict_name] + plot_names_cal,
+                                     **params)
 
 
 ## Nodes that are classes ##
@@ -894,7 +658,8 @@ class RabiAnalysis(object):
             meas_obj_sweep_points_map[mobjn]][0] as sweep points
         """
         self.data_dict = data_dict
-        self.data_to_proc_dict = get_data_to_process(self.data_dict, keys_in)
+        self.data_to_proc_dict = help_func_mod.get_data_to_process(
+            self.data_dict, keys_in)
         self.keys_in = keys_in
 
         if params.pop('auto', True):
@@ -907,14 +672,14 @@ class RabiAnalysis(object):
             if prepare_fitting:
                 self.prepare_fitting()
             if do_fitting:
-                getattr(fit_plt, 'run_fitting')(
+                getattr(fit_module, 'run_fitting')(
                     self.data_dict, keys_in=list(self.data_dict['fit_dicts']),
                     **params)
                 self.analyze_fit_results()
             if prepare_plots:
                 self.prepare_plots(**params)
             if do_plotting:
-                getattr(fit_plt, 'plot')(
+                getattr(plot_module, 'plot')(
                     self.data_dict, keys_in=list(self.data_dict['plot_dicts']),
                     **params)
 
@@ -923,7 +688,7 @@ class RabiAnalysis(object):
 
     def process_data(self, **params):
         self.cp, self.sp, self.meas_obj_sweep_points_map, self.mobjn = \
-            get_cp_sp_spmap_measobjn(self.data_dict, **params)
+            help_func_mod.get_cp_sp_spmap_measobjn(self.data_dict, **params)
         # Get from the hdf5 file any parameters specified in
         # params_dict and numeric_params.
         params_dict = {}
@@ -933,36 +698,18 @@ class RabiAnalysis(object):
                 s+f'.{trans_name}_amp180'
             params_dict[f'{trans_name}_amp90scale_'+self.mobjn] = \
                 s+f'.{trans_name}_amp90_scale'
-        get_params_from_hdf_file(self.data_dict, params_dict=params_dict,
-                                 numeric_params=list(params_dict), **params)
+        help_func_mod.get_params_from_hdf_file(self.data_dict,
+                                               params_dict=params_dict,
+                                               numeric_params=list(params_dict),
+                                               **params)
 
         self.physical_swpts = self.sp[0][self.meas_obj_sweep_points_map[
             self.mobjn][0]][0]
 
     def prepare_fitting(self):
-        fit_dicts = OrderedDict()
-        for keyi, data in self.data_to_proc_dict.items():
-            data_fit = get_msmt_data(data, self.cp, self.mobjn)
-            cos_mod = lmfit.Model(fit_mods.CosFunc)
-            guess_pars = fit_mods.Cos_guess(
-                model=cos_mod, t=self.physical_swpts, data=data_fit)
-            guess_pars['amplitude'].vary = True
-            guess_pars['amplitude'].min = -10
-            guess_pars['offset'].vary = True
-            guess_pars['frequency'].vary = True
-            guess_pars['phase'].vary = True
-
-            key = 'rabi_fit_' + self.mobjn + keyi
-            fit_dicts[key] = {
-                'fit_fn': fit_mods.CosFunc,
-                'fit_xvals': {'t': self.physical_swpts},
-                'fit_yvals': {'data': data_fit},
-                'guess_pars': guess_pars}
-
-        if 'fit_dicts' in self.data_dict:
-            self.data_dict['fit_dicts'].update(fit_dicts)
-        else:
-            self.data_dict['fit_dicts'] = fit_dicts
+        fit_module.prepare_cos_fit_dict(self.data_dict,
+                                        keys_in=list(self.data_to_proc_dict),
+                                        meas_obj_name=self.mobjn)
 
     def analyze_fit_results(self):
         if 'fit_dicts' in self.data_dict:
@@ -1036,8 +783,9 @@ class RabiAnalysis(object):
                     rabi_amplitudes[self.mobjn]['piPulse'],
                     **fit_res.best_values)],
                 'xmin': self.physical_swpts[0],
-                'xmax': get_cal_sweep_points(self.physical_swpts, self.cp,
-                                             self.mobjn)[-1],
+                'xmax': help_func_mod.get_cal_sweep_points(self.physical_swpts,
+                                                           self.cp,
+                                                           self.mobjn)[-1],
                 'colors': 'gray'}
 
             plot_dicts['pihalfamp_marker_' + self.mobjn + keyi] = {
@@ -1064,8 +812,9 @@ class RabiAnalysis(object):
                     rabi_amplitudes[self.mobjn]['piHalfPulse'],
                     **fit_res.best_values)],
                 'xmin': self.physical_swpts[0],
-                'xmax': get_cal_sweep_points(self.physical_swpts, self.cp,
-                                             self.mobjn)[-1],
+                'xmax': help_func_mod.get_cal_sweep_points(self.physical_swpts,
+                                                           self.cp,
+                                                           self.mobjn)[-1],
                 'colors': 'gray'}
 
             trans_name = 'ef' if 'f' in keyi else 'ge'
@@ -1234,7 +983,8 @@ class SingleQubitRBAnalysis(object):
             on outermost
         """
         self.data_dict = data_dict
-        self.data_to_proc_dict = get_data_to_process(self.data_dict, keys_in)
+        self.data_to_proc_dict = help_func_mod.get_data_to_process(
+            self.data_dict, keys_in)
         self.keys_in = keys_in
 
         if params.get('auto', True):
@@ -1247,14 +997,14 @@ class SingleQubitRBAnalysis(object):
             if prepare_fitting:
                 self.prepare_fitting()
             if do_fitting:
-                getattr(fit_plt, 'run_fitting')(
+                getattr(fit_module, 'run_fitting')(
                     self.data_dict, keys_in=list(self.data_dict['fit_dicts']),
                     **params)
                 self.analyze_fit_results()
             if prepare_plots:
                 self.prepare_plots(**params)
             if do_plotting:
-                getattr(fit_plt, 'plot')(
+                getattr(plot_module, 'plot')(
                     self.data_dict, keys_in=list(self.data_dict['plot_dicts']),
                     **params)
 
@@ -1263,7 +1013,7 @@ class SingleQubitRBAnalysis(object):
 
     def process_data(self, **params):
         self.cp, self.sp, self.meas_obj_sweep_points_map, self.mobjn = \
-            get_cp_sp_spmap_measobjn(self.data_dict, **params)
+            help_func_mod.get_cp_sp_spmap_measobjn(self.data_dict, **params)
         # Get from the hdf5 file any parameters specified in
         # params_dict and numeric_params.
         params_dict = {}
@@ -1278,22 +1028,24 @@ class SingleQubitRBAnalysis(object):
                 s+f'.{trans_name}_sigma'
             params_dict[f'{trans_name}_nr_sigma_'+self.mobjn] = \
                 s+f'.{trans_name}_nr_sigma'
-        get_params_from_hdf_file(self.data_dict, params_dict=params_dict,
-                                 numeric_params=list(params_dict), **params)
+        help_func_mod.get_params_from_hdf_file(self.data_dict,
+                                               params_dict=params_dict,
+                                               numeric_params=list(params_dict),
+                                               **params)
 
         self.nr_seeds = len(self.sp[0][self.meas_obj_sweep_points_map[
             self.mobjn][0]][0])
         self.cliffords = self.sp[1][self.meas_obj_sweep_points_map[
             self.mobjn][1]][0]
-        self.conf_level = get_param('conf_level', self.data_dict,
-                                    default_value=0.68, **params)
-        self.gate_decomp = get_param('gate_decomp', self.data_dict,
-                                    default_value='HZ', **params)
-        self.use_empirical_variance = get_param(
+        self.conf_level = help_func_mod.get_param('conf_level', self.data_dict,
+                                                  default_value=0.68, **params)
+        self.gate_decomp = help_func_mod.get_param('gate_decomp', self.data_dict,
+                                                   default_value='HZ', **params)
+        self.use_empirical_variance = help_func_mod.get_param(
             'use_empirical_variance', self.data_dict,
             default_value=True, **params)
-        self.std_keys = get_param('std_keys', self.data_dict, raise_error=True,
-                                  **params)
+        self.std_keys = help_func_mod.get_param('std_keys', self.data_dict,
+                                                raise_error=True, **params)
         if len(self.std_keys) != len(self.keys_in):
             raise ValueError('std_keys and keys_in do not have '
                              'the same length.')
@@ -1320,8 +1072,8 @@ class SingleQubitRBAnalysis(object):
         guess_pars = rb_mod.make_params()
 
         for keyi, keys in zip(self.data_to_proc_dict, self.std_keys):
-            data_fit = get_msmt_data(self.data_to_proc_dict[keyi], self.cp,
-                                     self.mobjn)
+            data_fit = help_func_mod.get_msmt_data(self.data_to_proc_dict[keyi],
+                                                   self.cp, self.mobjn)
             model = deepcopy(rb_mod)
             key = 'rb_fit_' + self.mobjn + keyi
             fit_dicts[key] = {
@@ -1339,8 +1091,10 @@ class SingleQubitRBAnalysis(object):
                                     params=guess_pars)
                 # Use the found error per Clifford to standard errors for the
                 # data points fro Helsen et al. (2017)
-                epsilon_guess = get_param('epsilon_guess', self.data_dict,
-                                          default_value=0.01, **params)
+                epsilon_guess = help_func_mod.get_param('epsilon_guess',
+                                                        self.data_dict,
+                                                        default_value=0.01,
+                                                        **params)
                 epsilon = self.calculate_confidence_intervals(
                     nr_seeds=self.nr_seeds,
                     nr_cliffords=self.cliffords,
@@ -1453,8 +1207,8 @@ class SingleQubitRBAnalysis(object):
                 'legend_bbox_to_anchor': (1, -0.15),
                 'legend_pos': 'upper right'}
 
-            if get_param('plot_T1_lim', self.data_dict, default_value=True,
-                         **params):
+            if help_func_mod.get_param('plot_T1_lim', self.data_dict,
+                                       default_value=True, **params):
                 # plot T1 limited curve
                 F_T1, p_T1 = self.calc_T1_limited_fidelity(
                     self.data_dict['T1_'+self.mobjn],
@@ -1504,7 +1258,8 @@ class SingleQubitRBAnalysis(object):
                         '{:.3f}%'.format((1-F_T1)*100))
         textstr += ('\n' + r'$\langle \sigma_z \rangle _{m=0}$ = ' +
                     '{:.2f} $\pm$ {:.2f}'.format(
-                        fit_res.params['Amplitude'].value + fit_res.params['offset'].value,
+                        fit_res.params['Amplitude'].value +
+                        fit_res.params['offset'].value,
                         np.sqrt(fit_res.params['offset'].stderr**2 +
                                 fit_res.params['Amplitude'].stderr**2)))
 

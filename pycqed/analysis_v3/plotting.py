@@ -2,19 +2,13 @@ import logging
 log = logging.getLogger()
 log.addHandler(logging.StreamHandler())
 
-import lmfit
 import numpy as np
-import scipy as sp
-import itertools
 import numbers
 from inspect import signature
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 from pycqed.analysis_v3 import saving as save_mod
-from pycqed.analysis import fitting_models as fit_mods
-from pycqed.analysis import analysis_toolbox as a_tools
-from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from copy import deepcopy
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -26,81 +20,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 import sys
 this_mod = sys.modules[__name__]
-
-
-def run_fitting(data_dict, keys_in='all', **params):
-    """
-    Fits the data dicts in dat_dict['fit_dicts'] specified by keys_in.
-    Only model fitting is implemented here. Minimizing fitting should
-    be implemented here.
-    """
-    fit_res_dict = {}
-    if 'fit_dicts' not in data_dict:
-        raise ValueError('fit_dicts not found in data_dict.')
-
-    if keys_in == 'all':
-        fit_dicts = data_dict['fit_dicts']
-    else:
-        fit_dicts = {fk: fd for fk, fd in data_dict['fit_dicts'].items() if
-                     fk in keys_in}
-
-    for fit_key, fit_dict in fit_dicts.items():
-        fit_one_dict(fit_dict)
-        fit_res_dict[fit_key] = fit_dict['fit_res']
-
-    if params.get('save_fit_results', True):
-        getattr(save_mod, 'save_fit_results')(data_dict, fit_res_dict,
-                                              **params)
-
-
-def fit_one_dict(fit_dict, **params):
-    """
-    Does fitting to one fit_dict. Updates the fit_dict with the entry 'fit_res.'
-    """
-    guess_dict = fit_dict.get('guess_dict', None)
-    guess_pars = fit_dict.get('guess_pars', None)
-    guessfn_pars = fit_dict.get('guessfn_pars', {})
-    fit_yvals = fit_dict['fit_yvals']
-    fit_xvals = fit_dict['fit_xvals']
-
-    model = fit_dict.get('model', None)
-    if model is None:
-        fit_fn = fit_dict.get('fit_fn', None)
-        model = fit_dict.get('model', lmfit.Model(fit_fn))
-    fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-    if fit_guess_fn is None and fit_dict.get('fit_guess', True):
-        fit_guess_fn = model.guess
-
-    fit_kwargs = fit_dict.get('fit_kwargs', {})
-    if guess_pars is None:
-        if fit_guess_fn is not None:
-            # a fit function should return lmfit parameter
-            # objects but can also work by returning a
-            # dictionary of guesses
-            guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals,
-                                      **guessfn_pars)
-            if not isinstance(guess_pars, lmfit.Parameters):
-                for gd_key, val in list(guess_pars.items()):
-                    model.set_param_hint(gd_key, **val)
-                guess_pars = model.make_params()
-
-            if guess_dict is not None:
-                for gd_key, val in guess_dict.items():
-                    for attr, attr_val in val.items():
-                        # e.g. setattr(guess_pars['frequency'],
-                        # 'value', 20e6)
-                        setattr(guess_pars[gd_key], attr,
-                                attr_val)
-            # A guess can also be specified as a dictionary.
-            # additionally this can be used to overwrite values
-            # from the guess functions.
-        elif guess_dict is not None:
-            for gd_key, val in list(guess_dict.items()):
-                model.set_param_hint(gd_key, **val)
-            guess_pars = model.make_params()
-    fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
-                                    params=guess_pars, **fit_kwargs)
-
 
 
 #####################################
