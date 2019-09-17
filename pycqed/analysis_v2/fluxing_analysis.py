@@ -7,7 +7,8 @@ import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from pycqed.analysis.tools.data_manipulation import \
     populations_using_rate_equations
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, plot_fit
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, plot_fit, \
+    make_anglemap, make_segmented_cmap
 import matplotlib.pyplot as plt
 from pycqed.analysis.fitting_models import CosFunc, Cos_guess, \
     avoided_crossing_freq_shift
@@ -255,14 +256,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
         super().prepare_plots()
-
-        white = '#ffffff'
-        black = '#000000'
-        red = '#ff0000'
-        blue = '#0000ff'
-        anglemap = colors.LinearSegmentedColormap.from_list('anglemap', 
-            [black, red, white, blue, black], N=256, gamma=1)
-
+        anglemap = make_anglemap()
         for i, val_name in enumerate(self.proc_data_dict['value_names']):
 
             zlabel = '{} ({})'.format(val_name,

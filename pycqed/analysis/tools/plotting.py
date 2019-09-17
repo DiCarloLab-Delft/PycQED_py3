@@ -520,3 +520,28 @@ def plot_fit(xvals, fit_res, ax, **plot_kws):
     yvals = model.eval(fit_res.params, **{independent_var: xvals})
     ax.plot(xvals, yvals, **plot_kws)
 
+
+def cmap_to_alpha(cmap):
+    """
+    Takes a cmap and makes the transparency of the cmap 
+    changes with each element.
+    """
+    my_cmap = cmap(np.arange(cmap.N))
+    # Set alpha
+    my_cmap[:,-1] = np.linspace(0, 1, cmap.N)
+    # Create new colormap
+    my_cmap = col.ListedColormap(my_cmap)
+    return my_cmap
+
+def cmap_first_to_alpha(cmap):
+    """
+    Makes the first element of a cmap transparant. 
+    """
+    my_cmap = cmap(np.arange(cmap.N))
+    # Set alpha
+    my_cmap[0,-1] = 0
+    my_cmap[1:,-1] = 1
+
+    # Create new colormap
+    my_cmap = col.ListedColormap(my_cmap)
+    return my_cmap

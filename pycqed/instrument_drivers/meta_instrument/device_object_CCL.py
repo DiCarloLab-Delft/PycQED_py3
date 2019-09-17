@@ -1376,6 +1376,7 @@ class DeviceCCL(Instrument):
             prepare_for_timedomain: bool =True,
             result_logging_mode='raw',
             initialize: bool=False, analyze=True, shots_per_meas: int=2**16,
+            label='Mux_SSRO', 
             MC=None):
         """
         Perform a simultaneous ssro experiment on multiple qubits.
@@ -1392,8 +1393,7 @@ class DeviceCCL(Instrument):
                 acquisition with UHFQC
 
         """
-        log.warning('This method is a WIP')
-        log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
+         log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
             self.name, qubits))
 
         # off and on, not including post selection init measurements yet
@@ -1419,6 +1419,14 @@ class DeviceCCL(Instrument):
         d = self.get_int_logging_detector(qubits,
                                           result_logging_mode=result_logging_mode)
 
+        # This assumes qubit names do not contain spaces
+        det_qubits = [v.split()[-1] for v in d.value_names]
+        if qubits != det_qubits: 
+            # this occurs because the detector groups qubits per feedline.
+            # If you do not pay attention, this will mess up the analysis of 
+            # this experiment. 
+            raise ValueError('Detector qubits do not match order specified')
+
         shots_per_meas = int(np.floor(
             np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
 
@@ -1432,15 +1440,13 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        MC.run('Mux_SSRO_{}_{}'.format(qubits, self.msmt_suffix))
+        MC.run('{}_{}_{}'.format(label, qubits, self.msmt_suffix))
 
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
-            # a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
-            # a = ma2.Multiplexed_Readout_Analysis()
-            print('Hello!')
-        return a
+            a = ma2.Multiplexed_Readout_Analysis(label=label)
+        return 
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
@@ -2340,6 +2346,9 @@ class DeviceCCL(Instrument):
         if sim_cz_qubits is not None: 
             sim_cz_qubits_idxs = [self.find_instrument(q).cfg_qubit_nr() 
                 for q in sim_cz_qubits]
+        else: 
+            sim_cz_qubits_idxs = None 
+
         for i in range(nr_seeds):
             # check for keyboard interrupt q because generating can be slow
             check_keyboard_interrupt()
@@ -2827,6 +2836,7 @@ class DeviceCCL(Instrument):
                          calibrate_threshold=True,
                          # option should be here but is currently not implementd
                          # update_threshold: bool=True,
+                         mux_ro_label='Mux_SSRO',
                          update_cross_talk_matrix: bool=False)-> bool:
         """
         Calibrates multiplexed Readout.
@@ -2875,16 +2885,17 @@ class DeviceCCL(Instrument):
                     q.measure_ssro(update=True, nr_shots_per_case=2**13)
 
         self.measure_ssro_multi_qubit(qubits,
+            label=mux_ro_label, 
             result_logging_mode='lin_trans')
 
 
-        if len (qubits)> 2: 
-            raise NotImplementedError
+        # if len (qubits)> 2: 
+        #     raise NotImplementedError
 
-        res_dict = mra.two_qubit_ssro_fidelity(
-            label='{}_{}'.format(q0.name, q1.name),
-            qubit_labels=[q0.name, q1.name])
-        V_offset_cor = res_dict['V_offset_cor']
+        # res_dict = mra.two_qubit_ssro_fidelity(
+        #     label='{}_{}'.format(q0.name, q1.name),
+        #     qubit_labels=[q0.name, q1.name])
+        # V_offset_cor = res_dict['V_offset_cor']
 
         # N.B. no crosstalk parameters are assigned
         # # weights 0 and 1 are the correct indices because I set the numbering
@@ -2902,7 +2913,9 @@ class DeviceCCL(Instrument):
 
     def calibrate_cz_single_q_phase(self, q_osc: str, q_spec: str,
                                     amps,
+                                    q2=None, q3=None,
                                     waveform='cz_NE',
+                                    flux_codeword_park=None,
                                     update: bool = True,
                                     prepare_for_timedomain: bool=True, MC=None):
         """
@@ -2943,6 +2956,12 @@ class DeviceCCL(Instrument):
 
         q0idx = self.find_instrument(q_osc).cfg_qubit_nr()
         q1idx = self.find_instrument(q_spec).cfg_qubit_nr()
+        if q2 is not None:
+            q2idx = self.find_instrument(q2).cfg_qubit_nr()
+            q3idx = self.find_instrument(q3).cfg_qubit_nr()
+        else:
+            q2idx = None
+            q3idx = None
         fl_lutman_q0 = self.find_instrument(
             q_osc).instr_LutMan_Flux.get_instr()
 
@@ -2950,7 +2969,9 @@ class DeviceCCL(Instrument):
 
         p = mqo.conditional_oscillation_seq(
             q0idx, q1idx,
+            q2idx, q3idx,
             flux_codeword=flux_codeword,
+            flux_codeword_park=flux_codeword_park,
             platf_cfg=self.cfg_openql_platform_fn(),
             CZ_disabled=False, add_cal_points=False,
             angles=[90])

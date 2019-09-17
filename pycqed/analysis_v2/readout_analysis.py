@@ -749,7 +749,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 }
 
 
-class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
+class Multiplexed_Readout_Analysis_deprecated(ba.BaseDataAnalysis):
     """
     For two qubits, to make an n-qubit mux readout experiment.
     we should vectorize this analysis
