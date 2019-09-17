@@ -59,6 +59,15 @@ Changelog:
 
 20190627 WJV
 - removed DIO calibration support, which will shortly be replaced
+
+20190709 NCH
+- Github PR #578
+
+20190917 WJV
+- removed duplicates from __init__
+- cleanup
+- changed _configure_codeword_protocol() to use table of modes
+
 """
 
 import time
@@ -70,7 +79,6 @@ import pycqed
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
-import pycqed.instrument_drivers.physical_instruments.QuTech_CCL as qtccl
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
@@ -114,12 +122,11 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         """
         t0 = time.time()
         super().__init__(name=name, device=device, interface=interface, server=server, port=port, num_codewords=num_codewords, **kw)
-        # Set default waveform length to 20 ns at 2.4 GSa/s
-        self._default_waveform_length = 48
 
-         # show some info
+        # show some info
         log.info('{}: DIO interface found in mode {}'
                  .format(self.devname, 'CMOS' if self.get('dios_0_interface') == 0 else 'LVDS')) # NB: mode is persistent across device restarts
+
         # Ensure snapshot is fairly small for HDAWGs
         self._snapshot_whitelist = {
             'IDN',
@@ -140,14 +147,8 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
 
         self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
 
-
-         # NB: we don't want to load defaults automatically, but leave it up to the user
-         # Configure instrument to blink forever
-        self.seti('raw/error/blinkseverity', 1)
-        self.seti('raw/error/blinkforever', 1)
-
         t1 = time.time()
-        print('Initialized ZI_HDAWG_core', self.devname, 'in %.2fs' % (t1-t0))
+        log.info('{}: Initialized ZI_HDAWG in {}s'.format(self.devname, t1-t0))
 
     def _add_extra_parameters(self):
         self.add_parameter('timeout', unit='s',
@@ -291,8 +292,6 @@ while (1) {
                                  zibase.gen_waveform_name(ch+1, dio_cw)))
         return wf_table
 
-
-
     def _codeword_table_preamble(self, awg_nr):
         """
         Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
@@ -311,7 +310,6 @@ while (1) {
 
         return program
 
-    # FIXME: should probably be private as it works in tandem with upload_codeword_program
     def _configure_codeword_protocol(self, default_dio_timing: bool=False):
         """
         This method configures the AWG-8 codeword protocol.
@@ -325,6 +323,9 @@ while (1) {
             flux      : Each AWG pair is responsible for 2 flux channels.
                         this also affects the "codeword_program" and
                         setting "wave_chX_cwXXX" parameters.
+            # FIXME: comment outdated
+            # FIXME: unused parameter default_dio_timing
+            # FIXME: turn cfg_codeword_protocol into a function parameter
 
         """
         # Check overall configuration
@@ -352,74 +353,86 @@ while (1) {
             # 0: no edges 1: rising edge, 2: falling edge or 3: both edges
             self.set('awgs_{}_dio_strobe_slope'.format(awg_nr), 0)
 
+            # No special requirements regarding waveforms by default
+            self._clear_readonly_waveforms(awg_nr)
+
             # the mask determines how many bits will be used in the protocol
             # e.g., mask 3 will mask the bits with bin(3) = 00000011 using
             # only the 2 Least Significant Bits.
             num_codewords = int(2**np.ceil(np.log2(self._num_codewords)))
-
             self.set('awgs_{}_dio_mask_value'.format(awg_nr), num_codewords-1)
 
-            # No special requirements regarding waveforms by default
-            self._clear_readonly_waveforms(awg_nr)
-
-            if self.cfg_codeword_protocol() == 'identical':
-                # In the identical protocol all bits are used to trigger
-                # the same codewords on all AWG's
-
-                # N.B. The shift is applied before the mask
-                # The relevant bits can be selected by first shifting them
-                # and then masking them.
-                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-            elif self.cfg_codeword_protocol() == 'microwave':
-                # In the mw protocol bits [0:7] -> CW0 and bits [(8+1):15] -> CW1
-                # N.B. DIO bit 8 (first of 2nd byte)  not connected in AWG8!
-                if awg_nr in [0, 1]:
+            # set mask and shift for codeword protocol
+            # N.B. The shift is applied before the mask
+            # The relevant bits can be selected by first shifting them
+            # and then masking them.
+            if 1:   # FIXME: new
+                dio_mode_list = {
+                    # Name                      AWG[0:3]
+                    'identical':            [   0,  0,  0,  0],
+                    'microwave':            [   0,  0,  9,  9],     # bits [7:0] and [16:9]. Skips bit 8 because of v1 hardware issues
+                    'new_microwave':        [   0,  0,  16, 16],    # bits [7:0] and [23:16]
+                    'new_novsm_microwave':  [   0,  7,  16, 23],    # bits [6:0], [13:7], [22:16] and [29:23]
+                    'flux':                 [   0,  6,  16, 22],
+                }
+                dio_mode = dio_mode_list.get(self.cfg_codeword_protocol())
+                if dio_mode is None:
+                    raise ValueError("Invalid value '{}' for parameter cfg_codeword_protocol".format(self.cfg_codeword_protocol))
+                shift = dio_mode[awg_nr]
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), shift)
+                # FIXME: flux mode sets mask
+            else:
+                if self.cfg_codeword_protocol() == 'identical':
+                    # In the identical protocol all bits are used to trigger
+                    # the same codewords on all AWG's
                     self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                elif awg_nr in [2, 3]:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 9)
+                elif self.cfg_codeword_protocol() == 'microwave':
+                    # In the mw protocol bits [0:7] -> CW0 and bits [(8+1):15] -> CW1
+                    # N.B. DIO bit 8 (first of 2nd byte)  not connected in AWG8!
+                    if awg_nr in [0, 1]:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                    elif awg_nr in [2, 3]:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 9)
 
-            # NEW
-            # In the new mw protocol bits [0:7] -> CW0 and bits [23:16] -> CW1
-            elif self.cfg_codeword_protocol() == 'new_microwave':
-                if awg_nr in [0, 1]:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                elif awg_nr in [2, 3]:
+                # NEW
+                # In the new mw protocol bits [0:7] -> CW0 and bits [23:16] -> CW1
+                elif self.cfg_codeword_protocol() == 'new_microwave':
+                    if awg_nr in [0, 1]:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                    elif awg_nr in [2, 3]:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
 
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
+                # NEW
+                # In the NO-VSM mw protocol bits [0:6] -> CW0, bits [13, 7] -> CW1,
+                # bits [22:16] -> CW2 and bits [29:23] -> CW4
+                elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
+                    if awg_nr == 0:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                    elif awg_nr == 1:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 7)
+                    elif awg_nr == 2:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
+                    elif awg_nr == 3:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 23)
 
-            # NEW
-            # In the NO-VSM mw protocol bits [0:6] -> CW0, bits [13, 7] -> CW1,
-            # bits [22:16] -> CW2 and bits [29:23] -> CW4
-            elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
-                if awg_nr == 0:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                elif awg_nr == 1:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 7)
-                elif awg_nr == 2:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
-                elif awg_nr == 3:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 23)
+                # NEW
+                # Proper use of flux AWG to allow independent triggering of flux
+                # bits[0:2] for awg0_ch0, bits[3:5] for awg0_ch1,
+                # bits[6:8] for awg0_ch2, bits[9:11] for awg0_ch3,
+                # bits[16:18] for awg0_ch4, bits[19:21] for awg0_ch5,
+                # bits[22:24] for awg0_ch6, bits[25:27] for awg0_ch7
+                elif self.cfg_codeword_protocol() == 'flux':
+                    self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
 
-            # NEW
-            # Proper use of flux AWG to allow independent trigerring of flux
-            # bits[0:2] for awg0_ch0, bits[3:5] for awg0_ch1,
-            # bits[6:8] for awg0_ch2, bits[9:11] for awg0_ch3,
-            # bits[16:18] for awg0_ch4, bits[19:21] for awg0_ch5,
-            # bits[22:24] for awg0_ch6, bits[25:27] for awg0_ch7
-            elif self.cfg_codeword_protocol() == 'flux':
-                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
+                    if awg_nr == 0:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                    elif awg_nr == 1:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 6)
+                    elif awg_nr == 2:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
+                    elif awg_nr == 3:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 22)
 
-                if awg_nr == 0:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                elif awg_nr == 1:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 6)
-                elif awg_nr == 2:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
-                elif awg_nr == 3:
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 22)
-
-                # self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
-                # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
         ####################################################
         # Turn on device
         ####################################################
@@ -470,7 +483,7 @@ while (1) {
             parameter_class=ManualParameter)
 
     ##########################################################################
-    # 'private' functions: DIO calibrration
+    # 'private' functions: DIO calibration
     ##########################################################################
 
     def _get_awg_dio_data(self, awg):
@@ -571,6 +584,10 @@ while (1) {
 
         return set(valid_delays)
 
+    ##########################################################################
+    # DIO calibration functions for *CC*
+    # FIXME: should not be in driver
+    ##########################################################################
 
     def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
         """

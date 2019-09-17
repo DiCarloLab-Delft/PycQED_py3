@@ -97,39 +97,39 @@ class SCPIBase:
         """
         return self._ask('system:err?')
 
-    def get_system_error_count(self):
+    def get_system_error_count(self) -> int:
         return self._ask_int('system:error:count?')
 
-    def status_preset(self):
+    def status_preset(self) -> None:
         self._transport.write('STATus:PRESet')
 
     def get_system_version(self) -> str:
         return self._ask('system:version?')
 
 
-    def get_status_questionable_condition(self):
+    def get_status_questionable_condition(self) -> int:
         return self._ask_int('STATus:QUEStionable:CONDition?')
 
-    def get_status_questionable_event(self):
+    def get_status_questionable_event(self) -> int:
         return self._ask_int('STATus:QUEStionable:EVENt?')
 
-    def set_status_questionable_enable(self, val):
+    def set_status_questionable_enable(self, val) -> None:
         self._transport.write('STATus:QUEStionable:ENABle {}'.format(val))
 
-    def get_status_questionable_enable(self):
+    def get_status_questionable_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:ENABle?')
 
 
-    def get_status_operation_condition(self):
+    def get_status_operation_condition(self) -> int:
         return self._ask_int('STATus:OPERation:CONDition?')
 
-    def get_status_operation_event(self):
+    def get_status_operation_event(self) -> int:
         return self._ask_int('STATus:OPERation:EVENt?')
 
-    def set_status_operation_enable(self, val):
+    def set_status_operation_enable(self, val) -> None:
         self._transport.write('STATus:OPERation:ENABle {}'.format(val))
 
-    def get_status_operation_enable(self):
+    def get_status_operation_enable(self) -> int:
         return self._ask_int('STATus:OPERation:ENABle?')
 
     ###

@@ -33,7 +33,7 @@ class QuTechCC(QuTechCC_core, Instrument):
 
         # user constants
         self._num_ccio = num_ccio  # the number of CCIO modules used
-        if ccio_slots_driving_vsm == None:
+        if ccio_slots_driving_vsm is None:
             self._ccio_slots_driving_vsm = []
         else:
             self._ccio_slots_driving_vsm = ccio_slots_driving_vsm  # the slot numbers of the CCIO driving the VSM

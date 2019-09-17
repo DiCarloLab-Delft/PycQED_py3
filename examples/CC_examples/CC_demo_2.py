@@ -7,13 +7,14 @@ import CC_logging
 import sys
 import os
 import logging
-from pathlib import Path
 import numpy as np
+from pathlib import Path
 
 from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.wouter import ZI_HDAWG8
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.wouter import UHFQuantumController as ZI_UHFQC
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import ZI_HDAWG8
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
 import pycqed.measurement.openql_experiments.openql_helpers as oqh
@@ -54,15 +55,14 @@ if len(sys.argv)>1:
 # instrument info
 conf = lambda:0 # create empty 'struct'
 conf.ro_0 = ''
-conf.ro_0 = 'dev2295'
-conf.mw_0 = 'dev8079'
-#conf.mw_0 = 'dev8078'
+conf.ro_0 = '' # 'dev2312'   # 'dev2295'
+conf.mw = ['dev8068', 'dev8079']
 conf.flux_0 = ''
 conf.cc_ip = '192.168.0.241'
 
-qubit_idx = 3 # NB: connects to AWG8'mw_0'  in slot 3
+qubit_idx = 3 # NB: connects to AWG8'mw'  in slot 3
 slot_ro_1 = 1
-slot_mw_0 = 4
+slot_mw = 4
 curdir = os.path.dirname(__file__)
 cfg_openql_platform_fn = str(Path("../../pycqed/tests/openql/test_cfg_cc.json"))
 print(cfg_openql_platform_fn)
@@ -127,10 +127,13 @@ log.debug("File for CC = '{}'".format(cc_file_name))
 #station = station.Station()
 
 instr = lambda:0 # create empty 'struct'
-if conf.mw_0 != '':
-    log.debug('connecting to mw_0')
-    instr.mw_0 = ZI_HDAWG8.ZI_HDAWG8('mw_0', device=conf.mw_0)
-    #station.add_component(instr.mw_0)
+instr.mw = []
+for i, dev in enumerate(conf.mw):
+    name = 'mw_'+str(i)
+    log.debug(f'connecting to mw AWG8 {name}={dev}')
+    instr.mw.append(ZI_HDAWG8.ZI_HDAWG8(name, device=dev))
+    log.debug(f'connected to mw AWG8 {name}={dev}')
+    #station.add_component(instr.mw[i])
 
 if conf.flux_0 != '':
     log.debug('connecting to flux_0')
@@ -157,37 +160,44 @@ rolut = UHFQC_RO_LutMan('rolut', num_res=7)
 ##########################################
 #  Configure AWGs
 ##########################################
-if conf.mw_0 != '':
-    log.debug('configuring mw_0')
+for i, dev in enumerate(conf.mw):
+    log.debug(f'configuring mw HDAWG {dev}')
     # define sequence
     sequence_length = 32
 
-    # configure instrument
-    instr.mw_0.load_default_settings()
-    instr.mw_0.assure_ext_clock()
-    set_waveforms(instr.mw_0, 'square', sequence_length)
+    # set DIO interface
     if 0: # FIXME
-        log.warning('setting DIO interface to CMOS')
-        instr.mw_0.set('dios_0_interface', 1)
-    instr.mw_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
-    instr.mw_0.cfg_codeword_protocol('microwave')
-    instr.mw_0.upload_codeword_program()
-    if 1:   # FIXME: should be moved to driver
-        instr.mw_0._dev.setd('raw/dios/0/extclk', 1)  # enable 50 MHz sampling of DIO inputs
-        for awg in range(4):
-            instr.mw_0.set('awgs_{}_dio_strobe_slope'.format(awg), 0)  # disable strobe triggering
+        log.warning('setting DIO interface to LVDS')
+        instr.mw[i].set('dios_0_interface', 1)
 
-    #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
+    # configure instrument
+    instr.mw[i].clear_errors()
+    instr.mw[i].load_default_settings()
+    instr.mw[i].assure_ext_clock()
+    set_waveforms(instr.mw[i], 'square', sequence_length)
+
+    # set DIO protocol
+    instr.mw[i].cfg_codeword_protocol.set('microwave')
+    instr.mw[i].upload_codeword_program()
+    if 0:   # FIXME: should be moved to driver
+        instr.mw[i]._dev.setd('raw/dios/0/extclk', 1)  # enable 50 MHz sampling of DIO inputs
+        for awg in range(4):
+            instr.mw[i].set('awgs_{}_dio_strobe_slope'.format(awg), 0)  # disable strobe triggering
+
+    # AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
+
     if 0:
         delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
         for awg in range(4):
-            instr.mw_0._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)  # skew TOGGLE_DS versus rest
+            instr.mw[i]._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)  # skew TOGGLE_DS versus rest
     else:
         delay = 0  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
-        instr.mw_0._dev.setd('raw/dios/0/delays/*/value', delay)  # new interface?, range [0:15]
+        instr.mw[i].setd('raw/dios/0/delays/*/value', delay)  # new interface?, range [0:15]
         for awg in range(4):
-            dio_timing_errors = instr.mw_0._dev.geti('awgs/{}/dio/error/timing'.format(awg))
+            dio_timing_errors = instr.mw[i].geti('awgs/{}/dio/error/timing'.format(awg))
             log.debug('DIO timing errors on AWG {}: {}'.format(awg,dio_timing_errors))
+
+    instr.mw[i].start()
 
 """
     dev8079 *After* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
@@ -243,11 +253,11 @@ if conf.flux_0 != '':
     sequence_length = 8
 
     # configure instrument
-    instr.mw_0.load_default_settings()
+    instr.flux_0.clear_errors()
+    instr.flux_0.load_default_settings()
     instr.flux_0.assure_ext_clock()
     set_waveforms(instr.flux_0, 'square', sequence_length)
-    instr.flux_0.cfg_num_codewords(sequence_length)  # this makes the seqC program a bit smaller
-    instr.flux_0.cfg_codeword_protocol('flux')
+    instr.flux_0.cfg_codeword_protocol.set('flux')
     instr.flux_0.upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
 
@@ -299,9 +309,9 @@ if conf.ro_0 != '':
 
 log.debug('configuring CC')
 instr.cc.debug_marker_out(slot_ro_1, instr.cc.UHFQA_TRIG) # UHF-QA trigger
-instr.cc.debug_marker_out(slot_mw_0, instr.cc.HDAWG_TRIG) # HDAWG trigger
+instr.cc.debug_marker_out(slot_mw, instr.cc.HDAWG_TRIG) # HDAWG trigger
 
-log.debug("uploading '{}' to CC".format(p.filename))
+log.debug(f"uploading '{p.filename}' to CC")
 instr.cc.eqasm_program(p.filename)
 
 log.debug("printing CC errors")

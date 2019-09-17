@@ -4,9 +4,9 @@ Author:     Wouter Vlothuizen, TNO/QuTech,
             edited by Adriaan Rol, Gerco Versloot
 Purpose:    Instrument driver for Qutech QWG
 Usage:
-Notes:      It is possible to view the QWG log using ssh. To do this connect
-            using ssh e.g., "ssh root@192.168.0.10"
-            Logging can be enabled using "tailf /var/qwg.log"
+Notes:      It is possible to view the QWG log using ssh. To do this:
+            - connect using ssh e.g., "ssh root@192.168.0.10"
+            - view log using "tail -f /var/log/qwg.log"
 Bugs:
 """
 
@@ -1082,7 +1082,7 @@ class QuTech_AWG_Module(SCPI):
             return fun(ch, cw)
         return get_func
 
-
+# FIXME: unused code
 # class QWGMultiDevices:
     """
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
