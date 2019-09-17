@@ -13,14 +13,11 @@ import pycqed.measurement.hdf5_data as h5d
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     """
-    For two qubits, to make an n-qubit mux readout experiment.
-    we should vectorize this analysis
+    Multiplexed readout analysis.
 
-    TODO: This needs to be rewritten/debugged!
-    Suggestion:
-        Use N*(N-1)/2 instances of Singleshot_Readout_Analysis,
-          run them without saving the plots and then merge together the
-          plot_dicts as in the cross_dephasing_analysis.
+    Does data binning and creates histograms of data.
+    Threshold is auto determined as the mean of the data.
+    Used to construct a assignment probability matris.
     """
 
     def __init__(self, t_start: str = None, t_stop: str = None,
@@ -231,8 +228,6 @@ def plot_mux_ssro_histograms(
         ax=None, **kw):
     if ax is None:
         f, ax = plt.subplots()
-    else:
-        f = ax.get_figure()
 
     colors_R = pl.cm.Reds
     colors_B = pl.cm.Blues
