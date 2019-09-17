@@ -177,7 +177,7 @@ def calc_tfd_hamiltonian(pauli_terms: dict, g: float = 1, T=1):
     H_AB = pauli_terms['ZIZI'] + pauli_terms['IZIZ'] + \
         pauli_terms['XIXI'] + pauli_terms['IXIX']
 
-    H = H_A + H_B + T*H_AB
+    H = H_A + H_B - T*H_AB
 
     return {'H': H, 'H_A': H_A, 'H_B': H_B, 'H_AB': H_AB}
 
