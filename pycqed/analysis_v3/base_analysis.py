@@ -187,6 +187,10 @@ class BaseDataAnalysis(object):
                  'Experimental Data.Experimental Metadata'})
 
         self.data_dict = self.get_data_from_timestamp_list()
+        self.metadata = self.data_dict.get('exp_metadata', {})
+        self.metadata.update(self.get_param_value('exp_metadata', {}))
+        self.data_dict['exp_metadata'] = self.metadata
+
         if len(self.timestamps) == 1:
             self.data_dict = self.add_measured_data(
                 self.data_dict)
@@ -196,10 +200,6 @@ class BaseDataAnalysis(object):
                 temp_dict_list.append(
                     self.add_measured_data(rd_dict))
             self.data_dict = tuple(temp_dict_list)
-
-        self.metadata = self.data_dict.get('exp_metadata', {})
-        if self.metadata is None:
-            self.metadata = {}
 
         self.processing_pipe = self.get_param_value('processing_pipe')
         if self.processing_pipe is None:
@@ -301,6 +301,8 @@ class BaseDataAnalysis(object):
                 else:
                     measured_data = data[i]
                 raw_data_dict['measured_data'][ro_ch] = measured_data
+        else:
+            raise ValueError('"measured_data" was not added.')
         return raw_data_dict
 
     def process_data(self):

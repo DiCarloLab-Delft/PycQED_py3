@@ -163,25 +163,6 @@ class SegmentHardSweep(swf.Hard_Sweep):
             print('programmed hard sweep')
 
 
-class InstrumentSoftSweep(swf.Soft_Sweep):
-
-    def __init__(self, instrument, param_name, param_unit,
-                 process_sweep_point_func=lambda x: x):
-        super().__init__()
-        self.name = 'Instrument soft sweep'
-        self.instr = instrument
-        self.parameter_name = param_name
-        self.unit = param_unit
-        self.process_sweep_point_func = process_sweep_point_func
-
-    def prepare(self):
-        pass
-
-    def set_parameter(self, val, **kw):
-        proc_val = self.process_sweep_point_func(val)
-        self.instr.set(self.parameter_name, proc_val)
-
-
 class SegmentSoftSweep(swf.Soft_Sweep):
 
     def __init__(self, hard_sweep_func, sequence_list,
@@ -206,6 +187,25 @@ class SegmentSoftSweep(swf.Soft_Sweep):
         if self.upload_next:
             self.hard_sweep.prepare(awgs_to_upload=self.awgs_to_upload)
         self.upload_next = True
+
+
+class InstrumentSoftSweep(swf.Soft_Sweep):
+
+    def __init__(self, instrument, param_name, param_unit,
+                 process_sweep_point_func=lambda x: x):
+        super().__init__()
+        self.name = 'Instrument soft sweep'
+        self.instr = instrument
+        self.parameter_name = param_name
+        self.unit = param_unit
+        self.process_sweep_point_func = process_sweep_point_func
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        proc_val = self.process_sweep_point_func(val)
+        self.instr.set(self.parameter_name, proc_val)
 
 
 class T1(swf.Hard_Sweep):
