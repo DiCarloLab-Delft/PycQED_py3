@@ -331,18 +331,16 @@ class PipeDataAnalysis(object):
                              'contain "processing_pipe."')
 
         for node_dict in self.processing_pipe:
-            try:
-                node = getattr(dat_proc, node_dict["node_type"])
-            except AttributeError:
+            node = None
+            for module in [dat_proc, plot_module, fit_module]:
                 try:
-                    node = getattr(plot_module, node_dict["node_type"])
+                    node = getattr(module, node_dict["node_type"])
+                    break
                 except AttributeError:
-                    try:
-                        node = getattr(fit_module, node_dict["node_type"])
-                    except AttributeError:
-                        raise KeyError(f'Processing node '
-                                       f'"{node_dict["node_type"]}" '
-                                       f'not recognized')
+                    continue
+            if node is None:
+                raise KeyError(f'Processing node "{node_dict["node_type"]}" '
+                               f'not recognized')
             node(self.data_dict, **node_dict)
 
     def analyze_fit_results(self):

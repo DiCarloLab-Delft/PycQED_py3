@@ -44,6 +44,8 @@ def filter_data(data_dict, keys_out, keys_in=None, **params):
                          'the same length.')
     data_filter_func = help_func_mod.get_param('data_filter', data_dict,
                                   default_value=lambda data: data, **params)
+    if hasattr(data_filter_func, '__iter__'):
+        data_filter_func = eval(data_filter_func)
     for keyo, keyi in zip(keys_out, list(data_to_proc_dict)):
         data = data_dict
         all_keys = keyo.split('.')
@@ -52,7 +54,7 @@ def filter_data(data_dict, keys_out, keys_in=None, **params):
                 data[all_keys[i]] = OrderedDict()
             else:
                 data = data[all_keys[i]]
-        data[all_keys[-1]] = eval(data_filter_func)(data_to_proc_dict[keyi])
+        data[all_keys[-1]] = data_filter_func(data_to_proc_dict[keyi])
     return data_dict
 
 
@@ -431,6 +433,7 @@ def rotate_1d_array(data_dict, keys_out, keys_in=None, **params):
         ex: indices for ch 0: {'0': {'g': [-4, -3], 'e': [-2, -1]}}
     """
     data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
+    keys_in = list(data_to_proc_dict)
 
     mobjn = help_func_mod.get_param('meas_obj_name', data_dict,
                                     raise_error=True, **params)
@@ -549,8 +552,13 @@ class RabiAnalysis(object):
         self.physical_swpts = self.sp[0][self.meas_obj_sweep_points_map[
             self.mobjn][0]][0]
 
-        self.meas_obj_value_names_map = help_func_mod.get_param(
-            'meas_obj_value_names_map', self.data_dict, **params)
+        self.reset_reps = 0
+        metadata = self.data_dict['exp_metadata']
+        if 'preparation_params' in metadata:
+            if 'active' in metadata['preparation_params'].get(
+                    'preparation_type', 'wait'):
+                self.reset_reps = metadata['preparation_params'].get(
+                    'reset_reps', 0)
 
     def prepare_fitting(self):
         fit_module.prepare_cos_fit_dict(self.data_dict,
@@ -575,8 +583,32 @@ class RabiAnalysis(object):
 
     def prepare_plots(self, **params):
         # prepare raw data plot
-        plot_module.prepare_raw_data_plot_dicts(self.data_dict,
-                                               meas_obj_name=self.mobjn)
+        if self.reset_reps != 0:
+            swpts = deepcopy(self.physical_swpts)
+            if len(self.cp.states) != 0:
+                swpts = np.concatenate([
+                    swpts, help_func_mod.get_cal_sweep_points(
+                        self.physical_swpts, self.cp, self.mobjn)])
+            swpts = np.repeat(swpts, self.reset_reps+1)
+            swpts = np.arange(len(swpts))
+            plot_module.prepare_raw_data_plot_dicts(
+                self.data_dict,
+                meas_obj_name=params.pop('meas_obj_name', self.mobjn),
+                xvals=swpts, **params)
+
+            filtered_raw_keys = [k for k in self.data_dict.keys() if 'filter' in k]
+            if len(filtered_raw_keys) > 0:
+                plot_module.prepare_1d_plot_dicts(
+                    data_dict=self.data_dict,
+                    keys_in=filtered_raw_keys,
+                    fig_name='raw_data_filtered',
+                    xvals=self.physical_swpts,
+                    meas_obj_name=params.pop('meas_obj_name', self.mobjn),
+                    **params)
+        else:
+            plot_module.prepare_raw_data_plot_dicts(
+                self.data_dict,
+                meas_obj_name=params.pop('meas_obj_name', self.mobjn), **params)
 
         if 'fit_dicts' in self.data_dict:
             fit_dicts = self.data_dict['fit_dicts']
@@ -911,6 +943,14 @@ class SingleQubitRBAnalysis(object):
             raise ValueError('std_keys and keys_in do not have '
                              'the same length.')
 
+        self.reset_reps = 0
+        metadata = self.data_dict['exp_metadata']
+        if 'preparation_params' in metadata:
+            if 'active' in metadata['preparation_params'].get(
+                    'preparation_type', 'wait'):
+                self.reset_reps = metadata['preparation_params'].get(
+                    'reset_reps', 0)
+
     def prepare_fitting(self, **params):
         fit_dicts = OrderedDict()
         rb_mod = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
@@ -1037,9 +1077,33 @@ class SingleQubitRBAnalysis(object):
 
     def prepare_plots(self, **params):
         # prepare raw data plot
-        plot_module.prepare_raw_data_plot_dicts(
-            self.data_dict, meas_obj_name=self.mobjn,
-            xvals=np.repeat(self.cliffords, self.nr_seeds))
+        if self.reset_reps != 0:
+            swpts = deepcopy(np.repeat(self.cliffords, self.nr_seeds))
+            if len(self.cp.states) != 0:
+                swpts = np.concatenate([
+                    swpts, help_func_mod.get_cal_sweep_points(
+                        swpts, self.cp, self.mobjn)])
+            swpts = np.repeat(swpts, self.reset_reps+1)
+            swpts = np.arange(len(swpts))
+            plot_module.prepare_raw_data_plot_dicts(
+                self.data_dict,
+                meas_obj_name=params.pop('meas_obj_name', self.mobjn),
+                xvals=swpts, **params)
+
+            filtered_raw_keys = [k for k in self.data_dict.keys() if
+                                 'filter' in k]
+            if len(filtered_raw_keys) > 0:
+                plot_module.prepare_1d_plot_dicts(
+                    data_dict=self.data_dict,
+                    keys_in=filtered_raw_keys,
+                    fig_name='raw_data_filtered',
+                    xvals=np.repeat(self.cliffords, self.nr_seeds),
+                    meas_obj_name=params.pop('meas_obj_name', self.mobjn),
+                    **params)
+        else:
+            plot_module.prepare_raw_data_plot_dicts(
+                self.data_dict, meas_obj_name=self.mobjn,
+                xvals=np.repeat(self.cliffords, self.nr_seeds))
 
         if 'fit_dicts' in self.data_dict:
             fit_dicts = self.data_dict['fit_dicts']

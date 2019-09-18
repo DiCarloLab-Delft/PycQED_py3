@@ -301,8 +301,6 @@ class BaseDataAnalysis(object):
                 value_names = [value_names]
 
             sweep_points = measured_data[:-len(value_names)]
-
-
             if sweep_points.shape[0] > 1:
                 raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
                 raw_data_dict['soft_sweep_points'] = np.unique(sweep_points[1:])

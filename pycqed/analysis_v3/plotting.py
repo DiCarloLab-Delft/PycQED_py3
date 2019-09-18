@@ -413,7 +413,8 @@ def prepare_raw_data_plot_dicts(data_dict, fig_name=None, **params):
             'yunit': yunit,
             'setlabel': data_label,
             'title': title,
-            'linestyle': 'none',
+            'linestyle': params.get('linestyle', '-'),
+            'color': params.get('color', None),
             'do_legend': do_legend,
             'legend_bbox_to_anchor': (1, 0.5),
             'legend_pos': 'center left'}
