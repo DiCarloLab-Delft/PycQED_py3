@@ -107,7 +107,7 @@ class QuTech_AWG_Module(SCPI):
         super().__init__(name, address, port, **kwargs)
 
         # AWG properties
-        self._dev_desc = type('', (), {})()
+        self._dev_desc = lambda:0  # create empty device descriptor
         self._dev_desc.model = 'QWG'
         self._dev_desc.numChannels = 4
 #        self._dev_desc.numDacBits = 12
@@ -370,15 +370,7 @@ class QuTech_AWG_Module(SCPI):
         """
         self.write('wlist:waveform:data? "%s"' % name)
         binBlock = self.binBlockRead()
-        # extract waveform
-        if 1:   # high performance
-            waveform = np.frombuffer(binBlock, dtype=np.float32)
-        else:   # more generic
-            waveformLen = int(len(binBlock)/4)   # 4 bytes per record
-            waveform = np.array(range(waveformLen), dtype=float)
-            for k in range(waveformLen):
-                val = struct.unpack_from('<f', binBlock, k*4)
-                waveform[k] = val[0]
+        waveform = np.frombuffer(binBlock, dtype=np.float32)  # extract waveform
         return waveform
 
     def sendWaveformDataReal(self, name, waveform):
@@ -405,13 +397,8 @@ class QuTech_AWG_Module(SCPI):
         """
 
         # generate the binblock
-        if 1:   # high performance
-            arr = np.asarray(waveform, dtype=np.float32)
-            binBlock = arr.tobytes()
-        else:   # more generic
-            binBlock = b''
-            for i in range(len(waveform)):
-                binBlock = binBlock + struct.pack('<f', waveform[i])
+        arr = np.asarray(waveform, dtype=np.float32)
+        binBlock = arr.tobytes()
 
         # write binblock
         hdr = f'wlist:waveform:data "{name}",'
