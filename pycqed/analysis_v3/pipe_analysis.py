@@ -11,7 +11,10 @@ import json
 import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import read_dict_from_hdf5
+from pycqed.analysis_v3 import helper_functions as help_func_mod
 from pycqed.analysis_v3 import data_processing as dat_proc
+from pycqed.analysis_v3 import fitting as fit_module
+from pycqed.analysis_v3 import plotting as plot_module
 import copy
 import logging
 log = logging.getLogger()
@@ -292,7 +295,8 @@ class BaseDataAnalysis(object):
             if data.shape[0] != len(raw_data_dict['value_names']):
                 raise ValueError('Shape mismatch between data and '
                                  'ro channels.')
-            TD = dat_proc.get_param('TwoD', raw_data_dict, default_value=False)
+            TD = help_func_mod.get_param('TwoD', raw_data_dict,
+                                         default_value=False)
             for i, ro_ch in enumerate(raw_data_dict['value_names']):
                 if 'soft_sweep_points' in raw_data_dict and TD:
                     hsl = len(sweep_points[0][list(sweep_points[0])[0]][0])
@@ -329,10 +333,17 @@ class BaseDataAnalysis(object):
         for node_dict in self.processing_pipe:
             try:
                 node = getattr(dat_proc, node_dict["node_type"])
-                node(self.data_dict, **node_dict)
             except AttributeError:
-                raise KeyError(f'Processing node "{node_dict["node_type"]}" '
-                               f'not recognized')
+                try:
+                    node = getattr(plot_module, node_dict["node_type"])
+                except AttributeError:
+                    try:
+                        node = getattr(fit_module, node_dict["node_type"])
+                    except AttributeError:
+                        raise KeyError(f'Processing node '
+                                       f'"{node_dict["node_type"]}" '
+                                       f'not recognized')
+            node(self.data_dict, **node_dict)
 
     def analyze_fit_results(self):
         """

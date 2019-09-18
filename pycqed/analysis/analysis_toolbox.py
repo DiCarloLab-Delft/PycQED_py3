@@ -806,10 +806,10 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         all_measdirs = [d for d in all_measdirs if not d.startswith('.')]
 
         if np.all([l is not None for l in label]):
-            if exact_label_match:
-                all_measdirs = [x for x in all_measdirs if label in x]
-            else:
-                for each_label in label:
+            for each_label in label:
+                if exact_label_match:
+                    all_measdirs = [x for x in all_measdirs if label == x]
+                else:
                     all_measdirs = [x for x in all_measdirs if each_label in x]
         if (date.date() - datetime_start.date()).days == 0:
             # Check if newer than starting timestamp
@@ -1750,6 +1750,7 @@ def predict_gm_proba_from_cal_points(X, cal_points):
                                constraints=proba_sum_constr)
         probas.append(opt_results.x)
     return np.array(probas)
+
 
 def predict_gm_proba_from_clf(X, clf_params):
     """

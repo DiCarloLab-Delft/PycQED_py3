@@ -132,9 +132,12 @@ def get_data_to_process(data_dict, keys_in=None):
 
 def get_param(name, data_dict, default_value=None, raise_error=False, **params):
     value = params.get(name,
-                          data_dict.get('exp_metadata',
-                                        dict()).get(name,
-                                                    default_value))
+                          data_dict.get(name,
+                                        data_dict.get('exp_metadata',
+                                                      dict()).get(name,
+                                                                  default_value)
+                                        )
+                       )
     if raise_error and value is None:
         raise ValueError(f'{name} was not found in either exp_metadata or '
                          f'input params.')
