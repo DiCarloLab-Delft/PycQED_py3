@@ -21,7 +21,7 @@ log = logging.getLogger()
 log.addHandler(logging.StreamHandler())
 
 
-class BaseDataAnalysis(object):
+class PipeDataAnalysis(object):
     """
     Abstract Base Class (not intended to be instantiated directly) for
     analysis.
