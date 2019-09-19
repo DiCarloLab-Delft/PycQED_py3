@@ -160,6 +160,8 @@ class MeasurementControl(Instrument):
 
         with h5d.Data(name=self.get_measurement_name(),
                       datadir=self.datadir()) as self.data_object:
+            if exp_metadata is not None:
+                self.save_exp_metadata(exp_metadata, self.data_object)
             try:
                 self.check_keyboard_interrupt()
                 self.get_measurement_begintime()
@@ -188,8 +190,6 @@ class MeasurementControl(Instrument):
             result = self.dset[()]
             self.get_measurement_endtime()
             self.save_MC_metadata(self.data_object)  # timing labels etc
-            if exp_metadata is not None:
-                self.save_exp_metadata(exp_metadata, self.data_object)
             return_dict = self.create_experiment_result_dict()
 
         self.finish(result)
