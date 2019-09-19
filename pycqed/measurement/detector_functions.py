@@ -1183,6 +1183,20 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
             first call the prepare statement. This is particularly important
             when it is both a single_int_avg detector and acquires multiple
             segments per point.
+        get_values_function_kwargs (dict): looks for the following keys:
+            classified (default: True): whether to classify the shots or not
+            averaged (default: True): whether to average over the shots
+            thresholded (default:True): whether to threshold the shots
+            correlated (default: False): whether to calculate <ZZ...Z>,
+                assuming |f> states are |g> states. This creates and additional
+                data column called "correlation"
+            classifier_params (default: None): this must be provided if
+                classified == True. Parameters for the classifier (or list of
+                parameters for the classifiers if multiple qubits) used to
+                classify the shots.
+            sate_prob_mtx (default: None): state assignment probability matrix
+                (or list of matrices if multiple qubits) used to correct for
+                RO errors. No correction is applied if None.
         """
         super().__init__(UHFQC)
 
@@ -1251,8 +1265,6 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
         # The AWG program uses userregs/0 to define the number of iterations
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
-
-
         self.UHFQC.quex_rl_length(self.nr_shots*self.nr_sweep_points)
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
@@ -1298,29 +1310,19 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
                 not isinstance(state_prob_mtx_list, list):
             state_prob_mtx_list = [state_prob_mtx_list]
 
-        # nr_states = len(self.state_labels)
-        # classified_data = np.zeros(
-        #     (nr_states*len(self.channel_str_pairs) + self.correlated,
-        #      self.nr_sweep_points))
         classified_data = data
-        if self.get_values_function_kwargs.get('classify', True):
+        if self.get_values_function_kwargs.get('classified', True):
             classified_data = self.classify_shots(
                 data, classifier_params_list, state_prob_mtx_list,
-                self.get_values_function_kwargs.get('average', True),
-                self.correlated)
-            # for i in range(len(self.channel_str_pairs)):
-            #     classified_data[nr_states*i: nr_states*i+nr_states, :] = \
-            #         self.classify_shots(data[2*i: 2*i+2, :],
-            #                             classifier_params_list[i],
-            #                             state_prob_mtx_list[i],
-            #                             self.get_values_function_kwargs.get(
-            #                                'average', True), self.correlated)
-        print(classified_data.shape)
+                self.get_values_function_kwargs.get('averaged', True),
+                self.correlated,
+                self.get_values_function_kwargs.get('thresholded', True))
+
         return classified_data.T
 
     def classify_shots(self, data, classifier_params_list,
-                       state_prob_mtx_list=None, average=False,
-                       correlated=False):
+                       state_prob_mtx_list=None, averaged=False,
+                       correlated=False, thresholded=True):
 
         if classifier_params_list is None:
             raise ValueError('Please specify the classifier parameters list.')
@@ -1331,22 +1333,24 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
 
         clf_data_all = np.zeros((self.nr_sweep_points*self.nr_shots,
                                 nr_states*len(self.channel_str_pairs)))
-        # print(classified_data.shape)
+
         for i in range(len(self.channel_str_pairs)):
-            # print('here:', data[2*i: 2*i+2, :].shape)
             clf_data = a_tools.predict_gm_proba_from_clf(
                 data[2*i: 2*i+2, :].T, classifier_params_list[i])
+            if thresholded:
+                # clf_data must be 2 dimensional, rows are shots*sweep_points,
+                # columns are nr_states
+                clf_data = (clf_data == np.repeat(
+                    np.amax(clf_data, axis=1, keepdims=True),
+                    nr_states, axis=1)).astype(int)
             clf_data_all[:, nr_states*i: nr_states*i+nr_states] = clf_data
 
-            # print(clf_data.shape)
             # reshape into (nr_shots, nr_sweep_points, nr_data_columns)
             clf_data = np.reshape(
                 clf_data, (self.nr_shots, self.nr_sweep_points,
                                   clf_data.shape[-1]))
-            # print(clf_data.shape)
-            if average:
+            if averaged:
                 clf_data = np.mean(clf_data, axis=0)
-            # print(clf_data.shape)
             if state_prob_mtx_list is not None:
                 clf_data = np.linalg.inv(
                     state_prob_mtx_list[i]).T @ clf_data.T
@@ -1354,33 +1358,24 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
             else:
                 print('not correcting data')
                 clf_data = clf_data.T
-            # print(clf_data.shape)
             classified_data[nr_states * i: nr_states * i + nr_states, :] = \
                 clf_data
 
-        # print()
-        # print(classified_data.shape)
         if correlated:
             # can only correlate corresponding probabilities on all channels;
             # it cannot correlate selected channels
-            # print(clf_data_all.shape)
             q = clf_data_all.shape[1] // nr_states
-            # print(q)
             qb_states_list = [np.argmax(
                 clf_data_all[:, i*nr_states: i*nr_states + nr_states],
                 axis=1) for i in range(q)]
-            # print(np.array(qb_states_list).shape)
             corr_data = np.sum(np.array(qb_states_list) % 2, axis=0) % 2
-            # print(corr_data.shape)
             if average:
                 corr_data = np.reshape(
                     corr_data, (self.nr_shots, self.nr_sweep_points))
                 corr_data = np.mean(corr_data, axis=0)
-            # print(corr_data.shape)
             corr_data = np.reshape(corr_data, (1, corr_data.size))
             classified_data = np.concatenate([classified_data, corr_data],
                                              axis=0)
-            # print(classified_data.shape)
         return classified_data.T
 
     def finish(self):

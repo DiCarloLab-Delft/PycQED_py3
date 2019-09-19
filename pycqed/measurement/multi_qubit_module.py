@@ -161,7 +161,7 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                used_channels=None,
                                                correlations=None,
                                                add_channels=None,
-                                               correlated=False,
+                                               det_get_values_kws=None,
                                                **kw):
     uhfs = set()
     uhf_instances = {}
@@ -188,12 +188,11 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
         acq_classifier_params += [qb.acq_classifier_params()]
         acq_state_prob_mtxs += [qb.acq_state_prob_mtx()]
 
-    classif_det_get_values_kws = {
+    if det_get_values_kws is None:
+        det_get_values_kws = {}
+    det_get_values_kws.update({
         'classifier_params': acq_classifier_params,
-        'state_prob_mtx': acq_state_prob_mtxs,
-        'average': True,
-        'correlated': correlated
-    }
+        'state_prob_mtx': acq_state_prob_mtxs})
 
     if add_channels is None:
         add_channels = {uhf: [] for uhf in uhfs}
@@ -245,7 +244,7 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
             'int_avg_classif_det': det.UHFQC_integration_average_classifier_det(
                 UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
                 integration_length=max_int_len[uhf], nr_shots=nr_shots,
-                get_values_function_kwargs=classif_det_get_values_kws,
+                get_values_function_kwargs=det_get_values_kws,
                 result_logging_mode='raw', **kw),
             'dig_avg_det': det.UHFQC_integrated_average_detector(
                 UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
@@ -844,8 +843,9 @@ def measure_two_qubit_randomized_benchmarking(
         qb1, qb2, cliffords, nr_seeds, cz_pulse_name,
         character_rb=False, net_clifford=0,
         clifford_decomposition_name='HZ', interleaved_gate=None,
-        classified=False, n_cal_points_per_state=2, cal_states=tuple(),
-        label=None, prep_params=None, upload=True, analyze_RB=True):
+        n_cal_points_per_state=2, cal_states=tuple(),
+        label=None, prep_params=None, upload=True, analyze_RB=True,
+        classified=True, correlated=True, thresholded=True, averaged=True):
 
     qb1n = qb1.name
     qb2n = qb2.name
@@ -893,9 +893,13 @@ def measure_two_qubit_randomized_benchmarking(
     MC.set_sweep_function_2D(awg_swf.SegmentSoftSweep(
         hard_sweep_func, sequences, 'Nr. Seeds', ''))
     MC.set_sweep_points_2D(soft_sweep_points)
+    det_get_values_kws = {'classified': classified,
+                          'correlated': correlated,
+                          'thresholded': thresholded,
+                          'averaged': averaged}
     det_func = get_multiplexed_readout_detector_functions(
         qubits, nr_averages=max(qb.acq_averages() for qb in qubits),
-        correlated=True)[
+        det_get_values_kws=det_get_values_kws)[
         'int_avg_classif_det' if classified else 'dig_corr_det']
     MC.set_detector_function(det_func)
 
