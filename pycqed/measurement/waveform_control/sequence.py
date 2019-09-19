@@ -104,3 +104,8 @@ class Sequence:
             string_repr += str(seg) + "\n"
         return string_repr
 
+    def plot(self, segments=None, **segment_plot_kwargs):
+        if segments is None:
+            segments = self.segments.values()
+        for s in segments:
+            s.plot(**segment_plot_kwargs)

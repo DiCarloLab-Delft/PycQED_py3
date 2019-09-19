@@ -671,6 +671,125 @@ class GaussFilteredCosIQPulse(Pulse):
         hashlist += [self.alpha, self.phi_skew, phase]
         return hashlist
 
+class GaussFilteredCosIQPulseMultiChromatic(Pulse):
+    def __init__(self,
+                 I_channel,
+                 Q_channel,
+                 element_name,
+                 name='gauss filtered cos IQ pulse multi chromatic',
+                 **kw):
+        super().__init__(name, element_name)
+
+        self.I_channel = I_channel
+        self.Q_channel = Q_channel
+        self.channels = [self.I_channel, self.Q_channel]
+
+        self.amplitude = kw.pop('amplitude', 0)
+        self.mod_frequency = kw.pop('mod_frequency', [0])
+        if  np.ndim(self.mod_frequency) != 1:
+            raise ValueError("MultiChromatic Pulse requires a list or 1D array "
+                             f"of frequencies. Instead {self.mod_frequency} "
+                             f"was given")
+        self.phase = kw.pop('phase', 0.)
+        self.phi_skew = kw.pop('phi_skew', 0.)
+        self.alpha = kw.pop('alpha', 1.)
+
+        self.pulse_length = kw.pop('pulse_length', 0)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma', 0)
+        self.nr_sigma = kw.pop('nr_sigma', 5)
+        self.phase_lock = kw.pop('phase_lock', False)
+        self.length = self.pulse_length + \
+                      self.gaussian_filter_sigma*self.nr_sigma
+        self.codeword = kw.pop('codeword', 'no_codeword')
+
+        params = dict(amplitude=self.amplitude,
+                      phase=self.phase,
+                      phi_skew=self.phi_skew,
+                      alpha=self.alpha)
+        for pname, p in params.items():
+
+            if np.ndim(p) == 0:
+                setattr(self, pname, len(self.mod_frequency) * [p])
+            elif len(p) != len(self.mod_frequency):
+                raise ValueError(f"Received {len(p)} {pname}  but expected "
+                                 f"{len(self.mod_frequency)} (number of frequencies)")
+
+    def __call__(self, **kw):
+        self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.mod_frequency = kw.pop('mod_frequency', self.mod_frequency)
+        if  np.ndim(self.mod_frequency) != 1:
+            raise ValueError("MultiChromatic Pulse requires a list or 1D array "
+                             f"of frequencies. Instead {self.mod_frequency} "
+                             f"was given")
+        self.pulse_length = kw.pop('pulse_length', self.pulse_length)
+        self.gaussian_filter_sigma = kw.pop('gaussian_filter_sigma',
+                                            self.gaussian_filter_sigma)
+        self.nr_sigma = kw.pop('nr_sigma', self.nr_sigma)
+        self.length = self.pulse_length + \
+                      self.gaussian_filter_sigma*self.nr_sigma
+        self.channels = kw.pop('channels', self.channels)
+        self.channels.append(self.I_channel)
+        self.channels.append(self.Q_channel)
+
+        params = dict(amplitude=self.amplitude,
+                      phase=self.phase,
+                      phi_skew=self.phi_skew,
+                      alpha=self.alpha)
+        for pname, p in params.items():
+            if np.ndim(p) == 0:
+                setattr(self, pname, len(self.mod_frequency)*[p])
+            elif len(p) != len(self.mod_frequency):
+                raise ValueError(f"Received {len(p)} {pname}  but expected "
+                                 f"{len(self.mod_frequency)} (number of frequencies)")
+        return self
+
+    def chan_wf(self, chan, tvals, **kw):
+        I_mods, Q_mods = np.zeros_like(tvals), np.zeros_like(tvals)
+        for a, ph, f, phi, alpha in zip(self.amplitude, self.phase,
+                                     self.mod_frequency, self.phi_skew,
+                                     self.alpha):
+            if self.gaussian_filter_sigma == 0:
+                wave = np.ones_like(tvals) * a
+                wave *= (tvals >= tvals[0])
+                wave *= (tvals < tvals[0] + self.pulse_length)
+            else:
+                tstart = tvals[0] + 0.5 * self.gaussian_filter_sigma * self.nr_sigma
+                tend = tstart + self.pulse_length
+                scaling = 1 / np.sqrt(2) / self.gaussian_filter_sigma
+                wave = 0.5 * (sp.special.erf(
+                    (tvals - tstart) * scaling) - sp.special.erf(
+                        (tvals - tend) * scaling)) * a
+            I_mod, Q_mod = apply_modulation(
+                wave,
+                np.zeros_like(wave),
+                tvals,
+                mod_frequency=f,
+                phase=ph,
+                phi_skew=phi,
+                alpha=alpha,
+                phase_lock=self.phase_lock)
+            I_mods += I_mod
+            Q_mods += Q_mod
+        if chan == self.I_channel:
+            return I_mods
+        if chan == self.Q_channel:
+            return Q_mods
+
+    def hashables(self, tstart, channel):
+        if channel not in self.channels:
+            return []
+        hashlist = [type(self), self.algorithm_time() - tstart]
+        hashlist += [channel == self.I_channel]
+        hashlist += list(self.amplitude)
+        hashlist += self.mod_frequency
+        hashlist += [self.gaussian_filter_sigma]
+        hashlist += [self.nr_sigma, self.pulse_length]
+        phase = [p + 360*(not self.phase_lock)*f *self.algorithm_time()\
+                  for p,f in zip(self.phase, self.mod_frequency)]
+        hashlist += self.alpha
+        hashlist += self.phi_skew
+        hashlist += phase
+        return hashlist
 
 class Z_pulse(Pulse):
     def __init__(self, name, element_name,  **kw):

@@ -387,7 +387,7 @@ def measure_multiplexed_readout(qubits, liveplot=False,
 
 
 def measure_active_reset(qubits, shots=5000,
-                         qutrit=False, upload=True, repetition_rate='auto'):
+                         qutrit=False, upload=True, label=None):
     MC = qubits[0].instr_mc.get_instr()
     trig = qubits[0].instr_trigger.get_instr()
 
@@ -401,7 +401,7 @@ def measure_active_reset(qubits, shots=5000,
     seq, swp = mqs.n_qubit_reset(qb_names, operation_dict, prep_params,
                                 upload=False, states='gef' if qutrit else 'ge')
     # create sweep points
-    sp = SweepPoints('reset_reps', swp[:-1], '', 'Nr. Reset Repetitions')
+    sp = SweepPoints('reset_reps', swp, '', 'Nr. Reset Repetitions')
 
     df = get_multiplexed_readout_detector_functions(qubits,
                                                     nr_shots=shots)['int_log_det']
@@ -412,17 +412,15 @@ def measure_active_reset(qubits, shots=5000,
     MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq, upload=upload))
     MC.set_sweep_points(swp)
     MC.set_detector_function(df)
-
-    label = 'active_reset_{}_x{}_{}'.format('ef' if qutrit else 'e',
-                                            prep_params['reset_reps'],
-                                            ','.join(qb_names))
+    if label is None:
+        label = 'active_reset_{}_x{}_{}'.format('ef' if qutrit else 'e',
+                                                prep_params['reset_reps'],
+                                                ','.join(qb_names))
     exp_metadata = {'preparation_params': prep_params,
-                    'sweep_points': "swp",
-                    'repetition_rate':  repetition_rate,
+                    'sweep_points': sp,
                     'shots': shots}
     temp_values = [(qb.acq_shots, shots) for qb in qubits]
-    temp_values += [(MC.soft_avg, 1),
-                    (trig.pulse_period, repetition_rate)]
+    temp_values += [(MC.soft_avg, 1)]
     with temporary_value(*temp_values):
         MC.run(name=label,  exp_metadata=exp_metadata)
 
