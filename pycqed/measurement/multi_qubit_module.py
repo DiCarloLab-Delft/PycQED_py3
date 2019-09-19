@@ -424,6 +424,80 @@ def measure_active_reset(qubits, shots=5000,
     with temporary_value(*temp_values):
         MC.run(name=label,  exp_metadata=exp_metadata)
 
+def measure_arbitrary_sequence(qubits, sequence=None, sequence_function=None,
+                               sequence_args=dict(), drive=None, label=None,
+                               detector_function=None, df_kwargs=dict(),
+                               sweep_function=awg_swf.SegmentHardSweep,
+                               sweep_points=None, temporary_values=(),
+                               exp_metadata=dict(), upload=True,
+                               analyze=True):
+    """
+    Measures arbitrary sequence provided in input.
+    Args:
+        qubits (list): qubits on which the sequence is performed
+        sequence (Sequence): sequence to measure. Optionally,
+            the path of the sequence can be provided (eg. sqs.active_reset) as
+            sequence_function.
+        sequence_function (callable): sequence function which creates a sequences using
+            sequence_args. Should return (sequence, sweep_points).
+        sequence_args (dict): arguments used to build the sequence
+        drive (string): drive method. Defaults to timedomain
+        label (string): measurement label. Defaults to sequence.name.
+        detector_function (string): detector function string. eg.
+            'int_avg_detector'. Built using multi_uhf get_multiplexed_readout_detector_functions
+        df_kwargs (dict): detector function kwargs
+        sweep_function (callable): sweep function. Defaults to segment hard sweep.
+        sweep_points (list or array): list of sweep points. Required only if
+            argument sequence is used.
+        temporary_values (tuple): list of tuple pairs with qcode param and its
+            temporary value. eg [(qb1.acq_shots, 10000),(MC.soft_avg, 1)]
+        exp_metadata:
+        upload:
+        analyze:
+
+    Returns:
+
+    """
+    if sequence is None and sequence_function is None:
+        raise ValueError("Either Sequence or sequence name must be given.")
+
+    MC = qubits[0].instr_mc.get_instr()
+
+    # combine preparation dictionaries
+    qb_names = [qb.name for qb in qubits]
+    prep_params = \
+        get_multi_qubit_prep_params([qb.preparation_params() for qb in qubits])
+
+    # sequence
+    if sequence is not None:
+        if sweep_points is None:
+            raise ValueError("Sweep points must be specified if sequence object"
+                             "is given")
+    else:
+        sequence, sweep_points = sequence_function(**sequence_args)
+
+    # create sweep points
+    df = get_multiplexed_readout_detector_functions(qubits, **df_kwargs)[
+        detector_function]
+
+    for qb in qubits:
+        qb.prepare(drive=drive)
+
+    MC.set_sweep_function(sweep_function(sequence=sequence, upload=upload))
+    MC.set_sweep_points(sweep_points)
+    MC.set_detector_function(df)
+
+    if label is None:
+        label = f'{sequence.name}_{",".join(qb_names)}'
+
+    exp_metadata.update({'preparation_params': prep_params,
+                    # 'sweep_points': ,
+                    })
+    with temporary_value(*temporary_values):
+        MC.run(name=label, exp_metadata=exp_metadata)
+
+    if analyze:
+        return ma.MeasurementAnalysis()
 
 def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                               CZ_pulses, nreps=1, parity_op='ZZ',
