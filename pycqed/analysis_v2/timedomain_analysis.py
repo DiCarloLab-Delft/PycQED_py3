@@ -308,13 +308,13 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         self.qb_names[0])[self.qb_names[0]] if rotate else None
                 self.cal_states_rotations = self.get_param_value(
                     'cal_states_rotations', default_value=cal_states_rots)
-                sweep_points_w_calpts = \
-                    {qbn: {'sweep_points': self.cp.extend_sweep_points(
-                        self.proc_data_dict['sweep_points_dict'][qbn][
-                            'sweep_points'], qbn)} for qbn in self.qb_names}
-                self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
             else:
                 self.cal_states_rotations = None
+            sweep_points_w_calpts = \
+                {qbn: {'sweep_points': self.cp.extend_sweep_points(
+                    self.proc_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'], qbn)} for qbn in self.qb_names}
+            self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
         except TypeError as e:
             log.error(e)
             log.warning("Failed retrieving cal point objects or states. "
@@ -384,7 +384,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 self.proc_data_dict['sweep_points_2D_dict'] = \
                     {qbn: list(soft_sweep_params.values())[0]['values']
                      for qbn in self.qb_names}
-                print(self.proc_data_dict['sweep_points_2D_dict'])
             else:
                 self.proc_data_dict['sweep_points_2D_dict'] = \
                     {qbn: self.raw_data_dict['soft_sweep_points'][0] for
@@ -589,7 +588,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                 [v[:, col] for k, v in meas_res_dict.items()
                                  if ro_suf in k])
                             rotated_data_dict[qb_name][ro_suf][col], _, _ = \
-                                a_tools.rotate_and_normalize_data(
+                                a_tools.rotate_and_normalize_data_IQ(
                                     data=data_array,
                                     cal_zero_points=cal_zero_points,
                                     cal_one_points=cal_one_points)
@@ -3051,7 +3050,7 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                     cal_zero_points=self.cal_points[0],
                     cal_one_points=self.cal_points[1])
         else:
-            pdd['corr_data_all'] = a_tools.rotate_and_normalize_data(
+            pdd['corr_data_all'] = a_tools.rotate_and_normalize_data_IQ(
                 data=rdd['measured_values'],
                 zero_coord=None, one_coord=None,
                 cal_zero_points=self.cal_points[0],
@@ -4377,7 +4376,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
         amps_errs[amps_errs == None] = 0.0
 
         population_loss = np.abs(amps[0::2] - amps[1::2])/amps[1::2]
-        x = amps[0::2] - amps[1::2]
+        x   = amps[0::2] - amps[1::2]
         x_err = np.array(amps_errs[0::2]**2 + amps_errs[1::2]**2,
                          dtype=np.float64)
         y = amps[1::2]
@@ -4769,7 +4768,7 @@ class CZDynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                         textstr += '\n length: {:.2f} ns'.format(fpl*1e9)
                     fpa = self.get_param_value('flux_pulse_amp')
                     if fpa is not None:
-                        textstr += '\n amp: {:.2f} V'.format(fpa)
+                        textstr += '\n amp: {:.4f} V'.format(fpa)
 
                     self.plot_dicts['text_msg_' + qbn] = {
                         'fig_id': base_plot_name,

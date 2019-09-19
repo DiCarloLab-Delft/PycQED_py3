@@ -136,7 +136,7 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
 
 
 def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
-                      cz_pulse_name, cal_points=None,
+                      cz_pulse_name, cal_points=None, prepend_n_cz=0,
                       upload=False, prep_params=dict()):
     '''
     Performs a Ramsey with interleaved Flux pulse
@@ -144,13 +144,15 @@ def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
                    |fluxpulse|
         |X90|  -------------------     |X90|  ---  |RO|
                                      sweep phase
+    Optional: prepend n Flux pulses before starting ramsey
     '''
 
     seq_name = 'Dynamic_phase_seq'
 
     ge_half_start = deepcopy(operation_dict['X90 ' + qb_name])
     ge_half_start['name'] = 'pi_half_start'
-    ge_half_start['element_name'] = 'pi_half_start_el'
+    # ge_half_start['element_name'] = 'pi_half_start_el'
+    ge_half_start['element_name'] = 'pi'
 
     flux_pulse = deepcopy(operation_dict[cz_pulse_name])
     flux_pulse['name'] = 'flux'
@@ -158,11 +160,14 @@ def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
 
     ge_half_end = deepcopy(operation_dict['X90 ' + qb_name])
     ge_half_end['name'] = 'pi_half_end'
-    ge_half_end['element_name'] = 'pi_half_end_el'
+    # ge_half_end['element_name'] = 'pi_half_end_el'
+    ge_half_end['element_name'] = 'pi'
 
     ro_pulse = deepcopy(operation_dict['RO ' + qb_name])
 
-    pulse_list = [ge_half_start, flux_pulse, ge_half_end, ro_pulse]
+    pulse_list = [deepcopy(operation_dict[cz_pulse_name])
+                  for _ in range(prepend_n_cz)]
+    pulse_list += [ge_half_start, flux_pulse, ge_half_end, ro_pulse]
     hsl = len(list(hard_sweep_dict.values())[0]['values'])
     if 'amplitude' in flux_pulse:
         param_to_set = 'amplitude'
@@ -177,6 +182,9 @@ def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
     params.update({f'pi_half_end.{k}': v['values']
                    for k, v in hard_sweep_dict.items()})
     swept_pulses = sweep_pulse_params(pulse_list, params)
+    for k, p in enumerate(swept_pulses):
+        fp = p[1]
+        fp['element_name'] = 'flux_el_{}'.format(k)
 
     swept_pulses_with_prep = \
         [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)

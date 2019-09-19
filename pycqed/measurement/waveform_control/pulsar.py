@@ -31,6 +31,8 @@ except Exception:
 try:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.\
         UHFQuantumController import UHFQC
+    from pycqed.instrument_drivers.physical_instruments.ZurichInstruments. \
+        dummy_UHFQC import dummy_UHFQC
 except Exception:
     UHFQC = type(None)
 try:
@@ -40,13 +42,15 @@ except Exception:
     ZI_HDAWG8 = type(None)
 log = logging.getLogger(__name__)
 
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments. \
+        dummy_UHFQC import dummy_UHFQC
 
 class UHFQCPulsar:
     """
     Defines the Zurich Instruments UHFQC specific functionality for the Pulsar
     class
     """
-    _supportedAWGtypes = (UHFQC,)
+    _supportedAWGtypes = (UHFQC, dummy_UHFQC)
     
     _uhf_sequence_string_template = (
         "const WINT_EN   = 0x01ff0000;\n"
@@ -1239,11 +1243,13 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             if w1 is None and w2 is not None:
                 # This hack is needed due to a bug on the HDAWG. 
                 # Remove this if case once the bug is fixed.
-                playback_string.append(
-                    f'prefetch(zeros(1) + marker(1, 0), {w2});')
+                if not acq:
+                    playback_string.append(
+                        f'prefetch(zeros(1) + marker(1, 0), {w2});')
             elif w1 is not None or w2 is not None:
-                playback_string.append('prefetch({});'.format(', '.join(
-                        [wn for wn in [w1, w2] if wn is not None])))
+                if not acq:
+                    playback_string.append('prefetch({});'.format(', '.join(
+                            [wn for wn in [w1, w2] if wn is not None])))
         playback_string.append(
             'waitDigTrigger(1{});'.format(', 1' if device == 'uhf' else ''))
         if codeword:
