@@ -205,8 +205,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
     def extract_data(self):
         super().extract_data()
-        self.metadata = self.raw_data_dict.get('exp_metadata', [{}])
-        if self.metadata is None:
+        self.metadata = self.raw_data_dict.get('exp_metadata', [])
+        if len(self.metadata) == 0:
             self.metadata = {}
 
         self.channel_map = self.get_param_value('channel_map')
@@ -4312,6 +4312,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
+        self.leakage_values = np.array([])
         labels = ['e', 'g']
         for i, qbn in enumerate(self.qb_names):
             for row in range(self.proc_data_dict['data_to_fit_reshaped'][
@@ -4339,15 +4340,19 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                         'fit_yvals': {'data': data},
                         'guess_pars': guess_pars}
                 else:
-                    # fit leakage qb results to a constant
-                    model = lmfit.models.ConstantModel()
-                    guess_pars = model.guess(data=data, x=phases)
+                    if self.get_param_value('classified_ro', False):
+                        self.leakage_values = np.append(self.leakage_values,
+                                                        np.mean(data))
+                    else:
+                        # fit leakage qb results to a constant
+                        model = lmfit.models.ConstantModel()
+                        guess_pars = model.guess(data=data, x=phases)
 
-                    self.fit_dicts[key] = {
-                        'fit_fn': model.func,
-                        'fit_xvals': {'x': phases},
-                        'fit_yvals': {'data': data},
-                        'guess_pars': guess_pars}
+                        self.fit_dicts[key] = {
+                            'fit_fn': model.func,
+                            'fit_xvals': {'x': phases},
+                            'fit_yvals': {'data': data},
+                            'guess_pars': guess_pars}
 
     def analyze_fit_results(self):
         self.proc_data_dict['analysis_params_dict'] = OrderedDict()
@@ -4389,24 +4394,26 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
 
         if self.leakage_qbname is not None:
             # get leakage
-            keys = [k for k in list(self.fit_dicts.keys()) if
-                    self.leakage_qbname in k]
-            fit_res_objs = [self.fit_dicts[k]['fit_res'] for k in keys]
+            if self.get_param_value('classified_ro', False):
+                leakage = self.leakage_values[0::2] - self.leakage_values[1::2]
+                leakage_errs = np.zeros(len(leakage))
+            else:
+                keys = [k for k in list(self.fit_dicts.keys()) if
+                        self.leakage_qbname in k]
+                fit_res_objs = [self.fit_dicts[k]['fit_res'] for k in keys]
 
-            lines = np.array([fr.best_values['c'] for fr in fit_res_objs])
-            lines_errs = np.array([fr.params['c'].stderr for fr in fit_res_objs])
-            lines_errs[lines_errs == None] = 0.0
+                lines = np.array([fr.best_values['c'] for fr in fit_res_objs])
+                lines_errs = np.array([fr.params['c'].stderr for
+                                       fr in fit_res_objs])
+                lines_errs[lines_errs == None] = 0.0
 
-            leakage = lines[0::2] - lines[1::2]#/np.abs(lines[1::2])
-            x = lines[1::2] - lines[0::2]
-            x_err = np.array(np.sqrt(lines_errs[0::2]**2 + lines_errs[1::2]**2),
-                             dtype=np.float64)
-            y = lines[1::2]
-            y_err = lines_errs[1::2]
-            leakage_errs = np.sqrt(np.array(
-                ((y*x_err)**2 + (x*y_err)**2)/(y**4), dtype=np.float64))
+                leakage = lines[0::2] - lines[1::2]
+                leakage_errs = np.array(np.sqrt(lines_errs[0::2]**2 +
+                                                lines_errs[1::2]**2),
+                                 dtype=np.float64)
+
             self.proc_data_dict['analysis_params_dict'][
-                'leakage'] = {'val': leakage, 'stderr': x_err}
+                'leakage'] = {'val': leakage, 'stderr': leakage_errs}
 
         self.save_processed_data(key='analysis_params_dict')
 
@@ -4514,6 +4521,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                 'ylabel': '{} state population'.format(
                     self.get_latex_prob_label(prob_label)),
                 'yunit': '',
+                'yscale': self.get_param_value("yscale", "linear"),
                 'setlabel': 'Data - ' + legend_label
                 if row in [0, 1] else '',
                 'title': self.raw_data_dict['timestamp'] + ' ' +
@@ -4528,9 +4536,9 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             if self.do_fitting and 'projected' not in figure_name:
                 k = 'fit_{}{}_{}'.format(
                     'e' if row % 2 == 0 else 'g', row, qbn)
-                fit_res = self.fit_dicts[k]['fit_res']
 
                 if qbn == self.cphase_qbname:
+                    fit_res = self.fit_dicts[k]['fit_res']
                     self.plot_dicts[k + '_' + prob_label] = {
                         'fig_id': figure_name,
                         'plotfn': self.plot_fit,
@@ -4544,28 +4552,32 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                             legend_bbox_to_anchor,
                         'legend_pos': legend_pos}
                 else:
-                    xvals = fit_res.userkws[
-                        fit_res.model.independent_vars[0]]
-                    xfine = np.linspace(min(xvals), max(xvals), 100)
-                    yvals = fit_res.model.func(
-                        xfine, **fit_res.best_values)
-                    if not hasattr(yvals, '__iter__'):
-                        yvals = np.array(len(xfine)*[yvals])
+                    if self.get_param_value('classified_ro', False):
+                        pass
+                    else:
+                        fit_res = self.fit_dicts[k]['fit_res']
+                        xvals = fit_res.userkws[
+                            fit_res.model.independent_vars[0]]
+                        xfine = np.linspace(min(xvals), max(xvals), 100)
+                        yvals = fit_res.model.func(
+                            xfine, **fit_res.best_values)
+                        if not hasattr(yvals, '__iter__'):
+                            yvals = np.array(len(xfine)*[yvals])
 
-                    self.plot_dicts[k] = {
-                        'fig_id': figure_name,
-                        'plotfn': self.plot_line,
-                        'xvals': xfine,
-                        'yvals': yvals,
-                        'marker': '',
-                        'setlabel': 'Fit - ' + legend_label
-                        if row in [0, 1] else '',
-                        'do_legend': row in [0, 1],
-                        'legend_ncol': legend_ncol,
-                        'color': 'C0' if row % 2 == 0 else 'C2',
-                        'legend_bbox_to_anchor':
-                            legend_bbox_to_anchor,
-                        'legend_pos': legend_pos}
+                        self.plot_dicts[k] = {
+                            'fig_id': figure_name,
+                            'plotfn': self.plot_line,
+                            'xvals': xfine,
+                            'yvals': yvals,
+                            'marker': '',
+                            'setlabel': 'Fit - ' + legend_label
+                            if row in [0, 1] else '',
+                            'do_legend': row in [0, 1],
+                            'legend_ncol': legend_ncol,
+                            'color': 'C0' if row % 2 == 0 else 'C2',
+                            'legend_bbox_to_anchor':
+                                legend_bbox_to_anchor,
+                            'legend_pos': legend_pos}
 
         # ref state plots need to be added at the end, otherwise the
         # legend for |g> and |e> is added twice (because of the

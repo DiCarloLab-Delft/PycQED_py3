@@ -870,7 +870,7 @@ def measure_two_qubit_randomized_benchmarking(
             [qb.preparation_params() for qb in [qb1, qb2]])
 
     cal_states = CalibrationPoints.guess_cal_states(cal_states)
-    cp = CalibrationPoints.multi_qubit([qb1.name, qb2.name], cal_states,
+    cp = CalibrationPoints.multi_qubit([qb1.name, qb2.name, 'corr'], cal_states,
                                         n_per_state=n_cal_points_per_state)
 
     operation_dict = get_operation_dict(qubits)
@@ -904,14 +904,17 @@ def measure_two_qubit_randomized_benchmarking(
     sp.add_sweep_dimension()
     sp.add_sweep_parameter('cliffords', cliffords, '',
                            'Number of applied Cliffords, $m$')
+    meas_obj_value_names_map = {
+        qb.name: qb.int_avg_classif_det.value_names for qb in [qb1, qb2]}
+    meas_obj_value_names_map.update({'corr': det_func.value_names[-1]})
     exp_metadata = {'preparation_params': prep_params,
                      'cal_points': repr(cp),
                      'sweep_points': sp,
                      'meas_obj_sweep_points_map':
                         {qb1.name: ['nr_seeds', 'cliffords'],
-                         qb2.name: ['nr_seeds', 'cliffords']},
-                     'meas_obj_value_names_map': {
-                         qb.name: det_func.value_names for qb in [qb1, qb2]}
+                         qb2.name: ['nr_seeds', 'cliffords'],
+                         'corr': ['nr_seeds', 'cliffords']},
+                     'meas_obj_value_names_map': meas_obj_value_names_map,
                          }
     MC.run_2D(name=label, exp_metadata=exp_metadata)
 
@@ -2151,6 +2154,7 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                          'cphase_qbname': qbt.name,
                          'preparation_params': prep_params,
                          'cal_points': repr(cp),
+                         'classified_ro': classified,
                          'rotate': len(cal_states) != 0 and not classified,
                          'cal_states_rotations':
                              {qbc.name: {'g': 0, 'f': 1},
