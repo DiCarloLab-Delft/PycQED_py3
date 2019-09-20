@@ -1150,7 +1150,7 @@ class UHFQC_integration_logging_det(UHFQC_Base):
             self.AWG.stop()
 
 
-class UHFQC_integration_average_classifier_det(UHFQC_Base):
+class UHFQC_classifier_detector(UHFQC_Base):
 
     '''
     Detector used for integrated average results with the UHFQC

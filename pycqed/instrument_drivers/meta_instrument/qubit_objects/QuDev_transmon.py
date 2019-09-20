@@ -341,7 +341,7 @@ class QuDev_transmon(Qubit):
             integration_length=self.acq_length(), 
             result_logging_mode='raw')
 
-        self.int_avg_classif_det = det.UHFQC_integration_average_classifier_det(
+        self.int_avg_classif_det = det.UHFQC_classifier_detector(
             UHFQC=self.instr_uhf.get_instr(), 
             AWG=self.instr_pulsar.get_instr(),  
             channels=channels, nr_shots=self.acq_averages(),
@@ -2064,11 +2064,10 @@ class QuDev_transmon(Qubit):
             self.acq_IQ_angle(self.acq_IQ_angle() + ana.theta)
         return ana.theta
 
-    def find_frequency(self, freqs, method='cw_spectroscopy', update=False,
-                       trigger_separation=3e-6, RO_marker_length=5e-9,
-                       MC=None, close_fig=True, analyze_ef=False, analyze=True,
-                       upload=True, label=None,
-                       **kw):
+    def find_qubit_frequency(self, freqs, method='cw_spectroscopy',
+                             update=False, trigger_separation=3e-6,
+                             close_fig=True, analyze_ef=False, analyze=True,
+                             upload=True, label=None, **kw):
         """
         WARNING: Does not automatically update the qubit frequency parameter.
         Set update=True if you want this!

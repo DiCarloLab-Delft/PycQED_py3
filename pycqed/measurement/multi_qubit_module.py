@@ -243,7 +243,7 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
             'int_avg_det': det.UHFQC_integrated_average_detector(
                 UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
                 integration_length=max_int_len[uhf], nr_averages=nr_averages, **kw),
-            'int_avg_classif_det': det.UHFQC_integration_average_classifier_det(
+            'int_avg_classif_det': det.UHFQC_classifier_detector(
                 UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
                 integration_length=max_int_len[uhf], nr_shots=nr_shots,
                 get_values_function_kwargs=det_get_values_kws,
