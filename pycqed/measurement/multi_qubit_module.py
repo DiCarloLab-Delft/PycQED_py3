@@ -930,10 +930,10 @@ def measure_two_qubit_randomized_benchmarking(
     sp.add_sweep_parameter('cliffords', cliffords, '',
                            'Number of applied Cliffords, $m$')
 
-    qb_names = [qb1n, qb2n] + (['corr'] if correlated else [])
+    qb_names = [qb1n, qb2n] + (['corr'] if (classified and correlated) else [])
     # create analysis pipeline object
     meas_obj_value_names_map = get_meas_obj_value_names_map(qubits, det_type)
-    if det_type == 'int_avg_classif_det':
+    if classified and correlated:
         # FIXME: do the proper thing (SEPT)
         meas_obj_value_names_map['corr'] = [
             'correlation ' + qb1.instr_uhf.get_instr().name]
