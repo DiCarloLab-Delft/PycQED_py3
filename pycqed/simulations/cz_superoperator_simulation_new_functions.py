@@ -1258,17 +1258,17 @@ def verify_CPTP(U):
 def return_instrument_args(fluxlutman,noise_parameters_CZ, which_gate: str = 'NE'):
 
     fluxlutman_args = {'sampling_rate': fluxlutman.sampling_rate(),
-                           'cz_length_' + which_gate: fluxlutman.get('cz_length_{}'.format(which_gate))(),
-                           'q_J2_' + which_gate: fluxlutman.get('q_J2_{}'.format(which_gate))(),
-                           'czd_double_sided_' + which_gate: fluxlutman.get('czd_double_sided_{}'.format(which_gate))(),
-                           'cz_lambda_2_' + which_gate: fluxlutman.get('cz_lambda_2_{}'.format(which_gate))(),
-                           'cz_lambda_3_' + which_gate: fluxlutman.get('cz_lambda_3_{}'.format(which_gate))(),
-                           'cz_theta_f_' + which_gate: fluxlutman.get('cz_theta_f_{}'.format(which_gate))(),
-                           'czd_length_ratio_' + which_gate: fluxlutman.get('czd_length_ratio_{}'.format(which_gate))(),
+                           'cz_length_' + which_gate: fluxlutman.get('cz_length_{}'.format(which_gate)),
+                           'q_J2_' + which_gate: fluxlutman.get('q_J2_{}'.format(which_gate)),
+                           'czd_double_sided_' + which_gate: fluxlutman.get('czd_double_sided_{}'.format(which_gate)),
+                           'cz_lambda_2_' + which_gate: fluxlutman.get('cz_lambda_2_{}'.format(which_gate)),
+                           'cz_lambda_3_' + which_gate: fluxlutman.get('cz_lambda_3_{}'.format(which_gate)),
+                           'cz_theta_f_' + which_gate: fluxlutman.get('cz_theta_f_{}'.format(which_gate)),
+                           'czd_length_ratio_' + which_gate: fluxlutman.get('czd_length_ratio_{}'.format(which_gate)),
                            'q_polycoeffs_freq_01_det': fluxlutman.q_polycoeffs_freq_01_det(),
                            'q_polycoeffs_anharm': fluxlutman.q_polycoeffs_anharm(),
                            'q_freq_01': fluxlutman.q_freq_01(),
-                           'q_freq_10_' + which_gate: fluxlutman.get('q_freq_10_{}'.format(which_gate))()}
+                           'q_freq_10_' + which_gate: fluxlutman.get('q_freq_10_{}'.format(which_gate))}
 
     noise_parameters_CZ_args = {'Z_rotations_length': noise_parameters_CZ.Z_rotations_length(),
                                 'voltage_scaling_factor': noise_parameters_CZ.voltage_scaling_factor(),
@@ -1303,17 +1303,17 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ, which_gate: str = 'NE
 def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args, which_gate: str = 'NE'):
 
     fluxlutman.sampling_rate(fluxlutman_args['sampling_rate'])
-    fluxlutman.get('cz_length_{}'.format(which_gate))(fluxlutman_args['cz_length_' + which_gate])
-    fluxlutman.get('q_J2_{}'.format(which_gate))(fluxlutman_args['q_J2_' + which_gate])
-    fluxlutman.get('czd_double_sided_{}'.format(which_gate))(fluxlutman_args['czd_double_sided_' + which_gate])
-    fluxlutman.get('cz_lambda_2_{}'.format(which_gate))(fluxlutman_args['cz_lambda_2_' + which_gate])
-    fluxlutman.get('cz_lambda_3_{}'.format(which_gate))(fluxlutman_args['cz_lambda_3_' + which_gate])
-    fluxlutman.get('cz_theta_f_{}'.format(which_gate))(fluxlutman_args['cz_theta_f_' + which_gate])
-    fluxlutman.get('czd_length_ratio_{}'.format(which_gate))(fluxlutman_args['czd_length_ratio_' + which_gate])
+    fluxlutman.set('cz_length_{}'.format(which_gate), fluxlutman_args['cz_length_' + which_gate])
+    fluxlutman.set('q_J2_{}'.format(which_gate), fluxlutman_args['q_J2_' + which_gate])
+    fluxlutman.set('czd_double_sided_{}'.format(which_gate), fluxlutman_args['czd_double_sided_' + which_gate])
+    fluxlutman.set('cz_lambda_2_{}'.format(which_gate), fluxlutman_args['cz_lambda_2_' + which_gate])
+    fluxlutman.set('cz_lambda_3_{}'.format(which_gate), fluxlutman_args['cz_lambda_3_' + which_gate])
+    fluxlutman.set('cz_theta_f_{}'.format(which_gate), fluxlutman_args['cz_theta_f_' + which_gate])
+    fluxlutman.set('czd_length_ratio_{}'.format(which_gate), fluxlutman_args['czd_length_ratio_' + which_gate])
     fluxlutman.q_polycoeffs_freq_01_det(fluxlutman_args['q_polycoeffs_freq_01_det'])
     fluxlutman.q_polycoeffs_anharm(fluxlutman_args['q_polycoeffs_anharm'])
     fluxlutman.q_freq_01(fluxlutman_args['q_freq_01'])
-    fluxlutman.get('q_freq_10_{}'.format(which_gate))(fluxlutman_args['q_freq_10_' + which_gate])
+    fluxlutman.set('q_freq_10_{}'.format(which_gate), fluxlutman_args['q_freq_10_' + which_gate])
 
     noise_parameters_CZ.Z_rotations_length(noise_parameters_CZ_args['Z_rotations_length'])
     noise_parameters_CZ.voltage_scaling_factor(noise_parameters_CZ_args['voltage_scaling_factor'])
