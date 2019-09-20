@@ -461,7 +461,7 @@ class UHFQC_Base(Hard_Detector):
                             if len(data[UHFname][n]) >= self.detectors[
                                 self.UHF_map[UHFname]].nr_sweep_points:
                                 gotem[UHFname][n] = True
-            accumulated_time += 0.01*len(self.UHFs)
+            accumulated_time += 0.01 * len(self.UHFs)
 
         if not all(np.concatenate(list(gotem.values()))):
             for UHF in self.UHFs:
@@ -782,6 +782,7 @@ class UHFQC_integrated_average_detector(UHFQC_Base):
             self.nr_sweep_points = self.seg_per_point
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
+
         # this sets the result to integration and rotation outcome
             if (self.chunk_size is not None and
                     self.chunk_size < self.nr_sweep_points):
@@ -809,8 +810,9 @@ class UHFQC_integrated_average_detector(UHFQC_Base):
             # int(self.nr_averages*self.nr_sweep_points))
             int(self.nr_averages))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
-        # The AWG program uses userregs/0 to define the number of iterations in
-        # the loop
+        # Do not enable the rerun button; the AWG program uses userregs/0 to
+        # define the number of iterations in the loop
+        self.UHFQC.awgs_0_single(1)
 
         self.UHFQC.quex_rl_length(self.nr_sweep_points)
         self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))

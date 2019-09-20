@@ -874,6 +874,35 @@ def over_under_rotation_seq(qb_name, nr_pi_pulses_array, operation_dict,
     return
 
 
+def res_amp_sweep_seqs(qb_name, hard_sweep_dict, soft_sweep_dict,
+                       uhf_name, operation_dict, upload=True):
+    seq_name = 'Res_amp_sweep_sequence'
+
+    ro_pulse = deepcopy(operation_dict['RO ' + qb_name])
+    ro_pulse['name'] = 'RO_pulse'
+
+    ssl = len(list(soft_sweep_dict.values())[0]['values'])
+    sequences = []
+    for i in range(ssl):
+        ro_p = deepcopy(ro_pulse)
+        ro_p.update({k: v['values'][i] for k, v in soft_sweep_dict.items()})
+        pulses = [ro_p]
+        swept_pulses = sweep_pulse_params(
+            pulses, {f'RO_pulse.{k}': v['values']
+                        for k, v in hard_sweep_dict.items()})
+        seq = pulse_list_list_seq(swept_pulses,
+                                  seq_name+f'_{i}', upload=False)
+        sequences.append(seq)
+
+    repeat_dict = {uhf_name: (sequences[0].n_acq_elements(), 1)}
+
+    if upload:
+        ps.Pulsar.get_instance().program_awgs(sequences[0],
+                                              repeat_dict=repeat_dict)
+
+    return sequences, np.arange(sequences[0].n_acq_elements()), np.arange(ssl)
+
+
 # Helper functions
 
 def pulse_list_list_seq(pulse_list_list, name='pulse_list_list_sequence',
