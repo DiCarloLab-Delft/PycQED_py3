@@ -204,11 +204,14 @@ def get_msmt_data(all_data, cal_points, qb_name):
     """
     if isinstance(cal_points, str):
         cal_points = repr(cal_points)
-    n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
-    if n_cal_pts == 0:
-        return all_data
+    if qb_name in cal_points.qb_names:
+        n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
+        if n_cal_pts == 0:
+            return all_data
+        else:
+            return deepcopy(all_data[:-n_cal_pts])
     else:
-        return deepcopy(all_data[:-n_cal_pts])
+        return all_data
 
 
 def get_cal_data(all_data, cal_points, qb_name):
@@ -223,11 +226,14 @@ def get_cal_data(all_data, cal_points, qb_name):
     """
     if isinstance(cal_points, str):
         cal_points = repr(cal_points)
-    n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
-    if n_cal_pts == 0:
-        return []
+    if qb_name in cal_points.qb_names:
+        n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
+        if n_cal_pts == 0:
+            return np.array([])
+        else:
+            return deepcopy(all_data[-n_cal_pts:])
     else:
-        return deepcopy(all_data[-n_cal_pts:])
+        return np.array([])
 
 
 def get_cal_sweep_points(sweep_points_array, cal_points, qb_name):
@@ -241,13 +247,16 @@ def get_cal_sweep_points(sweep_points_array, cal_points, qb_name):
     """
     if isinstance(cal_points, str):
         cal_points = repr(cal_points)
-    n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
-    if n_cal_pts == 0:
-        return []
+    if qb_name in cal_points.qb_names:
+        n_cal_pts = len(cal_points.get_states(qb_name)[qb_name])
+        if n_cal_pts == 0:
+            return np.array([])
+        else:
+            step = np.abs(sweep_points_array[-1] - sweep_points_array[-2])
+            return np.array([sweep_points_array[-1] + i * step for
+                             i in range(1, n_cal_pts + 1)])
     else:
-        step = np.abs(sweep_points_array[-1] - sweep_points_array[-2])
-        return np.array([sweep_points_array[-1] + i * step for
-                         i in range(1, n_cal_pts + 1)])
+        return np.array([])
 
 
 ## Plotting nodes ##
@@ -263,8 +272,11 @@ def get_cal_state_color(cal_state_label):
 
 
 def get_latex_prob_label(prob_label):
-    if 'p' in prob_label.lower():
-        return r'$|{}\rangle$ state population'.format(
-            prob_label[prob_label.index('p')+1])
+    if 'pg ' in prob_label.lower():
+        return r'$|g\rangle$ state population'
+    elif 'pe ' in prob_label.lower():
+        return r'$|e\rangle$ state population'
+    elif 'pf ' in prob_label.lower():
+        return r'$|f\rangle$ state population'
     else:
         return prob_label

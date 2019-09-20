@@ -14,16 +14,16 @@ from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.sweep_points import SweepPoints
 from pycqed.measurement.calibration_points import CalibrationPoints
+from pycqed.analysis_v3.processing_pipeline import ProcessingPipeline
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
-from pycqed.analysis_v3 import base_analysis as ba3
+from pycqed.analysis_v3 import pipeline_analysis as pla
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import timedomain_analysis as tda
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.utilities.general import temporary_value
-from pycqed.utilities.general import dictionify
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
     import Qubit
 from pycqed.measurement import optimization as opti
@@ -1184,21 +1184,6 @@ class QuDev_transmon(Qubit):
         if analyze:
             tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
-    def measure_allxy(self, double_points=True, MC=None, upload=True,
-                      analyze=True, close_fig=True):
-        self.prepare(drive='timedomain')
-        if MC is None:
-            MC = self.instr_mc.get_instr()
-
-        MC.set_sweep_function(awg_swf.AllXY(
-            pulse_pars=self.get_ge_pars(), RO_pars=self.get_ro_pars(),
-            double_points=double_points, upload=upload))
-        MC.set_detector_function(self.int_avg_det)
-        MC.run('AllXY'+self.msmt_suffix)
-
-        if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
-
     def measure_randomized_benchmarking(
             self, cliffords, nr_seeds,
             gate_decomp='HZ', interleaved_gate=None,
@@ -1253,8 +1238,6 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function_2D(awg_swf.SegmentSoftSweep(
             hard_sweep_func, sequences, 'Nr. Seeds', ''))
         MC.set_sweep_points_2D(soft_sweep_points)
-
-        data_processing_pipe = []
         if thresholded:
             det_func = self.dig_avg_det
         elif classified_ro:
@@ -1263,28 +1246,21 @@ class QuDev_transmon(Qubit):
             det_func = self.int_avg_det
         MC.set_detector_function(det_func)
 
-        data_processing_pipe += [
-            # average data
-            {'node_type': 'average',
-             'num_bins': [len(cliffords)]*len(det_func.value_names),
-             'data_keys_in': det_func.value_names,
-             'data_keys_out': [e+'_avg' for e in det_func.value_names], **kw},
-            # std for each clifford sequence
-            {'node_type': 'get_std_deviation',
-             'num_bins': [len(cliffords)]*len(det_func.value_names),
-             'data_keys_in': det_func.value_names,
-             'data_keys_out': [e+'_std' for e in det_func.value_names], **kw},
-            # do SgQbRB
-            {'node_type': 'SingleQubitRBAnalysis',
-             'std_keys': [e+'_std' for e in det_func.value_names],
-             'data_keys_in': [e+'_avg' for e in det_func.value_names],
-             'meas_obj_name': self.name, **kw}]
-
-        # create sweep points
+        # create sweep points object
         sp = SweepPoints('nr_seeds', np.arange(nr_seeds), '', 'Nr. Seeds')
         sp.add_sweep_dimension()
         sp.add_sweep_parameter('cliffords', cliffords, '',
                                'Number of applied Cliffords, $m$')
+        # create analysis pipeline object
+        pp = ProcessingPipeline(
+            'average',  keys_in=det_func.value_names,
+            num_bins=[len(cliffords)]*len(det_func.value_names))
+        pp.add_node(
+            'get_std_deviation', keys_in=det_func.value_names,
+            num_bins=[len(cliffords)]*len(det_func.value_names))
+        pp.add_node('SingleQubitRBAnalysis', keys_in='previous',
+                    std_keys=[k+' std' for k in det_func.value_names],
+                    meas_obj_name=self.name, do_plotting=True)
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'preparation_params': prep_params,
@@ -1294,14 +1270,11 @@ class QuDev_transmon(Qubit):
                                  sp.get_sweep_points_map([self.name]),
                              'meas_obj_value_names_map': {
                                  self.name: det_func.value_names},
-                             'processing_pipe': data_processing_pipe})
+                             'processing_pipe': pp})
         MC.run_2D(label, exp_metadata=exp_metadata)
 
         if analyze:
-            if classified_ro:
-                ba3.BaseDataAnalysis()
-            else:
-                print('Currently only classified ro is supported.')
+            pla.PipelineDataAnalysis()
 
     def measure_transients(self, states=('g', 'e'), upload=True,
                            analyze=True, acq_length=4097/1.8e9,
@@ -2474,17 +2447,7 @@ class QuDev_transmon(Qubit):
 
         #Analysis
         if analyze:
-            if interleaved_gate is None:
-                if classified_ro:
-                    ba3.BaseDataAnalysis()
-                else:
-                    print('Currently only classified ro is supported.')
-            else:
-                rbma.Interleaved_RB_Analysis(
-                    folders_dict={interleaved_gate:
-                                      a_tools.latest_data(contains=label)},
-                    qb_name=self.name,
-                    gate_decomp=gate_decomposition)
+            pla.PipelineDataAnalysis()
 
     def find_frequency_T2_ramsey(self, times, artificial_detunings=None,
                                  upload=True, label=None, n=1,

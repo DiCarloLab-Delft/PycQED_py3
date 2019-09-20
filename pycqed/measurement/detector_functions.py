@@ -837,8 +837,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
                  nr_averages=1024,  real_imag=True,
                  channels: list = [0, 1], correlations: list=[(0, 1)],
-                 used_channels=None,
-                 value_names=None,
+                 result_logging_mode: str='raw',
+                 used_channels=None, value_names=None,
                  seg_per_point=1, single_int_avg=False, thresholding=False,
                  **kw):
         super().__init__(
@@ -846,11 +846,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             nr_averages=nr_averages, real_imag=real_imag,
             channels=channels,
             seg_per_point=seg_per_point, single_int_avg=single_int_avg,
-            result_logging_mode='raw',  # FIXME -> do the proper thing (MAR)
+            result_logging_mode=result_logging_mode,  # FIXME -> do the proper thing (MAR)
             **kw)
 
+        self.result_logging_mode = result_logging_mode
         self.correlations = correlations
-        self.thresholding = thresholding
+        self.thresholding = self.result_logging_mode == 'digitized'
 
         self.used_channels = used_channels
         if self.used_channels is None:
@@ -859,7 +860,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         if value_names is None:
             self.value_names = []
             for ch in channels:
-                self.value_names += ['{}_w{}'.format(UHFQC.name, ch)]
+                self.value_names += ['{}_{} w{}'.format(
+                    UHFQC.name, self.result_logging_mode, ch)]
         else:
             self.value_names = value_names
 
@@ -896,6 +898,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
 
+        self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def define_correlation_channels(self):

@@ -23,12 +23,14 @@ import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 import pycqed.measurement.detector_functions as det
 from pycqed.measurement.sweep_points import SweepPoints
 from pycqed.measurement.calibration_points import CalibrationPoints
+from pycqed.analysis_v3.processing_pipeline import ProcessingPipeline
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     one_qubit_reset
 from pycqed.measurement.waveform_control import pulsar as ps
 import pycqed.measurement.composite_detector_functions as cdet
 import pycqed.analysis.measurement_analysis as ma
 import pycqed.analysis.randomized_benchmarking_analysis as rbma
+from pycqed.analysis_v3 import pipeline_analysis as pla
 import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis_v2.timedomain_analysis as tda
 import pycqed.measurement.waveform_control.sequence as sequence
@@ -287,6 +289,25 @@ def get_multi_qubit_prep_params(prep_params_list):
     prep_params = deepcopy(prep_params_list[0])
     prep_params['threshold_mapping'] = thresh_map
     return prep_params
+
+
+def get_meas_obj_value_names_map(qubits, det_type):
+    if det_type == 'int_avg_classif_det':
+        meas_obj_value_names_map = {
+            qb.name: [vn + ' ' + qb.instr_uhf.get_instr().name for
+                      vn in qb.int_avg_classif_det.value_names]
+            for qb in qubits}
+    elif det_type == 'inp_avg_det':
+        meas_obj_value_names_map = {
+            qb.name: [vn + ' ' + qb.instr_uhf.get_instr().name for
+                      vn in qb.inp_avg_det.value_names]
+            for qb in qubits}
+    else:
+        meas_obj_value_names_map = {
+            qb.name: [vn + ' ' + qb.instr_uhf.get_instr().name for
+                      vn in qb.int_avg_det.value_names]
+            for qb in qubits}
+    return meas_obj_value_names_map
 
 
 def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
@@ -870,8 +891,8 @@ def measure_two_qubit_randomized_benchmarking(
             [qb.preparation_params() for qb in [qb1, qb2]])
 
     cal_states = CalibrationPoints.guess_cal_states(cal_states)
-    cp = CalibrationPoints.multi_qubit([qb1.name, qb2.name], cal_states,
-                                        n_per_state=n_cal_points_per_state)
+    cp = CalibrationPoints.multi_qubit([qb1n, qb2n], cal_states,
+                                       n_per_state=n_cal_points_per_state)
 
     operation_dict = get_operation_dict(qubits)
     sequences, hard_sweep_points, soft_sweep_points = \
@@ -897,10 +918,10 @@ def measure_two_qubit_randomized_benchmarking(
                           'correlated': correlated,
                           'thresholded': thresholded,
                           'averaged': averaged}
+    det_type = 'int_avg_classif_det' if classified else 'dig_corr_det'
     det_func = get_multiplexed_readout_detector_functions(
         qubits, nr_averages=max(qb.acq_averages() for qb in qubits),
-        det_get_values_kws=det_get_values_kws)[
-        'int_avg_classif_det' if classified else 'dig_corr_det']
+        det_get_values_kws=det_get_values_kws)[det_type]
     MC.set_detector_function(det_func)
 
     # create sweep points
@@ -908,24 +929,39 @@ def measure_two_qubit_randomized_benchmarking(
     sp.add_sweep_dimension()
     sp.add_sweep_parameter('cliffords', cliffords, '',
                            'Number of applied Cliffords, $m$')
+
+    qb_names = [qb1n, qb2n] + (['corr'] if correlated else [])
+    # create analysis pipeline object
+    meas_obj_value_names_map = get_meas_obj_value_names_map(qubits, det_type)
+    if det_type == 'int_avg_classif_det':
+        # FIXME: do the proper thing (SEPT)
+        meas_obj_value_names_map['corr'] = [
+            'correlation ' + qb1.instr_uhf.get_instr().name]
+    pp = ProcessingPipeline()
+    for i, mobjn in enumerate(qb_names):
+        num_avg_bins = [len(cliffords)]*len(meas_obj_value_names_map[mobjn])
+        pp.add_node(
+            'get_std_deviation', keys_in=meas_obj_value_names_map[mobjn],
+            num_bins=num_avg_bins)
+        pp.add_node(
+            'average', keys_in=meas_obj_value_names_map[mobjn],
+            num_bins=num_avg_bins)
+        pp.add_node(
+            'SingleQubitRBAnalysis', keys_in='previous',
+            std_keys=[k+' std' for k in meas_obj_value_names_map[mobjn]],
+            meas_obj_name=mobjn, do_plotting=(i == len(qb_names)-1))
+    # create experimental metadata
     exp_metadata = {'preparation_params': prep_params,
-                     'cal_points': repr(cp),
-                     'sweep_points': sp,
-                     'meas_obj_sweep_points_map':
-                        {qb1.name: ['nr_seeds', 'cliffords'],
-                         qb2.name: ['nr_seeds', 'cliffords']},
-                     'meas_obj_value_names_map': {
-                         qb.name: det_func.value_names for qb in [qb1, qb2]}
-                         }
+                    'cal_points': repr(cp),
+                    'sweep_points': sp,
+                    'meas_obj_sweep_points_map':
+                       {qbn: ['nr_seeds', 'cliffords'] for qbn in qb_names},
+                    'meas_obj_value_names_map': meas_obj_value_names_map,
+                    'processing_pipe': pp}
     MC.run_2D(name=label, exp_metadata=exp_metadata)
 
     if analyze_RB:
-        rbma.Simultaneous_RB_Analysis(
-            qb_names=[qb1n, qb2n],
-            use_latest_data=True,
-            gate_decomp=clifford_decomposition_name,
-            add_correction=False,
-            single_fit=True)
+        pla.PipelineDataAnalysis()
 
 
 def measure_n_qubit_simultaneous_randomized_benchmarking(

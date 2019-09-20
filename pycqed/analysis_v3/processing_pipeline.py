@@ -1,3 +1,4 @@
+import re
 import logging
 log = logging.getLogger(__name__)
 
@@ -11,21 +12,39 @@ class ProcessingPipeline(list):
     def __init__(self, node_type=None, **params):
         super().__init__()
         if node_type is not None:
-            self.append(eval(('add_' + node_type + '_node')(**params)))
+            # self.append(eval(('add_' + node_type + '_node')(**params)))
+            self.append(getattr(self, 'add_' + node_type + '_node')(**params))
 
     def add_node(self, node_type, **params):
-        self.append(getattr(self, 'add_' + node_type + '_node')(**params))
+        if hasattr(self, 'add_' + node_type + '_node'):
+            self.append(getattr(self, 'add_' + node_type + '_node')(**params))
+        else:
+            params['node_type'] = node_type
+            self.append(params)
 
-    def check_keys_in(self, keys_in='previous'):
+    def check_keys_in(self, keys_in=None):
         if keys_in == 'previous':
             if len(self) > 0:
                 keys_in = self[-1]['keys_out']
             else:
                 raise ValueError('This is the first node in the pipeline. '
                                  'keys_in must be specified.')
+        # else:
+        #     if not isinstance(keys_in, list):
+        #         keys_in = [keys_in]
+        #     # check if keys_in are suffixes of previous keys_out
+        #     keys_out_in_pipe = []
+        #     for d in self:
+        #         if 'keys_out' in d:
+        #             keys_out_in_pipe += [d['keys_out'] for keyi in keys_in if
+        #                                  keyi in d['keys_out'][0]]
+        #             # print(f'Taking keys_in as the keys_out of node '
+        #             #       f'{d["node_type"]} for the key suffix {keyi}')
+        #     if len(keys_out_in_pipe) > 0:
+        #         keys_in = [kk for k in keys_out_in_pipe for kk in k]
         return keys_in
 
-    def add_filter_data_node(self, reset_reps, keys_in='previous', **params):
+    def add_filter_data_node(self, reset_reps, keys_in=None, **params):
         keys_in = self.check_keys_in(keys_in=keys_in)
         return {'node_type': 'filter_data',
                 'keys_in': keys_in,
@@ -33,7 +52,7 @@ class ProcessingPipeline(list):
                 'data_filter': f'lambda x: x[{reset_reps}::{reset_reps}+1]',
                 **params}
 
-    def add_average_node(self, num_bins, keys_in='previous', **params):
+    def add_average_node(self, num_bins, keys_in=None, **params):
         keys_in = self.check_keys_in(keys_in)
         return {'node_type': 'average',
                 'keys_in': keys_in,
@@ -41,7 +60,7 @@ class ProcessingPipeline(list):
                 'num_bins': num_bins,
                 **params}
 
-    def add_get_std_deviation_node(self, num_bins, keys_in='previous',
+    def add_get_std_deviation_node(self, num_bins, keys_in=None,
                                    **params):
         keys_in = self.check_keys_in(keys_in)
         return {'node_type': 'get_std_deviation',
@@ -50,7 +69,7 @@ class ProcessingPipeline(list):
                 'num_bins': num_bins,
                 **params}
 
-    def add_rotate_iq_node(self, keys_in='previous', meas_obj_name='', **params):
+    def add_rotate_iq_node(self, keys_in=None, meas_obj_name='', **params):
         keys_in = self.check_keys_in(keys_in)
         return {'node_type': 'rotate_iq',
                 'keys_in': keys_in,
@@ -58,7 +77,7 @@ class ProcessingPipeline(list):
                 'meas_obj_name': meas_obj_name,
                 **params}
 
-    def add_rotate_1d_array_node(self, keys_in='previous', meas_obj_name='',
+    def add_rotate_1d_array_node(self, keys_in=None, meas_obj_name='',
                                  **params):
         keys_in = self.check_keys_in(keys_in)
         return {'node_type': 'rotate_1d_array',
@@ -72,10 +91,10 @@ class ProcessingPipeline(list):
     ######################################
 
     def add_prepare_1d_plot_dicts_node(
-            self, keys_in='previous', meas_obj_name='', fig_name='',
+            self, keys_in=None, meas_obj_name='', fig_name='',
             do_plotting=False, **params):
         keys_in = self.check_keys_in(keys_in)
-        return {'node_type': 'get_std_deviation',
+        return {'node_type': 'prepare_1d_plot_dicts',
                 'keys_in': keys_in,
                 'meas_obj_name': meas_obj_name,
                 'fig_name': fig_name,
@@ -116,18 +135,8 @@ class ProcessingPipeline(list):
                 **params}
 
     def add_SingleQubitRBAnalysis_node(self, meas_obj_name, keys_in='previous',
-                                       use_std=True, **params):
+                                       std_keys=None, **params):
         keys_in = self.check_keys_in(keys_in)
-        std_keys = None
-        if use_std:
-            std_node_dict = [d['keys_out'] for d in self if
-                             d['node_type'] == 'get_std_deviation']
-            if len(std_node_dict) != 0:
-                std_keys = std_node_dict[0]['keys_out']
-            else:
-                raise ValueError('use_std is True, but the '
-                                 'get_standard_deviation node was not added.')
-
         return {'node_type': 'SingleQubitRBAnalysis',
                 'keys_in': keys_in,
                 'std_keys': std_keys,

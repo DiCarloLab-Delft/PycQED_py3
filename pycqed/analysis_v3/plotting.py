@@ -116,7 +116,8 @@ def prepare_cal_states_plot_dicts(data_dict, fig_name=None,
     cp, sp, meas_obj_sweep_points_map, mobjn = \
         help_func_mod.get_cp_sp_spmap_measobjn(data_dict, **params)
     if len(cp.states) == 0:
-        raise ValueError('There are not cal_states to plot.')
+        print(f'There are no cal_states to plot for {mobjn}.')
+        return
 
     sp_name = params.get('sp_name', meas_obj_sweep_points_map[mobjn][0])
     sweep_info = [v for d in sp for k, v in d.items() if sp_name == k]
@@ -271,8 +272,8 @@ def prepare_1d_plot_dicts(data_dict, fig_name, keys_in, **params):
     xunit = sweep_info[0][1]
     ylabel = params.get('ylabel', None)
     if ylabel is None and len(cp.states) != 0:
-        ylabel = r'$|f\rangle$ state population' if ('f,') in cp.states else \
-            r'$|e\rangle$ state population'
+            ylabel = r'$|f\rangle$ state population' if ('f,') in cp.states else \
+                r'$|e\rangle$ state population'
     yunit = params.get('yunit', '')
 
     data_label = params.get('data_label', 'Data')
@@ -292,8 +293,9 @@ def prepare_1d_plot_dicts(data_dict, fig_name, keys_in, **params):
         if xvals is None:
             xvals = deepcopy(sweep_info[0][0])
         yvals = data_to_proc_dict[keyi]
-        if len(cp.states) != 0:
-            yvals = help_func_mod.get_msmt_data(yvals, cp, mobjn)
+        yvals = help_func_mod.get_msmt_data(yvals, cp, mobjn)
+        if ylabel is None:
+            ylabel = help_func_mod.get_latex_prob_label(keyi)
 
         plot_dict_name = fig_name + '_' + keyi + plot_name_suffix
         plot_dicts[plot_dict_name] = {

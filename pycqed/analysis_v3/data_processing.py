@@ -379,7 +379,8 @@ def rotate_iq(data_dict, keys_out, keys_in=None, **params):
                                              default_value=[], **params)
     mobjn = help_func_mod.get_param('meas_obj_name', data_dict,
                                     raise_error=True, **params)
-
+    if mobjn not in cp.qb_names:
+        raise KeyError(f'{mobjn} not found in cal_points.')
     for j, cp in enumerate(cp_list):
         data_to_proc_dict = help_func_mod.get_data_to_process(
             data_dict, keys_in[j])
@@ -435,9 +436,10 @@ def rotate_1d_array(data_dict, keys_out, keys_in=None, **params):
     """
     data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
     keys_in = list(data_to_proc_dict)
+    if len(keys_out) != len(data_to_proc_dict):
+        raise ValueError('keys_out and keys_in do not have '
+                         'the same length.')
 
-    mobjn = help_func_mod.get_param('meas_obj_name', data_dict,
-                                    raise_error=True, **params)
     cp_list = help_func_mod.get_param('cal_points_list', data_dict, **params)
     if cp_list is None:
         cp = help_func_mod.get_param('cal_points', data_dict, **params)
@@ -454,9 +456,10 @@ def rotate_1d_array(data_dict, keys_out, keys_in=None, **params):
     last_ge_pulses = help_func_mod.get_param('last_ge_pulses', data_dict,
                                              default_value=[], **params)
 
-    if len(keys_out) != len(data_to_proc_dict):
-        raise ValueError('keys_out and keys_in do not have '
-                         'the same length.')
+    mobjn = help_func_mod.get_param('meas_obj_name', data_dict,
+                                    raise_error=True, **params)
+    if mobjn not in cp.qb_names:
+        raise KeyError(f'{mobjn} not found in cal_points.')
 
     for j, keyi in enumerate(data_to_proc_dict):
         data = data_dict
@@ -513,16 +516,16 @@ class RabiAnalysis(object):
             prepare_fitting = params.pop('prepare_fitting', True)
             do_fitting = params.pop('do_fitting', True)
             prepare_plots = params.pop('prepare_plots', True)
-            do_plotting = params.pop('do_plotting', True)
+            do_plotting = params.pop('do_plotting', False)
 
             self.process_data(**params)
             if prepare_fitting:
                 self.prepare_fitting()
-            if do_fitting:
-                getattr(fit_module, 'run_fitting')(
-                    self.data_dict, keys_in=list(self.data_dict['fit_dicts']),
-                    **params)
-                self.analyze_fit_results()
+                if do_fitting:
+                    getattr(fit_module, 'run_fitting')(
+                        self.data_dict, keys_in=list(
+                            self.data_dict['fit_dicts']),**params)
+                    self.analyze_fit_results()
             if prepare_plots:
                 self.prepare_plots(**params)
             if do_plotting:
@@ -610,11 +613,6 @@ class RabiAnalysis(object):
                 self.data_dict,
                 meas_obj_name=params.pop('meas_obj_name', self.mobjn), **params)
 
-        if 'fit_dicts' in self.data_dict:
-            fit_dicts = self.data_dict['fit_dicts']
-        else:
-            raise KeyError('data_dict does not contain fit_dicts.')
-
         plot_dicts = OrderedDict()
         for keyi, data in self.data_to_proc_dict.items():
             base_plot_name = 'Rabi_' + self.mobjn + '_' + keyi
@@ -638,110 +636,113 @@ class RabiAnalysis(object):
                     meas_obj_name=params.pop('meas_obj_name', self.mobjn),
                     do_plotting=False, **params)
 
-            # plot fit
-            fit_res = fit_dicts['rabi_fit_' + self.mobjn + keyi]['fit_res']
-            plot_dicts['fit_' + self.mobjn + keyi] = {
-                'fig_id': base_plot_name,
-                'plotfn': 'plot_fit',
-                'fit_res': fit_res,
-                'setlabel': 'cosine fit',
-                'color': 'r',
-                'do_legend': True,
-                'legend_ncol': 2,
-                'legend_bbox_to_anchor': (1, -0.15),
-                'legend_pos': 'upper right'}
-
-            rabi_amplitudes = self.data_dict['analysis_params_dict']
-            plot_dicts['piamp_marker_' + self.mobjn + keyi] = {
-                'fig_id': base_plot_name,
-                'plotfn': 'plot_line',
-                'xvals': np.array([rabi_amplitudes[self.mobjn]['piPulse']]),
-                'yvals': np.array([fit_res.model.func(
-                    rabi_amplitudes[self.mobjn]['piPulse'],
-                    **fit_res.best_values)]),
-                'setlabel': '$\pi$-Pulse amp',
-                'color': 'r',
-                'marker': 'o',
-                'line_kws': {'markersize': 10},
-                'linestyle': '',
-                'do_legend': True,
-                'legend_ncol': 2,
-                'legend_bbox_to_anchor': (1, -0.15),
-                'legend_pos': 'upper right'}
-
-            plot_dicts['piamp_hline_' + self.mobjn + keyi] = {
-                'fig_id': base_plot_name,
-                'plotfn': 'plot_hlines',
-                'y': [fit_res.model.func(
-                    rabi_amplitudes[self.mobjn]['piPulse'],
-                    **fit_res.best_values)],
-                'xmin': self.physical_swpts[0],
-                'xmax': help_func_mod.get_cal_sweep_points(self.physical_swpts,
-                                                           self.cp,
-                                                           self.mobjn)[-1],
-                'colors': 'gray'}
-
-            plot_dicts['pihalfamp_marker_' + self.mobjn + keyi] = {
-                'fig_id': base_plot_name,
-                'plotfn': 'plot_line',
-                'xvals': np.array([rabi_amplitudes[self.mobjn]['piHalfPulse']]),
-                'yvals': np.array([fit_res.model.func(
-                    rabi_amplitudes[self.mobjn]['piHalfPulse'],
-                    **fit_res.best_values)]),
-                'setlabel': '$\pi /2$-Pulse amp',
-                'color': 'm',
-                'marker': 'o',
-                'line_kws': {'markersize': 10},
-                'linestyle': '',
-                'do_legend': True,
-                'legend_ncol': 2,
-                'legend_bbox_to_anchor': (1, -0.15),
-                'legend_pos': 'upper right'}
-
-            plot_dicts['pihalfamp_hline_' + self.mobjn + keyi] = {
-                'fig_id': base_plot_name,
-                'plotfn': 'plot_hlines',
-                'y': [fit_res.model.func(
-                    rabi_amplitudes[self.mobjn]['piHalfPulse'],
-                    **fit_res.best_values)],
-                'xmin': self.physical_swpts[0],
-                'xmax': help_func_mod.get_cal_sweep_points(self.physical_swpts,
-                                                           self.cp,
-                                                           self.mobjn)[-1],
-                'colors': 'gray'}
-
-            trans_name = 'ef' if 'f' in keyi else 'ge'
-            old_pipulse_val = self.data_dict[
-                f'{trans_name}_amp180_'+self.mobjn]
-            if old_pipulse_val != old_pipulse_val:
-                old_pipulse_val = 0
-            old_pihalfpulse_val = self.data_dict[
-                f'{trans_name}_amp90scale_'+self.mobjn]
-            if old_pihalfpulse_val != old_pihalfpulse_val:
-                old_pihalfpulse_val = 0
-            old_pihalfpulse_val *= old_pipulse_val
-
-            if not hasattr(old_pipulse_val, '__iter__'):
-                textstr = ('  $\pi-Amp$ = {:.3f} V'.format(
-                    rabi_amplitudes[self.mobjn]['piPulse']) +
-                           ' $\pm$ {:.3f} V '.format(
-                               rabi_amplitudes[self.mobjn]['piPulse_stderr']) +
-                           '\n$\pi/2-Amp$ = {:.3f} V '.format(
-                               rabi_amplitudes[self.mobjn]['piHalfPulse']) +
-                           ' $\pm$ {:.3f} V '.format(
-                               rabi_amplitudes[self.mobjn]['piHalfPulse_stderr']) +
-                           '\n  $\pi-Amp_{old}$ = ' + '{:.3f} V '.format(
-                            old_pipulse_val) +
-                           '\n$\pi/2-Amp_{old}$ = ' + '{:.3f} V '.format(
-                            old_pihalfpulse_val))
-                plot_dicts['text_msg_' + self.mobjn + keyi] = {
+            if 'fit_dicts' in self.data_dict:
+                fit_dicts = self.data_dict['fit_dicts']
+                # plot fit
+                fit_res = fit_dicts['rabi_fit_' + self.mobjn + keyi]['fit_res']
+                plot_dicts['fit_' + self.mobjn + keyi] = {
                     'fig_id': base_plot_name,
-                    'ypos': -0.2,
-                    'xpos': -0.05,
-                    'horizontalalignment': 'left',
-                    'verticalalignment': 'top',
-                    'plotfn': 'plot_text',
-                    'text_string': textstr}
+                    'plotfn': 'plot_fit',
+                    'fit_res': fit_res,
+                    'setlabel': 'cosine fit',
+                    'color': 'r',
+                    'do_legend': True,
+                    'legend_ncol': 2,
+                    'legend_bbox_to_anchor': (1, -0.15),
+                    'legend_pos': 'upper right'}
+
+                rabi_amplitudes = self.data_dict['analysis_params_dict']
+                plot_dicts['piamp_marker_' + self.mobjn + keyi] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': 'plot_line',
+                    'xvals': np.array([rabi_amplitudes[self.mobjn]['piPulse']]),
+                    'yvals': np.array([fit_res.model.func(
+                        rabi_amplitudes[self.mobjn]['piPulse'],
+                        **fit_res.best_values)]),
+                    'setlabel': '$\pi$-Pulse amp',
+                    'color': 'r',
+                    'marker': 'o',
+                    'line_kws': {'markersize': 10},
+                    'linestyle': '',
+                    'do_legend': True,
+                    'legend_ncol': 2,
+                    'legend_bbox_to_anchor': (1, -0.15),
+                    'legend_pos': 'upper right'}
+
+                plot_dicts['piamp_hline_' + self.mobjn + keyi] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': 'plot_hlines',
+                    'y': [fit_res.model.func(
+                        rabi_amplitudes[self.mobjn]['piPulse'],
+                        **fit_res.best_values)],
+                    'xmin': self.physical_swpts[0],
+                    'xmax': help_func_mod.get_cal_sweep_points(
+                        self.physical_swpts, self.cp, self.mobjn)[-1],
+                    'colors': 'gray'}
+
+                plot_dicts['pihalfamp_marker_' + self.mobjn + keyi] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': 'plot_line',
+                    'xvals': np.array([rabi_amplitudes[self.mobjn][
+                                           'piHalfPulse']]),
+                    'yvals': np.array([fit_res.model.func(
+                        rabi_amplitudes[self.mobjn]['piHalfPulse'],
+                        **fit_res.best_values)]),
+                    'setlabel': '$\pi /2$-Pulse amp',
+                    'color': 'm',
+                    'marker': 'o',
+                    'line_kws': {'markersize': 10},
+                    'linestyle': '',
+                    'do_legend': True,
+                    'legend_ncol': 2,
+                    'legend_bbox_to_anchor': (1, -0.15),
+                    'legend_pos': 'upper right'}
+
+                plot_dicts['pihalfamp_hline_' + self.mobjn + keyi] = {
+                    'fig_id': base_plot_name,
+                    'plotfn': 'plot_hlines',
+                    'y': [fit_res.model.func(
+                        rabi_amplitudes[self.mobjn]['piHalfPulse'],
+                        **fit_res.best_values)],
+                    'xmin': self.physical_swpts[0],
+                    'xmax': help_func_mod.get_cal_sweep_points(
+                        self.physical_swpts, self.cp, self.mobjn)[-1],
+                    'colors': 'gray'}
+
+                trans_name = 'ef' if 'f' in keyi else 'ge'
+                old_pipulse_val = self.data_dict[
+                    f'{trans_name}_amp180_'+self.mobjn]
+                if old_pipulse_val != old_pipulse_val:
+                    old_pipulse_val = 0
+                old_pihalfpulse_val = self.data_dict[
+                    f'{trans_name}_amp90scale_'+self.mobjn]
+                if old_pihalfpulse_val != old_pihalfpulse_val:
+                    old_pihalfpulse_val = 0
+                old_pihalfpulse_val *= old_pipulse_val
+
+                if not hasattr(old_pipulse_val, '__iter__'):
+                    textstr = ('  $\pi-Amp$ = {:.3f} V'.format(
+                        rabi_amplitudes[self.mobjn]['piPulse']) +
+                               ' $\pm$ {:.3f} V '.format(
+                                   rabi_amplitudes[self.mobjn][
+                                       'piPulse_stderr']) +
+                               '\n$\pi/2-Amp$ = {:.3f} V '.format(
+                                   rabi_amplitudes[self.mobjn]['piHalfPulse']) +
+                               ' $\pm$ {:.3f} V '.format(
+                                   rabi_amplitudes[self.mobjn][
+                                       'piHalfPulse_stderr']) +
+                               '\n  $\pi-Amp_{old}$ = ' + '{:.3f} V '.format(
+                                old_pipulse_val) +
+                               '\n$\pi/2-Amp_{old}$ = ' + '{:.3f} V '.format(
+                                old_pihalfpulse_val))
+                    plot_dicts['text_msg_' + self.mobjn + keyi] = {
+                        'fig_id': base_plot_name,
+                        'ypos': -0.2,
+                        'xpos': -0.05,
+                        'horizontalalignment': 'left',
+                        'verticalalignment': 'top',
+                        'plotfn': 'plot_text',
+                        'text_string': textstr}
 
         if 'plot_dicts' in self.data_dict:
             self.data_dict['plot_dicts'].update(plot_dicts)
@@ -886,16 +887,17 @@ class SingleQubitRBAnalysis(object):
             prepare_fitting = params.pop('prepare_fitting', True)
             do_fitting = params.pop('do_fitting', True)
             prepare_plots = params.pop('prepare_plots', True)
-            do_plotting = params.pop('do_plotting', True)
+            do_plotting = params.pop('do_plotting', False)
 
             self.process_data(**params)
             if prepare_fitting:
                 self.prepare_fitting()
-            if do_fitting:
-                getattr(fit_module, 'run_fitting')(
-                    self.data_dict, keys_in=list(self.data_dict['fit_dicts']),
-                    **params)
-                self.analyze_fit_results()
+                if do_fitting:
+                    getattr(fit_module, 'run_fitting')(
+                        self.data_dict, keys_in=list(
+                            self.data_dict['fit_dicts']),
+                        **params)
+                    self.analyze_fit_results()
             if prepare_plots:
                 self.prepare_plots(**params)
             if do_plotting:
@@ -937,7 +939,7 @@ class SingleQubitRBAnalysis(object):
         self.gate_decomp = help_func_mod.get_param('gate_decomp', self.data_dict,
                                                    default_value='HZ', **params)
         self.do_simple_fit = help_func_mod.get_param(
-            'do_simple_fit', self.data_dict, default_value=True, **params)
+            'do_simple_fit', self.data_dict, default_value=False, **params)
         self.std_keys = help_func_mod.get_param('std_keys', self.data_dict,
                                                 raise_error=False, **params)
         if self.std_keys is None:
@@ -1110,11 +1112,6 @@ class SingleQubitRBAnalysis(object):
                 self.data_dict, meas_obj_name=self.mobjn,
                 xvals=np.repeat(self.cliffords, self.nr_seeds))
 
-        if 'fit_dicts' in self.data_dict:
-            fit_dicts = self.data_dict['fit_dicts']
-        else:
-            raise KeyError('data_dict does not contain fit_dicts.')
-
         plot_dicts = OrderedDict()
         for keyi, data in self.data_to_proc_dict.items():
             base_plot_name = 'RB_' + self.mobjn + keyi
@@ -1139,54 +1136,57 @@ class SingleQubitRBAnalysis(object):
                     meas_obj_name=params.pop('meas_obj_name', self.mobjn),
                     do_plotting=False, **params)
 
-            # plot fit
-            fit_res = fit_dicts['rb_fit_' + self.mobjn + keyi]['fit_res']
-            plot_dicts['fit_' + self.mobjn + keyi] = {
-                'fig_id': base_plot_name,
-                'plotfn': 'plot_fit',
-                'fit_res': fit_res,
-                'setlabel': 'fit',
-                'color': 'r',
-                'do_legend': True,
-                'legend_ncol': 2,
-                'legend_bbox_to_anchor': (1, -0.15),
-                'legend_pos': 'upper right'}
-
-            if help_func_mod.get_param('plot_T1_lim', self.data_dict,
-                                       default_value=True, **params):
-                # plot T1 limited curve
-                F_T1, p_T1 = self.calc_T1_limited_fidelity(
-                    self.data_dict['T1_'+self.mobjn],
-                    self.data_dict['T2_'+self.mobjn],
-                    self.data_dict['ge_sigma_'+self.mobjn] *
-                    self.data_dict['ge_nr_sigma_'+self.mobjn],
-                    self.gate_decomp)
-                clfs_fine = np.linspace(self.cliffords[0], self.cliffords[-1],
-                                        1000)
-                T1_limited_curve = fit_res.model.func(
-                    clfs_fine, fit_res.best_values['Amplitude'], p_T1,
-                              fit_res.best_values['offset'])
-                plot_dicts['t1Lim_' + self.mobjn + keyi] = {
+            if 'fit_dicts' in self.data_dict:
+                fit_dicts = self.data_dict['fit_dicts']
+                # plot fit
+                fit_res = fit_dicts['rb_fit_' + self.mobjn + keyi]['fit_res']
+                plot_dicts['fit_' + self.mobjn + keyi] = {
                     'fig_id': base_plot_name,
-                    'plotfn': 'plot_line',
-                    'xvals': clfs_fine,
-                    'yvals': T1_limited_curve,
-                    'linestyle': '--',
-                    'marker': ''}
-            else:
-                F_T1 = None
+                    'plotfn': 'plot_fit',
+                    'fit_res': fit_res,
+                    'setlabel': 'fit',
+                    'color': 'r',
+                    'do_legend': True,
+                    'legend_ncol': 2,
+                    'legend_bbox_to_anchor': (1, -0.15),
+                    'legend_pos': 'upper right'}
 
-            # add texbox
-            textstr, ha, hp, va, vp = self.get_textbox_str(fit_res, F_T1,
-                                                           **params)
-            plot_dicts['text_msg_' + self.mobjn + keyi] = {
-                'fig_id': base_plot_name,
-                'ypos': vp,
-                'xpos': hp,
-                'horizontalalignment': ha,
-                'verticalalignment': va,
-                'plotfn': 'plot_text',
-                'text_string': textstr}
+                if help_func_mod.get_param('plot_T1_lim', self.data_dict,
+                                           default_value=False, **params):
+                    # plot T1 limited curve
+                    F_T1, p_T1 = self.calc_T1_limited_fidelity(
+                        self.data_dict['T1_'+self.mobjn],
+                        self.data_dict['T2_'+self.mobjn],
+                        self.data_dict['ge_sigma_'+self.mobjn] *
+                        self.data_dict['ge_nr_sigma_'+self.mobjn],
+                        self.gate_decomp)
+                    clfs_fine = np.linspace(self.cliffords[0],
+                                            self.cliffords[-1],
+                                            1000)
+                    T1_limited_curve = fit_res.model.func(
+                        clfs_fine, fit_res.best_values['Amplitude'], p_T1,
+                                  fit_res.best_values['offset'])
+                    plot_dicts['t1Lim_' + self.mobjn + keyi] = {
+                        'fig_id': base_plot_name,
+                        'plotfn': 'plot_line',
+                        'xvals': clfs_fine,
+                        'yvals': T1_limited_curve,
+                        'linestyle': '--',
+                        'marker': ''}
+                else:
+                    F_T1 = None
+
+                # add texbox
+                textstr, ha, hp, va, vp = self.get_textbox_str(fit_res, F_T1,
+                                                               **params)
+                plot_dicts['text_msg_' + self.mobjn + keyi] = {
+                    'fig_id': base_plot_name,
+                    'ypos': vp,
+                    'xpos': hp,
+                    'horizontalalignment': ha,
+                    'verticalalignment': va,
+                    'plotfn': 'plot_text',
+                    'text_string': textstr}
 
         if 'plot_dicts' in self.data_dict:
             self.data_dict['plot_dicts'].update(plot_dicts)
