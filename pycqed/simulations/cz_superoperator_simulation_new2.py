@@ -29,6 +29,8 @@ def f_to_parallelize_new(arglist):
     number = arglist['number']
     adaptive_pars = arglist['adaptive_pars']
     live_plot_enabled = arglist['live_plot_enabled']
+    which_gate = arglist['which_gate']
+
 
     try: 
         MC = Instrument.find_instrument('MC'+'{}'.format(number))
@@ -45,7 +47,12 @@ def f_to_parallelize_new(arglist):
     noise_parameters_CZ = npCZ.NoiseParametersCZ('noise_parameters_CZ'+'{}'.format(number))
     station.add_component(noise_parameters_CZ)
 
-    fluxlutman, noise_parameters_CZ = czf.return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args)
+    fluxlutman, noise_parameters_CZ = czf.return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args, which_gate=which_gate)
+    
+    cz_lambda_2 = fluxlutman.get('cz_lambda_2_{}'.format(which_gate))
+    cz_length = fluxlutman.get('cz_length_{}'.format(which_gate))
+    cz_theta_f = fluxlutman.get('cz_theta_f_{}'.format(which_gate))
+    czd_double_sided = fluxlutman.get('czd_double_sided_{}'.format(which_gate))
 
     d=CZ_trajectory_superoperator(fluxlutman=fluxlutman, noise_parameters_CZ=noise_parameters_CZ,
                                   fitted_stepresponse_ty=fitted_stepresponse_ty, 
@@ -53,15 +60,15 @@ def f_to_parallelize_new(arglist):
     MC.set_detector_function(d)
 
 
-    exp_metadata = {'double sided':fluxlutman.czd_double_sided_NE(), 
-                     'length': fluxlutman.cz_length_NE(),
+    exp_metadata = {'double sided':czd_double_sided, 
+                     'length': cz_length,
                      'distortions': noise_parameters_CZ.distortions(), 
                      'T2_scaling': noise_parameters_CZ.T2_scaling(), 
                      'sigma_q1': noise_parameters_CZ.sigma_q1(), 
                      'sigma_q0': noise_parameters_CZ.sigma_q0()}
 
     if adaptive_pars['mode']=='adaptive': 
-        MC.set_sweep_functions([fluxlutman.cz_theta_f_NE, fluxlutman.cz_lambda_2_NE])
+        MC.set_sweep_functions([cz_theta_f, cz_lambda_2])
         if adaptive_pars['uniform']: 
             loss_per_triangle= adaptive.learner.learner2D.uniform_loss
         else: 
@@ -74,14 +81,14 @@ def f_to_parallelize_new(arglist):
              (adaptive_pars['lambda2_min'], adaptive_pars['lambda2_max'])]})
 
         if noise_parameters_CZ.cluster():
-            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided_NE(),
-                fluxlutman.cz_length_NE()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(czd_double_sided,
+                cz_length*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='adaptive',exp_metadata=exp_metadata)
 
         else:
             if adaptive_pars['long_name']:
-                dat = MC.run('2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided_NE(),
-                fluxlutman.cz_length_NE()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                dat = MC.run('2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(czd_double_sided,
+                cz_length*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='adaptive',exp_metadata=exp_metadata)
             else:
                 dat = MC.run('2D simulation_new_2', 
@@ -89,18 +96,18 @@ def f_to_parallelize_new(arglist):
                 mode='adaptive')
 
     elif adaptive_pars['mode']=='1D':
-        MC.set_sweep_functions([fluxlutman.cz_theta_f_NE])
+        MC.set_sweep_functions([cz_theta_f])
         MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'], 
             adaptive_pars['theta_f_max'],adaptive_pars['n_points']))
         if noise_parameters_CZ.cluster():
-            dat = MC.run('1D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided_NE(),
-                fluxlutman.cz_length_NE()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+            dat = MC.run('1D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(czd_double_sided,
+                cz_length*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='1D',exp_metadata=exp_metadata)
 
         else:
             if adaptive_pars['long_name']:
-                dat = MC.run('1D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided_NE(),
-                fluxlutman.cz_length_NE()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                dat = MC.run('1D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(czd_double_sided,
+                cz_length*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='1D',exp_metadata=exp_metadata)
             else:
                 dat = MC.run('1D simulation_new_2', 
@@ -108,7 +115,7 @@ def f_to_parallelize_new(arglist):
                 mode='1D')
 
     if adaptive_pars['mode']=='cma_optimizer': 
-        MC.set_sweep_functions([fluxlutman.cz_theta_f_NE, fluxlutman.cz_lambda_2_NE])
+        MC.set_sweep_functions([cz_theta_f, cz_lambda_2])
         if adaptive_pars['uniform']: 
             loss_per_triangle= adaptive.learner.learner2D.uniform_loss
         else: 
@@ -125,14 +132,14 @@ def f_to_parallelize_new(arglist):
              })
 
         if noise_parameters_CZ.cluster():
-            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided_NE(),
-                fluxlutman.cz_length_NE()*1e9, noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+            dat = MC.run('2D simulation_new_cluster2 double sided {} - length {:.1f} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(czd_double_sided,
+                cz_length*1e9, noise_parameters_CZ.waiting_at_sweetspot(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='adaptive',exp_metadata=exp_metadata)
 
         else:
             if adaptive_pars['long_name']:
-                dat = MC.run('2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(fluxlutman.czd_double_sided_NE(),
-                fluxlutman.cz_length_NE()*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
+                dat = MC.run('2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}'.format(czd_double_sided,
+                cz_length*1e9, noise_parameters_CZ.distortions(), noise_parameters_CZ.T2_scaling(), noise_parameters_CZ.sigma_q1()*1e6, noise_parameters_CZ.sigma_q0()*1e6), 
                 mode='adaptive',exp_metadata=exp_metadata)
             else:
                 dat = MC.run('2D simulation_new_2', 
@@ -147,8 +154,6 @@ def f_to_parallelize_new(arglist):
 
 
 
-
-
 def compute_propagator(arglist):
     # I was parallelizing this function in the cluster, then I changed but the list as an argument remains.
     # Below each list item is assigned to its own variable
@@ -158,35 +163,42 @@ def compute_propagator(arglist):
     fitted_stepresponse_ty = arglist['fitted_stepresponse_ty']
     fluxlutman = arglist['fluxlutman']
     noise_parameters_CZ = arglist['noise_parameters_CZ']
+    which_gate = arglist['which_gate']
 
+    q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
+    czd_double_sided = fluxlutman.get('czd_double_sided_{}'.format(which_gate))
+    cz_length = fluxlutman.get('cz_length_{}'.format(which_gate))
+    cz_lambda_2 = fluxlutman.get('cz_lambda_2_{}'.format(which_gate))
+    cz_lambda_3 = fluxlutman.get('cz_lambda_3_{}'.format(which_gate))
+    cz_theta_f = fluxlutman.get('cz_theta_f_{}'.format(which_gate))
 
     sim_step=1/fluxlutman.sampling_rate()
     subdivisions_of_simstep=4                          # 4 is a good one, corresponding to a time step of 0.1 ns
     sim_step_new=sim_step/subdivisions_of_simstep      # waveform is generated according to sampling rate of AWG,
                                                        # but we can use a different step for simulating the time evolution
-    tlist = np.arange(0, fluxlutman.cz_length_NE(), sim_step)
+    tlist = np.arange(0, cz_length, sim_step)
     
-    # residual_coupling=czf.conditional_frequency(0,fluxlutman,noise_parameters_CZ)      # To check residual coupling at the operating point.
+    # residual_coupling=czf.conditional_frequency(0,fluxlutman,noise_parameters_CZ, which_gate=which_gate)      # To check residual coupling at the operating point.
     # print(residual_coupling)                                                       # Change amp to get the residual coupling at different points
 
 
     
-    eps_i = fluxlutman.calc_amp_to_eps(0, state_A='11', state_B='02')
-    theta_i = wfl.eps_to_theta(eps_i, g=fluxlutman.q_J2_NE())           # Beware theta in radian!
+    eps_i = fluxlutman.calc_amp_to_eps(0, state_A='11', state_B='02', which_gate=which_gate)
+    theta_i = wfl.eps_to_theta(eps_i, g=q_J2)           # Beware theta in radian!
 
-    if not fluxlutman.czd_double_sided_NE():
+    if not czd_double_sided:
         thetawave = wfl.martinis_flux_pulse(
-            length=fluxlutman.cz_length_NE(),
-            lambda_2=fluxlutman.cz_lambda_2_NE(),
-            lambda_3=fluxlutman.cz_lambda_3_NE(),
+            length=cz_length,
+            lambda_2=cz_lambda_2,
+            lambda_3=cz_lambda_3,
             theta_i=theta_i,
-            theta_f=np.deg2rad(fluxlutman.cz_theta_f_NE()),
+            theta_f=np.deg2rad(cz_theta_f),
             sampling_rate=fluxlutman.sampling_rate())    # return in terms of theta
-        epsilon = wfl.theta_to_eps(thetawave, fluxlutman.q_J2_NE())
-        amp = fluxlutman.calc_eps_to_amp(epsilon, state_A='11', state_B='02')
+        epsilon = wfl.theta_to_eps(thetawave, q_J2)
+        amp = fluxlutman.calc_eps_to_amp(epsilon, state_A='11', state_B='02', which_gate=which_gate)
                  # transform detuning frequency to (positive) amplitude
     else:
-        amp = get_f_pulse_double_sided(fluxlutman,theta_i)
+        amp = get_f_pulse_double_sided(fluxlutman,theta_i, which_gate=which_gate)
 
 
 
@@ -194,19 +206,19 @@ def compute_propagator(arglist):
     # We split here below in two cases to keep into account that certain times net-zero is one AWG time-step longer
     # than the conventional pulse with the same pulse length.
     if len(tlist) == len(amp):
-        tlist_temp=np.concatenate((tlist,np.array([fluxlutman.cz_length_NE()])))
-        tlist_new = np.arange(0, fluxlutman.cz_length_NE(),
+        tlist_temp=np.concatenate((tlist,np.array([cz_length])))
+        tlist_new = np.arange(0, cz_length,
                        sim_step_new)
     else:
-        tlist_temp=np.concatenate((tlist,np.array([fluxlutman.cz_length_NE(),fluxlutman.cz_length_NE()+sim_step])))
-        tlist_new = np.arange(0, fluxlutman.cz_length_NE()+sim_step,
+        tlist_temp=np.concatenate((tlist,np.array([cz_length,cz_length+sim_step])))
+        tlist_new = np.arange(0, cz_length+sim_step,
                        sim_step_new)
     amp_temp=np.concatenate((amp,np.array([0])))    # amp should come back to the initial value, i.e. at the sweet spot
     amp_interp=interp1d(tlist_temp,amp_temp)
     amp=amp_interp(tlist_new)
 
 
-    if fluxlutman.czd_double_sided_NE() and noise_parameters_CZ.waiting_at_sweetspot()!=0:
+    if czd_double_sided and noise_parameters_CZ.waiting_at_sweetspot()!=0:
         tlist_new, amp = czf.add_waiting_at_sweetspot(tlist_new,amp, noise_parameters_CZ.waiting_at_sweetspot())
 
 
@@ -230,7 +242,7 @@ def compute_propagator(arglist):
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
 
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
-    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
+    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ, which_gate=which_gate)
 
 
 
@@ -242,18 +254,18 @@ def compute_propagator(arglist):
         actual_Z_rotations_length = np.arange(0,noise_parameters_CZ.Z_rotations_length(),sim_step_new)[-1]+sim_step_new
         intervals_list = np.append(intervals_list,[actual_Z_rotations_length/2,actual_Z_rotations_length/2])
         amp_Z_rotation=[0,0]
-        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
+        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ, which_gate=which_gate)
 
     # We add the idle time at the end of the pulse (even if it's not at the end. It doesn't matter)
     if noise_parameters_CZ.total_idle_time() != 0:
         actual_total_idle_time = np.arange(0,noise_parameters_CZ.total_idle_time(),sim_step_new)[-1]+sim_step_new
         intervals_list = np.append(intervals_list,[actual_total_idle_time/2,actual_total_idle_time/2])
         amp_idle_time=[0,0]
-        double_sided = fluxlutman.czd_double_sided_NE()                # idle time is single-sided so we save the fluxlutman.czd_double_sided_NE() value, set it to False
+        double_sided = czd_double_sided                # idle time is single-sided so we save the czd_double_sided value, set it to False
                                                                     # and later restore it to the original value
-        fluxlutman.czd_double_sided_NE(False)
-        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ)
-        fluxlutman.czd_double_sided_NE(double_sided)
+        fluxlutman.set('czd_double_sided_{}'.format(which_gate), False)
+        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0,noise_parameters_CZ=noise_parameters_CZ, which_gate=which_gate)
+        fluxlutman.set('czd_double_sided_{}'.format(which_gate), double_sided)
 
 
 
@@ -288,37 +300,42 @@ def compute_propagator(arglist):
 
     ### Compute propagator
     U_final = czf.time_evolution_new(c_ops=c_ops, noise_parameters_CZ=noise_parameters_CZ, 
-                                 fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new, intervals_list=intervals_list)
+                                 fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new, intervals_list=intervals_list, which_gate=which_gate)
     #print(czf.verify_CPTP(U_superop_average))    # simple check of CPTP property
 
     return [U_final, t_final]
 
 
 
-
-def get_f_pulse_double_sided(fluxlutman,theta_i):
+def get_f_pulse_double_sided(fluxlutman,theta_i, which_gate: str = 'NE'):
+    cz_lambda_2 = fluxlutman.get('cz_lambda_2_{}'.format(which_gate))
+    cz_lambda_3 = fluxlutman.get('cz_lambda_3_{}'.format(which_gate))
+    cz_length = fluxlutman.get('cz_length_{}'.format(which_gate))
+    cz_theta_f = fluxlutman.get('cz_theta_f_{}'.format(which_gate))
+    czd_length_ratio = fluxlutman.get('czd_length_ratio_{}'.format(which_gate))
+    q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
 
     thetawave_A = wfl.martinis_flux_pulse(
-        length=fluxlutman.cz_length_NE()*fluxlutman.czd_length_ratio_NE(),
-        lambda_2=fluxlutman.cz_lambda_2_NE(),
-        lambda_3=fluxlutman.cz_lambda_3_NE(),
+        length=cz_length*czd_length_ratio,
+        lambda_2=cz_lambda_2,
+        lambda_3=cz_lambda_3,
         theta_i=theta_i,
-        theta_f=np.deg2rad(fluxlutman.cz_theta_f_NE()),
+        theta_f=np.deg2rad(cz_theta_f),
         sampling_rate=fluxlutman.sampling_rate())    # return in terms of theta
-    epsilon_A = wfl.theta_to_eps(thetawave_A, fluxlutman.q_J2_NE())
-    amp_A = fluxlutman.calc_eps_to_amp(epsilon_A, state_A='11', state_B='02')
+    epsilon_A = wfl.theta_to_eps(thetawave_A, q_J2)
+    amp_A = fluxlutman.calc_eps_to_amp(epsilon_A, state_A='11', state_B='02', which_gate=which_gate)
                  # transform detuning frequency to positive amplitude
     
     # Generate the second CZ pulse
     thetawave_B = wfl.martinis_flux_pulse(
-        length=fluxlutman.cz_length_NE()*(1-fluxlutman.czd_length_ratio_NE()),
-        lambda_2=fluxlutman.cz_lambda_2_NE(),
-        lambda_3=fluxlutman.cz_lambda_3_NE(),
+        length=cz_length*(1-czd_length_ratio),
+        lambda_2=cz_lambda_2,
+        lambda_3=cz_lambda_3,
         theta_i=theta_i,
-        theta_f=np.deg2rad(fluxlutman.cz_theta_f_NE()),
+        theta_f=np.deg2rad(cz_theta_f),
         sampling_rate=fluxlutman.sampling_rate())    # return in terms of theta
-    epsilon_B = wfl.theta_to_eps(thetawave_B, fluxlutman.q_J2_NE())
-    amp_B = fluxlutman.calc_eps_to_amp(epsilon_B, state_A='11', state_B='02', positive_branch=False)
+    epsilon_B = wfl.theta_to_eps(thetawave_B, q_J2)
+    amp_B = fluxlutman.calc_eps_to_amp(epsilon_B, state_A='11', state_B='02', positive_branch=False, which_gate=which_gate)
                  # transform detuning frequency to negative amplitude
 
     # N.B. No amp scaling and offset present
@@ -327,13 +344,13 @@ def get_f_pulse_double_sided(fluxlutman,theta_i):
 
 
 
-
-
-
-
 class CZ_trajectory_superoperator(det.Soft_Detector):
-    def __init__(self, fluxlutman, noise_parameters_CZ, fitted_stepresponse_ty, 
-                qois='all'):
+    def __init__(self,
+        fluxlutman,
+        noise_parameters_CZ,
+        fitted_stepresponse_ty,
+        qois='all',
+        which_gate: str = 'NE'):
         """
         Detector for simulating a CZ trajectory.
         Args:
@@ -350,6 +367,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         Returns: quantities of interest
         """
         super().__init__()
+
+        self.which_gate = which_gate # compatibility with new fluxlutman
+
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
                             'cond_phase02', 'coherent_leakage11', 'offset_difference', 'missing_fraction', '12_21_population_transfer', '12_03_population_transfer',
@@ -415,7 +435,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                                    'fluxbias_q1': fluxbias_q1,
                                    'fluxlutman': self.fluxlutman,
                                    'noise_parameters_CZ': self.noise_parameters_CZ,
-                                   'fitted_stepresponse_ty': self.fitted_stepresponse_ty}
+                                   'fitted_stepresponse_ty': self.fitted_stepresponse_ty,
+                                   'which_gate': self.which_gate}
 
                     weight = values_gaussian_q0[j_q0]*delta_x_q0 * values_gaussian_q1[j_q1]*delta_x_q1
                     weights.append(weight)
@@ -432,12 +453,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
-            #w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ)     # needed to compute phases in the rotating frame
+            #w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.noise_parameters_CZ, which_gate=self.which_gate)     # needed to compute phases in the rotating frame
             																										 # not used anymore
 
 
             ## Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
-            #czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,self.fluxlutman,self.noise_parameters_CZ)
+            #czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,self.fluxlutman,self.noise_parameters_CZ, which_gate=self.which_gate)
 
 
             for i in range(len(U_final_vec)):
@@ -448,7 +469,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             #print(czf.verify_CPTP(U_superop_average))
 
 
-            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, noise_parameters_CZ=self.noise_parameters_CZ)
+            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, noise_parameters_CZ=self.noise_parameters_CZ, which_gate=self.which_gate)
 
             if self.noise_parameters_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
                                                                                         # then we optimize the search via higher-order cost function
@@ -467,10 +488,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             ## To study the effect of the coherence of leakage on repeated CZs (simpler than simulating a full RB experiment):
-            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,self.fluxlutman,self.noise_parameters_CZ)
+            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,self.fluxlutman,self.noise_parameters_CZ, which_gate=self.which_gate)
 
 
-            #czf.plot_spectrum(self.fluxlutman,self.noise_parameters_CZ)
+            #czf.plot_spectrum(self.fluxlutman,self.noise_parameters_CZ, which_gate=self.which_gate)
 
 
         qoi_plot = np.array(qoi_plot)
