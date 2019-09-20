@@ -74,7 +74,8 @@ def get_std_deviation(data_dict, keys_out, keys_in=None, **params):
     :param keys_out: list of key names or dictionary keys paths in
                     data_dict for the processed data to be saved into
     :param params: keyword arguments:
-        num_bins (list): list with number of bins on which to compute std dev.
+        num_bins (list): list with number of bins into which to reshape the
+        data and on which to compute std dev.
 
     Assumptions:
         - len(keys_out) == len(keys_in)
@@ -85,9 +86,9 @@ def get_std_deviation(data_dict, keys_out, keys_in=None, **params):
     data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
     num_bins = help_func_mod.get_param('num_bins', data_dict, **params)
     if num_bins is None:
-        raise ValueError('num_avg_bins is not specified.')
+        raise ValueError('num_bins is not specified.')
     if len(keys_in) != len(num_bins):
-        raise ValueError('keys_in and num_avg_bins do not have '
+        raise ValueError('keys_in and num_bins do not have '
                          'the same length.')
     if len(keys_out) != len(data_to_proc_dict):
         raise ValueError('keys_out and keys_in do not have '
@@ -294,9 +295,9 @@ def average(data_dict, keys_out, keys_in=None, **params):
     data_to_proc_dict = help_func_mod.get_data_to_process(data_dict, keys_in)
     num_bins = help_func_mod.get_param('num_bins', data_dict, **params)
     if num_bins is None:
-        raise ValueError('num_avg_bins is not specified.')
+        raise ValueError('num_bins is not specified.')
     if len(keys_in) != len(num_bins):
-        raise ValueError('keys_in and num_avg_bins do not have '
+        raise ValueError('keys_in and num_bins do not have '
                          'the same length.')
     if len(keys_out) != len(data_to_proc_dict):
         raise ValueError('keys_out and keys_in do not have '
@@ -598,11 +599,10 @@ class RabiAnalysis(object):
 
             filtered_raw_keys = [k for k in self.data_dict.keys() if 'filter' in k]
             if len(filtered_raw_keys) > 0:
-                plot_module.prepare_1d_plot_dicts(
+                plot_module.prepare_raw_data_plot_dicts(
                     data_dict=self.data_dict,
                     keys_in=filtered_raw_keys,
                     fig_name='raw_data_filtered',
-                    xvals=self.physical_swpts,
                     meas_obj_name=params.pop('meas_obj_name', self.mobjn),
                     **params)
         else:
@@ -872,8 +872,10 @@ class SingleQubitRBAnalysis(object):
         Assumptions:
             - cal_points, sweep_points, qb_sweep_points_map, qb_name exist in
             metadata or params
-            - expects a 2d sweep with nr_seeds on innermost sweep and cliffordsdd
+            - expects a 2d sweep with nr_seeds on innermost sweep and cliffords
             on outermost
+            - if active reset was used, 'filter' must be in the key names of the
+            filtered data if you want the filtered raw data to be plotted
         """
         self.data_dict = data_dict
         self.data_to_proc_dict = help_func_mod.get_data_to_process(
@@ -934,11 +936,12 @@ class SingleQubitRBAnalysis(object):
                                                   default_value=0.68, **params)
         self.gate_decomp = help_func_mod.get_param('gate_decomp', self.data_dict,
                                                    default_value='HZ', **params)
-        self.use_empirical_variance = help_func_mod.get_param(
-            'use_empirical_variance', self.data_dict,
-            default_value=True, **params)
+        self.do_simple_fit = help_func_mod.get_param(
+            'do_simple_fit', self.data_dict, default_value=True, **params)
         self.std_keys = help_func_mod.get_param('std_keys', self.data_dict,
-                                                raise_error=True, **params)
+                                                raise_error=False, **params)
+        if self.std_keys is None:
+            self.std_keys = [None] * len(self.keys_in)
         if len(self.std_keys) != len(self.keys_in):
             raise ValueError('std_keys and keys_in do not have '
                              'the same length.')
@@ -983,7 +986,9 @@ class SingleQubitRBAnalysis(object):
                 'fit_yvals': {'data': data_fit},
                 'guess_pars': guess_pars}
 
-            if self.use_empirical_variance:
+            if self.do_simple_fit:
+                fit_kwargs = {'scale_covar': False}
+            elif keys is not None:
                 fit_kwargs = {'scale_covar': False,
                               'weights': 1/self.data_dict[keys]}
             else:
@@ -1083,21 +1088,21 @@ class SingleQubitRBAnalysis(object):
                 swpts = np.concatenate([
                     swpts, help_func_mod.get_cal_sweep_points(
                         swpts, self.cp, self.mobjn)])
-            swpts = np.repeat(swpts, self.reset_reps+1)
-            swpts = np.arange(len(swpts))
+            swpts_with_rst = np.repeat(swpts, self.reset_reps+1)
+            swpts_with_rst = np.arange(len(swpts_with_rst))
             plot_module.prepare_raw_data_plot_dicts(
                 self.data_dict,
                 meas_obj_name=params.pop('meas_obj_name', self.mobjn),
-                xvals=swpts, **params)
+                xvals=swpts_with_rst, **params)
 
             filtered_raw_keys = [k for k in self.data_dict.keys() if
                                  'filter' in k]
             if len(filtered_raw_keys) > 0:
-                plot_module.prepare_1d_plot_dicts(
+                plot_module.prepare_raw_data_plot_dicts(
                     data_dict=self.data_dict,
                     keys_in=filtered_raw_keys,
                     fig_name='raw_data_filtered',
-                    xvals=np.repeat(self.cliffords, self.nr_seeds),
+                    xvals=swpts,
                     meas_obj_name=params.pop('meas_obj_name', self.mobjn),
                     **params)
         else:

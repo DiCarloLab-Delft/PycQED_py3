@@ -97,12 +97,16 @@ def prepare_cal_states_plot_dicts(data_dict, fig_name=None,
             plot names in this function
         title_suffix (str, default: ''): suffix to be added to the figure
             title, which is by default meas_obj_name
-        ncols (int, default: 1): number of subplots along x
-        nrows (int, default: 1): number of subplots along y
+        ncols (int, default: 2 if len(data_to_proc_dict) > 2 else 1):
+            number of subplots along x
+        nrows (int, default: 2 if len(data_to_proc_dict) == 2 else
+            len(data_to_proc_dict) // 2 + len(data_to_proc_dict) % 2):
+            number of subplots along y
 
     Assumptions:
         - if len(keys_in) > 1, this function will plot the data corresponding to
-        each key_in on a separate subplot
+        each key_in on a separate subplot. To plot on same axis,
+        set ncols=1, nrows=1.
         - cal_points, sweep_points, meas_obj_name exist in
         exp_metadata or params
         - expects 1d arrays
@@ -229,12 +233,17 @@ def prepare_1d_plot_dicts(data_dict, fig_name, keys_in, **params):
             plot names in this function
         title_suffix (str, default: ''): suffix to be added to the figure
             title, which is by default meas_obj_name
-        ncols (int, default: 1): number of subplots along x
-        nrows (int, default: 1): number of subplots along y
+        ncols (int, default: 2 if len(data_to_proc_dict) > 2 else 1):
+            number of subplots along x
+        nrows (int, default: 2 if len(data_to_proc_dict) == 2 else
+            len(data_to_proc_dict) // 2 + len(data_to_proc_dict) % 2):
+            number of subplots along y
 
     Assumptions:
+        - automatically excludes cal points if len(cp.states) != 0.
         - if len(keys_in) > 1, this function will plot the data corresponding to
-        each key_in on a separate subplot
+        each key_in on a separate subplot. To plot on same axis,
+        set ncols=1, nrows=1.
         - cal_points, sweep_points, meas_obj_name exist in
         exp_metadata or params
         - expects 1d arrays
@@ -318,7 +327,8 @@ def prepare_1d_plot_dicts(data_dict, fig_name, keys_in, **params):
         plot(data_dict, keys_in=plot_dict_names, **params)
 
 
-def prepare_raw_data_plot_dicts(data_dict, fig_name=None, **params):
+def prepare_raw_data_plot_dicts(data_dict, keys_in=None, fig_name=None,
+                                **params):
     """
     Prepares plot for raw data and adds the plot dicts to the
     data_dict['plot_dicts'].
@@ -338,10 +348,18 @@ def prepare_raw_data_plot_dicts(data_dict, fig_name=None, **params):
         do_legend (bool, default: True): whether to show the legend
         title_suffix (str, default: ''): suffix to be added to the figure
             title, which is by default meas_obj_name
-        ncols (int, default: 1): number of subplots along x
-        nrows (int, default: 1): number of subplots along y
+        ncols (int, default: 2 if len(data_to_proc_dict) > 2 else 1):
+            number of subplots along x
+        nrows (int, default: 2 if len(data_to_proc_dict) == 2 else
+            len(data_to_proc_dict) // 2 + len(data_to_proc_dict) % 2):
+            number of subplots along y
 
     Assumptions:
+        - does NOT exclude cal points if len(cp.states) != 0; instead it extends
+        the physical sweep points (if user does not provide xvals)
+        - if len(keys_in) > 1, this function will plot the data corresponding to
+        each key_in on a separate subplot. To plot on same axis,
+        set ncols=1, nrows=1.
         - cal_points, sweep_points, meas_obj_name exist in
         exp_metadata or params
         - expects 1d arrays
@@ -349,10 +367,12 @@ def prepare_raw_data_plot_dicts(data_dict, fig_name=None, **params):
     """
     cp, sp, meas_obj_sweep_points_map, mobjn = \
         help_func_mod.get_cp_sp_spmap_measobjn(data_dict, **params)
-    meas_obj_value_names_map = help_func_mod.get_param(
-        'meas_obj_value_names_map', data_dict, raise_error=True)
+    if keys_in is None:
+        meas_obj_value_names_map = help_func_mod.get_param(
+            'meas_obj_value_names_map', data_dict, raise_error=True)
+        keys_in=meas_obj_value_names_map[mobjn]
     data_to_proc_dict = help_func_mod.get_data_to_process(
-        data_dict, keys_in=meas_obj_value_names_map[mobjn])
+        data_dict, keys_in=keys_in)
     sp_name = params.get('sp_name', meas_obj_sweep_points_map[mobjn][0])
     sweep_info = [v for d in sp for k, v in d.items() if sp_name == k]
     if len(sweep_info) == 0:
