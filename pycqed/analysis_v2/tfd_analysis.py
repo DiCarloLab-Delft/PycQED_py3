@@ -48,12 +48,17 @@ class TFD_3CZ_Analysis(ba.BaseDataAnalysis):
         self.timestamp = self.timestamps[0]
 
         data_fp = get_datafilepath_from_timestamp(self.timestamp)
-        param_spec = {'data':
-                      ('Experimental Data/Data', 'dset'),
-                      'value_names': ('Experimental Data', 'attr:value_names')}
+        param_spec = {
+            'data': ('Experimental Data/Data', 'dset'),
+            'combinations':  ('Experimental Data/Experimental Metadata/combinations', 'dset'),
+            'value_names': ('Experimental Data', 'attr:value_names')}
 
         self.raw_data_dict = h5d.extract_pars_from_datafile(
             data_fp, param_spec)
+
+        # For some reason the list is stored a list of length 1 arrays...
+        self.raw_data_dict['combinations'] = [
+            c[0] for c in self.raw_data_dict['combinations']]
 
         # Parts added to be compatible with base analysis data requirements
         self.raw_data_dict['timestamps'] = self.timestamps
@@ -61,7 +66,8 @@ class TFD_3CZ_Analysis(ba.BaseDataAnalysis):
 
     def process_data(self):
         self.proc_data_dict = {}
-        combinations = ['X', 'Z', '0000', '1111']
+        # combinations = ['X', 'Z', '0000', '1111']
+        combinations = self.raw_data_dict['combinations']
 
         raw_shots = self.raw_data_dict['data'][:, 1:]
         value_names = self.raw_data_dict['value_names']
@@ -109,8 +115,8 @@ class TFD_3CZ_Analysis(ba.BaseDataAnalysis):
         x_cnt = 0
         z_cnt = 0
         for i, row in enumerate(digitized_data_pm):
-            comb = combinations[i % 4]
-            if comb == 'X':
+            comb = combinations[i % len(combinations)]
+            if comb == 'X' or comb == 'X-IIII':
                 x_cnt += 1
                 pauli_terms['XIII'] += row[0]
                 pauli_terms['IXII'] += row[1]
@@ -119,7 +125,7 @@ class TFD_3CZ_Analysis(ba.BaseDataAnalysis):
                 pauli_terms['XIXI'] += row[0]*row[2]
                 pauli_terms['IXIX'] += row[1]*row[3]
 
-            elif comb == 'Z':
+            elif comb == 'Z' or comb == 'Z-IIII':
                 z_cnt += 1
                 pauli_terms['ZZII'] += row[0]*row[1]
                 pauli_terms['IIZZ'] += row[2]*row[3]
