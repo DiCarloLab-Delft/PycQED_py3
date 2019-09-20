@@ -47,7 +47,6 @@ class Sequence:
         """
         waveforms = {}
         sequences = {}
-        
         for seg in self.segments.values():
             seg.resolve_segment()
             seg.gen_elements_on_awg()

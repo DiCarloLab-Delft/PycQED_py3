@@ -839,8 +839,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
                  nr_averages=1024,  real_imag=True,
                  channels: list = [0, 1], correlations: list=[(0, 1)],
-                 used_channels=None,
-                 value_names=None,
+                 result_logging_mode: str='raw',
+                 used_channels=None, value_names=None,
                  seg_per_point=1, single_int_avg=False, thresholding=False,
                  **kw):
         super().__init__(
@@ -848,11 +848,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             nr_averages=nr_averages, real_imag=real_imag,
             channels=channels,
             seg_per_point=seg_per_point, single_int_avg=single_int_avg,
-            result_logging_mode='raw',  # FIXME -> do the proper thing (MAR)
+            result_logging_mode=result_logging_mode,  # FIXME -> do the proper thing (MAR)
             **kw)
 
+        self.result_logging_mode = result_logging_mode
         self.correlations = correlations
-        self.thresholding = thresholding
+        self.thresholding = self.result_logging_mode == 'digitized'
 
         self.used_channels = used_channels
         if self.used_channels is None:
@@ -861,7 +862,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         if value_names is None:
             self.value_names = []
             for ch in channels:
-                self.value_names += ['{}_w{}'.format(UHFQC.name, ch)]
+                self.value_names += ['{}_{} w{}'.format(
+                    UHFQC.name, self.result_logging_mode, ch)]
         else:
             self.value_names = value_names
 
@@ -898,6 +900,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
 
+        self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def define_correlation_channels(self):
@@ -1149,7 +1152,7 @@ class UHFQC_integration_logging_det(UHFQC_Base):
             self.AWG.stop()
 
 
-class UHFQC_integration_average_classifier_det(UHFQC_Base):
+class UHFQC_classifier_detector(UHFQC_Base):
 
     '''
     Detector used for integrated average results with the UHFQC
@@ -1160,7 +1163,6 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
                  integration_length: float=1e-6,
                  nr_shots: int=4094,
                  channels: list=(0, 1),
-                 correlations=None,
                  result_logging_mode: str='raw',
                  always_prepare: bool=False,
                  prepare_function=None,
@@ -1174,11 +1176,6 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
         integration_length (float): integration length in seconds
         nr_shots (int)     : nr of shots (max is 4095)
         channels (list)    : index (channel) of UHFQC weight functions to use
-        correlations (list): list of tuples containing channels which should
-                             be correlated. This detector only works for 2 ro
-                             channels per data point, so correlations must be:
-                             [ ((ch0, ch1),(ch2, ch3)), ((ch0, ch1),(ch4, ch5)),
-                             ... ].
         result_logging_mode (str):  options are
             - raw        -> returns raw data in V
             - lin_trans  -> applies the linear transformation matrix and
@@ -1191,6 +1188,20 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
             first call the prepare statement. This is particularly important
             when it is both a single_int_avg detector and acquires multiple
             segments per point.
+        get_values_function_kwargs (dict): looks for the following keys:
+            classified (default: True): whether to classify the shots or not
+            averaged (default: True): whether to average over the shots
+            thresholded (default:True): whether to threshold the shots
+            correlated (default: False): whether to calculate <ZZ...Z>,
+                assuming |f> states are |g> states. This creates and additional
+                data column called "correlation"
+            classifier_params (default: None): this must be provided if
+                classified == True. Parameters for the classifier (or list of
+                parameters for the classifiers if multiple qubits) used to
+                classify the shots.
+            sate_prob_mtx (default: None): state assignment probability matrix
+                (or list of matrices if multiple qubits) used to correct for
+                RO errors. No correction is applied if None.
         """
         super().__init__(UHFQC)
 
@@ -1198,7 +1209,7 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
             result_logging_mode)
         self.state_labels = ['pg', 'pe', 'pf']
         self.channels = channels
-        self.correlations = correlations
+        self.correlated = get_values_function_kwargs.get('correlated', False)
 
         # Currently doesn't work with single readout channel;
         # assumes 2 channels per data point
@@ -1214,17 +1225,8 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
                     state, ch_pair)
                 idx += 1
 
-        if self.correlations is not None:
-            # get [[ch0ch1, ch2ch3], [ch0ch1, ch4ch5],...]
-            # extend value_names for correlations
-            self.correlation_string_lists = []
-            for corr in self.correlations:
-                corr_strs = []
-                for ch_pair in corr:
-                    corr_strs += [''.join([str(ch) for ch in ch_pair])]
-                self.correlation_string_lists += [corr_strs]
-                self.value_names += [f'{s} corr ({",".join(corr_strs)}) '
-                                     for s in self.state_labels]
+        if self.correlated:
+            self.value_names += ['correlation']
 
         if result_logging_mode == 'raw':
             self.value_units = ['']*len(self.value_names)
@@ -1268,8 +1270,6 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
         # The AWG program uses userregs/0 to define the number of iterations
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
-
-
         self.UHFQC.quex_rl_length(self.nr_shots*self.nr_sweep_points)
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
@@ -1311,62 +1311,77 @@ class UHFQC_integration_average_classifier_det(UHFQC_Base):
             classifier_params_list = [classifier_params_list]
         state_prob_mtx_list = self.get_values_function_kwargs.get(
                     'state_prob_mtx', None)
-        if state_prob_mtx_list is None:
-            state_prob_mtx_list = [None]*len(classifier_params_list)
-        elif not isinstance(state_prob_mtx_list, list):
+        if state_prob_mtx_list is not None and \
+                not isinstance(state_prob_mtx_list, list):
             state_prob_mtx_list = [state_prob_mtx_list]
+
+        classified_data = data
+        if self.get_values_function_kwargs.get('classified', True):
+            classified_data = self.classify_shots(
+                data, classifier_params_list, state_prob_mtx_list,
+                self.get_values_function_kwargs.get('averaged', True),
+                self.correlated,
+                self.get_values_function_kwargs.get('thresholded', True))
+
+        return classified_data.T
+
+    def classify_shots(self, data, classifier_params_list,
+                       state_prob_mtx_list=None, averaged=False,
+                       correlated=False, thresholded=True):
+
+        if classifier_params_list is None:
+            raise ValueError('Please specify the classifier parameters list.')
 
         nr_states = len(self.state_labels)
         classified_data = np.zeros(
-            (nr_states*len(self.channel_str_pairs),self.nr_sweep_points))
-        if self.get_values_function_kwargs.get('classify', True):
-            for i in range(len(self.channel_str_pairs)):
-                classified_data[nr_states*i: nr_states*i+nr_states, :] = \
-                    self.classify_shots(data[2*i: 2*i+2, :],
-                                        classifier_params_list[i],
-                                        state_prob_mtx_list[i],
-                                        self.get_values_function_kwargs.get(
-                                           'average', True),
-                                        self.get_values_function_kwargs.get(
-                                            'correlate', False))
-        return classified_data
+            (nr_states*len(self.channel_str_pairs), self.nr_sweep_points))
 
-    def classify_shots(self, data, classifier_params_dict, state_prob_mtx=None,
-                       average=False, correlate=False):
-        if classifier_params_dict is None:
-            raise ValueError('Please specify the classifier parameters dict.')
+        clf_data_all = np.zeros((self.nr_sweep_points*self.nr_shots,
+                                nr_states*len(self.channel_str_pairs)))
 
-        classified_data = a_tools.predict_gm_proba_from_clf(
-            data.T, classifier_params_dict)
-        # reshape into (nr_shots, nr_sweep_points, nr_data_columns)
-        classified_data = np.reshape(
-            classified_data, (self.nr_shots, self.nr_sweep_points,
-                              classified_data.shape[1]))
+        for i in range(len(self.channel_str_pairs)):
+            clf_data = a_tools.predict_gm_proba_from_clf(
+                data[2*i: 2*i+2, :].T, classifier_params_list[i])
+            if thresholded:
+                # clf_data must be 2 dimensional, rows are shots*sweep_points,
+                # columns are nr_states
+                clf_data = (clf_data == np.repeat(
+                    np.amax(clf_data, axis=1, keepdims=True),
+                    nr_states, axis=1)).astype(int)
+            clf_data_all[:, nr_states*i: nr_states*i+nr_states] = clf_data
 
-        if correlate:
+            # reshape into (nr_shots, nr_sweep_points, nr_data_columns)
+            clf_data = np.reshape(
+                clf_data, (self.nr_shots, self.nr_sweep_points,
+                                  clf_data.shape[-1]))
+            if averaged:
+                clf_data = np.mean(clf_data, axis=0)
+            if state_prob_mtx_list is not None:
+                clf_data = np.linalg.inv(
+                    state_prob_mtx_list[i]).T @ clf_data.T
+                log.info('Data corrected based on state_prob_mtx.')
+            else:
+                print('not correcting data')
+                clf_data = clf_data.T
+            classified_data[nr_states * i: nr_states * i + nr_states, :] = \
+                clf_data
+
+        if correlated:
             # can only correlate corresponding probabilities on all channels;
             # it cannot correlate selected channels
-            assert (classified_data.shape[-1] // len(self.state_labels) > 1)
-            corr_data = np.zeros(shape=(classified_data.shape[0],
-                                        classified_data.shape[1],
-                                        len(self.state_labels)))
-            for p in range(len(self.state_labels)):
-                corr_data[:, :, p] = np.product(
-                    [classified_data[:, :, c] for c in np.arange(
-                        classified_data.shape[2])[p::len(self.state_labels)]],
-                    axis=0)
-            classified_data = np.concatenate([data, corr_data], axis=2)
-
-        if average:
-            classified_data = np.mean(classified_data, axis=0)
-        if state_prob_mtx is not None:
-            classified_data = \
-                np.linalg.inv(state_prob_mtx).T @ classified_data.T
-            log.info('Data corrected based on state_prob_mtx.')
-        else:
-            classified_data = classified_data.T
-
-        return classified_data
+            q = clf_data_all.shape[1] // nr_states
+            qb_states_list = [np.argmax(
+                clf_data_all[:, i*nr_states: i*nr_states + nr_states],
+                axis=1) for i in range(q)]
+            corr_data = np.sum(np.array(qb_states_list) % 2, axis=0) % 2
+            if average:
+                corr_data = np.reshape(
+                    corr_data, (self.nr_shots, self.nr_sweep_points))
+                corr_data = np.mean(corr_data, axis=0)
+            corr_data = np.reshape(corr_data, (1, corr_data.size))
+            classified_data = np.concatenate([classified_data, corr_data],
+                                             axis=0)
+        return classified_data.T
 
     def finish(self):
         if self.AWG is not None:

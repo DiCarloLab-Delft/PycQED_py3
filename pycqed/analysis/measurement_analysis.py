@@ -1670,7 +1670,7 @@ class TD_Analysis(MeasurementAnalysis):
         else:
             cal_zero_points = self.cal_points[0]
             cal_one_points = self.cal_points[1]
-        self.corr_data = a_tools.normalize_data_v3(
+        self.corr_data = a_tools.rotate_and_normalize_data_1ch(
             self.measured_values[0],
             cal_zero_points=cal_zero_points,
             cal_one_points=cal_one_points)
@@ -1817,9 +1817,9 @@ class TD_Analysis(MeasurementAnalysis):
             if len(self.measured_values) == 1 or len(self.RO_channels) == 1:
                 # Only one quadrature was measured
                 if cal_zero_points is None and cal_one_points is None:
-                    # a_tools.normalize_data_v3 does not work with 0 cal_points. Use
+                    # a_tools.rotate_and_normalize_data_1ch does not work with 0 cal_points. Use
                     # 4 cal_points.
-                    logging.warning('a_tools.normalize_data_v3 does not have support'
+                    logging.warning('a_tools.rotate_and_normalize_data_1ch does not have support'
                                     ' for 0 cal_points. Setting NoCalPoints to 4.')
                     self.NoCalPoints = 4
                     calsteps = 4
@@ -1831,7 +1831,7 @@ class TD_Analysis(MeasurementAnalysis):
                 ch_to_measure = \
                     0 if len(self.measured_values) == 1 else self.RO_channels[0]
                 print('ch to measure ', ch_to_measure)
-                self.corr_data = a_tools.normalize_data_v3(
+                self.corr_data = a_tools.rotate_and_normalize_data_1ch(
                     self.measured_values[ch_to_measure],
                     cal_zero_points, cal_one_points)
             else:
@@ -1935,7 +1935,7 @@ class chevron_optimization_v2(TD_Analysis):
     def run_default_analysis(self,
                              close_main_fig=True, **kw):
         super(chevron_optimization_v2, self).run_default_analysis(**kw)
-        measured_values = a_tools.normalize_data_v3(self.measured_values[0])
+        measured_values = a_tools.rotate_and_normalize_data_1ch(self.measured_values[0])
         self.cost_value_1, self.period = self.sum_cost(self.sweep_points * 1e9,
                                                        measured_values)
         self.cost_value_2 = self.swap_cost(self.sweep_points * 1e9,
@@ -1963,7 +1963,7 @@ class chevron_optimization_v2(TD_Analysis):
         self.save_fig(fig, fig_tight=False, **kw)
 
     def analysis_on_fig(self, ax):
-        measured_values = a_tools.normalize_data_v3(self.measured_values[0])
+        measured_values = a_tools.rotate_and_normalize_data_1ch(self.measured_values[0])
         self.cost_value_1, self.period = self.sum_cost(self.sweep_points * 1e9,
                                                        measured_values)
         self.cost_value_2 = self.swap_cost(self.sweep_points * 1e9,
@@ -2629,7 +2629,7 @@ class TD_UHFQC(TD_Analysis):
     def run_default_analysis(self,
                              close_main_fig=True, **kw):
         super(TD_UHFQC, self).run_default_analysis(**kw)
-        measured_values = a_tools.normalize_data_v3(self.measured_values[0])
+        measured_values = a_tools.rotate_and_normalize_data_1ch(self.measured_values[0])
 
         fig, ax = plt.subplots(1, figsize=(8, 6))
 
@@ -4018,6 +4018,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         signal = abs(mu0_0 - mu1_1)
         noise = (sigma0_0 + sigma1_1) / 2
         SNR = signal / noise
+        p_rem = 0
 
         if plot:
             # plotting s-curves
@@ -4180,6 +4181,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         fid_grp.attrs.create(name='V_th_a', data=self.V_th_a)
         fid_grp.attrs.create(name='V_th_d', data=self.V_th_d)
         fid_grp.attrs.create(name='F_a', data=self.F_a)
+        fid_grp.attrs.create(name='p_rem', data=p_rem)
 
         self.sigma0_0 = sigma0_0
         self.sigma1_1 = sigma1_1
@@ -8732,7 +8734,7 @@ class DoubleFrequency(TD_Analysis):
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
         x = self.sweep_points
-        y = a_tools.normalize_data_v3(self.measured_values[0])
+        y = a_tools.rotate_and_normalize_data_1ch(self.measured_values[0])
 
         fit_res = self.fit(x[:-4], y[:-4])
         self.fit_res = fit_res
@@ -11251,7 +11253,7 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
                     data_filter(self.data[1])[cal_points_idxs[0] +
                                               cal_points_idxs[1]]
                 ))
-                self.ampls = a_tools.normalize_data_v3(
+                self.ampls = a_tools.rotate_and_normalize_data_1ch(
                     measured_values, cal_zero_points=cal_points_idxs[0],
                     cal_one_points=cal_points_idxs[1])[0:-self.NoCalPoints]
 
@@ -11301,7 +11303,7 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
                                     print_fit_results=print_fit_results)
 
         # plot
-        ax.plot(thetas, ampls, 'o-', label=dict_label)
+        ax.plot(thetas, ampls, 'o', label=dict_label)
 
         thetas_fine = np.linspace(thetas[0], thetas[-1], len(thetas)*100)
         if fit_res.best_values['amplitude'] > 0:

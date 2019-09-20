@@ -10,6 +10,10 @@ import logging
 #   Fitting Functions Library   #
 #################################
 
+def RandomizedBenchmarkingLeakage(numCliff, pu, pd, p0):
+    val = pu/(pd+pu) * (1-np.exp(-(pd+pu)*numCliff)) + p0*np.exp(-(pd+pu)*numCliff)
+    return val
+
 def RandomizedBenchmarkingDecay(numCliff, Amplitude, p, offset):
     val = Amplitude * (p ** numCliff) + offset
     return val

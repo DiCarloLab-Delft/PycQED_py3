@@ -8,6 +8,7 @@
 import numpy as np
 import math
 import logging
+log = logging.getLogger(__name__)
 from copy import deepcopy
 import pycqed.measurement.waveform_control.pulse_library as pl
 import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
@@ -54,7 +55,8 @@ class Segment:
 
         # Makes sure that pulse name is unique
         if pars_copy.get('name') in self._pulse_names:
-            raise ValueError('Name of added pulse already exists!')
+            raise ValueError(f'Name of added pulse already exists: '
+                             f'{pars_copy.get("name")}')
         if pars_copy.get('name', None) is None:
             pars_copy['name'] = pulse_pars['pulse_type'] + '_' + str(
                 len(self.unresolved_pulses))
@@ -199,7 +201,6 @@ class Segment:
         Adds charge compensation pulse to channels with pulsar parameter
         charge_buildup_compensation.
         """
-
         t_end = -float('inf')
         pulse_area = {}
         compensation_chan = set()
@@ -947,6 +948,7 @@ class Segment:
                 ax[i, 0].spines["right"].set_visible(frameon)
                 ax[i, 0].spines["bottom"].set_visible(frameon)
                 ax[i, 0].spines["left"].set_visible(frameon)
+                ax[i, 0].set_ylabel('Voltage (V)')
                 # plotting
                 for elem_name, v in wfs[instr].items():
                     for k, wf_per_ch in v.items():
@@ -965,9 +967,6 @@ class Segment:
 
             # formatting
             ax[-1, 0].set_xlabel('time ($\mu$s)')
-            # start, end = ax[-1,0].get_xlim()
-            # step = (end - start)/20
-            # ax[-1,0].xaxis.set_ticks(np.arange(start, end, 0.25))
             plt.tight_layout()
             if savefig:
                 plt.savefig(f'{self.name}.png')

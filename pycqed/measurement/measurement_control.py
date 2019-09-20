@@ -160,6 +160,8 @@ class MeasurementControl(Instrument):
 
         with h5d.Data(name=self.get_measurement_name(),
                       datadir=self.datadir()) as self.data_object:
+            if exp_metadata is not None:
+                self.save_exp_metadata(exp_metadata, self.data_object)
             try:
                 self.check_keyboard_interrupt()
                 self.get_measurement_begintime()
@@ -188,8 +190,6 @@ class MeasurementControl(Instrument):
             result = self.dset[()]
             self.get_measurement_endtime()
             self.save_MC_metadata(self.data_object)  # timing labels etc
-            if exp_metadata is not None:
-                self.save_exp_metadata(exp_metadata, self.data_object)
             return_dict = self.create_experiment_result_dict()
 
         self.finish(result)
@@ -305,7 +305,6 @@ class MeasurementControl(Instrument):
 
         datasetshape = self.dset.shape
         start_idx, stop_idx = self.get_datawriting_indices_update_ctr(new_data)
-
         new_datasetshape = (np.max([datasetshape[0], stop_idx]),
                             datasetshape[1])
         self.dset.resize(new_datasetshape)
@@ -321,9 +320,8 @@ class MeasurementControl(Instrument):
         else:
             old_vals = self.dset[start_idx:stop_idx,
                                  len(self.sweep_functions):]
-            new_vals = ((new_data + old_vals*self.soft_iteration) /
-                        (1+self.soft_iteration))
-
+            new_vals = ((new_data + old_vals * self.soft_iteration) /
+                        (1 + self.soft_iteration))
             self.dset[start_idx:stop_idx,
                       len(self.sweep_functions):] = new_vals
         sweep_len = len(self.get_sweep_points().T)
@@ -1262,7 +1260,8 @@ class MeasurementControl(Instrument):
             max_sweep_points = np.shape(self.get_sweep_points())[0]
 
         start_idx = int(self.total_nr_acquired_values % max_sweep_points)
-
+        print('total_nr_acquired_values ', self.total_nr_acquired_values)
+        print('max_sweep_points ', max_sweep_points)
         self.soft_iteration = int(
             self.total_nr_acquired_values//max_sweep_points)
 

@@ -136,7 +136,7 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
 
 
 def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
-                      cz_pulse_name, cal_points=None,
+                      cz_pulse_name, cal_points=None, prepend_n_cz=0,
                       upload=False, prep_params=dict()):
     '''
     Performs a Ramsey with interleaved Flux pulse
@@ -144,6 +144,7 @@ def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
                    |fluxpulse|
         |X90|  -------------------     |X90|  ---  |RO|
                                      sweep phase
+    Optional: prepend n Flux pulses before starting ramsey
     '''
 
     seq_name = 'Dynamic_phase_seq'
@@ -164,7 +165,9 @@ def dynamic_phase_seq(qb_name, hard_sweep_dict, operation_dict,
 
     ro_pulse = deepcopy(operation_dict['RO ' + qb_name])
 
-    pulse_list = [ge_half_start, flux_pulse, ge_half_end, ro_pulse]
+    pulse_list = [deepcopy(operation_dict[cz_pulse_name])
+                  for _ in range(prepend_n_cz)]
+    pulse_list += [ge_half_start, flux_pulse, ge_half_end, ro_pulse]
     hsl = len(list(hard_sweep_dict.values())[0]['values'])
     if 'amplitude' in flux_pulse:
         param_to_set = 'amplitude'

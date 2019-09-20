@@ -31,6 +31,8 @@ except Exception:
 try:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.\
         UHFQuantumController import UHFQC
+    from pycqed.instrument_drivers.physical_instruments.ZurichInstruments. \
+        dummy_UHFQC import dummy_UHFQC
 except Exception:
     UHFQC = type(None)
 try:
@@ -40,13 +42,15 @@ except Exception:
     ZI_HDAWG8 = type(None)
 log = logging.getLogger(__name__)
 
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments. \
+        dummy_UHFQC import dummy_UHFQC
 
 class UHFQCPulsar:
     """
     Defines the Zurich Instruments UHFQC specific functionality for the Pulsar
     class
     """
-    _supportedAWGtypes = (UHFQC,)
+    _supportedAWGtypes = (UHFQC, dummy_UHFQC)
     
     _uhf_sequence_string_template = (
         "const WINT_EN   = 0x01ff0000;\n"
@@ -803,7 +807,7 @@ class AWG5014Pulsar:
             maxlen = max(maxlen, 256)
 
             wfname_l.append([])
-            for grp in [f'ch{i}' for i in range(4)]:
+            for grp in [f'ch{i + 1}' for i in range(4)]:
                 wave = (chid_to_hash.get(grp, None),
                         chid_to_hash.get(grp + 'm1', None), 
                         chid_to_hash.get(grp + 'm2', None))
@@ -812,7 +816,7 @@ class AWG5014Pulsar:
                 grp_wfs = [np.pad(waveforms.get(h, [0]), 
                                   (0, maxlen - len(waveforms.get(h, [0]))), 
                                   'constant', constant_values=0) for h in wave]
-                packed_waveforms[wfname] = obj.pack_waveform(*wfs)
+                packed_waveforms[wfname] = obj.pack_waveform(*grp_wfs)
                 wfname_l[-1].append(wfname)
                 if any([wf[0] != 0 for wf in grp_wfs]):
                     log.warning(f'Element {element} starts with non-zero ' 
@@ -832,7 +836,8 @@ class AWG5014Pulsar:
         logic_jump_l = [0] * len(wfname_l)
 
         filename = 'pycqed_pulsar.awg'
-        awg_file = obj.generate_awg_file(packed_waveforms, np.array(wfname_l),
+
+        awg_file = obj.generate_awg_file(packed_waveforms, np.array(wfname_l).transpose().copy(),
                                          nrep_l, wait_l, goto_l, logic_jump_l,
                                          self._awg5014_chan_cfg(obj.name))
         obj.send_awg_file(filename, awg_file)
@@ -846,7 +851,7 @@ class AWG5014Pulsar:
         obj.is_awg_ready()
 
         for grp in ['ch1', 'ch2', 'ch3', 'ch4']:
-            obj.set('{}_state'.format(grp), grp_has_waveforms[grp])
+            obj.set('{}_state'.format(grp), 1*grp_has_waveforms[grp])
 
         hardware_offsets = 0
         for grp in ['ch1', 'ch2', 'ch3', 'ch4']:
@@ -889,12 +894,12 @@ class AWG5014Pulsar:
             if self.get('{}_awg'.format(channel)) != awg:
                 continue
             cid = self.get('{}_id'.format(channel))
-            amp = self.get('{}_amp'.format(channel)) * 2
+            amp = self.get('{}_amp'.format(channel))
             off = self.get('{}_offset'.format(channel))
             if self.get('{}_type'.format(channel)) == 'analog':
                 offset_mode = self.get('{}_offset_mode'.format(channel))
                 channel_cfg['ANALOG_METHOD_' + cid[2]] = 1
-                channel_cfg['ANALOG_AMPLITUDE_' + cid[2]] = amp
+                channel_cfg['ANALOG_AMPLITUDE_' + cid[2]] = amp * 2
                 if offset_mode == 'software':
                     channel_cfg['ANALOG_OFFSET_' + cid[2]] = off
                     channel_cfg['DC_OUTPUT_LEVEL_' + cid[2]] = 0

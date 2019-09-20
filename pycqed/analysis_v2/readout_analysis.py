@@ -8,33 +8,30 @@ This includes
 Originally written by Adriaan, updated/rewritten by Rene May 2018
 """
 import itertools
+import logging
+log = logging.getLogger(__name__)
+from collections import OrderedDict
 from copy import deepcopy
 
-import matplotlib.pyplot as plt
-import matplotlib.colors as mc
 import lmfit
-import logging
-import itertools
-from collections import OrderedDict
+import matplotlib.colors as mc
+import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.mixture import GaussianMixture as GM
-from sklearn.tree import DecisionTreeClassifier as DTC
-from sklearn.metrics import confusion_matrix
-
-import pycqed.analysis.fitting_models as fit_mods
-from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, \
-    gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
-import pycqed.analysis.analysis_toolbox as a_tools
-import pycqed.analysis_v2.base_analysis as ba
-from scipy.optimize import minimize
-from pycqed.analysis.tools.plotting import SI_val_to_msg_str
-import pycqed.analysis.tools.data_manipulation as dm_tools
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
-from pycqed.utilities.general import int2base
-
 from matplotlib import gridspec
 from matplotlib.colors import LinearSegmentedColormap as lscmap
+from scipy.optimize import minimize
+from sklearn.metrics import confusion_matrix
+from sklearn.mixture import GaussianMixture as GM
+from sklearn.tree import DecisionTreeClassifier as DTC
 
+import pycqed.analysis.analysis_toolbox as a_tools
+import pycqed.analysis.tools.data_manipulation as dm_tools
+import pycqed.analysis_v2.base_analysis as ba
+from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, gaussian_2D, \
+gauss_2D_guess, \
+    gaussianCDF, ro_double_gauss_guess
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from pycqed.analysis.tools.plotting import set_xlabel
 
 odict = OrderedDict
 
@@ -1028,7 +1025,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                          color="white" if fm[i, j] > thresh else "black")
         plt.tight_layout()
         ax.set_ylabel('Prepared State')
-        ax.set_xlabel('Predicted State\n$\mathcal{{F}}_{{avg}}$={:0.2f} %'
+        ax.set_xlabel('Assigned State\n$\mathcal{{F}}_{{avg}}$={:0.2f} %'
                       .format(fidelity_avg * 100))
         if show:
             plt.show()
@@ -1042,27 +1039,53 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                         for i in tree_.feature]
         if class_names is None:
             class_names = np.arange(len(tree_.value[0]))
-        thresholds, mapping = dict(), dict()
+        thresholds, mapping = OrderedDict(), dict()
 
-        def recurse(node, thresholds_final, loc, mapping):
+        def recurse(node, thresholds_final, loc, mapping, feature_depth_path):
+            name = feature_name[node]
+            feature_depth_path = feature_depth_path.copy() + \
+                                 [tree_.feature[node]]
+
             if tree_.feature[node] != -2:
-                name = feature_name[node]
                 threshold = tree_.threshold[node]
                 if not name in thresholds_final.keys():
                     thresholds_final[name] = threshold
                 recurse(tree_.children_left[node], thresholds_final,
-                        loc + [0], mapping)
+                        loc + [0], mapping, feature_depth_path)
                 recurse(tree_.children_right[node], thresholds_final,
-                        loc + [1], mapping)
+                        loc + [1], mapping, feature_depth_path)
             else:
-                mapping[tuple(loc)] = class_names[np.argmax(tree_.value[node])]
+                print(loc, tree_.value[node], feature_depth_path)
+                if len(loc) < tree_.n_features:
+                    log.warning(
+                        "Location < n_features, threshold mapping might not be "
+                        "correct")
+                    for l in itertools.combinations_with_replacement(
+                            [0, 1], tree_.n_features - len(loc)):
+                        loc_full = loc + list(l)
 
-        recurse(0, thresholds, [], mapping)
+                        mapping[tuple(
+                            [loc_full[i]
+                             for i in np.argsort(feature_depth_path[:-1])])] = \
+                                class_names[np.argmax(tree_.value[node])]
 
-        #translate keys to codeword index format
+                else:
+                    # swap if first threshold is on axis 1
+                    # FIXME: will work only when 2 integration units are used
+                    if list(thresholds_final.keys())[0] == 1:
+                        loc = list(reversed(loc))
+                    mapping[tuple(loc)] = class_names[np.argmax(tree_.value[node])]
+                    log.debug(mapping)
+
+        recurse(0, thresholds, [], mapping, feature_depth_path=[])
+
+        # translate keys to codeword index format
         mapping = {Singleshot_Readout_Analysis_Qutrit._to_codeword_idx(k): v
                    for k, v in mapping.items()}
-
+        if len(mapping) < 2 ** tree_clf.max_depth:
+            log.warning(f"threshold mapping is of length {len(mapping)} "
+                        f"instead of expected  length "
+                        f"{2 ** tree_clf.max_depth}. Mapping may be incorrect.")
         return thresholds, mapping
 
     @staticmethod
@@ -1176,6 +1199,63 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         xx, yy = make_meshgrid(X0, X1)
         plot_contours(ax, clf, xx, yy, cmap=cmap, alpha=0.3)
 
+    @staticmethod
+    def plot_std(mean, cov, ax, n_std=1.0, facecolor='none', **kwargs):
+        """
+        Create a plot of the covariance confidence ellipse of `x` and `y`
+
+        Parameters
+        ----------
+        x, y : array_like, shape (n, )
+            Input data.
+
+        ax : matplotlib.axes.Axes
+            The axes object to draw the ellipse into.
+
+        n_std : float
+            The number of standard deviations to determine the ellipse's radiuses.
+
+        Returns
+        -------
+        matplotlib.patches.Ellipse
+
+        Other parameters
+        ----------------
+        kwargs : `~matplotlib.patches.Patch` properties
+        """
+        from matplotlib.patches import Ellipse
+        import matplotlib.transforms as transforms
+
+        pearson = cov[0, 1] / np.sqrt(cov[0, 0] * cov[1, 1])
+        # Using a special case to obtain the eigenvalues of this
+        # two-dimensionl dataset.
+        ell_radius_x = 1#np.sqrt(1 + pearson)
+        ell_radius_y = 1# np.sqrt(1 - pearson)
+        print(ell_radius_x)
+        ellipse = Ellipse((0, 0),
+                          width=ell_radius_x * 2,
+                          height=ell_radius_y * 2,
+                          facecolor=facecolor,
+                          **kwargs)
+
+        # Calculating the stdandard deviation of x from
+        # the squareroot of the variance and multiplying
+        # with the given number of standard deviations.
+        scale_x = np.sqrt(cov[0, 0]) * n_std
+        mean_x = np.mean(mean[0])
+
+        # calculating the stdandard deviation of y ...
+        scale_y = np.sqrt(cov[1, 1]) * n_std
+        mean_y = np.mean(mean[1])
+
+        transf = transforms.Affine2D() \
+            .rotate_deg(45) \
+            .scale(scale_x, scale_y) \
+            .translate(mean_x, mean_y)
+
+        ellipse.set_transform(transf + ax.transData)
+        return ax.add_patch(ellipse)
+
     def prepare_plots(self):
         cmap = plt.get_cmap('tab10')
         tab_x = a_tools.truncate_colormap(cmap, 0, len(self.levels)/10)
@@ -1216,6 +1296,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                           label="threshold i.u. {}: {:.5f}".format(k, thres),
                           color='k', linestyle="--")
                 main_ax.legend(loc=[0.2,-0.62])
+
             self.figs['{}_classifier_{}'.format(self.classif_method, dk)] = fig
         if show:
             plt.show()
@@ -1445,7 +1526,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         cdict = {'red':   [(v[i], c[i][0], c[i][0]) for i in range(len(v))],
                  'green': [(v[i], c[i][1], c[i][1]) for i in range(len(v))],
                  'blue':  [(v[i], c[i][2], c[i][2]) for i in range(len(v))]}
-        cm = lscmap('customcmap', cdict)
+        cm = mc.LinearSegmentedColormap('customcmap', cdict)
 
         if only_odd:
             ylist = list(range(int(self.n_readouts/2)))
@@ -1780,6 +1861,7 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
                                              self.preselection_available)
 
         self.observables = options_dict.get('observables', None)
+
         if self.observables is None:
             combination_list = list(itertools.product([False, True],
                                                       repeat=len(qubits)))
