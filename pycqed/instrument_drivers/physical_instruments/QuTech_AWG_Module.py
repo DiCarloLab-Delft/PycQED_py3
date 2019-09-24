@@ -299,7 +299,7 @@ class QuTech_AWG_Module(SCPI):
     # AWG5014 functions: WLIST (Waveform list)
     ##########################################################################
 
-    # FIXME: disaled, but supported by QWG
+    # FIXME: disabled, but supported by QWG
     # def getWlistSize(self):
     #     return self.ask_int('wlist:size?')
 
@@ -382,7 +382,7 @@ class QuTech_AWG_Module(SCPI):
 
         Args:
             name (string): waveform name excluding double quotes, e.g. 'test'.
-            Must already exits in AWG
+            Must already exist in AWG
 
             waveform (np.array of float)): vector defining the waveform,
             normalized between -1.0 and 1.0
@@ -681,7 +681,7 @@ class QuTech_AWG_Module(SCPI):
     # QCoDeS parameter definitions
     ##########################################################################
 
-    def _add_codeword_parameters(self):
+    def _add_codeword_parameters(self, add_extra: bool=True):
         self.add_parameter(
             'codeword_protocol',
             unit='',
@@ -690,15 +690,6 @@ class QuTech_AWG_Module(SCPI):
             set_cmd=self._setCodewordProtocol,
             vals=vals.Enum('MICROWAVE', 'FLUX', 'MICROWAVE_NO_VSM'),
             docstring=_codeword_protocol_doc + '\nEffective immediately when sent')
-
-        self.add_parameter(
-            'get_max_codeword_bits',
-            unit='',
-            label='Max codeword bits',
-            get_cmd=self._nr_cw_bits_cmd,
-            vals=vals.Strings(),
-            get_parser=int,
-            docstring='Reads the maximum number of codeword bits for all channels')
 
         docst = 'Specifies a waveform for a specific codeword. \n' \
                 'The channel number corresponds' \
@@ -721,7 +712,17 @@ class QuTech_AWG_Module(SCPI):
                 # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(parname)
 
-    def _add_dio_parameters(self):
+        if add_extra:
+            self.add_parameter(
+                'get_max_codeword_bits',
+                unit='',
+                label='Max codeword bits',
+                get_cmd=self._nr_cw_bits_cmd,
+                vals=vals.Strings(),
+                get_parser=int,
+                docstring='Reads the maximum number of codeword bits for all channels')
+
+    def _add_dio_parameters(self, add_extra: bool=True):
         self.add_parameter(
             'dio_mode',
             unit='',
@@ -757,48 +758,49 @@ class QuTech_AWG_Module(SCPI):
                       'Effective immediately when sent' # FIXME: no way, not a HandshakeParameter
             )
 
-        self.add_parameter(
-            'dio_suitable_indexes',
-            unit='',
-            label='DIO suitable indexes',
-            get_cmd='DIO:INDexes?',
-            get_parser=self._int_to_array,
-            docstring='Get DIO all suitable indexes\n'
-                      '\t- The array is ordered by most preferable index first\n'
-            )
+        if add_extra:
+            self.add_parameter(
+                'dio_suitable_indexes',
+                unit='',
+                label='DIO suitable indexes',
+                get_cmd='DIO:INDexes?',
+                get_parser=self._int_to_array,
+                docstring='Get DIO all suitable indexes\n'
+                          '\t- The array is ordered by most preferable index first\n'
+                )
 
-        self.add_parameter(
-            'dio_calibrated_inputs',
-            unit='',
-            label='DIO calibrated inputs',
-            get_cmd='DIO:INPutscalibrated?',
-            get_parser=int,
-            docstring='Get all DIO inputs which are calibrated\n'
-            )
+            self.add_parameter(
+                'dio_calibrated_inputs',
+                unit='',
+                label='DIO calibrated inputs',
+                get_cmd='DIO:INPutscalibrated?',
+                get_parser=int,
+                docstring='Get all DIO inputs which are calibrated\n'
+                )
 
-        self.add_parameter(
-            'dio_lvds',
-            unit='bool',
-            label='LVDS DIO connection detected',
-            get_cmd='DIO:LVDS?',
-            val_mapping={True: '1', False: '0'},
-            docstring='Get the DIO LVDS connection status.\n'
-                     'Result:\n'
-                     '\tTrue: Cable detected\n'
-                     '\tFalse: No cable detected'
-            )
+            self.add_parameter(
+                'dio_lvds',
+                unit='bool',
+                label='LVDS DIO connection detected',
+                get_cmd='DIO:LVDS?',
+                val_mapping={True: '1', False: '0'},
+                docstring='Get the DIO LVDS connection status.\n'
+                         'Result:\n'
+                         '\tTrue: Cable detected\n'
+                         '\tFalse: No cable detected'
+                )
 
-        self.add_parameter(
-            'dio_interboard',
-            unit='bool',
-            label='DIO interboard detected',
-            get_cmd='DIO:IB?',
-            val_mapping={True: '1', False: '0'},
-            docstring='Get the DIO interboard status.\n'
-                     'Result:\n'
-                     '\tTrue:  To master interboard connection detected\n'
-                     '\tFalse: No interboard connection detected'
-            )
+            self.add_parameter(
+                'dio_interboard',
+                unit='bool',
+                label='DIO interboard detected',
+                get_cmd='DIO:IB?',
+                val_mapping={True: '1', False: '0'},
+                docstring='Get the DIO interboard status.\n'
+                         'Result:\n'
+                         '\tTrue:  To master interboard connection detected\n'
+                         '\tFalse: No interboard connection detected'
+                )
 
     # parameters not used in normal lab setup
     def _add_extra_parameters(self):

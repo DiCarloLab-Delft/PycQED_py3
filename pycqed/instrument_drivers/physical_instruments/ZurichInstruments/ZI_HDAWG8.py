@@ -382,6 +382,8 @@ while (1) {
                 shift = dio_mode[awg_nr]
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), shift)
                 # FIXME: flux mode sets mask
+                # FIXME: check _num_codewords against mode
+                # FIXME: derive amp vs direct mode from dio_mode_list
             else:
                 if self.cfg_codeword_protocol() == 'identical':
                     # In the identical protocol all bits are used to trigger
