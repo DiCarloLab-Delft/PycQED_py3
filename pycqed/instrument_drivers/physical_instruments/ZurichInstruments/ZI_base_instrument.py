@@ -1329,7 +1329,8 @@ class ZI_base_instrument(Instrument):
 
         self.check_errors()
 
-    def close(self) -> None:
+    # FIXME: temporary solution for issue
+    def FIXMEclose(self) -> None:
         try:
             if self._is_device_connected(self.devname):
                 # Stop all AWG's. In case errors are flagged we demote them

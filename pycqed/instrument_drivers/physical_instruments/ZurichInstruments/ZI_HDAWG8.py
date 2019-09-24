@@ -67,6 +67,7 @@ Changelog:
 - removed duplicates from __init__
 - cleanup
 - changed _configure_codeword_protocol() to use table of modes
+- split off calibrate_dio_protocol from calibrate_CC_dio_protocol for use with CC
 
 """
 
@@ -543,14 +544,14 @@ while (1) {
 
         return False
 
-    def _find_valid_delays(self, awgs_and_sequences, repetitions=1, verbose=False):
+    def _find_valid_delays(self, awgs_and_sequences, repetitions=1, verbose=False):  # FIXME: repetitions unused
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
         if verbose: print("  Finding valid delays")
-        valid_delays= []
+        valid_delays = []
         for delay in range(16):
-            if verbose: print('   Testing delay {}'.format(delay))
+            if verbose: print(f'   Testing delay {delay}')
             self.setd('raw/dios/0/delays/*/value', delay)
             time.sleep(1)
             valid_sequence = True
@@ -562,8 +563,8 @@ while (1) {
                     for n, cw in enumerate(cws):
                         if n == 0:
                             if cw not in sequence:
-                                if verbose: print("WARNING: Codeword {} with value {} not in expected sequence {}!".format(n, cw, sequence))
-                                if verbose: print("Detected codeword sequence: {}".format(cws))
+                                if verbose: print(f"WARNING: Codeword {n} with value {cw} not in expected sequence {sequence}!")
+                                if verbose: print(f"Detected codeword sequence: {cws}")
                                 valid_sequence = False
                                 break
                             else:
@@ -572,8 +573,8 @@ while (1) {
                             last_index = index
                             index = (index + 1) % len(sequence)
                             if cw != sequence[index]:
-                                if verbose: print("WARNING: Codeword {} with value {} not expected to follow codeword {} in expected sequence {}!".format(n, cw, sequence[last_index], sequence))
-                                if verbose: print("Detected codeword sequence: {}".format(cws))
+                                if verbose: print(f"WARNING: Codeword {n} with value {cw} not expected to follow codeword {sequence[last_index]} in expected sequence {sequence}!")
+                                if verbose: print(f"Detected codeword sequence: {cws}")
                                 valid_sequence = False
                                 break
                 else:
@@ -714,7 +715,6 @@ while (1) {
         CCL.start()
         return expected_sequence
 
-
     def calibrate_CC_dio_protocol(self, CC, verbose=False, repetitions=1):
         """
         Calibrates the DIO communication between CC and HDAWG.
@@ -734,7 +734,11 @@ while (1) {
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
+        self.calibrate_dio_protocol(expected_sequence, verbose, repetitions)
+        # If successful return True
+        return True
 
+    def calibrate_dio_protocol(self, expected_sequence, verbose=False, repetitions=1) -> None:
         # Make sure the configuration is up-to-date
         self.assure_ext_clock()
         self.upload_codeword_program()
@@ -746,15 +750,11 @@ while (1) {
         valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
         if len(valid_delays) == 0:
             raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
-            return
-
         min_valid_delay = min(valid_delays)
 
         # Print information
-        if verbose: print("  Valid delays are {}".format(valid_delays))
-        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+        if verbose: print(f"  Valid delays are {valid_delays}")
+        if verbose: print(f"  Setting delay to {min_valid_delay}")
 
         # And configure the delays
         self.setd('raw/dios/0/delays/*', min_valid_delay)
-        # If succesful return True
-        return True

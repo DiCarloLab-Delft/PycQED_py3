@@ -308,6 +308,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
     # 'private' functions, internal to the driver
     ##########################################################################
 
+    # FIXME: no longer used
     def _set_dio_delay(self, delay):
         """
         The function sets the DIO delay for the instrument. The valid delay range is

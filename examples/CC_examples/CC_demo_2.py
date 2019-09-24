@@ -178,24 +178,37 @@ for i, dev in enumerate(conf.mw):
 
     # set DIO protocol
     instr.mw[i].cfg_codeword_protocol.set('microwave')
-    instr.mw[i].upload_codeword_program()
-    if 0:   # FIXME: should be moved to driver
-        instr.mw[i]._dev.setd('raw/dios/0/extclk', 1)  # enable 50 MHz sampling of DIO inputs
-        for awg in range(4):
-            instr.mw[i].set('awgs_{}_dio_strobe_slope'.format(awg), 0)  # disable strobe triggering
+    instr.mw[i].upload_codeword_program()  # FIXME: also done by calibrate_dio_protocol?
 
-    # AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
+    if 1:  # DIO calibration
+        sequence_length = 32
+        staircase_sequence = range(1, sequence_length)
+        expected_sequence = [
+            (0, list(reversed(staircase_sequence))),
+            (1, list(reversed(staircase_sequence))),
+            (2, list(reversed(staircase_sequence))),
+            (3, list(reversed(staircase_sequence)))]
 
-    if 0:
-        delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
-        for awg in range(4):
-            instr.mw[i]._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)  # skew TOGGLE_DS versus rest
-    else:
-        delay = 0  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
-        instr.mw[i].setd('raw/dios/0/delays/*/value', delay)  # new interface?, range [0:15]
-        for awg in range(4):
-            dio_timing_errors = instr.mw[i].geti('awgs/{}/dio/error/timing'.format(awg))
-            log.debug('DIO timing errors on AWG {}: {}'.format(awg,dio_timing_errors))
+        instr.mw[i].plot_dio_snapshot()
+
+        try:
+            instr.mw[i].calibrate_dio_protocol(expected_sequence, verbose=True)
+        except:
+            log.warning('calibrate_dio_protocol raised exception')
+            instr.mw[i].plot_dio_snapshot()
+            raise
+
+    if 0:  # manual DIO delay
+        if 0:
+            delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
+            for awg in range(4):
+                instr.mw[i]._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)  # skew TOGGLE_DS versus rest
+        else:
+            delay = 0  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
+            instr.mw[i].setd('raw/dios/0/delays/*/value', delay)  # new interface?, range [0:15]
+            for awg in range(4):
+                dio_timing_errors = instr.mw[i].geti('awgs/{}/dio/error/timing'.format(awg))
+                log.debug('DIO timing errors on AWG {}: {}'.format(awg,dio_timing_errors))
 
     instr.mw[i].start()
 
