@@ -331,7 +331,7 @@ while (1) {
         """
         # Check overall configuration
         if self.system_awg_channelgrouping() != 0:
-            log.warning('{}: Instrument not in 4 x 2 channel mode! Switching...'.format(self.devname))
+            log.warning(f'{self.devname}: Instrument not in 4 x 2 channel mode! Switching...')
             self.system_awg_channelgrouping(0)
             self.sync()
 
@@ -498,11 +498,11 @@ while (1) {
             cw[n] = (d & ((1 << 10)-1))
         return (ts, cw)
 
-    def _ensure_activity(self, awg_nr, mask_value=None, timeout=5, verbose=False):
+    def _ensure_activity(self, awg_nr, mask_value=None, timeout=5):
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
-        if verbose: print("Testing DIO activity for AWG {}".format(awg_nr))
+        log.info(f"{self.devname}: Testing DIO activity for AWG {awg_nr}")
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
@@ -530,15 +530,15 @@ while (1) {
                 strb_activity |= (d & strb_mask)
 
             if cw_activity != cw_mask:
-                print("Did not see all codeword bits toggle! Got 0x{:08x}, expected 0x{:08x}.".format(cw_activity, cw_mask))
+                log.warning(f"{self.devname}: Did not see all codeword bits toggle! Got 0x{cw_activity:08x}, expected 0x{cw_mask:08x}.")
                 valid = False
 
             if vld_polarity != 0 and vld_activity != vld_mask:
-                print("Did not see valid bit toggle!")
+                log.warning(f"{self.devname}: Did not see valid bit toggle!")
                 valid = False
 
             if strb_slope != 0 and strb_activity != strb_mask:
-                print("Did not see valid bit toggle!")
+                log.warning(f"{self.devname}: Did not see strobe bit toggle!")
                 valid = False
 
             if valid:
@@ -552,7 +552,7 @@ while (1) {
         codewords are sampled incorrectly."""
         if verbose: print("  Finding valid delays")
         valid_delays = []
-        for delay in range(16):
+        for delay in range(16):  # FIXME: limit to 6 (which seems to be 20 ns), higher values give more latency, but a similar pattern in timing violations
             if verbose: print(f'   Testing delay {delay}')
             self.setd('raw/dios/0/delays/*/value', delay)
             time.sleep(1)
@@ -565,7 +565,7 @@ while (1) {
                     for n, cw in enumerate(cws):
                         if n == 0:
                             if cw not in sequence:
-                                if verbose: print(f"WARNING: Codeword {n} with value {cw} not in expected sequence {sequence}!")
+                                log.warning(f"{self.devname} AWG {awg}: Codeword {n} with value {cw} not in expected sequence {sequence}!")
                                 if verbose: print(f"Detected codeword sequence: {cws}")
                                 valid_sequence = False
                                 break
@@ -575,7 +575,7 @@ while (1) {
                             last_index = index
                             index = (index + 1) % len(sequence)
                             if cw != sequence[index]:
-                                if verbose: print(f"WARNING: Codeword {n} with value {cw} not expected to follow codeword {sequence[last_index]} in expected sequence {sequence}!")
+                                log.warning(f"{self.devname} AWG {awg}: Codeword {n} with value {cw} not expected to follow codeword {sequence[last_index]} in expected sequence {sequence}!")
                                 if verbose: print(f"Detected codeword sequence: {cws}")
                                 valid_sequence = False
                                 break
@@ -746,7 +746,7 @@ while (1) {
         self.upload_codeword_program()
 
         for awg, sequence in expected_sequence:
-            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence), verbose=verbose):
+            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence)):
                 raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
         valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
@@ -755,8 +755,8 @@ while (1) {
         min_valid_delay = min(valid_delays)
 
         # Print information
-        if verbose: print(f"  Valid delays are {valid_delays}")
-        if verbose: print(f"  Setting delay to {min_valid_delay}")
+        log.info(f"{self.devname}: Valid delays are {valid_delays}")
+        log.info(f"{self.devname}: Setting delay to {min_valid_delay}")  # FIXME: choose center of valid area iso min?
 
         # And configure the delays
         self.setd('raw/dios/0/delays/*', min_valid_delay)

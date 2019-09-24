@@ -150,6 +150,7 @@ instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
 instr.cc.reset()
 instr.cc.clear_status()
 instr.cc.status_preset()
+log.debug('connected to CC, set to defaults')
 
 ##########################################
 # Open virtual instruments
@@ -184,18 +185,39 @@ for i, dev in enumerate(conf.mw):
         sequence_length = 32
         staircase_sequence = range(1, sequence_length)
         expected_sequence = [
-            (0, list(reversed(staircase_sequence))),
-            (1, list(reversed(staircase_sequence))),
+            (0, list(staircase_sequence)),
+            (1, list(staircase_sequence)),
             (2, list(reversed(staircase_sequence))),
             (3, list(reversed(staircase_sequence)))]
 
-        instr.mw[i].plot_dio_snapshot()
+        cc_prog = """
+# staircase program for HDAWG microwave mode, CW_1 31->1, CW_2 1->31
+.DEF        cw_31_01        0x80003E01      # TRIG=1(0x80000000), CW_1=31(0x00003E00), CW_2=1(0x00000001)
+.DEF        incr            0xFFFFFE01      # CW_1--, CW_2++
+.DEF        duration        4
+repeat:     move            $cw_31_01,R0
+            move            31,R1           # loop counter
+inner:      seq_out         R0,$duration
+            add             R0,$incr,R0
+            loop            R1,@inner
+            jmp             @repeat
+"""
+        log.debug('uploading DIO calibration program to CC')
+        instr.cc.sequence_program(cc_prog)
+        log.debug("printing CC errors")
+        err_cnt = instr.cc.get_system_error_count()
+        if err_cnt > 0:
+            log.warning('CC status after upload')
+        for i in range(err_cnt):
+            print(instr.cc.get_error())
+        instr.cc.start()
+        log.debug('starting CC')
 
         try:
             instr.mw[i].calibrate_dio_protocol(expected_sequence, verbose=True)
         except:
             log.warning('calibrate_dio_protocol raised exception')
-            instr.mw[i].plot_dio_snapshot()
+            # instr.mw[i].plot_dio_snapshot()
             raise
 
     if 0:  # manual DIO delay
