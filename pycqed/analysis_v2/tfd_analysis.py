@@ -14,7 +14,7 @@ from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
 import pycqed.measurement.hdf5_data as h5d
 
 
-class TFD_3CZ_Analysis(ba.BaseDataAnalysis):
+class TFD_3CZ_Analysis_Pauli_Strings(ba.BaseDataAnalysis):
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
                  g: float = 1, T: float = 1,
@@ -145,7 +145,7 @@ class TFD_3CZ_Analysis(ba.BaseDataAnalysis):
             **self.proc_data_dict['energy_terms']}
 
     def prepare_plots(self):
-        self.plot_dicts['pauli_operators'] = {
+        self.plot_dicts['pauli_operators_Strings'] = {
             'plotfn': plot_pauli_ops,
             'pauli_terms': self.proc_data_dict['pauli_terms'],
             'energy_terms': self.proc_data_dict['energy_terms']
@@ -178,12 +178,12 @@ def calc_tfd_hamiltonian(pauli_terms: dict, g: float = 1, T=1):
         H_AB = (Z_1^A * Z_1^B)+(Z_2^A * Z_2^B) + (X_1^A* X_1^B)+(X_2^A * X_2^B)
         <H_AB>  = ZIZI + IZIZ + XIXI + IXIX
     """
-    H_A = pauli_terms['ZZII'] + g*pauli_terms['XIII'] + g*pauli_terms['IXII']
-    H_B = pauli_terms['IIZZ'] + g*pauli_terms['IIXI'] + g*pauli_terms['IIIX']
+    H_A = 1.57*pauli_terms['ZZII'] + g*pauli_terms['XIII'] + g*pauli_terms['IXII']
+    H_B = 1.57*pauli_terms['IIZZ'] + g*pauli_terms['IIXI'] + g*pauli_terms['IIIX']
     H_AB = pauli_terms['ZIZI'] + pauli_terms['IZIZ'] + \
         pauli_terms['XIXI'] + pauli_terms['IXIX']
 
-    H = H_A + H_B - T*H_AB
+    H = H_A + H_B - (T**1.57)*H_AB
 
     return {'H': H, 'H_A': H_A, 'H_B': H_B, 'H_AB': H_AB}
 
