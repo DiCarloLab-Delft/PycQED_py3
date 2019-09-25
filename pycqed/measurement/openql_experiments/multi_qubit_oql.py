@@ -662,6 +662,7 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
 
 def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
             buffer_time, buffer_time2, flux_cw: int, platf_cfg: str,
+            measure_parked_qubit: bool = False,
             target_qubit_sequence: str='ramsey', cc: str='CCL'):
     """
     Writes output files to the directory specified in openql.
@@ -672,7 +673,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
         qubit_idx_spec: int specifying the spectator qubit
         buffer_time   :
         buffer_time2  :
-
+        measure_parked_qubit (bool): Whether we set a measurement on the parked qubit
         platf_cfg:      filename of the platform config file
         target_qubit_sequence: selects whether to run a ramsey sequence on
             a target qubit ('ramsey'), keep it in gorund state ('ground')
@@ -721,12 +722,15 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
     if cc=='CCL':
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         k.gate('fl_cw_{:02}'.format(flux_cw), [2,0])
-        k.gate('fl_cw_06', [qubit_idx_park]) # square pulse
+        if qubit_idx_park is not None:
+            k.gate('fl_cw_06', [qubit_idx_park]) # square pulse
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
     elif cc=='QCC':
         k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+        if qubit_idx_park is not None:
+            k.gate('sf_square', [qubit_idx_park])
+        k.gate("wait", list(np.arange(17)), 20) #alignment workaround
         k.gate('sf_{}'.format(flux_cw_name), [qubit_idx])
-        k.gate('sf_square', [qubit_idx_park])
         k.gate("wait", list(np.arange(17)), 0) #alignment workaround
     else:
         raise ValuerError('CC type not understood: {}'.format(cc))
@@ -738,6 +742,8 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
     # k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
     k.measure(qubit_idx)
     k.measure(qubit_idx_spec)
+    if (qubit_idx_park is not None) and measure_parked_qubit:
+        k.measure(qubit_idx_park)
 
     p.add_kernel(k)
 

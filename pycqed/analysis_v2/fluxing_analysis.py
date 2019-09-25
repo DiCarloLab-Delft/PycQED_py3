@@ -7,11 +7,22 @@ import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from pycqed.analysis.tools.data_manipulation import \
     populations_using_rate_equations
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, plot_fit
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, plot_fit, \
+    make_anglemap, make_segmented_cmap
 import matplotlib.pyplot as plt
 from pycqed.analysis.fitting_models import CosFunc, Cos_guess, \
     avoided_crossing_freq_shift
+from pycqed.analysis_v2.simple_analysis import Basic2DInterpolatedAnalysis
 
+from pycqed.analysis.analysis_toolbox import color_plot
+
+from matplotlib import colors
+from copy import deepcopy
+from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Chevron_Analysis(ba.BaseDataAnalysis):
     def __init__(self, ts: str=None, label=None,
@@ -210,3 +221,81 @@ def plot_chevron_FFT(x, xunit,  fft_freqs, fft_data, freq_fits, freq_fits_std,
     set_ylabel(ax, 'Frequency', 'Hz')
     ax.legend(loc=(1.05, .7))
     ax.text(1.05, 0.5, coupling_msg, transform=ax.transAxes)
+
+
+class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
+    """
+    Write some docstring explaining what we analyze 
+    """
+    def __init__(self,
+                t_start: str = None,
+                t_stop: str = None,
+                label: str = '',
+                data_file_path: str = None,
+                close_figs: bool = True,
+                options_dict: dict = None,
+                extract_only: bool = False,
+                do_fitting: bool = False,
+                auto: bool= True,
+                interp_method='linear',
+                testpar: str = 'viridis'):
+        super().__init__(
+                t_start = t_start,
+                t_stop = t_stop,
+                label = label,
+                data_file_path = data_file_path,
+                close_figs = close_figs,
+                options_dict = options_dict,
+                extract_only = extract_only,
+                do_fitting = do_fitting,
+                auto = auto,
+                interp_method = interp_method)
+        
+        self.testpar = testpar
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+        super().prepare_plots()
+        anglemap = make_anglemap()
+        for i, val_name in enumerate(self.proc_data_dict['value_names']):
+
+            zlabel = '{} ({})'.format(val_name,
+                                      self.proc_data_dict['value_units'][i])
+            self.plot_dicts[val_name] = {
+                'plotfn': color_plot,
+                'x': self.proc_data_dict['x_int'],
+                'y': self.proc_data_dict['y_int'],
+                'z': self.proc_data_dict['interpolated_values'][i],
+                'xlabel': self.proc_data_dict['xlabel'],
+                'x_unit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['ylabel'],
+                'y_unit': self.proc_data_dict['yunit'],
+                'zlabel': zlabel,
+                'title': '{}\n{}'.format(
+                    self.timestamp, self.proc_data_dict['measurementstring'])
+                }
+            if self.proc_data_dict['value_units'][i] == 'deg':
+                self.plot_dicts[val_name]['cmap_chosen'] = anglemap
+
+            if self.proc_data_dict['value_names'][i] in {'L1', 'missing fraction', 
+                    'offset difference'}:
+                self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
+
+    def process_data(self):
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+
+        self.proc_data_dict['interpolated_values'] = []
+        for i in range(len(self.proc_data_dict['value_names'])):
+            if self.proc_data_dict['value_units'][i] == 'deg':
+                interp_method = 'deg'
+            else:
+                interp_method = self.interp_method
+
+            x_int, y_int, z_int = interpolate_heatmap(
+                self.proc_data_dict['x'],
+                self.proc_data_dict['y'],
+                self.proc_data_dict['measured_values'][i],
+                interp_method= interp_method)
+            self.proc_data_dict['interpolated_values'].append(z_int)
+        self.proc_data_dict['x_int'] = x_int
+        self.proc_data_dict['y_int'] = y_int

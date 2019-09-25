@@ -4,10 +4,11 @@ import qutip as qtp
 import scipy
 import time
 import logging
+logger = logging.getLogger(__name__)
+
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 np.set_printoptions(threshold=np.inf)
-
 
 # Hardcoded number of levels for the two transmons.
 # Currently only 3,3 or 4,3 are supported. The bottleneck is the function 
@@ -186,7 +187,7 @@ def calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ):
     alpha_q0=fluxlutman.calc_amp_to_freq(amp,'02')-2*w_q0
     alpha_q1=noise_parameters_CZ.alpha_q1()
     w_q0_intpoint=w_q1-alpha_q0
-    J=fluxlutman.q_J2()/np.sqrt(2)
+    J=fluxlutman.q_J2_NE()/np.sqrt(2)
     w_bus=noise_parameters_CZ.w_bus()
 
     delta_q1=w_q1-w_bus
@@ -262,7 +263,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
         rate_02_scaling = 4
         rate_12_scaling = 0
     else:
-        logging.warning('Unsupported rescaling of Tphi_02.')
+        logger.warning('Unsupported rescaling of Tphi_02.')
 
 
     if Tphi01_q1 != 0:                                 
@@ -804,7 +805,7 @@ def distort_amplitude(fitted_stepresponse_ty,amp,tlist_new,sim_step_new):
 
 def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,noise_parameters_CZ):
     
-    if not fluxlutman.czd_double_sided():
+    if not fluxlutman.czd_double_sided_NE():
         omega_0 = compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot())
 
         f_pulse = fluxlutman.calc_amp_to_freq(amp_final,'01')
@@ -927,17 +928,19 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
     else:
         S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S
 
+    logger.debug('\nBefore change q_freq_10_NE {before}\n'.format(before=fluxlutman.q_freq_10_NE()))
 
-    w_q1 = fluxlutman.q_freq_10()    # we 'save' the input value of w_q1
+    w_q1 = fluxlutman.q_freq_10_NE()    # we 'save' the input value of w_q1
     w_q1_sweetspot = noise_parameters_CZ.w_q1_sweetspot()
+    logger.debug('\nw_q1_sweetspot = {}\n'.format(w_q1_sweetspot))
     if w_q1 > w_q1_sweetspot:
         print('operating frequency of q1 should be lower than its sweet spot frequency.')
         w_q1 = w_q1_sweetspot
 
     w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
 
-    fluxlutman.q_freq_10(w_q1_biased)     # we insert the change to w_q1 in this way because then J1 is also tuned appropriately
-
+    fluxlutman.q_freq_10_NE(w_q1_biased)     # we insert the change to w_q1 in this way because then J1 is also tuned appropriately
+    logger.debug('\nChanged q_freq_10_NE {before} -> {after}\n'.format(before=w_q1, after=fluxlutman.q_freq_10_NE()))
 
     #t0 = time.time()
 
@@ -963,7 +966,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
     #t1 = time.time()
     #print('\n alternative propagator',t1-t0)
 
-    fluxlutman.q_freq_10(w_q1)
+    fluxlutman.q_freq_10_NE(w_q1)
 
     U_final = exp_L_total    
     return U_final
@@ -998,7 +1001,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
         population_transfer_12_03 = 0
 
 
-    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=fluxlutman.q_freq_10(), 
+    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=fluxlutman.q_freq_10_NE(), 
                                                         alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=noise_parameters_CZ.alpha_q1(), J=0)  # old wrong way
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
@@ -1116,8 +1119,8 @@ def shift_due_to_fluxbias_q0_singlefrequency(f_pulse,omega_0,fluxbias,positive_b
         sign = -1
 
     # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
-    f_pulse_final = f_pulse - np.pi/2 * (omega_0**2/f_pulse) * np.sqrt(1 - (f_pulse**4/omega_0**4)) * sign * fluxbias - \
-                          +np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * fluxbias**2
+    f_pulse_final = f_pulse - np.pi/2 * (omega_0**2/f_pulse) * np.sqrt(1 - (f_pulse**4/omega_0**4)) * sign * fluxbias  \
+                          -np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * fluxbias**2
                           # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
 
     return f_pulse_final
@@ -1239,7 +1242,7 @@ def average_phases(phases,weights):
         else:
             angle = 2*np.pi-angle_temp_cos
     else:
-        logging.warning('Something wrong with averaging the phases.')
+        logger.warning('Something wrong with averaging the phases.')
     return np.rad2deg(angle) % 360
 
 
@@ -1255,17 +1258,17 @@ def verify_CPTP(U):
 def return_instrument_args(fluxlutman,noise_parameters_CZ):
 
     fluxlutman_args = {'sampling_rate': fluxlutman.sampling_rate(),
-                           'cz_length': fluxlutman.cz_length(),
-                           'q_J2': fluxlutman.q_J2(),
-                           'czd_double_sided': fluxlutman.czd_double_sided(),
-                           'cz_lambda_2': fluxlutman.cz_lambda_2(),
-                           'cz_lambda_3': fluxlutman.cz_lambda_3(),
-                           'cz_theta_f': fluxlutman.cz_theta_f(),
-                           'czd_length_ratio': fluxlutman.czd_length_ratio(),
+                           'cz_length_NE': fluxlutman.cz_length_NE(),
+                           'q_J2_NE': fluxlutman.q_J2_NE(),
+                           'czd_double_sided_NE': fluxlutman.czd_double_sided_NE(),
+                           'cz_lambda_2_NE': fluxlutman.cz_lambda_2_NE(),
+                           'cz_lambda_3_NE': fluxlutman.cz_lambda_3_NE(),
+                           'cz_theta_f_NE': fluxlutman.cz_theta_f_NE(),
+                           'czd_length_ratio_NE': fluxlutman.czd_length_ratio_NE(),
                            'q_polycoeffs_freq_01_det': fluxlutman.q_polycoeffs_freq_01_det(),
                            'q_polycoeffs_anharm': fluxlutman.q_polycoeffs_anharm(),
                            'q_freq_01': fluxlutman.q_freq_01(),
-                           'q_freq_10': fluxlutman.q_freq_10()}
+                           'q_freq_10_NE': fluxlutman.q_freq_10_NE()}
 
     noise_parameters_CZ_args = {'Z_rotations_length': noise_parameters_CZ.Z_rotations_length(),
                                 'voltage_scaling_factor': noise_parameters_CZ.voltage_scaling_factor(),
@@ -1300,17 +1303,17 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ):
 def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args):
 
     fluxlutman.sampling_rate(fluxlutman_args['sampling_rate'])
-    fluxlutman.cz_length(fluxlutman_args['cz_length'])
-    fluxlutman.q_J2(fluxlutman_args['q_J2'])
-    fluxlutman.czd_double_sided(fluxlutman_args['czd_double_sided'])
-    fluxlutman.cz_lambda_2(fluxlutman_args['cz_lambda_2'])
-    fluxlutman.cz_lambda_3(fluxlutman_args['cz_lambda_3'])
-    fluxlutman.cz_theta_f(fluxlutman_args['cz_theta_f'])
-    fluxlutman.czd_length_ratio(fluxlutman_args['czd_length_ratio'])
+    fluxlutman.cz_length_NE(fluxlutman_args['cz_length_NE'])
+    fluxlutman.q_J2_NE(fluxlutman_args['q_J2_NE'])
+    fluxlutman.czd_double_sided_NE(fluxlutman_args['czd_double_sided_NE'])
+    fluxlutman.cz_lambda_2_NE(fluxlutman_args['cz_lambda_2_NE'])
+    fluxlutman.cz_lambda_3_NE(fluxlutman_args['cz_lambda_3_NE'])
+    fluxlutman.cz_theta_f_NE(fluxlutman_args['cz_theta_f_NE'])
+    fluxlutman.czd_length_ratio_NE(fluxlutman_args['czd_length_ratio_NE'])
     fluxlutman.q_polycoeffs_freq_01_det(fluxlutman_args['q_polycoeffs_freq_01_det'])
     fluxlutman.q_polycoeffs_anharm(fluxlutman_args['q_polycoeffs_anharm'])
     fluxlutman.q_freq_01(fluxlutman_args['q_freq_01'])
-    fluxlutman.q_freq_10(fluxlutman_args['q_freq_10'])
+    fluxlutman.q_freq_10_NE(fluxlutman_args['q_freq_10_NE'])
 
     noise_parameters_CZ.Z_rotations_length(noise_parameters_CZ_args['Z_rotations_length'])
     noise_parameters_CZ.voltage_scaling_factor(noise_parameters_CZ_args['voltage_scaling_factor'])

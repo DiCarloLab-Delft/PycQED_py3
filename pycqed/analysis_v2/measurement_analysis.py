@@ -55,8 +55,11 @@ from pycqed.analysis_v2.timedomain_analysis import (
     Oscillation_Analysis,
     Conditional_Oscillation_Analysis, Idling_Error_Rate_Analyisis,
     Grovers_TwoQubitAllStates_Analysis)
-from pycqed.analysis_v2.readout_analysis import Singleshot_Readout_Analysis, \
+from pycqed.analysis_v2.readout_analysis import Singleshot_Readout_Analysis
+
+from pycqed.analysis_v2.multiplexed_readout_analysis import \
     Multiplexed_Readout_Analysis
+    
 from pycqed.analysis_v2.syndrome_analysis import (
     Single_Qubit_RoundsToEvent_Analysis, One_Qubit_Paritycheck_Analysis)
 
@@ -92,5 +95,5 @@ from pycqed.analysis_v2.randomized_benchmarking_analysis import (
 #     GST_SingleQubit_DataExtraction, GST_TwoQubit_DataExtraction
 
 
-from pycqed.analysis_v2.fluxing_analysis import Chevron_Analysis
+from pycqed.analysis_v2.fluxing_analysis import Chevron_Analysis, Conditional_Oscillation_Heatmap_Analysis
 

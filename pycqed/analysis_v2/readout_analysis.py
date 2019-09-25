@@ -376,7 +376,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'residual_excitation': self.proc_data_dict['residual_excitation'],
             'measurement_induced_relaxation':
                 self.proc_data_dict['measurement_induced_relaxation']
-            }
+        }
         self.qoi = self.proc_data_dict['quantities_of_interest']
 
     def prepare_plots(self):
@@ -392,7 +392,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             y_volt_label = self.raw_data_dict['value_names'][1]
             y_volt_unit = self.raw_data_dict['value_units'][1]
         z_hist_label = 'Counts'
-        labels= self.options_dict.get('preparation_labels', ['|g> prep.', '|e> prep.'])
+        labels = self.options_dict.get(
+            'preparation_labels', ['|g> prep.', '|e> prep.'])
         label_0 = labels[0]
         label_1 = labels[1]
         title = ('\n' + self.timestamps[0] + ' - "' +
@@ -520,7 +521,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'title': 'Raw '+label_0+' Binned Shot Counts' + title,
                 'ax_id': '2D_histogram_0',
                 # 'plotfn': self.plot_colorxy,
-                'plotfn':plot_2D_ssro_histogram,
+                'plotfn': plot_2D_ssro_histogram,
                 'xvals': self.proc_data_dict['2D_histogram_x'],
                 'yvals': self.proc_data_dict['2D_histogram_y'],
                 'zvals': self.proc_data_dict['2D_histogram_z'][0].T,
@@ -541,7 +542,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'title': 'Raw '+label_1+' Binned Shot Counts' + title,
                 'ax_id': '2D_histogram_1',
                 # 'plotfn': self.plot_colorxy,
-                'plotfn':plot_2D_ssro_histogram,
+                'plotfn': plot_2D_ssro_histogram,
                 'xvals': self.proc_data_dict['2D_histogram_x'],
                 'yvals': self.proc_data_dict['2D_histogram_y'],
                 'zvals': self.proc_data_dict['2D_histogram_z'][1].T,
@@ -561,11 +562,11 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             # Scatter Shots
             volts = self.proc_data_dict['all_channel_int_voltages']
 
-            v_flat =np.concatenate(np.concatenate(volts))
+            v_flat = np.concatenate(np.concatenate(volts))
             plot_range = (np.min(v_flat), np.max(v_flat))
 
             vxr = plot_range
-            vyr=plot_range
+            vyr = plot_range
             self.plot_dicts['2D_shots_0'] = {
                 'title': 'Raw Shots' + title,
                 'ax_id': '2D_shots',
@@ -748,7 +749,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 }
 
 
-class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
+class Multiplexed_Readout_Analysis_deprecated(ba.BaseDataAnalysis):
     """
     For two qubits, to make an n-qubit mux readout experiment.
     we should vectorize this analysis
@@ -1091,23 +1092,22 @@ def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
         ax.set_title(title)
 
 
-
 def plot_2D_ssro_histogram(xvals, yvals, zvals, xlabel, xunit, ylabel, yunit, zlabel, zunit,
                            xlim=None, ylim=None,
                            title='',
                            cmap='viridis',
                            cbarwidth='10%',
-                           cbarpad =  '5%',
+                           cbarpad='5%',
                            no_label=False,
                            ax=None, cax=None, **kw):
     if ax is None:
-        f, ax=plt.subplots()
+        f, ax = plt.subplots()
     if not no_label:
         ax.set_title(title)
 
     # Plotting the "heatmap"
     out = flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=ax,
-                                             plot_cbar=True, cmap=cmap)
+                                    plot_cbar=True, cmap=cmap)
     # Adding the colorbar
     if cax is None:
         ax.ax_divider = make_axes_locatable(ax)
@@ -1123,8 +1123,8 @@ def plot_2D_ssro_histogram(xvals, yvals, zvals, xlabel, xunit, ylabel, yunit, zl
     set_ylabel(ax, ylabel, yunit)
     set_cbarlabel(ax.cbar, zlabel, zunit)
     if xlim is None:
-        xlim = np.min([xvals, yvals]),np.max([xvals, yvals])
+        xlim = np.min([xvals, yvals]), np.max([xvals, yvals])
     ax.set_xlim(xlim)
     if ylim is None:
-        ylim = np.min([xvals, yvals]),np.max([xvals, yvals])
+        ylim = np.min([xvals, yvals]), np.max([xvals, yvals])
     ax.set_ylim(ylim)
