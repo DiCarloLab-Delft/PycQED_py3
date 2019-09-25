@@ -214,10 +214,10 @@ class UHFQC(zibase.ZI_base_instrument):
         self._default_waveform_length = 32
 
         t1 = time.time()
-        print('Initialized UHFQC', self.devname, 'in %.2fs' % (t1-t0))
+        log.info(f'{self.devname}: Initialized UHFQC in {t1 - t0}s')
 
     ##########################################################################
-    # Private methods
+    # 'private' overrides for ZI_base_instrument
     ##########################################################################
 
     def _check_devtype(self):
@@ -260,25 +260,6 @@ class UHFQC(zibase.ZI_base_instrument):
     def _num_channels(self):
         return 2
 
-    def _reset_awg_program_features(self):
-        """
-        Resets the self._awg_program_features to disable all features. The UHFQC can be configured with a number
-        of application-specific AWG programs using this driver. However, all the programs share some characteristics that
-        are described in the _awg_program_features dictionary. For example, all of the programs include a main loop
-        that runs for a number of iterations given by a user register. This feature is indicated by the 'loop_cnt'
-        item in the dictionary. In contrast, not all program include an extra loop for the number of averages that
-        should be done. Therefore, the 'awg_cnt' item in the dictionary is not automatically set. The driver
-        uses these features to keep track of what the current AWG program can do. It then raises errors in case
-        the user tries to do something that is not supported.
-        """
-        self._awg_program_features = {
-            'loop_cnt': False,
-            'avg_cnt': False,
-            'wait_dly': False,
-            'waves': False,
-            'cases': False,
-            'diocws': False}
-
     def _add_extra_parameters(self) -> None:
         """
         We add a few additional custom parameters on top of the ones defined in the device files. These are:
@@ -304,31 +285,34 @@ class UHFQC(zibase.ZI_base_instrument):
         # this allows normalized calibration when performing cross-talk suppressed
         # readout
         for i in range(self._nr_integration_channels):
-            self.add_parameter("qas_0_trans_offset_weightfunction_{}".format(i),
-                               unit='',  # unit is adc value
-                               label='RO normalization offset',
-                               initial_value=0.0,
-                               docstring='an offset correction parameter for all weight functions, '\
-                                         'this allows normalized calibration when performing cross-talk suppressed readout. The parameter '\
-                                         'is not actually used in this driver, but in some of the support classes that make use of the driver.',
-                               parameter_class=ManualParameter)
+            self.add_parameter(
+                "qas_0_trans_offset_weightfunction_{}".format(i),
+                unit='',  # unit is adc value
+                label='RO normalization offset',
+                initial_value=0.0,
+                docstring='an offset correction parameter for all weight functions, '\
+                         'this allows normalized calibration when performing cross-talk suppressed readout. The parameter '\
+                         'is not actually used in this driver, but in some of the support classes that make use of the driver.',
+                parameter_class=ManualParameter)
 
-        self.add_parameter('AWG_file',
-                           set_cmd=self._do_set_AWG_file,
-                           docstring='Configures the AWG with a SeqC program from a specific file. '
-                                     'Provided only for backwards compatibility. It is discouraged to use '
-                                     'this parameter unless you know what you are doing',
-                           vals=validators.Anything())
+        self.add_parameter(
+            'AWG_file',
+            set_cmd=self._do_set_AWG_file,
+            docstring='Configures the AWG with a SeqC program from a specific file. '
+                     'Provided only for backwards compatibility. It is discouraged to use '
+                     'this parameter unless you know what you are doing',
+            vals=validators.Anything())
 
-        self.add_parameter('wait_dly',
-                           set_cmd=self._set_wait_dly,
-                           get_cmd=self._get_wait_dly,
-                           unit='',
-                           label='AWG cycle delay',
-                           docstring='Configures a delay in AWG clocks cycles (4.44 ns) to be '
-                           'applied between when the AWG starts playing the readout waveform, and when it triggers the '
-                           'actual readout.',
-                           vals=validators.Ints())
+        self.add_parameter(
+            'wait_dly',
+            set_cmd=self._set_wait_dly,
+            get_cmd=self._get_wait_dly,
+            unit='',
+            label='AWG cycle delay',
+            docstring='Configures a delay in AWG clocks cycles (4.44 ns) to be '
+            'applied between when the AWG starts playing the readout waveform, and when it triggers the '
+            'actual readout.',
+            vals=validators.Ints())
 
         self.add_parameter(
             'cases',
@@ -344,6 +328,168 @@ class UHFQC(zibase.ZI_base_instrument):
             'an AWG program that handles only codewords 1, 5 and 7. When running, if the AWG receives a codeword '
             'that is not part of this list, an error will be triggered.',
             vals=validators.Lists())
+
+    def _codeword_table_preamble(self, awg_nr):
+        """
+        Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
+        The generated code depends on the instrument type. For the UHF-QA we simply define the raw waveforms.
+        """
+        program = ''
+
+        # If the program doesn't need waveforms, just return here
+        if not self._awg_program_features['waves']:
+            return
+
+        # If the program needs cases, but none are defined, flag it as an error
+        if self._awg_program_features['cases'] and self._cases is None:
+            raise zibase.ziConfigurationError(
+                'Missing definition of cases for AWG program!')
+
+        wf_table = self._get_waveform_table(awg_nr)
+        for dio_cw, (wf_l, wf_r) in enumerate(wf_table):
+            csvname_l = self.devname + '_' + wf_l
+            csvname_r = self.devname + '_' + wf_r
+            program += 'wave {} = "{}";\n'.format(
+                wf_l, csvname_l)
+            program += 'wave {} = "{}";\n'.format(
+                wf_r, csvname_r)
+        return program
+
+    ##########################################################################
+    # 'public' overrides for ZI_base_instrument
+    ##########################################################################
+
+    def assure_ext_clock(self) -> None:
+        """
+        Make sure the instrument is using an external reference clock
+        """
+        # get source:
+        #   1: external
+        #   0: internal (commanded so, or because of failure to sync to external clock)
+        source = self.system_extclk()
+        if source == 1:
+            return
+
+        print('Switching to external clock. This could take a while!')
+        while True:
+            self.system_extclk(1)
+            timeout = 10
+            while timeout > 0:
+                time.sleep(0.1)
+                status = self.system_extclk()
+                if status == 1:             # synced
+                    break
+                else:                       # sync failed
+                    timeout -= 0.1
+                    print('X', end='')
+            if self.system_extclk() != 1:
+                print(' Switching to external clock failed. Trying again.')
+            else:
+                break
+        print('\nDone')
+
+    def load_default_settings(self, upload_sequence=True) -> None:
+        # standard configurations adapted from Haendbaek's notebook
+
+        # The averaging-count is used to specify how many times the AWG program
+        # should run
+        LOG2_AVG_CNT = 10
+
+        # Load an AWG program
+        if upload_sequence:
+            self.awg_sequence_acquisition()
+
+        # Setting the clock to external
+        self.system_extclk(1)
+
+        # Turn on both outputs
+        self.sigouts_0_on(1)
+        self.sigouts_1_on(1)
+
+        # Set the output channels to 50 ohm
+        self.sigouts_0_imp50(True)
+        self.sigouts_1_imp50(True)
+
+        # Configure the analog trigger input 1 of the AWG to assert on a rising
+        # edge on Ref_Trigger 1 (front-panel of the instrument)
+        self.awgs_0_triggers_0_rising(1)
+        self.awgs_0_triggers_0_level(0.000000000)
+        self.awgs_0_triggers_0_channel(2)
+
+        # Configure the digital trigger to be a rising-edge trigger
+        self.awgs_0_auxtriggers_0_slope(1)
+
+        # Straight connection, signal input 1 to channel 1, signal input 2 to
+        # channel 2
+
+        self.qas_0_deskew_rows_0_cols_0(1.0)
+        self.qas_0_deskew_rows_0_cols_1(0.0)
+        self.qas_0_deskew_rows_1_cols_0(0.0)
+        self.qas_0_deskew_rows_1_cols_1(1.0)
+
+        # Set DIO mode:
+        # - QuExpress thresholds on DIO (mode == 2)
+        # - AWG control of DIO (mode == 1)
+        self.dios_0_mode(2)
+        self.dios_0_drive(0x3)  # Drive DIO bits 15 to 0
+        self.dios_0_extclk(2)  # 50 MHz clocking of the DIO
+
+        # Configure the codeword protocol
+        if self._use_dio:
+            self.awgs_0_dio_strobe_index(15)  # FIXME: 15 for QCC, 31 for CCL
+            self.awgs_0_dio_strobe_slope(0)  # no edge, not used anymore
+            self.awgs_0_dio_valid_index(16)
+            self.awgs_0_dio_valid_polarity(2)  # high polarity
+
+        # No rotation on the output of the weighted integration unit, i.e. take
+        # real part of result
+        for i in range(0, self._nr_integration_channels):
+            self.set('qas_0_rotations_{}'.format(i), 1.0 + 0.0j)
+            # remove offsets to weight function
+            self.set('qas_0_trans_offset_weightfunction_{}'.format(i), 0.0)
+
+        # No cross-coupling in the matrix multiplication (identity matrix)
+        self.reset_crosstalk_matrix()
+
+        # disable correlation mode on all channels
+        self.reset_correlation_params()
+
+        # Configure the result logger to not do any averaging
+        self.qas_0_result_length(1000)
+        self.qas_0_result_averages(pow(2, LOG2_AVG_CNT))
+        # result_logging_mode 2 => raw (IQ)
+        self.qas_0_result_source(2)
+
+        # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
+        # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
+        # these signals on the output here.
+        self.sigouts_0_enables_0(0)
+        self.sigouts_0_enables_1(0)
+        self.sigouts_1_enables_0(0)
+        self.sigouts_1_enables_1(0)
+
+    ##########################################################################
+    # Private methods
+    ##########################################################################
+
+    def _reset_awg_program_features(self):
+        """
+        Resets the self._awg_program_features to disable all features. The UHFQC can be configured with a number
+        of application-specific AWG programs using this driver. However, all the programs share some characteristics that
+        are described in the _awg_program_features dictionary. For example, all of the programs include a main loop
+        that runs for a number of iterations given by a user register. This feature is indicated by the 'loop_cnt'
+        item in the dictionary. In contrast, not all program include an extra loop for the number of averages that
+        should be done. Therefore, the 'awg_cnt' item in the dictionary is not automatically set. The driver
+        uses these features to keep track of what the current AWG program can do. It then raises errors in case
+        the user tries to do something that is not supported.
+        """
+        self._awg_program_features = {
+            'loop_cnt': False,
+            'avg_cnt': False,
+            'wait_dly': False,
+            'waves': False,
+            'cases': False,
+            'diocws': False}
 
     def _set_wait_dly(self, value):
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), value)
@@ -443,145 +589,12 @@ setUserReg(4, err_cnt);"""
                              zibase.gen_waveform_name(ch+1, case)))
         return wf_table
 
-    def _codeword_table_preamble(self, awg_nr):
-        """
-        Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
-        The generated code depends on the instrument type. For the UHF-QA we simply define the raw waveforms.
-        """
-        program = ''
-
-        # If the program doesn't need waveforms, just return here
-        if not self._awg_program_features['waves']:
-            return
-
-        # If the program needs cases, but none are defined, flag it as an error
-        if self._awg_program_features['cases'] and self._cases is None:
-            raise zibase.ziConfigurationError(
-                'Missing definition of cases for AWG program!')
-
-        wf_table = self._get_waveform_table(awg_nr)
-        for dio_cw, (wf_l, wf_r) in enumerate(wf_table):
-            csvname_l = self.devname + '_' + wf_l
-            csvname_r = self.devname + '_' + wf_r
-            program += 'wave {} = "{}";\n'.format(
-                wf_l, csvname_l)
-            program += 'wave {} = "{}";\n'.format(
-                wf_r, csvname_r)
-        return program
-
-    def load_default_settings(self, upload_sequence=True) -> None:
-        # standard configurations adapted from Haendbaek's notebook
-
-        # The averaging-count is used to specify how many times the AWG program
-        # should run
-        LOG2_AVG_CNT = 10
-
-        # Load an AWG program
-        if upload_sequence:
-            self.awg_sequence_acquisition()
-
-        # Setting the clock to external
-        self.system_extclk(1)
-
-        # Turn on both outputs
-        self.sigouts_0_on(1)
-        self.sigouts_1_on(1)
-
-        # Set the output channels to 50 ohm
-        self.sigouts_0_imp50(True)
-        self.sigouts_1_imp50(True)
-
-        # Configure the analog trigger input 1 of the AWG to assert on a rising
-        # edge on Ref_Trigger 1 (front-panel of the instrument)
-        self.awgs_0_triggers_0_rising(1)
-        self.awgs_0_triggers_0_level(0.000000000)
-        self.awgs_0_triggers_0_channel(2)
-
-        # Configure the digital trigger to be a rising-edge trigger
-        self.awgs_0_auxtriggers_0_slope(1)
-
-        # Straight connection, signal input 1 to channel 1, signal input 2 to
-        # channel 2
-
-        self.qas_0_deskew_rows_0_cols_0(1.0)
-        self.qas_0_deskew_rows_0_cols_1(0.0)
-        self.qas_0_deskew_rows_1_cols_0(0.0)
-        self.qas_0_deskew_rows_1_cols_1(1.0)
-
-        # Set DIO mode:
-        # - QuExpress thresholds on DIO (mode == 2)
-        # - AWG control of DIO (mode == 1)
-        self.dios_0_mode(2)
-        # Drive DIO bits 15 to 0
-        self.dios_0_drive(0x3)
-        # 50 MHz clocking of the DIO
-        self.dios_0_extclk(2)
-
-        # Configure the codeword protocol
-        if self._use_dio:
-            self.awgs_0_dio_strobe_index(15)  # FIXME: 15 for QCC, 31 for CCL
-            self.awgs_0_dio_strobe_slope(0)  # no edge, not used anymore
-            self.awgs_0_dio_valid_index(16)
-            self.awgs_0_dio_valid_polarity(2)  # high polarity
-
-        # No rotation on the output of the weighted integration unit, i.e. take
-        # real part of result
-        for i in range(0, self._nr_integration_channels):
-            self.set('qas_0_rotations_{}'.format(i), 1.0 + 0.0j)
-            # remove offsets to weight function
-            self.set('qas_0_trans_offset_weightfunction_{}'.format(i), 0.0)
-
-        # No cross-coupling in the matrix multiplication (identity matrix)
-        self.reset_crosstalk_matrix()
-
-        # disable correlation mode on all channels
-        self.reset_correlation_params()
-        
-        # Configure the result logger to not do any averaging
-        self.qas_0_result_length(1000)
-        self.qas_0_result_averages(pow(2, LOG2_AVG_CNT))
-        # result_logging_mode 2 => raw (IQ)
-        self.qas_0_result_source(2)
-
-        # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
-        # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
-        # these signals on the output here.
-        self.sigouts_0_enables_0(0)
-        self.sigouts_0_enables_1(0)
-        self.sigouts_1_enables_0(0)
-        self.sigouts_1_enables_1(0)
+    ##########################################################################
+    # 'public' functions
+    ##########################################################################
 
     def clock_freq(self):
         return 1.8e9
-
-    def assure_ext_clock(self) -> None:
-        """
-        Make sure the instrument is using an external reference clock
-        """
-        # get source:
-        #   1: external
-        #   0: internal (commanded so, or because of failure to sync to external clock)
-        source = self.system_extclk()
-        if source == 1:
-            return
-
-        print('Switching to external clock. This could take a while!')
-        while True:
-            self.system_extclk(1)
-            timeout = 10
-            while timeout > 0:
-                time.sleep(0.1)
-                status = self.system_extclk()
-                if status == 1:             # synced
-                    break
-                else:                       # sync failed
-                    timeout -= 0.1
-                    print('X', end='')
-            if self.system_extclk() != 1:
-                print(' Switching to external clock failed. Trying again.')
-            else:
-                break
-        print('\nDone')
 
     ##########################################################################
     # 'public' functions: utility
@@ -608,7 +621,6 @@ setUserReg(4, err_cnt);"""
             self.set('qas_0_thresholds_{}_correlation_source'.format(i), 0)
 
     def reset_rotation_params(self):
-
         for i in range(10):
             self.set('qas_0_rotations_{}'.format(i), 1+1j)
 
@@ -693,15 +705,13 @@ setUserReg(4, err_cnt);"""
             self.qas_0_monitor_averages(averages)
             ro_mode = 1
 
-        self.set('awgs_0_userregs_{}'.format(
-            UHFQC.USER_REG_LOOP_CNT), loop_cnt)
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_LOOP_CNT), loop_cnt)
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_RO_MODE), ro_mode)
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_AVG_CNT), averages)
         if self.wait_dly() > 0 and not self._awg_program_features['wait_dly']:
             raise ziUHFQCSeqCError(
                 'Trying to use a delay of {} using an AWG program that does not use \'wait_dly\'.'.format(self.wait_dly()))
-        self.set('awgs_0_userregs_{}'.format(
-            UHFQC.USER_REG_WAIT_DLY), self.wait_dly())
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), self.wait_dly())
         self.subs(self._get_full_path('auxins/0/sample'))
 
         # Generate more dummy data
@@ -1340,6 +1350,7 @@ setTrigger(0);
     def plot_dio_snapshot(self, bits=range(32)):
         zibase.plot_timing_diagram(self.getv('awgs/0/dio/data'), bits, 64)
 
+    # FIXME: just starts CCL, no calibration occurs
     def calibrate_CCL_dio_protocol(self, CCL=None, verbose=False, repetitions=1):
         log.info('Calibrating DIO delays')
         if verbose:
@@ -1471,5 +1482,3 @@ setTrigger(0);
         self.print_rotations_overview()
         self.print_thresholds_overview()
         self.print_user_regs_overview()
-
-

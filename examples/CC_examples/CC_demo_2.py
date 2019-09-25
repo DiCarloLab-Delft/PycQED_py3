@@ -220,67 +220,8 @@ inner:      seq_out         R0,$duration
             # instr.mw[i].plot_dio_snapshot()
             raise
 
-    if 0:  # manual DIO delay
-        if 0:
-            delay = 1   # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
-            for awg in range(4):
-                instr.mw[i]._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)  # skew TOGGLE_DS versus rest
-        else:
-            delay = 0  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
-            instr.mw[i].setd('raw/dios/0/delays/*/value', delay)  # new interface?, range [0:15]
-            for awg in range(4):
-                dio_timing_errors = instr.mw[i].geti('awgs/{}/dio/error/timing'.format(awg))
-                log.debug('DIO timing errors on AWG {}: {}'.format(awg,dio_timing_errors))
-
     instr.mw[i].start()
 
-"""
-    dev8079 *After* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
-    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
-    0       +       0/0/0/0         66
-    1       +       0/0/0/0         66
-    2       +       0/0/0/0         66
-    
-    3       +       1/0/0/0         86
-    4       +       1/0/0/0         86
-    5       +       0/0/0/0         86
-    6       +       0/0/0/0         86
-    7       +       0/0/0/0         86
-    8       +       0/0/0/0         86
-    
-    9       +       1/0/0/0        106
-
-
-
-    dev8079 *Before* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
-    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
-    0       +       0/0/0/0         60
-    1       +       0/0/0/0         60
-    2       +       0/1/1/1         66
-    3       +       1/1/1/1         66
-    4       +       1/0/0/0         73
-    5       +       0/0/0/0         73
-    
-    6       +       0/0/0/0         80
-    7       +       0/0/0/0         80
-    8       +       0/1/1/1         86
-    9       +       1/1/1/1         86
-    10      +       1/0/0/0         93
-    11      +       0/0/0/0         93
-    
-    12      +       0/0/0/0         99
-    13      +       0/0/0/0         99
-    14      +       0/1/1/1        106
-    15      +       1/1/1/1        106
-    
-    Analysis:
-    - delay steps are 3.33 ns each
-    - 15 steps == 50 ns
-    - 6 steps == 20 ns, pattern repeats after that
-    ...
-    
-    
-"""
 
 if conf.flux_0 != '':
     log.debug('configuring flux_0')
@@ -365,3 +306,70 @@ if err_cnt>0:
 for i in range(err_cnt):
     print(instr.cc.get_error())
 
+
+
+
+
+
+
+
+
+    """
+    if 0:  # manual DIO delay
+        if 0:
+            delay = 1  # OK: [1:2] in our particular configuration, with old AWG8 firmware (not yet sampling at 50 MHz)
+            for awg in range(4):
+                instr.mw[i]._set_dio_delay(awg, 0x40000000, 0xBFFFFFFF, delay)  # skew TOGGLE_DS versus rest
+        else:
+            delay = 0  # firmware 62730, LabOne LabOneEarlybird64-19.05.62848.msi
+            instr.mw[i].setd('raw/dios/0/delays/*/value', delay)  # new interface?, range [0:15]
+            for awg in range(4):
+                dio_timing_errors = instr.mw[i].geti('awgs/{}/dio/error/timing'.format(awg))
+                log.debug('DIO timing errors on AWG {}: {}'.format(awg, dio_timing_errors))
+
+    dev8079 *After* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
+    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
+    0       +       0/0/0/0         66
+    1       +       0/0/0/0         66
+    2       +       0/0/0/0         66
+
+    3       +       1/0/0/0         86
+    4       +       1/0/0/0         86
+    5       +       0/0/0/0         86
+    6       +       0/0/0/0         86
+    7       +       0/0/0/0         86
+    8       +       0/0/0/0         86
+
+    9       +       1/0/0/0        106
+
+
+
+    dev8079 *Before* adding 'raw/dios/0/extclk'=1 and 'awgs_{}_dio_strobe_slope'=0
+    delay   stable  timing errors   scope delta T between CC marker rising and AWG8 signal falling [ns]
+    0       +       0/0/0/0         60
+    1       +       0/0/0/0         60
+    2       +       0/1/1/1         66
+    3       +       1/1/1/1         66
+    4       +       1/0/0/0         73
+    5       +       0/0/0/0         73
+
+    6       +       0/0/0/0         80
+    7       +       0/0/0/0         80
+    8       +       0/1/1/1         86
+    9       +       1/1/1/1         86
+    10      +       1/0/0/0         93
+    11      +       0/0/0/0         93
+
+    12      +       0/0/0/0         99
+    13      +       0/0/0/0         99
+    14      +       0/1/1/1        106
+    15      +       1/1/1/1        106
+
+    Analysis:
+    - delay steps are 3.33 ns each
+    - 15 steps == 50 ns
+    - 6 steps == 20 ns, pattern repeats after that
+    ...
+
+
+"""

@@ -149,7 +149,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
 
         t1 = time.time()
-        log.info('{}: Initialized ZI_HDAWG in {}s'.format(self.devname, t1-t0))
+        log.info(f'{self.devname}: Initialized ZI_HDAWG in {t1 - t0}s')
 
     def _add_extra_parameters(self):
         self.add_parameter('timeout', unit='s',

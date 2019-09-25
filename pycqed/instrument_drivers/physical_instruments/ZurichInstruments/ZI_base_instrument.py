@@ -705,7 +705,7 @@ class ZI_base_instrument(Instrument):
         self.connect_message(begin_time=t0)
 
     ##########################################################################
-    # Private methods
+    # Private methods: Abstract Base Class methods
     ##########################################################################
 
     def _check_devtype(self):
@@ -752,6 +752,10 @@ class ZI_base_instrument(Instrument):
             initial_value=30,
             parameter_class=ManualParameter,
             vals=validators.Ints())
+
+    ##########################################################################
+    # Private methods
+    ##########################################################################
 
     def _add_codeword_waveform_parameters(self, num_codewords) -> None:
         """
@@ -1200,7 +1204,7 @@ class ZI_base_instrument(Instrument):
             logging.warning(f"{self.devname}: No program configured for awg_nr {awg_nr}.")
 
     ##########################################################################
-    # Public methods
+    # Public methods: node helpers
     ##########################################################################
 
     def setd(self, path, value) -> None:
@@ -1266,6 +1270,10 @@ class ZI_base_instrument(Instrument):
 
     def sync(self) -> None:
         self.daq.sync()
+
+    ##########################################################################
+    # Public methods
+    ##########################################################################
 
     def start(self):
         log.info(f"{self.devname}: Starting '{self.name}'")
