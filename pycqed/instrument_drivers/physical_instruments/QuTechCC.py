@@ -20,6 +20,20 @@ from qcodes import Instrument
 
 log = logging.getLogger(__name__)
 
+_cc_prog_dio_cal_microwave = """
+# staircase program for HDAWG microwave mode, CW_1 31->1, CW_2 1->31
+.DEF        cw_31_01        0x80003E01      # TRIG=1(0x80000000), CW_1=31(0x00003E00), CW_2=1(0x00000001)
+.DEF        incr            0xFFFFFE01      # CW_1--, CW_2++
+.DEF        duration        4
+repeat:     move            $cw_31_01,R0
+            move            31,R1           # loop counter
+inner:      seq_out         R0,$duration
+            add             R0,$incr,R0
+            loop            R1,@inner
+            jmp             @repeat
+"""
+
+
 
 class QuTechCC(QuTechCC_core, Instrument):
     def __init__(self,
@@ -172,6 +186,31 @@ class QuTechCC(QuTechCC_core, Instrument):
         self.stop()
         self.set_q1_reg(ccio, self._Q1REG_DIO_DELAY, cnt_in_20ns_steps)
         self.start()
+
+    ##########################################################################
+    # DIO calibration support for connected instruments
+    ##########################################################################
+
+    def output_dio_calibration_data(self, dio_mode, port):
+        if dio_mode == "microwave":
+            cc_prog = _cc_prog_dio_cal_microwave
+        elif dio_mode == "new_microwave":
+            pass
+        elif dio_mode == "new_novsm_microwave":
+            pass
+        elif dio_mode == "flux":
+            pass
+
+        log.debug(f'uploading DIO calibration program for mode {dio_mode} to CC')
+        self.sequence_program(cc_prog)
+        log.debug("printing CC errors")
+        err_cnt = self.get_system_error_count()
+        if err_cnt > 0:
+            log.warning('CC status after upload')
+        for i in range(err_cnt):
+            print(self.get_error())
+        self.start()
+        log.debug('starting CC')
 
 
 # helpers for Instrument::add_parameter.set_cmd

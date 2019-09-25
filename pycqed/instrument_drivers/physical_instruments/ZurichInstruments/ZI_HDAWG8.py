@@ -369,19 +369,20 @@ while (1) {
             # and then masking them.
             if 1:   # FIXME: new
                 dio_mode_list = {
-                    # Name                      AWG[0:3]
+                    # Name                      AWG[0:3] shift
                     'identical':            [   0,  0,  0,  0],
                     'microwave':            [   0,  0,  9,  9],     # bits [7:0] and [16:9]. Skips bit 8 because of v1 hardware issues
                     'new_microwave':        [   0,  0,  16, 16],    # bits [7:0] and [23:16]
                     'new_novsm_microwave':  [   0,  7,  16, 23],    # bits [6:0], [13:7], [22:16] and [29:23]
                     'flux':                 [   0,  6,  16, 22],
                 }
+                # FIXME: define DIO modes centrally in device independent way (lsb, width, channelCount)
                 dio_mode = dio_mode_list.get(self.cfg_codeword_protocol())
                 if dio_mode is None:
                     raise ValueError("Invalid value '{}' for parameter cfg_codeword_protocol".format(self.cfg_codeword_protocol))
                 shift = dio_mode[awg_nr]
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), shift)
-                # FIXME: flux mode sets mask
+                # FIXME: flux mode sets mask, using 6 bits=2channels
                 # FIXME: check _num_codewords against mode
                 # FIXME: derive amp vs direct mode from dio_mode_list
             else:
@@ -638,7 +639,6 @@ while (1) {
         elif self.cfg_codeword_protocol() == 'new_microwave':
             raise NotImplementedError()
 
-
         elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
             raise NotImplementedError()
             # test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
@@ -653,7 +653,7 @@ while (1) {
             #                      (3, list(reversed(staircase_sequence)))]
 
         else:
-            zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
+            raise zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
 
         # Start the QCC with the program configured above
         QCC.eqasm_program(test_fp)
@@ -740,10 +740,36 @@ while (1) {
         # If successful return True
         return True
 
-    def calibrate_dio_protocol(self, expected_sequence, verbose=False, repetitions=1) -> None:
+    def calibrate_dio_protocol(self, expected_sequence=None, verbose=False, repetitions=1) -> None:
+        """
+        Calibrate the DIO protocol. Requires the DIO interface to be driven using a proper data pattern.
+
+        Please note that instrument latency may change if the delay value is changed
+        """
+
         # Make sure the configuration is up-to-date
         self.assure_ext_clock()
         self.upload_codeword_program()
+
+        # if not specified, derive expected_sequence from cfg_codeword_protocol
+        if expected_sequence is None:
+            codeword_protocol = self.cfg_codeword_protocol()
+            if codeword_protocol == "microwave":
+                sequence_length = 32
+                staircase_sequence = range(1, sequence_length)
+                expected_sequence = [
+                    (0, list(staircase_sequence)),
+                    (1, list(staircase_sequence)),
+                    (2, list(reversed(staircase_sequence))),
+                    (3, list(reversed(staircase_sequence)))]
+            elif codeword_protocol == "new_microwave":
+                raise NotImplementedError()
+            elif codeword_protocol == "new_novsm_microwave":
+                raise NotImplementedError()
+            elif codeword_protocol == "flux":
+                raise NotImplementedError()
+            else
+                raise ValueError('unexpected value {} for cfg_codeword_protocol'.format(codeword_protocol))
 
         for awg, sequence in expected_sequence:
             if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence)):
@@ -760,3 +786,7 @@ while (1) {
 
         # And configure the delays
         self.setd('raw/dios/0/delays/*', min_valid_delay)
+
+    def calibrate_dio_protocol_mode(self, verbose=False) -> None:
+
+        self.calibrate_dio_protocol(expected_sequence, verbose)

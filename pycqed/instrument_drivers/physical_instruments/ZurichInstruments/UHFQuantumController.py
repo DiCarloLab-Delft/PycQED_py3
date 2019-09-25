@@ -427,19 +427,15 @@ class UHFQC(zibase.ZI_base_instrument):
         self.qas_0_deskew_rows_1_cols_0(0.0)
         self.qas_0_deskew_rows_1_cols_1(1.0)
 
-        # Set DIO mode:
-        # - QuExpress thresholds on DIO (mode == 2)
-        # - AWG control of DIO (mode == 1)
-        self.dios_0_mode(2)
-        self.dios_0_drive(0x3)  # Drive DIO bits 15 to 0
-        self.dios_0_extclk(2)  # 50 MHz clocking of the DIO
-
         # Configure the codeword protocol
         if self._use_dio:
-            self.awgs_0_dio_strobe_index(15)  # FIXME: 15 for QCC, 31 for CCL
-            self.awgs_0_dio_strobe_slope(0)  # no edge, not used anymore
-            self.awgs_0_dio_valid_index(16)
+            self.dios_0_mode(2)  # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
+            self.dios_0_drive(0x3)  # Drive DIO bits 15 to 0
+            self.dios_0_extclk(2)  # 50 MHz clocking of the DIO
+            self.awgs_0_dio_strobe_slope(0)  # no edge, replaced by dios_0_extclk(2)
+            self.awgs_0_dio_strobe_index(15)  # NB: 15 for QCC, 31 for CCL. Irrelevant now we use 50 MHz clocking
             self.awgs_0_dio_valid_polarity(2)  # high polarity
+            self.awgs_0_dio_valid_index(16)
 
         # No rotation on the output of the weighted integration unit, i.e. take
         # real part of result
@@ -869,6 +865,23 @@ setUserReg(4, err_cnt);"""
     ##########################################################################
     # 'public' functions: DIO support
     ##########################################################################
+
+    def set_dio_delay(self, index: int, delay: int) -> None:
+        # FIXME: possibly outdated by new 50 MHz DIO clocking scheme
+        """
+        Configure DIO timing
+
+        Args:
+            index(int): DIO bit index [0:31]
+            delay(int): delay value, [0:3] in 1/450 MHz = 2.222 ns steps
+
+        NB: UHFQC::awgs_0_dio_delay_index() should not be used directly, the index is
+        encoded in the value. This is different from the AWG-8, and requires
+        the maximum value for "awgs/0/dio/delay/value" in s_node_pars.txt to
+        be changed to 1024
+        """
+        # FIXME: check parameters
+        self.awgs_0_dio_delay_value((delay << 8) + index)
 
     def plot_dio(self, bits=range(32), line_length=64):
         data = self.getv('awgs/0/dio/data')

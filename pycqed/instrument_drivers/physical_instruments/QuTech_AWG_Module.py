@@ -76,6 +76,49 @@ Configures the codeword input bits/channels per channel. These are predefined se
 \tNote: at the moment the presets are created for CCL use which only allows calibration of
 8 bits, the QWG can support up to 14 bits of which 10 are selectable'''
 
+# other constants
+_nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
+_nr_cw_inp_cmd = "SYSTem:CODEwords:SELect?"
+
+# Codeword protocols: Pre-defined per channel bit maps
+cw_protocols_dio = {
+    # FIXME: CCLight is limited to 8 cw bits output, QWG can have up to cw 14 bits input of which 10 are
+    #  selectable
+    'MICROWAVE': [
+        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
+        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
+        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
+        [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
+
+    'MICROWAVE_NO_VSM': [
+        [0, 1, 2, 3, 4, 5, 6],  # Ch1
+        [0, 1, 2, 3, 4, 5, 6],  # Ch2
+        [7, 8, 9, 10, 11, 12, 13],  # Ch3
+        [7, 8, 9, 10, 11, 12, 13]],  # Ch4
+
+    'FLUX': [
+        [0, 1, 2],  # Ch1
+        [3, 4, 5],  # Ch2
+        [6, 7, 8],  # Ch3
+        [9, 10, 11]],  # Ch4  # See limitation/fixme; will use ch 3's bitmap
+}
+
+# Marker trigger protocols
+cw_protocols_mt = {
+    # Name
+    'MICROWAVE': [
+        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
+        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
+        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
+        [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
+
+    'FLUX': [
+        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
+        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
+        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
+        [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
+}
+
 
 class QuTech_AWG_Module(SCPI):
     __doc__ = f"""
@@ -118,18 +161,15 @@ class QuTech_AWG_Module(SCPI):
         # Check for driver / QWG compatibility
         version_min = (1, 5, 0)  # driver supported software version: Major, minor, patch
 
-        self._nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
-        self._nr_cw_inp_cmd = "SYSTem:CODEwords:SELect?"
-
-        idn_firmware = self.get_idn()["firmware"]
+        idn_firmware = self.get_idn()["firmware"]  # NB: called 'version' in QWG source code
         regex = r"swVersion=(\d).(\d).(\d)"
         sw_version = re.search(regex, idn_firmware)
         version_cur = (int(sw_version.group(1)), int(sw_version.group(2)), int(sw_version.group(3)))
         driver_outdated = True
 
         if sw_version and version_cur >= version_min:
-            self._dev_desc.numSelectCwInputs = int(self.ask(self._nr_cw_inp_cmd))
-            self._dev_desc.numMaxCwBits = int(self.ask(self._nr_cw_bits_cmd))
+            self._dev_desc.numSelectCwInputs = int(self.ask(_nr_cw_inp_cmd))
+            self._dev_desc.numMaxCwBits = int(self.ask(_nr_cw_bits_cmd))
             driver_outdated = False
         else:
             # FIXME: we could be less rude and only disable the new parameters
@@ -145,45 +185,6 @@ class QuTech_AWG_Module(SCPI):
         # validator values
         self._dev_desc.mvals_trigger_impedance = vals.Enum(50),
         self._dev_desc.mvals_trigger_level = vals.Numbers(0, 5.0)
-
-        # Codeword protocols: Pre-defined per channel bit maps
-        cw_protocols_dio = {
-            # FIXME: CCLight is limited to 8 cw bits output, QWG can have up to cw 14 bits input of which 10 are
-            #  selectable
-            'MICROWAVE': [
-                [0, 1, 2, 3, 4, 5, 6, 7],   # Ch1
-                [0, 1, 2, 3, 4, 5, 6, 7],   # Ch2
-                [0, 1, 2, 3, 4, 5, 6, 7],   # Ch3
-                [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
-
-            'MICROWAVE_NO_VSM': [
-                [0, 1, 2, 3, 4, 5, 6],      # Ch1
-                [0, 1, 2, 3, 4, 5, 6],      # Ch2
-                [7, 8, 9, 10, 11, 12, 13],  # Ch3
-                [7, 8, 9, 10, 11, 12, 13]], # Ch4
-
-            'FLUX': [
-                [0, 1, 2],                  # Ch1
-                [3, 4, 5],                  # Ch2
-                [6, 7, 8],                  # Ch3
-                [9, 10, 11]],               # Ch4  # See limitation/fixme; will use ch 3's bitmap
-        }
-
-        # Marker trigger protocols
-        cw_protocols_mt = {
-            # Name
-            'MICROWAVE': [
-                [0, 1, 2, 3, 4, 5, 6, 7],   # Ch1
-                [0, 1, 2, 3, 4, 5, 6, 7],   # Ch2
-                [0, 1, 2, 3, 4, 5, 6, 7],   # Ch3
-                [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
-
-            'FLUX': [
-                [0, 1, 2, 3, 4, 5, 6, 7],   # Ch1
-                [0, 1, 2, 3, 4, 5, 6, 7],   # Ch2
-                [0, 1, 2, 3, 4, 5, 6, 7],   # Ch3
-                [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
-        }
 
         if self._dev_desc.numMaxCwBits <= 7:    # FIXME: random constant
             self.codeword_protocols = cw_protocols_mt
@@ -710,6 +711,8 @@ class QuTech_AWG_Module(SCPI):
             vals=vals.Enum('MICROWAVE', 'FLUX', 'MICROWAVE_NO_VSM'),
             docstring=_codeword_protocol_doc + '\nEffective immediately when sent')
 
+        # FIXME: HDAWG uses cfg_codeword_protocol, with different options
+
         docst = 'Specifies a waveform for a specific codeword. \n' \
                 'The channel number corresponds' \
                 ' to the channel as indicated on the device (1 is lowest).'
@@ -736,7 +739,7 @@ class QuTech_AWG_Module(SCPI):
                 'get_max_codeword_bits',
                 unit='',
                 label='Max codeword bits',
-                get_cmd=self._nr_cw_bits_cmd,
+                get_cmd=_nr_cw_bits_cmd,
                 vals=vals.Strings(),
                 get_parser=int,
                 docstring='Reads the maximum number of codeword bits for all channels')
@@ -1067,7 +1070,7 @@ class QuTech_AWG_Module(SCPI):
         # NB: setting mode "CON" (valid SCPI abbreviation) reads back as "CONt"
 
         # Parameter for codeword per channel
-        for cw in range(self._dev_desc.numCodewords):
+        for cw in range(self._dev_desc.numCodewords):  # FIXME: this may give 1024 parameters per channel
             for j in range(self._dev_desc.numChannels):
                 ch = j+1
                 # Codeword 0 corresponds to bitcode 0
@@ -1266,7 +1269,6 @@ class Mock_QWG(QuTech_AWG_Module):
         self._dev_desc.numMarkers = 8
         self._dev_desc.numTriggers = 8
 
-        self._nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
         self._dev_desc.numMaxCwBits = 32  # Some random mock val
 
         self._dev_desc.numSelectCwInputs = 10  # mock val based on DIO
@@ -1275,18 +1277,6 @@ class Mock_QWG(QuTech_AWG_Module):
         # valid values
         self._dev_desc.mvals_trigger_impedance = vals.Enum(50),
         self._dev_desc.mvals_trigger_level = vals.Numbers(0, 5.0)
-
-        cw_protocols_mt = {
-            # Name          Ch1,    Ch2,    Ch3,    Ch4
-            'FLUX':         [0x5F,  0x5F,   0x5F,   0x5F],
-            'MICROWAVE':    [0x5F,  0x5F,   0x5F,   0x5F]
-        }
-
-        cw_protocols_dio = {
-            # Name          Ch1,   Ch2,  Ch3,  Ch4
-            'FLUX':         [0x07, 0x38, 0x1C0, 0xE00],
-            'MICROWAVE':    [0x3FF, 0x3FF, 0x3FF, 0x3FF]
-        }
 
         if self._dev_desc.numMaxCwBits <= 7:
             self.codeword_protocols = cw_protocols_mt

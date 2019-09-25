@@ -54,10 +54,9 @@ if len(sys.argv)>1:
 ##########################################
 # instrument info
 conf = lambda:0 # create empty 'struct'
-conf.ro_0 = ''
-conf.ro_0 = '' # 'dev2312'   # 'dev2295'
+conf.ro = [] # 'dev2312'   # 'dev2295'
 conf.mw = ['dev8068', 'dev8079']
-conf.flux_0 = ''
+conf.flux = []
 conf.cc_ip = '192.168.0.241'
 
 qubit_idx = 3 # NB: connects to AWG8'mw'  in slot 3
@@ -128,22 +127,26 @@ log.debug("File for CC = '{}'".format(cc_file_name))
 
 instr = lambda:0 # create empty 'struct'
 instr.mw = []
+instr.flux = []
+instr.ro = []
 for i, dev in enumerate(conf.mw):
     name = 'mw_'+str(i)
-    log.debug(f'connecting to mw AWG8 {name}={dev}')
+    log.debug(f'connecting to microwave AWG8 {name}={dev}')
     instr.mw.append(ZI_HDAWG8.ZI_HDAWG8(name, device=dev))
     log.debug(f'connected to mw AWG8 {name}={dev}')
     #station.add_component(instr.mw[i])
 
-if conf.flux_0 != '':
-    log.debug('connecting to flux_0')
-    instr.flux_0 = ZI_HDAWG8.ZI_HDAWG8('flux_0', device=conf.flux_0)
-    #station.add_component(instr.flux_0)
+for i, dev in enumerate(conf.flux):
+    name = 'flux_'+str(i)
+    log.debug(f'connecting to flux AWG8 {name}={dev}')
+    instr.flux.append(ZI_HDAWG8.ZI_HDAWG8(name, device=dev))
+    #station.add_component(instr.flux[i])
 
-if conf.ro_0 != '':
-    log.debug('connecting to ro_0')
-    instr.ro_0 = ZI_UHFQC.UHFQC('ro_0', device=conf.ro_0)
-    #station.add_component(instr.ro_0)
+for i, dev in enumerate(conf.ro):
+    name = 'ro_'+str(i)
+    log.debug(f'connecting to readout UHFQA {name}={dev}')
+    instr.ro.append(ZI_UHFQC.UHFQC(name, device=dev))
+    #station.add_component(instr.ro[i])
 
 log.debug('connecting to CC')
 instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
@@ -182,39 +185,10 @@ for i, dev in enumerate(conf.mw):
     instr.mw[i].upload_codeword_program()  # FIXME: also done by calibrate_dio_protocol?
 
     if 1:  # DIO calibration
-        sequence_length = 32
-        staircase_sequence = range(1, sequence_length)
-        expected_sequence = [
-            (0, list(staircase_sequence)),
-            (1, list(staircase_sequence)),
-            (2, list(reversed(staircase_sequence))),
-            (3, list(reversed(staircase_sequence)))]
-
-        cc_prog = """
-# staircase program for HDAWG microwave mode, CW_1 31->1, CW_2 1->31
-.DEF        cw_31_01        0x80003E01      # TRIG=1(0x80000000), CW_1=31(0x00003E00), CW_2=1(0x00000001)
-.DEF        incr            0xFFFFFE01      # CW_1--, CW_2++
-.DEF        duration        4
-repeat:     move            $cw_31_01,R0
-            move            31,R1           # loop counter
-inner:      seq_out         R0,$duration
-            add             R0,$incr,R0
-            loop            R1,@inner
-            jmp             @repeat
-"""
-        log.debug('uploading DIO calibration program to CC')
-        instr.cc.sequence_program(cc_prog)
-        log.debug("printing CC errors")
-        err_cnt = instr.cc.get_system_error_count()
-        if err_cnt > 0:
-            log.warning('CC status after upload')
-        for i in range(err_cnt):
-            print(instr.cc.get_error())
-        instr.cc.start()
-        log.debug('starting CC')
+        instr.cc.output_dio_calibration_data()
 
         try:
-            instr.mw[i].calibrate_dio_protocol(expected_sequence, verbose=True)
+            instr.mw[i].calibrate_dio_protocol(verbose=True)
         except:
             log.warning('calibrate_dio_protocol raised exception')
             # instr.mw[i].plot_dio_snapshot()
