@@ -15,9 +15,8 @@ import qutip as qtp
 import cma
 #np.set_printoptions(threshold=np.inf)
 
-
-
-
+import logging
+log = logging.getLogger(__name__)
 
 def f_to_parallelize_new(arglist):
     # cluster wants a list as an argument.
@@ -467,7 +466,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 U_final_vec[i] = U_final_vec[i] * weights[i]
             U_superop_average = sum(U_final_vec)              # computing resulting average propagator
             #print(czf.verify_CPTP(U_superop_average))
-
 
             qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, noise_parameters_CZ=self.noise_parameters_CZ, which_gate=self.which_gate)
 

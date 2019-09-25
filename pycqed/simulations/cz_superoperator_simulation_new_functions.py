@@ -169,10 +169,12 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
     alpha_q1 = float(alpha_q1)
     J = float(J)
 
+    adag = a.dag()
+    bdag = b.dag()
 
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
-        1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
-        J * (-1)*(a.dag()*b+a*b.dag()) \
+        1/2*alpha_q0*(adag*adag*a*a) + 1/2*alpha_q1*(bdag*bdag*b*b) +\
+        J * (-1)*(adag*b+a*bdag) \
         # + J * (basis_state(0,1,to_vector=False)*basis_state(1,0,to_vector=False).dag() + \
         #        basis_state(1,0,to_vector=False)*basis_state(0,1,to_vector=False).dag())
         #(a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
@@ -942,7 +944,6 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp,
 
     fluxlutman.set('q_freq_10_{}'.format(which_gate), w_q1_biased)     # we insert the change to w_q1 in this way because then J1 is also tuned appropriately
 
-    #t0 = time.time()
 
     exp_L_total=1
     for i in range(len(amp)):
@@ -954,17 +955,15 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp,
         if c_ops != []:
             c_ops_temp=[]
             for c in range(len(c_ops)):
+                S_Hdag = S_H.dag()
                 if isinstance(c_ops[c],list):
-                    c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_H.dag())    # c_ops are already in the H_0 basis
+                    c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_Hdag)    # c_ops are already in the H_0 basis
                 else:
-                    c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
+                    c_ops_temp.append(S_H * c_ops[c] * S_Hdag)
             liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*intervals_list[i]).expm()
         else:
             liouville_exp_t=(-1j*H*intervals_list[i]).expm()
         exp_L_total=liouville_exp_t*exp_L_total
-
-    #t1 = time.time()
-    #print('\n alternative propagator',t1-t0)
 
     fluxlutman.set('q_freq_10_{}'.format(which_gate), w_q1)
 
