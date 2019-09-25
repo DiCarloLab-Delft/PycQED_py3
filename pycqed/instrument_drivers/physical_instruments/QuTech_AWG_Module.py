@@ -18,7 +18,7 @@ Todo:
 from .SCPI import SCPI
 
 import numpy as np
-import struct
+import re
 import json
 import logging
 import warnings
@@ -115,15 +115,34 @@ class QuTech_AWG_Module(SCPI):
 #        self._dev_desc.numMarkers = 8 # FIXME
         self._dev_desc.numTriggers = 8  # FIXME: depends on IORear type
 
-        # FIXME: requires QWG version >1.3.0
-        self._nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
-        self._dev_desc.numMaxCwBits = int(self.ask(self._nr_cw_bits_cmd))
+        # Check for driver / QWG compatibility
+        version_min = (1, 5, 0)  # driver supported software version: Major, minor, patch
 
+        self._nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
         self._nr_cw_inp_cmd = "SYSTem:CODEwords:SELect?"
-        self._dev_desc.numSelectCwInputs = int(self.ask(self._nr_cw_inp_cmd))
+
+        idn_firmware = self.get_idn()["firmware"]
+        regex = r"swVersion=(\d).(\d).(\d)"
+        sw_version = re.search(regex, idn_firmware)
+        version_cur = (int(sw_version.group(1)), int(sw_version.group(2)), int(sw_version.group(3)))
+        driver_outdated = True
+
+        if sw_version and version_cur >= version_min:
+            self._dev_desc.numSelectCwInputs = int(self.ask(self._nr_cw_inp_cmd))
+            self._dev_desc.numMaxCwBits = int(self.ask(self._nr_cw_bits_cmd))
+            driver_outdated = False
+        else:
+            # FIXME: we could be less rude and only disable the new parameters
+            logging.warning(f"Incompatible driver version of QWG ({self.name}); The version ({version_cur[0]}."
+                            f"{version_cur[1]}.{version_cur[2]}) "
+                            f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
+                            f"parameters will not operate and timeout. Please update the QWG software to "
+                            f"{version_min[0]}.{version_min[1]}.{version_min[2]} or later")
+            self._dev_desc.numMaxCwBits = 7
+            self._dev_desc.numSelectCwInputs = 7
         self._dev_desc.numCodewords = pow(2, self._dev_desc.numSelectCwInputs)
 
-        # valid values
+        # validator values
         self._dev_desc.mvals_trigger_impedance = vals.Enum(50),
         self._dev_desc.mvals_trigger_level = vals.Numbers(0, 5.0)
 
@@ -184,10 +203,10 @@ class QuTech_AWG_Module(SCPI):
         if run_mode:
             self.run_mode(run_mode)
 
-        if dio_mode:
+        if dio_mode and not driver_outdated:
             self.dio_mode(dio_mode)
 
-        if codeword_protocol:
+        if codeword_protocol and not driver_outdated:
             self.codeword_protocol(codeword_protocol)
 
     def start(self):
@@ -237,7 +256,7 @@ class QuTech_AWG_Module(SCPI):
             errMgs = []
             for i in range(errNr):
                 errMgs.append(self.getError())
-            raise RuntimeError(', '.join(errMgs))
+            raise RuntimeError(f'{repr(self)}: ' + ', '.join(errMgs))
 
     def dio_calibrate(self, target_index: int = ''):
         """
