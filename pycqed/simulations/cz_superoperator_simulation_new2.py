@@ -471,7 +471,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
             if self.noise_parameters_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
                                                                                         # then we optimize the search via higher-order cost function
-                cost_func_val = (-np.log10(1-qoi['avgatefid_compsubspace_pc']))**4
+                cost_func_val = (np.log10(1-qoi['avgatefid_compsubspace_pc']))**4       # sign removed for even powers
             else:
                 cost_func_val = (-np.log10(1-qoi['avgatefid_compsubspace_pc']))
 

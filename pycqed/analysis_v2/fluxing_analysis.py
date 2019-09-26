@@ -22,7 +22,7 @@ from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
 
 import logging
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 class Chevron_Analysis(ba.BaseDataAnalysis):
     def __init__(self, ts: str=None, label=None,
