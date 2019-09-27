@@ -165,7 +165,7 @@ rolut = UHFQC_RO_LutMan('rolut', num_res=7)
 #  Configure AWGs
 ##########################################
 for i, dev in enumerate(conf.mw):
-    log.debug(f'configuring mw HDAWG {dev}')
+    log.debug(f'configuring microwave HDAWG {dev}')
     # define sequence
     sequence_length = 32
 
@@ -181,47 +181,48 @@ for i, dev in enumerate(conf.mw):
     set_waveforms(instr.mw[i], 'square', sequence_length)
 
     # set DIO protocol
-    instr.mw[i].cfg_codeword_protocol.set('microwave')
+    codeword_protocol = 'microwave'
+    instr.mw[i].cfg_codeword_protocol.set(codeword_protocol)
     instr.mw[i].upload_codeword_program()  # FIXME: also done by calibrate_dio_protocol?
 
     if 1:  # DIO calibration
-        instr.cc.output_dio_calibration_data()
+        instr.cc.output_dio_calibration_data(codeword_protocol)
 
         try:
             instr.mw[i].calibrate_dio_protocol(verbose=True)
         except:
             log.warning('calibrate_dio_protocol raised exception')
-            # instr.mw[i].plot_dio_snapshot()
+            instr.mw[i].plot_dio_snapshot()
             raise
 
     instr.mw[i].start()
 
 
-if conf.flux_0 != '':
-    log.debug('configuring flux_0')
+for i, dev in enumerate(conf.flux):
+    log.debug(f'configuring flux HDAWG {dev}')
     # define sequence
     sequence_length = 8
 
     # configure instrument
-    instr.flux_0.clear_errors()
-    instr.flux_0.load_default_settings()
-    instr.flux_0.assure_ext_clock()
-    set_waveforms(instr.flux_0, 'square', sequence_length)
-    instr.flux_0.cfg_codeword_protocol.set('flux')
-    instr.flux_0.upload_codeword_program()
+    instr.flux[i].clear_errors()
+    instr.flux[i].load_default_settings()
+    instr.flux[i].assure_ext_clock()
+    set_waveforms(instr.flux[i], 'square', sequence_length)
+    instr.flux[i].cfg_codeword_protocol.set('flux')
+    instr.flux[i].upload_codeword_program()
     #AWG8.calibrate_dio_protocol() # aligns the different bits in the codeword protocol
 
 ##########################################
 #  Configure UHFQA's
 ##########################################
 
-if conf.ro_0 != '':
-    log.debug('configuring ro_0')
-    instr.ro_0.load_default_settings() # FIXME: also done at init?
+for i, dev in enumerate(conf.ro):
+    log.debug(f'configuring readout UHFQA {dev}')
+    instr.ro[i].load_default_settings() # FIXME: also done at init?
 
     # configure UHFQC to generate codeword based readout signals
-    instr.ro_0.quex_rl_length(1)
-    instr.ro_0.quex_wint_length(int(600e-9 * 1.8e9))
+    instr.ro[i].quex_rl_length(1)
+    instr.ro[i].quex_wint_length(int(600e-9 * 1.8e9))
 
     if 1:
         # generate waveforms and ZIseqC program using rolut
@@ -243,7 +244,7 @@ if conf.ro_0 != '':
             rolut.set('M_modulation_R{}'.format(res), 0)
 
         rolut.acquisition_delay(200e-9)
-        rolut.AWG(instr.ro_0.name)
+        rolut.AWG(instr.ro[i].name)
         rolut.sampling_rate(1.8e9)
         rolut.generate_standard_waveforms()
         rolut.pulse_type('M_up_down_down')
@@ -251,7 +252,7 @@ if conf.ro_0 != '':
         rolut.resonator_combinations([[0,2,3,5,6]])  # FIXME: must use resonators from resonator_codeword_bit_mapping
         rolut.load_DIO_triggered_sequence_onto_UHFQC()  # upload waveforms and ZIseqC program
 
-        instr.ro_0.awgs_0_userregs_0(1024)  # loop_cnt, see UHFQC driver (awg_sequence_acquisition_and_DIO_triggered_pulse)
+        instr.ro[i].awgs_0_userregs_0(1024)  # loop_cnt, see UHFQC driver (awg_sequence_acquisition_and_DIO_triggered_pulse)
 
 ##########################################
 #  Configure CC

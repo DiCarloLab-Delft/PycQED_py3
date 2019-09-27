@@ -191,7 +191,7 @@ class QuTechCC(QuTechCC_core, Instrument):
     # DIO calibration support for connected instruments
     ##########################################################################
 
-    def output_dio_calibration_data(self, dio_mode, port):
+    def output_dio_calibration_data(self, dio_mode, port=None):
         if dio_mode == "microwave":
             cc_prog = _cc_prog_dio_cal_microwave
         elif dio_mode == "new_microwave":
@@ -201,7 +201,7 @@ class QuTechCC(QuTechCC_core, Instrument):
         elif dio_mode == "flux":
             pass
 
-        log.debug(f'uploading DIO calibration program for mode {dio_mode} to CC')
+        log.debug(f"uploading DIO calibration program for mode '{dio_mode}' to CC")
         self.sequence_program(cc_prog)
         log.debug("printing CC errors")
         err_cnt = self.get_system_error_count()

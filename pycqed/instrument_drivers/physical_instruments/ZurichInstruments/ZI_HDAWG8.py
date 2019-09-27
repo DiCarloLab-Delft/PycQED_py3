@@ -151,33 +151,6 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         t1 = time.time()
         log.info(f'{self.devname}: Initialized ZI_HDAWG in {t1 - t0}s')
 
-    def _add_extra_parameters(self):
-        self.add_parameter('timeout', unit='s',
-                           initial_value=10,
-                           parameter_class=ManualParameter)
-        self.add_parameter(
-            'cfg_num_codewords', label='Number of used codewords', docstring=(
-                'This parameter is used to determine how many codewords to '
-                'upload in "self.upload_codeword_program".'),
-            initial_value=self._num_codewords,
-            # N.B. I have commentd out numbers larger than self._num_codewords
-            # see also issue #358
-            vals=vals.Enum(2, 4, 8, 16, 32),  # , 64, 128, 256, 1024),
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'cfg_codeword_protocol', initial_value='identical',
-            vals=vals.Enum('identical', 'microwave', 'new_microwave', 'new_novsm_microwave', 'flux'), docstring=(
-                'Used in the configure codeword method to determine what DIO'
-                ' pins are used in for which AWG numbers.'),
-            parameter_class=ManualParameter)
-
-        for i in range(4):
-            self.add_parameter(
-                'awgs_{}_sequencer_program_crc32_hash'.format(i),
-                parameter_class=ManualParameter,
-                initial_value=0, vals=vals.Ints())
-
     def snapshot_base(self, update: bool=False,
                       params_to_skip_update =None,
                       params_to_exclude = None ):
@@ -326,7 +299,7 @@ while (1) {
                         setting "wave_chX_cwXXX" parameters.
             # FIXME: comment outdated
             # FIXME: unused parameter default_dio_timing
-            # FIXME: turn cfg_codeword_protocol into a function parameter
+            # FIXME: turn cfg_codeword_protocol into a function parameter?
 
         """
         # Check overall configuration
@@ -473,15 +446,17 @@ while (1) {
         # AWGS/0/DIO/DATA
 
     ##########################################################################
-    # 'private' functions: parameter support for codewords
+    # 'private' functions: parameter support for codewords, override ZI_base_instrument
     ##########################################################################
 
     def _add_extra_parameters(self) -> None:
         super()._add_extra_parameters()
 
         self.add_parameter(
-            'cfg_codeword_protocol', initial_value='identical',
-            vals=validators.Enum('identical', 'microwave', 'flux'), docstring=(
+            'cfg_codeword_protocol',
+            initial_value='identical',
+            vals=validators.Enum('identical', 'microwave', 'new_microwave', 'new_novsm_microwave', 'flux'),
+            docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
@@ -503,7 +478,7 @@ while (1) {
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
-        log.info(f"{self.devname}: Testing DIO activity for AWG {awg_nr}")
+        log.debug(f"{self.devname}: Testing DIO activity for AWG {awg_nr}")
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
@@ -531,18 +506,19 @@ while (1) {
                 strb_activity |= (d & strb_mask)
 
             if cw_activity != cw_mask:
-                log.warning(f"{self.devname}: Did not see all codeword bits toggle! Got 0x{cw_activity:08x}, expected 0x{cw_mask:08x}.")
+                log.warning(f"{self.devname}: Invalid DIO activity: did not see all codeword bits toggle! Got 0x{cw_activity:08x}, expected 0x{cw_mask:08x}.")
                 valid = False
 
             if vld_polarity != 0 and vld_activity != vld_mask:
-                log.warning(f"{self.devname}: Did not see valid bit toggle!")
+                log.warning(f"{self.devname}: Invalid DIO activity: did not see valid bit toggle!")
                 valid = False
 
             if strb_slope != 0 and strb_activity != strb_mask:
-                log.warning(f"{self.devname}: Did not see strobe bit toggle!")
+                log.warning(f"{self.devname}: Invalid DIO activity: did not see strobe bit toggle!")
                 valid = False
 
             if valid:
+                log.info(f"{self.devname}: Detected proper DIO activity for AWG {awg_nr}")
                 return True
 
         return False
@@ -587,6 +563,69 @@ while (1) {
                 valid_delays.append(delay)
 
         return set(valid_delays)
+
+    ##########################################################################
+    # 'public' DIO calibration functions
+    ##########################################################################
+
+    def calibrate_dio_protocol(self, expected_sequence=None, verbose=False, repetitions=1) -> None:
+        """
+        Calibrate the DIO protocol. Requires the DIO interface to be driven using a proper data pattern.
+
+        Please note that instrument latency may change if the delay value is changed
+        """
+
+        # Make sure the configuration is up-to-date
+        self.assure_ext_clock()
+        self.upload_codeword_program()
+
+        # if not specified, derive expected_sequence from cfg_codeword_protocol
+        if expected_sequence is None:
+            codeword_protocol = self.cfg_codeword_protocol()
+            if codeword_protocol == "microwave":
+                sequence_length = 32
+                staircase_sequence = range(1, sequence_length)
+                expected_sequence = [
+                    (0, list(staircase_sequence)),
+                    (1, list(staircase_sequence)),
+                    (2, list(reversed(staircase_sequence))),
+                    (3, list(reversed(staircase_sequence)))]
+            elif codeword_protocol == "new_microwave":
+                raise NotImplementedError()
+            elif codeword_protocol == "new_novsm_microwave":
+                raise NotImplementedError()
+            elif codeword_protocol == "flux":
+                raise NotImplementedError()
+            else:
+                raise ValueError('unexpected value {} for cfg_codeword_protocol'.format(codeword_protocol))
+
+        for awg, sequence in expected_sequence:
+            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence)):
+                raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
+
+        valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
+        if len(valid_delays) == 0:
+            raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
+            # FIXME: a potential cause is that the instruments are not locked to the reference clock. It would be nice to
+            # provide some hooks to detect that situation
+        min_valid_delay = min(valid_delays)
+        if 1:
+            log.warning("HACKING the delay to set")
+            min_valid_delay += 1  # FIXME: hack
+
+        # Print information
+        log.info(f"{self.devname}: Valid delays are {valid_delays}")
+        log.info(f"{self.devname}: Setting delay to {min_valid_delay}")  # FIXME: choose center of valid area iso min?
+        # FIXME: make chosen delay available in a parameter, to give the end user the capability to track calibration changes (which might change latency)
+
+        # And configure the delays
+        self.setd('raw/dios/0/delays/*', min_valid_delay)
+
+        if 0: # FIXME: clear timing violation flag (is that required or already done internally)
+            for awg in [0, 1, 2, 3]:
+                self.seti('awgs/' + str(awg) + '/dio/error/timing', 0)  # FIXME: correct? Does not seem to help
+        if 1: # FIXME: clear all errors instead
+            self.clear_errors()
 
     ##########################################################################
     # DIO calibration functions for *CC*
@@ -740,53 +779,3 @@ while (1) {
         # If successful return True
         return True
 
-    def calibrate_dio_protocol(self, expected_sequence=None, verbose=False, repetitions=1) -> None:
-        """
-        Calibrate the DIO protocol. Requires the DIO interface to be driven using a proper data pattern.
-
-        Please note that instrument latency may change if the delay value is changed
-        """
-
-        # Make sure the configuration is up-to-date
-        self.assure_ext_clock()
-        self.upload_codeword_program()
-
-        # if not specified, derive expected_sequence from cfg_codeword_protocol
-        if expected_sequence is None:
-            codeword_protocol = self.cfg_codeword_protocol()
-            if codeword_protocol == "microwave":
-                sequence_length = 32
-                staircase_sequence = range(1, sequence_length)
-                expected_sequence = [
-                    (0, list(staircase_sequence)),
-                    (1, list(staircase_sequence)),
-                    (2, list(reversed(staircase_sequence))),
-                    (3, list(reversed(staircase_sequence)))]
-            elif codeword_protocol == "new_microwave":
-                raise NotImplementedError()
-            elif codeword_protocol == "new_novsm_microwave":
-                raise NotImplementedError()
-            elif codeword_protocol == "flux":
-                raise NotImplementedError()
-            else
-                raise ValueError('unexpected value {} for cfg_codeword_protocol'.format(codeword_protocol))
-
-        for awg, sequence in expected_sequence:
-            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence)):
-                raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
-
-        valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
-        if len(valid_delays) == 0:
-            raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
-        min_valid_delay = min(valid_delays)
-
-        # Print information
-        log.info(f"{self.devname}: Valid delays are {valid_delays}")
-        log.info(f"{self.devname}: Setting delay to {min_valid_delay}")  # FIXME: choose center of valid area iso min?
-
-        # And configure the delays
-        self.setd('raw/dios/0/delays/*', min_valid_delay)
-
-    def calibrate_dio_protocol_mode(self, verbose=False) -> None:
-
-        self.calibrate_dio_protocol(expected_sequence, verbose)

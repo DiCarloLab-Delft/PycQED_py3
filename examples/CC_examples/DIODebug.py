@@ -7,9 +7,9 @@
 import sys
 import logging
 
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.wouter import ZI_HDAWG8
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.wouter import UHFQuantumController as ZI_UHFQC
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.wouter import ZI_tools
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import ZI_HDAWG8
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import ZI_tools
 
 # configure our logger
 log = logging.getLogger('DIODebug')
@@ -22,49 +22,68 @@ def print_var(name: str, val_format: str=''):
     print(fmt.format(name, instr.get(name)))
 
 
-# from http://localhost:8888/notebooks/Electronics_Design/AWG8_V4_DIO_Calibration.ipynb
-def get_awg_dio_data(dev, awg):
-    data = dev.getv('awgs/' + str(awg) + '/dio/data')
-    ts = len(data) * [0]
-    cw = len(data) * [0]
-    for n, d in enumerate(data):
-        ts[n] = d >> 10
-        cw[n] = (d & ((1 << 10) - 1))
-    return (ts, cw)
-
-
-# parameter handling
 log.debug('started')
-sel = 0
-if len(sys.argv)>1:
-    sel = int(sys.argv[1])
 
-# instrument info
-dev = 'dev8078'
+# default parameters:
+dev = 'dev8068'
+opt_codewords = False
+opt_dio = False
+# parameter handling
+arg = 1
+while arg < len(sys.argv):
+    val = sys.argv[arg]
+    if val == "-c":
+        opt_codewords = True
+    elif val == "-d":
+        opt_dio = True
+    else:
+        dev = val
+    arg += 1
 
 # show DIO
 log.debug('connecting to instrument')
 if 1:   # HDAWG
     instr = ZI_HDAWG8.ZI_HDAWG8('mw_0', device=dev)
+    instr.assure_ext_clock()
 
     dio_lines = range(31, -1, -1)
 
+    if 0:  # driver function
+        instr.plot_dio_snapshot()
+
+    if opt_codewords:
+        for awg in [0, 1, 2, 3]:
+            instr.plot_awg_codewords(awg)
+
     # take a snapshot of the DIO interface
-    if 1:
+    if opt_dio:
         # get the snapshot data. Time resolution =  3.33 ns, #samples = 1024
-        # FIXME: is this still true: NB: the DIO timing is applied before the snapshot is taken
-        data = instr._dev.getv('raw/dios/0/data') # FIXME: no node for that
-        ZI_tools.print_timing_diagram_simple(data, dio_lines, 64)
+        # NB: the DIO timing is applied before the snapshot is taken
+        data = instr.getv('raw/dios/0/data')  # NB: no node for that
+        ZI_tools.print_timing_diagram_simple(data, dio_lines, 10*6)  # NB: print multiple of 6 samples (i.e. 20 ns)
 
     if 0:
         # FIXME: looking at single awg
         ts, cws = get_awg_dio_data(instr._dev, 0)
         ZI_tools.print_timing_diagram_simple(cws, dio_lines, 64)
 
+
+
+    if 1:  # get list of nodes
+        #nodes = instr.daq.listNodes('/' + dev + '/', 7)
+        nodes = instr.daq.listNodes('/', 7)
+        with open("nodes.txt", "w") as file:
+            file.write(str(nodes))
+    #log.info(f"DIO delay is set to {instr.getd('raw/dios/0/delays/0')}")
+    for awg in [0, 1, 2, 3]:
+        log.info(f"AWG{awg} DIO delay is set to {instr.getd(f'awgs/{awg}/dio/delay/value')}")
+
+
+
     for awg in [0, 1, 2, 3]:
         print_var('awgs_{}_dio_error_timing'.format(awg))
         print_var('awgs_{}_dio_error_width'.format(awg))
-        print_var('awgs_{}_dio_value'.format(awg), ':#08X')
+        #print_var('awgs_{}_dio_value'.format(awg), ':#08X')
         print_var('awgs_{}_dio_highbits'.format(awg), ':#08X')
         print_var('awgs_{}_dio_lowbits'.format(awg), ':#08X')
 
