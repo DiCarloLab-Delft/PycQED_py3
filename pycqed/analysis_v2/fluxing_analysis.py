@@ -262,6 +262,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             zlabel = '{} ({})'.format(val_name,
                                       self.proc_data_dict['value_units'][i])
             self.plot_dicts[val_name] = {
+                'ax_id': val_name,
                 'plotfn': color_plot,
                 'x': self.proc_data_dict['x_int'],
                 'y': self.proc_data_dict['y_int'],
@@ -277,9 +278,28 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             if self.proc_data_dict['value_units'][i] == 'deg':
                 self.plot_dicts[val_name]['cmap_chosen'] = anglemap
 
-            if self.proc_data_dict['value_names'][i] in {'L1', 'missing fraction', 
+            if val_name in {'L1', 'missing fraction', 
                     'offset difference'}:
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
+
+            if val_name in {'Cost func'} and self.proc_data_dict['optimal_pnt']:
+                # log.warning(self.plot_dicts[val_name]['ax_id'])
+                optimal_pnt = self.proc_data_dict['optimal_pnt']
+                optimal_parameters_msg = (
+                    'Optimal Parameters:\n'
+                    'Cost func: {:4.2f}\n'
+                    'Theta_f: {:4.1f}\n'
+                    'lambda_2: {:4.3f}'
+                    .format(optimal_pnt['z'], optimal_pnt['x'], optimal_pnt['y'])
+                    )
+                self.plot_dicts['optimal_parameters_msg'] = {
+                    'ax_id': val_name,
+                    'ypos': 0.95,
+                    'xpos': 1.55,
+                    'plotfn': self.plot_text,
+                    'box_props': 'fancy',
+                    'line_kws': {'alpha': 0},
+                    'text_string': optimal_parameters_msg}
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
@@ -297,5 +317,14 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 self.proc_data_dict['measured_values'][i],
                 interp_method= interp_method)
             self.proc_data_dict['interpolated_values'].append(z_int)
+
+            if self.proc_data_dict['value_names'][i] in {'Cost func'}:
+                argmax = np.unravel_index(z_int.argmax(), z_int.shape)
+                # to be called as e.g. z_int[argmax[0]][argmax[1]]
+                self.proc_data_dict['optimal_pnt'] = \
+                    {'x': x_int[argmax[1]], 'y': y_int[argmax[0]], 'z': z_int[argmax[0]][argmax[1]]}
+                # log.warning('{}\n{}\n{}'.format(np.shape(x_int), np.shape(y_int), np.shape(z_int), np.shape(argmax)))
+                # log.warning('argmax: {}, x_int: {}, y_int: {}'.format(argmax ,x_int[argmax],y_int[argmax]))
+                # log.warning('{} {}'.format(x_int[argmax[0]], y_int[argmax[1]]))
         self.proc_data_dict['x_int'] = x_int
         self.proc_data_dict['y_int'] = y_int
