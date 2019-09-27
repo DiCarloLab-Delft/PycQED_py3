@@ -907,6 +907,8 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         self._zi_waves_cleared = False
         self._hash_to_wavename_table = {}
 
+        self.num_seg = 0
+
         Pulsar._instance = self
 
     @staticmethod
@@ -1107,6 +1109,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             self._program_awg(self.AWG_obj(awg=awg), 
                               awg_sequences.get(awg, {}), waveforms)       
         
+        self.num_seg = len(sequence.segments)
         self.AWGs_prequeried(False)
 
     def _program_awg(self, obj, awg_sequence, waveforms):
