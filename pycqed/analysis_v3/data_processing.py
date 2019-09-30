@@ -446,6 +446,37 @@ def average(data_dict, data_keys_in, data_keys_out, **params):
             data_to_proc_dict[keyi], (num_bins[k], averages)), axis=-1)
     return data_dict
 
+def arbitrary_mapping(data_dict, data_keys_in, data_keys_out, **params):
+    """
+    Maps data in data_dict specified by data_keys_in using mapping callable
+    (can be any function).
+    :param data_dict: OrderedDict containing data to be processed and where
+                    processed data is to be stored
+    :param data_keys_in: list of key names or dictionary keys paths in
+                    data_dict for the data to be processed
+    :param data_keys_out: list of key names or dictionary keys paths in
+                    data_dict for the processed data to be saved into
+    :param params: keyword arguments.:
+        mapping (callable): string form of a callable or callable function
+        mapping_kwargs (dict): additional arguments to forward to mapping function
+
+    """
+    mapping = get_param('mapping', data_dict, **params)
+    mapping_kwargs = get_param('mapping_kwargs', data_dict,
+                               default_value=dict(), **params)
+    if mapping is None:
+        raise ValueError('mapping is not specified.')
+    elif isinstance(mapping, str):
+        mapping = eval(mapping)
+    data_to_proc_dict = get_data_to_process(data_dict, data_keys_in)
+
+    if len(data_keys_out) != len(data_to_proc_dict):
+        raise ValueError('data_keys_out and data_keys_in do not have '
+                         'the same length.')
+
+    for k, (keyi, keyo) in enumerate(zip(data_to_proc_dict, data_keys_out)):
+        data_dict[keyo] = mapping(data_to_proc_dict[keyi], **mapping_kwargs)
+    return data_dict
 
 def get_qb_channel_map_from_file(data_dict, data_keys, **params):
     file_type = params.get('file_type', 'hdf')
