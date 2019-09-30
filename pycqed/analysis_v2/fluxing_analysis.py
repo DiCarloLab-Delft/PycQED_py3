@@ -282,7 +282,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     'offset difference'}:
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
-            if val_name in {'Cost func'} and self.proc_data_dict['optimal_pnt']:
+            if val_name in {'Cost func', 'Cost function', 'Cost function value'} and self.proc_data_dict['optimal_pnt']:
                 # log.warning(self.plot_dicts[val_name]['ax_id'])
                 optimal_pnt = self.proc_data_dict['optimal_pnt']
                 optimal_parameters_msg = (
@@ -318,7 +318,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 interp_method= interp_method)
             self.proc_data_dict['interpolated_values'].append(z_int)
 
-            if self.proc_data_dict['value_names'][i] in {'Cost func'}:
+            if self.proc_data_dict['value_names'][i] in {'Cost func', 'Cost function', 'Cost function value'}:
                 argmax = np.unravel_index(z_int.argmax(), z_int.shape)
                 # to be called as e.g. z_int[argmax[0]][argmax[1]]
                 self.proc_data_dict['optimal_pnt'] = \
