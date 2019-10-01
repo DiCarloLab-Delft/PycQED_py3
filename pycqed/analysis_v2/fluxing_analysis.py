@@ -237,8 +237,13 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 extract_only: bool = False,
                 do_fitting: bool = False,
                 auto: bool = True,
-                testpar: str = 'viridis',
-                interp_method='linear'):
+                interp_method: str = 'linear',
+                plt_orig_pnts: bool = True,
+                plt_contour_phase: bool = True):
+
+        self.plt_orig_pnts = plt_orig_pnts
+        self.plt_contour_phase = plt_contour_phase
+
         super().__init__(
             t_start=t_start,
             t_stop=t_stop,
@@ -252,12 +257,11 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             interp_method=interp_method
         )
 
-        self.testpar = testpar
-
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
         super().prepare_plots()
         anglemap = make_anglemap()
+
         for i, val_name in enumerate(self.proc_data_dict['value_names']):
 
             zlabel = '{} ({})'.format(val_name,
@@ -277,6 +281,38 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     self.timestamp, self.proc_data_dict['measurementstring'])
             }
 
+            if self.plt_orig_pnts:
+                self.plot_dicts[val_name + '_non_interpolated'] = {
+                    'ax_id': val_name,
+                    'plotfn': non_interpolated_overlay,
+                    'x': self.proc_data_dict['x'],
+                    'y': self.proc_data_dict['y']
+                }
+
+            if self.plt_contour_phase:
+                # Find index of Conditional Phase
+                z_cond_phase = None
+                cond_phase_names = {'Cond phase', 'Cond. phase',
+                    'Conditional phase', 'cond phase', 'cond. phase',
+                    'conditional phase'}
+                for j, val_name_j in enumerate(self.proc_data_dict['value_names']):
+                    pass
+                    if val_name_j in cond_phase_names:
+                        z_cond_phase = self.proc_data_dict['interpolated_values'][j]
+                        break
+
+                if z_cond_phase is not None:
+                    self.plot_dicts[val_name + '_cond_phase_contour'] = {
+                        'ax_id': val_name,
+                        'plotfn': contour_overlay,
+                        'x': self.proc_data_dict['x_int'],
+                        'y': self.proc_data_dict['y_int'],
+                        'z': z_cond_phase,
+                        'colormap': anglemap
+                    }
+                else:
+                    log.warning('No data found named {}'.format(cond_phase_names))
+
             if self.proc_data_dict['value_units'][i] == 'deg':
                 self.plot_dicts[val_name]['cmap_chosen'] = anglemap
 
@@ -284,8 +320,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     'offset difference'}:
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
-            if val_name in {'Cost func', 'Cost function', 'Cost function value'} and self.proc_data_dict['optimal_pnt']:
-                # log.warning(self.plot_dicts[val_name]['ax_id'])
+            if val_name in {'Cost func', 'Cost function',
+                    'Cost function value'} and self.proc_data_dict['optimal_pnt']:
                 optimal_pnt = self.proc_data_dict['optimal_pnt']
                 optimal_parameters_msg = (
                     'Optimal Parameters:\n'
@@ -320,7 +356,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 interp_method=interp_method)
             self.proc_data_dict['interpolated_values'].append(z_int)
 
-            if self.proc_data_dict['value_names'][i] in {'Cost func', 'Cost function', 'Cost function value'}:
+            if self.proc_data_dict['value_names'][i] in {
+                    'Cost func', 'Cost function', 'Cost function value'}:
                 argmax = np.unravel_index(z_int.argmax(), z_int.shape)
                 # to be called as e.g. z_int[argmax[0]][argmax[1]]
                 self.proc_data_dict['optimal_pnt'] = \
@@ -330,3 +367,71 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 # log.warning('{} {}'.format(x_int[argmax[0]], y_int[argmax[1]]))
         self.proc_data_dict['x_int'] = x_int
         self.proc_data_dict['y_int'] = y_int
+
+
+def non_interpolated_overlay(x, y, fig=None, ax=None, transpose=False, **kw):
+    """
+    x, and y are lists.
+    Args:
+        x (array [shape: n*1]):     x data
+        y (array [shape: m*1]):     y data
+        fig (Object):
+            figure object
+    """
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    color = 'w'
+    edgecolors = 'gray'
+    linewidth = 0.5
+
+    if transpose:
+        log.debug('Inverting x and y axis for non-interpolated points')
+        ax.scatter(y, x, marker='.',
+            color=color, edgecolors=edgecolors, linewidth=linewidth)
+    else:
+        ax.scatter(x, y, marker='.',
+            color=color, edgecolors=edgecolors, linewidth=linewidth)
+
+    return fig, ax
+
+
+def contour_overlay(x, y, z, colormap,
+        contour_levels=[90, 180, 270], vlim=(0, 360), fig=None,
+        ax=None, **kw):
+    """
+    x, and y are lists, z is a matrix with shape (len(x), len(y))
+    Args:
+        x (array [shape: n*1]):     x data
+        y (array [shape: m*1]):     y data
+        z_cond_phase (array [shape: n*m]):     z data from the cond.
+        phase plot
+        angle_colormap (matplotlib.colors.ListedColormap): angle_colormap of the
+        cond. phase plot
+        fig (Object):
+            figure object
+    """
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    vmax = vlim[-1]
+    vmin = vlim[0]
+
+    clipped_lvls = np.clip(contour_levels, vmin, vmax)
+
+    phase_2d_uw  = np.unwrap(np.deg2rad(z) - np.pi)
+    phase_2d_uw_1 = np.rad2deg(phase_2d_uw + np.pi)
+    phase_2d_uw_2 = np.rad2deg(phase_2d_uw - np.pi)
+
+    ax.contour(x, y, phase_2d_uw_1,
+            levels=contour_levels,
+            # fixme determine anglemaps dynamically
+            colors=[colormap(lvl / (vmax - vmin)) for lvl in clipped_lvls],
+            linewidths=2.2)
+    ax.contour(x, y, phase_2d_uw_2,
+            levels=contour_levels,
+            # fixme determine anglemaps dynamically
+            colors=[colormap(lvl / (vmax - vmin)) for lvl in clipped_lvls],
+            linewidths=2.2)
+
+    return fig, ax
