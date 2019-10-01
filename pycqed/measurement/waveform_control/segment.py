@@ -914,7 +914,7 @@ class Segment:
         """
         return samples / self.pulsar.clock(**kw)
 
-    def plot(self, instruments=None, channels=None,
+    def plot(self, instruments=None, channels=None, legend=True,
              delays=dict(), savefig=False, cmap=None, frameon=True):
         """
         Plots a segment. Can only be done if the segment can be resolved.
@@ -962,15 +962,17 @@ class Segment:
                                 ax[i, 0].plot(tvals * 1e6, wf,
                                               label=f"{elem_name[1]}_{k}_{ch}",
                                               linewidth=0.7)
-
-                ax[i, 0].legend(loc=[1.02, 0], prop={'size': 8})
+                if legend:
+                    ax[i, 0].legend(loc=[1.02, 0], prop={'size': 8})
 
             # formatting
             ax[-1, 0].set_xlabel('time ($\mu$s)')
+            fig.suptitle(f'{self.name}')
             plt.tight_layout()
             if savefig:
                 plt.savefig(f'{self.name}.png')
             plt.show()
+            return fig, ax
         except Exception as e:
             log.error(f"Could not plot: {self.name}")
             raise e
