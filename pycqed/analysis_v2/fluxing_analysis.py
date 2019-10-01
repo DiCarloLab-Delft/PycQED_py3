@@ -225,7 +225,7 @@ def plot_chevron_FFT(x, xunit,  fft_freqs, fft_data, freq_fits, freq_fits_std,
 
 class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
     """
-    Write some docstring explaining what we analyze 
+    Write some docstring explaining what we analyze
     """
     def __init__(self,
                 t_start: str = None,
@@ -236,21 +236,22 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 options_dict: dict = None,
                 extract_only: bool = False,
                 do_fitting: bool = False,
-                auto: bool= True,
-                interp_method='linear',
-                testpar: str = 'viridis'):
+                auto: bool = True,
+                testpar: str = 'viridis',
+                interp_method='linear'):
         super().__init__(
-                t_start = t_start,
-                t_stop = t_stop,
-                label = label,
-                data_file_path = data_file_path,
-                close_figs = close_figs,
-                options_dict = options_dict,
-                extract_only = extract_only,
-                do_fitting = do_fitting,
-                auto = auto,
-                interp_method = interp_method)
-        
+            t_start=t_start,
+            t_stop=t_stop,
+            label=label,
+            data_file_path=data_file_path,
+            close_figs=close_figs,
+            options_dict=options_dict,
+            extract_only=extract_only,
+            do_fitting=do_fitting,
+            auto=auto,
+            interp_method=interp_method
+        )
+
         self.testpar = testpar
 
     def prepare_plots(self):
@@ -274,11 +275,12 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 'zlabel': zlabel,
                 'title': '{}\n{}'.format(
                     self.timestamp, self.proc_data_dict['measurementstring'])
-                }
+            }
+
             if self.proc_data_dict['value_units'][i] == 'deg':
                 self.plot_dicts[val_name]['cmap_chosen'] = anglemap
 
-            if val_name in {'L1', 'missing fraction', 
+            if val_name in {'L1', 'missing fraction',
                     'offset difference'}:
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
@@ -291,7 +293,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     'Theta_f: {:4.1f}\n'
                     'lambda_2: {:4.3f}'
                     .format(optimal_pnt['z'], optimal_pnt['x'], optimal_pnt['y'])
-                    )
+                )
                 self.plot_dicts['optimal_parameters_msg'] = {
                     'ax_id': val_name,
                     'ypos': 0.95,
@@ -315,7 +317,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 self.proc_data_dict['x'],
                 self.proc_data_dict['y'],
                 self.proc_data_dict['measured_values'][i],
-                interp_method= interp_method)
+                interp_method=interp_method)
             self.proc_data_dict['interpolated_values'].append(z_int)
 
             if self.proc_data_dict['value_names'][i] in {'Cost func', 'Cost function', 'Cost function value'}:

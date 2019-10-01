@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 np.set_printoptions(threshold=np.inf)
 
 # Hardcoded number of levels for the two transmons.
-# Currently only 3,3 or 4,3 are supported. The bottleneck is the function 
+# Currently only 3,3 or 4,3 are supported. The bottleneck is the function
 # that changes to the dressed basis at sweet spot (matrix_change_of_variables)
 n_levels_q0 = 4
 n_levels_q1 = 3
@@ -59,7 +59,7 @@ U_target_diffdims.dims = [[n_levels_q0*n_levels_q1],[n_levels_q0*n_levels_q1]]
 '''
 remember that qutip uses the Liouville (matrix) representation for superoperators,
 with column stacking.
-E.g. for qutrits this means that 
+E.g. for qutrits this means that
 rho_{xy,x'y'}=rho[3*x+y,3*x'+y']
 rho_{xy,x'y'}=operator_to_vector(rho)[3*x+y+27*x'+9*y']
 where xy is the row and x'y' is the column
@@ -123,7 +123,7 @@ def qubit_to_2qutrit_unitary(U_2q,right_or_left):
         for j in range(np.size(U_2q_matrix,axis=1)):
             U_temp[i,j]=U_2q_matrix[i,j]
     U_temp=qtp.Qobj(U_temp,type='oper',dims=[[d],[d]])
-            
+
     if right_or_left == 'right':
         return qtp.tensor(qtp.qeye(n_levels_q1),U_temp)
     elif right_or_left == 'left':
@@ -135,11 +135,11 @@ def bloch_sphere_rotation(angle, unit_vector):
     # angle (float): rotation angle (in rad) around the axis specified by unit_vector
     # unit_vector: real vector with unit norm specifying the axis of rotation. If it doesn't have unit norm,
     #              then we normalize it
-    
+
     unit_vector=unit_vector/np.linalg.norm(unit_vector)
-    
+
     sigma_scalar_unit_vector = qtp.sigmax()*unit_vector[0]+qtp.sigmay()*unit_vector[1]+qtp.sigmaz()*unit_vector[2]
-    
+
     return np.cos(angle/2)*qtp.qeye(2) - 1j * np.sin(angle/2) * sigma_scalar_unit_vector
 
 
@@ -222,7 +222,7 @@ def rotating_frame_transformation_propagator_new(U, t: float, H):
     if U.type=='super':
         U_RF=qtp.to_super(U_RF)
 
-    U_prime = U_RF * U  
+    U_prime = U_RF * U
     """ U_RF only on one side because that's the operator that
     satisfies the Schroedinger equation in the interaction picture.
     """
@@ -272,7 +272,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
         log.warning('Unsupported rescaling of Tphi_02.')
 
 
-    if Tphi01_q1 != 0:                                 
+    if Tphi01_q1 != 0:
         sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                     [0,-1,0],
                                     [0,0,0]])
@@ -296,7 +296,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
 
     if n_levels_q0 == 3:
 
-        if Tphi01_q0_vec != []:                                 
+        if Tphi01_q0_vec != []:
             sigmaZinqutrit = qtp.Qobj([[1,0,0],
                                         [0,-1,0],
                                         [0,0,0]])
@@ -404,7 +404,7 @@ def leakage_from_superoperator(U):
         Calculates leakage by summing over all in and output states in the
         computational subspace.
             L1 = 1- 1/2^{number computational qubits} sum_i sum_j abs(|<phi_i|U|phi_j>|)**2
-        The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+        The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by
             the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
             If this is not the case, one need to change the basis to that one, before calling this function.
         """
@@ -426,7 +426,7 @@ def leakage_from_superoperator(U):
         computational subspace.
             L1 = 1- 1/2^{number computational qubits} sum_i sum_j Tr(rho_{x'y'}C_U(rho_{xy}))
             where C_U is U in the channel representation
-        The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+        The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by
             the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
             If this is not the case, one need to change the basis to that one, before calling this function.
         """
@@ -443,7 +443,7 @@ def leakage_from_superoperator(U):
                 sump += p
         sump /= 4  # divide by dimension of comp subspace
         sump=np.real(sump)
-        L1 = 1-sump       
+        L1 = 1-sump
         return L1
 
 
@@ -452,7 +452,7 @@ def seepage_from_superoperator(U):
     Calculates seepage by summing over all in and output states outside the
     computational subspace.
         L1 = 1- 1/2^{number non-computational states} sum_i sum_j abs(|<phi_i|U|phi_j>|)**2
-        The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+        The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by
             the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
             If this is not the case, one need to change the basis to that one, before calling this function.
     """
@@ -492,7 +492,7 @@ def calc_population_02_state(U):
     Calculates the population that escapes from |11> to |02>.
     Formula for unitary propagator:  population = |<02|U|11>|^2
     and similarly for the superoperator case.
-        The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+        The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by
             the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
             If this is not the case, one need to change the basis to that one, before calling this function.
     """
@@ -526,7 +526,7 @@ def pro_avfid_superoperator_compsubspace(U,L1):
     """
     Average process (gate) fidelity in the qubit computational subspace for two qutrits.
     Leakage has to be taken into account, see Woods & Gambetta.
-    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by
             the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
             If this is not the case, one need to change the basis to that one, before calling this function.
     """
@@ -537,7 +537,7 @@ def pro_avfid_superoperator_compsubspace(U,L1):
         ptrace = 0
         for i in part_idx:
             ptrace += inner[i, i]
-        dim = 4  # 2 qubits comp subspace       
+        dim = 4  # 2 qubits comp subspace
 
         return np.real(((np.abs(ptrace))**2+dim*(1-L1))/(dim*(dim+1)))
 
@@ -561,7 +561,7 @@ def pro_avfid_superoperator_compsubspace_phasecorrected(U,L1,phases):
     Average process (gate) fidelity in the qubit computational subspace for two qutrits
     Leakage has to be taken into account, see Woods & Gambetta
     The phase is corrected with Z rotations considering both transmons as qubits. The correction is done perfectly.
-    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by
             the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
             If this is not the case, one need to change the basis to that one, before calling this function.
     """
@@ -587,7 +587,7 @@ def pro_avfid_superoperator_compsubspace_phasecorrected(U,L1,phases):
         ptrace = 0
         for i in part_idx:
             ptrace += inner[i, i]
-        dim = 4  # 2 qubits comp subspace       
+        dim = 4  # 2 qubits comp subspace
 
         return np.real(((np.abs(ptrace))**2+dim*(1-L1))/(dim*(dim+1)))
 
@@ -605,7 +605,7 @@ def pro_avfid_superoperator_compsubspace_phasecorrected(U,L1,phases):
             psum += (np.abs(ptrace))**2
 
         ## To plot the Pauli error rates of the twirled channel:
-        #calc_chi_matrix(qtp.to_super(U_target).dag()*U)            
+        #calc_chi_matrix(qtp.to_super(U_target).dag()*U)
 
         return np.real((dim*(1-L1) + psum) / (dim*(dim + 1)))
 
@@ -615,7 +615,7 @@ def pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U,L1,pha
     Average process (gate) fidelity in the qubit computational subspace for two qutrits
     Leakage has to be taken into account, see Woods & Gambetta
     The phase is corrected with Z rotations considering both transmons as qubits. The correction is done perfectly.
-    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by
             the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
             If this is not the case, one need to change the basis to that one, before calling this function.
     """
@@ -641,7 +641,7 @@ def pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U,L1,pha
         ptrace = 0
         for i in part_idx:
             ptrace += inner[i, i]
-        dim = 4  # 2 qubits comp subspace       
+        dim = 4  # 2 qubits comp subspace
 
         return np.real(((np.abs(ptrace))**2+dim*(1-L1))/(dim*(dim+1)))
 
@@ -664,7 +664,7 @@ def pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U,L1,pha
 def pro_avfid_superoperator(U):
     """
     Average process (gate) fidelity in the whole space for two qutrits
-    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by
             the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
             If this is not the case, one need to change the basis to that one, before calling this function.
     """
@@ -681,7 +681,7 @@ def pro_avfid_superoperator_phasecorrected(U,phases):
     """
     Average process (gate) fidelity in the whole space for two qutrits
     Qubit Z rotation and qutrit "Z" rotations are applied, taking into account the anharmonicity as well.
-    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by
             the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
             If this is not the case, one need to change the basis to that one, before calling this function.
     This function is quite useless because we are always interested in the computational subspace only.
@@ -775,7 +775,7 @@ def offset_difference_and_missing_fraction(U):
     return offset_difference, missing_fraction
 
 
-    
+
 
 
 
@@ -836,7 +836,7 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,noise_parameters_C
 
 
         f_pulse_A = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=f_pulse_A,omega_0=omega_0,fluxbias=fluxbias_q0,positive_branch=True)
-        f_pulse_A = np.clip(f_pulse_A,a_min=None,a_max=omega_0) 
+        f_pulse_A = np.clip(f_pulse_A,a_min=None,a_max=omega_0)
         amp_A = fluxlutman.calc_freq_to_amp(f_pulse_A,state='01', which_gate=which_gate)
 
 
@@ -844,7 +844,7 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,noise_parameters_C
         f_pulse_B = np.clip(f_pulse_B,a_min=None,a_max=omega_0)
 
         f_pulse_B = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=f_pulse_B,omega_0=omega_0,fluxbias=fluxbias_q0,positive_branch=False)
-        f_pulse_B = np.clip(f_pulse_B,a_min=None,a_max=omega_0) 
+        f_pulse_B = np.clip(f_pulse_B,a_min=None,a_max=omega_0)
         amp_B = fluxlutman.calc_freq_to_amp(f_pulse_B,state='01',positive_branch=False, which_gate=which_gate)
 
 
@@ -895,7 +895,7 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
         if T1_q0 != 0:
             Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
         else:
-            Tphi01_q0_vec = T2_q0_vec 
+            Tphi01_q0_vec = T2_q0_vec
     else:
         Tphi01_q0_vec = []
 
@@ -914,7 +914,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp,
         c_ops (list of Qobj): time (in)dependent jump operators
         amp(array): amplitude in voltage describes the y-component of the trajectory to simulate. Should be equisampled in time
         fluxlutman,noise_parameters_CZ: instruments containing various parameters
-        fluxbias_q1(float): random fluxbias on the spectator qubit 
+        fluxbias_q1(float): random fluxbias on the spectator qubit
 
     Returns
         U_final(Qobj): propagator
@@ -946,12 +946,14 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp,
 
 
     exp_L_total=1
+    # tt = 0
     for i in range(len(amp)):
         H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ, which_gate=which_gate)
         H=S.dag()*H*S
-        S_H = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])   
+        S_H = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])
                                                    # Alternative for collapse operators that follow the basis of H
                                                    # We do not believe that this would be the correct model.
+
         if c_ops != []:
             c_ops_temp=[]
             for c in range(len(c_ops)):
@@ -960,16 +962,21 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp,
                     c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_Hdag)    # c_ops are already in the H_0 basis
                 else:
                     c_ops_temp.append(S_H * c_ops[c] * S_Hdag)
+
+            # t1 = time.time()
             liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*intervals_list[i]).expm()
+            # tt += time.time() - t1
         else:
             liouville_exp_t=(-1j*H*intervals_list[i]).expm()
         exp_L_total=liouville_exp_t*exp_L_total
 
+    # log.warning('\n expm: {}\n'.format(tt))
+
     fluxlutman.set('q_freq_10_{}'.format(which_gate), w_q1)
 
-    U_final = exp_L_total    
+    U_final = exp_L_total
     return U_final
-    
+
 
 def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, noise_parameters_CZ, which_gate: str = 'NE'):
     """
@@ -1000,7 +1007,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
         population_transfer_12_03 = 0
 
 
-    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=q_freq_10, 
+    H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=q_freq_10,
                                                         alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=noise_parameters_CZ.alpha_q1(), J=0)  # old wrong way
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
@@ -1024,7 +1031,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
 
     phase_diff_12_02 = (phases[6]-phases[4]-phase_q1) % 360
     phase_diff_21_20 = (phases[7]-phases[5]-phase_q0) % 360
-    
+
 
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid,
             'avgatefid_compsubspace_pc': avgatefid_compsubspace, 'phase_q0': phase_q0, 'phase_q1': phase_q1,
@@ -1098,7 +1105,7 @@ def dressed_frequencies(fluxlutman, noise_parameters_CZ, which_gate: str = 'NE')
     if noise_parameters_CZ.dressed_compsub():
         S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[n_levels_q1, n_levels_q0], [n_levels_q1, n_levels_q0]])
     else:
-        S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S  
+        S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S
     H_0_diag = S.dag()*H_0*S
 
     w_q0 = (H_0_diag[index_in_ket([0,1]),index_in_ket([0,1])]-H_0_diag[index_in_ket([0,0]),index_in_ket([0,0])]) / (2*np.pi)
@@ -1630,7 +1637,7 @@ def phase_correction_U(U,states_to_fix):
     # function that apply phase corrections for adequate computation of fidelity to a CZ.
 
     phases=phases_from_superoperator(U)
-    
+
     Ucorrection = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0))
 
     for state in states_to_fix:
@@ -1672,7 +1679,7 @@ def calc_populations(U):
 
     if U.type == 'oper':
         U_pi2_pulsed = hadamard_q0 * U * hadamard_q0
-        populations = {'population_lower_state': np.abs(U_pi2_pulsed[index_in_ket([0,0]),index_in_ket([0,0])])**2, 
+        populations = {'population_lower_state': np.abs(U_pi2_pulsed[index_in_ket([0,0]),index_in_ket([0,0])])**2,
                        'population_higher_state': np.abs(U_pi2_pulsed[index_in_ket([0,0]),index_in_ket([0,1])])**2}
     elif U.type == 'super':
         U_pi2_pulsed = qtp.to_super(hadamard_q0) * U * qtp.to_super(hadamard_q0)
@@ -1724,7 +1731,7 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
     else:
         print('invalid keyword for initial state')
 
-    
+
     return populations
 
 
@@ -1752,7 +1759,7 @@ def calc_chi_matrix(U):
     for i in range(Pauli_gr_size):              # projecting over the two qubit subspace
         for j in range(Pauli_gr_size):
             U_2qubits[i,j]=U[indexlist[i],indexlist[j]]
-    
+
     U_2qubits=qtp.Qobj(U_2qubits,type='super',dims=[[[2, 2], [2, 2]], [[2, 2], [2, 2]]])
     chi_matrix = qtp.to_chi(U_2qubits)/Pauli_gr_size    # normalize so that the trace is 1
     #print(chi_matrix)
@@ -1773,7 +1780,7 @@ def calc_chi_matrix(U):
                           title='Pauli error rates from the chi matrix',
                           xlabel='Pauli index',ylabel='Error',yscale='log')
     print(diag)
-    
+
 
     return chi_matrix
 
@@ -1855,7 +1862,7 @@ def nullify_coherence(U_temp,state_A,state_B):
             for x in range(0,n_levels_q1):
                 for y in range(0,n_levels_q0):
 
-                    U_temp[index_in_vector_of_dm_matrix_element(state_A,state_B),index_in_vector_of_dm_matrix_element([x,y],[x_prime,y_prime])]=0            
+                    U_temp[index_in_vector_of_dm_matrix_element(state_A,state_B),index_in_vector_of_dm_matrix_element([x,y],[x_prime,y_prime])]=0
                     U_temp[index_in_vector_of_dm_matrix_element(state_B,state_A),index_in_vector_of_dm_matrix_element([x,y],[x_prime,y_prime])]=0
 
     return U_temp
