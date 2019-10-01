@@ -1127,6 +1127,13 @@ class MeasurementControl(Instrument):
         parameter. Only saves the value and not the update time (which is
         known in the snapshot)
         '''
+
+
+        import numpy
+        import sys
+        opt = numpy.get_printoptions()
+        numpy.set_printoptions(threshold=sys.maxsize)
+
         if data_object is None:
             data_object = self.data_object
         if not hasattr(self, 'station'):
@@ -1148,10 +1155,11 @@ class MeasurementControl(Instrument):
                 parameter_list = dict_to_ordered_tuples(par_snap)
                 for (p_name, p) in parameter_list:
                     try:
-                        val = str(p['value'])
+                        val = repr(p['value'])
                     except KeyError:
                         val = ''
-                    instrument_grp.attrs[p_name] = str(val)
+                    instrument_grp.attrs[p_name] = val
+        numpy.set_printoptions(**opt)
 
     def save_MC_metadata(self, data_object=None, *args):
         '''

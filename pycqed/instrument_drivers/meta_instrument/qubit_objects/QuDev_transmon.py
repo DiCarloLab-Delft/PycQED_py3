@@ -884,6 +884,7 @@ class QuDev_transmon(Qubit):
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: qscales},
+                             'preparation_params': prep_params,
              'sweep_name': 'Qscale factor',
              'sweep_unit': '',
              'cal_points': repr(cp),

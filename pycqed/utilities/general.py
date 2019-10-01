@@ -234,6 +234,7 @@ def load_settings(instrument,
         params_to_set (list)    : list of strings referring to the parameters
             that should be set for the instrument
     '''
+    from numpy import array  # DO not remove. Used in eval(array(...))
     if folder is None:
         folder_specified = False
     else:
@@ -307,11 +308,11 @@ def load_settings(instrument,
                                 instrument.set(parameter, float(value))
                             except Exception:
                                 try:
-                                    instrument.set(parameter, value)
+                                    instrument.set(parameter, eval(value))
                                 except Exception:
                                     try:
                                         instrument.set(parameter,
-                                                       ast.literal_eval(value))
+                                                       value)
                                     except Exception:
                                         print('Could not set parameter '
                                               '"%s" to "%s" '
