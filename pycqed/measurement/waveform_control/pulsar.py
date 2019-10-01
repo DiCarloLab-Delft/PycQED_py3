@@ -82,6 +82,13 @@ class UHFQCPulsar:
         self.add_parameter('{}_reuse_waveforms'.format(awg.name),
                            initial_value=True, vals=vals.Bool(),
                            parameter_class=ManualParameter)
+        self.add_parameter('{}_minimize_sequencer_memory'.format(awg.name),
+                           initial_value=True, vals=vals.Bool(),
+                           parameter_class=ManualParameter,
+                           docstring="Minimizes the sequencer "
+                                     "memory by repeating specific sequence "
+                                     "patterns (eg. readout) passed in "
+                                     "'repeat dictionary'")
         self.add_parameter('{}_granularity'.format(awg.name),
                            get_cmd=lambda: 16)
         self.add_parameter('{}_element_start_granularity'.format(awg.name),
@@ -120,7 +127,7 @@ class UHFQCPulsar:
             name = channel_name_map.get(id, awg.name + '_' + id)
             self._uhfqc_create_channel_parameters(id, name, awg)
             self.channels.add(name)
-    
+
     def _uhfqc_create_channel_parameters(self, id, name, awg):
         self.add_parameter('{}_id'.format(name), get_cmd=lambda _=id: _)
         self.add_parameter('{}_awg'.format(name), get_cmd=lambda _=awg.name: _)
@@ -329,6 +336,13 @@ class HDAWG8Pulsar:
         self.add_parameter('{}_reuse_waveforms'.format(awg.name),
                            initial_value=True, vals=vals.Bool(),
                            parameter_class=ManualParameter)
+        self.add_parameter('{}_minimize_sequencer_memory'.format(awg.name),
+                           initial_value=False, vals=vals.Bool(),
+                           parameter_class=ManualParameter,
+                           docstring="Minimizes the sequencer "
+                                     "memory by repeating specific sequence "
+                                     "patterns (eg. readout) passed in "
+                                     "'repeat dictionary'")
         self.add_parameter('{}_granularity'.format(awg.name),
                            get_cmd=lambda: 16)
         self.add_parameter('{}_element_start_granularity'.format(awg.name),
@@ -593,6 +607,13 @@ class AWG5014Pulsar:
         self.add_parameter('{}_reuse_waveforms'.format(awg.name),
                            initial_value=True, vals=vals.Bool(),
                            parameter_class=ManualParameter)
+        self.add_parameter('{}_minimize_sequencer_memory'.format(awg.name),
+                           initial_value=False, vals=vals.Bool(),
+                           parameter_class=ManualParameter,
+                           docstring="Minimizes the sequencer "
+                                     "memory by repeating specific sequence "
+                                     "patterns (eg. readout) passed in "
+                                     "'repeat dictionary'")
         self.add_parameter('{}_granularity'.format(awg.name),
                            get_cmd=lambda: 4)
         self.add_parameter('{}_element_start_granularity'.format(awg.name),
@@ -1141,7 +1162,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         for awg in used_awgs:
             self._stop_awg(awg)
     
-    def program_awgs(self, sequence, awgs='all', repeat_dict=dict()):
+    def program_awgs(self, sequence, awgs='all'):
 
         # Stores the last uploaded sequence for easy access and plotting
         self.last_sequence = sequence
@@ -1157,11 +1178,15 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         self.AWGs_prequeried(True)
 
         waveforms, awg_sequences = sequence.generate_waveforms_sequences()
-        
+
+        if self.get("{}_minimize_sequencer_memory"):
+            channels_used = self._channels_in_awg_sequences(awg_sequences)
+            repeat_dict = self._generate_awg_repeat_dict(sequence.repeat_patterns,
+                                                         channels_used)
+        else:
+            repeat_dict = {}
         self._zi_waves_cleared = False
         self._hash_to_wavename_table = {}
-
-        print(repeat_dict)
 
         for awg in awgs:
             if awg in repeat_dict.keys():
@@ -1362,6 +1387,64 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                self.get('{}_id'.format(cname)) == cid:
                 return cname
         return None
+
+    @staticmethod
+    def _channels_in_awg_sequences(awg_sequences):
+        """
+        identifies all channels used in the given awg keyed sequence
+        :param awg_sequences (dict): awg sequences keyed by awg name, i.e. as
+        returned by sequence.generate_sequence_waveforms()
+        :return: dictionary keyed by awg of with all channel used during the sequence
+        """
+        channels_used = dict()
+        for awg in awg_sequences:
+            channels_used[awg] = []
+            for segname in awg_sequences[awg]:
+                if awg_sequences[awg][segname] is None:
+                    pass
+                else:
+                    elements = awg_sequences[awg][segname]
+                    for cw in elements:
+                        if cw == "metadata":
+                            pass
+                        else:
+                            [channels_used[awg].append(ch) for ch in elements[cw]
+                             if ch not in channels_used[awg]]
+        return channels_used
+
+    def _generate_awg_repeat_dict(self, repeat_dict_per_ch, channels_used):
+        """
+        Translates a repeat dictionary keyed by channels to a repeat dictionary
+        keyed by awg. Checks whether all channels in channels_used have an entry.
+        :param repeat_dict_per_ch: keys: channels_id, values: repeat pattern
+        :param channels_used (dict): list of channel used on each awg
+        :return:
+        """
+        awg_ch_repeat_dict = dict()
+        repeat_dict_per_awg = dict()
+        for cname in repeat_dict_per_ch:
+            awg = self.get(f"{cname}_awg")
+            chid = self.get(f"{cname}_id")
+
+            if not awg in awg_ch_repeat_dict.keys():
+                awg_ch_repeat_dict[awg] = []
+            awg_ch_repeat_dict[awg].append(chid)
+            if repeat_dict_per_awg.get(awg, repeat_dict_per_ch[cname]) \
+                    != repeat_dict_per_ch[cname]:
+                raise NotImplementedError(f"Repeat pattern on {cname} is "
+                f"different from at least one other channel on {awg}:"
+                f"{repeat_dict_per_ch[cname]} vs {repeat_dict_per_awg[awg]}")
+            repeat_dict_per_awg[awg] = repeat_dict_per_ch[cname]
+            
+        for awg_repeat, chs_repeat in awg_ch_repeat_dict.items():
+            for ch in channels_used[awg_repeat]:
+                assert ch in chs_repeat, f"Repeat pattern " \
+                    f"provided for {awg_repeat} but no pattern was given on " \
+                    f"{ch}. All used channels on the same awg must have a " \
+                    f"repeat pattern."
+
+        return repeat_dict_per_awg
+
 
 def to_base(n, b, alphabet=None, prev=None):
     if prev is None: prev = []
