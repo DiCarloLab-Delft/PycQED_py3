@@ -1,3 +1,4 @@
+
 import unittest
 import pytest
 import numpy as np
@@ -190,9 +191,9 @@ class Test_Mock_CCL(unittest.TestCase):
     ###########################################################
     def test_find_qubit_sweetspot(self):
         self.CCL_qubit.mock_sweetspot_phi_over_phi0(0.01343)
-        current = 0.01343*self.CCL_qubit.mock_fl_dc_V_per_phi0()[
+        current = 0.01343*self.CCL_qubit.mock_fl_dc_I_per_phi0()[
                         self.CCL_qubit.mock_cfg_dc_flux_ch()]
-        self.CCL_qubit.fl_dc_V0(current)
+        self.CCL_qubit.fl_dc_I0(current)
 
         fluxcurrent = self.CCL_qubit.instr_FluxCtrl.get_instr()
         fluxcurrent[self.CCL_qubit.mock_cfg_dc_flux_ch()](current)
@@ -209,7 +210,7 @@ class Test_Mock_CCL(unittest.TestCase):
 
         self.CCL_qubit.find_qubit_sweetspot()
 
-        assert self.CCL_qubit.fl_dc_V0() == pytest.approx(
+        assert self.CCL_qubit.fl_dc_I0() == pytest.approx(
                                     current,
                                     abs=30e-6)
 

@@ -107,7 +107,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
 
         # Qubit flux
-        self.add_parameter('mock_fl_dc_V_per_phi0', unit='A/Wb',
+        self.add_parameter('mock_fl_dc_I_per_phi0', unit='A/Wb',
                            initial_value={'FBL_Q1': 20e-3,
                                           'FBL_Q2': 2},
                            parameter_class=ManualParameter)
@@ -977,7 +977,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         for FBL in fluxcurrent.channel_map:
             current = fluxcurrent[FBL]()
 
-            flux += current/self.mock_fl_dc_V_per_phi0()[FBL]
+            flux += current/self.mock_fl_dc_I_per_phi0()[FBL]
 
         flux -= self.mock_sweetspot_phi_over_phi0()
 
