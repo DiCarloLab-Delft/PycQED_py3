@@ -170,8 +170,8 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
     uhf_instances = {}
     max_int_len = {}
     channels = {}
-    acq_classifier_params = []
-    acq_state_prob_mtxs = []
+    acq_classifier_params = {}
+    acq_state_prob_mtxs = {}
     for qb in qubits:
         uhf = qb.instr_uhf()
         uhfs.add(uhf)
@@ -188,14 +188,28 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
             if qb.acq_Q_channel() is not None:
                 channels[uhf] += [qb.acq_Q_channel()]
 
-        acq_classifier_params += [qb.acq_classifier_params()]
-        acq_state_prob_mtxs += [qb.acq_state_prob_mtx()]
+        if uhf not in acq_classifier_params:
+            acq_classifier_params[uhf] = []
+        acq_classifier_params[uhf] += [qb.acq_classifier_params()]
+        if uhf not in acq_state_prob_mtxs:
+            acq_state_prob_mtxs[uhf] = []
+        acq_state_prob_mtxs[uhf] += [qb.acq_state_prob_mtx()]
 
     if det_get_values_kws is None:
         det_get_values_kws = {}
-    det_get_values_kws.update({
-        'classifier_params': acq_classifier_params,
-        'state_prob_mtx': acq_state_prob_mtxs})
+        det_get_values_kws_in = None
+    else:
+        det_get_values_kws_in = deepcopy(det_get_values_kws)
+        for uhf in acq_state_prob_mtxs:
+            det_get_values_kws_in.pop(uhf, False)
+    for uhf in acq_state_prob_mtxs:
+        if uhf not in det_get_values_kws:
+            det_get_values_kws[uhf] = {}
+        det_get_values_kws[uhf].update({
+            'classifier_params': acq_classifier_params[uhf],
+            'state_prob_mtx': acq_state_prob_mtxs[uhf]})
+        if det_get_values_kws_in is not None:
+            det_get_values_kws[uhf].update(det_get_values_kws_in)
 
     if add_channels is None:
         add_channels = {uhf: [] for uhf in uhfs}
@@ -247,7 +261,7 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
             'int_avg_classif_det': det.UHFQC_classifier_detector(
                 UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
                 integration_length=max_int_len[uhf], nr_shots=nr_shots,
-                get_values_function_kwargs=det_get_values_kws,
+                get_values_function_kwargs=det_get_values_kws[uhf],
                 result_logging_mode='raw', **kw),
             'dig_avg_det': det.UHFQC_integrated_average_detector(
                 UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
@@ -295,17 +309,17 @@ def get_multi_qubit_prep_params(prep_params_list):
 def get_meas_obj_value_names_map(qubits, det_type):
     if det_type == 'int_avg_classif_det':
         meas_obj_value_names_map = {
-            qb.name: [vn + ' ' + qb.instr_uhf.get_instr().name for
+            qb.name: [vn + ' ' + qb.instr_uhf() for
                       vn in qb.int_avg_classif_det.value_names]
             for qb in qubits}
     elif det_type == 'inp_avg_det':
         meas_obj_value_names_map = {
-            qb.name: [vn + ' ' + qb.instr_uhf.get_instr().name for
+            qb.name: [vn + ' ' + qb.instr_uhf() for
                       vn in qb.inp_avg_det.value_names]
             for qb in qubits}
     else:
         meas_obj_value_names_map = {
-            qb.name: [vn + ' ' + qb.instr_uhf.get_instr().name for
+            qb.name: [vn + ' ' + qb.instr_uhf() for
                       vn in qb.int_avg_det.value_names]
             for qb in qubits}
     return meas_obj_value_names_map
@@ -792,13 +806,11 @@ def measure_tomography(qubits, prep_sequence, state_name,
     if preselection:
         n_segments *= 2
 
-    print(n_segments)
     # from this point on number of segments is fixed
     sf = awg_swf2.n_qubit_seq_sweep(seq_len=n_segments)
     shots *= n_segments
     if shots > 1048576:
         shots = 1048576 - 1048576 % n_segments
-    print('shots = ', shots)
     # if shots is None:
     #     shots = 4094 - 4094 % n_segments
     # # shots = 600000
@@ -867,7 +879,7 @@ def measure_two_qubit_randomized_benchmarking(
         clifford_decomposition_name='HZ', interleaved_gate=None,
         n_cal_points_per_state=2, cal_states=tuple(),
         label=None, prep_params=None, upload=True, analyze_RB=True,
-        classified=True, correlated=True, thresholded=True, averaged=True):
+        classified=True, correlated=False, thresholded=True, averaged=True):
 
     qb1n = qb1.name
     qb2n = qb2.name
@@ -936,8 +948,7 @@ def measure_two_qubit_randomized_benchmarking(
     meas_obj_value_names_map = get_meas_obj_value_names_map(qubits, det_type)
     if classified and correlated:
         # FIXME: do the proper thing (SEPT)
-        meas_obj_value_names_map['corr'] = [
-            'correlation ' + qb1.instr_uhf.get_instr().name]
+        meas_obj_value_names_map['corr'] = ['correlation ' + qb1.instr_uhf()]
     pp = ProcessingPipeline()
     for i, mobjn in enumerate(qb_names):
         num_avg_bins = [len(cliffords)]*len(meas_obj_value_names_map[mobjn])
@@ -1025,7 +1036,6 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
             experiment_channels += [qb.RO_acq_weight_function_I()]
         log.warning('experiment_channels is None. Using only the channels '
                     'in the qubits RO_acq_weight_function_I parameters.')
-    print(experiment_channels)
     if label is None:
         label = 'SRB_{}_{}_seeds_{}_cliffords_qubits{}'.format(
             gate_decomp, nr_seeds, nr_cliffords[-1] if
@@ -1547,7 +1557,6 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     for key, spts in sweep_points_dict.items():
         if spts is None:
             if key == 'n_rabi':
-                print('n_rabi')
                 sweep_points_dict[key] = {}
                 for qb in qubits:
                     sweep_points_dict[key][qb.name] = \
@@ -2203,10 +2212,14 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
     MC.run_2D(label, exp_metadata=exp_metadata)
     if analyze:
         if classified:
-            channel_map = {qb.name: qb.int_avg_classif_det.value_names
+            channel_map = {qb.name: [vn + ' ' +
+                                     qb.instr_uhf() for vn in
+                                     qb.int_avg_classif_det.value_names]
                            for qb in [qbc, qbt]}
         else:
-            channel_map = {qb.name: qb.int_avg_det.value_names
+            channel_map = {qb.name: [vn + ' ' +
+                                     qb.instr_uhf() for vn in
+                                     qb.int_avg_det.value_names]
                            for qb in [qbc, qbt]}
         flux_pulse_tdma = tda.CPhaseLeakageAnalysis(
             qb_names=[qbc.name, qbt.name],
@@ -2261,8 +2274,6 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
             cp = None
 
         prep_params = qb.preparation_params()
-
-        print(get_operation_dict(qubits_to_measure)[cz_pulse_name])
         seq, hard_sweep_points = \
             fsqs.dynamic_phase_seq(
                 qb_name=qb.name, hard_sweep_dict=hard_sweep_params,
@@ -2762,7 +2773,6 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
                         dataset[gs].update({basis_states[j]: shots[i, j]})
 
             dataset.done_adding_data()
-            print(dataset)
             # Get results
             if linear_GST:
                 results = pygsti.do_linear_gst(dataset, gs_target,

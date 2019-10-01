@@ -160,7 +160,6 @@ class SegmentHardSweep(swf.Hard_Sweep):
             ps.Pulsar.get_instance().program_awgs(self.sequence,
                                                   awgs=awgs_to_upload)
             time.sleep(0.1)
-            print('programmed hard sweep')
 
 
 class SegmentSoftSweep(swf.Soft_Sweep):

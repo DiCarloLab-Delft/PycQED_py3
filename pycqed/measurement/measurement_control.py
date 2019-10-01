@@ -1001,7 +1001,10 @@ class MeasurementControl(Instrument):
         return self.column_names
 
     def create_experimentaldata_dataset(self):
-        data_group = self.data_object.create_group('Experimental Data')
+        if 'Experimental Data' in self.data_object:
+            data_group = self.data_object['Experimental Data']
+        else:
+            data_group = self.data_object.create_group('Experimental Data')
         self.dset = data_group.create_dataset(
             'Data', (0, len(self.sweep_functions) +
                      len(self.detector_function.value_names)),
@@ -1260,8 +1263,6 @@ class MeasurementControl(Instrument):
             max_sweep_points = np.shape(self.get_sweep_points())[0]
 
         start_idx = int(self.total_nr_acquired_values % max_sweep_points)
-        print('total_nr_acquired_values ', self.total_nr_acquired_values)
-        print('max_sweep_points ', max_sweep_points)
         self.soft_iteration = int(
             self.total_nr_acquired_values//max_sweep_points)
 

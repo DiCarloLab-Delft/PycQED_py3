@@ -907,9 +907,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         self.correlation_channels = []
         used_channels = deepcopy(self.used_channels)
         for corr in self.correlations:
-            print(corr)
-            print(self.channels)
-            print(used_channels)
             # Start by assigning channels
             if corr[0] not in used_channels or corr[1] not in used_channels:
                 raise ValueError('Correlations should be in used channels')
@@ -1345,9 +1342,9 @@ class UHFQC_classifier_detector(UHFQC_Base):
             if thresholded:
                 # clf_data must be 2 dimensional, rows are shots*sweep_points,
                 # columns are nr_states
-                clf_data = (clf_data == np.repeat(
-                    np.amax(clf_data, axis=1, keepdims=True),
-                    nr_states, axis=1)).astype(int)
+                clf_data = np.isclose(np.repeat([np.arange(nr_states)],
+                                                clf_data.shape[0], axis=0).T,
+                                      np.argmax(clf_data, axis=1)).T
             clf_data_all[:, nr_states*i: nr_states*i+nr_states] = clf_data
 
             # reshape into (nr_shots, nr_sweep_points, nr_data_columns)
@@ -1374,7 +1371,7 @@ class UHFQC_classifier_detector(UHFQC_Base):
                 clf_data_all[:, i*nr_states: i*nr_states + nr_states],
                 axis=1) for i in range(q)]
             corr_data = np.sum(np.array(qb_states_list) % 2, axis=0) % 2
-            if average:
+            if averaged:
                 corr_data = np.reshape(
                     corr_data, (self.nr_shots, self.nr_sweep_points))
                 corr_data = np.mean(corr_data, axis=0)

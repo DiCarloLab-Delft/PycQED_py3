@@ -548,11 +548,6 @@ class ResonatorSpectroscopy(Spectroscopy):
             for tt in range(len(self.raw_data_dict['timestamps'])):
                 y = np.squeeze(self.plot_amp[tt])
                 x = np.squeeze(self.plot_frequency)[tt]
-                # print(self.plot_frequency)
-                # [print(x.shape) for x in self.plot_frequency]
-                # print(x)
-                # print(y)
-                # print(len(x),len(y))
                 guess_dict = SlopedHangerFuncAmplitudeGuess(y, x)
                 Q = guess_dict['Q']['value']
                 f0 = guess_dict['f0']['value']
@@ -576,12 +571,9 @@ class ResonatorSpectroscopy(Spectroscopy):
             model = lmfit.Model(fit_fn)
             fit_yvals = amp
             fit_xvals = {'t': freq}
-            # fit_guess_fn = double_cos_linear_offset_guess
-            # guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
             for key, val in list(back_dict.items()):
                 model.set_param_hint(key, **val)
             params = model.make_params()
-            print(fit_xvals)
             fit_res = model.fit(fit_yvals,
                                 params=params,
                                 **fit_xvals)
@@ -1030,7 +1022,6 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                 self.proc_data_dict['spectra'],
                 self.proc_data_dict['plot_frequency'][0],
                 **self.options_dict.get('qutrit_fit_options', dict()))
-            print(states)
             self.proc_data_dict["fit_raw_results"][key] = raw_results
         else:
             raise ValueError("{} states were given but method expects 1, "

@@ -458,22 +458,6 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             else:
                 cal_zero_points = list(cal_states_dict[qb_name].values())[0]
                 cal_one_points = list(cal_states_dict[qb_name].values())[1]
-        #     data = np.stack(list(meas_res_dict.values()), axis=1)
-        #
-        #     cal_points = np.zeros((len(cal_states_dict),
-        #                            len(meas_res_dict)))
-        #     for i, cal_state in enumerate(cal_states_dict):
-        #         cal_points[i] = [np.mean(dat[cal_states_dict[cal_state]])
-        #                          for dat in meas_res_dict.values()]
-        #     print(cal_points)
-        #     rotated_data = a_tools.predict_gm_proba_from_cal_points(
-        #         data, cal_points)
-        #     print(rotated_data.shape)
-        #     rotated_data_dict[qb_name] = rotated_data[:, 2]
-        #         # {list(cal_states_dict)[i]: rotated_data[:, i] for i in
-        #         #  range(len(cal_states_dict))}
-        #
-        # return rotated_data_dict
             rotated_data_dict[qb_name] = OrderedDict()
             if len(meas_res_dict) == 1:
                 # one RO channel per qubit
@@ -1001,7 +985,6 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
             if not vary_N2:
                 guess_pars['N2'].value = 1e21
                 guess_pars['N2'].vary = False
-            # print(guess_pars)
             self.fit_dicts['fit {}'.format(states[i])] = {
                 'model': mod,
                 'fit_xvals': {'N': xvals},
@@ -2324,8 +2307,6 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
             self.run_analysis()
 
     def process_data(self):
-        #print(len(self.raw_data_dict['measured_values'][0][0]))
-        #print(len(self.raw_data_dict['measured_data']['raw w0 _measure'][0]))
         self.proc_data_dict = OrderedDict()
         self.proc_data_dict['qubit_state'] = [[],[]]
         self.proc_data_dict['delay_to_relax'] = self.raw_data_dict[

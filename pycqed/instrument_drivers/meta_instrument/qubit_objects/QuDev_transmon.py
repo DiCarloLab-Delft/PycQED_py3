@@ -875,8 +875,6 @@ class QuDev_transmon(Qubit):
 
         MC.run(label, exp_metadata=exp_metadata)
 
-        MC.run(label, exp_metadata=exp_metadata)
-
         if analyze:
             tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name])
 
@@ -2018,8 +2016,7 @@ class QuDev_transmon(Qubit):
                 upload=upload,
                 preselection=preselection,
                 RO_spacing=RO_spacing))
-            MC.set_sweep_points(np.arange(self.acq_shots() *
-                                          (4 if preselection else 2)))
+            MC.set_sweep_points(np.arange(4 if preselection else 2))
             MC.set_detector_function(det_func)
             with temporary_value(MC.soft_avg, 1):
                 MC.run(name=label + self.msmt_suffix)
