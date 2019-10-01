@@ -76,9 +76,9 @@ _codeword_protocol_doc = 'Configures the codeword input bits/channels per channe
 class QuTech_AWG_Module(SCPI):
     __doc__ = f"""
     Driver for a Qutech AWG Module (QWG) instrument. Will establish a connection to a module via ethernet.
-    :param name: Name of the instrument  
+    :param name: Name of the instrument
     :param address: Ethernet address of the device
-    :param port: Device port  
+    :param port: Device port
     :param reset: Set device to the default settings
     :param run_mode: {_run_mode_doc}
     :param dio_mode: {_dio_mode_doc}
@@ -276,7 +276,7 @@ class QuTech_AWG_Module(SCPI):
                            set_cmd='DIO:INDexes:ACTive {}',
                            get_parser=np.uint32,
                            vals=vals.Ints(0, 20),
-                           docstring='Get and set DIO calibration index\n' 
+                           docstring='Get and set DIO calibration index\n'
                                      'See dio_calibrate() parameter\n'
                                      'Effective immediately when send'
                            )
@@ -347,7 +347,7 @@ class QuTech_AWG_Module(SCPI):
                 parameter_class=HandshakeParameter,
                 label=f'Channel {ch} Amplitude ',
                 unit='Vpp',
-                docstring=f'Amplitude channel {ch} (Vpp into 50 Ohm) \n' 
+                docstring=f'Amplitude channel {ch} (Vpp into 50 Ohm) \n'
                           'Effective immediately when send',
                 get_cmd=amp_cmd + '?',
                 set_cmd=amp_cmd + ' {:.6f}',
@@ -443,7 +443,7 @@ class QuTech_AWG_Module(SCPI):
                                                       # useful when other logic is needed
                                docstring='Reads the current input values on the all the trigger '
                                          'inputs for a channel, after the bitSelect.\nReturn:'
-                                         '\n\tuint32 where rigger 1 (T1) ' 
+                                         '\n\tuint32 where rigger 1 (T1) '
                                          'is on the Least significant bit (LSB), T2 on the second  '
                                          'bit after LSB, etc.\n\n For example, if only T3 is '
                                          'connected to a high signal, the return value is: '
@@ -1083,91 +1083,91 @@ class QuTech_AWG_Module(SCPI):
         return get_func
 
 
-# class QWGMultiDevices:
+class QWGMultiDevices:
     """
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
     Usually all methods are static
     """
-    # from pycqed.instrument_drivers.physical_instruments import QuTech_CCL
+    from pycqed.instrument_drivers.physical_instruments import QuTech_QCC
 
-    # @staticmethod
-    # def dio_calibration(ccl: QuTech_CCL, qwgs: List[QuTech_AWG_Module], 
-    #         verbose: bool = False):
-    #     """
-    #     Calibrate multiple QWG using a CCLight
-    #     First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
-    #     master.
-    #     On failure of calibration an exception is raised.
-    #     Will stop all QWGs before calibration
+    @staticmethod
+    def dio_calibration(cc: QuTech_QCC, qwgs: List[QuTech_AWG_Module],
+            verbose: bool = False):
+        """
+        Calibrate multiple QWG using a CCLight
+        First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
+        master.
+        On failure of calibration an exception is raised.
+        Will stop all QWGs before calibration
 
-    #     Note: Will use the QWG_DIO_Calibration.qisa, cs.txt and qisa_opcodes.qmap 
-    #     files to assemble a  calibration program for the CCLight. These files
-    #     should be located in the _QWG subfolder in the path of this file. 
-    #     :param ccl: CCLight device, connection has to be active
-    #     :param qwgs: List of QWG which will be calibrated, all QWGs are expected to have an active connection
-    #     :param verbose: Print the DIO calibration rapport of all QWGs
-    #     :return: None
-    #     """
-    #     # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
-    #     for qwg in qwgs:
-    #         qwg.stop()
+        Note: Will use the QWG_DIO_Calibration.qisa, cs.txt and qisa_opcodes.qmap
+        files to assemble a  calibration program for the CCLight. These files
+        should be located in the _QWG subfolder in the path of this file.
+        :param ccl: CCLight device, connection has to be active
+        :param qwgs: List of QWG which will be calibrated, all QWGs are expected to have an active connection
+        :param verbose: Print the DIO calibration rapport of all QWGs
+        :return: None
+        """
+        # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
+        for qwg in qwgs:
+            qwg.stop()
 
-    #     if not ccl:
-    #         raise ValueError("Cannot calibrate QWGs; No CCL provided")
+        if not cc:
+            raise ValueError("Cannot calibrate QWGs; No CC provided")
 
-    #     if ccl.ask("QUTech:RUN?") == '1':
-    #         ccl.stop()
+        if cc.ask("QUTech:RUN?") == '1':
+            cc.stop()
 
-    #     _qwg_path = os.path.abspath(
-    #         os.path.join(os.path.dirname(__file__), '_QWG'))
-        
+        _qwg_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '_QWG'))
 
-    #     qisa_qwg_dio_calibrate = os.path.join(_qwg_path, 
-    #         'QWG_DIO_Calibration.qisa')
 
-    #     cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
+        qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
+            'QCC_DIO_Calibration.qisa')
 
-    #     qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path, 
-    #         'qisa_opcodes.qmap')
+        cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
 
-    #     old_cs = ccl.control_store()
-    #     old_qisa_opcode = ccl.qisa_opcode()
+        qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
+            'qcc_qisa_opcodes.qmap')
 
-    #     ccl.control_store(cs_qwg_dio_calibrate)
-    #     ccl.qisa_opcode(qisa_opcode_qwg_dio_calibrate)
+        old_cs = cc.control_store()
+        old_qisa_opcode = cc.qisa_opcode()
 
-    #     ccl.eqasm_program(qisa_qwg_dio_calibrate)
-    #     ccl.start()
-    #     ccl.getOperationComplete()
+        cc.control_store(cs_qwg_dio_calibrate)
+        cc.qisa_opcode(qisa_opcode_qwg_dio_calibrate)
 
-    #     if not qwgs:
-    #         raise ValueError("Can not calibrate QWGs; No QWGs provided")
+        cc.eqasm_program(qisa_qwg_dio_calibrate)
+        cc.start()
+        cc.getOperationComplete()
 
-    #     def try_errors(qwg):
-    #         try:
-    #             qwg.getErrors()
-    #         except Exception as e:
-    #             raise type(e)(f'{qwg.name}: {e}')
+        if not qwgs:
+            raise ValueError("Can not calibrate QWGs; No QWGs provided")
 
-    #     main_qwg = qwgs[0]
-    #     if main_qwg.dio_mode() is not 'MASTER':
-    #         raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefor it is not save the use it "
-    #                          f"as base QWG for calibration of multiple QWGs.")
-    #     main_qwg.dio_calibrate()
-    #     try_errors(main_qwg)
-    #     active_index = main_qwg.dio_active_index()
+        def try_errors(qwg):
+            try:
+                qwg.getErrors()
+            except Exception as e:
+                raise type(e)(f'{qwg.name}: {e}')
 
-    #     for qwg in qwgs[1:]:
-    #         qwg.dio_calibrate(active_index)
-    #         try_errors(qwg)
-    #     if verbose:
-    #         for qwg in qwgs:
-    #             print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
-    #     ccl.stop()
+        main_qwg = qwgs[0]
+        if main_qwg.dio_mode() is not 'MASTER':
+            raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefor it is not save the use it "
+                             f"as base QWG for calibration of multiple QWGs.")
+        main_qwg.dio_calibrate()
+        try_errors(main_qwg)
+        active_index = main_qwg.dio_active_index()
 
-    #     #Set the control store
-    #     ccl.control_store(old_cs)
-    #     ccl.qisa_opcode(old_qisa_opcode)
+        for qwg in qwgs[1:]:
+            qwg.dio_calibrate(active_index)
+            try_errors(qwg)
+        if verbose:
+            for qwg in qwgs:
+                print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
+        cc.stop()
+
+        #Set the control store
+        cc.control_store(old_cs)
+        cc.qisa_opcode(old_qisa_opcode)
 
 
 

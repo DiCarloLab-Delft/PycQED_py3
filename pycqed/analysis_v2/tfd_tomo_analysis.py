@@ -184,7 +184,8 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
         beta_X_imp = np.zeros(4)
         op_idx_betaX = np.zeros(4, dtype=int)
 
-        ch_X_id = list(value_names).index(b'UHFQC_1 w1 X')
+        # FIXME: How to look for X without hardcoding the weightfunction number???
+        ch_X_id = [i for i in range(len(value_names)) if b'X' in value_names[i]][0]
         z0 = 2**(3-idx_qubit_ro.index('X'))
         z1 = 2**(3-idx_qubit_ro.index('D2'))
         z0z1 = z1+z0
@@ -198,7 +199,6 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
         submatrix_B = matrix_B[op_idx_betaX, :]
         inv_subB = np.linalg.pinv(submatrix_B).transpose()
         beta_X_imp = inv_subB @ qubit_state_avg[ch_X_id, cal_point_seg_start:]
-
 
         # 8.bis Complicating betas on correl channel X-D4
         # M_XD4 = III + I_D4 I_X Z_D2 + I_D4 Z_X I_D2 + Z_D4 I_X I_D2
@@ -324,7 +324,6 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                      num_prerots:(ch_w1_id+1)*num_prerots, :] = this_M_matrix
 
         if self.complexity_of_readout_model > 1:
-            # UNDER-WORK. DONT TRUST YET!!!!!!!
             ch_w2_id = ch_XD4_id
             this_M_matrix = np.zeros(
                 (num_prerots, num_ops))  # prepare M_matrix
@@ -511,11 +510,11 @@ class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                         1] = np.where(this_q_data > this_th, -1, 1)
             qubit_state_avg[id_channel-1, :] = [np.mean(shots_discr[i_seg::self.num_segments,
                                                                     id_channel-1]) for i_seg in range(self.num_segments)]
-        # 5. Compute betas weight-1
-        betas_w1 = np.zeros((4, 2))
-        op_idx_w1 = np.zeros((4, 2), dtype=int)
+        # 5. Compute full betas weight-1
+        betas_w1 = np.zeros((4, self.num_states))
+        op_idx_w1 = np.zeros((4, self.num_states), dtype=int)
         for i in range(self.num_qubits):
-            op_list_bin = ['0000', format(2**(3-i), '#06b')[2:]]
+            op_list_bin = [format(i, '#06b')[2:] for i in range(self.num_states)]
             op_id_list = [int(op, 2) for op in op_list_bin]
             op_idx_w1[i, :] = op_id_list
         #     print(op_id_list)
@@ -538,78 +537,20 @@ class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
             correl_avg[:, i] = [
                 np.mean(correl_discr[i_seg::self.num_segments, i]) for i_seg in range(self.num_segments)]
 
-        # 7. Compute betas weight-2
-        betas_w2 = np.zeros((4, 4))
-        op_idx_w2 = np.zeros((4, 4), dtype=int)
+        # 7. Compute full betas weight-2
+        betas_w2 = np.zeros((4, self.num_states))
+        op_idx_w2 = np.zeros((4, self.num_states), dtype=int)
         for i_c, c in enumerate(correlations):
-            z0 = 2**(3-idx_qubit_ro.index(c[0]))
-            z1 = 2**(3-idx_qubit_ro.index(c[1]))
-            z0z1 = z1+z0
-            op_list_bin = ['0000', format(z0, '#06b')[2:],
-                           format(z1, '#06b')[2:],
-                           format(z0z1, '#06b')[2:]]
+            op_list_bin = [format(i, '#06b')[2:] for i in range(self.num_states)]
         #     op_id_list = [int(op,2) for op in op_list_bin]
-            op_id_list = [0, z0, z1, z0z1]
+            op_id_list = [int(op, 2) for op in op_list_bin]
             op_idx_w2[i_c, :] = op_id_list
         #     print(op_id_list,op_list_bin)
 
             submatrix_B = matrix_B[op_id_list, :]
             inv_subB = np.linalg.pinv(submatrix_B).transpose()
             betas_w2[i_c, :] = inv_subB @ correl_avg[cal_point_seg_start:, i_c]
-        # 8. Complicating betas on qubit X
-        # M_X = II + I_X Z_D2 + Z_X I_D2 + Z_X Z_D2
-        # DOES NOT REQUIRES EXTRA PRE-ROT TO SOLVE AS WE ALREADY TOGGLE X-D2 CORRELS
-        beta_X_imp = np.zeros(4)
-        op_idx_betaX = np.zeros(4, dtype=int)
 
-        ch_X_id = list(value_names).index(b'UHFQC_1 w1 X')
-        z0 = 2**(3-idx_qubit_ro.index('X'))
-        z1 = 2**(3-idx_qubit_ro.index('D2'))
-        z0z1 = z1+z0
-        op_list_bin = ['0000', format(z0, '#06b')[2:],
-                       format(z1, '#06b')[2:],
-                       format(z0z1, '#06b')[2:]]
-        #     op_id_list = [int(op,2) for op in op_list_bin]
-        op_idx_betaX = [0, z0, z1, z0z1]
-        #     print(op_id_list,op_list_bin)
-
-        submatrix_B = matrix_B[op_idx_betaX, :]
-        inv_subB = np.linalg.pinv(submatrix_B).transpose()
-        beta_X_imp = inv_subB @ qubit_state_avg[ch_X_id, cal_point_seg_start:]
-
-
-        # 8.bis Complicating betas on correl channel X-D4
-        # M_XD4 = III + I_D4 I_X Z_D2 + I_D4 Z_X I_D2 + Z_D4 I_X I_D2
-        #       + I_D4 Z_X Z_D2 + Z_D4 I_X Z_D2 + Z_D4 Z_X I_D2 +
-        #       + Z_D4 Z_X Z_D2
-        # REQUIRES EXTRA PRE-ROT TO SOLVE AS WE DO NOT TOGGLE D4-D2 CORRELS, AS WELL AS W3 CORRELS
-        # EXTRA ROTS ARE (D4,X,Z2,D2 notation) XIIX & XXIX
-        beta_XD4_imp = np.zeros(8)
-        op_idx_betaXD4 = np.zeros(8, dtype=int)
-
-        ch_XD4_id = 2 # from correlations variable above
-        z0 = 2**(3-idx_qubit_ro.index('X'))
-        z1 = 2**(3-idx_qubit_ro.index('D2'))
-        z2 = 2**(3-idx_qubit_ro.index('D4'))
-        z0z1 = z1+z0
-        z0z2 = z0+z2
-        z1z2 = z1+z2
-        z0z1z2 = z0+z1+z2
-        op_list_bin = ['0000',
-                       format(z0, '#06b')[2:],
-                       format(z1, '#06b')[2:],
-                       format(z2, '#06b')[2:],
-                       format(z0z1, '#06b')[2:],
-                       format(z0z2, '#06b')[2:],
-                       format(z1z2, '#06b')[2:],
-                       format(z0z1z2, '#06b')[2:]]
-        #     op_id_list = [int(op,2) for op in op_list_bin]
-        op_idx_betaXD4 = [0, z0, z1, z2, z0z1, z0z2, z1z2, z0z1z2]
-        #     print(op_id_list,op_list_bin)
-
-        submatrix_B = matrix_B[op_idx_betaXD4, :]
-        inv_subB = np.linalg.pinv(submatrix_B).transpose()
-        beta_XD4_imp = inv_subB @ correl_avg[cal_point_seg_start:, ch_XD4_id]
 
         """
         # 9. Computing inversion matrix for tomo
@@ -676,49 +617,6 @@ class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                     sign = np.product([1-2*int(rot_bin[k])*int(op_bin[k])
                                        for k in range(len(op_bin))])
         #             print(ir,id_op)
-                    this_M_matrix[ir, id_op] = sign*bt
-            M_matrix[36+ch_w2_id*num_prerots:36 +
-                     (ch_w2_id+1)*num_prerots, :] = this_M_matrix
-        # if enabled, enhance mmt model for X
-        if self.complexity_of_readout_model > 0:
-            ch_w1_id = ch_X_id
-            this_M_matrix = np.zeros(
-                (num_prerots, num_ops))  # prepare M_matrix
-            for ir, id_rot in enumerate(pre_rot_list):
-                rot_bin = format(id_rot, '#06b')[2:]
-                # grabbing betas and operators
-                this_betas = beta_X_imp
-                this_op = op_idx_betaX
-                for i_b, bt in enumerate(this_betas):
-                    # print(i_b,bt,this_op)
-                    id_op = this_op[i_b]
-                    op_bin = format(id_op, '#06b')[2:]
-                    # decide the sign
-                    sign = np.product([1-2*int(rot_bin[k])*int(op_bin[k])
-                                       for k in range(len(op_bin))])
-            #             print(ir,id_op)
-                    this_M_matrix[ir, id_op] = sign*bt
-            M_matrix[ch_w1_id *
-                     num_prerots:(ch_w1_id+1)*num_prerots, :] = this_M_matrix
-
-        if self.complexity_of_readout_model > 1:
-            # UNDER-WORK. DONT TRUST YET!!!!!!!
-            ch_w2_id = ch_XD4_id
-            this_M_matrix = np.zeros(
-                (num_prerots, num_ops))  # prepare M_matrix
-            for ir, id_rot in enumerate(pre_rot_list):
-                rot_bin = format(id_rot, '#06b')[2:]
-                # grabbing betas and operators
-                this_betas = beta_XD4_imp
-                this_op = op_idx_betaXD4
-                for i_b, bt in enumerate(this_betas):
-                    # print(i_b,bt,this_op)
-                    id_op = this_op[i_b]
-                    op_bin = format(id_op, '#06b')[2:]
-                    # decide the sign
-                    sign = np.product([1-2*int(rot_bin[k])*int(op_bin[k])
-                                       for k in range(len(op_bin))])
-            #             print(ir,id_op)
                     this_M_matrix[ir, id_op] = sign*bt
             M_matrix[36+ch_w2_id*num_prerots:36 +
                      (ch_w2_id+1)*num_prerots, :] = this_M_matrix

@@ -29,7 +29,7 @@ start:
     bs 2 FL_CW_05 s0
     bs 2 FL_CW_06 s0
     bs 2 FL_CW_07 s0
-    bs 2 CW_01 s7
+    bs 2 CW_03 s7
     br always, start
     nop
     nop

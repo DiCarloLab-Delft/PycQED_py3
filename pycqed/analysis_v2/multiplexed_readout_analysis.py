@@ -165,7 +165,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             'combinations': self.proc_data_dict['combinations'],
             'valid_combinations': self.proc_data_dict['valid_combinations'],
             'qubit_labels': self.proc_data_dict['qubit_labels'],
-            'plotsize': np.array(np.shape(self.proc_data_dict['assignment_prob_matrix'])).T*.7
+            'plotsize': np.array(np.shape(self.proc_data_dict['assignment_prob_matrix'].T))*.8
         }
         for i, value_name in enumerate(self.raw_data_dict['value_names']):
             qubit_label = self.proc_data_dict['qubit_labels'][i]
