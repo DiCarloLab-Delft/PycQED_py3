@@ -1237,9 +1237,9 @@ class Qubit(Instrument):
 
         elif self.cfg_qubit_freq_calc_method() == 'flux':
             if V is None:
-                V = self.fl_dc_V()
+                V = self.fl_dc_I()
             if V_per_phi0 is None:
-                V_per_phi0 = self.fl_dc_V_per_phi0()
+                V_per_phi0 = self.fl_dc_I_per_phi0()
 
             qubit_freq_est = fit_mods.Qubit_dac_to_freq(
                 dac_voltage=V,
@@ -1275,7 +1275,7 @@ class Qubit(Instrument):
 
         # Requires an estimate of V_per_phi0 (which should be a current)
 
-        freqs = self.freq_max() + np.arange(-80e6, +20e6, .5e6)
+        freqs = self.freq_max() + np.arange(-20e6, +5e6, .5e6)
 
         # Should be replaced by self.fl_dc_I() # which gets this automatically
         # self.fl_dc_I()
@@ -1283,7 +1283,7 @@ class Qubit(Instrument):
         current_dac_val = fluxcontrol.parameters[(self.fl_dc_ch())].get()
         
         dac_range  = 0.1 * self.fl_dc_I_per_phi0() # Should correspond to approx 50MHz around sweetspot.  
-        dac_values = current_dac_val + np.linspace(-dac_range/2, dac_range/2, 6)
+        dac_values = current_dac_val + np.linspace(-dac_range/2, dac_range/2, 7)
 
         self.measure_qubit_frequency_dac_scan(freqs=freqs, dac_values=dac_values)
         
@@ -1353,11 +1353,13 @@ class Qubit(Instrument):
 
 
     def tune_freq_to(self, target_frequency, 
-                          MC, nested_MC, 
+                          MC=None, nested_MC=None, 
                           calculate_initial_step: bool=False,
                           initial_flux_step: float = None, 
                           max_repetitions=15,
-                          resonator_use_min=True): 
+                          resonator_use_min=True,
+                          find_res=None,
+                          ): 
         """
         Iteratively tune the qubit frequency to a specific target frequency
         """ 
@@ -1372,7 +1374,7 @@ class Qubit(Instrument):
         delta_freq = target_frequency - f_q  
 
 
-        if abs(delta_freq) > 50e6: 
+        if abs(delta_freq) > 50e6 and find_res == None: 
             find_res = True
 
 
