@@ -1290,7 +1290,6 @@ class ZI_base_instrument(Instrument):
                 self._awg_needs_configuration[awg_nr] = False
                 self._clear_dirty_waveforms(awg_nr)
             else:
-
                 log.debug(f"{self.devname}: Did not detect awg configuration tag for AWG {awg_nr}.")
                 # Loop through all waveforms and update accordingly
                 self._upload_updated_waveforms(awg_nr)

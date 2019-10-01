@@ -134,12 +134,12 @@
 					],
 					"trigger_bits": [31]
 				},
-				"awg8-mw-direct-iq": {				      // just I&Q to generate microwave without VSM. FIXME: no official mode yet
+				"awg8-mw-direct-iq": {				      // just I&Q to generate microwave without VSM. HDAWG8: "new_novsm_microwave"
 					"control_bits": [
 						[6,5,4,3,2,1,0],                  // group 0
 						[13,12,11,10,9,8,7],              // group 1
-						[20,19,18,17,16,15,14],           // group 2
-						[27,26,25,24,23,22,21]            // group 4
+						[22,21,20,19,18,17,16],           // group 2. NB: starts at bit 16 so twin-QWG can also support it
+						[29,28,27,26,25,24,23]            // group 4
 					],
 					"trigger_bits": [31]
 				},
@@ -150,10 +150,10 @@
 						[5,4,3],
 						[8,7,6],
 						[11,10,9],
-						[14,13,12],
-						[17,16,15],
-						[20,19,18],
-						[23,22,21]                        // group 7
+						[18,17,16],                       // group 4. NB: starts at bit 16 so twin-QWG can also support it
+						[21,20,19],
+						[24,23,22],
+						[27,26,25]                        // group 7
 					],
 					"trigger_bits": [31]
 				},

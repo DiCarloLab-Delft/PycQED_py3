@@ -17,8 +17,8 @@ log.setLevel(logging.DEBUG)
 log.debug('starting')
 
 
-def print_var(name: str, val_format: str=''):
-    fmt = '{{}} = {{{}}}'.format(val_format) # e.g. '{} = {}' or '{} = {:#08X}'
+def print_var(name: str, val_format: str='{}'):
+    fmt = '{{}} = {}'.format(val_format)  # e.g. '{} = {}' or '{} = {:#08X}'
     print(fmt.format(name, instr.get(name)))
 
 
@@ -51,16 +51,43 @@ if 1:   # HDAWG
     if 0:  # driver function
         instr.plot_dio_snapshot()
 
+    # -c: show codewords as actually seen by AWGs
     if opt_codewords:
         for awg in [0, 1, 2, 3]:
             instr.plot_awg_codewords(awg)
 
-    # take a snapshot of the DIO interface
+    # -d: take a snapshot of the DIO interface
     if opt_dio:
         # get the snapshot data. Time resolution =  3.33 ns, #samples = 1024
         # NB: the DIO timing is applied before the snapshot is taken
         data = instr.getv('raw/dios/0/data')  # NB: no node for that
         ZI_tools.print_timing_diagram_simple(data, dio_lines, 10*6)  # NB: print multiple of 6 samples (i.e. 20 ns)
+
+    # show codewords based on DIO snapshot
+    if 1:
+        data = instr.getv('raw/dios/0/data')  # NB: no node for that
+        prev_d = 0
+        mask0 = instr.awgs_0_dio_mask_value()
+        mask1 = instr.awgs_1_dio_mask_value()
+        mask2 = instr.awgs_2_dio_mask_value()
+        mask3 = instr.awgs_3_dio_mask_value()
+        shift0 = instr.awgs_0_dio_mask_shift()
+        shift1 = instr.awgs_1_dio_mask_shift()
+        shift2 = instr.awgs_2_dio_mask_shift()
+        shift3 = instr.awgs_3_dio_mask_shift()
+
+        for i,d in enumerate(data):
+            if d & 0x80000000 and d != prev_d:
+                print('0x{:08X}: {} {} {} {}'.format(d,
+                                                     d >> shift3 & mask3,
+                                                     d >> shift2 & mask2,
+                                                     d >> shift1 & mask1,
+                                                     d >> shift0 & mask0,
+                                                     ))
+                prev_d = d
+
+# add:
+    # DIO port identification
 
     if 0:
         # FIXME: looking at single awg
@@ -82,20 +109,18 @@ if 1:   # HDAWG
 
     for awg in [0, 1, 2, 3]:
         print_var('awgs_{}_dio_error_timing'.format(awg))
-        print_var('awgs_{}_dio_error_width'.format(awg))
-        #print_var('awgs_{}_dio_value'.format(awg), ':#08X')
-        print_var('awgs_{}_dio_highbits'.format(awg), ':#08X')
-        print_var('awgs_{}_dio_lowbits'.format(awg), ':#08X')
+        print_var('awgs_{}_dio_state'.format(awg))
 
         print_var('awgs_{}_dio_mask_shift'.format(awg))
-        print_var('awgs_{}_dio_mask_value'.format(awg), ':#08X')
-        print_var('awgs_{}_dio_state'.format(awg))
+        print_var('awgs_{}_dio_mask_value'.format(awg), '0x{:08X}')
+        print_var('awgs_{}_dio_highbits'.format(awg), '0x{:08X}')
+        print_var('awgs_{}_dio_lowbits'.format(awg), '0x{:08X}')
+
         print_var('awgs_{}_dio_strobe_index'.format(awg))
         print_var('awgs_{}_dio_strobe_slope'.format(awg))
-        print_var('awgs_{}_dio_strobe_width'.format(awg))
         print_var('awgs_{}_dio_valid_index'.format(awg))
         print_var('awgs_{}_dio_valid_polarity'.format(awg))
-        print_var('awgs_{}_dio_valid_width'.format(awg))
+        print()
 
 if 0:   # FIXME: UHFQC
     # take a snapshot of the DIO interface (NB: control CC manually)

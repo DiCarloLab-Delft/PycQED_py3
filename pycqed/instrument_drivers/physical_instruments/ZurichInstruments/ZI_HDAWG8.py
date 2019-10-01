@@ -63,11 +63,13 @@ Changelog:
 20190709 NCH
 - Github PR #578
 
-20190917 WJV
+20191001 WJV
 - removed duplicates from __init__
 - cleanup
 - changed _configure_codeword_protocol() to use table of modes
 - split off calibrate_dio_protocol from calibrate_CC_dio_protocol for use with CC
+- removed unused parameters cfg_num_codewords and cfg_codeword_protocol from upload_codeword_program()
+- removed unused parameter default_dio_timing from _configure_codeword_protocol()
 
 """
 
@@ -202,19 +204,11 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
     # 'public' functions: application specific/codeword support
     ##########################################################################
 
-    def upload_codeword_program(self, awgs=np.arange(4), cfg_num_codewords=None, cfg_codeword_protocol=None):
+    def upload_codeword_program(self, awgs=np.arange(4)):
         """
         Generates a program that plays the codeword waves for each channel.
 
         awgs (array): the awg numbers to which to upload the codeword program.
-                    By default uploads to all channels but can be specific to
-                    speed up the process.
-        cfg_num_codewords (optional): Optionally specify the number of codewords. Uses the num_codewords
-                    member if not specified.
-        cfg_codeword_protocol (optional): Optionally specify the codeword protocol. Uses the cfg_codeword_protocol()
-                    parameter if not specified.
-
-        Note: Assumes 'system/awg/channelgrouping' to be '4x2' or an exception will be raised.
         """
         self._configure_codeword_protocol()
 
@@ -284,23 +278,13 @@ while (1) {
 
         return program
 
-    def _configure_codeword_protocol(self, default_dio_timing: bool=False):
+    def _configure_codeword_protocol(self):
         """
         This method configures the AWG-8 codeword protocol.
+        The qcodes parameter "cfg_codeword_protocol" defines what protocol is used.
+
         The final step enables the signal output of each AWG and sets
         it to the right mode.
-
-        The qcodes parameter "cfg_codeword_protocol" defines what protocol is used.
-        There are three options:
-            identical : all AWGs have the same configuration
-            microwave : AWGs 0 and 1 share bits
-            flux      : Each AWG pair is responsible for 2 flux channels.
-                        this also affects the "codeword_program" and
-                        setting "wave_chX_cwXXX" parameters.
-            # FIXME: comment outdated
-            # FIXME: unused parameter default_dio_timing
-            # FIXME: turn cfg_codeword_protocol into a function parameter?
-
         """
         # Check overall configuration
         if self.system_awg_channelgrouping() != 0:
@@ -330,35 +314,38 @@ while (1) {
             # No special requirements regarding waveforms by default
             self._clear_readonly_waveforms(awg_nr)
 
-            # the mask determines how many bits will be used in the protocol
-            # e.g., mask 3 will mask the bits with bin(3) = 00000011 using
-            # only the 2 Least Significant Bits.
-            num_codewords = int(2**np.ceil(np.log2(self._num_codewords)))
-            self.set('awgs_{}_dio_mask_value'.format(awg_nr), num_codewords-1)
-
-            # set mask and shift for codeword protocol
-            # N.B. The shift is applied before the mask
-            # The relevant bits can be selected by first shifting them
-            # and then masking them.
             if 1:   # FIXME: new
+                num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
                 dio_mode_list = {
-                    # Name                      AWG[0:3] shift
-                    'identical':            [   0,  0,  0,  0],
-                    'microwave':            [   0,  0,  9,  9],     # bits [7:0] and [16:9]. Skips bit 8 because of v1 hardware issues
-                    'new_microwave':        [   0,  0,  16, 16],    # bits [7:0] and [23:16]
-                    'new_novsm_microwave':  [   0,  7,  16, 23],    # bits [6:0], [13:7], [22:16] and [29:23]
-                    'flux':                 [   0,  6,  16, 22],
+                    'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
+                    'microwave':            { 'mask': 0xFF, 'shift': [0,  0,  9,  9] },     # bits [7:0] and [16:9]. Skips bit 8 because of v1 hardware issues
+                    'new_microwave':        { 'mask': 0xFF, 'shift': [0,  0,  16, 16] },    # bits [7:0] and [23:16]
+                    'new_novsm_microwave':  { 'mask': 0x7F, 'shift': [0,  7,  16, 23] },    # bits [6:0], [13:7], [22:16] and [29:23]
+                    'flux':                 { 'mask': 0x3F, 'shift': [0,  6,  16, 22] },    # FIXME: mask for 2 channels
                 }
                 # FIXME: define DIO modes centrally in device independent way (lsb, width, channelCount)
                 dio_mode = dio_mode_list.get(self.cfg_codeword_protocol())
                 if dio_mode is None:
                     raise ValueError("Invalid value '{}' for parameter cfg_codeword_protocol".format(self.cfg_codeword_protocol))
-                shift = dio_mode[awg_nr]
-                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), shift)
+                mask = dio_mode['mask']
+                self.set(f'awgs_{awg_nr}_dio_mask_value', mask)
+                shift = dio_mode['shift'][awg_nr]
+                self.set(f'awgs_{awg_nr}_dio_mask_shift', shift)
                 # FIXME: flux mode sets mask, using 6 bits=2channels
                 # FIXME: check _num_codewords against mode
                 # FIXME: derive amp vs direct mode from dio_mode_list
             else:
+                # the mask determines how many bits will be used in the protocol
+                # e.g., mask 3 will mask the bits with bin(3) = 00000011 using
+                # only the 2 Least Significant Bits.
+                num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
+                self.set('awgs_{}_dio_mask_value'.format(awg_nr), num_codewords - 1)
+
+                # set mask and shift for codeword protocol
+                # N.B. The shift is applied before the mask
+                # The relevant bits can be selected by first shifting them
+                # and then masking them.
+
                 if self.cfg_codeword_protocol() == 'identical':
                     # In the identical protocol all bits are used to trigger
                     # the same codewords on all AWG's
