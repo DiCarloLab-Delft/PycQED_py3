@@ -92,7 +92,8 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     return p
 
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
-                           platf_cfg: str, trigger_idx: int):
+                           platf_cfg: str, trigger_idx: int,
+                           wait_time_ns: int = 0):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
     this one triggers the 0th trigger port of the CCLight and usus the zeroth
@@ -103,6 +104,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     k = oqh.create_kernel("main", p)
 
     nr_clocks = int(spec_pulse_length/20e-9)
+    print('Adding {} to spec seq'.format(wait_time_ns))
 
     for i in range(nr_clocks):
         # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
@@ -110,6 +112,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
         k.gate('spec', [trigger_idx])
     if trigger_idx != qubit_idx:    
         k.wait([trigger_idx, qubit_idx], 0)
+    k.wait([qubit_idx],wait_time_ns)
         
     k.measure(qubit_idx)
     p.add_kernel(k)

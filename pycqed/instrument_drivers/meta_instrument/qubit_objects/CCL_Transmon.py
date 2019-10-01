@@ -568,6 +568,11 @@ class CCLight_Transmon(Qubit):
             vals=vals.Numbers(-70, 20),
             parameter_class=ManualParameter,
             initial_value=-30)
+        self.add_parameter(
+            'spec_wait_time', unit='s',
+            vals=vals.Numbers(0,100e-6),
+            parameter_class=ManualParameter,
+            initial_value=0)
 
     def add_flux_parameters(self):
         # fl_dc_ is the prefix for DC flux bias related params
@@ -931,6 +936,18 @@ class CCLight_Transmon(Qubit):
         LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
         LO.on()
         LO.power(self.ro_pow_LO())
+
+    # def _prep_ro_sources(self, qubits):
+    #     """
+    #     turn on and configure the RO LO's of all qubits to be measured.
+    #     """
+
+    #     for qb_name in qubits:
+    #         LO = self.find_instrument(qb_name).instr_LO_ro.get_instr()
+    #         LO.frequency.set(self.ro_lo_freq())
+    #         LO.power(self.ro_pow_LO())
+    #         LO.on()
+
 
     def _prep_ro_pulse(self, upload=True, CW=False):
         """
@@ -2444,13 +2461,16 @@ class CCLight_Transmon(Qubit):
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
 
+        wait_time_ns = self.spec_wait_time()*1e9
+
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq_marked(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
-            trigger_idx=0)
+            trigger_idx=0,
+            wait_time_ns=wait_time_ns)
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
@@ -5345,7 +5365,7 @@ class CCLight_Transmon(Qubit):
             curr (float):
                 current in A
         """
-        polycoeffs = self.flux_polycoeff()
+        polycoeffs = self.fl_dc_polycoeff()
 
         return np.polyval(polycoeffs, curr)
 
@@ -5363,5 +5383,5 @@ class CCLight_Transmon(Qubit):
         """
 
         return ct.freq_to_amp_root_parabola(freq=freq,
-                                         poly_coeffs=self.flux_polycoeff(),
+                                         poly_coeffs=self.fl_dc_polycoeff(),
                                          **kw)
