@@ -32,6 +32,7 @@ import pycqed.analysis.randomized_benchmarking_analysis as rbma
 import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis_v2.timedomain_analysis as tda
 import pycqed.measurement.waveform_control.sequence as sequence
+import pycqed.analysis.analysis_toolbox as a_tools
 
 try:
     import \
@@ -194,7 +195,6 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
         'average': True,
         'correlated': correlated
     }
-
     if add_channels is None:
         add_channels = {uhf: [] for uhf in uhfs}
     elif isinstance(add_channels, list):
@@ -425,7 +425,7 @@ def measure_active_reset(qubits, shots=5000,
         MC.run(name=label,  exp_metadata=exp_metadata)
 
 def measure_arbitrary_sequence(qubits, sequence=None, sequence_function=None,
-                               sequence_args=dict(), drive=None, label=None,
+                               sequence_args=dict(), drive='timedomain', label=None,
                                detector_function=None, df_kwargs=dict(),
                                sweep_function=awg_swf.SegmentHardSweep,
                                sweep_points=None, temporary_values=(),
@@ -493,7 +493,10 @@ def measure_arbitrary_sequence(qubits, sequence=None, sequence_function=None,
     exp_metadata.update({'preparation_params': prep_params,
                     # 'sweep_points': ,
                     })
-    with temporary_value(*temporary_values):
+    if len(temporary_values) > 0:
+        with temporary_value(*temporary_values):
+            MC.run(name=label, exp_metadata=exp_metadata)
+    else:
         MC.run(name=label, exp_metadata=exp_metadata)
 
     if analyze:
@@ -1966,7 +1969,9 @@ def measure_chevron(qbc, qbt, qbr, hard_sweep_params, soft_sweep_params,
                                         n_per_state=n_cal_points_per_state)
 
     if prep_params is None:
-        prep_params = qbr.preparation_params()
+        prep_params = \
+            get_multi_qubit_prep_params([qb.preparation_params()
+                                         for qb in [qbc, qbt]])
     sequences, hard_sweep_points, soft_sweep_points = \
         fsqs.chevron_seqs(
             qbc_name=qbc.name, qbt_name=qbt.name, qbr_name=qbr.name,
@@ -2207,7 +2212,7 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
     MC.set_sweep_function(hard_sweep_func)
     MC.set_sweep_points(hard_sweep_points)
 
-    channels_to_upload = [qbc.get_operation_dict()[cz_pulse_name]['channel']]
+    channels_to_upload = [operation_dict[cz_pulse_name]['channel']]
     MC.set_sweep_function_2D(awg_swf.SegmentSoftSweep(
         hard_sweep_func, sequences,
         list(soft_sweep_params)[0], list(soft_sweep_params.values())[0]['unit'],
@@ -2257,6 +2262,134 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
         return cphases, population_losses, leakage, flux_pulse_tdma
     else:
         return
+
+def measure_arbitrary_phase(qbc, qbt, target_phases, phase_func, cz_pulse_name,
+        soft_sweep_params=dict(), measure_dynamic_phase=False,
+        measure_conditional_phase=True, hard_sweep_params=None,
+        num_cz_gates=1, n_cal_points_per_state=1, cal_states='auto',
+        classified_ro=True, prep_params=None, exp_metadata=dict(), label=None,
+        analyze=True, upload=True, for_ef=True, **kw):
+    '''
+    method to measure the leakage and the phase acquired during a flux pulse
+    conditioned on the state of the control qubit (self).
+    In this measurement, the phase from two Ramsey type measurements
+    on qb_target is measured, once with the control qubit in the excited state
+    and once in the ground state. The conditional phase is calculated as the
+    difference.
+
+    Args:
+        qbc (QuDev_transmon): control qubit / fluxed qubit
+        qbt (QuDev_transmon): target qubit / non-fluxed qubit
+        phase_func (callable): function with input the target phase, returning
+         (flux pulse amplitude, dyn_phase)
+    '''
+
+    if label is None:
+        label = 'Arbitrary_Phase_{}_{}'.format(qbc.name, qbt.name)
+    assert qbc.get_operation_dict()[cz_pulse_name]['pulse_type'] == \
+        'BufferedCZPulseEffectiveTime', "Arbritrary phase measurement requires" \
+            "'BufferedCZPulseEffectiveTime' pulse type but pulse type is '{}'" \
+        .format(qbc.get_operation_dict()[cz_pulse_name]['pulse_type'])
+    results = dict() #dictionary to store measurement results
+    amplitudes, predicted_dyn_phase = phase_func(target_phases)
+    soft_sweep_params['amplitude'] = dict(values=amplitudes, unit='V')
+    exp_metadata.update(dict(target_phases=target_phases))
+    if measure_conditional_phase:
+        cphases, population_losses, leakage, flux_pulse_tdma = \
+            measure_cphase(qbc=qbc, qbt=qbt, soft_sweep_params=soft_sweep_params,
+                           cz_pulse_name=cz_pulse_name,
+                           hard_sweep_params=hard_sweep_params,
+                           num_cz_gates=num_cz_gates,
+                           n_cal_points_per_state=n_cal_points_per_state,
+                           cal_states=cal_states,
+                           prep_params=prep_params, exp_metadata=exp_metadata,
+                           label=label, analyze=True, upload=upload, for_ef=for_ef,
+                           classified= classified_ro,
+                           **kw)
+        if analyze:
+            # get folder to save figures.
+            # FIXME: temporary while no proper analysis class is made
+            a = ma.MeasurementAnalysis(auto=False)
+            a.get_naming_and_values()
+            save_folder = a.folder
+            if kw.get("wrap_phase", True):
+                tol = kw.get("wrap_tol", 0)
+                cphases[cphases < 0 - tol] = cphases[cphases < 0 - tol] + 2 * np.pi
+                cphases[cphases > 2 * np.pi + tol] = cphases[cphases > 2 * np.pi + tol] + \
+                                                     2 * np.pi
+                target_phases[target_phases < 0 - tol] = \
+                    target_phases[target_phases < 0 - tol] + 2 * np.pi
+                target_phases[target_phases > 2 * np.pi + tol] = \
+                    target_phases[target_phases > 2 * np.pi + tol] + 2 * np.pi
+
+            for param_name, values in soft_sweep_params.items():
+                fig, ax = plt.subplots(2, sharex=True, figsize=(7, 8))
+                ax[0].scatter(values['values'], target_phases * 180 / np.pi,
+                              label='Target phase', marker='x')
+                ax[0].scatter(values['values'], cphases * 180 / np.pi,
+                              label='Measured phase', marker='x')
+                ax[0].set_ylabel(f"Conditional Phase (deg)")
+                ax[0].legend(prop=dict(size=12))
+
+                diff_phases = ((cphases - target_phases + np.pi) %
+                               (2 * np.pi) - np.pi) * 180 / np.pi
+
+                ax[1].scatter(values['values'], diff_phases, label='Target - Measured')
+                ax[1].set_xlabel(f"{param_name} ({values.get('unit', '')})")
+                ax[1].set_ylabel(f"Conditional Phase (deg)")
+                ax[1].plot([], [], color='w',
+                           label=f"mean err: {np.mean(diff_phases):0.2f} $\pm$ "
+                           f"{np.std(diff_phases):0.2f}°\n" \
+                           f"median err: {np.median(diff_phases): 0.2f}°")
+                ax[1].legend(prop=dict(size=12))
+                fig.savefig(
+                    os.path.join(save_folder,
+                                 f"cphase_and_target_phase_vs_{param_name}.png"))
+            results['cphases'] = cphases
+            results['cphases_diff'] = diff_phases
+
+    if measure_dynamic_phase:
+        dyn_phases = []
+        # FIXME: infering amplitude parameter from pulse name, but if naming
+        #  protocol changes this might fail
+        ampl_param_name = "_".join(cz_pulse_name.split(" ")[:-1] + ["amplitude"])
+        for amp in amplitudes:
+            with temporary_value(
+                    (getattr(qbc, ampl_param_name), amp)):
+                dyn_phases.append(
+                    measure_dynamic_phases(qbc, qbt, cz_pulse_name, update=False,
+                                           qubits_to_measure=[qbc],
+                                           reset_phases_before_measurement=True))
+
+        if analyze:
+            a = ma.MeasurementAnalysis(auto=False)
+            a.get_naming_and_values()
+            save_folder = a.folder
+            dyn_phases = np.array([d[qbc.name] for d in dyn_phases])
+
+            if kw.get("wrap_phase", True):
+                dyn_phases[dyn_phases < 0 ] = dyn_phases[dyn_phases < 0] + 360
+                dyn_phases[dyn_phases > 360] = dyn_phases[dyn_phases > 360] + 360
+            fig, ax = plt.subplots(2, sharex=True)
+            ax[0].scatter(amplitudes, predicted_dyn_phase,
+                          label='Predicted dynamic phase', marker='x')
+            ax[0].scatter(amplitudes, dyn_phases, marker='x',
+                          label='Measured dynamic phase')
+            ax[0].set_ylabel(f"Dynamic Phase (deg)")
+            ax[0].legend(prop=dict(size=12))
+
+            # wrapping to get difference around 0 degree
+            diff_dyn_phases = \
+                (dyn_phases - predicted_dyn_phase + 180) % 360 - 180
+            ax[1].scatter(amplitudes, diff_dyn_phases, label='Target - Measured')
+            ax[1].set_xlabel(f"Amplitude (V)")
+            ax[1].set_ylabel(f"Dynamic Phase (deg)")
+            ax[1].legend(prop=dict(size=12))
+            fig.savefig(os.path.join(save_folder, "dynamic_phase.png"))
+            results['dphases'] = dyn_phases
+            results['dphases_diff'] = diff_dyn_phases
+
+    return results
 
 
 def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
