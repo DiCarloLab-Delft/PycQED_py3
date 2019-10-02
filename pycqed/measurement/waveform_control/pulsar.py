@@ -31,8 +31,6 @@ except Exception:
 try:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.\
         UHFQuantumController import UHFQC
-    from pycqed.instrument_drivers.physical_instruments.ZurichInstruments. \
-        dummy_UHFQC import dummy_UHFQC
 except Exception:
     UHFQC = type(None)
 try:

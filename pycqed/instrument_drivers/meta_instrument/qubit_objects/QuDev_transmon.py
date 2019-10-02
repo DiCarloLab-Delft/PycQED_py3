@@ -218,8 +218,9 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('acq_weights_basis', vals=vals.Lists(),
                            label="weight basis used",
-                           docstring=("Used to log the weights basis for integration "
-                                      "during qutrit readout"),
+                           docstring=("Used to log the weights basis for "
+                                      "integration during qutrit readout. E.g."
+                                      " ['ge', 'gf'] or ['ge', 'ortho']."),
                            parameter_class=ManualParameter)
         self.add_parameter('acq_classifier_params', vals=vals.Dict(),
                            label='Parameters for the qutrit classifier.',
