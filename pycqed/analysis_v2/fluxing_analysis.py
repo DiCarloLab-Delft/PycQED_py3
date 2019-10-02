@@ -313,7 +313,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 if z_cond_phase is not None:
                     self.plot_dicts[val_name + '_cond_phase_contour'] = {
                         'ax_id': val_name,
-                        'plotfn': angle_contour_overlay,
+                        'plotfn': contour_overlay,
                         'x': self.proc_data_dict['x_int'],
                         'y': self.proc_data_dict['y_int'],
                         'z': z_cond_phase,
@@ -343,7 +343,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
 
                     self.plot_dicts[val_name + '_L1_contour'] = {
                         'ax_id': val_name,
-                        'plotfn': angle_contour_overlay,
+                        'plotfn': contour_overlay,
                         'x': self.proc_data_dict['x_int'],
                         'y': self.proc_data_dict['y_int'],
                         'z': z_L1,
@@ -431,7 +431,7 @@ def non_interpolated_overlay(x, y, fig=None, ax=None, transpose=False, **kw):
     return fig, ax
 
 
-def angle_contour_overlay(x, y, z, colormap,
+def contour_overlay(x, y, z, colormap, transpose=False,
         contour_levels=[90, 180, 270], vlim=(0, 360), unit='deg', fig=None,
         ax=None, **kw):
     """
@@ -443,6 +443,7 @@ def angle_contour_overlay(x, y, z, colormap,
         z_cond_phase (array [shape: n*m]):     z data for the contour
         colormap (matplotlib.colors.Colormap or str): colormap to be used
         unit (str): 'deg' is a special case
+        vlim (tuple(vmin, vmax)): required for the colormap nomalization
         fig (Object):
             figure object
     """
@@ -454,6 +455,13 @@ def angle_contour_overlay(x, y, z, colormap,
 
     norm = colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
     linewidth = 2
+    fontsize = 'smaller'
+
+    if transpose:
+        y_tmp = np.copy(y)
+        y = np.copy(x)
+        x = y_tmp
+        z = np.transpose(z)
 
     if unit == 'deg':
         # This "improves" the contour plot artifacts
@@ -466,15 +474,15 @@ def angle_contour_overlay(x, y, z, colormap,
         c1 = ax.contour(x, y, phase_2d_uw_1,
             levels=contour_levels, linewidths=linewidth, cmap=colormap,
             norm=norm, linestyles=linestyle)
-        ax.clabel(c1, fmt='%.0f', inline='True', fontsize='smaller')
+        ax.clabel(c1, fmt='%.0f', inline='True', fontsize=fontsize)
         c2 = ax.contour(x, y, phase_2d_uw_2,
             levels=contour_levels, linewidths=linewidth, cmap=colormap,
             norm=norm, linestyles=linestyle)
-        ax.clabel(c2, fmt='%.0f', inline='True', fontsize='smaller')
+        ax.clabel(c2, fmt='%.0f', inline='True', fontsize=fontsize)
     else:
         c3 = ax.contour(x, y, z,
             levels=contour_levels, linewidths=linewidth, cmap=colormap,
             norm=norm, linestyles='dashdot')
-        ax.clabel(c3, fmt='%.1f', inline='True', fontsize='smaller')
+        ax.clabel(c3, fmt='%.1f', inline='True', fontsize=fontsize)
 
     return fig, ax
