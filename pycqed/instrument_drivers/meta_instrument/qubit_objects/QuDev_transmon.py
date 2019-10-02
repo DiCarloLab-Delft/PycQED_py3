@@ -926,9 +926,10 @@ class QuDev_transmon(Qubit):
         exp_metadata.update({'sweep_points_dict': {self.name: qscales},
              'sweep_name': 'Qscale factor',
              'sweep_unit': '',
+             'preparation_params': prep_params,
              'cal_points': repr(cp),
-             'last_ge_pulses': [last_ge_pulse],
              'rotate': len(cp.states) != 0,
+             'last_ge_pulses': [last_ge_pulse],
              'data_to_fit': {self.name: 'pf' if for_ef else 'pe'}})
         MC.run(label, exp_metadata=exp_metadata)
 
@@ -3455,6 +3456,7 @@ class QuDev_transmon(Qubit):
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: delays},
+                             'sweep_points_dict_2D': {self.name: freqs},
                              'use_cal_points': cal_points,
                              'preparation_params': prep_params,
                              'cal_points': repr(cp),
@@ -3465,7 +3467,11 @@ class QuDev_transmon(Qubit):
         MC.run_2D(label, exp_metadata=exp_metadata)
 
         if analyze:
-            ma.MeasurementAnalysis(TwoD=True)
+            try:
+                tda.MultiQubit_TimeDomain_Analysis(qb_names=[self.name],
+                                                   options_dict=dict(TwoD=True))
+            except Exception:
+                ma.MeasurementAnalysis(TwoD=True)
 
     def measure_flux_pulse_scope_nzcz_alpha(
             self, nzcz_alphas, delays, CZ_pulse_name=None,

@@ -456,32 +456,51 @@ class NZBufferedCZPulse(Pulse):
         pulse_length = self.pulse_length
         l1 = self.length1
         if chan != self.channel:
-            amp1 = self.aux_channels_dict[chan]*amp1
-            amp2 = -amp1*self.alpha
+            # amp1 = self.aux_channels_dict[chan]*amp1
+            # amp2 = -amp1*self.alpha
+            # buffer_start -= self.extra_buffer_aux_pulse
+            # buffer_end -= self.extra_buffer_aux_pulse
+            # pulse_length += 2*self.extra_buffer_aux_pulse
+            # l1 = self.alpha*pulse_length/(self.alpha + 1)
+            amp = self.aux_channels_dict[chan]
             buffer_start -= self.extra_buffer_aux_pulse
             buffer_end -= self.extra_buffer_aux_pulse
-            pulse_length += 2*self.extra_buffer_aux_pulse
-            l1 = self.alpha*pulse_length/(self.alpha + 1)
+            pulse_length += 2 * self.extra_buffer_aux_pulse
 
-        if self.gaussian_filter_sigma == 0:
-            wave1 = np.ones_like(tvals)*amp1
-            wave1 *= (tvals >= tvals[0] + buffer_start)
-            wave1 *= (tvals < tvals[0] + buffer_start + l1)
-
-            wave2 = np.ones_like(tvals)*amp2
-            wave2 *= (tvals >= tvals[0] + buffer_start + l1)
-            wave2 *= (tvals < tvals[0] + buffer_start + pulse_length)
-
-            wave = wave1 + wave2
+            if self.gaussian_filter_sigma == 0:
+                wave = np.ones_like(tvals) * amp
+                wave *= (tvals >= tvals[0] + buffer_start)
+                wave *= (tvals < tvals[0] + buffer_start + pulse_length)
+            else:
+                tstart = tvals[0] + buffer_start
+                tend = tvals[0] + buffer_start + pulse_length
+                scaling = 1 / np.sqrt(2) / self.gaussian_filter_sigma
+                wave = 0.5 * (sp.special.erf(
+                    (tvals - tstart) * scaling) - sp.special.erf(
+                    (tvals - tend) * scaling)) * amp
+            t_rel = tvals - tvals[0]
+            wave *= np.cos(
+                2 * np.pi * (self.frequency * t_rel + self.phase / 360.))
         else:
-            tstart = tvals[0] + buffer_start
-            tend = tvals[0] + buffer_start + l1
-            tend2 = tvals[0] + buffer_start + pulse_length
-            scaling = 1/np.sqrt(2)/self.gaussian_filter_sigma
-            wave = 0.5*(amp1*sp.special.erf((tvals - tstart)*scaling) -
-                        amp1*sp.special.erf((tvals - tend)*scaling) +
-                        amp2*sp.special.erf((tvals - tend)*scaling) -
-                        amp2*sp.special.erf((tvals - tend2)*scaling))
+            if self.gaussian_filter_sigma == 0:
+                wave1 = np.ones_like(tvals)*amp1
+                wave1 *= (tvals >= tvals[0] + buffer_start)
+                wave1 *= (tvals < tvals[0] + buffer_start + l1)
+
+                wave2 = np.ones_like(tvals)*amp2
+                wave2 *= (tvals >= tvals[0] + buffer_start + l1)
+                wave2 *= (tvals < tvals[0] + buffer_start + pulse_length)
+
+                wave = wave1 + wave2
+            else:
+                tstart = tvals[0] + buffer_start
+                tend = tvals[0] + buffer_start + l1
+                tend2 = tvals[0] + buffer_start + pulse_length
+                scaling = 1/np.sqrt(2)/self.gaussian_filter_sigma
+                wave = 0.5*(amp1*sp.special.erf((tvals - tstart)*scaling) -
+                            amp1*sp.special.erf((tvals - tend)*scaling) +
+                            amp2*sp.special.erf((tvals - tend)*scaling) -
+                            amp2*sp.special.erf((tvals - tend2)*scaling))
         return wave
 
     def hashables(self, tstart, channel):

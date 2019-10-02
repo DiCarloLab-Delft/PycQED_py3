@@ -2135,13 +2135,21 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
     plot_all_probs = kw.get('plot_all_probs', True)
     classified = kw.get('classified', False)
     predictive_label = kw.pop('predictive_label', False)
+    if prep_params is None:
+        prep_params = get_multi_qubit_prep_params(
+            [qb.preparation_params() for qb in [qbc, qbt]])
 
     if label is None:
         if predictive_label:
-            label = 'Predictive_cphase_nz_measurement_{}_{}'.format(
-                qbc.name, qbt.name)
+            label = 'Predictive_cphase_nz_measurement'
         else:
-            label = 'CPhase_nz_measurement_{}_{}'.format(qbc.name, qbt.name)
+            label = 'CPhase_nz_measurement'
+        if classified:
+            label += '_classified'
+        if 'active' in prep_params['preparation_type']:
+            label += '_reset'
+        label += f'_{qbc.name}_{qbt.name}'
+
     if hard_sweep_params is None:
         hard_sweep_params = {
             'phase': {'values': np.tile(np.linspace(0, 2*np.pi, 6)*180/np.pi, 2),
@@ -2159,10 +2167,6 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
 
     if max_flux_length is not None:
         print(f'max_flux_length = {max_flux_length*1e9:.2f} ns, set by user')
-
-    if prep_params is None:
-        prep_params = get_multi_qubit_prep_params(
-            [qb.preparation_params() for qb in [qbc, qbt]])
     operation_dict = get_operation_dict([qbc, qbt])
     sequences, hard_sweep_points, soft_sweep_points = \
         fsqs.cphase_seqs(

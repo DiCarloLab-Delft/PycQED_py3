@@ -229,6 +229,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
     def process_data(self):
         super().process_data()
         data_filter = self.get_param_value('data_filter')
+        self.data_with_reset = False
         if data_filter is None:
             if 'preparation_params' in self.metadata:
                 if 'active' in self.metadata['preparation_params'].get(
@@ -236,6 +237,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     reset_reps = self.metadata['preparation_params'].get(
                         'reset_reps', 1)
                     data_filter = lambda x: x[reset_reps::reset_reps+1]
+                    self.data_with_reset = True
         if data_filter is None:
             data_filter = lambda x: x
 
@@ -381,14 +383,14 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 # assumed to be of the form {qbn1: swpts_array1,
                 # qbn2: swpts_array2}
                 self.proc_data_dict['sweep_points_2D_dict'] = \
-                    {qbn: sweep_points_2D_dict[qbn] for qbn in self.qb_names}
+                    sweep_points_2D_dict
             elif soft_sweep_params is not None:
                 self.proc_data_dict['sweep_points_2D_dict'] = \
                     {qbn: list(soft_sweep_params.values())[0]['values']
                      for qbn in self.qb_names}
             else:
                 self.proc_data_dict['sweep_points_2D_dict'] = \
-                    {qbn: self.raw_data_dict['soft_sweep_points'][0] for
+                    {qbn: self.raw_data_dict['soft_sweep_points'] for
                      qbn in self.qb_names}
 
     def get_cal_data_points(self):
@@ -651,9 +653,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     self.prepare_raw_data_plots(plot_filtered=True)
 
     def prepare_raw_data_plots(self, plot_filtered=False):
-        if plot_filtered:
+        if plot_filtered or not self.data_with_reset:
             key = 'meas_results_per_qb'
-            suffix = 'filtered'
+            suffix = 'filtered' if self.data_with_reset else ''
             func_for_swpts = lambda qb_name: self.proc_data_dict[
                 'sweep_points_dict'][qb_name]['sweep_points']
         else:
