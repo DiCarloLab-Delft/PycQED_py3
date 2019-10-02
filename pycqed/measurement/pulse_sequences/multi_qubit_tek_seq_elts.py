@@ -10,7 +10,7 @@ from pycqed.measurement.pulse_sequences.standard_elements import \
 import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
-    get_pulse_dict_from_pars, add_preparation_pulses, pulse_list_list_seq
+    get_pulse_dict_from_pars, add_preparation_pulses, pulse_list_list_seq, add_suffix, sweep_pulse_params
 from pycqed.measurement.gate_set_tomography.gate_set_tomography import \
     create_experiment_list_pyGSTi_qudev as get_exp_list
 from pycqed.measurement.waveform_control import pulsar as ps
@@ -1057,6 +1057,73 @@ def Ramsey_add_pulse_seq(times, measured_qubit_name,
     else:
         return seq_name
 
+def ramsey_add_pulse_seq_active_reset(times, measured_qubit_name, pulsed_qubit_name,
+                                      operation_dict, cal_points, n=1, artificial_detunings = 0,
+                                      upload=True, for_ef=False, last_ge_pulse=False, prep_params=dict()):
+    '''
+     Azz sequence:  Ramsey on measured_qubit
+                    pi-pulse on pulsed_qubit
+     Input pars:
+         times:           array of delays (s)
+         n:               number of pulses (1 is conventional Ramsey)
+     '''
+    seq_name = 'Ramsey_with_additional_pulse_sequence'
+
+    # Operations
+    if for_ef:
+        ramsey_ops_measured = ["X180"] + ["X90_ef"] * 2 * n
+        ramsey_ops_pulsed = ["X180"]
+        if last_ge_pulse:
+            ramsey_ops_measured += ["X180"]
+    else:
+        ramsey_ops_measured = ["X90"] * 2 * n
+        ramsey_ops_pulsed = ["X180"]
+
+    ramsey_ops_measured += ["RO"]
+    ramsey_ops_measured = add_suffix(ramsey_ops_measured, " " + measured_qubit_name)
+    ramsey_ops_pulsed = add_suffix(ramsey_ops_pulsed, " " + pulsed_qubit_name)
+    ramsey_ops_init = ramsey_ops_pulsed + ramsey_ops_measured
+    ramsey_ops_det = ramsey_ops_measured
+
+    # pulses
+    ramsey_pulses_init = [deepcopy(operation_dict[op]) for op in ramsey_ops_init]
+    ramsey_pulses_det = [deepcopy(operation_dict[op]) for op in ramsey_ops_det]
+
+    # name and reference swept pulse
+    for i in range(n):
+        idx = -2 #(2 if for_ef else 1) + i * 2 + 1
+        ramsey_pulses_init[idx]["name"] = f"Ramsey_x2_{i}"
+        ramsey_pulses_init[idx]['ref_point'] = 'start'
+        ramsey_pulses_det[idx]["name"] = f"Ramsey_x2_{i}"
+        ramsey_pulses_det[idx]['ref_point'] = 'start'
+
+    # compute dphase
+    a_d = artificial_detunings if np.ndim(artificial_detunings) == 1 \
+        else [artificial_detunings]
+    dphase = [((t - times[0]) * a_d[i % len(a_d)] * 360) % 360
+                 for i, t in enumerate(times)]
+
+    # sweep pulses
+    params = {f'Ramsey_x2_{i}.pulse_delay': times for i in range(n)}
+    params.update({f'Ramsey_x2_{i}.phase': dphase for i in range(n)})
+    swept_pulses_init = sweep_pulse_params(ramsey_pulses_init, params)
+    swept_pulses_det = sweep_pulse_params(ramsey_pulses_det, params)
+    swept_pulses = np.ravel((swept_pulses_init,swept_pulses_det), order='F')
+
+    # add preparation pulses
+    swept_pulses_with_prep = \
+        [add_preparation_pulses(p, operation_dict, [pulsed_qubit_name, measured_qubit_name], **prep_params)
+         for p in swept_pulses]
+    seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
+
+    # add calibration segments
+    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+
+    log.debug(seq)
+    if upload:
+        ps.Pulsar.get_instance().program_awgs(seq)
+
+    return seq, np.arange(seq.n_acq_elements())
 
 def Ramsey_add_pulse_sweep_phase_seq(
         phases, measured_qubit_name,

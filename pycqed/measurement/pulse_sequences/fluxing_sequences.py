@@ -328,7 +328,7 @@ def fluxpulse_scope_sequence(
     seq_name = 'Fluxpulse_scope_sequence'
     ge_pulse = deepcopy(operation_dict['X180 ' + qb_name])
     ge_pulse['name'] = 'FPS_Pi'
-    ge_pulse['element_name'] = 'FPS_Pi_el'
+    # ge_pulse['element_name'] = 'FPS_Pi_el'
 
     flux_pulse = deepcopy(operation_dict[cz_pulse_name])
     flux_pulse['name'] = 'FPS_Flux'
@@ -491,12 +491,17 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
                          deepcopy(operation_dict['X90s ' + qbt_name])]
     initial_rotations[0]['name'] = 'cphase_init_pi_qbc'
     initial_rotations[1]['name'] = 'cphase_init_pihalf_qbt'
-    for rot_pulses in initial_rotations:
-        rot_pulses['element_name'] = 'cphase_initial_rots_el'
-
+    initial_rotations[1]['ref_pulse'] = "segment_start"
+    initial_rotations[0]['ref_pulse'] = "segment_start"
+    initial_rotations[1]['delay'] = 0
+    initial_rotations[0]['delay'] = 0
+    print(initial_rotations)
     flux_pulse = deepcopy(operation_dict[cz_pulse_name])
+    flux_pulse['ref_pulse'] = 'cphase_init_pihalf_qbt'
+    flux_pulse['pulse_delay'] = 0
     flux_pulse['name'] = 'cphase_flux'
-    flux_pulse['element_name'] = 'cphase_flux_el'
+    # flux_pulse['element_name'] = 'cphase_flux_el'
+    # DEBUG COMMENT: removed for flux pulse on same AWG, Michele 20190926
 
     final_rotations = [deepcopy(operation_dict['X180 ' + qbc_name]),
                        deepcopy(operation_dict['X90s ' + qbt_name])]
@@ -505,8 +510,8 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
     # final_rotations = [deepcopy(operation_dict['X90 ' + qbt_name])]
     # final_rotations[0]['name'] = 'cphase_final_pihalf_qbt'
 
-    for rot_pulses in final_rotations:
-        rot_pulses['element_name'] = 'cphase_final_rots_el'
+    #for rot_pulses in final_rotations:
+    #    rot_pulses['element_name'] = 'cphase_final_rots_el'
 
     # set pulse delay of final_rotations[0] to max_flux_length
     if max_flux_length is None:
@@ -545,7 +550,12 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
     for i in range(ssl):
         flux_p = deepcopy(flux_pulse)
         flux_p.update({k: v['values'][i] for k, v in soft_sweep_dict.items()})
-        pulses = initial_rotations + [flux_p] + final_rotations + ro_pulses
+
+        pulses = initial_rotations + [flux_p] + final_rotations
+        for pulse in pulses:
+            pulse['element_name'] = 'awg_pulses'
+        pulses += ro_pulses
+
         swept_pulses = sweep_pulse_params(pulses, params)
         swept_pulses_with_prep = \
             [add_preparation_pulses(p, operation_dict, [qbc_name, qbt_name],

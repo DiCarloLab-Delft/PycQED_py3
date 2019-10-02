@@ -362,7 +362,7 @@ def measure_multiplexed_readout(qubits, liveplot=False,
         [qb.name for qb in qubits])))
 
     if analyse and thresholds is not None:
-        channel_map = {qb.name: qb.int_log_det.value_names[0] for qb in qubits}
+        channel_map = {qb.name: qb.int_log_det.value_names[0]+' '+qb.instr_uhf() for qb in qubits}
         print('MRO channel map ', channel_map)
         ra.Multiplexed_Readout_Analysis(options_dict=dict(
             n_readouts=(2 if preselection else 1) * 2 ** len(qubits),
@@ -2038,9 +2038,9 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                          'cal_points': repr(cp),
                          'rotate': len(cal_states) != 0,
                          'cal_states_rotations':
-                             {qbc.name: {'g': 0, 'f': 1},
+                             {qbc.name: {'g': 0,  ('f' if for_ef else 'e'): 1},
                               qbt.name: {'g': 0, 'e': 1}},
-                         'data_to_fit': {qbc.name: 'pf', qbt.name: 'pe'},
+                         'data_to_fit': {qbc.name:  ('pf' if for_ef else 'pe'), qbt.name: 'pe'},
                          'hard_sweep_params': hard_sweep_params,
                          'soft_sweep_params': soft_sweep_params})
     MC.run_2D(label, exp_metadata=exp_metadata)
@@ -2206,9 +2206,11 @@ def measure_cz_bleed_through(qb, CZ_separation_times, phases, CZ_pulse_name,
 
 
 def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,
-                             artificial_detuning=0, interleave=True,
+                             artificial_detuning=0,
                              label='', MC=None, analyze=True, close_fig=True,
-                             cal_points=True, upload=True):
+                             cal_states="auto", n_cal_points_per_state=2,
+                             n=1, upload=True,  last_ge_pulse=False, for_ef = False,
+                             classified_ro=False, prep_params={}, exp_metadata=None):
     if times is None:
         raise ValueError("Unspecified times for measure_ramsey")
     if artificial_detuning is None:
@@ -2221,43 +2223,78 @@ def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,
                     'The units should be seconds.')
 
     for qb in [pulsed_qubit, measured_qubit]:
-        qb.prepare_for_timedomain()
+#        qb.prepare_for_timedomain()
+        qb.prepare(drive='timedomain')
     if MC is None:
-        MC = measured_qubit.MC
+        MC = measured_qubit.instr_mc.get_instr()
 
     # Define the measurement label
     if label == '':
         label = 'Ramsey_add_pulse_{}'.format(pulsed_qubit.name) + \
                 measured_qubit.msmt_suffix
 
-    step = np.abs(times[1] - times[0])
-    if interleave:
-        times = np.repeat(times, 2)
+#    step = np.abs(times[1] - times[0])
+#    if interleave:
+#        times = np.repeat(times, 2)
+#
+#    if cal_points:
+#        sweep_points = np.concatenate(
+#            [times, [times[-1] + step, times[-1] + 2 * step,
+#                     times[-1] + 3 * step, times[-1] + 4 * step]])
+#    else:
+#        sweep_points = times
 
-    if cal_points:
-        sweep_points = np.concatenate(
-            [times, [times[-1] + step, times[-1] + 2 * step,
-                     times[-1] + 3 * step, times[-1] + 4 * step]])
-    else:
-        sweep_points = times
+#    Rams_swf = awg_swf2.Ramsey_add_pulse_swf(
+#        measured_qubit_name=measured_qubit.name,
+#        pulsed_qubit_name=pulsed_qubit.name,
+#        operation_dict=get_operation_dict([measured_qubit, pulsed_qubit]),
+#        artificial_detuning=artificial_detuning,
+#        cal_points=cal_points,
+#        upload=upload)
 
-    Rams_swf = awg_swf2.Ramsey_add_pulse_swf(
+    # create cal points
+    cal_states = CalibrationPoints.guess_cal_states(cal_states, for_ef)
+    cp = CalibrationPoints.single_qubit(measured_qubit.name, cal_states,
+                                        n_per_state=n_cal_points_per_state)
+    # create sequence
+    seq, sweep_points = mqs.ramsey_add_pulse_seq_active_reset(
+        times=times,
         measured_qubit_name=measured_qubit.name,
         pulsed_qubit_name=pulsed_qubit.name,
         operation_dict=get_operation_dict([measured_qubit, pulsed_qubit]),
-        artificial_detuning=artificial_detuning,
-        cal_points=cal_points,
-        upload=upload)
-    MC.set_sweep_function(Rams_swf)
+        cal_points=cp,
+        n = n,
+        artificial_detunings=artificial_detuning,
+        upload = upload,
+        for_ef = for_ef,
+        last_ge_pulse = False)
+
+    MC.set_sweep_function(awg_swf.SegmentHardSweep(
+        sequence=seq, upload=upload, parameter_name='Delay', unit='s'))
     MC.set_sweep_points(sweep_points)
-    MC.set_detector_function(measured_qubit.int_avg_det)
-    MC.run(label, exp_metadata={'artificial_detuning': artificial_detuning,
-                                'measured_qubit': measured_qubit.name,
-                                'pulsed_qubit': pulsed_qubit.name})
+
+    MC.set_detector_function(measured_qubit.int_avg_classif_det if classified_ro else
+                             measured_qubit.int_avg_det)
+
+    if exp_metadata is None:
+        exp_metadata = {}
+    exp_metadata.update(
+        {'sweep_points_dict': {measured_qubit.name: times},
+         'sweep_name': 'Delay',
+         'sweep_unit': 's',
+         'cal_points': repr(cp),
+         'preparation_params': prep_params,
+         'last_ge_pulses': [last_ge_pulse],
+         'artificial_detuning': artificial_detuning,
+         'rotate': len(cp.states) != 0,
+         'data_to_fit': {measured_qubit.name: 'pf' if for_ef else 'pe'},
+         'measured_qubit': measured_qubit.name,
+         'pulsed_qubit': pulsed_qubit.name})
+
+    MC.run(label, exp_metadata=exp_metadata)
 
     if analyze:
-        ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                               qb_name=measured_qubit.name)
+        ramseyaddpulse_ana = tda.RamseyAddPulseAnalysis(auto=True, qb_names=[measured_qubit.name])
 
 
 def measure_ramsey_add_pulse_sweep_phase(

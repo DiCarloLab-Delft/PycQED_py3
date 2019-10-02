@@ -500,7 +500,7 @@ class Segment:
         # checks if elements on AWGs overlap
         self._test_overlap()
         # checks if there is only one element on the master AWG
-        self._test_trigger_awg()
+        #self._test_trigger_awg()
 
     def find_trigger_element(self, trigger_awg, trigger_pulse_time):
         """

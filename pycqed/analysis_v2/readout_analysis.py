@@ -1331,8 +1331,8 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
         for qubit, channel in self.channel_map.items():
             shots_cont = np.array(
-                self.raw_data_dict['measured_values_ord_dict'][channel])
-            shots_thresh[qubit] = (shots_cont > self.thresholds[qubit])[0]
+                self.raw_data_dict['measured_data'][channel])
+            shots_thresh[qubit] = (shots_cont > self.thresholds[qubit])
         self.proc_data_dict['shots_thresholded'] = shots_thresh
 
         logging.info("Calculating observables")
