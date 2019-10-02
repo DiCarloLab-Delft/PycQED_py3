@@ -232,9 +232,9 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
 
         nr_bins = self.options_dict.get('nr_bins', 100)
 
-        shots_anc = list(self.raw_data_dict['measured_values_ord_dict'].values())\
+        shots_anc = list(self.raw_data_dict['measured_data'].values())\
             [ch_idx_anc][0]
-        shots_data = list(self.raw_data_dict['measured_values_ord_dict'].values())\
+        shots_data = list(self.raw_data_dict['measured_data'].values())\
             [ch_idx_data][0]
 
         dat_dict['shots_anc'] = shots_anc
