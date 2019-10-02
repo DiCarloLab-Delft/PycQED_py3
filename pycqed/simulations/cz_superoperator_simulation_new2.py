@@ -163,6 +163,7 @@ def compute_propagator(arglist):
     fluxlutman = arglist['fluxlutman']
     noise_parameters_CZ = arglist['noise_parameters_CZ']
     which_gate = arglist['which_gate']
+    simstep_div = arglist['simstep_div']
 
     q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
     czd_double_sided = fluxlutman.get('czd_double_sided_{}'.format(which_gate))
@@ -172,7 +173,7 @@ def compute_propagator(arglist):
     cz_theta_f = fluxlutman.get('cz_theta_f_{}'.format(which_gate))
 
     sim_step=1/fluxlutman.sampling_rate()
-    subdivisions_of_simstep=1                          # 4 is a good one, corresponding to a time step of 0.1 ns
+    subdivisions_of_simstep=simstep_div                # 4 is a good one, corresponding to a time step of 0.1 ns
     sim_step_new=sim_step/subdivisions_of_simstep      # waveform is generated according to sampling rate of AWG,
                                                        # but we can use a different step for simulating the time evolution
     tlist = np.arange(0, cz_length, sim_step)
@@ -347,8 +348,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
     def __init__(self,
         fluxlutman,
         noise_parameters_CZ,
-        fitted_stepresponse_ty,
+        fitted_stepresponse_ty=None,
         qois='all',
+        simstep_div: str = 1,
         which_gate: str = 'NE'):
         """
         Detector for simulating a CZ trajectory.
@@ -368,6 +370,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         super().__init__()
 
         self.which_gate = which_gate # compatibility with new fluxlutman
+        self.simstep_div = simstep_div
 
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
@@ -384,8 +387,11 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         self.fluxlutman = fluxlutman
         self.noise_parameters_CZ = noise_parameters_CZ
-        self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
-                                                                # as a function of time (=t)
+        if fitted_stepresponse_ty is None:
+            self.fitted_stepresponse_ty = [np.array(1), np.array(1)]
+        else:
+            self.fitted_stepresponse_ty = fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
+                                                                      # as a function of time (=t)
 
     def acquire_data_point(self, **kw):
 
@@ -437,7 +443,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                                    'fluxlutman': self.fluxlutman,
                                    'noise_parameters_CZ': self.noise_parameters_CZ,
                                    'fitted_stepresponse_ty': self.fitted_stepresponse_ty,
-                                   'which_gate': self.which_gate}
+                                   'which_gate': self.which_gate,
+                                   'simstep_div': self.simstep_div}
 
                     weight = values_gaussian_q0[j_q0]*delta_x_q0 * values_gaussian_q1[j_q1]*delta_x_q1
                     weights.append(weight)

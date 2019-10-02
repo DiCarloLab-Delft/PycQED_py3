@@ -1,10 +1,14 @@
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 import numpy as np
 import logging
+log = logging.getLogger(__name__)
 from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
+from pycqed.instrument_drivers.virtual_instruments import\
+noise_parameters_CZ_new as npCZ
+from pycqed.simulations import cz_superoperator_simulation_new2 as cz_main
 import warnings
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
@@ -137,6 +141,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict_dist = dict()
         self.sampling_rate(2.4e9)
         self._add_qubit_parameters()
+        self._add_CZ_sim_parameters()
 
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
@@ -716,7 +721,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         channel_amp = AWG.set('awgs_{}_outputs_{}_amplitude'.format(
             awg_nr, ch_pair), val)
 
-
     def _get_awg_channel_range(self):
         AWG = self.AWG.get_instr()
         awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
@@ -854,6 +858,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            docstring='LutMan responsible for the corresponding'
                            'channel in the AWG8 channel pair. '
                            'Reference is used when uploading waveforms',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_noise_CZ',
+                           docstring='Noise parameters for CZ simulation.',
                            parameter_class=InstrumentRefParameter)
 
         self.add_parameter(
@@ -1303,6 +1310,50 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return ax
 
+    #################################
+    #  Simulation methods           #
+    #################################
+
+    def _add_CZ_sim_parameters(self):
+        for this_cz in ['NE', 'NW', 'SW', 'SE']:
+            self.add_parameter('anharm_q1_%s' % this_cz,
+                               docstring='[CZ simulation] Anharmonicity of static qubit.',
+                               vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+
+            self.add_parameter('bus_freq_%s' % this_cz,
+                               docstring='[CZ simulation] Bus frequency.',
+                               vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+
+    def sim_CZ(self, which_gate: str = 'NE', qois='all', simstep_div=1):
+        """
+        Simulates a CZ gate for the current paramenters.
+        """
+        noise_CZ = self.instr_noise_CZ.get_instr()
+        # if not defined set the sweetspot freqs same as the operating
+        # point freqs
+        if noise_CZ.get('w_q0_sweetspot') is None:
+            noise_CZ.w_q0_sweetspot(self.get('q_freq_01'))
+        if noise_CZ.get('w_q1_sweetspot') is None:
+            noise_CZ.w_q1_sweetspot(self.get('q_freq_10_{}'.format(which_gate)))
+
+        detector = cz_main.CZ_trajectory_superoperator(self,
+                noise_parameters_CZ=noise_CZ, qois=qois, which_gate=which_gate,
+                simstep_div=simstep_div)
+
+        sim_results = detector.acquire_data_point()
+
+        if qois == 'all':
+            values = {detector.value_names[i]: sim_results[i] for i, result in enumerate(sim_results)}
+            units = {detector.value_names[i]: detector.value_units[i] for i, result in enumerate(sim_results)}
+        else:
+            values = {qoi: sim_results[i] for i, qoi in enumerate(qois)}
+            units = {qoi: detector.value_units[detector.value_names.index(qoi)]
+                for i, qoi in enumerate(qois)}
+            pass
+
+        return values, units
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):

@@ -189,16 +189,16 @@ def calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ, which_gate: str = 'NE')
     w_q0=fluxlutman.calc_amp_to_freq(amp,'01', which_gate=which_gate)
     w_q1=fluxlutman.calc_amp_to_freq(amp,'10', which_gate=which_gate)
     alpha_q0=fluxlutman.calc_amp_to_freq(amp,'02', which_gate=which_gate)-2*w_q0
-    alpha_q1=noise_parameters_CZ.alpha_q1()
+    alpha_q1=fluxlutman.get('anharm_q1_{}'.format(which_gate))
     w_q0_intpoint=w_q1-alpha_q0
 
     q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
     J=q_J2/np.sqrt(2)
-    w_bus=noise_parameters_CZ.w_bus()
+    bus_freq=fluxlutman.get('bus_freq_{}'.format(which_gate))
 
-    delta_q1=w_q1-w_bus
-    delta_q0_intpoint=(w_q0_intpoint)-w_bus
-    delta_q0=(w_q0)-w_bus
+    delta_q1=w_q1-bus_freq
+    delta_q0_intpoint=(w_q0_intpoint)-bus_freq
+    delta_q0=(w_q0)-bus_freq
     J_temp = J / ((delta_q1+delta_q0_intpoint)/(delta_q1*delta_q0_intpoint)) * ((delta_q1+delta_q0)/(delta_q1*delta_q0))
 
     H=coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=J_temp)
@@ -1008,7 +1008,7 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
 
 
     H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=q_freq_10,
-                                                        alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=noise_parameters_CZ.alpha_q1(), J=0)  # old wrong way
+                                                        alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=fluxlutman.get('anharm_q1_{}'.format(which_gate)), J=0)  # old wrong way
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
     avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_new,L1)
@@ -1274,6 +1274,8 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ, which_gate: str = 'NE
                            'q_polycoeffs_freq_01_det': fluxlutman.q_polycoeffs_freq_01_det(),
                            'q_polycoeffs_anharm': fluxlutman.q_polycoeffs_anharm(),
                            'q_freq_01': fluxlutman.q_freq_01(),
+                           'bus_freq_' + which_gate: fluxlutman.get('bus_freq_{}'.format(which_gate)),
+                           'alpha_q1': fluxlutman.get('anharm_q1_{}'.format(which_gate)),
                            'q_freq_10_' + which_gate: fluxlutman.get('q_freq_10_{}'.format(which_gate))}
 
     noise_parameters_CZ_args = {'Z_rotations_length': noise_parameters_CZ.Z_rotations_length(),
@@ -1284,8 +1286,6 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ, which_gate: str = 'NE
                                 'T2_q0_amplitude_dependent': noise_parameters_CZ.T2_q0_amplitude_dependent(),
                                 'T2_q1': noise_parameters_CZ.T2_q1(),
                                 'w_q1_sweetspot': noise_parameters_CZ.w_q1_sweetspot(),
-                                'alpha_q1': noise_parameters_CZ.alpha_q1(),
-                                'w_bus': noise_parameters_CZ.w_bus(),
                                 'dressed_compsub': noise_parameters_CZ.dressed_compsub(),
                                 'sigma_q0': noise_parameters_CZ.sigma_q0(),
                                 'sigma_q1': noise_parameters_CZ.sigma_q1(),
@@ -1316,10 +1316,12 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     fluxlutman.set('cz_lambda_3_{}'.format(which_gate), fluxlutman_args['cz_lambda_3_' + which_gate])
     fluxlutman.set('cz_theta_f_{}'.format(which_gate), fluxlutman_args['cz_theta_f_' + which_gate])
     fluxlutman.set('czd_length_ratio_{}'.format(which_gate), fluxlutman_args['czd_length_ratio_' + which_gate])
+    fluxlutman.set('bus_freq_{}'.format(which_gate), fluxlutman_args['bus_freq_' + which_gate])
+    fluxlutman.set('anharm_q1_{}'.format(which_gate), fluxlutman_args['anharm_q1_' + which_gate])
+    fluxlutman.set('q_freq_10_{}'.format(which_gate), fluxlutman_args['q_freq_10_' + which_gate])
     fluxlutman.q_polycoeffs_freq_01_det(fluxlutman_args['q_polycoeffs_freq_01_det'])
     fluxlutman.q_polycoeffs_anharm(fluxlutman_args['q_polycoeffs_anharm'])
     fluxlutman.q_freq_01(fluxlutman_args['q_freq_01'])
-    fluxlutman.set('q_freq_10_{}'.format(which_gate), fluxlutman_args['q_freq_10_' + which_gate])
 
     noise_parameters_CZ.Z_rotations_length(noise_parameters_CZ_args['Z_rotations_length'])
     noise_parameters_CZ.voltage_scaling_factor(noise_parameters_CZ_args['voltage_scaling_factor'])
@@ -1329,8 +1331,6 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     noise_parameters_CZ.T2_q0_amplitude_dependent(noise_parameters_CZ_args['T2_q0_amplitude_dependent'])
     noise_parameters_CZ.T2_q1(noise_parameters_CZ_args['T2_q1'])
     noise_parameters_CZ.w_q1_sweetspot(noise_parameters_CZ_args['w_q1_sweetspot'])
-    noise_parameters_CZ.alpha_q1(noise_parameters_CZ_args['alpha_q1'])
-    noise_parameters_CZ.w_bus(noise_parameters_CZ_args['w_bus'])
     noise_parameters_CZ.dressed_compsub(noise_parameters_CZ_args['dressed_compsub'])
     noise_parameters_CZ.sigma_q0(noise_parameters_CZ_args['sigma_q0'])
     noise_parameters_CZ.sigma_q1(noise_parameters_CZ_args['sigma_q1'])
