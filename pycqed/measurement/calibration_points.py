@@ -122,20 +122,22 @@ class CalibrationPoints:
 
         """
         qb_names = self._check_qb_names(qb_names)
+        states = self.get_states(qb_names)
         rotations = dict()
 
         if len(qb_names) == 0:
             return rotations
-        if len(qb_names) == 1:
-            last_ge_pulses = [last_ge_pulses] if \
-                isinstance(last_ge_pulses, bool) else last_ge_pulses
-        else:
-            i, j = len(qb_names), \
-                   1 if isinstance(last_ge_pulses, bool) else len(last_ge_pulses)
-            assert i == j, f"Size of qb_names and last_ge_pulses don't " \
-                f"match: {i} vs {j}"
+        if 'f' in [s for v in states.values() for s in v]:
+            if len(qb_names) == 1:
+                last_ge_pulses = [last_ge_pulses] if \
+                    isinstance(last_ge_pulses, bool) else last_ge_pulses
+            else:
+                i, j = len(qb_names), \
+                       1 if isinstance(last_ge_pulses, bool) else \
+                           len(last_ge_pulses)
+                assert i == j, f"Size of qb_names and last_ge_pulses don't " \
+                    f"match: {i} vs {j}"
 
-        states = self.get_states(qb_names)
         for i, qbn in enumerate(qb_names):
             # get unique states in reversed alphabetical order: g, [e, f]
             order = {"g": 0, "e": 1, "f": 2}

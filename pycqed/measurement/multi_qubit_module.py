@@ -9,6 +9,9 @@ import lmfit
 from copy import deepcopy
 import pygsti
 import logging
+
+from pycqed.utilities.general import temporary_value
+
 log = logging.getLogger()
 log.addHandler(logging.StreamHandler())
 
@@ -18,6 +21,7 @@ import pycqed.measurement.awg_sweep_functions_multi_qubit as awg_swf2
 import pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts as mqs
 import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 import pycqed.measurement.detector_functions as det
+from pycqed.measurement.sweep_points import SweepPoints
 from pycqed.measurement.calibration_points import CalibrationPoints
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     one_qubit_reset
@@ -28,6 +32,7 @@ import pycqed.analysis.randomized_benchmarking_analysis as rbma
 import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis_v2.timedomain_analysis as tda
 import pycqed.measurement.waveform_control.sequence as sequence
+import pycqed.analysis.analysis_toolbox as a_tools
 
 try:
     import \
@@ -152,11 +157,12 @@ def get_operation_dict(qubits):
     return operation_dict
 
 
-def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
+def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                nr_shots=4095,
                                                used_channels=None,
                                                correlations=None,
                                                add_channels=None,
+                                               correlated=False,
                                                **kw):
     uhfs = set()
     uhf_instances = {}
@@ -181,14 +187,14 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
                 channels[uhf] += [qb.acq_Q_channel()]
 
         acq_classifier_params += [qb.acq_classifier_params()]
-        acq_state_prob_mtxs += [qb.acq_state_prob_mtx]
+        acq_state_prob_mtxs += [qb.acq_state_prob_mtx()]
 
     classif_det_get_values_kws = {
         'classifier_params': acq_classifier_params,
         'state_prob_mtx': acq_state_prob_mtxs,
-        'average': True
+        'average': True,
+        'correlated': correlated
     }
-
     if add_channels is None:
         add_channels = {uhf: [] for uhf in uhfs}
     elif isinstance(add_channels, list):
@@ -241,11 +247,6 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
                 integration_length=max_int_len[uhf], nr_shots=nr_shots,
                 get_values_function_kwargs=classif_det_get_values_kws,
                 result_logging_mode='raw', **kw),
-            'int_avg_classif_corr_det': det.UHFQC_integration_average_classifier_det(
-                UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
-                integration_length=max_int_len[uhf], nr_shots=nr_shots,
-                get_values_function_kwargs=classif_det_get_values_kws,
-                correlations=correlations[uhf], result_logging_mode='raw', **kw),
             'dig_avg_det': det.UHFQC_integrated_average_detector(
                 UHFQC=uhf_instances[uhf], AWG=AWG, channels=channels[uhf],
                 integration_length=max_int_len[uhf], nr_averages=nr_averages,
@@ -270,10 +271,23 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2 ** 10,
         individual_detectors[uhf][det_type] for uhf in uhfs])
         for det_type in ['int_log_det', 'dig_log_det',
                          'int_avg_det', 'dig_avg_det', 'inp_avg_det',
-                         'int_avg_classif_det', 'int_avg_classif_corr_det',
-                         'int_corr_det', 'dig_corr_det']}
+                         'int_avg_classif_det', 'int_corr_det', 'dig_corr_det']}
 
     return combined_detectors
+
+
+def get_multi_qubit_prep_params(prep_params_list):
+    if len(prep_params_list) == 0:
+        raise ValueError('prep_params_list is empty.')
+
+    thresh_map = {}
+    for prep_params in prep_params_list:
+        if 'threshold_mapping' in prep_params:
+            thresh_map.update(prep_params['threshold_mapping'])
+
+    prep_params = deepcopy(prep_params_list[0])
+    prep_params['threshold_mapping'] = thresh_map
+    return prep_params
 
 
 def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
@@ -362,8 +376,7 @@ def measure_multiplexed_readout(qubits, liveplot=False,
         [qb.name for qb in qubits])))
 
     if analyse and thresholds is not None:
-        channel_map = {qb.name: qb.int_log_det.value_names[0] for qb in qubits}
-        print('MRO channel map ', channel_map)
+        channel_map = {qb.name: qb.int_log_det.value_names[0]+' '+qb.instr_uhf() for qb in qubits}
         ra.Multiplexed_Readout_Analysis(options_dict=dict(
             n_readouts=(2 if preselection else 1) * 2 ** len(qubits),
             thresholds=thresholds,
@@ -372,47 +385,124 @@ def measure_multiplexed_readout(qubits, liveplot=False,
         ))
 
 
-def measure_active_reset(qubits, nreps=1, shots=5000,
-                         qutrit=False, upload=True):
+def measure_active_reset(qubits, shots=5000,
+                         qutrit=False, upload=True, label=None):
     MC = qubits[0].instr_mc.get_instr()
+    trig = qubits[0].instr_trigger.get_instr()
 
-    exp_metadata = {'reset_cycle_time':
-                        qubits[0].preparation_params()['post_ro_wait'],
-                    'nr_resets': qubits[0].preparation_params()['reset_reps'],
-                    'shots': shots}
+    # combine operations and preparation dictionaries
+    operation_dict = get_operation_dict(qubits)
+    qb_names = [qb.name for qb in qubits]
+    prep_params = \
+        get_multi_qubit_prep_params([qb.preparation_params() for qb in qubits])
 
-    operation_dict = {}
-    qb_names = []
-    for qb in qubits:
-        qb_names.append(qb.name)
-        operation_dict.update(qb.get_operation_dict())
+    # sequence
+    seq, swp = mqs.n_qubit_reset(qb_names, operation_dict, prep_params,
+                                upload=False, states='gef' if qutrit else 'ge')
+    # create sweep points
+    sp = SweepPoints('reset_reps', swp, '', 'Nr. Reset Repetitions')
 
-    seq, swp = one_qubit_reset(qb_names[0], operation_dict,
-                               qubits[0].preparation_params(), upload=False,
-                               states='gef' if qutrit else 'ge')
     df = get_multiplexed_readout_detector_functions(qubits,
                                                     nr_shots=shots)['int_log_det']
-    prev_avg = MC.soft_avg()
-    MC.soft_avg(1)
 
     for qb in qubits:
         qb.prepare(drive='timedomain')
 
     MC.set_sweep_function(awg_swf.SegmentHardSweep(sequence=seq, upload=upload))
     MC.set_sweep_points(swp)
-    MC.set_sweep_function_2D(swf.None_Sweep())
-    MC.set_sweep_points_2D(np.arange(nreps))
+    MC.set_detector_function(df)
+    if label is None:
+        label = 'active_reset_{}_x{}_{}'.format('ef' if qutrit else 'e',
+                                                prep_params['reset_reps'],
+                                                ','.join(qb_names))
+    exp_metadata = {'preparation_params': prep_params,
+                    'sweep_points': sp,
+                    'shots': shots}
+    temp_values = [(qb.acq_shots, shots) for qb in qubits]
+    temp_values += [(MC.soft_avg, 1)]
+    with temporary_value(*temp_values):
+        MC.run(name=label,  exp_metadata=exp_metadata)
+
+def measure_arbitrary_sequence(qubits, sequence=None, sequence_function=None,
+                               sequence_args=dict(), drive='timedomain', label=None,
+                               detector_function=None, df_kwargs=dict(),
+                               sweep_function=awg_swf.SegmentHardSweep,
+                               sweep_points=None, temporary_values=(),
+                               exp_metadata=None, upload=True,
+                               analyze=True):
+    """
+    Measures arbitrary sequence provided in input.
+    Args:
+        qubits (list): qubits on which the sequence is performed
+        sequence (Sequence): sequence to measure. Optionally,
+            the path of the sequence can be provided (eg. sqs.active_reset) as
+            sequence_function.
+        sequence_function (callable): sequence function which creates a sequences using
+            sequence_args. Should return (sequence, sweep_points).
+        sequence_args (dict): arguments used to build the sequence
+        drive (string): drive method. Defaults to timedomain
+        label (string): measurement label. Defaults to sequence.name.
+        detector_function (string): detector function string. eg.
+            'int_avg_detector'. Built using multi_uhf get_multiplexed_readout_detector_functions
+        df_kwargs (dict): detector function kwargs
+        sweep_function (callable): sweep function. Defaults to segment hard sweep.
+        sweep_points (list or array): list of sweep points. Required only if
+            argument sequence is used.
+        temporary_values (tuple): list of tuple pairs with qcode param and its
+            temporary value. eg [(qb1.acq_shots, 10000),(MC.soft_avg, 1)]
+        exp_metadata:
+        upload:
+        analyze:
+
+    Returns:
+
+    """
+    if sequence is None and sequence_function is None:
+        raise ValueError("Either Sequence or sequence name must be given.")
+
+    MC = qubits[0].instr_mc.get_instr()
+
+    # combine preparation dictionaries
+    qb_names = [qb.name for qb in qubits]
+    prep_params = \
+        get_multi_qubit_prep_params([qb.preparation_params() for qb in qubits])
+
+    # sequence
+    if sequence is not None:
+        if sweep_points is None:
+            raise ValueError("Sweep points must be specified if sequence object"
+                             "is given")
+    else:
+        sequence, sweep_points = sequence_function(**sequence_args)
+
+    # create sweep points
+    df = get_multiplexed_readout_detector_functions(qubits, **df_kwargs)[
+        detector_function]
+
+    for qb in qubits:
+        qb.prepare(drive=drive)
+
+    MC.set_sweep_function(sweep_function(sequence=sequence, upload=upload))
+    MC.set_sweep_points(sweep_points)
     MC.set_detector_function(df)
 
-    label = 'active_reset_{}_x{}_{}'.format('ef' if qutrit else 'e',
-                                            qubits[0].preparation_params()[
-                                                'reset_reps'], ','.join(qb_names))
+    if label is None:
+        label = f'{sequence.name}_{",".join(qb_names)}'
 
-    MC.run_2D(name=label,
-              exp_metadata=exp_metadata)
+    if exp_metadata is None:
+        exp_metadata = {}
 
-    MC.soft_avg(prev_avg)
+    exp_metadata.update({'preparation_params': prep_params,
+                    # 'sweep_points': ,
+                    })
+    if len(temporary_values) > 0:
+        with temporary_value(*temporary_values):
+            MC.run(name=label, exp_metadata=exp_metadata)
+    else:
+        MC.run(name=label, exp_metadata=exp_metadata)
 
+    if analyze:
+        return ma.MeasurementAnalysis()
 
 def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO,
                               CZ_pulses, nreps=1, parity_op='ZZ',
@@ -551,7 +641,8 @@ def measure_parity_single_round(ancilla_qubit, data_qubits, CZ_map,
         label = 'Parity-1-round_'+'-'.join([qb.name for qb in qubits])
     
     if prep_params is None:
-        prep_params = ancilla_qubit.preparation_params()
+        prep_params = get_multi_qubit_prep_params(
+            [qb.preparation_params() for qb in qubits])
 
     if cal_points is None:
         cal_points = CalibrationPoints.multi_qubit(qb_names, 'ge')
@@ -591,6 +682,106 @@ def measure_parity_single_round(ancilla_qubit, data_qubits, CZ_map,
          'hard_sweep_params': {'preps': {'values': np.arange(0, len(preps)),
                                          'unit': ''}}
         })
+
+    MC.run(label, exp_metadata=exp_metadata)
+
+    if analyze:
+        channel_map = {
+            qb.name: qb.int_log_det.value_names[0] + ' ' + qb.instr_uhf() for qb in
+            qubits}
+        tda.MultiQubit_TimeDomain_Analysis(qb_names=qb_names, options_dict=dict(
+                channel_map=channel_map
+            ))
+
+
+def measure_multi_parity_multi_round(ancilla_qubits, data_qubits,
+                                     parity_map, CZ_map,
+                                     prep=None, upload=True, prep_params=None,
+                                     mode='tomo',
+                                     parity_seperation=1100e-9,
+                                     rots_basis=('I', 'Y90', 'X90'),
+                                     parity_loops = 1,
+                                     cal_points=None, analyze=True,
+                                     exp_metadata=None, label=None,
+                                     detector='int_log_det'):
+    """
+
+    :param ancilla_qubit:
+    :param data_qubits:
+    :param CZ_map: example:
+        {'CZ qb1 qb2': ['Y90 qb1', 'CX qb1 qb2', 'mY90 qb1'],
+         'CZ qb3 qb4': ['CZ qb4 qb3']}
+    :param preps:
+    :param upload:
+    :param prep_params:
+    :param cal_points:
+    :param analyze:
+    :param exp_metadata:
+    :param label:
+    :param detector:
+    :return:
+    """
+
+    qubits = ancilla_qubits + data_qubits
+    qb_names = [qb.name for qb in qubits]
+    for qb in qubits:
+        qb.prepare(drive='timedomain')
+
+    if label is None:
+        label = 'S7-rounds_' + str(parity_loops) + '_' + '-'.join(rots_basis) + \
+                '_' + '-'.join([qb.name for qb in qubits])
+
+    if prep_params is None:
+        prep_params = get_multi_qubit_prep_params(
+            [qb.preparation_params() for qb in qubits])
+
+    # if cal_points is None:
+    #     cal_points = CalibrationPoints.multi_qubit(qb_names, 'ge')
+
+    if prep is None:
+        prep = 'g'*len(data_qubits)
+
+    MC = ancilla_qubits[0].instr_mc.get_instr()
+
+    seq, sweep_points = mqs.multi_parity_multi_round_seq(
+                                 [qb.name for qb in ancilla_qubits],
+                                 [qb.name for qb in data_qubits],
+                                 parity_map,
+                                 CZ_map,
+                                 prep,
+                                 operation_dict = get_operation_dict(qubits),
+                                 mode=mode,
+                                 parity_seperation=parity_seperation,
+                                 rots_basis=rots_basis,
+                                 parity_loops=parity_loops,
+                                 cal_points=cal_points,
+                                 prep_params=prep_params,
+                                 upload=upload)
+
+    MC.set_sweep_function(awg_swf.SegmentHardSweep(
+        sequence=seq, upload=False, parameter_name='Tomography'))
+    MC.set_sweep_points(sweep_points)
+
+    rounds = 0
+    for k in range(len(parity_map)):
+        if parity_map[k]['round'] > rounds:
+            rounds = parity_map[k]['round']
+    rounds += 1
+
+    MC.set_detector_function(
+        get_multiplexed_readout_detector_functions(
+            qubits,
+            nr_averages=ancilla_qubits[0].acq_averages(),
+            nr_shots=ancilla_qubits[0].acq_shots(),
+        )[detector])
+    if exp_metadata is None:
+        exp_metadata = {}
+    exp_metadata.update(
+        {'sweep_name': 'Tomography',
+         'preparation_params': prep_params,
+         'hard_sweep_params': {'tomo': {'values': np.arange(0, len(sweep_points)),
+                                         'unit': ''}}
+         })
 
     MC.run(label, exp_metadata=exp_metadata)
 
@@ -730,7 +921,7 @@ def measure_two_qubit_randomized_benchmarking(
         qb1, qb2, cliffords, nr_seeds, cz_pulse_name,
         character_rb=False, net_clifford=0,
         clifford_decomposition_name='HZ', interleaved_gate=None,
-        classified=False, n_cal_points_per_state=2, cal_states=(),
+        classified=False, n_cal_points_per_state=2, cal_states=tuple(),
         label=None, prep_params=None, upload=True, analyze_RB=True):
 
     qb1n = qb1.name
@@ -752,10 +943,11 @@ def measure_two_qubit_randomized_benchmarking(
         qb.prepare(drive='timedomain')
 
     if prep_params is None:
-        prep_params = qb1.preparation_params()
+        prep_params = get_multi_qubit_prep_params(
+            [qb.preparation_params() for qb in [qb1, qb2]])
 
     cal_states = CalibrationPoints.guess_cal_states(cal_states)
-    cp = CalibrationPoints.single_qubit(qb1.name, cal_states,
+    cp = CalibrationPoints.multi_qubit([qb1.name, qb2.name, 'corr'], cal_states,
                                         n_per_state=n_cal_points_per_state)
 
     operation_dict = get_operation_dict(qubits)
@@ -766,7 +958,8 @@ def measure_two_qubit_randomized_benchmarking(
             max_clifford_idx=24**2 if character_rb else 11520,
             cz_pulse_name=cz_pulse_name, net_clifford=net_clifford,
             clifford_decomposition_name=clifford_decomposition_name,
-            interleaved_gate=interleaved_gate, upload=False, cal_points=cp)
+            interleaved_gate=interleaved_gate, upload=False,
+            cal_points=cp, prep_params=prep_params)
 
     hard_sweep_func = awg_swf.SegmentHardSweep(
         sequence=sequences[0], upload=upload,
@@ -777,29 +970,29 @@ def measure_two_qubit_randomized_benchmarking(
     MC.set_sweep_function_2D(awg_swf.SegmentSoftSweep(
         hard_sweep_func, sequences, 'Nr. Seeds', ''))
     MC.set_sweep_points_2D(soft_sweep_points)
-
-    if classified:
-        correlations = [(
-            (qb1.acq_I_channel(), qb1.acq_Q_channel()),
-            (qb2.acq_I_channel(), qb2.acq_Q_channel())
-        )]
-        det_name = 'int_avg_classif_corr_det'
-    else:
-        correlations = [(qb1.acq_I_channel(), qb2.acq_I_channel())]
-        det_name = 'dig_corr_det'
     det_func = get_multiplexed_readout_detector_functions(
         qubits, nr_averages=max(qb.acq_averages() for qb in qubits),
-        correlations=correlations)[det_name]
+        correlated=True)[
+        'int_avg_classif_det' if classified else 'dig_corr_det']
     MC.set_detector_function(det_func)
+
+    # create sweep points
+    sp = SweepPoints('nr_seeds', np.arange(nr_seeds), '', 'Nr. Seeds')
+    sp.add_sweep_dimension()
+    sp.add_sweep_parameter('cliffords', cliffords, '',
+                           'Number of applied Cliffords, $m$')
+    meas_obj_value_names_map = {
+        qb.name: qb.int_avg_classif_det.value_names for qb in [qb1, qb2]}
+    meas_obj_value_names_map.update({'corr': det_func.value_names[-1]})
     exp_metadata = {'preparation_params': prep_params,
-                    'cal_points': repr(cp),
-                    'rotate': len(cal_states) != 0,
-                    'data_to_fit': {qb1.name: 'pe', qb2.name: 'pe'},
-                    'hard_sweep_params':
-                        {'nr_seeds': {'values': np.arange(nr_seeds),
-                                      'unit': ''}},
-                    'soft_sweep_params':
-                        {'cliffords': {'values': cliffords, 'unit': ''}}}
+                     'cal_points': repr(cp),
+                     'sweep_points': sp,
+                     'meas_obj_sweep_points_map':
+                        {qb1.name: ['nr_seeds', 'cliffords'],
+                         qb2.name: ['nr_seeds', 'cliffords'],
+                         'corr': ['nr_seeds', 'cliffords']},
+                     'meas_obj_value_names_map': meas_obj_value_names_map,
+                         }
     MC.run_2D(name=label, exp_metadata=exp_metadata)
 
     if analyze_RB:
@@ -1778,7 +1971,9 @@ def measure_chevron(qbc, qbt, qbr, hard_sweep_params, soft_sweep_params,
                                         n_per_state=n_cal_points_per_state)
 
     if prep_params is None:
-        prep_params = qbr.preparation_params()
+        prep_params = \
+            get_multi_qubit_prep_params([qb.preparation_params()
+                                         for qb in [qbc, qbt]])
     sequences, hard_sweep_points, soft_sweep_points = \
         fsqs.chevron_seqs(
             qbc_name=qbc.name, qbt_name=qbt.name, qbr_name=qbr.name,
@@ -1969,6 +2164,7 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
         qbt (QuDev_transmon): target qubit / non-fluxed qubit
     '''
     plot_all_traces = kw.get('plot_all_traces', True)
+    plot_all_probs = kw.get('plot_all_probs', True)
     classified = kw.get('classified', False)
     predictive_label = kw.pop('predictive_label', False)
 
@@ -1994,10 +2190,11 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                                         n_per_state=n_cal_points_per_state)
 
     if max_flux_length is not None:
-        print(f'max_flux_length = {max_flux_length*1e9:.2f} ns, set by user')
+        log.debug(f'max_flux_length = {max_flux_length*1e9:.2f} ns, set by user')
 
     if prep_params is None:
-        prep_params = qbc.preparation_params()
+        prep_params = get_multi_qubit_prep_params(
+            [qb.preparation_params() for qb in [qbc, qbt]])
     operation_dict = get_operation_dict([qbc, qbt])
     sequences, hard_sweep_points, soft_sweep_points = \
         fsqs.cphase_seqs(
@@ -2017,7 +2214,7 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
     MC.set_sweep_function(hard_sweep_func)
     MC.set_sweep_points(hard_sweep_points)
 
-    channels_to_upload = [qbc.get_operation_dict()[cz_pulse_name]['channel']]
+    channels_to_upload = [operation_dict[cz_pulse_name]['channel']]
     MC.set_sweep_function_2D(awg_swf.SegmentSoftSweep(
         hard_sweep_func, sequences,
         list(soft_sweep_params)[0], list(soft_sweep_params.values())[0]['unit'],
@@ -2036,19 +2233,28 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                          'cphase_qbname': qbt.name,
                          'preparation_params': prep_params,
                          'cal_points': repr(cp),
-                         'rotate': len(cal_states) != 0,
+                         'classified_ro': classified,
+                         'rotate': len(cal_states) != 0 and not classified,
                          'cal_states_rotations':
                              {qbc.name: {'g': 0, 'f': 1},
-                              qbt.name: {'g': 0, 'e': 1}},
+                              qbt.name: {'g': 0, 'e': 1}} if
+                             (len(cal_states) != 0 and not classified) else None,
                          'data_to_fit': {qbc.name: 'pf', qbt.name: 'pe'},
                          'hard_sweep_params': hard_sweep_params,
                          'soft_sweep_params': soft_sweep_params})
     MC.run_2D(label, exp_metadata=exp_metadata)
-
     if analyze:
+        if classified:
+            channel_map = {qb.name: qb.int_avg_classif_det.value_names
+                           for qb in [qbc, qbt]}
+        else:
+            channel_map = {qb.name: qb.int_avg_det.value_names
+                           for qb in [qbc, qbt]}
         flux_pulse_tdma = tda.CPhaseLeakageAnalysis(
             qb_names=[qbc.name, qbt.name],
-            options_dict={'TwoD': True, 'plot_all_traces': plot_all_traces})
+            options_dict={'TwoD': True, 'plot_all_traces': plot_all_traces,
+                          'plot_all_probs': plot_all_probs,
+                          'channel_map': channel_map})
         cphases = flux_pulse_tdma.proc_data_dict[
             'analysis_params_dict']['cphase']['val']
         population_losses = flux_pulse_tdma.proc_data_dict[
@@ -2059,13 +2265,142 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
     else:
         return
 
+def measure_arbitrary_phase(qbc, qbt, target_phases, phase_func, cz_pulse_name,
+        soft_sweep_params=dict(), measure_dynamic_phase=False,
+        measure_conditional_phase=True, hard_sweep_params=None,
+        num_cz_gates=1, n_cal_points_per_state=1, cal_states='auto',
+        classified_ro=True, prep_params=None, exp_metadata=dict(), label=None,
+        analyze=True, upload=True, for_ef=True, **kw):
+    '''
+    method to measure the leakage and the phase acquired during a flux pulse
+    conditioned on the state of the control qubit (self).
+    In this measurement, the phase from two Ramsey type measurements
+    on qb_target is measured, once with the control qubit in the excited state
+    and once in the ground state. The conditional phase is calculated as the
+    difference.
+
+    Args:
+        qbc (QuDev_transmon): control qubit / fluxed qubit
+        qbt (QuDev_transmon): target qubit / non-fluxed qubit
+        phase_func (callable): function with input the target phase, returning
+         (flux pulse amplitude, dyn_phase)
+    '''
+
+    if label is None:
+        label = 'Arbitrary_Phase_{}_{}'.format(qbc.name, qbt.name)
+    assert qbc.get_operation_dict()[cz_pulse_name]['pulse_type'] == \
+        'BufferedCZPulseEffectiveTime', "Arbritrary phase measurement requires" \
+            "'BufferedCZPulseEffectiveTime' pulse type but pulse type is '{}'" \
+        .format(qbc.get_operation_dict()[cz_pulse_name]['pulse_type'])
+    results = dict() #dictionary to store measurement results
+    amplitudes, predicted_dyn_phase = phase_func(target_phases)
+    soft_sweep_params['amplitude'] = dict(values=amplitudes, unit='V')
+    exp_metadata.update(dict(target_phases=target_phases))
+    if measure_conditional_phase:
+        cphases, population_losses, leakage, flux_pulse_tdma = \
+            measure_cphase(qbc=qbc, qbt=qbt, soft_sweep_params=soft_sweep_params,
+                           cz_pulse_name=cz_pulse_name,
+                           hard_sweep_params=hard_sweep_params,
+                           num_cz_gates=num_cz_gates,
+                           n_cal_points_per_state=n_cal_points_per_state,
+                           cal_states=cal_states,
+                           prep_params=prep_params, exp_metadata=exp_metadata,
+                           label=label, analyze=True, upload=upload, for_ef=for_ef,
+                           classified= classified_ro,
+                           **kw)
+        if analyze:
+            # get folder to save figures.
+            # FIXME: temporary while no proper analysis class is made
+            a = ma.MeasurementAnalysis(auto=False)
+            a.get_naming_and_values()
+            save_folder = a.folder
+            if kw.get("wrap_phase", True):
+                tol = kw.get("wrap_tol", 0)
+                cphases[cphases < 0 - tol] = cphases[cphases < 0 - tol] + 2 * np.pi
+                cphases[cphases > 2 * np.pi + tol] = cphases[cphases > 2 * np.pi + tol] + \
+                                                     2 * np.pi
+                target_phases[target_phases < 0 - tol] = \
+                    target_phases[target_phases < 0 - tol] + 2 * np.pi
+                target_phases[target_phases > 2 * np.pi + tol] = \
+                    target_phases[target_phases > 2 * np.pi + tol] + 2 * np.pi
+
+            for param_name, values in soft_sweep_params.items():
+                fig, ax = plt.subplots(2, sharex=True, figsize=(7, 8))
+                ax[0].scatter(values['values'], target_phases * 180 / np.pi,
+                              label='Target phase', marker='x')
+                ax[0].scatter(values['values'], cphases * 180 / np.pi,
+                              label='Measured phase', marker='x')
+                ax[0].set_ylabel(f"Conditional Phase (deg)")
+                ax[0].legend(prop=dict(size=12))
+
+                diff_phases = ((cphases - target_phases + np.pi) %
+                               (2 * np.pi) - np.pi) * 180 / np.pi
+
+                ax[1].scatter(values['values'], diff_phases, label='Target - Measured')
+                ax[1].set_xlabel(f"{param_name} ({values.get('unit', '')})")
+                ax[1].set_ylabel(f"Conditional Phase (deg)")
+                ax[1].plot([], [], color='w',
+                           label=f"mean err: {np.mean(diff_phases):0.2f} $\pm$ "
+                           f"{np.std(diff_phases):0.2f}°\n" \
+                           f"median err: {np.median(diff_phases): 0.2f}°")
+                ax[1].legend(prop=dict(size=12))
+                fig.savefig(
+                    os.path.join(save_folder,
+                                 f"cphase_and_target_phase_vs_{param_name}.png"))
+            results['cphases'] = cphases
+            results['cphases_diff'] = diff_phases
+
+    if measure_dynamic_phase:
+        dyn_phases = []
+        # FIXME: infering amplitude parameter from pulse name, but if naming
+        #  protocol changes this might fail
+        ampl_param_name = "_".join(cz_pulse_name.split(" ")[:-1] + ["amplitude"])
+        for amp in amplitudes:
+            with temporary_value(
+                    (getattr(qbc, ampl_param_name), amp)):
+                dyn_phases.append(
+                    measure_dynamic_phases(qbc, qbt, cz_pulse_name, update=False,
+                                           qubits_to_measure=[qbc],
+                                           reset_phases_before_measurement=True))
+
+        if analyze:
+            a = ma.MeasurementAnalysis(auto=False)
+            a.get_naming_and_values()
+            save_folder = a.folder
+            dyn_phases = np.array([d[qbc.name] for d in dyn_phases])
+
+            if kw.get("wrap_phase", True):
+                dyn_phases[dyn_phases < 0 ] = dyn_phases[dyn_phases < 0] + 360
+                dyn_phases[dyn_phases > 360] = dyn_phases[dyn_phases > 360] + 360
+            fig, ax = plt.subplots(2, sharex=True)
+            ax[0].scatter(amplitudes, predicted_dyn_phase,
+                          label='Predicted dynamic phase', marker='x')
+            ax[0].scatter(amplitudes, dyn_phases, marker='x',
+                          label='Measured dynamic phase')
+            ax[0].set_ylabel(f"Dynamic Phase (deg)")
+            ax[0].legend(prop=dict(size=12))
+
+            # wrapping to get difference around 0 degree
+            diff_dyn_phases = \
+                (dyn_phases - predicted_dyn_phase + 180) % 360 - 180
+            ax[1].scatter(amplitudes, diff_dyn_phases, label='Target - Measured')
+            ax[1].set_xlabel(f"Amplitude (V)")
+            ax[1].set_ylabel(f"Dynamic Phase (deg)")
+            ax[1].legend(prop=dict(size=12))
+            fig.savefig(os.path.join(save_folder, "dynamic_phase.png"))
+            results['dphases'] = dyn_phases
+            results['dphases_diff'] = diff_dyn_phases
+
+    return results
+
 
 def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
                            qubits_to_measure=None, cal_points=True,
                            analyze=True, upload=True, n_cal_points_per_state=1,
                            cal_states='auto', prep_params=None,
                            exp_metadata=None, classified=False, update=False,
-                           reset_phases_before_measurement=True):
+                           reset_phases_before_measurement=True,
+                           basis_rot_par=None, prepend_n_cz=0):
 
     if qubits_to_measure is None:
         qubits_to_measure = [qbc, qbt]
@@ -2075,11 +2410,14 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
                 'values': np.tile(np.linspace(0, 2*np.pi, 6)*180/np.pi, 2),
                 'unit': 'deg'}}
 
+    if basis_rot_par is None:
+        basis_rot_par = f'{cz_pulse_name[:-8]}_{qbt.name}_basis_rotation'
+
     if reset_phases_before_measurement:
         dyn_phases = {qb.name: 0 for qb in qubits_to_measure}
-        qbc.set('CZ_{}_basis_rotation'.format(qbt.name), dyn_phases)
+        qbc.set(basis_rot_par, dyn_phases)
     else:
-        dyn_phases = qbc.get('CZ_{}_basis_rotation'.format(qbt.name))
+        dyn_phases = qbc.get(basis_rot_par)
     for qb in qubits_to_measure:
         label = f'Dynamic_phase_measurement_CZ{qbt.name}{qbc.name}-{qb.name}'
         qb.prepare(drive='timedomain')
@@ -2092,13 +2430,13 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
         else:
             cp = None
 
-        if prep_params is None:
-            prep_params = qb.preparation_params()
+        prep_params = qb.preparation_params()
         seq, hard_sweep_points = \
             fsqs.dynamic_phase_seq(
                 qb_name=qb.name, hard_sweep_dict=hard_sweep_params,
-                operation_dict=get_operation_dict([qbc, qbt]),
+                operation_dict=get_operation_dict(qubits_to_measure),
                 cz_pulse_name=cz_pulse_name, cal_points=cp,
+                prepend_n_cz=prepend_n_cz,
                 upload=False, prep_params=prep_params)
 
         MC.set_sweep_function(awg_swf.SegmentHardSweep(
@@ -2125,16 +2463,16 @@ def measure_dynamic_phases(qbc, qbt, cz_pulse_name, hard_sweep_params=None,
         if analyze:
             flux_pulse_amp = None
             if 'amplitude' in qbc.get_operation_dict()[cz_pulse_name]:
-                flux_pulse_amp = qbc.get('CZ_{}_pulse_length'.format(qbt.name))
+                flux_pulse_amp = qbc.get_operation_dict()[cz_pulse_name]['amplitude']
             MA = tda.CZDynamicPhaseAnalysis(qb_names=[qb.name], options_dict={
-                'flux_pulse_length': qbc.get(
-                    'CZ_{}_pulse_length'.format(qbt.name)),
+                'flux_pulse_length': qbc.get_operation_dict()[cz_pulse_name][
+                    'pulse_length'],
                 'flux_pulse_amp': flux_pulse_amp})
             dyn_phases[qb.name] = \
                 MA.proc_data_dict['analysis_params_dict'][qb.name][
                     'dynamic_phase']['val']*180/np.pi
     if update and reset_phases_before_measurement:
-        qbc.set('CZ_{}_basis_rotation'.format(qbt.name), dyn_phases)
+        qbc.set(basis_rot_par, dyn_phases)
     return dyn_phases
 
 

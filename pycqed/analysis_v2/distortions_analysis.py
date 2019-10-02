@@ -65,9 +65,9 @@ class Scope_Trace_analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['xunit'] = self.raw_data_dict['value_units'][0][x_ch_idx]
 
         self.proc_data_dict['xvals'] = list(self.raw_data_dict
-            ['measured_values_ord_dict'].values())[x_ch_idx][0]
+            ['measured_data'].values())[x_ch_idx][0]
         self.proc_data_dict['yvals'] = list(self.raw_data_dict
-            ['measured_values_ord_dict'].values())[y_ch_idx][0]
+            ['measured_data'].values())[y_ch_idx][0]
 
 
         # Detect the rising edge and shift the time axis

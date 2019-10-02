@@ -305,7 +305,6 @@ class MeasurementControl(Instrument):
 
         datasetshape = self.dset.shape
         start_idx, stop_idx = self.get_datawriting_indices_update_ctr(new_data)
-
         new_datasetshape = (np.max([datasetshape[0], stop_idx]),
                             datasetshape[1])
         self.dset.resize(new_datasetshape)
@@ -1128,6 +1127,13 @@ class MeasurementControl(Instrument):
         parameter. Only saves the value and not the update time (which is
         known in the snapshot)
         '''
+
+
+        import numpy
+        import sys
+        opt = numpy.get_printoptions()
+        numpy.set_printoptions(threshold=sys.maxsize)
+
         if data_object is None:
             data_object = self.data_object
         if not hasattr(self, 'station'):
@@ -1149,10 +1155,11 @@ class MeasurementControl(Instrument):
                 parameter_list = dict_to_ordered_tuples(par_snap)
                 for (p_name, p) in parameter_list:
                     try:
-                        val = str(p['value'])
+                        val = repr(p['value'])
                     except KeyError:
                         val = ''
-                    instrument_grp.attrs[p_name] = str(val)
+                    instrument_grp.attrs[p_name] = val
+        numpy.set_printoptions(**opt)
 
     def save_MC_metadata(self, data_object=None, *args):
         '''
@@ -1261,7 +1268,6 @@ class MeasurementControl(Instrument):
             max_sweep_points = np.shape(self.get_sweep_points())[0]
 
         start_idx = int(self.total_nr_acquired_values % max_sweep_points)
-
         self.soft_iteration = int(
             self.total_nr_acquired_values//max_sweep_points)
 

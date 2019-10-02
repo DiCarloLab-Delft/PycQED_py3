@@ -401,19 +401,96 @@ class Function_Detector(Soft_Detector):
 # Zurich Instruments UHFQC detector functions
 # --------------------------------------------
 
+class UHFQC_Base(Hard_Detector):
+    """
+    Base Class for all UHF detectors
+    """
+    def __init__(self, UHFQC=None, detectors=None):
+        super().__init__()
+        if detectors is None:
+            # if no detector is provided then itself is the only detector
+            self.detectors = [self]
+            assert UHFQC is not None, "UHFQC required when using single detector"
+            self.UHFQC = UHFQC
+        else:
+            # in multi uhf mode several detectors are passed.
+            self.detectors = [p[1] for p in sorted(
+                [(d.UHFQC._device, d) for d in detectors], reverse=True)]
+        self.AWG = None
 
-class UHFQC_multi_detector(Hard_Detector):
+        self.UHFs = [d.UHFQC for d in self.detectors]
+        self.UHF_map = {UHF.name: i
+                   for UHF, i in zip(self.UHFs, range(len(self.detectors)))}
+
+    def poll_data(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+
+        for UHF in self.UHFs:
+            UHF._daq.setInt('/' + UHF._device + '/quex/rl/readout', 1)
+
+        if self.AWG is not None:
+            self.AWG.start()
+
+        acq_paths = {UHF.name: UHF.acquisition_paths for UHF in self.UHFs}
+
+        data = {UHF.name: {k: [] for k, dummy in enumerate(UHF.acquisition_paths)}
+                for UHF in self.UHFs}
+
+        # Acquire data
+        gotem = {UHF.name: [False] * len(UHF.acquisition_paths) for UHF in
+                 self.UHFs}
+        accumulated_time = 0
+
+        while accumulated_time < self.UHFs[0].timeout() and \
+                not all(np.concatenate(list(gotem.values()))):
+            dataset = {}
+            for UHF in self.UHFs:
+                if not all(gotem[UHF.name]):
+                    time.sleep(0.01)
+                    dataset[UHF.name] = UHF._daq.poll(0.001, 1, 4, True)
+
+            for UHFname in dataset.keys():
+                for n, p in enumerate(acq_paths[UHFname]):
+                    if p in dataset[UHFname]:
+                        for v in dataset[UHFname][p]:
+                            data[UHFname][n] = np.concatenate(
+                                (data[UHFname][n], v['vector']))
+
+                            if len(data[UHFname][n]) >= self.detectors[
+                                self.UHF_map[UHFname]].nr_sweep_points:
+                                gotem[UHFname][n] = True
+            accumulated_time += 0.01*len(self.UHFs)
+
+        if not all(np.concatenate(list(gotem.values()))):
+            for UHF in self.UHFs:
+                UHF.acquisition_finalize()
+                for n, c in enumerate(UHF.acquisition_paths):
+                    if n in data[UHF.name]:
+                        n_swp = len(data[UHF.name][n])
+                        tot_swp = self.detectors[
+                            self.UHF_map[UHF.name]].nr_sweep_points
+                        log.info(f"\t: Channel {n}: Got {n_swp} of {tot_swp} "
+                                 f"samples")
+                raise TimeoutError("Error: Didn't get all results!")
+
+        data_raw = {UHF.name: np.array([data[UHF.name][key]
+                    for key in sorted(data[UHF.name].keys())]) for UHF in
+                    self.UHFs}
+
+        return data_raw
+
+class UHFQC_multi_detector(UHFQC_Base):
     """
     Combines several UHF detectors into a single detector
     """
     def __init__(self, detectors):
-        super().__init__()
-        self.detectors = [p[1] for p in sorted( \
-            [(d.UHFQC._device, d) for d in detectors], reverse=True)]
+        super().__init__(detectors=detectors)
         self.AWG = None
         self.value_names = []
         self.value_units = []
-        self.AWG = None
+
         for d in self.detectors:
             self.value_names += [vn + ' ' + d.UHFQC.name for vn in d.value_names]
             self.value_units += d.value_units
@@ -426,84 +503,16 @@ class UHFQC_multi_detector(Hard_Detector):
                 d.AWG = None
 
     def prepare(self, sweep_points):
-        # _daq = self.detectors[0].UHFQC._daq
-        # for d in self.detectors[1:]:
-        #     d.UHFQC._daq = _daq
-
         for d in self.detectors:
             d.prepare(sweep_points)
 
-        # for d in self.detectors[1:]:
-        #     self.detectors[0].UHFQC.acquisition_paths += \
-        #         d.UHFQC.acquisition_paths
-        #     d.UHFQC.acquisition_paths = []
-        #
-        #     self.detectors[0].value_names += d.value_names
-        #     d.value_names = []
-        #     self.detectors[0].channels += d.channels
-        #     d.channels = []
-
     def get_values(self):
-        if self.AWG is not None:
-            self.AWG.stop()
+        raw_data = self.poll_data()
 
-        UHFs = [d.UHFQC for d in self.detectors]
+        processed_data = [self.detectors[self.UHF_map[UHF]].process_data(d)
+                          for UHF, d in raw_data.items()]
 
-        for UHF in UHFs:
-            UHF._daq.setInt('/' + UHF._device + '/quex/rl/readout', 1)
-
-
-        if self.AWG is not None:
-            self.AWG.start()
-
-        acq_paths = {UHF.name: UHF.acquisition_paths for UHF in UHFs}
-
-        data = {UHF.name: {k: [] for k, dummy in enumerate(UHF.acquisition_paths)}
-                for UHF in UHFs}
-
-        # Acquire data
-        gotem = {UHF.name: [False] * len(UHF.acquisition_paths) for UHF in UHFs}
-        accumulated_time = 0
-
-        while accumulated_time < UHFs[0].timeout() and \
-                not all(np.concatenate(list(gotem.values()))):
-            dataset = {}
-            for UHF in UHFs:
-                if not all(gotem[UHF.name]):
-                    time.sleep(0.01)
-                    dataset[UHF.name] = UHF._daq.poll(0.001, 1, 4, True)
-
-            # print(dataset)
-
-            for UHFname in dataset.keys():
-                for n, p in enumerate(acq_paths[UHFname]):
-                    if p in dataset[UHFname]:
-                        for v in dataset[UHFname][p]:
-                            data[UHFname][n] = np.concatenate(
-                                (data[UHFname][n], v['vector']))
-                            if len(data[UHFname][n]) >= self.detectors[
-                                0].nr_sweep_points:
-                                gotem[UHFname][n] = True
-            accumulated_time += 0.01*len(UHFs)
-
-        if not all(np.concatenate(list(gotem.values()))):
-            for UHF in UHFs:
-                UHF.acquisition_finalize()
-                for n, c in enumerate(UHF.acquisition_paths):
-                    if n in data[UHF.name]:
-                        print("\t: Channel {}: Got {} of {} samples".format(
-                            n, len(data[UHF.name][n]),
-                            self.detectors[0].nr_sweep_points))
-                raise TimeoutError("Error: Didn't get all results!")
-        print("in detector:")
-        print(data.keys())
-        print(data['UHF1'])
-        data_flat = np.concatenate([np.array([data[UHF.name][key]
-                         for key in data[UHF.name].keys()]) for UHF in UHFs])
-
-        data = data_flat * self.detectors[0].scaling_factor
-
-        return data
+        return np.concatenate(processed_data)
 
 
     def finish(self):
@@ -513,7 +522,7 @@ class UHFQC_multi_detector(Hard_Detector):
         for d in self.detectors:
             d.finish()
 
-class UHFQC_input_average_detector(Hard_Detector):
+class UHFQC_input_average_detector(UHFQC_Base):
 
     '''
     Detector used for acquiring averaged input traces withe the UHFQC
@@ -522,13 +531,12 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     def __init__(self, UHFQC, AWG=None, channels=(0, 1),
                  nr_averages=1024, nr_samples=4096, **kw):
-        super(UHFQC_input_average_detector, self).__init__()
-        self.UHFQC = UHFQC
+        super(UHFQC_input_average_detector, self).__init__(UHFQC)
         self.channels = channels
         self.value_names = ['']*len(self.channels)
         self.value_units = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            self.value_names[i] = 'ch{}'.format(channel)
+            self.value_names[i] = f'{UHFQC.name}_ch{channel}'
             self.value_units[i] = 'V'
             # UHFQC returned data is in Volts
             # January 2018 verified by Xavi
@@ -537,20 +545,15 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.nr_averages = nr_averages
 
     def get_values(self):
-        self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
+        raw_data = self.poll_data()
+        processed_data = self.process_data(raw_data[self.UHFQC.name])
+        return processed_data
 
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
-
-        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
-                                               arm=False, acquisition_time=0.01)
-        data = np.array([data_raw[key]
-                         for key in sorted(data_raw.keys())])
+    def process_data(self, raw_data):
         # IMPORTANT: No re-scaling factor needed for input average mode as the UHFQC returns volts
         # Verified January 2018 by Xavi
+        return raw_data
 
-        return data
 
     def prepare(self, sweep_points):
         if self.AWG is not None:
@@ -558,8 +561,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.UHFQC.quex_iavg_length(self.nr_samples)
         self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_userregs_0(
-            int(self.nr_averages)) 
+        self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))
         self.nr_sweep_points = self.nr_samples
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='iavg')
 
@@ -568,7 +570,7 @@ class UHFQC_input_average_detector(Hard_Detector):
             self.AWG.stop()
 
 
-class UHFQC_integrated_average_detector(Hard_Detector):
+class UHFQC_integrated_average_detector(UHFQC_Base):
 
     '''
     Detector used for integrated average results with the UHFQC
@@ -625,20 +627,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             when it is both a single_int_avg detector and acquires multiple
             segments per point.
         """
-        super().__init__()
-        self.UHFQC = UHFQC
-        # if nr_averages # is not a powe of 2:
-
-        #    raise ValueError('Some descriptive message {}'.format(nr_averages))
-        # if integration_length > some value:
-        #     raise ValueError
+        super().__init__(UHFQC)
 
         self.name = '{}_UHFQC_integrated_average'.format(result_logging_mode)
         self.channels = deepcopy(channels)
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            self.value_names[i] = '{} w{}'.format(result_logging_mode,
-                                                  channel)
+            self.value_names[i] = \
+                '{}_{} w{}'.format(UHFQC.name, result_logging_mode, channel)
         if result_logging_mode == 'raw':
             # Units are only valid when using SSB or DSB demodulation.
             # value corrsponds to the peak voltage of a cosine with the
@@ -719,36 +715,31 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[1] = 'Phase'
             self.value_units[1] = 'deg'
 
-    def _get_readout(self):
-        return sum([(1 << c) for c in self.channels])
-
     def get_values(self):
         if self.always_prepare:
             self.prepare()
-        if self.AWG is not None:
-            self.AWG.stop()
+        data_raw = self.poll_data()
+        data_processed = self.process_data(data_raw[self.UHFQC.name])
 
-        # resets UHFQC internal readout counters
-        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout', 
-                                self._get_readout())
+        # if self.AWG is not None:
+        #     self.AWG.stop()
+        #
+        #
+        # # starting AWG
+        # if self.AWG is not None:
+        #     # self.AWG.start(exclude=['UHF1'])
+        #     self.AWG.start()
 
-        # starting AWG
-        if self.AWG is not None:
-            # self.AWG.start(exclude=['UHF1'])
-            self.AWG.start()
-
-
-        # print(self.nr_sweep_points)
-        time.sleep(0.1)
-        # self.UHFQC._daq.sync()
-        # self.UHFQC.acquisition_arm()
-        data_raw = self.UHFQC.acquisition_poll(
-            samples=self.nr_sweep_points, arm=False, acquisition_time=0.1)
+        # time.sleep(0.1)
+        #
+        # data_raw = self.UHFQC.acquisition_poll(
+        #     samples=self.nr_sweep_points, arm=False, acquisition_time=0.1)
         # the self.channels should be the same as data_raw.keys().
         # this is to be tested (MAR 26-9-2017)
+        return data_processed
 
-        data = np.array([data_raw[key]
-                         for key in sorted(data_raw.keys())])*self.scaling_factor
+    def process_data(self, data_raw):
+        data = data_raw * self.scaling_factor
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
@@ -762,8 +753,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data = np.reshape(data.T,
                           (-1, no_virtual_channels, len(self.channels))).T
         data = data.reshape((len(self.value_names), -1))
-        # Fixme: For debugging purposes
-        #self.UHFQC.acquisition_finalize()
+
         return data
 
     def convert_to_polar(self, data):
@@ -869,7 +859,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         if value_names is None:
             self.value_names = []
             for ch in channels:
-                self.value_names += ['w{}'.format(ch)]
+                self.value_names += ['{}_w{}'.format(UHFQC.name, ch)]
         else:
             self.value_names = value_names
 
@@ -891,7 +881,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         if sweep_points is None or self.single_int_avg:
             self.nr_sweep_points = self.seg_per_point
         else:
-            self.nr_sweep_points = len(sweep_points)*self.seg_per_point
+            self.nr_sweep_points = len(sweep_points) * self.seg_per_point
 
         self.UHFQC.quex_rl_length(self.nr_sweep_points)
         self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
@@ -1002,40 +992,29 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                     thresh_level)
 
     def get_values(self):
-        # Slightly different way to deal with scaling factor
-        self.scaling_factor = 1 / (1.8e9*self.integration_length)
+        data_raw = self.poll_data()
+        data_processed = self.process_data(data_raw[self.UHFQC.name])
+        return data_processed
 
-        if self.AWG is not None:
-            self.AWG.stop()
-        # self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout', 
-                                self._get_readout())
-        # self.UHFQC.acquisition_arm()
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
-
-        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
-                                               arm=False,
-                                               acquisition_time=0.01)
-        data = []
+    def process_data(self, data_raw):
         if self.thresholding:
-            for key in sorted(data_raw.keys()):
-                # data.append(np.array(data_raw[key])/0.00146484375)
-                data.append(np.array(data_raw[key]))
+            data = data_raw
         else:
-            for key in sorted(data_raw.keys()):
-                if key in self.correlation_channels:
-                    data.append(3*np.array(data_raw[key]) *
+            data = []
+            self.scaling_factor = 1 / (1.8e9 * self.integration_length)
+            # FIXME: this should be tested
+            for n, ch in enumerate(self.used_channels):
+                if ch in self.correlation_channels:
+                    data.append(3 * np.array(data_raw[n]) *
                                 (self.scaling_factor**2 / self.nr_averages))
                 else:
-                    data.append(np.array(data_raw[key]) *
+                    data.append(np.array(data_raw[n]) *
                                 (self.scaling_factor / self.nr_averages))
 
         return data
 
 
-class UHFQC_integration_logging_det(Hard_Detector):
+class UHFQC_integration_logging_det(UHFQC_Base):
 
     '''
     Detector used for integrated average results with the UHFQC
@@ -1073,17 +1052,16 @@ class UHFQC_integration_logging_det(Hard_Detector):
             when it is both a single_int_avg detector and acquires multiple
             segments per point.
         """
-        super().__init__()
+        super().__init__(UHFQC)
 
-        self.UHFQC = UHFQC
         self.name = '{}_UHFQC_integration_logging_det'.format(
             result_logging_mode)
         self.channels = channels
 
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            self.value_names[i] = '{} w{}'.format(result_logging_mode,
-                                                  channel)
+            self.value_names[i] = \
+                '{}_{} w{}'.format(UHFQC.name, result_logging_mode, channel)
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
             self.scaling_factor = 1  # /(1.8e9*integration_length)
@@ -1125,35 +1103,37 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
 
-
         self.UHFQC.quex_rl_length(self.nr_shots*len(sweep_points))
+        self.nr_sweep_points = self.nr_shots*len(sweep_points)
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
 
         self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
-    def _get_readout(self):
-        return sum([(1 << c) for c in self.channels])
 
     def get_values(self):
         if self.always_prepare:
             self.prepare()
-        if self.AWG is not None:
-            self.AWG.stop()
+        # if self.AWG is not None:
+        #     self.AWG.stop()
+        #
+        # # resets UHFQC internal readout counters
+        # self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout',
+        #                        self._get_readout())
+        #
+        # # starting AWG
+        # if self.AWG is not None:
+        #     self.AWG.start()
+        #
+        # data_raw = self.UHFQC.acquisition_poll(
+        #     samples=self.nr_shots, arm=False, acquisition_time=0.01)
+        data_raw = self.poll_data()
+        data_processed = self.process_data(data_raw[self.UHFQC.name])
+        return data_processed
 
-        # resets UHFQC internal readout counters
-        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout',
-                               self._get_readout())
-
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
-
-        data_raw = self.UHFQC.acquisition_poll(
-            samples=self.nr_shots, arm=False, acquisition_time=0.01)
-        data = np.array([data_raw[key]
-                         for key in sorted(data_raw.keys())])*self.scaling_factor
+    def process_data(self, data_raw):
+        data = data_raw * self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -1167,7 +1147,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             self.AWG.stop()
 
 
-class UHFQC_integration_average_classifier_det(Hard_Detector):
+class UHFQC_integration_average_classifier_det(UHFQC_Base):
 
     '''
     Detector used for integrated average results with the UHFQC
@@ -1178,7 +1158,6 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
                  integration_length: float=1e-6,
                  nr_shots: int=4094,
                  channels: list=(0, 1),
-                 correlations=None,
                  result_logging_mode: str='raw',
                  always_prepare: bool=False,
                  prepare_function=None,
@@ -1192,11 +1171,6 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
         integration_length (float): integration length in seconds
         nr_shots (int)     : nr of shots (max is 4095)
         channels (list)    : index (channel) of UHFQC weight functions to use
-        correlations (list): list of tuples containing channels which should
-                             be correlated. This detector only works for 2 ro
-                             channels per data point, so correlations must be:
-                             [ ((ch0, ch1),(ch2, ch3)), ((ch0, ch1),(ch4, ch5)),
-                             ... ].
         result_logging_mode (str):  options are
             - raw        -> returns raw data in V
             - lin_trans  -> applies the linear transformation matrix and
@@ -1210,14 +1184,13 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
             when it is both a single_int_avg detector and acquires multiple
             segments per point.
         """
-        super().__init__()
+        super().__init__(UHFQC)
 
-        self.UHFQC = UHFQC
         self.name = '{}_UHFQC_integration_logging_det'.format(
             result_logging_mode)
         self.state_labels = ['pg', 'pe', 'pf']
         self.channels = channels
-        self.correlations = correlations
+        self.correlated = get_values_function_kwargs.get('correlated', False)
 
         # Currently doesn't work with single readout channel;
         # assumes 2 channels per data point
@@ -1229,20 +1202,12 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
         idx = 0
         for ch_pair in self.channel_str_pairs:
             for state in self.state_labels:
-                self.value_names[idx] = f'{state} w{ch_pair}'
+                self.value_names[idx] = '{}_{} w{}'.format(UHFQC.name,
+                    state, ch_pair)
                 idx += 1
 
-        if self.correlations is not None:
-            # get [[ch0ch1, ch2ch3], [ch0ch1, ch4ch5],...]
-            # extend value_names for correlations
-            self.correlation_string_lists = []
-            for corr in self.correlations:
-                corr_strs = []
-                for ch_pair in corr:
-                    corr_strs += [''.join([str(ch) for ch in ch_pair])]
-                self.correlation_string_lists += [corr_strs]
-                self.value_names += [f'{s} corr ({",".join(corr_strs)}) '
-                                     for s in self.state_labels]
+        if self.correlated:
+            self.value_names += ['correlation']
 
         if result_logging_mode == 'raw':
             self.value_units = ['']*len(self.value_names)
@@ -1298,19 +1263,23 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
     def get_values(self):
         if self.always_prepare:
             self.prepare()
-        if self.AWG is not None:
-            self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        # if self.AWG is not None:
+        #     self.AWG.stop()
+        # self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        #
+        # # starting AWG
+        # if self.AWG is not None:
+        #     self.AWG.start()
+        #
+        # data_raw = self.UHFQC.acquisition_poll(
+        #     samples=self.nr_shots*self.nr_sweep_points,
+        #     arm=False, acquisition_time=0.01)
+        data_raw = self.poll_data()
+        processed_data = self.process_data(data_raw[self.UHFQC.name])
+        return processed_data
 
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
-
-        data_raw = self.UHFQC.acquisition_poll(
-            samples=self.nr_shots*self.nr_sweep_points,
-            arm=False, acquisition_time=0.01)
-        data = np.array([data_raw[key] for key in
-                         sorted(data_raw.keys())])*self.scaling_factor
+    def process_data(self, data_raw):
+        data = data_raw * self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -1325,62 +1294,93 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
             classifier_params_list = [classifier_params_list]
         state_prob_mtx_list = self.get_values_function_kwargs.get(
                     'state_prob_mtx', None)
-        if state_prob_mtx_list is None:
-            state_prob_mtx_list = [None]*len(classifier_params_list)
-        elif not isinstance(state_prob_mtx_list, list):
+        if state_prob_mtx_list is not None and \
+                not isinstance(state_prob_mtx_list, list):
             state_prob_mtx_list = [state_prob_mtx_list]
+
+        # nr_states = len(self.state_labels)
+        # classified_data = np.zeros(
+        #     (nr_states*len(self.channel_str_pairs) + self.correlated,
+        #      self.nr_sweep_points))
+        classified_data = data
+        if self.get_values_function_kwargs.get('classify', True):
+            classified_data = self.classify_shots(
+                data, classifier_params_list, state_prob_mtx_list,
+                self.get_values_function_kwargs.get('average', True),
+                self.correlated)
+            # for i in range(len(self.channel_str_pairs)):
+            #     classified_data[nr_states*i: nr_states*i+nr_states, :] = \
+            #         self.classify_shots(data[2*i: 2*i+2, :],
+            #                             classifier_params_list[i],
+            #                             state_prob_mtx_list[i],
+            #                             self.get_values_function_kwargs.get(
+            #                                'average', True), self.correlated)
+        return classified_data.T
+
+    def classify_shots(self, data, classifier_params_list,
+                       state_prob_mtx_list=None, average=False,
+                       correlated=False):
+
+        if classifier_params_list is None:
+            raise ValueError('Please specify the classifier parameters list.')
 
         nr_states = len(self.state_labels)
         classified_data = np.zeros(
-            (nr_states*len(self.channel_str_pairs),self.nr_sweep_points))
-        if self.get_values_function_kwargs.get('classify', True):
-            for i in range(len(self.channel_str_pairs)):
-                classified_data[nr_states*i: nr_states*i+nr_states, :] = \
-                    self.classify_shots(data[2*i: 2*i+2, :],
-                                        classifier_params_list[i],
-                                        state_prob_mtx_list[i],
-                                        self.get_values_function_kwargs.get(
-                                           'average', True),
-                                        self.get_values_function_kwargs.get(
-                                            'correlate', False))
-        return classified_data
+            (nr_states*len(self.channel_str_pairs), self.nr_sweep_points))
 
-    def classify_shots(self, data, classifier_params_dict, state_prob_mtx=None,
-                       average=False, correlate=False):
-        if classifier_params_dict is None:
-            raise ValueError('Please specify the classifier parameters dict.')
+        clf_data_all = np.zeros((self.nr_sweep_points*self.nr_shots,
+                                nr_states*len(self.channel_str_pairs)))
+        # print(classified_data.shape)
+        for i in range(len(self.channel_str_pairs)):
+            # print('here:', data[2*i: 2*i+2, :].shape)
+            clf_data = a_tools.predict_gm_proba_from_clf(
+                data[2*i: 2*i+2, :].T, classifier_params_list[i])
+            clf_data_all[:, nr_states*i: nr_states*i+nr_states] = clf_data
 
-        classified_data = a_tools.predict_gm_proba_from_clf(
-            data.T, classifier_params_dict)
-        # reshape into (nr_shots, nr_sweep_points, nr_data_columns)
-        classified_data = np.reshape(
-            classified_data, (self.nr_shots, self.nr_sweep_points,
-                              classified_data.shape[1]))
+            # print(clf_data.shape)
+            # reshape into (nr_shots, nr_sweep_points, nr_data_columns)
+            clf_data = np.reshape(
+                clf_data, (self.nr_shots, self.nr_sweep_points,
+                                  clf_data.shape[-1]))
+            # print(clf_data.shape)
+            if average:
+                clf_data = np.mean(clf_data, axis=0)
+            # print(clf_data.shape)
+            if state_prob_mtx_list is not None:
+                clf_data = np.linalg.inv(
+                    state_prob_mtx_list[i]).T @ clf_data.T
+                log.info('Data corrected based on state_prob_mtx.')
+            else:
+                log.info('not correcting data')
+                clf_data = clf_data.T
+            # print(clf_data.shape)
+            classified_data[nr_states * i: nr_states * i + nr_states, :] = \
+                clf_data
 
-        if correlate:
+        # print()
+        # print(classified_data.shape)
+        if correlated:
             # can only correlate corresponding probabilities on all channels;
             # it cannot correlate selected channels
-            assert (classified_data.shape[-1] // len(self.state_labels) > 1)
-            corr_data = np.zeros(shape=(classified_data.shape[0],
-                                        classified_data.shape[1],
-                                        len(self.state_labels)))
-            for p in range(len(self.state_labels)):
-                corr_data[:, :, p] = np.product(
-                    [classified_data[:, :, c] for c in np.arange(
-                        classified_data.shape[2])[p::len(self.state_labels)]],
-                    axis=0)
-            classified_data = np.concatenate([data, corr_data], axis=2)
-
-        if average:
-            classified_data = np.mean(classified_data, axis=0)
-        if state_prob_mtx is not None:
-            classified_data = \
-                np.linalg.inv(state_prob_mtx).T @ classified_data.T
-            log.info('Data corrected based on state_prob_mtx.')
-        else:
-            classified_data = classified_data.T
-
-        return classified_data
+            # print(clf_data_all.shape)
+            q = clf_data_all.shape[1] // nr_states
+            # print(q)
+            qb_states_list = [np.argmax(
+                clf_data_all[:, i*nr_states: i*nr_states + nr_states],
+                axis=1) for i in range(q)]
+            # print(np.array(qb_states_list).shape)
+            corr_data = np.sum(np.array(qb_states_list) % 2, axis=0) % 2
+            # print(corr_data.shape)
+            if average:
+                corr_data = np.reshape(
+                    corr_data, (self.nr_shots, self.nr_sweep_points))
+                corr_data = np.mean(corr_data, axis=0)
+            # print(corr_data.shape)
+            corr_data = np.reshape(corr_data, (1, corr_data.size))
+            classified_data = np.concatenate([classified_data, corr_data],
+                                             axis=0)
+            # print(classified_data.shape)
+        return classified_data.T
 
     def finish(self):
         if self.AWG is not None:
