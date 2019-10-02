@@ -264,7 +264,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         super().prepare_plots()
         anglemap = make_anglemap()
 
-        cost_func_Names = {'Cost func', 'Cost function', 'Cost function value'}
+        cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
+        'cost func.', 'cost function', 'Cost function', 'Cost function value'}
         L1_Names = {'L1', 'Leakage'}
         MF_Names = {'missing fraction', 'Missing fraction', 'missing frac',
             'missing frac.', 'Missing frac', 'Missing frac.'}
