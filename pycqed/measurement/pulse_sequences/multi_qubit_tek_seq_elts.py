@@ -229,7 +229,6 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_names_list,
             upload_AWGs += [station.pulsar.get(X90_pulse['I_channel'] + '_AWG'),
                             station.pulsar.get(X90_pulse['Q_channel'] + '_AWG')]
         upload_AWGs = list(set(upload_AWGs))
-    print(upload_AWGs)
 
     for elt_idx, i in enumerate(nr_seeds):
 
@@ -651,14 +650,14 @@ def parity_correction_seq(
         else:
             elements_length = el_fb.ideal_length() + el_repeat_x.ideal_length()
             dynamic_phase = el_repeat_x.drive_phase_offsets.get(qbn, 0)
-            print('Length difference of XX and ZZ cycles: {} s'.format(
+            log.info('Length difference of XX and ZZ cycles: {} s'.format(
                 el_repeat_x.ideal_length() - el_repeat_z.ideal_length()
             ))
         dynamic_phase -= el_main.drive_phase_offsets.get(qbn, 0)
         phase_from_if = 360*ifreq*elements_length
         total_phase = phase_from_if + dynamic_phase
         total_mod_phase = (total_phase + 180) % 360 - 180
-        print(qbn + ' aquires a phase of {} ≡ {} (mod 360)'.format(
+        log.info(qbn + ' aquires a phase of {} ≡ {} (mod 360)'.format(
             total_phase, total_mod_phase) + ' degrees each correction ' + 
             'cycle. You should reduce the intermediate frequency by {} Hz.'\
             .format(total_mod_phase/elements_length/360))
@@ -793,7 +792,6 @@ def parity_correction_no_reset_seq(
     # tomography elements
     tomography_sequences = get_tomography_pulses(q0n, q2n,
                                                  basis_pulses=tomography_basis)
-    print(len(tomography_sequences))
     # create the elements
     el_list = []
     for i, tomography_sequence in enumerate(tomography_sequences):
@@ -1109,13 +1107,10 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
                  (parity_loops, ROs),
                  1
                  )
-    print(repeat_dict)
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq, repeat_dict=repeat_dict)
 
-
-    print('sweep_points: ', seq.n_acq_elements())
     return seq, np.arange(seq.n_acq_elements())
 
 
@@ -1574,7 +1569,6 @@ def general_multi_qubit_seq(
                                                UDD_scheme=UDD_scheme)
 
         if not np.any([p['operation_type'] == 'RO' for p in pulse_list]):
-            # print('in add mux')
             pulse_list += [operation_dict['RO mux']]
         el = multi_pulse_elt(i, station, pulse_list)
 
@@ -1775,10 +1769,8 @@ def pygsti_seq(qb_names, pygsti_listOfExperiments, operation_dict,
                 for ch in CZ_pulse['aux_channels_dict']:
                     upload_AWGs += [station.pulsar.get(ch + '_AWG')]
         upload_AWGs = list(set(upload_AWGs))
-    print(upload_AWGs)
     for i, exp_lst in enumerate(experiment_lists):
         pulse_lst = [operation_dict[p] for p in exp_lst]
-        from pprint import pprint
         if preselection:
             pulse_lst.append(operation_dict[RO_str+'_presel'])
             pulse_lst.append(operation_dict[RO_str+'presel_dummy'])
@@ -1897,7 +1889,6 @@ def ro_dynamic_phase_seq(hard_sweep_dict, qbp_name, qbr_names,
     params.update({f'ro_probe.amplitude': np.concatenate(
         [ro_probe['amplitude'] * np.ones(hsl // 2), np.zeros(hsl // 2)])})
 
-    print(params)
     swept_pulses = sweep_pulse_params(pulse_list, params)
 
     swept_pulses_with_prep = \
@@ -1912,9 +1903,6 @@ def ro_dynamic_phase_seq(hard_sweep_dict, qbp_name, qbr_names,
     log.debug(seq)
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
-
-    print(seq.n_acq_elements())
-
     return seq, np.arange(seq.n_acq_elements())
 
 

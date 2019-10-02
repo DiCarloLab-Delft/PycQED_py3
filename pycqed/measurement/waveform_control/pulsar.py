@@ -1161,8 +1161,6 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         self._zi_waves_cleared = False
         self._hash_to_wavename_table = {}
 
-        print(repeat_dict)
-
         for awg in awgs:
             if awg in repeat_dict.keys():
                 self._program_awg(self.AWG_obj(awg=awg),

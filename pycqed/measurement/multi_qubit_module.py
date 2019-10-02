@@ -412,7 +412,6 @@ def measure_multiplexed_readout(qubits, liveplot=False,
 
     if analyse and thresholds is not None:
         channel_map = {qb.name: qb.int_log_det.value_names[0]+' '+qb.instr_uhf() for qb in qubits}
-        print('MRO channel map ', channel_map)
         ra.Multiplexed_Readout_Analysis(options_dict=dict(
             n_readouts=(2 if preselection else 1) * 2 ** len(qubits),
             thresholds=thresholds,
@@ -1248,13 +1247,13 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
                 target_values=target_values)
 
             if iteration == 0:
-                print('Added {} training samples from timestamp {}!' \
+                log.info('Added {} training samples from timestamp {}!' \
                       .format(np.shape(new_train_values)[0], t))
 
         data_size = 0 if training_grid is None else np.shape(training_grid)[0]
 
         # if not (iteration == 0 and timestamps_iter):
-        print('\n{} samples before Iteration {}'.format(data_size,
+        log.info('\n{} samples before Iteration {}'.format(data_size,
                                                         iteration))
         if iteration >= len(sampling_numbers):
             sampling_number = sampling_numbers[-1]
@@ -1271,7 +1270,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
         new_flux_amps = np.random.normal(pulse_amplitude_best,
                                          std_amp,
                                          sampling_number)
-        print('measuring {} samples in iteration {} \n'. \
+        log.info('measuring {} samples in iteration {} \n'. \
               format(sampling_number, iteration))
 
         cphases, population_losses, flux_pulse_ma = \
@@ -1315,7 +1314,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
             yield_new_measurement()
 
         if fine_tune:
-            print('optimized flux parameters good enough for finetuning.\n'
+            log.info('optimized flux parameters good enough for finetuning.\n'
                   'Finetuning amplitude with 6 values at fixed flux length!')
             if fine_tune_minmax is None:
                 lower_amp = pulse_amplitude_best - std_amp
@@ -1335,7 +1334,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
 
         # check success of iteration step
         if cphase_testing_agent.converged:
-            print('Cphase optimization converged in iteration {}.'. \
+            log.info('Cphase optimization converged in iteration {}.'. \
                   format(iteration))
 
         elif iteration + 1 >= max_measurements:
@@ -1343,12 +1342,12 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
             log.warning('\n maximum iterations exceeded without hitting'
                         ' specified tolerance levels for optimization!\n')
         else:
-            print('Iteration {} finished. Not converged with cphase {}*pi and '
+            log.info('Iteration {} finished. Not converged with cphase {}*pi and '
                   'population recovery {} %' \
                   .format(iteration, cphase_testing_agent.cphases[-1],
                           np.abs(1. - cphase_testing_agent.pop_losses[-1]) * 100))
 
-            print('Running Iteration {} of {} ...'.format(iteration + 1,
+            log.info('Running Iteration {} of {} ...'.format(iteration + 1,
                                                           max_measurements))
 
         if len(cphase_testing_agent.cphases) >= 2:
@@ -1368,7 +1367,7 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr, initial_values: list,
     pulse_amplitude_best = cphase_testing_agent.amps_opt[-1]
     std_cphase = cphase_testing_agent.cphase_std
 
-    print('CPhase optimization finished with optimal values: \n',
+    log.info('CPhase optimization finished with optimal values: \n',
           'Controlled Phase QBc={} Qb Target={}: '.format(qbc.name, qbt.name),
           cphase_opt, r" ($ \pm $", std_cphase, ' )', r"$\pi$", '\n',
           'Population Recovery |e> Qb Target: {}% \n' \
@@ -2094,7 +2093,7 @@ def measure_cphase_nn(qbc, qbt, qbr, lengths, amps, alphas=None,
     MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name, qbt.name))
 
     t1 = time.time()
-    print('Measured Cphases with ',
+    log.info('Measured Cphases with ',
           len(amps) * len(phases),
           ' sweeppoints in T=', t1 - t0, ' s.')
 
@@ -2107,8 +2106,8 @@ def measure_cphase_nn(qbc, qbt, qbr, lengths, amps, alphas=None,
         cphases = flux_pulse_ma.cphases
         population_losses = flux_pulse_ma.population_losses
         if output_measured_values:
-            print('fitted phases: ', cphases)
-            print('pop loss: ', population_losses)
+            log.info('fitted phases: ', cphases)
+            log.info('pop loss: ', population_losses)
         return cphases, population_losses, flux_pulse_ma
     else:
         return
@@ -2573,15 +2572,15 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
                    MC=None, UHFQC=None, pulsar=None, run=True, **kw):
     if UHFQC is None:
         UHFQC = qubits[0].UHFQC
-        print("Unspecified UHFQC instrument. Using {}.UHFQC.".format(
+        log.warning("Unspecified UHFQC instrument. Using {}.UHFQC.".format(
             qubits[0].name))
     if pulsar is None:
         pulsar = qubits[0].AWG
-        print("Unspecified pulsar instrument. Using {}.AWG.".format(
+        log.warning("Unspecified pulsar instrument. Using {}.AWG.".format(
             qubits[0].name))
     if MC is None:
         MC = qubits[0].MC
-        print("Unspecified MC object. Using {}.MC.".format(
+        log.warning("Unspecified MC object. Using {}.MC.".format(
             qubits[0].name))
 
     if len(qubits) == 2:
@@ -2640,7 +2639,7 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
     key = 'int'
     if thresholded:
         key = 'dig'
-        print('This is a thresholded measurement. Make sure you '
+        log.warning('This is a thresholded measurement. Make sure you '
               'have set the threshold values!')
         label += '_thresh'
 
@@ -2653,16 +2652,13 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
     # Check if there are too many experiments to do
     max_exp_len = kw.pop('max_exp_len', 800)
     if nr_exp > max_exp_len:
-        print('2D Sweep')
         nr_subexp = nr_exp // max_exp_len
-        print(nr_subexp)
         pygsti_sublistOfExperiments = [listOfExperiments[
                                        i * max_exp_len:(i + 1) * max_exp_len] for
                                        i in range(nr_subexp)]
         remaining_exps = nr_exp - max_exp_len * nr_subexp
         if remaining_exps > 0:
             pygsti_sublistOfExperiments += [listOfExperiments[-remaining_exps::]]
-        print(len(pygsti_sublistOfExperiments))
         # Set detector function
         nr_shots = nr_shots_per_seg * max_exp_len * (2 if preselection else 1)
         det_func = get_multiplexed_readout_detector_functions(
@@ -2691,7 +2687,6 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
             pygsti_sublistOfExperiments)
         MC_run_mode = '2D'
     else:
-        print('1D Sweep')
         # Set detector function
         nr_shots = nr_shots_per_seg * nr_exp * (2 if preselection else 1)
         det_func = get_multiplexed_readout_detector_functions(
