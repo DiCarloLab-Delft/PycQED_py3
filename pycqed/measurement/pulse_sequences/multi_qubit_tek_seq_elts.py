@@ -1049,10 +1049,6 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
         all_pulses += end_pulses
         all_pulses += generate_mux_ro_pulse_list(qb_names, operation_dict)
         all_pulsess.append(all_pulses)
-        if t==0:
-            from pprint import pprint
-            # pprint(all_pulses)
-
 
 
     if prep_params is not None:
@@ -1088,13 +1084,13 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
         repeat_dict[uhf] = (len(end_sequences),
                  (parity_loops, ROs), 1
                  )
-    print(repeat_dict)
+    log.debug(repeat_dict)
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq, repeat_dict=repeat_dict)
 
 
-    print('sweep_points: ', seq.n_acq_elements())
+    log.debug('sweep_points: ', seq.n_acq_elements())
     return seq, np.arange(seq.n_acq_elements())
 
 

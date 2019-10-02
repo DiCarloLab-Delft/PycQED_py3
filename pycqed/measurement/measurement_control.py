@@ -1268,8 +1268,6 @@ class MeasurementControl(Instrument):
             max_sweep_points = np.shape(self.get_sweep_points())[0]
 
         start_idx = int(self.total_nr_acquired_values % max_sweep_points)
-        print('total_nr_acquired_values ', self.total_nr_acquired_values)
-        print('max_sweep_points ', max_sweep_points)
         self.soft_iteration = int(
             self.total_nr_acquired_values//max_sweep_points)
 

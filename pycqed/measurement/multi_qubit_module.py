@@ -377,7 +377,6 @@ def measure_multiplexed_readout(qubits, liveplot=False,
 
     if analyse and thresholds is not None:
         channel_map = {qb.name: qb.int_log_det.value_names[0]+' '+qb.instr_uhf() for qb in qubits}
-        print('MRO channel map ', channel_map)
         ra.Multiplexed_Readout_Analysis(options_dict=dict(
             n_readouts=(2 if preselection else 1) * 2 ** len(qubits),
             thresholds=thresholds,
@@ -429,7 +428,7 @@ def measure_arbitrary_sequence(qubits, sequence=None, sequence_function=None,
                                detector_function=None, df_kwargs=dict(),
                                sweep_function=awg_swf.SegmentHardSweep,
                                sweep_points=None, temporary_values=(),
-                               exp_metadata=dict(), upload=True,
+                               exp_metadata=None, upload=True,
                                analyze=True):
     """
     Measures arbitrary sequence provided in input.
@@ -489,6 +488,9 @@ def measure_arbitrary_sequence(qubits, sequence=None, sequence_function=None,
 
     if label is None:
         label = f'{sequence.name}_{",".join(qb_names)}'
+
+    if exp_metadata is None:
+        exp_metadata = {}
 
     exp_metadata.update({'preparation_params': prep_params,
                     # 'sweep_points': ,
@@ -2188,7 +2190,7 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                                         n_per_state=n_cal_points_per_state)
 
     if max_flux_length is not None:
-        print(f'max_flux_length = {max_flux_length*1e9:.2f} ns, set by user')
+        log.debug(f'max_flux_length = {max_flux_length*1e9:.2f} ns, set by user')
 
     if prep_params is None:
         prep_params = get_multi_qubit_prep_params(

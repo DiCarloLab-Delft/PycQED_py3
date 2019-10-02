@@ -62,10 +62,10 @@ def save_data(self, data_dict, savedir: str = None, savebase: str = None,
 
     filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
     if self.verbose:
-        print('Saving raw data to %s' % filepath)
+        log.info('Saving raw data to %s' % filepath)
     with open(filepath, 'w') as file:
         json.dump(save_dict, file, cls=NumpyJsonEncoder, indent=4)
-    print('Data saved to "{}".'.format(filepath))
+    log.info('Data saved to "{}".'.format(filepath))
 
 
 def save_processed_data(self, key=None, overwrite=True):
@@ -99,7 +99,7 @@ def save_processed_data(self, key=None, overwrite=True):
             pass
 
         if self.verbose:
-            print('Saving fitting results to %s' % fn)
+            log.info('Saving fitting results to %s' % fn)
 
         with h5py.File(fn, 'a') as data_file:
             try:
@@ -136,7 +136,7 @@ def save_fit_results(data_dict, fit_res_dict, **params):
         pass
 
     if params.get('verbose', False):
-        print('Saving fitting results to %s' % fn)
+        log.info('Saving fitting results to %s' % fn)
 
     with h5py.File(fn, 'a') as data_file:
         try:
@@ -199,7 +199,7 @@ def save_figures(data_dict, figs, **params):
         pass
 
     if params.get('verbose', False):
-        print('Saving figures to %s' % savedir)
+        log.info('Saving figures to %s' % savedir)
 
     for key in key_list:
         if params.get('presentation_mode', False):

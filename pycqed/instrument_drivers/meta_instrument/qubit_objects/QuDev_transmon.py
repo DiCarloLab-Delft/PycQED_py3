@@ -1321,7 +1321,7 @@ class QuDev_transmon(Qubit):
             if classified_ro:
                 ba3.BaseDataAnalysis()
             else:
-                print('Currently only classified ro is supported.')
+                log.error('Currently only classified ro is supported.')
 
     def measure_transients(self, states=('g', 'e'), upload=True,
                            analyze=True, acq_length=4097/1.8e9,

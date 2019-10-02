@@ -1830,7 +1830,7 @@ class TD_Analysis(MeasurementAnalysis):
                         list(range(int(NoPts - int(self.NoCalPoints) / 2), NoPts))
                 ch_to_measure = \
                     0 if len(self.measured_values) == 1 else self.RO_channels[0]
-                print('ch to measure ', ch_to_measure)
+                log.debug('ch to measure ', ch_to_measure)
                 self.corr_data = a_tools.rotate_and_normalize_data_1ch(
                     self.measured_values[ch_to_measure],
                     cal_zero_points, cal_one_points)

@@ -169,7 +169,7 @@ class Segment:
 
             ref_points = new_ref_points
         if len(visited_pulses) != len(self.unresolved_pulses):
-            print(len(visited_pulses), len(self.unresolved_pulses))
+            log.error(len(visited_pulses), len(self.unresolved_pulses))
             for unpulse in visited_pulses:
                 if unpulse not in self.unresolved_pulses:
                     print(unpulse)

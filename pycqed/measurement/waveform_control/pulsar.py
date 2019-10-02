@@ -285,7 +285,7 @@ class UHFQCPulsar:
 
 
             if int(el_played) != int(el_total):
-                print(el_played, ' is not ', el_total)
+                log.error(el_played, ' is not ', el_total)
                 raise ValueError('Check number of sequences in repeat pattern')
 
 
