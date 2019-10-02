@@ -362,7 +362,7 @@ def measure_multiplexed_readout(qubits, liveplot=False,
         [qb.name for qb in qubits])))
 
     if analyse and thresholds is not None:
-        channel_map = {qb.name: qb.int_log_det.value_names[0]+' '+qb.instr_uhf() for qb in qubits}
+        channel_map = {qb.name: qb.int_log_det.value_names[0] for qb in qubits}
         print('MRO channel map ', channel_map)
         ra.Multiplexed_Readout_Analysis(options_dict=dict(
             n_readouts=(2 if preselection else 1) * 2 ** len(qubits),
@@ -2038,9 +2038,9 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
                          'cal_points': repr(cp),
                          'rotate': len(cal_states) != 0,
                          'cal_states_rotations':
-                             {qbc.name: {'g': 0,  ('f' if for_ef else 'e'): 1},
+                             {qbc.name: {'g': 0, 'f': 1},
                               qbt.name: {'g': 0, 'e': 1}},
-                         'data_to_fit': {qbc.name:  ('pf' if for_ef else 'pe'), qbt.name: 'pe'},
+                         'data_to_fit': {qbc.name: 'pf', qbt.name: 'pe'},
                          'hard_sweep_params': hard_sweep_params,
                          'soft_sweep_params': soft_sweep_params})
     MC.run_2D(label, exp_metadata=exp_metadata)

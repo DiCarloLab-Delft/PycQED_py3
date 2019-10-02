@@ -298,36 +298,23 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         cal_points = self.get_param_value('cal_points')
         last_ge_pulses = self.get_param_value('last_ge_pulses',
                                               default_value=False)
-        try:
-            self.cp = eval(cal_points)
+        self.cp = eval(cal_points)
 
-            # for now assuming the same for all qubits.
-            self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
-            if rotate:
-                cal_states_rots = self.cp.get_rotations(last_ge_pulses,
-                                                        self.qb_names[0])[self.qb_names[0]] if rotate else None
-                self.cal_states_rotations = self.get_param_value(
-                    'cal_states_rotations', default_value=cal_states_rots)
-                sweep_points_w_calpts = \
-                    {qbn: {'sweep_points': self.cp.extend_sweep_points(
-                        self.proc_data_dict['sweep_points_dict'][qbn][
-                            'sweep_points'], qbn)} for qbn in self.qb_names}
-                self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
-            else:
-                self.cal_states_rotations = None
-        except TypeError as e:
-            log.error(e)
-            log.warning("Failed retrieving cal point objects or states. "
-                        "Please update measurement to provide cal point object "
-                        "in metadata. Trying to get them using the old way ...")
-            if rotate:
-                self.cal_states_rotations = self.get_param_value(
-                    'cal_states_rotations', default_value=None)
-            else:
-                self.cal_states_rotations = None
-            self.cal_states_dict = self.get_param_value('cal_states_dict', default_value={})
+        # for now assuming the same for all qubits.
+        self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
 
-            # create projected_data_dict
+        cal_states_rots = self.cp.get_rotations(last_ge_pulses,
+                self.qb_names[0])[self.qb_names[0]] if rotate else None
+        self.cal_states_rotations = self.get_param_value(
+            'cal_states_rotations', default_value=cal_states_rots)
+
+        sweep_points_w_calpts = \
+            {qbn: {'sweep_points': self.cp.extend_sweep_points(
+                self.proc_data_dict['sweep_points_dict'][qbn][
+                    'sweep_points'], qbn)} for qbn in self.qb_names}
+        self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
+
+        # create projected_data_dict
         self.data_to_fit = self.get_param_value('data_to_fit')
 
         if self.cal_states_rotations is not None:
@@ -335,7 +322,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         else:
             self.proc_data_dict['projected_data_dict'] = OrderedDict()
             for qbn, data_dict in self.proc_data_dict[
-                'meas_results_per_qb'].items():
+                    'meas_results_per_qb'].items():
                 self.proc_data_dict['projected_data_dict'][qbn] = OrderedDict()
                 for state_prob in ['pg', 'pe', 'pf']:
                     self.proc_data_dict['projected_data_dict'][qbn].update(
@@ -349,7 +336,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         # get data_to_fit
         self.proc_data_dict['data_to_fit'] = OrderedDict()
         for qbn, prob_data in self.proc_data_dict[
-            'projected_data_dict'].items():
+                'projected_data_dict'].items():
             if qbn in self.data_to_fit:
                 self.proc_data_dict['data_to_fit'][qbn] = prob_data[
                     self.data_to_fit[qbn]]
@@ -360,17 +347,18 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                 self.proc_data_dict['sweep_points_dict'][qbn][
                     'msmt_sweep_points'] = \
                     self.proc_data_dict['sweep_points_dict'][qbn][
-                        'sweep_points'][:-self.num_cal_points]
+                    'sweep_points'][:-self.num_cal_points]
                 self.proc_data_dict['sweep_points_dict'][qbn][
                     'cal_points_sweep_points'] = \
                     self.proc_data_dict['sweep_points_dict'][qbn][
                         'sweep_points'][-self.num_cal_points::]
             else:
                 self.proc_data_dict['sweep_points_dict'][qbn][
-                    'msmt_sweep_points'] = self.proc_data_dict[
-                    'sweep_points_dict'][qbn]['sweep_points']
+                    'msmt_sweep_points'] = \
+                    self.proc_data_dict['sweep_points'][0]
                 self.proc_data_dict['sweep_points_dict'][qbn][
-                    'cal_points_sweep_points'] = []
+                    'cal_points_sweep_points'] = \
+                    self.proc_data_dict['sweep_points'][0]
         if self.options_dict.get('TwoD', False):
             sweep_points_2D_dict = self.get_param_value('sweep_points_2D_dict')
             soft_sweep_params = self.get_param_value('soft_sweep_params')

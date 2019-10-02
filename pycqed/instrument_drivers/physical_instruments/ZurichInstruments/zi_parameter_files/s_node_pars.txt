@@ -61,9 +61,9 @@
   ],
   [
     "awgs/0/enable",
-    "bool",
+    "int_8bit",
     0,
-    1.0
+    255
   ],
   [
     "awgs/0/outputs/0/amplitude",
@@ -135,7 +135,7 @@
     "awgs/0/triggers/0/hysteresis/absolute",
     "float",
     0,
-    999999995904.0
+    1500000026624.0
   ],
   [
     "awgs/0/triggers/0/hysteresis/mode",
@@ -201,7 +201,7 @@
     "awgs/0/triggers/1/hysteresis/absolute",
     "float",
     0,
-    20.0
+    0.02500000223517418
   ],
   [
     "awgs/0/triggers/1/hysteresis/mode",
@@ -213,7 +213,7 @@
     "awgs/0/triggers/1/hysteresis/relative",
     "float",
     0,
-    20.0
+    0.01666666753590107
   ],
   [
     "awgs/0/triggers/1/level",

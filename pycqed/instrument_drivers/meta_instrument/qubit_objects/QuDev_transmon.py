@@ -790,7 +790,6 @@ class QuDev_transmon(Qubit):
                                 self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
                              'data_to_fit': {self.name: 'pe'},
-                             'rotate': True,
                              'use_cal_points': cal_points})
         MC.run(label, exp_metadata=exp_metadata)
 
@@ -1133,7 +1132,6 @@ class QuDev_transmon(Qubit):
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
-                             'rotate': True,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
                                 self.acq_weights_type() != 'optimal_qutrit'
@@ -2458,11 +2456,11 @@ class QuDev_transmon(Qubit):
             self.measure_T1(times=times,
                             close_fig=close_fig,
                             cal_points=cal_points,
-                            upload=upload, label=label, analyze=False)
+                            upload=upload, label=label)
 
         #Extract T1 and T1_stddev from ma.T1_Analysis
         if kw.pop('analyze', True):
-            T1_ana = tda.T1Analysis(qb_names=[self.name], auto=True, options_dict=dict(rotate=True))
+            T1_ana = tda.T1Analysis(qb_names=[self.name])
             if update:
                 T1 = T1_ana.proc_data_dict['analysis_params_dict'][
                     self.name]['T1']
@@ -2765,15 +2763,13 @@ class QuDev_transmon(Qubit):
                 cal_points=cal_points,
                 close_fig=close_fig, upload=upload, label=label)
 
-#        if analyze:
-#            echo_ana = tda.EchoAnalysis(
-#                qb_names=[self.name],
-#                options_dict={
-#                    'artificial_detuning': artificial_detuning,
-#                    'fit_gaussian_decay':
-#                                  kw.get('fit_gaussian_decay', True)})
-        if kw.pop('analyze', True):
-            echo_ana = tda.EchoAnalysis(qb_names=[self.name],  options_dict=dict(rotate=True))
+        if analyze:
+            echo_ana = tda.EchoAnalysis(
+                qb_names=[self.name],
+                options_dict={
+                    'artificial_detuning': artificial_detuning,
+                    'fit_gaussian_decay':
+                                  kw.get('fit_gaussian_decay', True)})
             if update:
                 T2_echo = echo_ana.proc_data_dict[
                     'analysis_params_dict'][self.name]['T2_echo']
