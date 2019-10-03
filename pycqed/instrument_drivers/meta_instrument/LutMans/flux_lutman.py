@@ -859,8 +859,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            'channel in the AWG8 channel pair. '
                            'Reference is used when uploading waveforms',
                            parameter_class=InstrumentRefParameter)
-        self.add_parameter('instr_noise_CZ',
-                           docstring='Noise parameters for CZ simulation.',
+        self.add_parameter('instr_sim_control_CZ',
+                           docstring='Noise and other parameters for CZ simulation.',
                            parameter_class=InstrumentRefParameter)
 
         self.add_parameter(
@@ -1330,16 +1330,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         """
         Simulates a CZ gate for the current paramenters.
         """
-        noise_CZ = self.instr_noise_CZ.get_instr()
+        sim_control_CZ = self.instr_sim_control_CZ.get_instr()
         # if not defined set the sweetspot freqs same as the operating
         # point freqs
-        if noise_CZ.get('w_q0_sweetspot') is None:
-            noise_CZ.w_q0_sweetspot(self.get('q_freq_01'))
-        if noise_CZ.get('w_q1_sweetspot') is None:
-            noise_CZ.w_q1_sweetspot(self.get('q_freq_10_{}'.format(which_gate)))
+        if sim_control_CZ.get('w_q0_sweetspot') is None:
+            sim_control_CZ.w_q0_sweetspot(self.get('q_freq_01'))
+        if sim_control_CZ.get('w_q1_sweetspot') is None:
+            sim_control_CZ.w_q1_sweetspot(self.get('q_freq_10_{}'.format(which_gate)))
 
         detector = cz_main.CZ_trajectory_superoperator(self,
-                noise_parameters_CZ=noise_CZ, qois=qois, which_gate=which_gate,
+                sim_control_CZ=sim_control_CZ, qois=qois, which_gate=which_gate,
                 simstep_div=simstep_div)
 
         sim_results = detector.acquire_data_point()

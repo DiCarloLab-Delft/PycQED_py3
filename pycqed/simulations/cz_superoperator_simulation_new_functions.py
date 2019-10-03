@@ -182,7 +182,7 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
     return H
 
 
-def calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ, which_gate: str = 'NE'):
+def calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
     # all inputs should be given in terms of frequencies, i.e. without the 2*np.pi factor
     # instead, the output H includes already that factor
 
@@ -809,10 +809,10 @@ def distort_amplitude(fitted_stepresponse_ty,amp,tlist_new,sim_step_new):
 
 
 
-def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,noise_parameters_CZ, which_gate: str = 'NE'):
+def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,sim_control_CZ, which_gate: str = 'NE'):
 
     if not fluxlutman.get('czd_double_sided_{}'.format(which_gate)):
-        omega_0 = compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot())
+        omega_0 = compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot())
 
         f_pulse = fluxlutman.calc_amp_to_freq(amp_final,'01', which_gate=which_gate)
         f_pulse = np.clip(f_pulse,a_min=None,a_max=omega_0)                    # necessary otherwise the sqrt below gives nan
@@ -829,7 +829,7 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,noise_parameters_C
         amp_B = amp_final[half_length:]
 
 
-        omega_0 = compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot())
+        omega_0 = compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot())
 
         f_pulse_A = fluxlutman.calc_amp_to_freq(amp_A,'01', which_gate=which_gate)
         f_pulse_A = np.clip(f_pulse_A,a_min=None,a_max=omega_0)
@@ -855,12 +855,12 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,noise_parameters_C
 
 
 
-def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
+def return_jump_operators(sim_control_CZ, f_pulse_final, fluxlutman):
 
-    T1_q0 = noise_parameters_CZ.T1_q0()
-    T1_q1 = noise_parameters_CZ.T1_q1()
-    T2_q0_amplitude_dependent = noise_parameters_CZ.T2_q0_amplitude_dependent()
-    T2_q1 = noise_parameters_CZ.T2_q1()
+    T1_q0 = sim_control_CZ.T1_q0()
+    T1_q1 = sim_control_CZ.T1_q1()
+    T2_q0_amplitude_dependent = sim_control_CZ.T2_q0_amplitude_dependent()
+    T2_q1 = sim_control_CZ.T2_q1()
 
 
     # time-independent jump operators on q1
@@ -876,8 +876,8 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
     # time-dependent jump operators on q0
     if T2_q0_amplitude_dependent[0] != -1:
 
-        f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()))
-        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()))
+        f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot()))
+        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot()))
         for i in range(len(sensitivity)):
             if sensitivity[i] < 0.1:
                 sensitivity[i] = 0.1
@@ -900,12 +900,12 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
         Tphi01_q0_vec = []
 
 
-    c_ops = c_ops_amplitudedependent(T1_q0 * noise_parameters_CZ.T2_scaling(),T1_q1 * noise_parameters_CZ.T2_scaling(),
-                                    Tphi01_q0_vec * noise_parameters_CZ.T2_scaling(),Tphi01_q1 * noise_parameters_CZ.T2_scaling())
+    c_ops = c_ops_amplitudedependent(T1_q0 * sim_control_CZ.T2_scaling(),T1_q1 * sim_control_CZ.T2_scaling(),
+                                    Tphi01_q0_vec * sim_control_CZ.T2_scaling(),Tphi01_q1 * sim_control_CZ.T2_scaling())
     return c_ops
 
 
-def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp, sim_step, intervals_list=[-1], which_gate: str = 'NE'):
+def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxbias_q1, amp, sim_step, intervals_list=[-1], which_gate: str = 'NE'):
     """
     Calculates the propagator (either unitary or superoperator)
 
@@ -913,7 +913,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp,
         sim_step(float): time between one point and another of amp
         c_ops (list of Qobj): time (in)dependent jump operators
         amp(array): amplitude in voltage describes the y-component of the trajectory to simulate. Should be equisampled in time
-        fluxlutman,noise_parameters_CZ: instruments containing various parameters
+        fluxlutman,sim_control_CZ: instruments containing various parameters
         fluxbias_q1(float): random fluxbias on the spectator qubit
 
     Returns
@@ -928,14 +928,14 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp,
     if intervals_list[0]==-1:
         intervals_list = np.zeros(np.size(amp))+sim_step
 
-    H_0 = calc_hamiltonian(0,fluxlutman,noise_parameters_CZ, which_gate=which_gate)
-    if noise_parameters_CZ.dressed_compsub():
+    H_0 = calc_hamiltonian(0,fluxlutman,sim_control_CZ, which_gate=which_gate)
+    if sim_control_CZ.dressed_compsub():
         S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[n_levels_q1, n_levels_q0], [n_levels_q1, n_levels_q0]])
     else:
         S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S
 
     w_q1 = q_freq_10    # we 'save' the input value of w_q1
-    w_q1_sweetspot = noise_parameters_CZ.w_q1_sweetspot()
+    w_q1_sweetspot = sim_control_CZ.w_q1_sweetspot()
     if w_q1 > w_q1_sweetspot:
         log.warning('operating frequency of q1 should be lower than its sweet spot frequency.')
         w_q1 = w_q1_sweetspot
@@ -948,7 +948,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp,
     exp_L_total=1
     # tt = 0
     for i in range(len(amp)):
-        H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ, which_gate=which_gate)
+        H=calc_hamiltonian(amp[i],fluxlutman,sim_control_CZ, which_gate=which_gate)
         H=S.dag()*H*S
         S_H = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])
                                                    # Alternative for collapse operators that follow the basis of H
@@ -978,7 +978,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman, fluxbias_q1, amp,
     return U_final
 
 
-def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, noise_parameters_CZ, which_gate: str = 'NE'):
+def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, sim_control_CZ, which_gate: str = 'NE'):
     """
     Calculates the quantities of interest from the propagator (either unitary or superoperator)
 
@@ -1097,12 +1097,12 @@ def concatenate_CZpulse_and_Zrotations(Z_rotations_length,sim_step,tlist):
     return tlist
 
 
-def dressed_frequencies(fluxlutman, noise_parameters_CZ, which_gate: str = 'NE'):
-    H_0=calc_hamiltonian(0,fluxlutman,noise_parameters_CZ, which_gate=which_gate)   # computed at 0 amplitude
+def dressed_frequencies(fluxlutman, sim_control_CZ, which_gate: str = 'NE'):
+    H_0=calc_hamiltonian(0,fluxlutman,sim_control_CZ, which_gate=which_gate)   # computed at 0 amplitude
 
     # We change the basis from the standard basis to the basis of eigenvectors of H_0
     # The columns of S are the eigenvectors of H_0, appropriately ordered
-    if noise_parameters_CZ.dressed_compsub():
+    if sim_control_CZ.dressed_compsub():
         S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[n_levels_q1, n_levels_q0], [n_levels_q1, n_levels_q0]])
     else:
         S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S
@@ -1261,7 +1261,7 @@ def verify_CPTP(U):
     return ptrace
 
 
-def return_instrument_args(fluxlutman,noise_parameters_CZ, which_gate: str = 'NE'):
+def return_instrument_args(fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
 
     fluxlutman_args = {'sampling_rate': fluxlutman.sampling_rate(),
                            'cz_length_' + which_gate: fluxlutman.get('cz_length_{}'.format(which_gate)),
@@ -1278,35 +1278,35 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ, which_gate: str = 'NE
                            'alpha_q1': fluxlutman.get('anharm_q1_{}'.format(which_gate)),
                            'q_freq_10_' + which_gate: fluxlutman.get('q_freq_10_{}'.format(which_gate))}
 
-    noise_parameters_CZ_args = {'Z_rotations_length': noise_parameters_CZ.Z_rotations_length(),
-                                'voltage_scaling_factor': noise_parameters_CZ.voltage_scaling_factor(),
-                                'distortions': noise_parameters_CZ.distortions(),
-                                'T1_q0': noise_parameters_CZ.T1_q0(),
-                                'T1_q1': noise_parameters_CZ.T1_q1(),
-                                'T2_q0_amplitude_dependent': noise_parameters_CZ.T2_q0_amplitude_dependent(),
-                                'T2_q1': noise_parameters_CZ.T2_q1(),
-                                'w_q1_sweetspot': noise_parameters_CZ.w_q1_sweetspot(),
-                                'dressed_compsub': noise_parameters_CZ.dressed_compsub(),
-                                'sigma_q0': noise_parameters_CZ.sigma_q0(),
-                                'sigma_q1': noise_parameters_CZ.sigma_q1(),
-                                'T2_scaling': noise_parameters_CZ.T2_scaling(),
-                                'look_for_minimum': noise_parameters_CZ.look_for_minimum(),
-                                'n_sampling_gaussian_vec': noise_parameters_CZ.n_sampling_gaussian_vec(),
-                                'cluster': noise_parameters_CZ.cluster(),
-                                'detuning': noise_parameters_CZ.detuning(),
-                                'initial_state': noise_parameters_CZ.initial_state(),
-                                'total_idle_time': noise_parameters_CZ.total_idle_time(),
-                                'waiting_at_sweetspot': noise_parameters_CZ.waiting_at_sweetspot(),
-                                'w_q0_sweetspot': noise_parameters_CZ.w_q0_sweetspot(),
-                                'repetitions': noise_parameters_CZ.repetitions(),
-                                'time_series': noise_parameters_CZ.time_series(),
-                                'overrotation_sims': noise_parameters_CZ.overrotation_sims(),
-                                'axis_overrotation': noise_parameters_CZ.axis_overrotation()}
+    sim_control_CZ_args = {'Z_rotations_length': sim_control_CZ.Z_rotations_length(),
+                                'voltage_scaling_factor': sim_control_CZ.voltage_scaling_factor(),
+                                'distortions': sim_control_CZ.distortions(),
+                                'T1_q0': sim_control_CZ.T1_q0(),
+                                'T1_q1': sim_control_CZ.T1_q1(),
+                                'T2_q0_amplitude_dependent': sim_control_CZ.T2_q0_amplitude_dependent(),
+                                'T2_q1': sim_control_CZ.T2_q1(),
+                                'w_q1_sweetspot': sim_control_CZ.w_q1_sweetspot(),
+                                'dressed_compsub': sim_control_CZ.dressed_compsub(),
+                                'sigma_q0': sim_control_CZ.sigma_q0(),
+                                'sigma_q1': sim_control_CZ.sigma_q1(),
+                                'T2_scaling': sim_control_CZ.T2_scaling(),
+                                'look_for_minimum': sim_control_CZ.look_for_minimum(),
+                                'n_sampling_gaussian_vec': sim_control_CZ.n_sampling_gaussian_vec(),
+                                'cluster': sim_control_CZ.cluster(),
+                                'detuning': sim_control_CZ.detuning(),
+                                'initial_state': sim_control_CZ.initial_state(),
+                                'total_idle_time': sim_control_CZ.total_idle_time(),
+                                'waiting_at_sweetspot': sim_control_CZ.waiting_at_sweetspot(),
+                                'w_q0_sweetspot': sim_control_CZ.w_q0_sweetspot(),
+                                'repetitions': sim_control_CZ.repetitions(),
+                                'time_series': sim_control_CZ.time_series(),
+                                'overrotation_sims': sim_control_CZ.overrotation_sims(),
+                                'axis_overrotation': sim_control_CZ.axis_overrotation()}
 
-    return fluxlutman_args, noise_parameters_CZ_args
+    return fluxlutman_args, sim_control_CZ_args
 
 
-def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_CZ,noise_parameters_CZ_args, which_gate: str = 'NE'):
+def return_instrument_from_arglist(fluxlutman,fluxlutman_args,sim_control_CZ,sim_control_CZ_args, which_gate: str = 'NE'):
 
     fluxlutman.sampling_rate(fluxlutman_args['sampling_rate'])
     fluxlutman.set('cz_length_{}'.format(which_gate), fluxlutman_args['cz_length_' + which_gate])
@@ -1323,39 +1323,39 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     fluxlutman.q_polycoeffs_anharm(fluxlutman_args['q_polycoeffs_anharm'])
     fluxlutman.q_freq_01(fluxlutman_args['q_freq_01'])
 
-    noise_parameters_CZ.Z_rotations_length(noise_parameters_CZ_args['Z_rotations_length'])
-    noise_parameters_CZ.voltage_scaling_factor(noise_parameters_CZ_args['voltage_scaling_factor'])
-    noise_parameters_CZ.distortions(noise_parameters_CZ_args['distortions'])
-    noise_parameters_CZ.T1_q0(noise_parameters_CZ_args['T1_q0'])
-    noise_parameters_CZ.T1_q1(noise_parameters_CZ_args['T1_q1'])
-    noise_parameters_CZ.T2_q0_amplitude_dependent(noise_parameters_CZ_args['T2_q0_amplitude_dependent'])
-    noise_parameters_CZ.T2_q1(noise_parameters_CZ_args['T2_q1'])
-    noise_parameters_CZ.w_q1_sweetspot(noise_parameters_CZ_args['w_q1_sweetspot'])
-    noise_parameters_CZ.dressed_compsub(noise_parameters_CZ_args['dressed_compsub'])
-    noise_parameters_CZ.sigma_q0(noise_parameters_CZ_args['sigma_q0'])
-    noise_parameters_CZ.sigma_q1(noise_parameters_CZ_args['sigma_q1'])
-    noise_parameters_CZ.T2_scaling(noise_parameters_CZ_args['T2_scaling'])
-    noise_parameters_CZ.look_for_minimum(noise_parameters_CZ_args['look_for_minimum'])
-    noise_parameters_CZ.n_sampling_gaussian_vec(noise_parameters_CZ_args['n_sampling_gaussian_vec'])
-    noise_parameters_CZ.cluster(noise_parameters_CZ_args['cluster'])
-    noise_parameters_CZ.detuning(noise_parameters_CZ_args['detuning'])
-    noise_parameters_CZ.initial_state(noise_parameters_CZ_args['initial_state'])
-    noise_parameters_CZ.total_idle_time(noise_parameters_CZ_args['total_idle_time'])
-    noise_parameters_CZ.waiting_at_sweetspot(noise_parameters_CZ_args['waiting_at_sweetspot'])
-    noise_parameters_CZ.w_q0_sweetspot(noise_parameters_CZ_args['w_q0_sweetspot'])
-    noise_parameters_CZ.repetitions(noise_parameters_CZ_args['repetitions'])
-    noise_parameters_CZ.time_series(noise_parameters_CZ_args['time_series'])
-    noise_parameters_CZ.overrotation_sims(noise_parameters_CZ_args['overrotation_sims'])
-    noise_parameters_CZ.axis_overrotation(noise_parameters_CZ_args['axis_overrotation'])
+    sim_control_CZ.Z_rotations_length(sim_control_CZ_args['Z_rotations_length'])
+    sim_control_CZ.voltage_scaling_factor(sim_control_CZ_args['voltage_scaling_factor'])
+    sim_control_CZ.distortions(sim_control_CZ_args['distortions'])
+    sim_control_CZ.T1_q0(sim_control_CZ_args['T1_q0'])
+    sim_control_CZ.T1_q1(sim_control_CZ_args['T1_q1'])
+    sim_control_CZ.T2_q0_amplitude_dependent(sim_control_CZ_args['T2_q0_amplitude_dependent'])
+    sim_control_CZ.T2_q1(sim_control_CZ_args['T2_q1'])
+    sim_control_CZ.w_q1_sweetspot(sim_control_CZ_args['w_q1_sweetspot'])
+    sim_control_CZ.dressed_compsub(sim_control_CZ_args['dressed_compsub'])
+    sim_control_CZ.sigma_q0(sim_control_CZ_args['sigma_q0'])
+    sim_control_CZ.sigma_q1(sim_control_CZ_args['sigma_q1'])
+    sim_control_CZ.T2_scaling(sim_control_CZ_args['T2_scaling'])
+    sim_control_CZ.look_for_minimum(sim_control_CZ_args['look_for_minimum'])
+    sim_control_CZ.n_sampling_gaussian_vec(sim_control_CZ_args['n_sampling_gaussian_vec'])
+    sim_control_CZ.cluster(sim_control_CZ_args['cluster'])
+    sim_control_CZ.detuning(sim_control_CZ_args['detuning'])
+    sim_control_CZ.initial_state(sim_control_CZ_args['initial_state'])
+    sim_control_CZ.total_idle_time(sim_control_CZ_args['total_idle_time'])
+    sim_control_CZ.waiting_at_sweetspot(sim_control_CZ_args['waiting_at_sweetspot'])
+    sim_control_CZ.w_q0_sweetspot(sim_control_CZ_args['w_q0_sweetspot'])
+    sim_control_CZ.repetitions(sim_control_CZ_args['repetitions'])
+    sim_control_CZ.time_series(sim_control_CZ_args['time_series'])
+    sim_control_CZ.overrotation_sims(sim_control_CZ_args['overrotation_sims'])
+    sim_control_CZ.axis_overrotation(sim_control_CZ_args['axis_overrotation'])
 
-    return fluxlutman, noise_parameters_CZ
+    return fluxlutman, sim_control_CZ
 
 
-def plot_spectrum(fluxlutman,noise_parameters_CZ, which_gate: str = 'NE'):
+def plot_spectrum(fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
     eig_vec=[]
     amp_vec=np.arange(0,1.5,.01)
     for amp in amp_vec:
-        H=calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ, which_gate=which_gate)
+        H=calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate=which_gate)
         eigs=H.eigenenergies()
         eig_vec.append(eigs)
     eig_vec=np.array(eig_vec)/1e9/(2*np.pi)
@@ -1368,11 +1368,11 @@ def plot_spectrum(fluxlutman,noise_parameters_CZ, which_gate: str = 'NE'):
                           xlabel=r'$\omega_{q0}$ (GHz)',ylabel='Frequency (GHz)')
 
 
-def conditional_frequency(amp,fluxlutman,noise_parameters_CZ, which_gate: str = 'NE'):
+def conditional_frequency(amp,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
     # returns the energy difference (in Hz) between the actual 11 state and the bare 11 state
     #              (whose energy is equal to the sum of the energies of the 01 and 10 states)
     # amp=0 returns the residual coupling
-    H=calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ, which_gate=which_gate)
+    H=calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate=which_gate)
     eigs=H.eigenenergies()
     cond_frequency = eigs[4]-eigs[1]-eigs[2]+eigs[0]
     cond_frequency = cond_frequency/(2*np.pi)
@@ -1394,7 +1394,7 @@ def calc_rates(L_1,L_12to03,t_cycle,T_1):
 
 
 
-def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,fluxlutman,noise_parameters_CZ, which_gate: str = 'NE'):
+def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
     '''
     Function used to study the effect of constant flux offsets on the quantities of interest.
     The input should be a series of propagators computed for different flux offsets,
@@ -1414,7 +1414,7 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,fluxlutm
     for i in range(len(U_final_vec)):
         if U_final_vec[i].type == 'oper':
             U_final_vec[i] = qtp.to_super(U_final_vec[i])
-        qoi_temp = simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i],t_final=t_final,fluxlutman=fluxlutman,noise_parameters_CZ=noise_parameters_CZ, which_gate=which_gate)
+        qoi_temp = simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i],t_final=t_final,fluxlutman=fluxlutman,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
         if i==mid_index:
             print('qoi_temp =',qoi_temp)
         leakage_vec.append(qoi_temp['L1'])
@@ -1458,7 +1458,7 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,fluxlutm
 
 
 
-def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,noise_parameters_CZ, which_gate: str = 'NE'):
+def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
     '''
     Function used to study how the leakage accumulation differs from the case in which we use directly the gate that comes out of the simulations
     and the case in which we artificially dephase the leakage subspace wrt the computational subspace.
@@ -1508,8 +1508,8 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,noise_paramet
     for n in range(1,number_CZ_repetitions,step_repetitions):        # we consider only odd n so that in theory it should be always a CZ
         U_superop_n=U_superop_average**n
         U_superop_dephased_n = U_superop_dephased**n
-        qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,fluxlutman=fluxlutman,noise_parameters_CZ=noise_parameters_CZ, which_gate=which_gate)
-        qoi_dephased=simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,fluxlutman=fluxlutman,noise_parameters_CZ=noise_parameters_CZ, which_gate=which_gate)
+        qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,fluxlutman=fluxlutman,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
+        qoi_dephased=simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,fluxlutman=fluxlutman,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
         leakage_vec.append(qoi['L1'])
         infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
         leakage_dephased_vec.append(qoi_dephased['L1'])
@@ -1698,12 +1698,12 @@ def calc_populations_new(rho_out,population_states):
     return populations
 
 
-def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ, which_gate: str = 'NE'):
+def quantities_of_interest_ramsey(U,initial_state,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
 
     if initial_state == '11_dressed':
-        freq = noise_parameters_CZ.w_q0_sweetspot() + noise_parameters_CZ.detuning()
+        freq = sim_control_CZ.w_q0_sweetspot() + sim_control_CZ.detuning()
         amp = fluxlutman.calc_freq_to_amp(freq, which_gate=which_gate)
-        H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ, which_gate=which_gate)
+        H = calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate=which_gate)
         eigs,eigvectors = H.eigenstates()
         psi_in = eigvectors[4]
 
@@ -1715,7 +1715,7 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,noise_parameters_CZ
 
     elif initial_state == '11_bare':
         amp = 0
-        H = calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ, which_gate=which_gate)
+        H = calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate=which_gate)
         eigs,eigvectors = H.eigenstates()
         psi_in = eigvectors[4]
 
