@@ -373,6 +373,15 @@ def n_qubit_reset(qb_names, operation_dict, prep_params=dict(), upload=True,
         swept_pulses.append(segment_pulses + pulses)
 
     seq = pulse_list_list_seq(swept_pulses, seq_name, upload=False)
+
+    # reuse sequencer memory by repeating readout pattern
+    # 1. get all readout pulse names (if they are on different uhf,
+    # they will be applied to different channels)
+    ro_pulse_names = [p["pulse_name"] for p in
+                      generate_mux_ro_pulse_list(qb_names, operation_dict)]
+    # 2. repeat readout for each ro_pulse.
+    [seq.repeat_ro(pn, operation_dict) for pn in ro_pulse_names]
+
     log.debug(seq)
 
     if upload:
@@ -1107,10 +1116,13 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
                  (parity_loops, ROs),
                  1
                  )
+    log.debug(repeat_dict)
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq, repeat_dict=repeat_dict)
 
+
+    log.debug('sweep_points: ', seq.n_acq_elements())
     return seq, np.arange(seq.n_acq_elements())
 
 

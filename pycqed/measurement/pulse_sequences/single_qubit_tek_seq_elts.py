@@ -51,6 +51,10 @@ def one_qubit_reset(qb_name, operation_dict, prep_params=dict(), upload=True,
         swept_pulses.append(segment_pulses)
 
     seq = pulse_list_list_seq(swept_pulses, seq_name, upload=False)
+
+    # reuse sequencer memory by repeating readout pattern
+    seq.repeat_ro(f"RO {qb_name}", operation_dict)
+
     log.debug(seq)
 
     if upload:
@@ -105,6 +109,9 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points,
     # add calibration segments
     seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
+    # reuse sequencer memory by repeating readout pattern
+    seq.repeat_ro(f"RO {qb_name}", operation_dict)
+
     log.debug(seq)
     if upload:
        ps.Pulsar.get_instance().program_awgs(seq)
@@ -112,62 +119,6 @@ def rabi_seq_active_reset(amps, qb_name, operation_dict, cal_points,
     return seq, np.arange(seq.n_acq_elements())
 
 
-def t1_active_reset(times, qb_name, operation_dict, cal_points,
-                    upload=True, for_ef=False, last_ge_pulse=False,
-                    prep_params=dict()):
-    '''
-    T1 sequence for a single qubit using the tektronix.
-    SSB_Drag pulse is used for driving, simple modulation used for RO
-    Input pars:
-        times:       array of times to wait after the initial pi-pulse
-        pulse_pars:  dict containing the pulse parameters
-        RO_pars:     dict containing the RO parameters
-    '''
-
-    if np.any(times>1e-3):
-        logging.warning('The values in the times array might be too large.'
-                        'The units should be seconds.')
-    seq_name = 'T1_sequence'
-
-    #Operations
-    if for_ef:
-        ops = ["X180", "X180_ef"]
-        if last_ge_pulse:
-            ops += ["X180"]
-    else:
-        ops = ["X180"]
-    ops += ["RO"]
-    ops = add_suffix(ops, " " + qb_name)
-    pulses = [deepcopy(operation_dict[op]) for op in ops]
-
-    # name delayed pulse: last ge pulse if for_ef and last_ge_pulse
-    # otherwise readout pulse
-    if for_ef and last_ge_pulse:
-        delayed_pulse = -2 # last_ge_pulse
-        delays = np.array(times)
-    else:
-        delayed_pulse = -1 # readout pulse
-        delays = np.array(times) + pulses[-1]["pulse_delay"]
-
-    pulses[delayed_pulse]['name'] = "Delayed_pulse"
-
-    # vary delay of readout pulse or last ge pulse
-    swept_pulses = sweep_pulse_params(pulses, {'Delayed_pulse.pulse_delay': delays})
-
-    # add preparation pulses
-    swept_pulses_with_prep = \
-        [add_preparation_pulses(p, operation_dict, [qb_name], **prep_params)
-         for p in swept_pulses]
-    seq = pulse_list_list_seq(swept_pulses_with_prep, seq_name, upload=False)
-
-    # add calibration segments
-    seq.extend(cal_points.create_segments(operation_dict, **prep_params))
-
-    if upload:
-        ps.Pulsar.get_instance().program_awgs(seq)
-
-    return seq, np.arange(seq.n_acq_elements())
-
 
 def t1_active_reset(times, qb_name, operation_dict, cal_points,
                     upload=True, for_ef=False, last_ge_pulse=False,
@@ -219,6 +170,9 @@ def t1_active_reset(times, qb_name, operation_dict, cal_points,
 
     # add calibration segments
     seq.extend(cal_points.create_segments(operation_dict, **prep_params))
+
+    # reuse sequencer memory by repeating readout pattern
+    seq.repeat_ro(f"RO {qb_name}", operation_dict)
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
@@ -629,6 +583,9 @@ def ramsey_active_reset(times, qb_name, operation_dict, cal_points, n=1,
     # add calibration segments
     seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
+    # reuse sequencer memory by repeating readout pattern
+    seq.repeat_ro(f"RO {qb_name}", operation_dict)
+
     log.debug(seq)
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
@@ -716,73 +673,13 @@ def single_state_active_reset(operation_dict, qb_name,
     seg = segment.Segment('segment_{}_level'.format(state), pulses_with_prep)
     seq.add(seg)
 
+    # reuse sequencer memory by repeating readout pattern
+    seq.repeat_ro(f"RO {qb_name}", operation_dict)
+
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
 
     return seq, np.arange(seq.n_acq_elements())
-
-
-def single_level_seq(pulse_pars, RO_pars, pulse_pars_2nd=None,
-                     level='e', upload=True, return_seq=False,
-                     preselection=False):
-    '''
-    OffOn sequence for a single qubit using the tektronix.
-    SSB_Drag pulse is used for driving, simple modualtion used for RO
-    Input pars:
-        pulse_pars:          dict containing the pulse parameters
-        RO_pars:             dict containing the RO parameters
-        pulse_pars_2nd:      dict containing the pulse parameters of ef transition.
-                             Required if level is 'f'.
-        Initialize:          adds an exta measurement before state preparation
-                             to allow initialization by post-selection
-        Post-measurement delay:  should be sufficiently long to avoid
-                             photon-induced gate errors when post-selecting.
-        level:               specifies for which level a pulse should be generated (g,e,f)
-        preselection:        adds an extra readout pulse before other pulses.
-    '''
-    seq_name = 'single_level_sequence'
-    seq = sequence.Sequence(seq_name)
-    seg_list = []
-    # Create dicts with the parameters for all the pulses
-    pulse_1st = get_pulse_dict_from_pars(pulse_pars)
-    if level == 'g':
-        pulse_combination = [pulse_1st['I']]
-    elif level == 'e':
-        pulse_combination = [pulse_1st['X180']]
-    elif level == 'f':
-        assert pulse_pars_2nd is not None, \
-            "pulse_pars_2nd is a required parameter for f-level pulse."
-        pulse_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
-        pulse_combination = [pulse_1st['X180'], pulse_2nd['X180']]
-    else:
-        raise ValueError("Unrecognized Level: {}. Should be g, e or f.\n"
-                         "Note: Naming levels 'on' and 'off' is now deprecated "
-                         "to ensure clear denomination for 3 level readout. "
-                         "Please adapt your code:\n 'off' --> 'g'\n'on' --> 'e'"
-                         "\n'f' for f-level .")
-
-    
-    if preselection:
-        pulse_list = [RO_pars]
-        pulse = deepcopy(pulse_combination[0])
-        pulse['pulse_delay'] = 500e-9
-        pulse_list += [pulse]
-        if len(pulse_combination) > 1:
-            pulse_list += pulse_combination[1:]
-        pulse_list += [RO_pars]    
-    else:
-        pulse_list = pulse_combination+[RO_pars]
-    seg = segment.Segment('segment_{}_level'.format(level), pulse_list)
-    seg_list.append(seg)
-    seq.add(seg)
-    
-    if upload:
-        ps.Pulsar.get_instance().program_awgs(seq)
-
-    if return_seq:
-        return seq, seg_list
-    else:
-        return seq_name
 
 
 def randomized_renchmarking_seqs(
@@ -814,10 +711,11 @@ def randomized_renchmarking_seqs(
                                                   **prep_params))
         sequences.append(seq)
 
-    repeat_dict = {uhf_name: (sequences[0].n_acq_elements(), 1)}
+    # reuse sequencer memory by repeating readout pattern
+    [s.repeat_ro(f"RO {qb_name}", operation_dict) for s in sequences]
+
     if upload:
-        ps.Pulsar.get_instance().program_awgs(sequences[0],
-                                              repeat_dict=repeat_dict)
+        ps.Pulsar.get_instance().program_awgs(sequences[0])
 
     return sequences, np.arange(sequences[0].n_acq_elements()), \
            np.arange(len(cliffords))
@@ -891,8 +789,12 @@ def qscale_active_reset(qscales, qb_name, operation_dict, cal_points,
     # add calibration segments
     seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
+    # reuse sequencer memory by repeating readout pattern
+    seq.repeat_ro(f"RO {qb_name}", operation_dict)
+
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
+
     log.debug(seq)
     return seq, np.arange(seq.n_acq_elements())
 

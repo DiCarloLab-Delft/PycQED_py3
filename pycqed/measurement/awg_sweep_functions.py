@@ -188,47 +188,6 @@ class SegmentSoftSweep(swf.Soft_Sweep):
         self.upload_next = True
 
 
-class InstrumentSoftSweep(swf.Soft_Sweep):
-
-    def __init__(self, instrument, param_name, param_unit,
-                 process_sweep_point_func=lambda x: x):
-        super().__init__()
-        self.name = 'Instrument soft sweep'
-        self.instr = instrument
-        self.parameter_name = param_name
-        self.unit = param_unit
-        self.process_sweep_point_func = process_sweep_point_func
-
-    def prepare(self):
-        pass
-
-    def set_parameter(self, val, **kw):
-        proc_val = self.process_sweep_point_func(val)
-        self.instr.set(self.parameter_name, proc_val)
-
-
-class T1(swf.Hard_Sweep):
-
-    def __init__(self, pulse_pars, RO_pars, cal_points=True, upload=True):
-        super().__init__()
-        self.pulse_pars = pulse_pars
-        self.RO_pars = RO_pars
-        self.upload = upload
-        self.cal_points = cal_points
-
-        self.name = 'T1'
-        self.parameter_name = 't'
-        self.unit = 's'
-
-    def prepare(self, **kw):
-        if self.upload:
-            sqs.T1_seq(times=self.sweep_points,
-                       pulse_pars=self.pulse_pars,
-                       RO_pars=self.RO_pars,
-                       cal_points=self.cal_points,
-                       upload=self.upload)
-
-
 class T1_2nd_exc(swf.Hard_Sweep):
     def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, no_cal_points=6,
                  cal_points=True, upload=True, last_ge_pulse=True):

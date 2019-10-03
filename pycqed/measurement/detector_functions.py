@@ -1358,7 +1358,7 @@ class UHFQC_classifier_detector(UHFQC_Base):
                     state_prob_mtx_list[i]).T @ clf_data.T
                 log.info('Data corrected based on state_prob_mtx.')
             else:
-                print('not correcting data')
+                log.info('not correcting data')
                 clf_data = clf_data.T
             classified_data[nr_states * i: nr_states * i + nr_states, :] = \
                 clf_data

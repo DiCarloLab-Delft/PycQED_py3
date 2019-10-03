@@ -1037,11 +1037,11 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
         optimal_frequency = []
         sigmas = [sigma_init]
 
-        logging.debug("###### Starting Analysis to find qutrit f_RO ######")
+        log.debug("###### Starting Analysis to find qutrit f_RO ######")
 
         while ResonatorSpectroscopy_v2.update_sigma(avg_fidelities, sigmas, freqs,
                                 optimal_frequency, n_iter, **kw):
-            logging.debug("Iteration {}".format(n_iter))
+            log.debug("Iteration {}".format(n_iter))
             sigma = sigmas[-1]
             if sigma in avg_fidelities.keys():
                 continue
@@ -1057,7 +1057,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
         qutrit_key = "".join(list(spectra))
 
 
-        logging.debug("###### Finished Analysis. Optimal f_RO: {} ######"
+        log.debug("###### Finished Analysis. Optimal f_RO: {} ######"
                       .format(optimal_frequency[-1]))
 
         return optimal_frequency[-1], raw_results if return_full else \
@@ -1089,7 +1089,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
             fid, idx_width = ResonatorSpectroscopy_v2.fidelity_and_width(
                 avg_fidelities[sigma_current], target_fidelity)
             width = idx_width * delta_freq
-            logging.debug("sigmas " + str(sigmas) + " width (MHz): "
+            log.debug("sigmas " + str(sigmas) + " width (MHz): "
                           + str(width / 1e6))
             f_opt = freqs[np.argmax(avg_fidelities[sigma_current])]
             optimal_frequency.append(f_opt)
@@ -1112,7 +1112,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                     sigma_new = \
                         10 ** (np.log10(sigma_current) + np.abs(log_diff))
                 msg = "Width > max_width, update sigma to: {}"
-                logging.debug(msg.format(sigma_new))
+                log.debug(msg.format(sigma_new))
                 sigmas.append(sigma_new)
             elif fid < target_fidelity:
                 # sigma is too high, update higher bound
@@ -1122,7 +1122,7 @@ class ResonatorSpectroscopy_v2(Spectroscopy):
                     sigma_new = 10 ** (np.log10(sigma_current) -
                                        np.abs(log_diff) / 2)
                 msg = "Fidelity < target fidelity, update sigma to: {}"
-                logging.debug(msg.format(sigma_new))
+                log.debug(msg.format(sigma_new))
                 sigmas.append(sigma_new)
 
         return continue_search

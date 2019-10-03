@@ -1014,6 +1014,8 @@ class BaseDataAnalysis(object):
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
+        plot_yscale = pdict.get('yscale', None)
+        plot_xscale = pdict.get('xscale', None)
 
         if pdict.get('color', False):
             plot_linekws['color'] = pdict.get('color')
@@ -1101,6 +1103,10 @@ class BaseDataAnalysis(object):
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
             axs.set_ylim(ymin, ymax)
+        if plot_yscale is not None:
+            axs.set_yscale(plot_yscale)
+        if plot_xscale is not None:
+            axs.set_xscale(plot_xscale)
 
         if self.tight_fig:
             axs.figure.tight_layout()

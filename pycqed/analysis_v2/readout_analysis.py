@@ -1055,7 +1055,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
                 recurse(tree_.children_right[node], thresholds_final,
                         loc + [1], mapping, feature_depth_path)
             else:
-                print(loc, tree_.value[node], feature_depth_path)
+                log.debug(loc, tree_.value[node], feature_depth_path)
                 if len(loc) < tree_.n_features:
                     log.warning(
                         "Location < n_features, threshold mapping might not be "
@@ -1231,7 +1231,7 @@ class Singleshot_Readout_Analysis_Qutrit(ba.BaseDataAnalysis):
         # two-dimensionl dataset.
         ell_radius_x = 1#np.sqrt(1 + pearson)
         ell_radius_y = 1# np.sqrt(1 - pearson)
-        print(ell_radius_x)
+
         ellipse = Ellipse((0, 0),
                           width=ell_radius_x * 2,
                           height=ell_radius_y * 2,
@@ -1463,7 +1463,6 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
         table = np.zeros((n_readouts, len(observables)))
 
-        # print(observables)
 
         for qubit, results in shots_of_qubits.items():
             res_e[qubit] = np.array(results).reshape((n_readouts, -1),
@@ -1488,9 +1487,6 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                     else:
                         mask = np.logical_and(mask, res_g[qubit][seg])
                 table[readout_n, state_n] = np.count_nonzero(mask)
-        print(n_readouts)
-        print(n_shots)
-        print(np.sum(table))
         return table*n_readouts/n_shots
 
     @staticmethod

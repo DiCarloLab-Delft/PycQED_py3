@@ -119,26 +119,32 @@ class QuDev_transmon(Qubit):
                            label='Readout pulse upconversion mixer LO power')
         self.add_operation('RO')
         self.add_pulse_parameter('RO', 'ro_pulse_type', 'pulse_type',
-                                 vals=vals.Enum('GaussFilteredCosIQPulse'),
+                                 vals=vals.Enum('GaussFilteredCosIQPulse',
+                                                'GaussFilteredCosIQPulseMultiChromatic'),
                                  initial_value='GaussFilteredCosIQPulse')
         self.add_pulse_parameter('RO', 'ro_I_channel', 'I_channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'ro_Q_channel', 'Q_channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'ro_amp', 'amplitude',
-                                 initial_value=0.001, vals=vals.Numbers())
+                                 initial_value=0.001,
+                                 vals=vals.MultiType(vals.Numbers(), vals.Lists()))
         self.add_pulse_parameter('RO', 'ro_length', 'pulse_length',
                                  initial_value=2e-6, vals=vals.Numbers())
         self.add_pulse_parameter('RO', 'ro_delay', 'pulse_delay',
                                  initial_value=0, vals=vals.Numbers())
         self.add_pulse_parameter('RO', 'ro_mod_freq', 'mod_frequency',
-                                 initial_value=100e6, vals=vals.Numbers())
+                                 initial_value=100e6,
+                                 vals=vals.MultiType(vals.Numbers(), vals.Lists()))
         self.add_pulse_parameter('RO', 'ro_phase', 'phase',
-                                 initial_value=0, vals=vals.Numbers())
+                                 initial_value=0,
+                                 vals=vals.MultiType(vals.Numbers(), vals.Lists()))
         self.add_pulse_parameter('RO', 'ro_phi_skew', 'phi_skew',
-                                 initial_value=0, vals=vals.Numbers())
+                                 initial_value=0,
+                                 vals=vals.MultiType(vals.Numbers(), vals.Lists()))
         self.add_pulse_parameter('RO', 'ro_alpha', 'alpha',
-                                 initial_value=1, vals=vals.Numbers())
+                                 initial_value=1,
+                                 vals=vals.MultiType(vals.Numbers(), vals.Lists()))
         self.add_pulse_parameter('RO', 'ro_sigma', 
                                  'gaussian_filter_sigma',
                                  initial_value=10e-9, vals=vals.Numbers())
@@ -212,8 +218,9 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('acq_weights_basis', vals=vals.Lists(),
                            label="weight basis used",
-                           docstring=("Used to log the weights basis for integration "
-                                      "during qutrit readout"),
+                           docstring=("Used to log the weights basis for "
+                                      "integration during qutrit readout. E.g."
+                                      " ['ge', 'gf'] or ['ge', 'ortho']."),
                            parameter_class=ManualParameter)
         self.add_parameter('acq_classifier_params', vals=vals.Dict(),
                            label='Parameters for the qutrit classifier.',
@@ -394,7 +401,18 @@ class QuDev_transmon(Qubit):
         if lo() is not None:
             lo.get_instr().pulsemod_state('Off')
             lo.get_instr().power(self.ro_lo_power())
-            lo.get_instr().frequency(self.ro_freq() - self.ro_mod_freq())
+            # in case of multichromatic readout, take first ro freq, else just
+            # wrap the frequency in a list and take the first
+            if np.ndim(self.ro_freq()) == 0:
+                ro_freq = [self.ro_freq()]
+            else:
+                ro_freq = self.ro_freq()
+            if np.ndim(self.ro_mod_freq()) == 0:
+                ro_mod_freq = [self.ro_mod_freq()]
+            else:
+                ro_mod_freq = self.ro_mod_freq()
+            lo.get_instr().frequency(ro_freq[0] - ro_mod_freq[0])
+
             lo.get_instr().on()
 
         # configure qubit drive local oscillator
@@ -572,6 +590,10 @@ class QuDev_transmon(Qubit):
         operation_dict.update(add_suffix_to_dict_keys(
             sq.get_pulse_dict_from_pars(
                 operation_dict['X180_ef ' + self.name]), '_ef ' + self.name))
+        if np.ndim(self.ro_freq()) != 0:
+            delta_freqs = np.diff(self.ro_freq(), prepend=self.ro_freq()[0])
+            mods = [self.ro_mod_freq() + d for d in delta_freqs]
+            operation_dict['RO ' + self.name]['mod_frequency'] = mods
 
         return operation_dict
 
@@ -581,7 +603,12 @@ class QuDev_transmon(Qubit):
             -self.ro_mod_freq(),
             name='Readout frequency', 
             parameter_name='Readout frequency')
-
+    def swf_ro_mod_freq(self):
+        return swf.Offset_Sweep(
+            self.ro_mod_freq,
+            self.instr_ro_lo.get_instr().frequency(),
+            name='Readout frequency',
+            parameter_name='Readout frequency')
     def measure_resonator_spectroscopy(self, freqs, sweep_points_2D=None,
                                        sweep_function_2D=None,
                                        trigger_separation=3e-6, 
@@ -835,17 +862,9 @@ class QuDev_transmon(Qubit):
 
         MC = self.instr_mc.get_instr()
 
-        if prep_params is None:
-            prep_params = self.preparation_params()
-
         # Define the measurement label
         if label is None:
-            label = f'T1{"_ef" if for_ef else ""}'
-            if classified_ro:
-                label += '_classified'
-            if 'active' in prep_params['preparation_type']:
-                label += '_reset'
-            label += self.msmt_suffix
+            label = f'T1{"_ef" if for_ef else ""}' + self.msmt_suffix
 
         cal_states = CalibrationPoints.guess_cal_states(cal_states, for_ef)
         cp = CalibrationPoints.single_qubit(self.name, cal_states,
@@ -924,6 +943,7 @@ class QuDev_transmon(Qubit):
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: qscales},
+                             'preparation_params': prep_params,
              'sweep_name': 'Qscale factor',
              'sweep_unit': '',
              'preparation_params': prep_params,
@@ -1153,6 +1173,7 @@ class QuDev_transmon(Qubit):
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
+                             'rotate': True, # needs to be changed when adapting sequence; only true if not classified_ro
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
                                 self.acq_weights_type() != 'optimal_qutrit'
@@ -1936,7 +1957,7 @@ class QuDev_transmon(Qubit):
             plt.close()
 
     def find_ssro_fidelity(self, analyze=True, close_fig=True, no_fits=False,
-                           upload=True, thresholded=False,
+                           upload=True, thresholded=False, label=None,
                            RO_comm=3 / 225e6, RO_slack=150e-9,
                            qutrit=False, update=False, prep_params=None):
         """
@@ -1969,10 +1990,9 @@ class QuDev_transmon(Qubit):
             fidelity and SNR = 2 |mu00 - mu11| / (sigma00 + sigma11). Else
             returns just assignment fidelity.
         """
-
         MC = self.instr_mc.get_instr()
-
-        label = 'SSRO_fidelity'
+        if label is None:
+            label = 'SSRO_fidelity'
         if thresholded:
             label += '_thresh'
 
@@ -1981,10 +2001,10 @@ class QuDev_transmon(Qubit):
 
         self.prepare(drive='timedomain')
 
-        RO_spacing = self.instr_uhf.get_instr().quex_wint_delay()/1.8e9
+        RO_spacing = self.instr_uhf.get_instr().quex_wint_delay() / 1.8e9
         RO_spacing += self.acq_length()
-        RO_spacing += RO_slack # for slack
-        RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
+        RO_spacing += RO_slack  # for slack
+        RO_spacing = np.ceil(RO_spacing / RO_comm) * RO_comm
 
         if prep_params['preparation_type'] not in ['preselection', 'wait']:
             raise NotImplementedError()
@@ -2030,14 +2050,14 @@ class QuDev_transmon(Qubit):
                     dict(classif_method='threshold' if thresholded else 'gmm',
                          pre_selection=preselection)
                 # options = 'gmm'
-                labels = [label+'_{}'.format(l) for l in states]
+                labels = [label + '_{}'.format(l) for l in states]
                 ssqtro = \
                     Singleshot_Readout_Analysis_Qutrit(label=labels,
-                                                       options_dict=options)
+                                                          options_dict=options)
                 state_prob_mtx = ssqtro.proc_data_dict[
-                           'analysis_params']['state_prob_mtx_masked']
+                    'analysis_params']['state_prob_mtx_masked']
                 classifier_params = ssqtro.proc_data_dict[
-                           'analysis_params'].get('classifier_params', None)
+                    'analysis_params'].get('classifier_params', None)
                 if update:
                     self.acq_classifier_params(classifier_params)
                     self.acq_state_prob_mtx(state_prob_mtx)
@@ -2064,7 +2084,6 @@ class QuDev_transmon(Qubit):
                     return ana.F_a, ana.F_d, ana.SNR
                 else:
                     return ana.F_a
-
     def find_readout_angle(self, MC=None, upload=True, close_fig=True, update=True, nreps=10):
         """
         Finds the optimal angle on the IQ plane for readout (optimal phase for

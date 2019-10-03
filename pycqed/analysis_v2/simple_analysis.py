@@ -66,7 +66,7 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
 
         for i, val_name in enumerate(self.raw_data_dict['value_names'][0]):
 
-            yvals = self.raw_data_dict['measured_values_ord_dict'][val_name]
+            yvals = self.raw_data_dict['measured_data'][val_name]
 
             if self.options_dict.get('average_sets', False):
                 xvals =  self.raw_data_dict['xvals'][0]
@@ -134,7 +134,7 @@ class Basic2DAnalysis(Basic1DAnalysis):
                 'ylabel': self.raw_data_dict['xlabel'][0],
                 'yunit': self.raw_data_dict['xunit'][0][0],
 
-                'zvals': self.raw_data_dict['measured_values_ord_dict']
+                'zvals': self.raw_data_dict['measured_data']
                 [val_name],
                 'clabel': val_name,
                 'zunit': self.raw_data_dict['value_units'][0][i],
