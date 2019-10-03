@@ -652,64 +652,6 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(close_fig=close_fig, qb_name=self.name, 
                                    TwoD=(mode == '2D'))
 
-    def measure_resonator_amplitude_sweep(self, freqs, amps,
-                                          trigger_separation=3e-6,
-                                          upload=True, analyze=True,
-                                          close_fig=True, label=None):
-        """ Varies the frequency of the microwave source to the resonator and
-        measures the transmittance """
-        if np.any(freqs < 500e6):
-            log.warning(('Some of the values in the freqs array might be '
-                         'too small. The units should be Hz.'))
-
-        if label is None:
-            label = 'resonator_amplitude_scan' + self.msmt_suffix
-
-        self.prepare(drive=None)
-        MC = self.instr_mc.get_instr()
-
-        hard_sweep_params = {'mod_frequency': {
-            'values': freqs - self.instr_ro_lo.get_instr().frequency(),
-            'unit': 'Hz'}}
-        soft_sweep_params = {'amplitude': {'values': amps, 'unit': 'V'}}
-
-        sequences, hard_sweep_points, soft_sweep_points = \
-            sq.res_amp_sweep_seqs(
-                qb_name=self.name,
-                hard_sweep_dict=hard_sweep_params,
-                soft_sweep_dict=soft_sweep_params,
-                uhf_name=self.instr_uhf.get_instr().name,
-                operation_dict=self.get_operation_dict(), upload=False)
-
-        hard_sweep_func = awg_swf.SegmentHardSweep(
-            sequence=sequences[0], upload=upload,
-            parameter_name=list(hard_sweep_params)[0],
-            unit=list(hard_sweep_params.values())[0]['unit'])
-        MC.set_sweep_function(hard_sweep_func)
-        MC.set_sweep_points(hard_sweep_points)
-
-        channels_to_upload = [self.ro_I_channel(), self.ro_Q_channel()]
-        MC.set_sweep_function_2D(awg_swf.SegmentSoftSweep(
-            hard_sweep_func, sequences,
-            list(soft_sweep_params)[0],
-            list(soft_sweep_params.values())[0]['unit'],
-            channels_to_upload=channels_to_upload))
-        MC.set_sweep_points_2D(soft_sweep_points)
-        MC.set_detector_function(self.int_avg_det)
-
-        exp_metadata = {'hard_sweep_params': hard_sweep_params,
-                        'soft_sweep_params': soft_sweep_params}
-
-        with temporary_value(self.instr_trigger.get_instr().pulse_period,
-                             trigger_separation):
-            self.instr_pulsar.get_instr().start(exclude=[self.instr_uhf()])
-            MC.run(name=label, mode='2D', exp_metadata=exp_metadata)
-            self.instr_pulsar.get_instr().stop()
-
-        if analyze:
-            ma.MeasurementAnalysis(close_fig=close_fig, qb_name=self.name,
-                                   TwoD=True)
-
     def measure_qubit_spectroscopy(self, freqs, sweep_points_2D=None,
             sweep_function_2D=None, pulsed=True, trigger_separation=13e-6, 
             upload=True, analyze=True, close_fig=True, label=None):
@@ -943,7 +885,6 @@ class QuDev_transmon(Qubit):
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: qscales},
-                             'preparation_params': prep_params,
              'sweep_name': 'Qscale factor',
              'sweep_unit': '',
              'preparation_params': prep_params,

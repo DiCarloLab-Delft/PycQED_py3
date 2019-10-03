@@ -841,19 +841,22 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                  channels: list = [0, 1], correlations: list=[(0, 1)],
                  result_logging_mode: str='raw',
                  used_channels=None, value_names=None,
-                 seg_per_point=1, single_int_avg=False, thresholding=False,
+                 seg_per_point=1, single_int_avg=False,
                  **kw):
         super().__init__(
             UHFQC, AWG=AWG, integration_length=integration_length,
             nr_averages=nr_averages, real_imag=real_imag,
             channels=channels,
             seg_per_point=seg_per_point, single_int_avg=single_int_avg,
-            result_logging_mode=result_logging_mode,  # FIXME -> do the proper thing (MAR)
+            result_logging_mode=result_logging_mode,
             **kw)
 
         self.result_logging_mode = result_logging_mode
         self.correlations = correlations
         self.thresholding = self.result_logging_mode == 'digitized'
+        res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
+        self.result_logging_mode_idx = res_logging_indices[
+            self.result_logging_mode]
 
         self.used_channels = used_channels
         if self.used_channels is None:
@@ -868,12 +871,19 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.value_names = value_names
 
         # Note that V^2 is in brackets to prevent confusion with unit prefixes
-        if not thresholding:
+        if self.result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.value_names) + \
                                ['(V^2)']*len(self.correlations)
-        else:
-            self.value_units = ['fraction']*len(self.value_names) + \
+            self.scaling_factor = 1/(1.8e9*integration_length)
+        elif self.result_logging_mode == 'lin_trans':
+            self.value_units = ['a.u']*len(self.value_names) + \
+                               ['a.u.']*len(self.correlations)
+            self.scaling_factor = 1
+        elif self.result_logging_mode == 'digitized':
+            self.value_units = ['frac']*len(self.value_names) + \
                                ['normalized']*len(self.correlations)
+            self.scaling_factor = 1
+
         for corr in correlations:
             self.value_names += ['corr ({},{})'.format(corr[0], corr[1])]
 
@@ -1003,8 +1013,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             data = data_raw
         else:
             data = []
-            self.scaling_factor = 1 / (1.8e9 * self.integration_length)
-            # FIXME: this should be tested
             for n, ch in enumerate(self.used_channels):
                 if ch in self.correlation_channels:
                     data.append(3 * np.array(data_raw[n]) *
@@ -1012,7 +1020,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                 else:
                     data.append(np.array(data_raw[n]) *
                                 (self.scaling_factor / self.nr_averages))
-
         return data
 
 
