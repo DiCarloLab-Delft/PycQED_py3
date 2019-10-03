@@ -712,7 +712,7 @@ class NumpyJsonEncoder(json.JSONEncoder):
             return super().default(o)
 
 
-@contextmanager
+
 def temporary_value(*param_value_pairs):
     """
     This context manager allows to change a given QCodes parameter
@@ -728,15 +728,25 @@ def temporary_value(*param_value_pairs):
         # setting the parameter value
         with temporary_values((qb1.ro_freq, 6e9)):
             qb1.measure_spectroscopy(...)
-            
     """
-    if not isinstance(param_value_pairs[0], (tuple, list)):
-        param_value_pairs = (param_value_pairs,)
 
-    old_value_pairs = [(param, param()) for param, value in param_value_pairs]
-    for param, value in param_value_pairs: 
-        param(value)
-    yield
-    for param, value in old_value_pairs: 
-        param(value)
+    class TemporaryValueContext:
+        def __init__(self, *param_value_pairs):
+            if not isinstance(param_value_pairs[0], (tuple, list)):
+                param_value_pairs = (param_value_pairs,)
+            self.param_value_pairs = param_value_pairs
+            self.old_value_pairs = []
+
+        def __enter__(self):
+            log.debug('Entered TemporaryValueContext')
+            self.old_value_pairs = \
+                [(param, param()) for param, value in self.param_value_pairs]
+            for param, value in param_value_pairs: 
+                param(value)
     
+        def __exit__(self, type, value, traceback):
+            for param, value in self.old_value_pairs: 
+                param(value)
+            log.debug('Exited TemporaryValueContext')
+    
+    return TemporaryValueContext(*param_value_pairs)
