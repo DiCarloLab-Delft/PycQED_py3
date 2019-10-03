@@ -942,6 +942,7 @@ def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxbias_q1, amp, sim_
 
     w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
 
+    log.debug('Changing fluxlutman q_freq_10_{} value to {}'.format(which_gate, w_q1_biased))
     fluxlutman.set('q_freq_10_{}'.format(which_gate), w_q1_biased)     # we insert the change to w_q1 in this way because then J1 is also tuned appropriately
 
 
@@ -972,6 +973,7 @@ def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxbias_q1, amp, sim_
 
     # log.warning('\n expm: {}\n'.format(tt))
 
+    log.debug('Changing fluxlutman q_freq_10_{} value back to {}'.format(which_gate, w_q1))
     fluxlutman.set('q_freq_10_{}'.format(which_gate), w_q1)
 
     U_final = exp_L_total

@@ -263,8 +263,10 @@ def compute_propagator(arglist):
         amp_idle_time=[0,0]
         double_sided = czd_double_sided                # idle time is single-sided so we save the czd_double_sided value, set it to False
                                                                     # and later restore it to the original value
+        log.debug('Changing fluxlutman czd_double_sided_{} value to {}'.format(which_gate, False))
         fluxlutman.set('czd_double_sided_{}'.format(which_gate), False)
         amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
+        log.debug('Changing fluxlutman czd_double_sided_{} value back to {}'.format(which_gate, double_sided))
         fluxlutman.set('czd_double_sided_{}'.format(which_gate), double_sided)
 
 
