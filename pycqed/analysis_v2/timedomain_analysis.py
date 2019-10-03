@@ -4197,10 +4197,6 @@ class RamseyAddPulseAnalysis(MultiQubit_TimeDomain_Analysis):
             self.cross_kerr_error = np.sqrt((self.params_dict_ramsey['exp_decay_'+str(qbn)]['new_qb_freq_stderr'])**2 + \
                                             (self.params_dict_add_pulse['exp_decay_' + str(qbn)]['new_qb_freq_stderr'])**2)
 
-            print('Cross Kerr:', self.cross_kerr, " +- ", self.cross_kerr_error)
-
-
-
     def prepare_plots(self):
         self.ramsey_analysis.prepare_plots()
         self.ramsey_add_pulse_analysis.prepare_plots()

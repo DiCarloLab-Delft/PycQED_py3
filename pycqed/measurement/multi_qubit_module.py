@@ -2608,25 +2608,6 @@ def measure_ramsey_add_pulse(measured_qubit, pulsed_qubit, times=None,
         label = 'Ramsey_add_pulse_{}'.format(pulsed_qubit.name) + \
                 measured_qubit.msmt_suffix
 
-#    step = np.abs(times[1] - times[0])
-#    if interleave:
-#        times = np.repeat(times, 2)
-#
-#    if cal_points:
-#        sweep_points = np.concatenate(
-#            [times, [times[-1] + step, times[-1] + 2 * step,
-#                     times[-1] + 3 * step, times[-1] + 4 * step]])
-#    else:
-#        sweep_points = times
-
-#    Rams_swf = awg_swf2.Ramsey_add_pulse_swf(
-#        measured_qubit_name=measured_qubit.name,
-#        pulsed_qubit_name=pulsed_qubit.name,
-#        operation_dict=get_operation_dict([measured_qubit, pulsed_qubit]),
-#        artificial_detuning=artificial_detuning,
-#        cal_points=cal_points,
-#        upload=upload)
-
     # create cal points
     cal_states = CalibrationPoints.guess_cal_states(cal_states, for_ef)
     cp = CalibrationPoints.single_qubit(measured_qubit.name, cal_states,
