@@ -682,8 +682,11 @@ class MeasurementAnalysis(object):
             self.sweep_points_from_file = self.sweep_points
             self.sweep_points = new_sweep_points
 
-        self.exp_metadata = h5d.read_dict_from_hdf5(
-            {}, self.data_file['Experimental Data']['Experimental Metadata'])
+        try:
+            self.exp_metadata = h5d.read_dict_from_hdf5(
+                {}, self.data_file['Experimental Data']['Experimental Metadata'])
+        except KeyError:
+            self.exp_metadata = {}
 
     def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
                                        log=False, ticks_around=True, label=None,
@@ -997,8 +1000,11 @@ class MeasurementAnalysis(object):
             self.sweep_points_from_file = self.sweep_points
             self.sweep_points(new_sweep_points)
 
-        self.exp_metadata = h5d.read_dict_from_hdf5(
-            {}, self.data_file['Experimental Data']['Experimental Metadata'])
+        try:
+            self.exp_metadata = h5d.read_dict_from_hdf5(
+                {}, self.data_file['Experimental Data']['Experimental Metadata'])
+        except KeyError:
+            self.exp_metadata = {}
 
     def get_naming_and_values_2D_tuples(self):
         if 'datasaving_format' in list(self.g.attrs.keys()):
