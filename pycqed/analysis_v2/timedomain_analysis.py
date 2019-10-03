@@ -4139,6 +4139,128 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
         self.echo_analysis.save_figures(close_figs=True)
 
 
+class RamseyAddPulseAnalysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, *args, **kwargs):
+        auto = kwargs.pop('auto', True)
+        super().__init__(*args, auto=False, **kwargs)
+        self.ramsey_analysis = RamseyAnalysis(*args, auto=False,
+                                             options_dict=dict(
+                                             data_filter=lambda raw: np.concatenate([raw[:-4][1::2], raw[-4:]])),
+                                             **kwargs)
+        self.ramsey_add_pulse_analysis = RamseyAnalysis(*args, auto=False,
+                                             options_dict=dict
+                                             (data_filter=lambda raw: np.concatenate([raw[:-4][0::2], raw[-4:]])),
+                                             **kwargs)
+
+
+        if auto:
+            self.ramsey_analysis.extract_data()
+            self.ramsey_analysis.process_data()
+            self.ramsey_analysis.prepare_fitting()
+            self.ramsey_analysis.run_fitting()
+            self.ramsey_analysis.save_fit_results()
+            self.ramsey_add_pulse_analysis.extract_data()
+            self.ramsey_add_pulse_analysis.process_data()
+            self.ramsey_add_pulse_analysis.prepare_fitting()
+            self.ramsey_add_pulse_analysis.run_fitting()
+            self.ramsey_add_pulse_analysis.save_fit_results()
+            self.raw_data_dict = self.ramsey_analysis.raw_data_dict
+            self.analyze_fit_results()
+            self.prepare_plots()
+            keylist = []
+            for qbn in self.qb_names:
+                figure_name = 'CrossZZ_' + qbn
+                keylist.append(figure_name+'with')
+                keylist.append(figure_name+'no')
+            self.plot()
+            self.save_figures(close_figs=True)
+
+    def analyze_fit_results(self):
+        self.cross_kerr = 0.0
+        self.ramsey_analysis.analyze_fit_results()
+        self.ramsey_add_pulse_analysis.analyze_fit_results()
+
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+
+
+        for qbn in self.qb_names:
+
+            self.proc_data_dict['analysis_params_dict'][qbn] = OrderedDict()
+
+            self.params_dict_ramsey = self.ramsey_analysis.proc_data_dict[
+                'analysis_params_dict'][qbn]
+            self.params_dict_add_pulse = self.ramsey_add_pulse_analysis.proc_data_dict[
+                'analysis_params_dict'][qbn]
+            self.cross_kerr = self.params_dict_ramsey['exp_decay_'+str(qbn)]['new_qb_freq'] \
+                            - self.params_dict_add_pulse['exp_decay_'+str(qbn)]['new_qb_freq']
+            self.cross_kerr_error = np.sqrt((self.params_dict_ramsey['exp_decay_'+str(qbn)]['new_qb_freq_stderr'])**2 + \
+                                            (self.params_dict_add_pulse['exp_decay_' + str(qbn)]['new_qb_freq_stderr'])**2)
+
+    def prepare_plots(self):
+        self.ramsey_analysis.prepare_plots()
+        self.ramsey_add_pulse_analysis.prepare_plots()
+
+        self.ramsey_analysis.plot(key_list='auto')
+        self.ramsey_analysis.save_figures(close_figs=True, savebase='Ramsey_no')
+
+        self.ramsey_add_pulse_analysis.plot(key_list='auto')
+        self.ramsey_add_pulse_analysis.save_figures(close_figs=True,  savebase='Ramsey_with')
+
+        self.options_dict['plot_proj_data'] = False
+        self.metadata = {'plot_proj_data': False, 'plot_raw_data': False}
+        super().prepare_plots()
+
+        for qbn in self.qb_names:
+            data_no = self.ramsey_analysis.proc_data_dict['data_to_fit'][qbn][:-4]
+            data_with = self.ramsey_add_pulse_analysis.proc_data_dict['data_to_fit'][qbn][:-4]
+            delays = self.ramsey_analysis.proc_data_dict['sweep_points_dict'][qbn]['sweep_points'][:-4]
+
+            figure_name = 'CrossZZ_' + qbn
+            self.plot_dicts[figure_name+'with'] = {
+                'fig_id': figure_name,
+                'plotfn': self.plot_line,
+                'xvals': np.array(delays)*1e6,
+                'yvals': np.array(data_with),
+                'xlabel': 'Ramsey delay, $\mu$s',
+                'ylabel': '|e> state population',
+                'setlabel': 'with $\pi$-pulse',
+                'color': 'r',
+                'marker': 'o',
+                'line_kws': {'markersize': 5},
+                'linestyle': '-',
+                'do_legend': True,
+                'legend_ncol': 2,
+                'legend_bbox_to_anchor': (1, -0.15),
+                'legend_pos': 'upper right'}
+
+            self.plot_dicts[figure_name+'no'] = {
+                'fig_id': figure_name,
+                'plotfn': self.plot_line,
+                'xvals': np.array(delays)*1e6,
+                'yvals': np.array(data_no),
+                'setlabel': 'no $\pi$-pulse',
+                'color': 'g',
+                'marker': 'o',
+                'line_kws': {'markersize': 5},
+                'linestyle': '-',
+                'do_legend': True,
+                'legend_ncol': 2,
+                'legend_bbox_to_anchor': (1, -0.15),
+                'legend_pos': 'upper right'}
+
+            textstr = r'$\alpha ZZ$ = {:.2f} +- {:.2f}'.format(
+               self.cross_kerr*1e-3, self.cross_kerr_error*1e-3) + ' kHz'
+
+            self.plot_dicts['text_msg_' + qbn] = {'fig_id': figure_name,
+                                                  'text_string': textstr,
+                                                  'ypos': 0.8,
+                                                  'xpos': 0.8,
+                                                  'plotfn': self.plot_text,}
+
+
+
+
 class OverUnderRotationAnalysis(MultiQubit_TimeDomain_Analysis):
 
     def __init__(self, *args, **kwargs):
