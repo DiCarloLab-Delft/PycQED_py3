@@ -29,19 +29,6 @@ class ProcessingPipeline(list):
             else:
                 raise ValueError('This is the first node in the pipeline. '
                                  'keys_in must be specified.')
-        # else:
-        #     if not isinstance(keys_in, list):
-        #         keys_in = [keys_in]
-        #     # check if keys_in are suffixes of previous keys_out
-        #     keys_out_in_pipe = []
-        #     for d in self:
-        #         if 'keys_out' in d:
-        #             keys_out_in_pipe += [d['keys_out'] for keyi in keys_in if
-        #                                  keyi in d['keys_out'][0]]
-        #             # print(f'Taking keys_in as the keys_out of node '
-        #             #       f'{d["node_type"]} for the key suffix {keyi}')
-        #     if len(keys_out_in_pipe) > 0:
-        #         keys_in = [kk for k in keys_out_in_pipe for kk in k]
         return keys_in
 
     def add_filter_data_node(self, reset_reps, keys_in=None, **params):

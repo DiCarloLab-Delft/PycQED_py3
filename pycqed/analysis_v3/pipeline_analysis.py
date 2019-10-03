@@ -17,8 +17,7 @@ from pycqed.analysis_v3 import fitting as fit_module
 from pycqed.analysis_v3 import plotting as plot_module
 import copy
 import logging
-log = logging.getLogger()
-log.addHandler(logging.StreamHandler())
+log = logging.getLogger(__name__)
 
 
 class PipelineDataAnalysis(object):

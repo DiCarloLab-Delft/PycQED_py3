@@ -1,6 +1,5 @@
 import logging
-log = logging.getLogger()
-log.addHandler(logging.StreamHandler())
+log = logging.getLogger(__name__)
 
 import numpy as np
 import numbers

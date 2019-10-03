@@ -1,6 +1,6 @@
 import logging
-log = logging.getLogger()
-log.addHandler(logging.StreamHandler())
+log = logging.getLogger(__name__)
+
 import lmfit
 import numpy as np
 import scipy as sp
@@ -333,14 +333,15 @@ def arbitrary_mapping(data_dict, data_keys_in, data_keys_out, **params):
         mapping_kwargs (dict): additional arguments to forward to mapping function
 
     """
-    mapping = get_param('mapping', data_dict, **params)
-    mapping_kwargs = get_param('mapping_kwargs', data_dict,
+    mapping = help_func_mod.get_param('mapping', data_dict, **params)
+    mapping_kwargs = help_func_mod.get_param('mapping_kwargs', data_dict,
                                default_value=dict(), **params)
     if mapping is None:
         raise ValueError('mapping is not specified.')
     elif isinstance(mapping, str):
         mapping = eval(mapping)
-    data_to_proc_dict = get_data_to_process(data_dict, data_keys_in)
+    data_to_proc_dict = help_func_mod.get_data_to_process(data_dict,
+                                                          data_keys_in)
 
     if len(data_keys_out) != len(data_to_proc_dict):
         raise ValueError('data_keys_out and data_keys_in do not have '

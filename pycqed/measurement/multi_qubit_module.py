@@ -8,12 +8,10 @@ import os
 import lmfit
 from copy import deepcopy
 import pygsti
-import logging
-
 from pycqed.utilities.general import temporary_value
 
-log = logging.getLogger()
-log.addHandler(logging.StreamHandler())
+import logging
+log = logging.getLogger(__name__)
 
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.awg_sweep_functions as awg_swf
@@ -728,100 +726,6 @@ def measure_parity_single_round(ancilla_qubit, data_qubits, CZ_map,
                 channel_map=channel_map
             ))
 
-
-def measure_multi_parity_multi_round(ancilla_qubits, data_qubits,
-                                     parity_map, CZ_map,
-                                     prep=None, upload=True, prep_params=None,
-                                     mode='tomo',
-                                     parity_seperation=1100e-9,
-                                     rots_basis=('I', 'Y90', 'X90'),
-                                     parity_loops = 1,
-                                     cal_points=None, analyze=True,
-                                     exp_metadata=None, label=None,
-                                     detector='int_log_det'):
-    """
-
-    :param ancilla_qubit:
-    :param data_qubits:
-    :param CZ_map: example:
-        {'CZ qb1 qb2': ['Y90 qb1', 'CX qb1 qb2', 'mY90 qb1'],
-         'CZ qb3 qb4': ['CZ qb4 qb3']}
-    :param preps:
-    :param upload:
-    :param prep_params:
-    :param cal_points:
-    :param analyze:
-    :param exp_metadata:
-    :param label:
-    :param detector:
-    :return:
-    """
-
-    qubits = ancilla_qubits + data_qubits
-    qb_names = [qb.name for qb in qubits]
-    for qb in qubits:
-        qb.prepare(drive='timedomain')
-
-    if label is None:
-        label = 'S7-rounds_' + str(parity_loops) + '_' + '-'.join(rots_basis) + \
-                '_' + '-'.join([qb.name for qb in qubits])
-
-    if prep_params is None:
-        prep_params = get_multi_qubit_prep_params(
-            [qb.preparation_params() for qb in qubits])
-
-    # if cal_points is None:
-    #     cal_points = CalibrationPoints.multi_qubit(qb_names, 'ge')
-
-    if prep is None:
-        prep = 'g'*len(data_qubits)
-
-    MC = ancilla_qubits[0].instr_mc.get_instr()
-
-    seq, sweep_points = mqs.multi_parity_multi_round_seq(
-                                 [qb.name for qb in ancilla_qubits],
-                                 [qb.name for qb in data_qubits],
-                                 parity_map,
-                                 CZ_map,
-                                 prep,
-                                 operation_dict = get_operation_dict(qubits),
-                                 mode=mode,
-                                 parity_seperation=parity_seperation,
-                                 rots_basis=rots_basis,
-                                 parity_loops=parity_loops,
-                                 cal_points=cal_points,
-                                 prep_params=prep_params,
-                                 upload=upload)
-
-    MC.set_sweep_function(awg_swf.SegmentHardSweep(
-        sequence=seq, upload=False, parameter_name='Tomography'))
-    MC.set_sweep_points(sweep_points)
-
-    rounds = 0
-    for k in range(len(parity_map)):
-        if parity_map[k]['round'] > rounds:
-            rounds = parity_map[k]['round']
-    rounds += 1
-
-    MC.set_detector_function(
-        get_multiplexed_readout_detector_functions(
-            qubits,
-            nr_averages=ancilla_qubits[0].acq_averages(),
-            nr_shots=ancilla_qubits[0].acq_shots(),
-        )[detector])
-    if exp_metadata is None:
-        exp_metadata = {}
-    exp_metadata.update(
-        {'sweep_name': 'Tomography',
-         'preparation_params': prep_params,
-         'hard_sweep_params': {'tomo': {'values': np.arange(0, len(sweep_points)),
-                                         'unit': ''}}
-         })
-
-    MC.run(label, exp_metadata=exp_metadata)
-
-    if analyze:
-        tda.MultiQubit_TimeDomain_Analysis(qb_names=qb_names)
 
 def measure_tomography(qubits, prep_sequence, state_name,
                        rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),

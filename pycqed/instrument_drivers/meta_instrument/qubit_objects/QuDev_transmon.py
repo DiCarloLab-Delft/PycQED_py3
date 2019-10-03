@@ -1,4 +1,5 @@
 import logging
+log = logging.getLogger(__name__)
 import numpy as np
 import matplotlib.pyplot as plt
 from copy import deepcopy
@@ -30,8 +31,6 @@ from pycqed.measurement import optimization as opti
 from pycqed.measurement import mc_parameter_wrapper
 import pycqed.analysis_v2.spectroscopy_analysis as sa
 from pycqed.utilities import math
-log = logging.getLogger()
-log.addHandler(logging.StreamHandler())
 
 try:
     import pycqed.simulations.readout_mode_simulations_for_CLEAR_pulse \
@@ -2414,7 +2413,7 @@ class QuDev_transmon(Qubit):
                     self.T1_ef(T1)
                 else:
                     self.T1(T1)
-        return T1
+            return T1
 
     def find_rb_gate_fidelity(self, cliffords, nr_seeds, label=None,
                               gate_decomposition='HZ', interleaved_gate=None,

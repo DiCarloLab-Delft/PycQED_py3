@@ -1,6 +1,5 @@
 import logging
-log = logging.getLogger()
-log.addHandler(logging.StreamHandler())
+log = logging.getLogger(__name__)
 
 from pycqed.analysis_v3 import helper_functions as help_func_mod
 from pycqed.analysis import fitting_models as fit_mods
