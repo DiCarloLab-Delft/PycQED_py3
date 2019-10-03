@@ -738,6 +738,14 @@ def temporary_value(*param_value_pairs):
     for param, value in old_value_pairs: 
         param(value)
 
+class KeyboardFinish(KeyboardInterrupt):
+    """
+    Indicates that the user safely aborts/finishes the experiment.
+    Used to finish the experiment without raising an exception.
+    """
+    pass
+
+
 def check_keyboard_interrupt():
     try:  # Try except statement is to make it work on non windows pc
         if msvcrt.kbhit():

@@ -225,7 +225,8 @@ class MockDAQServer():
     just entries in a 'dict') based on the device name that is used when
     connecting to a device. These nodes differ depending on the instrument
     type, which is determined by the number in the device name: dev2XXX are
-    UHFQA instruments and dev8XXX are HDAWG8 instruments.
+    UHFQA instruments, dev8XXX are HDAWG8 instruments and dev0XXX are PQSC
+    instruments.
     """
     def __init__(self, server, port, apilevel, verbose=False):
         self.server = server
@@ -258,6 +259,9 @@ class MockDAQServer():
             self.devtype = 'UHFQA'
         elif self.device.lower().startswith('dev8'):
             self.devtype = 'HDAWG8'
+        #FIXME: Change to correct device identifier
+        elif self.device.lower().startswith('dev0'):
+            self.devtype = 'PQSC'
 
         # Add paths
         filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'zi_parameter_files', 'node_doc_{}.json'.format(self.devtype))
@@ -585,22 +589,25 @@ class ZI_base_instrument(Instrument):
             # Should never happen as we just created the file above
             log.error("{}: parameter file for data parameters {} not found".format(self.devname, filename))
             raise
+        
+        # FIXME: get rid of if clause write separate AWG module
+        if self.devtype != 'PQSC':
+            # Create modules
+            self._awgModule = self.daq.awgModule()
+            self._awgModule.set('awgModule/device', device)
+            self._awgModule.execute()
 
-        # Create modules
-        self._awgModule = self.daq.awgModule()
-        self._awgModule.set('awgModule/device', device)
-        self._awgModule.execute()
+            # Will hold information about all configured waveforms
+            self._awg_waveforms = {}
 
-        # Will hold information about all configured waveforms
-        self._awg_waveforms = {}
+        
+            # Asserted when AWG needs to be reconfigured
+            self._awg_needs_configuration = [False]*(self._num_channels()//2)
+            self._awg_program = [None]*(self._num_channels()//2)
 
-        # Asserted when AWG needs to be reconfigured
-        self._awg_needs_configuration = [False]*(self._num_channels()//2)
-        self._awg_program = [None]*(self._num_channels()//2)
-
-        # Create waveform parameters
-        self._num_codewords = 0
-        self._add_codeword_waveform_parameters(num_codewords)
+            # Create waveform parameters
+            self._num_codewords = 0
+            self._add_codeword_waveform_parameters(num_codewords)
 
         # Create other neat parameters
         self._add_extra_parameters()
@@ -670,12 +677,14 @@ class ZI_base_instrument(Instrument):
             parameter_class=ManualParameter,
             vals=validators.Ints())
 
-        for i in range(self._num_channels()//2):
-            self.add_parameter(
-                'awgs_{}_sequencer_program_crc32_hash'.format(i),
-                parameter_class=ManualParameter,
-                initial_value=0, 
-                vals=validators.Ints())
+        #FIXME: get rid of if clause
+        if self.devtype != 'PQSC':
+            for i in range(self._num_channels()//2):
+                self.add_parameter(
+                    'awgs_{}_sequencer_program_crc32_hash'.format(i),
+                    parameter_class=ManualParameter,
+                    initial_value=0, 
+                    vals=validators.Ints())
 
     def _add_codeword_waveform_parameters(self, num_codewords) -> None:
         """
@@ -1151,35 +1160,45 @@ class ZI_base_instrument(Instrument):
     def start(self):
         self.check_errors()
 
+        # FIXME
         # Loop through each AWG and check whether to reconfigure it
-        for awg_nr in range(self._num_channels()//2):
-            self._length_match_waveforms(awg_nr)
+        if self.devtype != 'PQSC':
+            for awg_nr in range(self._num_channels()//2):
+                self._length_match_waveforms(awg_nr)
 
-            # If the reconfiguration flag is set, upload new program
-            if self._awg_needs_configuration[awg_nr]:
-                self._configure_awg_from_variable(awg_nr)
-                self._awg_needs_configuration[awg_nr] = False
-                self._clear_dirty_waveforms(awg_nr)
-            else:
-                # Loop through all waveforms and update accordingly
-                self._upload_updated_waveforms(awg_nr)
-                self._clear_dirty_waveforms(awg_nr)
+                # If the reconfiguration flag is set, upload new program
+                if self._awg_needs_configuration[awg_nr]:
+                    self._configure_awg_from_variable(awg_nr)
+                    self._awg_needs_configuration[awg_nr] = False
+                    self._clear_dirty_waveforms(awg_nr)
+                else:
+                    # Loop through all waveforms and update accordingly
+                    self._upload_updated_waveforms(awg_nr)
+                    self._clear_dirty_waveforms(awg_nr)
 
         # Start all AWG's
-        for awg_nr in range(self._num_channels()//2):
-            # Skip AWG's without programs
-            if self._awg_program[awg_nr] is None:
-                continue
-            # Check that the AWG is ready
-            if not self.get('awgs_{}_ready'.format(awg_nr)):
-                raise ziReadyError('Tried to start AWG {} that is not ready!'.format(awg_nr))
-            # Enable it
-            self.set('awgs_{}_enable'.format(awg_nr), 1)
+        # FIXME: make this if clause nicer
+        if self.devtype != 'PQSC':
+            for awg_nr in range(self._num_channels()//2):
+                # Skip AWG's without programs
+                if self._awg_program[awg_nr] is None:
+                    continue
+                # Check that the AWG is ready
+                if not self.get('awgs_{}_ready'.format(awg_nr)):
+                    raise ziReadyError('Tried to start AWG {} that is not ready!'.format(awg_nr))
+                # Enable it
+                self.set('awgs_{}_enable'.format(awg_nr), 1)
+        else: 
+            self.set('execution_enable', 1)
 
     def stop(self): 
         # Stop all AWG's
-        for awg_nr in range(self._num_channels()//2):
-            self.set('awgs_{}_enable'.format(awg_nr), 0)
+        # FIXME: make this if clause nicer
+        if self.devtype != 'PQSC':
+            for awg_nr in range(self._num_channels()//2):
+                self.set('awgs_{}_enable'.format(awg_nr), 0)
+        else:
+            self.set('execution_enable', 0)
 
         self.check_errors()
 

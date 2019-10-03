@@ -110,6 +110,13 @@ class UHFQCPulsar:
         self.add_parameter('{}_compensation_pulse_min_length'.format(name), 
                            initial_value=0, unit='s',
                            parameter_class=ManualParameter)
+        self.add_parameter('{}_trigger_source'.format(awg.name), 
+                           initial_value='Dig1', vals=vals.Strings(),
+                           parameter_class=ManualParameter, 
+                           docstring='Defines for which trigger source \
+                                      the AWG should wait, before playing \
+                                      the next waveform. Allowed values \
+                                      are: "Dig1", "Dig2", "DIO"')
 
         for ch_nr in range(2):
             id = 'ch{}'.format(ch_nr + 1)
@@ -220,7 +227,10 @@ class UHFQCPulsar:
             wave_definitions += self._zi_wave_definition(wave, defined_waves)
 
             acq = metadata.get('acq', False)
-            playback_strings += self._zi_playback_string('uhf', wave, acq=acq)
+            playback_strings += self._zi_playback_string(name=self.name,
+                                                         device='uhf', 
+                                                         wave=wave, 
+                                                         acq=acq)
 
             ch_has_waveforms['ch1'] |= wave[0] is not None
             ch_has_waveforms['ch2'] |= wave[2] is not None
@@ -305,6 +315,13 @@ class HDAWG8Pulsar:
         self.add_parameter('{}_compensation_pulse_min_length'.format(name), 
                            initial_value=0, unit='s',
                            parameter_class=ManualParameter)
+        self.add_parameter('{}_trigger_source'.format(awg.name), 
+                           initial_value='Dig1', vals=vals.Strings(),
+                           parameter_class=ManualParameter, 
+                           docstring='Defines for which trigger source \
+                                      the AWG should wait, before playing \
+                                      the next waveform. Allowed values \
+                                      are: "Dig1", "Dig2", "DIO"')
 
         for ch_nr in range(8):
             id = 'ch{}'.format(ch_nr + 1)
@@ -484,8 +501,8 @@ class HDAWG8Pulsar:
                         ch_has_waveforms[ch2id] |= wave[2] is not None
                         ch_has_waveforms[ch2mid] |= wave[3] is not None
 
-                    playback_strings += self._zi_playback_string(
-                        'hdawg', wave, codeword=(nr_cw != 0))
+                    playback_strings += self._zi_playback_string(name=self.name,
+                        device='hdawg', wave=wave, codeword=(nr_cw != 0))
                 
             if not any([ch_has_waveforms[ch] 
                     for ch in [ch1id, ch1mid, ch2id, ch2mid]]):
@@ -907,6 +924,8 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         self._zi_waves_cleared = False
         self._hash_to_wavename_table = {}
 
+        self.num_seg = 0
+
         Pulsar._instance = self
 
     @staticmethod
@@ -1107,6 +1126,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             self._program_awg(self.AWG_obj(awg=awg), 
                               awg_sequences.get(awg, {}), waveforms)       
         
+        self.num_seg = len(sequence.segments)
         self.AWGs_prequeried(False)
 
     def _program_awg(self, obj, awg_sequence, waveforms):
@@ -1167,7 +1187,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                     defined_waves.add(wc)
         return wave_definition
 
-    def _zi_playback_string(self, device, wave, acq=False, codeword=False):
+    def _zi_playback_string(self, name, device, wave, acq=False, codeword=False):
         playback_string = []
         w1, w2 = self._zi_waves_to_wavenames(wave)
         if not codeword:
@@ -1179,8 +1199,20 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             elif w1 is not None or w2 is not None:
                 playback_string.append('prefetch({});'.format(', '.join(
                         [wn for wn in [w1, w2] if wn is not None])))
-        playback_string.append(
-            'waitDigTrigger(1{});'.format(', 1' if device == 'uhf' else ''))
+        
+        trig_source = self.get('{}_trigger_source'.format(name))
+        if trig_source == 'Dig1':
+            playback_string.append(
+                'waitDigTrigger(1{});'.format(', 1' if device == 'uhf' else ''))
+        elif trig_source == 'Dig2':
+            if device == 'hdawg':
+                raise ValueError('ZI HDAWG does not support having Dig2 as trigger source.')
+            playback_string.append('waitDigTrigger(2,1);')
+        elif trig_source == 'DIO':
+            playback_string.append('waitDIOTrigger();')
+        else:
+            raise ValueError('Trigger source for {} has to be "Dig1", "Dig2" or "DIO"!')
+        
         if codeword:
             playback_string.append('playWaveDIO();')
         else:
