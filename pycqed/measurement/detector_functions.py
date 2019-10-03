@@ -450,7 +450,7 @@ class UHFQC_multi_detector(Hard_Detector):
         UHFs = [d.UHFQC for d in self.detectors]
 
         for UHF in UHFs:
-            UHF._daq.setInt('/' + UHF._device + '/quex/rl/readout', 1)
+            UHF._daq.setInt('/' + UHF._device + '/qas/0/result/enable', 1)
 
 
         if self.AWG is not None:
@@ -537,7 +537,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.nr_averages = nr_averages
 
     def get_values(self):
-        self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
+        self.UHFQC.qas_0_result_enable(0)  # resets UHFQC internal readout counters
 
         # starting AWG
         if self.AWG is not None:
@@ -555,8 +555,8 @@ class UHFQC_input_average_detector(Hard_Detector):
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_iavg_length(self.nr_samples)
-        self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
+        self.UHFQC.qas_0_monitor_length(self.nr_samples)
+        self.UHFQC.qas_0_monitor_averages(self.nr_averages)
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages)) 
@@ -729,7 +729,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.stop()
 
         # resets UHFQC internal readout counters
-        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout', 
+        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/qas/0/result/enable', 
                                 self._get_readout())
 
         # starting AWG
@@ -753,7 +753,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
                 data[i] = data[i]-self.UHFQC.get(
-                    'quex_trans_offset_weightfunction_{}'.format(channel))
+                    'qas_0_trans_offset_weightfunction_{}'.format(channel))
         if not self.real_imag:
             data = self.convert_to_polar(data)
 
@@ -822,11 +822,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # The AWG program uses userregs/0 to define the number of iterations in
         # the loop
 
-        self.UHFQC.quex_rl_length(self.nr_sweep_points)
-        self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
-        self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
+        self.UHFQC.qas_0_result_length(self.nr_sweep_points)
+        self.UHFQC.qas_0_result_averages(self.nr_averages)
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
-        self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
+        self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
@@ -893,9 +893,9 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
 
-        self.UHFQC.quex_rl_length(self.nr_sweep_points)
-        self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
-        self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
+        self.UHFQC.qas_0_result_length(self.nr_sweep_points)
+        self.UHFQC.qas_0_result_averages(self.nr_averages)
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
         self.set_up_correlation_weights()
 
@@ -946,59 +946,54 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         if self.thresholding:
             # correlations mode after threshold
             # NOTE: thresholds need to be set outside the detctor object.
-            self.UHFQC.quex_rl_source(5)
+            self.UHFQC.qas_0_result_source(5)
         else:
             # correlations mode before threshold
-            self.UHFQC.quex_rl_source(4)
+            self.UHFQC.qas_0_result_source(4)
         # Configure correlation mode
         for ch in self.channels:
             if ch not in self.correlation_channels:
                 # Disable correlation mode as this is used for normal
                 # acquisition
-                self.UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
+                self.UHFQC.set('qas_0_correlations_{}_mode'.format(ch), 0)
 
         for correlation_channel, corr in zip(self.correlation_channels,
                                              self.correlations):
             # Duplicate source channel to the correlation channel and select
             # second channel as channel to correlate with.
             copy_int_weights_real = \
-                self.UHFQC.get('quex_wint_weights_{}_real'.format(corr[0]))[
+                self.UHFQC.get('qas_0_integration_weights_{}_real'.format(corr[0]))[
                     0]['vector']
             copy_int_weights_imag = \
-                self.UHFQC.get('quex_wint_weights_{}_imag'.format(corr[0]))[
+                self.UHFQC.get('qas_0_integration_weights_{}_imag'.format(corr[0]))[
                     0]['vector']
 
-            copy_rot_matrix_real = \
-                self.UHFQC.get('quex_rot_{}_real'.format(corr[0]))
-            copy_rot_matrix_imag = \
-                self.UHFQC.get('quex_rot_{}_imag'.format(corr[0]))
+            copy_rot_matrix = self.UHFQC.get('qas_0_rotations_{}'.format(corr[0]))
 
             self.UHFQC.set(
-                'quex_wint_weights_{}_real'.format(correlation_channel),
+                'qas_0_integration_weights_{}_real'.format(correlation_channel),
                 copy_int_weights_real)
             self.UHFQC.set(
-                'quex_wint_weights_{}_imag'.format(correlation_channel),
+                'qas_0_integration_weights_{}_imag'.format(correlation_channel),
                 copy_int_weights_imag)
 
             self.UHFQC.set(
-                'quex_rot_{}_real'.format(correlation_channel),
-                copy_rot_matrix_real)
-            self.UHFQC.set(
-                'quex_rot_{}_imag'.format(correlation_channel),
-                copy_rot_matrix_imag)
+                'qas_0_rotations_{}'.format(correlation_channel),
+                copy_rot_matrix)
+        
             # Enable correlation mode one the correlation output channel and
             # set the source to the second source channel
-            self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
-            self.UHFQC.set('quex_corr_{}_source'.format(correlation_channel),
+            self.UHFQC.set('qas_0_correlations_{}_mode'.format(correlation_channel), 1)
+            self.UHFQC.set('qas_0_correlations_{}_source'.format(correlation_channel),
                            corr[1])
 
             # If thresholding is enabled, set the threshold for the correlation
             # channel.
             if self.thresholding:
                 thresh_level = \
-                    self.UHFQC.get('quex_thres_{}_level'.format(corr[0]))
+                    self.UHFQC.get('qas_0_thresholds_{}_level'.format(corr[0]))
                 self.UHFQC.set(
-                    'quex_thres_{}_level'.format(correlation_channel),
+                    'qas_0_thresholds_{}_level'.format(correlation_channel),
                     thresh_level)
 
     def get_values(self):
@@ -1007,8 +1002,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
         if self.AWG is not None:
             self.AWG.stop()
-        # self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout', 
+        # self.UHFQC.qas_0_result_enable(1)  # resets UHFQC internal readout counters
+        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/qas/0/result/enable', 
                                 self._get_readout())
         # self.UHFQC.acquisition_arm()
         # starting AWG
@@ -1126,11 +1121,11 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
 
 
-        self.UHFQC.quex_rl_length(self.nr_shots*len(sweep_points))
-        self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
-        self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
+        self.UHFQC.qas_0_result_length(self.nr_shots*len(sweep_points))
+        self.UHFQC.qas_0_result_averages(1)
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
-        self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
+        self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def _get_readout(self):
@@ -1143,7 +1138,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             self.AWG.stop()
 
         # resets UHFQC internal readout counters
-        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/quex/rl/readout',
+        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/qas/0/result/enable',
                                self._get_readout())
 
         # starting AWG
@@ -1159,7 +1154,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
                 data[i] = data[i]-self.UHFQC.get(
-                    'quex_trans_offset_weightfunction_{}'.format(channel))
+                    'qas_0_trans_offset_weightfunction_{}'.format(channel))
         return data
 
     def finish(self):
@@ -1288,11 +1283,11 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
 
 
-        self.UHFQC.quex_rl_length(self.nr_shots*self.nr_sweep_points)
-        self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
-        self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
+        self.UHFQC.qas_0_result_length(self.nr_shots*self.nr_sweep_points)
+        self.UHFQC.qas_0_result_averages(1)  
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
-        self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
+        self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def get_values(self):
@@ -1300,7 +1295,7 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.qas_0_result_enable(1)  # resets UHFQC internal readout counters
 
         # starting AWG
         if self.AWG is not None:
@@ -1316,7 +1311,7 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
         if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
                 data[i] = data[i]-self.UHFQC.get(
-                    'quex_trans_offset_weightfunction_{}'.format(channel))
+                    'qas_0_trans_offset_weightfunction_{}'.format(channel))
 
         # Classify data into qutrit states
         classifier_params_list = self.get_values_function_kwargs.get(

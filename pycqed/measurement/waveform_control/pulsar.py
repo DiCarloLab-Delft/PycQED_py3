@@ -234,7 +234,7 @@ class UHFQCPulsar:
             playback_string='\n  '.join(playback_strings),
         )
 
-        obj.awg_string(awg_str, timeout=600)
+        obj.configure_awg_from_string(awg_nr=0, program_string=awg_str, timeout=600)
 
     def _is_awg_running(self, obj):
         if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
@@ -518,7 +518,7 @@ class HDAWG8Pulsar:
     def _clock(self, obj, cid):
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._clock(obj, cid)
-        return obj.clock_freq(0)
+        return obj.clock_freq()
 
     def _hdawg_active_awgs(self, obj):
         return [0,1,2,3]

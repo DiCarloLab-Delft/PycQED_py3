@@ -442,14 +442,12 @@ class QuDev_transmon(Qubit):
                 return
             # When optimal weights are used, only the RO I weight
             # channel is used
-            self.instr_uhf.get_instr().set('quex_wint_weights_{}_real'.format(
+            self.instr_uhf.get_instr().set('qas_0_integration_weights_{}_real'.format(
                 self.acq_I_channel()), self.acq_weights_I().copy())
-            self.instr_uhf.get_instr().set('quex_wint_weights_{}_imag'.format(
+            self.instr_uhf.get_instr().set('qas_0_integration_weights_{}_imag'.format(
                 self.acq_I_channel()), self.acq_weights_Q().copy())
-            self.instr_uhf.get_instr().set('quex_rot_{}_real'.format(
-                self.acq_I_channel()), 1.0)
-            self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
-                self.acq_I_channel()), -1.0)
+            self.instr_uhf.get_instr().set('qas_0_rotations_{}'.format(
+                self.acq_I_channel()), 1.0-1.0j)
         elif weights_type == 'optimal_qutrit':
             for w_f in [self.acq_weights_I, self.acq_weights_Q,
                         self.acq_weights_I2, self.acq_weights_Q2]:
@@ -461,27 +459,24 @@ class QuDev_transmon(Qubit):
             # if all weights are not None, set first integration weights (real 
             # and imag) on channel I amd second integration weights on channel 
             # Q.
-            self.instr_uhf.get_instr().set('quex_wint_weights_{}_real'.format(
+            self.instr_uhf.get_instr().set('qas_0_integration_weights_{}_real'.format(
                 self.acq_I_channel()),
                 self.acq_weights_I().copy())
-            self.instr_uhf.get_instr().set('quex_wint_weights_{}_imag'.format(
+            self.instr_uhf.get_instr().set('qas_0_integration_weights_{}_imag'.format(
                 self.acq_I_channel()),
                 self.acq_weights_Q().copy())
-            self.instr_uhf.get_instr().set('quex_wint_weights_{}_real'.format(
+            self.instr_uhf.get_instr().set('qas_0_integration_weights_{}_real'.format(
                 self.acq_Q_channel()),
                 self.acq_weights_I2().copy())
-            self.instr_uhf.get_instr().set('quex_wint_weights_{}_imag'.format(
+            self.instr_uhf.get_instr().set('qas_0_integration_weights_{}_imag'.format(
                 self.acq_Q_channel()),
                 self.acq_weights_Q2().copy())
 
-            self.instr_uhf.get_instr().set('quex_rot_{}_real'.format(
-                self.acq_I_channel()), 1.0)
-            self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
-                self.acq_I_channel()), -1.0)
-            self.instr_uhf.get_instr().set('quex_rot_{}_real'.format(
-                self.acq_Q_channel()), 1.0)
-            self.instr_uhf.get_instr().set('quex_rot_{}_imag'.format(
-                self.acq_Q_channel()), -1.0)
+            self.instr_uhf.get_instr().set('qas_0_rotations_{}'.format(
+                self.acq_I_channel()), 1.0-1.0j)
+            self.instr_uhf.get_instr().set('qas_0_rotations_{}'.format(
+                self.acq_Q_channel()), 1.0-1.0j)
+                
         else:
             tbase = np.arange(0, 4097 / 1.8e9, 1 / 1.8e9)
             theta = self.acq_IQ_angle()
@@ -491,26 +486,21 @@ class QuDev_transmon(Qubit):
             c2 = self.acq_Q_channel()
             uhf = self.instr_uhf.get_instr()
             if weights_type == 'SSB':
-                uhf.set('quex_wint_weights_{}_real'.format(c1), cosI)
-                uhf.set('quex_rot_{}_real'.format(c1), 1)
-                uhf.set('quex_wint_weights_{}_real'.format(c2), sinI)
-                uhf.set('quex_rot_{}_real'.format(c2), 1)
-                uhf.set('quex_wint_weights_{}_imag'.format(c1), sinI)
-                uhf.set('quex_rot_{}_imag'.format(c1), 1)
-                uhf.set('quex_wint_weights_{}_imag'.format(c2), cosI)
-                uhf.set('quex_rot_{}_imag'.format(c2), -1)
+                uhf.set('qas_0_integration_weights_{}_real'.format(c1), cosI)
+                uhf.set('qas_0_rotations_{}'.format(c1), 1.0+1.0j)
+                uhf.set('qas_0_integration_weights_{}_real'.format(c2), sinI)
+                uhf.set('qas_0_rotations_{}'.format(c2), 1.0-1.0j)
+                uhf.set('qas_0_integration_weights_{}_imag'.format(c1), sinI)
+                uhf.set('qas_0_integration_weights_{}_imag'.format(c2), cosI)
             elif weights_type == 'DSB':
-                uhf.set('quex_wint_weights_{}_real'.format(c1), cosI)
-                uhf.set('quex_rot_{}_real'.format(c1), 1)
-                uhf.set('quex_wint_weights_{}_real'.format(c2), sinI)
-                uhf.set('quex_rot_{}_real'.format(c2), 1)
-                uhf.set('quex_rot_{}_imag'.format(c1), 0)
-                uhf.set('quex_rot_{}_imag'.format(c2), 0)
+                uhf.set('qas_0_integration_weights_{}_real'.format(c1), cosI)
+                uhf.set('qas_0_rotations_{}'.format(c1), 1.0+0j)
+                uhf.set('qas_0_integration_weights_{}_real'.format(c2), sinI)
+                uhf.set('qas_0_rotations_{}'.format(c2), 1.0+0j)
             elif weights_type == 'square_rot':
-                uhf.set('quex_wint_weights_{}_real'.format(c1), cosI)
-                uhf.set('quex_rot_{}_real'.format(c1), 1)
-                uhf.set('quex_wint_weights_{}_imag'.format(c1), sinI)
-                uhf.set('quex_rot_{}_imag'.format(c1), 1)
+                uhf.set('qas_0_integration_weights_{}_real'.format(c1), cosI)
+                uhf.set('qas_0_rotations_{}'.format(c1), 1.0+1.0j)
+                uhf.set('qas_0_integration_weights_{}_imag'.format(c1), sinI)
             else:
                 raise KeyError('Invalid weights type: {}'.format(weights_type))
 
@@ -1268,7 +1258,7 @@ class QuDev_transmon(Qubit):
                                             n_per_state=n_cal_points_per_state)
 
         if thresholded or classified_ro:
-            if self.instr_uhf.get_instr().get('quex_thres_{}_level'.format(
+            if self.instr_uhf.get_instr().get('qas_0_thresholds_{}_level'.format(
                     self.acq_weights_I())) == 0.0:
                 raise ValueError('The threshold value is not set.')
 
@@ -1958,7 +1948,7 @@ class QuDev_transmon(Qubit):
 
         self.prepare(drive='timedomain')
 
-        RO_spacing = self.instr_uhf.get_instr().quex_wint_delay()/1.8e9
+        RO_spacing = self.instr_uhf.get_instr().qas_0_delay()/1.8e9
         RO_spacing += self.acq_length()
         RO_spacing += RO_slack # for slack
         RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
@@ -2504,7 +2494,7 @@ class QuDev_transmon(Qubit):
                     nr_seeds, cliffords[-1]) + self.msmt_suffix
 
         if thresholded:
-            if self.instr_uhf.get_instr().get('quex_thres_{}_level'.format(
+            if self.instr_uhf.get_instr().get('qas_0_thresholds_{}_level'.format(
                     self.acq_weights_I())) == 0.0:
                 raise ValueError('The threshold value is not set.')
 
