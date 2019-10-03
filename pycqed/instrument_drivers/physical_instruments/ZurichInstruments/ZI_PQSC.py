@@ -214,7 +214,7 @@ class ZI_PQSC(zibase.ZI_base_instrument):
         '''Returns a value between 0.0 and 1.0 indicating the progress as 
         triggers are generated.'''
 
-        self.get('execution_progress')
+        return self.get('execution_progress')
 
     def track_progress(self):
         '''Prints a progress bar.'''

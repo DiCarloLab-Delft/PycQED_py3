@@ -8,6 +8,8 @@ class PQSC_control(Instrument):
     ZI driver"""
 
     def __init__(self, name, pqsc_instr):
+        
+        super().__init__(name=name)
         self.pqsc_instr = pqsc_instr
 
         #FIXME: find the real boundary values
@@ -28,9 +30,9 @@ class PQSC_control(Instrument):
             get_cmd=(
                 lambda self=self: self.pqsc_instr.execution_repetitions()),
             set_cmd=(lambda val, self=self: self.pqsc_instr.
-                     execution_repetitions(val)),
+                     execution_repetitions(int(val))),
             unit='',
-            vals=vals.Ints(1, 10e20),
+            vals=vals.Ints(1, int(1e15)),
             docstring=('Command for setting the number of repetitions'))
 
     def start(self):

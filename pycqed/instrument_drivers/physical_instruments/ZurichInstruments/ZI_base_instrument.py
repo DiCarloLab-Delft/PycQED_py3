@@ -589,17 +589,18 @@ class ZI_base_instrument(Instrument):
             # Should never happen as we just created the file above
             log.error("{}: parameter file for data parameters {} not found".format(self.devname, filename))
             raise
-
-        # Create modules
-        self._awgModule = self.daq.awgModule()
-        self._awgModule.set('awgModule/device', device)
-        self._awgModule.execute()
-
-        # Will hold information about all configured waveforms
-        self._awg_waveforms = {}
-
-        # FIXME: get rid of if clause
+        
+        # FIXME: get rid of if clause write separate AWG module
         if self.devtype != 'PQSC':
+            # Create modules
+            self._awgModule = self.daq.awgModule()
+            self._awgModule.set('awgModule/device', device)
+            self._awgModule.execute()
+
+            # Will hold information about all configured waveforms
+            self._awg_waveforms = {}
+
+        
             # Asserted when AWG needs to be reconfigured
             self._awg_needs_configuration = [False]*(self._num_channels()//2)
             self._awg_program = [None]*(self._num_channels()//2)
