@@ -27,7 +27,7 @@ from pycqed.measurement.hdf5_data import write_dict_to_hdf5
 from pycqed.measurement.hdf5_data import read_dict_from_hdf5
 import copy
 import logging
-log = logging.getLogger()
+log = logging.getLogger(__name__)
 log.addHandler(logging.StreamHandler())
 
 
@@ -290,22 +290,27 @@ class BaseDataAnalysis(object):
         return raw_data_dict
 
     @staticmethod
-    def add_measured_values_ord_dict(raw_data_dict):
+    def add_measured_data(raw_data_dict):
         if 'measured_data' in raw_data_dict and \
                 'value_names' in raw_data_dict:
             measured_data = raw_data_dict.pop('measured_data')
             raw_data_dict['measured_data'] = OrderedDict()
-            sweep_points = measured_data[:-len(raw_data_dict['value_names'])]
+
+            value_names = raw_data_dict['value_names']
+            if not isinstance(value_names, list):
+                value_names = [value_names]
+
+            sweep_points = measured_data[:-len(value_names)]
             if sweep_points.shape[0] > 1:
                 raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
                 raw_data_dict['soft_sweep_points'] = np.unique(sweep_points[1:])
             else:
                 raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
 
-            data = measured_data[-len(raw_data_dict['value_names']):]
-            if data.shape[0] != len(raw_data_dict['value_names']):
+            data = measured_data[-len(value_names):]
+            if data.shape[0] != len(value_names):
                 raise ValueError('Shape mismatch between data and ro channels.')
-            for i, ro_ch in enumerate(raw_data_dict['value_names']):
+            for i, ro_ch in enumerate(value_names):
                 if 'soft_sweep_points' in raw_data_dict:
                     hsl = len(raw_data_dict['hard_sweep_points'])
                     ssl = len(raw_data_dict['soft_sweep_points'])
@@ -339,13 +344,13 @@ class BaseDataAnalysis(object):
 
         self.raw_data_dict = self.get_data_from_timestamp_list()
         if len(self.timestamps) == 1:
-            self.raw_data_dict = self.add_measured_values_ord_dict(
+            self.raw_data_dict = self.add_measured_data(
                 self.raw_data_dict)
         else:
             temp_dict_list = []
             for i, rd_dict in enumerate(self.raw_data_dict):
                 temp_dict_list.append(
-                    self.add_measured_values_ord_dict(rd_dict))
+                    self.add_measured_data(rd_dict))
             self.raw_data_dict = tuple(temp_dict_list)
 
     def process_data(self):
@@ -484,7 +489,8 @@ class BaseDataAnalysis(object):
         Only model fitting is implemented here. Minimizing fitting should
         be implemented here.
         '''
-        self.fit_res = {}
+        if self.fit_res is None:
+            self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
@@ -1008,6 +1014,8 @@ class BaseDataAnalysis(object):
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
+        plot_yscale = pdict.get('yscale', None)
+        plot_xscale = pdict.get('xscale', None)
 
         if pdict.get('color', False):
             plot_linekws['color'] = pdict.get('color')
@@ -1095,6 +1103,10 @@ class BaseDataAnalysis(object):
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
             axs.set_ylim(ymin, ymax)
+        if plot_yscale is not None:
+            axs.set_yscale(plot_yscale)
+        if plot_xscale is not None:
+            axs.set_xscale(plot_xscale)
 
         if self.tight_fig:
             axs.figure.tight_layout()

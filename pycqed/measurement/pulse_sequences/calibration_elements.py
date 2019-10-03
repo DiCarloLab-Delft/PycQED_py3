@@ -207,24 +207,6 @@ def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
         else:
             probe_pulse['pulse_delay'] = tau - min_delay
             readout_x1['pulse_delay'] = -tau
-            # probe_pulse.update({
-            #     'reference_pulse': 'segment_start',
-            #     'name': 'probe_pulse{}'.format(2 * i),
-            #     'element_name': 'probe_elt{}'.format(2 * i),
-            # })
-            # readout_x1.update({
-            #     'reference_pulse': 'probe_pulse{}'.format(2 * i),
-            #     'name': 'probe_ro{}'.format(2 * i),
-            #     'element_name': 'probe_elt{}'.format(2 * i),
-            # })
-            # readout_x2.update({
-            #     'reference_pulse': 'probe_ro{}'.format(2 * i),
-            #     'name': 'measure_ro{}'.format(2 * i),
-            #     'element_name': 'measure_elt{}'.format(2 * i),
-            # })
-            # from pprint import pprint
-            # for p in [probe_pulse, readout_x1, readout_x2]:
-            #     pprint(p)
             seg = segment.Segment('segment_{}'.format(2*i), prep_pulses +
                                   [probe_pulse, readout_x1, readout_x2])
             seg_list.append(seg)
