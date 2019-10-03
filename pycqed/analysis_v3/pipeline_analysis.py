@@ -11,14 +11,16 @@ import json
 import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import read_dict_from_hdf5
+from pycqed.analysis_v3 import helper_functions as help_func_mod
 from pycqed.analysis_v3 import data_processing as dat_proc
+from pycqed.analysis_v3 import fitting as fit_module
+from pycqed.analysis_v3 import plotting as plot_module
 import copy
 import logging
-log = logging.getLogger()
-log.addHandler(logging.StreamHandler())
+log = logging.getLogger(__name__)
 
 
-class BaseDataAnalysis(object):
+class PipelineDataAnalysis(object):
     """
     Abstract Base Class (not intended to be instantiated directly) for
     analysis.
@@ -160,7 +162,10 @@ class BaseDataAnalysis(object):
         """
         if self.data_dict is None:
             self.extract_data()  # extract data specified in params dict
-        self.process_data()  # binning, filtering etc
+        if len(self.processing_pipe) > 0:
+            self.process_data()  # binning, filtering etc
+        else:
+            print('There is no data processing pipe.')
 
     def extract_data(self):
         """
@@ -184,6 +189,10 @@ class BaseDataAnalysis(object):
                  'Experimental Data.Experimental Metadata'})
 
         self.data_dict = self.get_data_from_timestamp_list()
+        self.metadata = self.data_dict.get('exp_metadata', {})
+        self.metadata.update(self.get_param_value('exp_metadata', {}))
+        self.data_dict['exp_metadata'] = self.metadata
+
         if len(self.timestamps) == 1:
             self.data_dict = self.add_measured_data(
                 self.data_dict)
@@ -193,10 +202,6 @@ class BaseDataAnalysis(object):
                 temp_dict_list.append(
                     self.add_measured_data(rd_dict))
             self.data_dict = tuple(temp_dict_list)
-
-        self.metadata = self.data_dict.get('exp_metadata', {})
-        if self.metadata is None:
-            self.metadata = {}
 
         self.processing_pipe = self.get_param_value('processing_pipe')
         if self.processing_pipe is None:
@@ -264,7 +269,9 @@ class BaseDataAnalysis(object):
                                 {}, data_file[group_name][par_name])
                 if isinstance(raw_data_dict_ts[save_par], list) and \
                         len(raw_data_dict_ts[save_par]) == 1:
-                    raw_data_dict_ts[save_par] = raw_data_dict_ts[save_par][0]
+                    if save_par not in ['value_names', 'value_units']:
+                        raw_data_dict_ts[save_par] = raw_data_dict_ts[
+                            save_par][0]
             raw_data_dict.append(raw_data_dict_ts)
 
         if len(raw_data_dict) == 1:
@@ -277,28 +284,28 @@ class BaseDataAnalysis(object):
     @staticmethod
     def add_measured_data(raw_data_dict):
         if 'measured_data' in raw_data_dict and \
-                'value_names' in raw_data_dict:
+                'value_names' in raw_data_dict and \
+                'sweep_points' in raw_data_dict['exp_metadata']:
             measured_data = raw_data_dict.pop('measured_data')
+            sweep_points = raw_data_dict['exp_metadata']['sweep_points']
             raw_data_dict['measured_data'] = OrderedDict()
-            sweep_points = measured_data[:-len(raw_data_dict['value_names'])]
-            if sweep_points.shape[0] > 1:
-                raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
-                raw_data_dict['soft_sweep_points'] = np.unique(sweep_points[1:])
-            else:
-                raw_data_dict['hard_sweep_points'] = np.unique(sweep_points[0])
 
-            data = measured_data[-len(raw_data_dict['value_names']):]
+            data = measured_data[len(sweep_points):]
             if data.shape[0] != len(raw_data_dict['value_names']):
-                raise ValueError('Shape mismatch between data and ro channels.')
-            TD = dat_proc.get_param('TwoD', raw_data_dict, default_value=False)
+                raise ValueError('Shape mismatch between data and '
+                                 'ro channels.')
+            TD = help_func_mod.get_param('TwoD', raw_data_dict,
+                                         default_value=False)
             for i, ro_ch in enumerate(raw_data_dict['value_names']):
                 if 'soft_sweep_points' in raw_data_dict and TD:
-                    hsl = len(raw_data_dict['hard_sweep_points'])
-                    ssl = len(raw_data_dict['soft_sweep_points'])
+                    hsl = len(sweep_points[0][list(sweep_points[0])[0]][0])
+                    ssl = len(sweep_points[1][list(sweep_points[0])[0]][0])
                     measured_data = np.reshape(data[i], (ssl, hsl)).T
                 else:
                     measured_data = data[i]
                 raw_data_dict['measured_data'][ro_ch] = measured_data
+        else:
+            raise ValueError('"measured_data" was not added.')
         return raw_data_dict
 
     def process_data(self):
@@ -323,12 +330,17 @@ class BaseDataAnalysis(object):
                              'contain "processing_pipe."')
 
         for node_dict in self.processing_pipe:
-            try:
-                node = getattr(dat_proc, node_dict["node_type"])
-                node(self.data_dict, **node_dict)
-            except AttributeError:
+            node = None
+            for module in [dat_proc, plot_module, fit_module]:
+                try:
+                    node = getattr(module, node_dict["node_type"])
+                    break
+                except AttributeError:
+                    continue
+            if node is None:
                 raise KeyError(f'Processing node "{node_dict["node_type"]}" '
                                f'not recognized')
+            node(self.data_dict, **node_dict)
 
     def analyze_fit_results(self):
         """

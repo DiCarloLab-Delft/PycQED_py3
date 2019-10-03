@@ -12,6 +12,7 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
 import pycqed.measurement.hdf5_data as h5d
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from pycqed.measurement.calibration_points import CalibrationPoints
 import scipy.optimize as optimize
 import lmfit
 from collections import Counter  # used in counting string fractions
@@ -681,6 +682,11 @@ class MeasurementAnalysis(object):
             self.sweep_points_from_file = self.sweep_points
             self.sweep_points = new_sweep_points
 
+        try:
+            self.exp_metadata = h5d.read_dict_from_hdf5(
+                {}, self.data_file['Experimental Data']['Experimental Metadata'])
+        except KeyError:
+            self.exp_metadata = {}
 
     def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
                                        log=False, ticks_around=True, label=None,
@@ -993,6 +999,12 @@ class MeasurementAnalysis(object):
         if new_sweep_points is not None:
             self.sweep_points_from_file = self.sweep_points
             self.sweep_points(new_sweep_points)
+
+        try:
+            self.exp_metadata = h5d.read_dict_from_hdf5(
+                {}, self.data_file['Experimental Data']['Experimental Metadata'])
+        except KeyError:
+            self.exp_metadata = {}
 
     def get_naming_and_values_2D_tuples(self):
         if 'datasaving_format' in list(self.g.attrs.keys()):
@@ -11414,12 +11426,25 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
             plot = self.plot
         self.get_naming_and_values_2D()
 
-        delays = self.sweep_points
-        freqs = self.sweep_points_2D
+        error_occured = False
+        if len(self.exp_metadata) != 0:
+            try:
+                self.delays = self.exp_metadata['sweep_points_dict'][self.qb_name]
+                self.freqs = self.exp_metadata['sweep_points_dict_2D'][self.qb_name]
+                cp = self.exp_metadata.get('cal_points', None)
+                if cp is not None:
+                    cp = eval(cp)
+                    self.delays = cp.extend_sweep_points(self.delays, self.qb_name)
+            except KeyError:
+                error_occured = True
+        if error_occured:
+            self.delays = self.sweep_points
+            self.freqs = self.sweep_points_2D
+
         data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(
             self.data[2:, :])
 
-        data_rotated = data_rotated.reshape(len(freqs), len(delays))
+        data_rotated = data_rotated.reshape(len(self.freqs), len(self.delays))
         self.data_rotated = data_rotated
 
         if self.sign_of_peaks is None:
@@ -11428,7 +11453,7 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
         self.fit_all()
 
         fig, ax = plt.subplots()
-        im = ax.pcolormesh(delays/1e-9, freqs/1e9, data_rotated/1e-3,
+        im = ax.pcolormesh(self.delays/1e-9, self.freqs/1e9, data_rotated/1e-3,
                            cmap='viridis')
         ax.autoscale(tight=True)
 
@@ -11439,7 +11464,7 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
         ax.set_ylabel(r'drive frequency, $f_d$ (GHz)')
         ax.set_title('{} {}'.format(self.timestamp_string, self.measurementstring))
 
-        ax.plot(delays/1e-9, self.fitted_freqs/1e9, 'r', label='fitted freq.')
+        ax.plot(self.delays/1e-9, self.fitted_freqs/1e9, 'r', label='fitted freq.')
         ax.legend()
 
         plt.savefig('{}//{}_flux_pulse_scope_{}.png'.format(self.folder,

@@ -1,6 +1,5 @@
 import logging
-log = logging.getLogger()
-log.addHandler(logging.StreamHandler())
+log = logging.getLogger(__name__)
 
 import os
 import json
@@ -164,7 +163,7 @@ def save_fit_results(data_dict, fit_res_dict, **params):
 
 def save_figures(data_dict, figs, **params):
 
-    key_list = params.get('key_list', 'auto')
+    keys_in = params.get('keys_in', 'auto')
     fmt = params.get('fmt', 'png')
     dpi = params.get('dpi', 300)
     tag_tstamp = params.get('tag_tstamp', True)
@@ -190,8 +189,8 @@ def save_figures(data_dict, figs, **params):
     else:
         tstag = ''
 
-    if key_list == 'auto' or key_list is None:
-        key_list = figs.keys()
+    if keys_in == 'auto' or keys_in is None:
+        keys_in = figs.keys()
 
     try:
         os.mkdir(savedir)
@@ -201,7 +200,7 @@ def save_figures(data_dict, figs, **params):
     if params.get('verbose', False):
         log.info('Saving figures to %s' % savedir)
 
-    for key in key_list:
+    for key in keys_in:
         if params.get('presentation_mode', False):
             savename = os.path.join(savedir, savebase + key + tstag +
                                     'presentation' + '.' + fmt)

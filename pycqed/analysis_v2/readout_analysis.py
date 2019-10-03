@@ -1359,6 +1359,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                          extract_only=extract_only, do_fitting=do_fitting)
 
         self.n_readouts = options_dict['n_readouts']
+        self.kept_shots = 0
         self.thresholds = options_dict['thresholds']
         self.channel_map = options_dict['channel_map']
         self.use_preselection = options_dict.get('use_preselection', False)

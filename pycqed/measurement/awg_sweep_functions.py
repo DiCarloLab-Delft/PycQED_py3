@@ -160,26 +160,6 @@ class SegmentHardSweep(swf.Hard_Sweep):
             ps.Pulsar.get_instance().program_awgs(self.sequence,
                                                   awgs=awgs_to_upload)
             time.sleep(0.1)
-            print('programmed hard sweep')
-
-
-class InstrumentSoftSweep(swf.Soft_Sweep):
-
-    def __init__(self, instrument, param_name, param_unit,
-                 process_sweep_point_func=lambda x: x):
-        super().__init__()
-        self.name = 'Instrument soft sweep'
-        self.instr = instrument
-        self.parameter_name = param_name
-        self.unit = param_unit
-        self.process_sweep_point_func = process_sweep_point_func
-
-    def prepare(self):
-        pass
-
-    def set_parameter(self, val, **kw):
-        proc_val = self.process_sweep_point_func(val)
-        self.instr.set(self.parameter_name, proc_val)
 
 
 class SegmentSoftSweep(swf.Soft_Sweep):
