@@ -1177,12 +1177,11 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
 
         waveforms, awg_sequences = sequence.generate_waveforms_sequences()
 
-        if self.get("{}_minimize_sequencer_memory"):
-            channels_used = self._channels_in_awg_sequences(awg_sequences)
-            repeat_dict = self._generate_awg_repeat_dict(sequence.repeat_patterns,
-                                                         channels_used)
-        else:
-            repeat_dict = {}
+
+
+        channels_used = self._channels_in_awg_sequences(awg_sequences)
+        repeat_dict = self._generate_awg_repeat_dict(sequence.repeat_patterns,
+                                                     channels_used)
         self._zi_waves_cleared = False
         self._hash_to_wavename_table = {}
 
@@ -1396,18 +1395,14 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         """
         channels_used = dict()
         for awg in awg_sequences:
-            channels_used[awg] = []
+            channels_used[awg] = set()
             for segname in awg_sequences[awg]:
                 if awg_sequences[awg][segname] is None:
-                    pass
-                else:
-                    elements = awg_sequences[awg][segname]
-                    for cw in elements:
-                        if cw == "metadata":
-                            pass
-                        else:
-                            [channels_used[awg].append(ch) for ch in elements[cw]
-                             if ch not in channels_used[awg]]
+                    continue
+                elements = awg_sequences[awg][segname]
+                for cw in elements:
+                    if cw != "metadata":
+                        channels_used[awg] |= elements[cw].keys()
         return channels_used
 
     def _generate_awg_repeat_dict(self, repeat_dict_per_ch, channels_used):
