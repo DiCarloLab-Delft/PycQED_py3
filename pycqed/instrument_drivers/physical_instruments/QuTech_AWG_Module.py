@@ -8,7 +8,7 @@ Notes:      It is possible to view the QWG log using ssh. To do this:
             - connect using ssh e.g., "ssh root@192.168.0.10"
             - view log using "tail -f /var/log/qwg.log"
 Bugs:
-            - requires QWG software version > 1.3.0, which isn't officially released yet
+            - requires QWG software version > 1.5.0, which isn't officially released yet
 Todo:
             - cleanup after https://github.com/QCoDeS/Qcodes/pull/1653
             - cleanup after https://github.com/QCoDeS/Qcodes/issues/236
@@ -18,10 +18,10 @@ Todo:
 from .SCPI import SCPI
 
 import numpy as np
-import re
-import json
 import logging
 import warnings
+import re
+import json
 from typing import List, Sequence, Dict
 
 from qcodes.instrument.base import Instrument
@@ -57,7 +57,7 @@ _run_mode_doc = '''
 Run mode:\n
 \t- NONE: No mode selected (default)\n
 \t- CODeword: Codeword mode, will play wave based on codewords input via IORearDIO or IORearMT board\n
-\t- CONt: Continues mode, plays defined wave back to back\n
+\t- CONt: Continuous mode, plays defined wave back to back\n
 \t- SEQ: (Not implemented)'''
 
 _dio_mode_doc = '''
@@ -68,6 +68,7 @@ Get or set the DIO input operation mode\n
 \t- SLAVE: Use DIO codeword (upper 14 bits) input from the connected master IORearDIO board\n
 \t\tDisables single-ended (SE) and differential (DIFF) inputs'''
 
+# FIXME: modes outdated:
 _codeword_protocol_doc = '''
 Configures the codeword input bits/channels per channel. These are predefined sets of bit maps.\n 
 \tOptions:\n
@@ -104,6 +105,7 @@ cw_protocols_dio = {
 }
 
 # Marker trigger protocols
+# FIXME: which input is trigger? Do modes make sense?
 cw_protocols_mt = {
     # Name
     'MICROWAVE': [
@@ -119,6 +121,9 @@ cw_protocols_mt = {
         [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
 }
 
+##########################################################################
+# class
+##########################################################################
 
 class QuTech_AWG_Module(SCPI):
     __doc__ = f"""
@@ -162,6 +167,7 @@ class QuTech_AWG_Module(SCPI):
         version_min = (1, 5, 0)  # driver supported software version: Major, minor, patch
 
         idn_firmware = self.get_idn()["firmware"]  # NB: called 'version' in QWG source code
+        # FIXME: above will make usage of DummyTransport more difficult
         regex = r"swVersion=(\d).(\d).(\d)"
         sw_version = re.search(regex, idn_firmware)
         version_cur = (int(sw_version.group(1)), int(sw_version.group(2)), int(sw_version.group(3)))
@@ -173,6 +179,7 @@ class QuTech_AWG_Module(SCPI):
             driver_outdated = False
         else:
             # FIXME: we could be less rude and only disable the new parameters
+            # FIXME: let parmeters depend on SW version, and on IORear type
             logging.warning(f"Incompatible driver version of QWG ({self.name}); The version ({version_cur[0]}."
                             f"{version_cur[1]}.{version_cur[2]}) "
                             f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
@@ -223,7 +230,7 @@ class QuTech_AWG_Module(SCPI):
         self.getErrors()
 
         status = self.get_system_status()
-        warn_msg = self.detect_underdrive(status)
+        warn_msg = self._detect_underdrive(status)
 
         if(len(warn_msg) > 0):
             warnings.warn(', '.join(warn_msg))
@@ -235,16 +242,6 @@ class QuTech_AWG_Module(SCPI):
         self.write('awgcontrol:stop:immediate')
 
         self.getErrors()
-
-    def detect_underdrive(self, status):
-        """
-        Will raise an warning if on a channel underflow is detected
-        """
-        msg = []
-        for channel in status["channels"]:
-            if(channel["on"] == True) and (channel["underdrive"] == True):
-                msg.append(f"Possible wave underdrive detected on channel: {channel['id']}")
-        return msg
 
     def getErrors(self):
         """
@@ -258,19 +255,19 @@ class QuTech_AWG_Module(SCPI):
             for i in range(errNr):
                 errMgs.append(self.getError())
             raise RuntimeError(f'{repr(self)}: ' + ', '.join(errMgs))
+            # FIXME: is raising a potentially very long string useful?
 
+    # FIXME: HDAWG: def calibrate_dio_protocol(self, expected_sequence=None, verbose=False, repetitions=1) -> None:
     def dio_calibrate(self, target_index: int = ''):
+        # FIXME: cleanup docstring
         """
         Calibrate the DIO input signals.\n
 
-        Will analyze the input signals for each DIO
-        inputs (used to transfer codeword bits), secondly,
+        The QWG will analyze the input signals for each DIO input (used to transfer codeword bits), secondly,
         the most preferable index (active index) is set.\n\n
 
-        Each signal is sampled and divided into sections.
-        These sections are analyzed to find a stable
-        stable signal. These stable sections
-        are addressed by there index.\n\n
+        Each signal is sampled and divided into sections. These sections are analyzed to find a stable
+        signal. These stable sections are addressed by there index.\n\n
 
         After calibration the suitable indexes list (see dio_suitable_indexes()) contains all indexes which are stable.
 
@@ -279,21 +276,18 @@ class QuTech_AWG_Module(SCPI):
         on the target index. Used to determine the new index before or after the edge. This parameter is commonly used
         to calibrate a DIO slave where the target index is the active index after calibration of the DIO master
 
-        Note 1: Expects a DIO calibration signal on the inputs:\n
-        \tAn all codewords bits high followed by an all codeword
-        bits low in a continues repetition. This results in a
-        square wave of 25 MHz on the DIO inputs of the
-        DIO connection. Individual DIO inputs where no
-        signal is detected will not be calibrated (See
-         dio_calibrated_inputs())\n\n
-
-        Note 2: The QWG will continuously validate if
-        the active index is still stable.\n\n
-
-        Note 3: If no suitable indexes are found
-        is empty and an error is pushed onto the error stack\n
+        Notes:
+        \t- Expects a DIO calibration signal on the inputs where all codewords bits show activity (e.g. high followed \
+        by all codeword bits low in a continuous repetition. This results in a square wave of 25 MHz on the DIO inputs \
+        of the DIO connection).
+        \t- Individual DIO inputs where no signal is detected will not be calibrated (See dio_calibrated_inputs())\n
+        \t- The QWG will continuously validate if the active index is still stable.\n
+        \t- If no suitable indexes are found FIXME is empty and an error is pushed onto the error stack\n
         """
         self.write(f'DIO:CALibrate {target_index}')
+
+        # FIXME: define relation with mode and #codewords in use
+        # FIXME: provide high level function that performs the calibration
 
     def dio_calibration_rapport(self, extended: bool=False) -> str:
         """
@@ -710,7 +704,6 @@ class QuTech_AWG_Module(SCPI):
             set_cmd=self._setCodewordProtocol,
             vals=vals.Enum('MICROWAVE', 'FLUX', 'MICROWAVE_NO_VSM'),
             docstring=_codeword_protocol_doc + '\nEffective immediately when sent')
-
         # FIXME: HDAWG uses cfg_codeword_protocol, with different options
 
         docst = 'Specifies a waveform for a specific codeword. \n' \
@@ -1135,28 +1128,49 @@ class QuTech_AWG_Module(SCPI):
     ##########################################################################
 
     # Used for setting the channel pairs
-    def _gen_ch_set_func(self, fun, ch):
+    @staticmethod
+    def _gen_ch_set_func(fun, ch):
         def set_func(val):
             return fun(ch, val)
         return set_func
 
-    def _gen_ch_get_func(self, fun, ch):
+    @staticmethod
+    def _gen_ch_get_func(fun, ch):
         def get_func():
             return fun(ch)
         return get_func
 
-    def _gen_ch_cw_set_func(self, fun, ch, cw):
+    @staticmethod
+    def _gen_ch_cw_set_func(fun, ch, cw):
         def set_func(val):
             return fun(ch, cw, val)
         return set_func
 
-    def _gen_ch_cw_get_func(self, fun, ch, cw):
+    @staticmethod
+    def _gen_ch_cw_get_func(fun, ch, cw):
         def get_func():
             return fun(ch, cw)
         return get_func
 
+    ##########################################################################
+    # helpers
+    ##########################################################################
+
+    @staticmethod
+    def _detect_underdrive(status):
+        """
+        Will raise an warning if on a channel underflow is detected
+        """
+        msg = []
+        for channel in status["channels"]:
+            if(channel["on"] == True) and (channel["underdrive"] == True):
+                msg.append(f"Possible wave underdrive detected on channel: {channel['id']}")
+        return msg
 
 
+##########################################################################
+# unused
+##########################################################################
 
 # FIXME: unused code
 # class QWGMultiDevices:
@@ -1246,11 +1260,9 @@ class QuTech_AWG_Module(SCPI):
     #     ccl.qisa_opcode(old_qisa_opcode)
 
 
-
-
-
-
-
+##########################################################################
+# Mock_QWG
+##########################################################################
 
 class Mock_QWG(QuTech_AWG_Module):
     """

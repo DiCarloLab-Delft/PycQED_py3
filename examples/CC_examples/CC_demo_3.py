@@ -206,7 +206,7 @@ for i,scale in enumerate(scales):
         y = clamp(y, 0, 31)
 
         # generate instruction
-        val = (1<<31) + (y<<9) + (x)
+        val = (1<<31) + (y<<9) + (x)  # mode "microwave"
         prog += '    seq_out {},1\n'.format(val)
     prog += '    loop R0,@loop{}\n'.format(i)
 prog += '    jmp @start\n'

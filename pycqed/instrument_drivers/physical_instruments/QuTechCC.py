@@ -168,7 +168,7 @@ class QuTechCC(QuTechCC_core, Instrument):
     def _eqasm_program(self, file_name: str) -> None:
         with open(file_name, 'r') as f:
             prog = f.read()
-        self.sequence_program(prog)
+        self.sequence_program_assemble(prog)
 
     # helper for parameter 'vsm_channel_delay{}'
     # NB: CC-light range max = 127*2.5 ns = 317.5 ns, our fine delay range is 48/1200 MHz = 40 ns, so we must also shift program
@@ -202,7 +202,7 @@ class QuTechCC(QuTechCC_core, Instrument):
             pass
 
         log.debug(f"uploading DIO calibration program for mode '{dio_mode}' to CC")
-        self.sequence_program(cc_prog)
+        self.sequence_program_assemble(cc_prog)
         log.debug("printing CC errors")
         err_cnt = self.get_system_error_count()
         if err_cnt > 0:

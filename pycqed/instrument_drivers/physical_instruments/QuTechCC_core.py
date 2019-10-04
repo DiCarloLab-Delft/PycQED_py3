@@ -28,19 +28,19 @@ class QuTechCC_core(SCPIBase):
                  transport: Transport):
         super().__init__(name, transport)
 
-    def sequence_program(self, program_string: str) -> None:
+    def sequence_program_assemble(self, program_string: str) -> None:
         """
         upload sequence program string
         """
-        hdr = 'QUTech:SEQuence:PROGram ' # NB: include space as separator for binblock parameter
+        hdr = 'QUTech:SEQuence:PROGram:ASSEMble ' # NB: include space as separator for binblock parameter
         bin_block = program_string.encode('ascii')
         self.bin_block_write(bin_block, hdr)
 
-    def get_assembler_error(self) -> int:
-        return self._ask_int('QUTech:SEQuence:PROGram:ASSEMbler:ERRor?')
+    def get_assembler_success(self) -> int:
+        return self._ask_int('QUTech:SEQuence:PROGram:ASSEMble:SUCCESS?')
 
     def get_assembler_log(self) -> str:
-        return self._ask_bin('QUTech:SEQuence:PROGram:ASSEMbler:LOG?').decode('utf-8', 'ignore')
+        return self._ask_bin('QUTech:SEQuence:PROGram:ASSEMble:LOG?').decode('utf-8', 'ignore')
 
     def set_q1_reg(self, ccio: int, reg: int, val: int) -> None:
         # only possible if CC is stopped
