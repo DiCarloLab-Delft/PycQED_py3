@@ -469,7 +469,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         (data - np.min(data))/(np.max(data) - np.min(data))
                 else:
                     rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
-                        a_tools.normalize_data_v3(
+                        a_tools.rotate_and_normalize_data_1ch(
                             data=meas_res_dict[list(meas_res_dict)[0]],
                             cal_zero_points=cal_zero_points,
                             cal_one_points=cal_one_points)
