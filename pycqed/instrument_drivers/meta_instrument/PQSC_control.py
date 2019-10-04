@@ -8,7 +8,7 @@ class PQSC_control(Instrument):
     ZI driver"""
 
     def __init__(self, name, pqsc_instr):
-        
+
         super().__init__(name=name)
         self.pqsc_instr = pqsc_instr
 
@@ -16,11 +16,12 @@ class PQSC_control(Instrument):
         self.add_parameter(
             'pulse_period',
             label='Pulse period',
-            get_cmd=(lambda self=self: self.pqsc_instr.execution_holdoff),
+            get_cmd=(lambda self=self: self.pqsc_instr.execution_holdoff()),
             set_cmd=(
                 lambda val, self=self: self.pqsc_instr.execution_holdoff(val)),
             unit='s',
             vals=vals.Numbers(min_value=20e-9, max_value=2e3),
+            initial_value=20e-9,
             docstring=('Command for setting the desired pulse\
                                 period. Min value: 20 ns, Max value: 2000 s.'))
         # FIXME: get real boundary values

@@ -408,8 +408,10 @@ class UHFQC_multi_detector(Hard_Detector):
     """
     def __init__(self, detectors):
         super().__init__()
+        # self.detectors = [p[1] for p in sorted( \
+        #     [(d.UHFQC._device, d) for d in detectors], reverse=True)]
         self.detectors = [p[1] for p in sorted( \
-            [(d.UHFQC._device, d) for d in detectors], reverse=True)]
+            [(d.UHFQC, d) for d in detectors], reverse=True)]
         self.AWG = None
         self.value_names = []
         self.value_units = []
@@ -450,7 +452,7 @@ class UHFQC_multi_detector(Hard_Detector):
         UHFs = [d.UHFQC for d in self.detectors]
 
         for UHF in UHFs:
-            UHF._daq.setInt('/' + UHF._device + '/qas/0/result/enable', 1)
+            UHF.qas_0_result_enable(1)
 
 
         if self.AWG is not None:
@@ -471,7 +473,7 @@ class UHFQC_multi_detector(Hard_Detector):
             for UHF in UHFs:
                 if not all(gotem[UHF.name]):
                     time.sleep(0.01)
-                    dataset[UHF.name] = UHF._daq.poll(0.001, 1, 4, True)
+                    dataset[UHF.name] = UHF.poll(0.001)
 
             # print(dataset)
 
@@ -555,13 +557,13 @@ class UHFQC_input_average_detector(Hard_Detector):
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.qas_0_monitor_length(self.nr_samples)
-        self.UHFQC.qas_0_monitor_averages(self.nr_averages)
         self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_userregs_0(
-            int(self.nr_averages)) 
+        self.UHFQC.awgs_0_userregs_0(int(self.nr_averages)) 
         self.nr_sweep_points = self.nr_samples
-        self.UHFQC.acquisition_initialize(channels=self.channels, mode='iavg')
+        self.UHFQC.acquisition_initialize(samples=self.nr_sweep_points,
+                                          averages=self.nr_averages,
+                                          channels=self.channels, 
+                                          mode='iavg')
 
     def finish(self):
         if self.AWG is not None:
@@ -729,8 +731,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.stop()
 
         # resets UHFQC internal readout counters
-        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/qas/0/result/enable', 
-                                self._get_readout())
+        self.UHFQC.qas_0_result_enable(self._get_readout())
 
         # starting AWG
         if self.AWG is not None:
@@ -799,12 +800,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                 # points -> only acquire one chunk
                 self.nr_sweep_points = self.chunk_size * self.seg_per_point
 
-            if (self.chunk_size is not None and
-                    self.chunk_size < self.nr_sweep_points):
-                # Chunk size is defined and smaller than total number of sweep
-                # points -> only acquire one chunk
-                self.nr_sweep_points = self.chunk_size * self.seg_per_point
-
         # Optionally perform extra actions on prepare
         # This snippet is placed here so that it has a chance to modify the
         # nr_sweep_points in a UHFQC detector
@@ -822,12 +817,13 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # The AWG program uses userregs/0 to define the number of iterations in
         # the loop
 
-        self.UHFQC.qas_0_result_length(self.nr_sweep_points)
-        self.UHFQC.qas_0_result_averages(self.nr_averages)
         self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
-        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+        self.UHFQC.acquisition_initialize(samples=self.nr_sweep_points,
+                                          averages=self.nr_averages,
+                                          channels=self.channels, 
+                                          mode='rl')
 
     def finish(self):
         if self.AWG is not None:
@@ -893,8 +889,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
 
-        self.UHFQC.qas_0_result_length(self.nr_sweep_points)
-        self.UHFQC.qas_0_result_averages(self.nr_averages)
         self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
         self.set_up_correlation_weights()
@@ -906,7 +900,10 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
 
-        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+        self.UHFQC.acquisition_initialize(samples=self.nr_sweep_points,
+                                          averages=self.nr_averages,
+                                          channels=self.channels, 
+                                          mode='rl')
 
     def define_correlation_channels(self):
         self.correlation_channels = []
@@ -1003,8 +1000,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         if self.AWG is not None:
             self.AWG.stop()
         # self.UHFQC.qas_0_result_enable(1)  # resets UHFQC internal readout counters
-        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/qas/0/result/enable', 
-                                self._get_readout())
+        self.UHFQC.qas_0_result_enable(self._get_readout())
         # self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
@@ -1070,6 +1066,10 @@ class UHFQC_integration_logging_det(Hard_Detector):
         """
         super().__init__()
 
+        if always_prepare:
+            raise NotImplementedError('always_preapare not implemented for '
+                                      'UHFQC_integration_logging_det')
+
         self.UHFQC = UHFQC
         self.name = '{}_UHFQC_integration_logging_det'.format(
             result_logging_mode)
@@ -1120,13 +1120,13 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
 
-
-        self.UHFQC.qas_0_result_length(self.nr_shots*len(sweep_points))
-        self.UHFQC.qas_0_result_averages(1)
         self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
-        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+        self.UHFQC.acquisition_initialize(channels=self.channels, 
+                                          samples=self.nr_shots*len(sweep_points),
+                                          averages=1,
+                                          mode='rl')
 
     def _get_readout(self):
         return sum([(1 << c) for c in self.channels])
@@ -1138,8 +1138,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             self.AWG.stop()
 
         # resets UHFQC internal readout counters
-        self.UHFQC._daq.setInt('/' + self.UHFQC._device + '/qas/0/result/enable',
-                               self._get_readout())
+        self.UHFQC.qas_0_result_enable(self._get_readout())
 
         # starting AWG
         if self.AWG is not None:
@@ -1206,6 +1205,10 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
             segments per point.
         """
         super().__init__()
+
+        if always_prepare:
+            raise NotImplementedError('always_preapare not implemented for '
+                                      'UHFQC_integration_logging_det')
 
         self.UHFQC = UHFQC
         self.name = '{}_UHFQC_integration_logging_det'.format(
@@ -1282,13 +1285,13 @@ class UHFQC_integration_average_classifier_det(Hard_Detector):
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
 
-
-        self.UHFQC.qas_0_result_length(self.nr_shots*self.nr_sweep_points)
-        self.UHFQC.qas_0_result_averages(1)  
         self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
-        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+        self.UHFQC.acquisition_initialize(channels=self.channels,
+                                          samples=self.nr_shots*self.nr_sweep_points,
+                                          averages=1,
+                                          mode='rl')
 
     def get_values(self):
         if self.always_prepare:

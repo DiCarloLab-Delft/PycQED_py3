@@ -227,7 +227,7 @@ class UHFQCPulsar:
             wave_definitions += self._zi_wave_definition(wave, defined_waves)
 
             acq = metadata.get('acq', False)
-            playback_strings += self._zi_playback_string(name=self.name,
+            playback_strings += self._zi_playback_string(name=obj.name,
                                                          device='uhf', 
                                                          wave=wave, 
                                                          acq=acq)
@@ -243,6 +243,14 @@ class UHFQCPulsar:
             wave_definitions='\n'.join(wave_definitions),
             playback_string='\n  '.join(playback_strings),
         )
+
+        # Necessary hack to pass the UHFQC drivers sanity check 
+        # in acquisition_initialize()
+        obj._awg_program_features['loop_cnt'] = True
+        obj._awg_program_features['avg_cnt']  = True
+        # Hack needed to have 
+        obj._awg_needs_configuration[0] = False
+        obj._awg_program[0] = True
 
         obj.configure_awg_from_string(awg_nr=0, program_string=awg_str, timeout=600)
 
@@ -501,7 +509,7 @@ class HDAWG8Pulsar:
                         ch_has_waveforms[ch2id] |= wave[2] is not None
                         ch_has_waveforms[ch2mid] |= wave[3] is not None
 
-                    playback_strings += self._zi_playback_string(name=self.name,
+                    playback_strings += self._zi_playback_string(name=obj.name,
                         device='hdawg', wave=wave, codeword=(nr_cw != 0))
                 
             if not any([ch_has_waveforms[ch] 
@@ -513,6 +521,11 @@ class HDAWG8Pulsar:
                 codeword_table_defs='\n'.join(codeword_table_defs),
                 playback_string='\n  '.join(playback_strings),
             )
+
+            # Hack needed to pass the sanity check of the ZI_base_instrument
+            # class in 
+            obj._awg_needs_configuration[awg_nr] = False
+            obj._awg_program[awg_nr] = True
 
             obj.configure_awg_from_string(awg_nr, awg_str, timeout=600)
 
@@ -529,7 +542,7 @@ class HDAWG8Pulsar:
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._is_awg_running(obj)
 
-        return all([obj.get('awgs_{}_enable'.format(awg_nr)) for awg_nr in
+        return any([obj.get('awgs_{}_enable'.format(awg_nr)) for awg_nr in
                     self._hdawg_active_awgs(obj)])
 
     def _clock(self, obj, cid):
