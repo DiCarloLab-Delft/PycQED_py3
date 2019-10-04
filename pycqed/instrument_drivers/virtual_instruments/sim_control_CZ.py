@@ -97,6 +97,7 @@ class SimControlCZ(Instrument):
             label="true if we use the definition of the comp subspace that uses the dressed 00,01,10,11 states",
             parameter_class=ManualParameter,
             vals=vals.Bool(),
+            initial_value=True,
         )
         self.add_parameter(
             "distortions",
