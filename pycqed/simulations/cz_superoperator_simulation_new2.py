@@ -352,8 +352,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         sim_control_CZ,
         fitted_stepresponse_ty=None,
         qois='all',
-        simstep_div: str = 1,
-        which_gate: str = 'NE'):
+        ):
         """
         Detector for simulating a CZ trajectory.
         Args:
@@ -371,8 +370,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         """
         super().__init__()
 
-        self.which_gate = which_gate # compatibility with new fluxlutman
-        self.simstep_div = simstep_div
+        self.which_gate = sim_control_CZ.which_gate() # compatibility with new fluxlutman
+        self.simstep_div = sim_control_CZ.simstep_div()
 
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',

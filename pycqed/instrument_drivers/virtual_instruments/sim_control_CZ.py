@@ -153,6 +153,22 @@ class SimControlCZ(Instrument):
             initial_value=0,
         )
 
+        self.add_parameter(
+            "which_gate",
+            label="Direction of the CZ gate. E.g. 'NE'. Used to extract parameters from the fluxlutman ",
+            parameter_class=ManualParameter,
+            vals=vals.Strings(),
+            initial_value='NE',
+        )
+
+        self.add_parameter(
+            "simstep_div",
+            label="Division of the simulation time step. 4 is a good one, corresponding to a time step of 0.1 ns. 1 makes the sim faster and gives a qualitative landscape",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=1,
+        )
+
         # for ramsey/Rabi simulations
 
         self.add_parameter(

@@ -859,9 +859,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            'channel in the AWG8 channel pair. '
                            'Reference is used when uploading waveforms',
                            parameter_class=InstrumentRefParameter)
-        self.add_parameter('instr_sim_control_CZ',
-                           docstring='Noise and other parameters for CZ simulation.',
-                           parameter_class=InstrumentRefParameter)
 
         self.add_parameter(
             '_awgs_fl_sequencer_program_expected_hash',
@@ -1325,12 +1322,36 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                docstring='[CZ simulation] Bus frequency.',
                                vals=vals.Numbers(),
                                parameter_class=ManualParameter)
+            self.add_parameter('instr_sim_control_CZ_%s' % this_cz,
+                               docstring='Noise and other parameters for CZ simulation.',
+                               parameter_class=InstrumentRefParameter)
 
-    def sim_CZ(self, which_gate: str = 'NE', qois='all', simstep_div=1):
+    def sim_CZ(self, which_gate=None, qois='all'):
         """
         Simulates a CZ gate for the current paramenters.
         """
-        sim_control_CZ = self.instr_sim_control_CZ.get_instr()
+        # If there is only one sim_control_CZ instrument get it
+
+        if which_gate is None:
+            found = []
+            for this_cz in ['NE', 'NW', 'SW', 'SE']:
+                try:
+                    found.append(getattr(self, 'instr_sim_control_CZ_{}'.format(this_cz)).get_instr())
+                except Exception:
+                    pass
+
+            if len(found) == 0:
+                raise Exception('No sim_control_CZ instrument found! Define a "SimControlCZ" instrument first.')
+            elif len(found) > 1:
+                raise Exception('CZ instruments found: {}. Please specify "which_gate"'.
+                    format(found))
+            else:
+                sim_control_CZ = found[0]
+                which_gate = sim_control_CZ.which_gate()
+        else:
+            sim_control_CZ = getattr(self, 'instr_sim_control_CZ_{}'.format(which_gate)).get_instr()
+            assert which_gate == sim_control_CZ.which_gate()
+
         # if not defined set the sweetspot freqs same as the operating
         # point freqs
         if sim_control_CZ.get('w_q0_sweetspot') is None:
@@ -1338,9 +1359,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if sim_control_CZ.get('w_q1_sweetspot') is None:
             sim_control_CZ.w_q1_sweetspot(self.get('q_freq_10_{}'.format(which_gate)))
 
-        detector = cz_main.CZ_trajectory_superoperator(self,
-                sim_control_CZ=sim_control_CZ, qois=qois, which_gate=which_gate,
-                simstep_div=simstep_div)
+        detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ, qois=qois)
 
         sim_results = detector.acquire_data_point()
 
