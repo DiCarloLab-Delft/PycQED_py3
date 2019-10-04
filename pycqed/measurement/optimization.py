@@ -142,7 +142,7 @@ def SPSA(fun, x0,
          no_improve_thr=10e-6, no_improv_break=10,
          maxiter=0,
          gamma=0.101, alpha=0.602, a=0.2, c=0.3, A=300,
-         p=0.5, ctrl_min=0.,ctrl_max=np.pi,
+         p=0.5, ctrl_min=0., ctrl_max=np.pi,
          verbose=False):
     '''
     parameters:
