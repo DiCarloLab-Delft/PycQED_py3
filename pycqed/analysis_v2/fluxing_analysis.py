@@ -318,7 +318,10 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                         'x': self.proc_data_dict['x_int'],
                         'y': self.proc_data_dict['y_int'],
                         'z': z_cond_phase,
-                        'colormap': anglemap
+                        'colormap': anglemap,
+                        'cyclic_data': True,
+                        'contour_levels': [90, 180, 270],
+                        'vlim': (0, 360)
                     }
                 else:
                     log.warning('No data found named {}'.format(cond_phase_names))
@@ -436,7 +439,7 @@ def non_interpolated_overlay(x, y, fig=None, ax=None, transpose=False, **kw):
 def contour_overlay(x, y, z, colormap, transpose=False,
         contour_levels=[90, 180, 270], vlim=(0, 360), fig=None,
         linestyles='dashed',
-        # unit='deg',
+        cyclic_data=False,
         ax=None, **kw):
     """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
@@ -467,29 +470,15 @@ def contour_overlay(x, y, z, colormap, transpose=False,
         x = y_tmp
         z = np.transpose(z)
 
-    # This was a was supposed to fix contour artifacts for circular data
-    # It doesn't work properly if there are more then one discontinuity
-    # line in the data
-    # if unit == 'deg':
-    #     # This "improves" the contour plot artifacts
-    #     # See https://stackoverflow.com/questions/28884344/handling-cyclic-data-with-matplotlib-contour-contourf
-    #     phase_2d_uw = np.unwrap(np.deg2rad(z) - np.pi)
-    #     phase_2d_uw_1 = np.rad2deg(phase_2d_uw + np.pi)
-    #     phase_2d_uw_2 = np.rad2deg(phase_2d_uw - np.pi)
+    if cyclic_data:
+        # Avoid contour plot artifact for cyclic data by removing the
+        # data half way to the cyclic boundary
+        z[z < (vmin + np.min(contour_levels)) / 2] = np.nan
+        z[z > (vmax + np.max(contour_levels)) / 2] = np.nan
 
-    #     linestyle = 'dashed'
-    #     c1 = ax.contour(x, y, phase_2d_uw_1,
-    #         levels=contour_levels, linewidths=linewidth, cmap=colormap,
-    #         norm=norm, linestyles=linestyle)
-    #     ax.clabel(c1, fmt='%.0f', inline='True', fontsize=fontsize)
-    #     c2 = ax.contour(x, y, phase_2d_uw_2,
-    #         levels=contour_levels, linewidths=linewidth, cmap=colormap,
-    #         norm=norm, linestyles=linestyle)
-    #     ax.clabel(c2, fmt='%.0f', inline='True', fontsize=fontsize)
-    # else:
-    c3 = ax.contour(x, y, z,
+    c = ax.contour(x, y, z,
         levels=contour_levels, linewidths=linewidth, cmap=colormap,
         norm=norm, linestyles=linestyles)
-    ax.clabel(c3, fmt='%.1f', inline='True', fontsize=fontsize)
+    ax.clabel(c, fmt='%.1f', inline='True', fontsize=fontsize)
 
     return fig, ax
