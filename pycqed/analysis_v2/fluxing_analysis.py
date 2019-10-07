@@ -473,8 +473,9 @@ def contour_overlay(x, y, z, colormap, transpose=False,
     if cyclic_data:
         # Avoid contour plot artifact for cyclic data by removing the
         # data half way to the cyclic boundary
-        z[z < (vmin + np.min(contour_levels)) / 2] = np.nan
-        z[z > (vmax + np.max(contour_levels)) / 2] = np.nan
+        minz = (vmin + np.min(contour_levels)) / 2
+        maxz = (vmax + np.max(contour_levels)) / 2
+        z[(z < minz) | (z > maxz)] = np.nan
 
     c = ax.contour(x, y, z,
         levels=contour_levels, linewidths=linewidth, cmap=colormap,
