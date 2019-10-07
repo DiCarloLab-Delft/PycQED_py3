@@ -20,6 +20,7 @@ class Sequence:
         self.pulsar = ps.Pulsar.get_instance()
         self.segments = odict()
         self.awg_sequence = {}
+        self.repeat_patterns = {}
 
     def add(self, segment):
         if segment.name in self.segments:
@@ -47,7 +48,6 @@ class Sequence:
         """
         waveforms = {}
         sequences = {}
-        
         for seg in self.segments.values():
             seg.resolve_segment()
             seg.gen_elements_on_awg()
@@ -60,6 +60,7 @@ class Sequence:
         for awg in awgs:
             sequences[awg] = odict()
             for segname, seg in self.segments.items():
+                # Store the name of the segment
                 sequences[awg][segname] = None
                 for elname in seg.elements_on_awg.get(awg, []):
                     sequences[awg][elname] = {'metadata': {}}
@@ -98,10 +99,50 @@ class Sequence:
             n_readouts = np.sum(n_readouts)
         return n_readouts
 
+    def repeat(self, pulse_name, operation_dict, pattern,
+               pulse_channel_names=('I_channel', 'Q_channel')):
+        """
+        Creates a repetition dictionary keyed by awg channel for the pulse
+        to be repeated.
+        :param pulse_name: name of the pulse to repeat.
+        :param operation_dict:
+        :param pattern: repetition pattern (n_repetitions, 1) (???) cf. Christian
+        :param pulse_channel_names: names of the channels on which the pulse is
+        applied.
+        :return:
+        """
+        pulse = operation_dict[pulse_name]
+        repeat = dict()
+        for ch in pulse_channel_names:
+            repeat[pulse[ch]] = pattern
+        self.repeat_patterns.update(repeat)
+        return self.repeat_patterns
 
+    def repeat_ro(self, pulse_name, operation_dict):
+        """
+        Wrapper for repeated readout
+        :param pulse_name:
+        :param operation_dict:
+        :param sequence:
+        :return:
+        """
+        return self.repeat(pulse_name, operation_dict,
+                           (self.n_acq_elements(), 1))
     def __repr__(self):
         string_repr = f"####### {self.name} #######\n"
         for seg_name, seg in self.segments.items():
             string_repr += str(seg) + "\n"
         return string_repr
 
+    def plot(self, segments=None, **segment_plot_kwargs):
+        """
+        :param segments: list of segment names to plot
+        :param segment_plot_kwargs:
+        :return:
+        """
+        if segments is None:
+            segments = self.segments.values()
+        else:
+            segments = [self.segments[s] for s in segments]
+        for s in segments:
+            s.plot(**segment_plot_kwargs)

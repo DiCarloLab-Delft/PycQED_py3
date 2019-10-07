@@ -154,7 +154,7 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
         if len(self.raw_data_dict['measured_values']) == 1:
             # if only one weight function is used rotation is not required
-            self.proc_data_dict['corr_data'] = a_tools.normalize_data_v3(
+            self.proc_data_dict['corr_data'] = a_tools.rotate_and_normalize_data_1ch(
                 self.raw_data_dict['measured_values'][0],
                 cal_zero_points=cal_points[0],
                 cal_one_points=cal_points[1])
@@ -205,8 +205,8 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
 
     def extract_data(self):
         super().extract_data()
-        self.metadata = self.raw_data_dict.get('exp_metadata', [{}])
-        if self.metadata is None:
+        self.metadata = self.raw_data_dict.get('exp_metadata', [])
+        if len(self.metadata) == 0:
             self.metadata = {}
 
         self.channel_map = self.get_param_value('channel_map')
@@ -215,7 +215,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             if np.ndim(value_names) > 0:
                 value_names = value_names
             if 'w' in value_names[0]:
-                self.channel_map = a_tools.get_qb_channel_map_from_file(
+                self.channel_map = a_tools.get_qb_channel_map_from_hdf(
                     self.qb_names, value_names=value_names,
                     file_path=self.raw_data_dict['folder'])
             else:
@@ -229,6 +229,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
     def process_data(self):
         super().process_data()
         data_filter = self.get_param_value('data_filter')
+        self.data_with_reset = False
         if data_filter is None:
             if 'preparation_params' in self.metadata:
                 if 'active' in self.metadata['preparation_params'].get(
@@ -236,6 +237,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     reset_reps = self.metadata['preparation_params'].get(
                         'reset_reps', 1)
                     data_filter = lambda x: x[reset_reps::reset_reps+1]
+                    self.data_with_reset = True
         if data_filter is None:
             data_filter = lambda x: x
 
@@ -298,36 +300,52 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
         cal_points = self.get_param_value('cal_points')
         last_ge_pulses = self.get_param_value('last_ge_pulses',
                                               default_value=False)
-        self.cp = eval(cal_points)
+        try:
+            self.cp = eval(cal_points)
 
-        # for now assuming the same for all qubits.
-        self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
+            # for now assuming the same for all qubits.
+            self.cal_states_dict = self.cp.get_indices()[self.qb_names[0]]
+            if rotate:
+                cal_states_rots = self.cp.get_rotations(last_ge_pulses,
+                        self.qb_names[0])[self.qb_names[0]] if rotate else None
+                self.cal_states_rotations = self.get_param_value(
+                    'cal_states_rotations', default_value=cal_states_rots)
+            else:
+                self.cal_states_rotations = None
+            sweep_points_w_calpts = \
+                {qbn: {'sweep_points': self.cp.extend_sweep_points(
+                    self.proc_data_dict['sweep_points_dict'][qbn][
+                        'sweep_points'], qbn)} for qbn in self.qb_names}
+            self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
+        except TypeError as e:
+            log.error(e)
+            log.warning("Failed retrieving cal point objects or states. "
+                        "Please update measurement to provide cal point object "
+                        "in metadata. Trying to get them using the old way ...")
+            if rotate:
+                self.cal_states_rotations = self.get_param_value(
+                    'cal_states_rotations', default_value=None)
+            else:
+                self.cal_states_rotations = None
+            self.cal_states_dict = self.get_param_value('cal_states_dict',
+                                                         default_value={})
 
-        cal_states_rots = self.cp.get_rotations(last_ge_pulses,
-                self.qb_names[0])[self.qb_names[0]] if rotate else None
-        self.cal_states_rotations = self.get_param_value(
-            'cal_states_rotations', default_value=cal_states_rots)
-
-        sweep_points_w_calpts = \
-            {qbn: {'sweep_points': self.cp.extend_sweep_points(
-                self.proc_data_dict['sweep_points_dict'][qbn][
-                    'sweep_points'], qbn)} for qbn in self.qb_names}
-        self.proc_data_dict['sweep_points_dict'] = sweep_points_w_calpts
 
         # create projected_data_dict
         self.data_to_fit = self.get_param_value('data_to_fit')
-
         if self.cal_states_rotations is not None:
             self.cal_states_analysis()
         else:
+            # this assumes data obetained with classifier detector!
+            # ie pg, pe, pf are expected to be in the value_names
             self.proc_data_dict['projected_data_dict'] = OrderedDict()
             for qbn, data_dict in self.proc_data_dict[
                     'meas_results_per_qb'].items():
                 self.proc_data_dict['projected_data_dict'][qbn] = OrderedDict()
                 for state_prob in ['pg', 'pe', 'pf']:
                     self.proc_data_dict['projected_data_dict'][qbn].update(
-                        {state_prob: data for key, data in data_dict.items() if
-                         state_prob in key})
+                        {state_prob: data for key, data in data_dict.items()
+                         if state_prob in key})
             if self.cal_states_dict is None:
                 self.cal_states_dict = {}
             self.num_cal_points = np.array(list(
@@ -354,26 +372,25 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         'sweep_points'][-self.num_cal_points::]
             else:
                 self.proc_data_dict['sweep_points_dict'][qbn][
-                    'msmt_sweep_points'] = \
-                    self.proc_data_dict['sweep_points'][0]
+                    'msmt_sweep_points'] = self.proc_data_dict[
+                    'sweep_points_dict'][qbn]['sweep_points']
                 self.proc_data_dict['sweep_points_dict'][qbn][
-                    'cal_points_sweep_points'] = \
-                    self.proc_data_dict['sweep_points'][0]
+                    'cal_points_sweep_points'] = []
         if self.options_dict.get('TwoD', False):
-            sweep_points_2D_dict = self.get_param_value('data_to_fit')
+            sweep_points_2D_dict = self.get_param_value('sweep_points_2D_dict')
             soft_sweep_params = self.get_param_value('soft_sweep_params')
             if sweep_points_2D_dict is not None:
                 # assumed to be of the form {qbn1: swpts_array1,
                 # qbn2: swpts_array2}
                 self.proc_data_dict['sweep_points_2D_dict'] = \
-                    {qbn: sweep_points_2D_dict[qbn] for qbn in self.qb_names}
+                    sweep_points_2D_dict
             elif soft_sweep_params is not None:
                 self.proc_data_dict['sweep_points_2D_dict'] = \
                     {qbn: list(soft_sweep_params.values())[0]['values']
                      for qbn in self.qb_names}
             else:
                 self.proc_data_dict['sweep_points_2D_dict'] = \
-                    {qbn: self.raw_data_dict['soft_sweep_points'][0] for
+                    {qbn: self.raw_data_dict['soft_sweep_points'] for
                      qbn in self.qb_names}
 
     def get_cal_data_points(self):
@@ -443,34 +460,23 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
             else:
                 cal_zero_points = list(cal_states_dict[qb_name].values())[0]
                 cal_one_points = list(cal_states_dict[qb_name].values())[1]
-        #     data = np.stack(list(meas_res_dict.values()), axis=1)
-        #
-        #     cal_points = np.zeros((len(cal_states_dict),
-        #                            len(meas_res_dict)))
-        #     for i, cal_state in enumerate(cal_states_dict):
-        #         cal_points[i] = [np.mean(dat[cal_states_dict[cal_state]])
-        #                          for dat in meas_res_dict.values()]
-        #     print(cal_points)
-        #     rotated_data = a_tools.predict_gm_proba_from_cal_points(
-        #         data, cal_points)
-        #     print(rotated_data.shape)
-        #     rotated_data_dict[qb_name] = rotated_data[:, 2]
-        #         # {list(cal_states_dict)[i]: rotated_data[:, i] for i in
-        #         #  range(len(cal_states_dict))}
-        #
-        # return rotated_data_dict
             rotated_data_dict[qb_name] = OrderedDict()
             if len(meas_res_dict) == 1:
                 # one RO channel per qubit
-                rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
-                    a_tools.normalize_data_v3(
-                        data=meas_res_dict[list(meas_res_dict)[0]],
-                        cal_zero_points=cal_zero_points,
-                        cal_one_points=cal_one_points)
+                if cal_zero_points is None and cal_one_points is None:
+                    data = meas_res_dict[list(meas_res_dict)[0]]
+                    rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
+                        (data - np.min(data))/(np.max(data) - np.min(data))
+                else:
+                    rotated_data_dict[qb_name][data_to_fit[qb_name]] = \
+                        a_tools.rotate_and_normalize_data_1ch(
+                            data=meas_res_dict[list(meas_res_dict)[0]],
+                            cal_zero_points=cal_zero_points,
+                            cal_one_points=cal_one_points)
             elif list(meas_res_dict) == channel_map[qb_name]:
                 # two RO channels per qubit
                 rotated_data_dict[qb_name][data_to_fit[qb_name]], _, _ = \
-                    a_tools.rotate_and_normalize_data(
+                    a_tools.rotate_and_normalize_data_IQ(
                         data=np.array([v for v in meas_res_dict.values()]),
                         cal_zero_points=cal_zero_points,
                         cal_one_points=cal_one_points)
@@ -486,7 +492,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     if len(ro_suffixes) == len(meas_res_dict):
                         # one RO ch per qubit
                         rotated_data_dict[qb_name][ro_suf] = \
-                            a_tools.normalize_data_v3(
+                            a_tools.rotate_and_normalize_data_1ch(
                                 data=meas_res_dict[list(meas_res_dict)[i]],
                                 cal_zero_points=cal_zero_points,
                                 cal_one_points=cal_one_points)
@@ -499,7 +505,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                                for k in correct_keys])
                         rotated_data_dict[qb_name][ro_suf], \
                         _, _ = \
-                            a_tools.rotate_and_normalize_data(
+                            a_tools.rotate_and_normalize_data_IQ(
                                 data=data_array,
                                 cal_zero_points=cal_zero_points,
                                 cal_one_points=cal_one_points)
@@ -524,7 +530,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     deepcopy(raw_data_arr.transpose())
                 for col in range(raw_data_arr.shape[1]):
                     rotated_data_dict[qb_name][data_to_fit[qb_name]][col] = \
-                        a_tools.normalize_data_v3(
+                        a_tools.rotate_and_normalize_data_1ch(
                             data=raw_data_arr[:, col],
                             cal_zero_points=cal_zero_points,
                             cal_one_points=cal_one_points)
@@ -538,7 +544,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         [v[:, col] for v in meas_res_dict.values()])
                     rotated_data_dict[qb_name][
                             data_to_fit[qb_name]][col], _, _ = \
-                        a_tools.rotate_and_normalize_data(
+                        a_tools.rotate_and_normalize_data_IQ(
                             data=data_array,
                             cal_zero_points=cal_zero_points,
                             cal_one_points=cal_one_points)
@@ -561,7 +567,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                         for col in range(raw_data_arr.shape[1]):
                             rotated_data_dict[qb_name][
                                 ro_suf][col] = \
-                                a_tools.normalize_data_v3(
+                                a_tools.rotate_and_normalize_data_1ch(
                                     data=raw_data_arr[:, col],
                                     cal_zero_points=cal_zero_points,
                                     cal_one_points=cal_one_points)
@@ -575,7 +581,7 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                                 [v[:, col] for k, v in meas_res_dict.items()
                                  if ro_suf in k])
                             rotated_data_dict[qb_name][ro_suf][col], _, _ = \
-                                a_tools.rotate_and_normalize_data(
+                                a_tools.rotate_and_normalize_data_IQ(
                                     data=data_array,
                                     cal_zero_points=cal_zero_points,
                                     cal_one_points=cal_one_points)
@@ -647,9 +653,9 @@ class MultiQubit_TimeDomain_Analysis(ba.BaseDataAnalysis):
                     self.prepare_raw_data_plots(plot_filtered=True)
 
     def prepare_raw_data_plots(self, plot_filtered=False):
-        if plot_filtered:
+        if plot_filtered or not self.data_with_reset:
             key = 'meas_results_per_qb'
-            suffix = 'filtered'
+            suffix = 'filtered' if self.data_with_reset else ''
             func_for_swpts = lambda qb_name: self.proc_data_dict[
                 'sweep_points_dict'][qb_name]['sweep_points']
         else:
@@ -981,7 +987,6 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
             if not vary_N2:
                 guess_pars['N2'].value = 1e21
                 guess_pars['N2'].vary = False
-            # print(guess_pars)
             self.fit_dicts['fit {}'.format(states[i])] = {
                 'model': mod,
                 'fit_xvals': {'N': xvals},
@@ -1028,7 +1033,7 @@ class Grovers_TwoQubitAllStates_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
 
             if normalize_to_cal_points:
-                yvals = a_tools.normalize_data_v3(yvals,
+                yvals = a_tools.rotate_and_normalize_data_1ch(yvals,
                     cal_zero_points=cal_points[idx][0],
                     cal_one_points=cal_points[idx][1])
             self.proc_data_dict['yvals_{}'.format(idx)] = yvals
@@ -1680,7 +1685,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
 
             if normalize_to_cal_points:
-                yvals = a_tools.normalize_data_v3(yvals,
+                yvals = a_tools.rotate_and_normalize_data_1ch(yvals,
                     cal_zero_points=cal_points[i][0],
                     cal_one_points=cal_points[i][1])
                 i +=1
@@ -2304,8 +2309,6 @@ class ReadoutROPhotonsAnalysis(Single_Qubit_TimeDomainAnalysis):
             self.run_analysis()
 
     def process_data(self):
-        #print(len(self.raw_data_dict['measured_values'][0][0]))
-        #print(len(self.raw_data_dict['measured_data']['raw w0 _measure'][0]))
         self.proc_data_dict = OrderedDict()
         self.proc_data_dict['qubit_state'] = [[],[]]
         self.proc_data_dict['delay_to_relax'] = self.raw_data_dict[
@@ -3032,12 +3035,12 @@ class MeasurementInducedDephasingAnalysis(ba.BaseDataAnalysis):
                            if ch[-8:] == '_measure']
         if len(rdd['measured_values']) == 1:
             # if only one weight function is used rotation is not required
-            pdd['corr_data_all'] = a_tools.normalize_data_v3(
+            pdd['corr_data_all'] = a_tools.rotate_and_normalize_data_1ch(
                     rdd['measured_values'], 
                     cal_zero_points=self.cal_points[0],
                     cal_one_points=self.cal_points[1])
         else:
-            pdd['corr_data_all'] = a_tools.rotate_and_normalize_data(
+            pdd['corr_data_all'] = a_tools.rotate_and_normalize_data_IQ(
                 data=rdd['measured_values'],
                 zero_coord=None, one_coord=None,
                 cal_zero_points=self.cal_points[0],
@@ -4136,6 +4139,128 @@ class EchoAnalysis(MultiQubit_TimeDomain_Analysis):
         self.echo_analysis.save_figures(close_figs=True)
 
 
+class RamseyAddPulseAnalysis(MultiQubit_TimeDomain_Analysis):
+
+    def __init__(self, *args, **kwargs):
+        auto = kwargs.pop('auto', True)
+        super().__init__(*args, auto=False, **kwargs)
+        self.ramsey_analysis = RamseyAnalysis(*args, auto=False,
+                                             options_dict=dict(
+                                             data_filter=lambda raw: np.concatenate([raw[:-4][1::2], raw[-4:]])),
+                                             **kwargs)
+        self.ramsey_add_pulse_analysis = RamseyAnalysis(*args, auto=False,
+                                             options_dict=dict
+                                             (data_filter=lambda raw: np.concatenate([raw[:-4][0::2], raw[-4:]])),
+                                             **kwargs)
+
+
+        if auto:
+            self.ramsey_analysis.extract_data()
+            self.ramsey_analysis.process_data()
+            self.ramsey_analysis.prepare_fitting()
+            self.ramsey_analysis.run_fitting()
+            self.ramsey_analysis.save_fit_results()
+            self.ramsey_add_pulse_analysis.extract_data()
+            self.ramsey_add_pulse_analysis.process_data()
+            self.ramsey_add_pulse_analysis.prepare_fitting()
+            self.ramsey_add_pulse_analysis.run_fitting()
+            self.ramsey_add_pulse_analysis.save_fit_results()
+            self.raw_data_dict = self.ramsey_analysis.raw_data_dict
+            self.analyze_fit_results()
+            self.prepare_plots()
+            keylist = []
+            for qbn in self.qb_names:
+                figure_name = 'CrossZZ_' + qbn
+                keylist.append(figure_name+'with')
+                keylist.append(figure_name+'no')
+            self.plot()
+            self.save_figures(close_figs=True)
+
+    def analyze_fit_results(self):
+        self.cross_kerr = 0.0
+        self.ramsey_analysis.analyze_fit_results()
+        self.ramsey_add_pulse_analysis.analyze_fit_results()
+
+        self.proc_data_dict['analysis_params_dict'] = OrderedDict()
+
+
+        for qbn in self.qb_names:
+
+            self.proc_data_dict['analysis_params_dict'][qbn] = OrderedDict()
+
+            self.params_dict_ramsey = self.ramsey_analysis.proc_data_dict[
+                'analysis_params_dict'][qbn]
+            self.params_dict_add_pulse = self.ramsey_add_pulse_analysis.proc_data_dict[
+                'analysis_params_dict'][qbn]
+            self.cross_kerr = self.params_dict_ramsey['exp_decay_'+str(qbn)]['new_qb_freq'] \
+                            - self.params_dict_add_pulse['exp_decay_'+str(qbn)]['new_qb_freq']
+            self.cross_kerr_error = np.sqrt((self.params_dict_ramsey['exp_decay_'+str(qbn)]['new_qb_freq_stderr'])**2 + \
+                                            (self.params_dict_add_pulse['exp_decay_' + str(qbn)]['new_qb_freq_stderr'])**2)
+
+    def prepare_plots(self):
+        self.ramsey_analysis.prepare_plots()
+        self.ramsey_add_pulse_analysis.prepare_plots()
+
+        self.ramsey_analysis.plot(key_list='auto')
+        self.ramsey_analysis.save_figures(close_figs=True, savebase='Ramsey_no')
+
+        self.ramsey_add_pulse_analysis.plot(key_list='auto')
+        self.ramsey_add_pulse_analysis.save_figures(close_figs=True,  savebase='Ramsey_with')
+
+        self.options_dict['plot_proj_data'] = False
+        self.metadata = {'plot_proj_data': False, 'plot_raw_data': False}
+        super().prepare_plots()
+
+        for qbn in self.qb_names:
+            data_no = self.ramsey_analysis.proc_data_dict['data_to_fit'][qbn][:-4]
+            data_with = self.ramsey_add_pulse_analysis.proc_data_dict['data_to_fit'][qbn][:-4]
+            delays = self.ramsey_analysis.proc_data_dict['sweep_points_dict'][qbn]['sweep_points'][:-4]
+
+            figure_name = 'CrossZZ_' + qbn
+            self.plot_dicts[figure_name+'with'] = {
+                'fig_id': figure_name,
+                'plotfn': self.plot_line,
+                'xvals': np.array(delays)*1e6,
+                'yvals': np.array(data_with),
+                'xlabel': 'Ramsey delay, $\mu$s',
+                'ylabel': '|e> state population',
+                'setlabel': 'with $\pi$-pulse',
+                'color': 'r',
+                'marker': 'o',
+                'line_kws': {'markersize': 5},
+                'linestyle': '-',
+                'do_legend': True,
+                'legend_ncol': 2,
+                'legend_bbox_to_anchor': (1, -0.15),
+                'legend_pos': 'upper right'}
+
+            self.plot_dicts[figure_name+'no'] = {
+                'fig_id': figure_name,
+                'plotfn': self.plot_line,
+                'xvals': np.array(delays)*1e6,
+                'yvals': np.array(data_no),
+                'setlabel': 'no $\pi$-pulse',
+                'color': 'g',
+                'marker': 'o',
+                'line_kws': {'markersize': 5},
+                'linestyle': '-',
+                'do_legend': True,
+                'legend_ncol': 2,
+                'legend_bbox_to_anchor': (1, -0.15),
+                'legend_pos': 'upper right'}
+
+            textstr = r'$\alpha ZZ$ = {:.2f} +- {:.2f}'.format(
+               self.cross_kerr*1e-3, self.cross_kerr_error*1e-3) + ' kHz'
+
+            self.plot_dicts['text_msg_' + qbn] = {'fig_id': figure_name,
+                                                  'text_string': textstr,
+                                                  'ypos': 0.8,
+                                                  'xpos': 0.8,
+                                                  'plotfn': self.plot_text,}
+
+
+
+
 class OverUnderRotationAnalysis(MultiQubit_TimeDomain_Analysis):
 
     def __init__(self, *args, **kwargs):
@@ -4299,6 +4424,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
+        self.leakage_values = np.array([])
         labels = ['e', 'g']
         for i, qbn in enumerate(self.qb_names):
             for row in range(self.proc_data_dict['data_to_fit_reshaped'][
@@ -4326,15 +4452,19 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                         'fit_yvals': {'data': data},
                         'guess_pars': guess_pars}
                 else:
-                    # fit leakage qb results to a constant
-                    model = lmfit.models.ConstantModel()
-                    guess_pars = model.guess(data=data, x=phases)
+                    if self.get_param_value('classified_ro', False):
+                        self.leakage_values = np.append(self.leakage_values,
+                                                        np.mean(data))
+                    else:
+                        # fit leakage qb results to a constant
+                        model = lmfit.models.ConstantModel()
+                        guess_pars = model.guess(data=data, x=phases)
 
-                    self.fit_dicts[key] = {
-                        'fit_fn': model.func,
-                        'fit_xvals': {'x': phases},
-                        'fit_yvals': {'data': data},
-                        'guess_pars': guess_pars}
+                        self.fit_dicts[key] = {
+                            'fit_fn': model.func,
+                            'fit_xvals': {'x': phases},
+                            'fit_yvals': {'data': data},
+                            'guess_pars': guess_pars}
 
     def analyze_fit_results(self):
         self.proc_data_dict['analysis_params_dict'] = OrderedDict()
@@ -4363,7 +4493,7 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
         amps_errs[amps_errs == None] = 0.0
 
         population_loss = np.abs(amps[0::2] - amps[1::2])/amps[1::2]
-        x = amps[0::2] - amps[1::2]
+        x   = amps[0::2] - amps[1::2]
         x_err = np.array(amps_errs[0::2]**2 + amps_errs[1::2]**2,
                          dtype=np.float64)
         y = amps[1::2]
@@ -4376,24 +4506,26 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
 
         if self.leakage_qbname is not None:
             # get leakage
-            keys = [k for k in list(self.fit_dicts.keys()) if
-                    self.leakage_qbname in k]
-            fit_res_objs = [self.fit_dicts[k]['fit_res'] for k in keys]
+            if self.get_param_value('classified_ro', False):
+                leakage = self.leakage_values[0::2] - self.leakage_values[1::2]
+                leakage_errs = np.zeros(len(leakage))
+            else:
+                keys = [k for k in list(self.fit_dicts.keys()) if
+                        self.leakage_qbname in k]
+                fit_res_objs = [self.fit_dicts[k]['fit_res'] for k in keys]
 
-            lines = np.array([fr.best_values['c'] for fr in fit_res_objs])
-            lines_errs = np.array([fr.params['c'].stderr for fr in fit_res_objs])
-            lines_errs[lines_errs == None] = 0.0
+                lines = np.array([fr.best_values['c'] for fr in fit_res_objs])
+                lines_errs = np.array([fr.params['c'].stderr for
+                                       fr in fit_res_objs])
+                lines_errs[lines_errs == None] = 0.0
 
-            leakage = lines[0::2] - lines[1::2]#/np.abs(lines[1::2])
-            x = lines[1::2] - lines[0::2]
-            x_err = np.array(np.sqrt(lines_errs[0::2]**2 + lines_errs[1::2]**2),
-                             dtype=np.float64)
-            y = lines[1::2]
-            y_err = lines_errs[1::2]
-            leakage_errs = np.sqrt(np.array(
-                ((y*x_err)**2 + (x*y_err)**2)/(y**4), dtype=np.float64))
+                leakage = lines[0::2] - lines[1::2]
+                leakage_errs = np.array(np.sqrt(lines_errs[0::2]**2 +
+                                                lines_errs[1::2]**2),
+                                 dtype=np.float64)
+
             self.proc_data_dict['analysis_params_dict'][
-                'leakage'] = {'val': leakage, 'stderr': x_err}
+                'leakage'] = {'val': leakage, 'stderr': leakage_errs}
 
         self.save_processed_data(key='analysis_params_dict')
 
@@ -4474,25 +4606,38 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             else:
                 legend_label = 'qbc in $|g\\rangle$' if \
                     row % 2 != 0 else 'qbc in $|e\\rangle$'
-
+            hard_sweep_params = self.get_param_value('hard_sweep_params')
+            sweep_name = self.get_param_value('sweep_name')
+            sweep_unit = self.get_param_value('sweep_unit')
+            if hard_sweep_params is not None:
+                xlabel = list(hard_sweep_params)[0]
+                xunit = list(hard_sweep_params.values())[0][
+                    'unit']
+            elif (sweep_name is not None) and (sweep_unit is not None):
+                xlabel = sweep_name
+                xunit = sweep_unit
+            else:
+                xlabel = self.raw_data_dict['sweep_parameter_names']
+                xunit = self.raw_data_dict['sweep_parameter_units']
+            if np.ndim(xunit) > 0:
+                xunit = xunit[0]
             self.plot_dicts['data_{}_{}_{}'.format(
                 row, qbn, prob_label)] = {
                 'plotfn': self.plot_line,
                 'fig_id': figure_name,
                 'plotsize': plotsize,
                 'xvals': phases,
-                'xlabel': self.raw_data_dict[
-                    'sweep_parameter_names'][0][0],
-                'xunit': self.raw_data_dict[
-                    'sweep_parameter_units'][0][0],
+                'xlabel': xlabel,
+                'xunit': xunit,
                 'yvals': data,
                 'ylabel': '{} state population'.format(
                     self.get_latex_prob_label(prob_label)),
                 'yunit': '',
+                'yscale': self.get_param_value("yscale", "linear"),
                 'setlabel': 'Data - ' + legend_label
                 if row in [0, 1] else '',
                 'title': self.raw_data_dict['timestamp'] + ' ' +
-                         self.raw_data_dict['measurementstring'],
+                         self.raw_data_dict['measurementstring'] + '-' + qbn,
                 'linestyle': 'none',
                 'color': 'C0' if row % 2 == 0 else 'C2',
                 'do_legend': row in [0, 1],
@@ -4503,9 +4648,9 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
             if self.do_fitting and 'projected' not in figure_name:
                 k = 'fit_{}{}_{}'.format(
                     'e' if row % 2 == 0 else 'g', row, qbn)
-                fit_res = self.fit_dicts[k]['fit_res']
 
                 if qbn == self.cphase_qbname:
+                    fit_res = self.fit_dicts[k]['fit_res']
                     self.plot_dicts[k + '_' + prob_label] = {
                         'fig_id': figure_name,
                         'plotfn': self.plot_fit,
@@ -4519,28 +4664,32 @@ class CPhaseLeakageAnalysis(MultiQubit_TimeDomain_Analysis):
                             legend_bbox_to_anchor,
                         'legend_pos': legend_pos}
                 else:
-                    xvals = fit_res.userkws[
-                        fit_res.model.independent_vars[0]]
-                    xfine = np.linspace(min(xvals), max(xvals), 100)
-                    yvals = fit_res.model.func(
-                        xfine, **fit_res.best_values)
-                    if not hasattr(yvals, '__iter__'):
-                        yvals = np.array(len(xfine)*[yvals])
+                    if self.get_param_value('classified_ro', False):
+                        pass
+                    else:
+                        fit_res = self.fit_dicts[k]['fit_res']
+                        xvals = fit_res.userkws[
+                            fit_res.model.independent_vars[0]]
+                        xfine = np.linspace(min(xvals), max(xvals), 100)
+                        yvals = fit_res.model.func(
+                            xfine, **fit_res.best_values)
+                        if not hasattr(yvals, '__iter__'):
+                            yvals = np.array(len(xfine)*[yvals])
 
-                    self.plot_dicts[k] = {
-                        'fig_id': figure_name,
-                        'plotfn': self.plot_line,
-                        'xvals': xfine,
-                        'yvals': yvals,
-                        'marker': '',
-                        'setlabel': 'Fit - ' + legend_label
-                        if row in [0, 1] else '',
-                        'do_legend': row in [0, 1],
-                        'legend_ncol': legend_ncol,
-                        'color': 'C0' if row % 2 == 0 else 'C2',
-                        'legend_bbox_to_anchor':
-                            legend_bbox_to_anchor,
-                        'legend_pos': legend_pos}
+                        self.plot_dicts[k] = {
+                            'fig_id': figure_name,
+                            'plotfn': self.plot_line,
+                            'xvals': xfine,
+                            'yvals': yvals,
+                            'marker': '',
+                            'setlabel': 'Fit - ' + legend_label
+                            if row in [0, 1] else '',
+                            'do_legend': row in [0, 1],
+                            'legend_ncol': legend_ncol,
+                            'color': 'C0' if row % 2 == 0 else 'C2',
+                            'legend_bbox_to_anchor':
+                                legend_bbox_to_anchor,
+                            'legend_pos': legend_pos}
 
         # ref state plots need to be added at the end, otherwise the
         # legend for |g> and |e> is added twice (because of the
@@ -4743,7 +4892,7 @@ class CZDynamicPhaseAnalysis(MultiQubit_TimeDomain_Analysis):
                         textstr += '\n length: {:.2f} ns'.format(fpl*1e9)
                     fpa = self.get_param_value('flux_pulse_amp')
                     if fpa is not None:
-                        textstr += '\n amp: {:.2f} V'.format(fpa)
+                        textstr += '\n amp: {:.4f} V'.format(fpa)
 
                     self.plot_dicts['text_msg_' + qbn] = {
                         'fig_id': base_plot_name,

@@ -234,7 +234,11 @@ class dummy_UHFQC(Instrument):
         return get_func
 
     def clock_freq(self):
-        return 1.8e9/(2**self.awgs_0_time())
+        try:
+            return 1.8e9/(2**self.awgs_0_time())
+        except TypeError:
+            # occurs if awgs_0_time is None instead of 0
+            return 1.8e9/(2**0)
 
     def awg(self, filename):
         """

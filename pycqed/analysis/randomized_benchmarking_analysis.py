@@ -137,7 +137,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
 
             data = np.zeros((self.n_cl.size))
             if find_empirical_variance:
-                self.epsilon = np.zeros((self.n_cl.size))
+                self.epsilon = np.zeros(self.n_cl.size)
             for i in range(self.n_cl.size):
                 y = [data_raw[j][i] for j in range(self.nr_seeds)]
                 data[i] = np.mean(y)
@@ -169,11 +169,11 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
             # for TwoD==False
             self.data_calibrated = deepcopy(self.data_rearranged[0])
             if find_empirical_variance:
-                self.epsilon = np.zeros((self.n_cl.size))
+                self.epsilon = np.zeros(self.n_cl.size)
             for i in range(self.n_cl.size):
                 a[0] = data_rearranged[0][i]
                 a[1] = data_rearranged[1][i]
-                data_calibrated = a_tools.rotate_and_normalize_data(
+                data_calibrated = a_tools.rotate_and_normalize_data_IQ(
                     a, self.cal_points[0], self.cal_points[1])[0]
                 self.data_calibrated[i] = data_calibrated
                 data_calibrated = data_calibrated[:-int(self.NoCalPoints)]

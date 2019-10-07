@@ -33,7 +33,7 @@ class OptimizationAnalysis(ba.BaseDataAnalysis):
 
 
         for i, val_name in enumerate(self.raw_data_dict['value_names'][0]):
-            yvals = self.raw_data_dict['measured_values_ord_dict'][val_name][0]
+            yvals = self.raw_data_dict['measured_data'][val_name][0]
 
             self.plot_dicts['{}_vs_iteration'.format(val_name)] = {
                 'plotfn': self.plot_line,

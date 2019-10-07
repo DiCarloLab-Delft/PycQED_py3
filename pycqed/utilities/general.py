@@ -18,6 +18,7 @@ import subprocess
 from functools import reduce  # forward compatibility for Python 3
 import operator
 import string
+log = logging.getLogger(__name__)
 
 digs = string.digits + string.ascii_letters
 
@@ -163,7 +164,7 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
                 ins_group = sets_group[instrument_name]
             else:
                 ins_group = sets_group[load_from_instr]
-            print('Loaded Settings Successfully')
+            log.info('Loaded Settings Successfully')
             success = True
         except:
             older_than = os.path.split(folder)[0][-8:] \
@@ -173,7 +174,7 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
         count += 1
 
     if not success:
-        print('Could not open settings for instrument "%s"' % (
+        log.warning('Could not open settings for instrument "%s"' % (
             instrument_name))
         return False
 
@@ -184,14 +185,14 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
                     try:
                         instrument.set(parameter, False)
                     except:
-                        print('Could not set parameter: "%s" to "%s" for '
+                        log.error('Could not set parameter: "%s" to "%s" for '
                               'instrument "%s"' % (
                             parameter, value, instrument_name))
                 elif value == 'True':
                     try:
                         instrument.set(parameter, True)
                     except:
-                        print('Could not set parameter: "%s" to "%s" for '
+                        log.error('Could not set parameter: "%s" to "%s" for '
                               'instrument "%s"' % (
                             parameter, value, instrument_name))
                 else:
@@ -204,7 +205,7 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
                             try:
                                 instrument.set(parameter, int(value))
                             except:
-                                print('Could not set parameter: "%s" to "%s" '
+                                log.error('Could not set parameter: "%s" to "%s" '
                                       'for instrument "%s"' % (
                                     parameter, value, instrument_name))
             else:
@@ -234,6 +235,7 @@ def load_settings(instrument,
         params_to_set (list)    : list of strings referring to the parameters
             that should be set for the instrument
     '''
+    from numpy import array  # DO not remove. Used in eval(array(...))
     if folder is None:
         folder_specified = False
     else:
@@ -307,13 +309,13 @@ def load_settings(instrument,
                                 instrument.set(parameter, float(value))
                             except Exception:
                                 try:
-                                    instrument.set(parameter, value)
+                                    instrument.set(parameter, eval(value))
                                 except Exception:
                                     try:
                                         instrument.set(parameter,
-                                                       ast.literal_eval(value))
+                                                       value)
                                     except Exception:
-                                        print('Could not set parameter '
+                                        log.error('Could not set parameter '
                                               '"%s" to "%s" '
                                               'for instrument "%s"' % (
                                                   parameter, value,
@@ -334,7 +336,7 @@ def load_settings(instrument,
         count += 1
 
     if not success:
-        print('Could not open settings for instrument {}.'.format(
+        log.error('Could not open settings for instrument {}.'.format(
             instrument_name))
     print()
     return
@@ -710,7 +712,7 @@ class NumpyJsonEncoder(json.JSONEncoder):
             return super().default(o)
 
 
-@contextmanager
+
 def temporary_value(*param_value_pairs):
     """
     This context manager allows to change a given QCodes parameter
@@ -726,37 +728,25 @@ def temporary_value(*param_value_pairs):
         # setting the parameter value
         with temporary_values((qb1.ro_freq, 6e9)):
             qb1.measure_spectroscopy(...)
-            
     """
-    if not isinstance(param_value_pairs[0], (tuple, list)):
-        param_value_pairs = (param_value_pairs,)
 
-    old_value_pairs = [(param, param()) for param, value in param_value_pairs]
-    for param, value in param_value_pairs: 
-        param(value)
-    yield
-    for param, value in old_value_pairs: 
-        param(value)
+    class TemporaryValueContext:
+        def __init__(self, *param_value_pairs):
+            if not isinstance(param_value_pairs[0], (tuple, list)):
+                param_value_pairs = (param_value_pairs,)
+            self.param_value_pairs = param_value_pairs
+            self.old_value_pairs = []
 
-class KeyboardFinish(KeyboardInterrupt):
-    """
-    Indicates that the user safely aborts/finishes the experiment.
-    Used to finish the experiment without raising an exception.
-    """
-    pass
-
-
-def check_keyboard_interrupt():
-    try:  # Try except statement is to make it work on non windows pc
-        if msvcrt.kbhit():
-            key = msvcrt.getch()
-            if b'q' in key:
-                # this causes a KeyBoardInterrupt
-                raise KeyboardInterrupt('Human "q" terminated experiment.')
-            elif b'f' in key:
-                # this should not raise an exception
-                raise KeyboardFinish(
-                    'Human "f" terminated experiment safely.')
-    except Exception:
-        pass
+        def __enter__(self):
+            log.debug('Entered TemporaryValueContext')
+            self.old_value_pairs = \
+                [(param, param()) for param, value in self.param_value_pairs]
+            for param, value in self.param_value_pairs:
+                param(value)
     
+        def __exit__(self, type, value, traceback):
+            for param, value in self.old_value_pairs: 
+                param(value)
+            log.debug('Exited TemporaryValueContext')
+    
+    return TemporaryValueContext(*param_value_pairs)

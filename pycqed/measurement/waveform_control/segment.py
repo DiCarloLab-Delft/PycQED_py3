@@ -8,6 +8,7 @@
 import numpy as np
 import math
 import logging
+log = logging.getLogger(__name__)
 from copy import deepcopy
 import pycqed.measurement.waveform_control.pulse_library as pl
 import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
@@ -54,7 +55,8 @@ class Segment:
 
         # Makes sure that pulse name is unique
         if pars_copy.get('name') in self._pulse_names:
-            raise ValueError('Name of added pulse already exists!')
+            raise ValueError(f'Name of added pulse already exists: '
+                             f'{pars_copy.get("name")}')
         if pars_copy.get('name', None) is None:
             pars_copy['name'] = pulse_pars['pulse_type'] + '_' + str(
                 len(self.unresolved_pulses))
@@ -138,7 +140,6 @@ class Segment:
         for pulse in pulses['segment_start']:
             if pulse.pulse_obj.name in pulses:
                 ref_points.append((pulse.pulse_obj.name, pulse))
-
             t0 = pulse.delay - pulse.ref_point_new * pulse.pulse_obj.length
             pulse.pulse_obj.algorithm_time(t0)
             visited_pulses.append((t0, i, pulse))
@@ -167,8 +168,11 @@ class Segment:
                     i += 1
 
             ref_points = new_ref_points
-
         if len(visited_pulses) != len(self.unresolved_pulses):
+            log.error(len(visited_pulses), len(self.unresolved_pulses))
+            for unpulse in visited_pulses:
+                if unpulse not in self.unresolved_pulses:
+                    log.error(unpulse)
             raise Exception('Not all pulses have been resolved!')
 
         # adds the resolved pulses to the elements OrderedDictionary
@@ -197,7 +201,6 @@ class Segment:
         Adds charge compensation pulse to channels with pulsar parameter
         charge_buildup_compensation.
         """
-
         t_end = -float('inf')
         pulse_area = {}
         compensation_chan = set()
@@ -911,7 +914,7 @@ class Segment:
         """
         return samples / self.pulsar.clock(**kw)
 
-    def plot(self, instruments=None, channels=None,
+    def plot(self, instruments=None, channels=None, legend=True,
              delays=dict(), savefig=False, cmap=None, frameon=True):
         """
         Plots a segment. Can only be done if the segment can be resolved.
@@ -945,6 +948,7 @@ class Segment:
                 ax[i, 0].spines["right"].set_visible(frameon)
                 ax[i, 0].spines["bottom"].set_visible(frameon)
                 ax[i, 0].spines["left"].set_visible(frameon)
+                ax[i, 0].set_ylabel('Voltage (V)')
                 # plotting
                 for elem_name, v in wfs[instr].items():
                     for k, wf_per_ch in v.items():
@@ -958,18 +962,17 @@ class Segment:
                                 ax[i, 0].plot(tvals * 1e6, wf,
                                               label=f"{elem_name[1]}_{k}_{ch}",
                                               linewidth=0.7)
-
-                ax[i, 0].legend(loc=[1.02, 0], prop={'size': 8})
+                if legend:
+                    ax[i, 0].legend(loc=[1.02, 0], prop={'size': 8})
 
             # formatting
             ax[-1, 0].set_xlabel('time ($\mu$s)')
-            # start, end = ax[-1,0].get_xlim()
-            # step = (end - start)/20
-            # ax[-1,0].xaxis.set_ticks(np.arange(start, end, 0.25))
+            fig.suptitle(f'{self.name}')
             plt.tight_layout()
             if savefig:
                 plt.savefig(f'{self.name}.png')
             plt.show()
+            return fig, ax
         except Exception as e:
             log.error(f"Could not plot: {self.name}")
             raise e
