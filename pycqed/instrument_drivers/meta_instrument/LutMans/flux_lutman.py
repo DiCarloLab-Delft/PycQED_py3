@@ -1,10 +1,14 @@
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 import numpy as np
 import logging
+log = logging.getLogger(__name__)
 from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
+from pycqed.instrument_drivers.virtual_instruments import\
+noise_parameters_CZ_new as npCZ
+from pycqed.simulations import cz_superoperator_simulation_new2 as cz_main
 import warnings
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
@@ -137,6 +141,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict_dist = dict()
         self.sampling_rate(2.4e9)
         self._add_qubit_parameters()
+        self._add_CZ_sim_parameters()
 
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
@@ -715,7 +720,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         ch_pair = awg_ch % 2
         channel_amp = AWG.set('awgs_{}_outputs_{}_amplitude'.format(
             awg_nr, ch_pair), val)
-
 
     def _get_awg_channel_range(self):
         AWG = self.AWG.get_instr()
@@ -1303,6 +1307,72 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return ax
 
+    #################################
+    #  Simulation methods           #
+    #################################
+
+    def _add_CZ_sim_parameters(self):
+        for this_cz in ['NE', 'NW', 'SW', 'SE']:
+            self.add_parameter('anharm_q1_%s' % this_cz,
+                               docstring='[CZ simulation] Anharmonicity of static qubit.',
+                               vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+
+            self.add_parameter('bus_freq_%s' % this_cz,
+                               docstring='[CZ simulation] Bus frequency.',
+                               vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+            self.add_parameter('instr_sim_control_CZ_%s' % this_cz,
+                               docstring='Noise and other parameters for CZ simulation.',
+                               parameter_class=InstrumentRefParameter)
+
+    def sim_CZ(self, which_gate=None, qois='all'):
+        """
+        Simulates a CZ gate for the current paramenters.
+        """
+        # If there is only one sim_control_CZ instrument get it
+
+        if which_gate is None:
+            found = []
+            for this_cz in ['NE', 'NW', 'SW', 'SE']:
+                try:
+                    found.append(getattr(self, 'instr_sim_control_CZ_{}'.format(this_cz)).get_instr())
+                except Exception:
+                    pass
+
+            if len(found) == 0:
+                raise Exception('No sim_control_CZ instrument found! Define a "SimControlCZ" instrument first.')
+            elif len(found) > 1:
+                raise Exception('CZ instruments found: {}. Please specify "which_gate"'.
+                    format(found))
+            else:
+                sim_control_CZ = found[0]
+                which_gate = sim_control_CZ.which_gate()
+        else:
+            sim_control_CZ = getattr(self, 'instr_sim_control_CZ_{}'.format(which_gate)).get_instr()
+            assert which_gate == sim_control_CZ.which_gate()
+
+        # if not defined set the sweetspot freqs same as the operating
+        # point freqs
+        if sim_control_CZ.get('w_q0_sweetspot') is None:
+            sim_control_CZ.w_q0_sweetspot(self.get('q_freq_01'))
+        if sim_control_CZ.get('w_q1_sweetspot') is None:
+            sim_control_CZ.w_q1_sweetspot(self.get('q_freq_10_{}'.format(which_gate)))
+
+        detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ, qois=qois)
+
+        sim_results = detector.acquire_data_point()
+
+        if qois == 'all':
+            values = {detector.value_names[i]: sim_results[i] for i, result in enumerate(sim_results)}
+            units = {detector.value_names[i]: detector.value_units[i] for i, result in enumerate(sim_results)}
+        else:
+            values = {qoi: sim_results[i] for i, qoi in enumerate(qois)}
+            units = {qoi: detector.value_units[detector.value_names.index(qoi)]
+                for i, qoi in enumerate(qois)}
+            pass
+
+        return values, units
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
