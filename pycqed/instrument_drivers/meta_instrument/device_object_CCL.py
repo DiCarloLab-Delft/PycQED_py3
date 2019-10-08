@@ -1281,32 +1281,36 @@ class DeviceCCL(Instrument):
                 extract_only=False)
             return a
 
-    def measure_residual_ZZ_coupling(self, q0: str, q1: str,
+    def measure_residual_ZZ_coupling(self, q0: str, q_spectators: list,
+                                     spectator_state='0',
                                      times=np.linspace(0, 10e-6, 26),
                                      analyze: bool = True, close_fig: bool = True,
                                      prepare_for_timedomain: bool = True, MC=None):
 
         assert q0 in self.qubits()
-        assert q1 in self.qubits()
+        for q_s in q_spectators:
+            assert q_s in self.qubits()
+
+        all_qubits = [q0]+q_spectators
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0, q1])
+            self.prepare_for_timedomain(qubits=all_qubits)
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
-        q1idx = self.find_instrument(q1).cfg_qubit_nr()
+        q_spec_idx_list = [self.find_instrument(q_s).cfg_qubit_nr() for q_s in q_spectators]
 
-        p = mqo.residual_coupling_sequence(times, q0idx, q1idx,
+        p = mqo.residual_coupling_sequence(times, q0idx, q_spec_idx_list,
+                                           spectator_state,
                                            self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
-
-        d = self.get_correlation_detector([q0, q1])
+        d = self.get_int_avg_det(qubits=all_qubits)
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('Residual_ZZ_{}_{}{}'.format(q0, q1, self.msmt_suffix))
+        MC.run('Residual_ZZ_{}_{}_{}{}'.format(q0, q_spectators, spectator_state, self.msmt_suffix))
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
