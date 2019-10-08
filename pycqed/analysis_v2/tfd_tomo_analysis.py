@@ -144,7 +144,6 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
 
             submatrix_B = matrix_B[op_id_list, :]
             inv_subB = np.linalg.pinv(submatrix_B).transpose()
-            print(inv_subB.shape, qubit_state_avg[i, cal_point_seg_start:].shape)
             betas_w1[i, :] = inv_subB @ qubit_state_avg[i, cal_point_seg_start:]
 
         # 6. Bining weight-2 data
@@ -521,7 +520,6 @@ class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
 
             submatrix_B = matrix_B[op_id_list, :]
             inv_subB = np.linalg.pinv(submatrix_B).transpose()
-            print(inv_subB.shape, qubit_state_avg[i, cal_point_seg_start:].shape)
             betas_w1[i, :] = inv_subB @ qubit_state_avg[i, cal_point_seg_start:]
 
         # 6. Bining weight-2 data
