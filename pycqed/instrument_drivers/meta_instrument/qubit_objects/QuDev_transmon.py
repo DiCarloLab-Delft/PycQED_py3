@@ -800,8 +800,9 @@ class QuDev_transmon(Qubit):
                         'The units should be seconds.')
 
         self.prepare(drive='timedomain')
-
         MC = self.instr_mc.get_instr()
+        if prep_params is None:
+            prep_params = self.preparation_params()
 
         # Define the measurement label
         if label is None:
