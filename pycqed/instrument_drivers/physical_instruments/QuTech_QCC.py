@@ -158,12 +158,16 @@ class QCC(SCPI):
                         parameter['get_parser'] = lambda v: np.array(
                             v.split(','), dtype=int)
                     elif (val_type == "QECDataType"):
-                        parameter["vals"] = vals.Arrays()
                         # The QECDataType assumes a long array of ints in which groups of 6 datapoints are returned.
                         # In this datatype every row corresponds to a timeslot
                         # every column corresponds to a qubit index.
+                        parameter["vals"] = vals.Arrays()
                         parameter['get_parser'] = lambda v: np.reshape( 
                             np.array(v.split(','), dtype=int), newshape=(-1, 6))
+                    elif (val_type == "QECOCMDataType"):
+                        parameter["vals"] = vals.Anything()
+                        # parameter['get_parser'] = lambda v: np.array(
+                        #       v.split(','), dtype=int)
 
                     elif (val_type == "Non_Neg_Number"):
                         if ("range" in validator):
