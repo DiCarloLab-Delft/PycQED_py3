@@ -475,6 +475,7 @@ def contour_overlay(x, y, z, colormap, transpose=False,
         # data half way to the cyclic boundary
         minz = (vmin + np.min(contour_levels)) / 2
         maxz = (vmax + np.max(contour_levels)) / 2
+        z = np.copy(z)  # don't change the original data
         z[(z < minz) | (z > maxz)] = np.nan
 
     c = ax.contour(x, y, z,
