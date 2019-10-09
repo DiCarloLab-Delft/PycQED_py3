@@ -70,7 +70,6 @@ import pycqed
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
-import pycqed.instrument_drivers.physical_instruments.QuTech_CCL as qtccl
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
@@ -464,7 +463,7 @@ while (1) {
 
         self.add_parameter(
             'cfg_codeword_protocol', initial_value='identical',
-            vals=validators.Enum('identical', 'microwave', 'flux'), docstring=(
+            vals=validators.Enum('identical', 'microwave', 'flux', 'new_microwave', 'new_novsm_microwave'), docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
@@ -605,6 +604,7 @@ while (1) {
 
             sequence_length = 8
             staircase_sequence = np.arange(1, sequence_length)
+
             # expected sequence should be ([9, 18, 27, 36, 45, 54, 63])
             expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
                                  (1, list(staircase_sequence + (staircase_sequence << 3))), \
@@ -616,21 +616,32 @@ while (1) {
             raise zibase.ziConfigurationError('old_microwave DIO scheme not supported on QCC.')
 
         elif self.cfg_codeword_protocol() == 'new_microwave':
-            raise NotImplementedError()
+
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','QCC_example',
+                'qisa_test_assembly','withvsm_calibration.qisa'))
+
+            sequence_length = 32
+            staircase_sequence = range(1, sequence_length)
+            expected_sequence =  [(0, list(staircase_sequence)), \
+                                 (1, list(staircase_sequence)), \
+                                 (2, list(reversed(staircase_sequence))), \
+                                 (3, list(reversed(staircase_sequence)))]
 
 
         elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
-            raise NotImplementedError()
-            # test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-            #     '..','examples','QCC_example',
-            #     'qisa_test_assembly','calibration_cws_mw.qisa'))
+           
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..','examples','QCC_example',
+                'qisa_test_assembly','novsm_calibration.qisa'))
 
-            # sequence_length = 32
-            # staircase_sequence = range(1, sequence_length)
-            # expected_sequence = [(0, list(reversed(staircase_sequence))), \
-            #                      (1, list(reversed(staircase_sequence))), \
-            #                      (2, list(reversed(staircase_sequence))), \
-            #                      (3, list(reversed(staircase_sequence)))]
+            sequence_length = 32
+            staircase_sequence = range(1, sequence_length)
+            expected_sequence = [(0, list(staircase_sequence)), \
+                                 (1, list(reversed(staircase_sequence))), \
+                                 (2, list(staircase_sequence)), \
+                                 (3, list(reversed(staircase_sequence))) ]
 
         else:
             zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
@@ -716,7 +727,6 @@ while (1) {
                 CCL=CC, verbose=verbose)
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
-
 
         # Make sure the configuration is up-to-date
         self.assure_ext_clock()
