@@ -13,7 +13,7 @@ np.set_printoptions(threshold=np.inf)
 # Hardcoded number of levels for the two transmons.
 # Currently only 3,3 or 4,3 are supported. The bottleneck is the function
 # that changes to the dressed basis at sweet spot (matrix_change_of_variables)
-n_levels_q0 = 4
+n_levels_q0 = 3
 n_levels_q1 = 3
 
 
