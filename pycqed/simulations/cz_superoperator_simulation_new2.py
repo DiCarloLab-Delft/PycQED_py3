@@ -244,7 +244,8 @@ def compute_propagator(arglist):
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
 
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
-    amp_final, f_pulse_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
+    if sim_control_CZ.sigma_q0() != 0:
+        amp_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
 
 
 
@@ -256,7 +257,8 @@ def compute_propagator(arglist):
         actual_Z_rotations_length = np.arange(0,sim_control_CZ.Z_rotations_length(),sim_step_new)[-1]+sim_step_new
         intervals_list = np.append(intervals_list,[actual_Z_rotations_length/2,actual_Z_rotations_length/2])
         amp_Z_rotation=[0,0]
-        amp_Z_rotation, f_pulse_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
+        if sim_control_CZ.sigma_q0() != 0:
+            amp_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
 
     # We add the idle time at the end of the pulse (even if it's not at the end. It doesn't matter)
     if sim_control_CZ.total_idle_time() != 0:
@@ -267,7 +269,8 @@ def compute_propagator(arglist):
                                                                     # and later restore it to the original value
         log.debug('Changing fluxlutman czd_double_sided_{} value to {}'.format(which_gate, False))
         fluxlutman.set('czd_double_sided_{}'.format(which_gate), False)
-        amp_idle_time, f_pulse_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
+        if sim_control_CZ.sigma_q0() != 0:
+            amp_idle_time = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_idle_time,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
         log.debug('Changing fluxlutman czd_double_sided_{} value back to {}'.format(which_gate, double_sided))
         fluxlutman.set('czd_double_sided_{}'.format(which_gate), double_sided)
 
@@ -277,10 +280,8 @@ def compute_propagator(arglist):
     # It comes after the previous line because of details of the function czf.shift_due_to_fluxbias_q0
     if sim_control_CZ.Z_rotations_length() != 0:
         amp_final=np.concatenate((amp_final,amp_Z_rotation))
-        f_pulse_final=np.concatenate((f_pulse_final,f_pulse_Z_rotation))
     if sim_control_CZ.total_idle_time() != 0:
         amp_final=np.concatenate((amp_final,amp_idle_time))
-        f_pulse_final=np.concatenate((f_pulse_final,f_pulse_idle_time))
 
     # czf.plot(x_plot_vec=[np.arange(0,np.size(intervals_list))],y_plot_vec=[amp_final],
     #                          title='Pulse with (possibly) single qubit rotations and idle time',
@@ -289,17 +290,13 @@ def compute_propagator(arglist):
     # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp_final_new],
     #                          title='Pulse with distortions and shift due to fluxbias_q0, difference',
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
-    # amp_final = amp_final_new
-    # czf.plot(x_plot_vec=[np.arange(0,np.size(intervals_list))],y_plot_vec=[f_pulse_final/1e9],
-    #                          title='Pulse with distortions and shift due to fluxbias_q0',
-    #                            xlabel='Time (ns)',ylabel='Frequency (GHz)')
 
 
     t_final = np.sum(intervals_list)        # actual overall gate length
 
 
     ### Obtain jump operators for Lindblad equation
-    c_ops = czf.return_jump_operators(sim_control_CZ=sim_control_CZ, f_pulse_final=f_pulse_final, fluxlutman=fluxlutman)
+    c_ops = czf.return_jump_operators(sim_control_CZ=sim_control_CZ, amp_final=amp_final, fluxlutman=fluxlutman, which_gate=which_gate)
 
 
     ### Compute propagator

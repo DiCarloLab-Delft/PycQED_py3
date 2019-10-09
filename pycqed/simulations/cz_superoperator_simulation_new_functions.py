@@ -849,13 +849,12 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,sim_control_CZ, wh
 
 
         amp_final = np.concatenate([amp_A, amp_B])
-        f_pulse_final=np.concatenate([f_pulse_A, f_pulse_B])
 
-    return amp_final, f_pulse_final
-
+    return amp_final
 
 
-def return_jump_operators(sim_control_CZ, f_pulse_final, fluxlutman):
+
+def return_jump_operators(sim_control_CZ, amp_final, fluxlutman, which_gate: str = 'NE'):
 
     T1_q0 = sim_control_CZ.T1_q0()
     T1_q1 = sim_control_CZ.T1_q1()
@@ -876,8 +875,11 @@ def return_jump_operators(sim_control_CZ, f_pulse_final, fluxlutman):
     # time-dependent jump operators on q0
     if T2_q0_amplitude_dependent[0] != -1:
 
-        f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot()))
-        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot()))
+        omega_0 = compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot())
+        f_pulse = fluxlutman.calc_amp_to_freq(amp_final,'01', which_gate=which_gate)
+        f_pulse_final = np.clip(f_pulse,a_min=None,a_max=omega_0)
+
+        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],omega_0))
         for i in range(len(sensitivity)):
             if sensitivity[i] < 0.1:
                 sensitivity[i] = 0.1
@@ -935,12 +937,15 @@ def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxbias_q1, amp, sim_
         S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S
 
     w_q1 = q_freq_10    # we 'save' the input value of w_q1
-    w_q1_sweetspot = sim_control_CZ.w_q1_sweetspot()
-    if w_q1 > w_q1_sweetspot:
-        log.warning('operating frequency of q1 should be lower than its sweet spot frequency.')
-        w_q1 = w_q1_sweetspot
+    if sim_control_CZ.sigma_q1() != 0:
+        w_q1_sweetspot = sim_control_CZ.w_q1_sweetspot()
+        if w_q1 > w_q1_sweetspot:
+            log.warning('operating frequency of q1 should be lower than its sweet spot frequency.')
+            w_q1 = w_q1_sweetspot
 
-    w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
+        w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
+    else:
+    	w_q1_biased = w_q1
 
     log.debug('Changing fluxlutman q_freq_10_{} value to {}'.format(which_gate, w_q1_biased))
     fluxlutman.set('q_freq_10_{}'.format(which_gate), w_q1_biased)     # we insert the change to w_q1 in this way because then J1 is also tuned appropriately
