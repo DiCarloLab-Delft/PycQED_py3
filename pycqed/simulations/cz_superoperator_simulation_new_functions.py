@@ -1277,7 +1277,7 @@ def return_instrument_args(fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
                            'q_polycoeffs_anharm': fluxlutman.q_polycoeffs_anharm(),
                            'q_freq_01': fluxlutman.q_freq_01(),
                            'bus_freq_' + which_gate: fluxlutman.get('bus_freq_{}'.format(which_gate)),
-                           'alpha_q1': fluxlutman.get('anharm_q1_{}'.format(which_gate)),
+                           'anharm_q1_{}'.format(which_gate): fluxlutman.get('anharm_q1_{}'.format(which_gate)),
                            'q_freq_10_' + which_gate: fluxlutman.get('q_freq_10_{}'.format(which_gate))}
 
     sim_control_CZ_args = {'Z_rotations_length': sim_control_CZ.Z_rotations_length(),

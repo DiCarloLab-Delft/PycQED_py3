@@ -67,7 +67,8 @@ def f_to_parallelize_new(arglist):
                      'sigma_q0': sim_control_CZ.sigma_q0()}
 
     if adaptive_pars['mode']=='adaptive':
-        MC.set_sweep_functions([cz_theta_f, cz_lambda_2])
+        MC.set_sweep_functions([fluxlutman['cz_theta_f_{}'.format(which_gate)],
+                            fluxlutman['cz_lambda_2_{}'.format(which_gate)]])
         if adaptive_pars['uniform']:
             loss_per_triangle= adaptive.learner.learner2D.uniform_loss
         else:
@@ -95,7 +96,7 @@ def f_to_parallelize_new(arglist):
                 mode='adaptive')
 
     elif adaptive_pars['mode']=='1D':
-        MC.set_sweep_functions([cz_theta_f])
+        MC.MC.set_sweep_functions([fluxlutman['cz_theta_f_{}'.format(which_gate)]])
         MC.set_sweep_points(np.linspace(adaptive_pars['theta_f_min'],
             adaptive_pars['theta_f_max'],adaptive_pars['n_points']))
         if sim_control_CZ.cluster():
@@ -114,7 +115,8 @@ def f_to_parallelize_new(arglist):
                 mode='1D')
 
     if adaptive_pars['mode']=='cma_optimizer':
-        MC.set_sweep_functions([cz_theta_f, cz_lambda_2])
+        MC.set_sweep_functions(MC.set_sweep_functions([fluxlutman['cz_theta_f_{}'.format(which_gate)],
+                            fluxlutman['cz_lambda_2_{}'.format(which_gate)]]))
         if adaptive_pars['uniform']:
             loss_per_triangle= adaptive.learner.learner2D.uniform_loss
         else:
