@@ -59,7 +59,6 @@ import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
-from pycqed.utilities.general import check_keyboard_interrupt
 
 log = logging.getLogger(__name__)
 
@@ -224,6 +223,8 @@ class UHFQC(zibase.ZI_base_instrument):
         Checks that the correct options are installed on the instrument.
         """
         options = self.gets('features/options').split('\n')
+        if 'FF' in options:
+            return
         if 'QA' not in options:
             raise zibase.ziOptionsError('Device {} is missing the QA option!'.format(self.devname))
         if 'AWG' not in options:
@@ -643,6 +644,38 @@ setUserReg(4, err_cnt);"""
 
         # Generate more dummy data
         self.auxins_0_averaging(8)
+    
+    def qudev_acquisition_initialize(self, samples, averages, loop_cnt, channels=(0, 1), mode='rl') -> None:
+        # Define the channels to use and subscribe to them
+        self._acquisition_nodes = []
+
+        if mode == 'rl':
+            for c in channels:
+                path = self._get_full_path('qas/0/result/data/{}/wave'.format(c))
+                self._acquisition_nodes.append(path)
+                self.subs(path)
+            # Enable automatic readout
+            self.qas_0_result_reset(1)
+            self.qas_0_result_enable(0)
+            self.qas_0_result_length(samples)
+            self.qas_0_result_averages(averages)
+            ro_mode = 0
+        else:
+            for c in channels:
+                path = self._get_full_path('qas/0/monitor/inputs/{}/wave'.format(c))
+                self._acquisition_nodes.append(path)
+                self.subs(path)
+            # Enable automatic readout
+            self.qas_0_monitor_reset(1)
+            self.qas_0_monitor_enable(1)
+            self.qas_0_monitor_length(samples)
+            self.qas_0_monitor_averages(averages)
+            ro_mode = 1
+
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_LOOP_CNT), loop_cnt)
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_RO_MODE), ro_mode)
+        if self.wait_dly() > 0 and not self._awg_program_features['wait_dly']:
+            raise ziUHFQCSeqCError('Trying to use a delay of {} using an AWG program that does not use \'wait_dly\'.'.format(self.wait_dly()))
 
     def acquisition_arm(self, single=True) -> None:
         # time.sleep(0.01)

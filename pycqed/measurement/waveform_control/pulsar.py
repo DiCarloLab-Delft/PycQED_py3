@@ -308,7 +308,7 @@ class UHFQCPulsar:
         # Necessary hack to pass the UHFQC drivers sanity check 
         # in acquisition_initialize()
         obj._awg_program_features['loop_cnt'] = True
-        obj._awg_program_features['avg_cnt']  = True
+        obj._awg_program_features['avg_cnt']  = False
         # Hack needed to have 
         obj._awg_needs_configuration[0] = False
         obj._awg_program[0] = True

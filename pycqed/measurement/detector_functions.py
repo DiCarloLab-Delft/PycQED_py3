@@ -433,13 +433,13 @@ class UHFQC_Base(Hard_Detector):
         if self.AWG is not None:
             self.AWG.start()
 
-        acq_paths = {UHF.name: UHF.acquisition_paths for UHF in self.UHFs}
+        acq_paths = {UHF.name: UHF._acquisition_nodes for UHF in self.UHFs}
 
-        data = {UHF.name: {k: [] for k, dummy in enumerate(UHF.acquisition_paths)}
+        data = {UHF.name: {k: [] for k, dummy in enumerate(UHF._acquisition_nodes)}
                 for UHF in self.UHFs}
 
         # Acquire data
-        gotem = {UHF.name: [False] * len(UHF.acquisition_paths) for UHF in
+        gotem = {UHF.name: [False] * len(UHF._acquisition_nodes) for UHF in
                  self.UHFs}
         accumulated_time = 0
 
@@ -449,8 +449,7 @@ class UHFQC_Base(Hard_Detector):
             for UHF in self.UHFs:
                 if not all(gotem[UHF.name]):
                     time.sleep(0.01)
-                    dataset[UHF.name] = UHF._daq.poll(0.001, 1, 4, True)
-
+                    dataset[UHF.name] = UHF.poll(0.01)
             for UHFname in dataset.keys():
                 for n, p in enumerate(acq_paths[UHFname]):
                     if p in dataset[UHFname]:
@@ -466,7 +465,7 @@ class UHFQC_Base(Hard_Detector):
         if not all(np.concatenate(list(gotem.values()))):
             for UHF in self.UHFs:
                 UHF.acquisition_finalize()
-                for n, c in enumerate(UHF.acquisition_paths):
+                for n, c in enumerate(UHF._acquisition_nodes):
                     if n in data[UHF.name]:
                         n_swp = len(data[UHF.name][n])
                         tot_swp = self.detectors[
@@ -558,12 +557,11 @@ class UHFQC_input_average_detector(UHFQC_Base):
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
-        self.UHFQC.awgs_0_userregs_0(int(self.nr_averages))
         self.nr_sweep_points = self.nr_samples
-        self.UHFQC.acquisition_initialize(channels=self.channels, 
+        self.UHFQC.qudev_acquisition_initialize(channels=self.channels, 
                                           samples=self.nr_samples,
                                           averages=self.nr_averages,
+                                          loop_cnt=int(self.nr_averages),
                                           mode='iavg')
 
     def finish(self):
@@ -807,20 +805,17 @@ class UHFQC_integrated_average_detector(UHFQC_Base):
             if self.prepare_function is not None:
                 self.prepare_function()
 
-        self.UHFQC.awgs_0_userregs_0(
-            # int(self.nr_averages*self.nr_sweep_points))
-            int(self.nr_averages))
-        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
         # Do not enable the rerun button; the AWG program uses userregs/0 to
         # define the number of iterations in the loop
         self.UHFQC.awgs_0_single(1)
-
+        print(self.nr_sweep_points)
+        print(self.nr_averages)
         self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
-
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
-        self.UHFQC.acquisition_initialize(channels=self.channels, 
+        self.UHFQC.qudev_acquisition_initialize(channels=self.channels, 
                                           samples=self.nr_sweep_points,
                                           averages=self.nr_averages,
+                                          loop_cnt=int(self.nr_averages),
                                           mode='rl')
 
     def finish(self):
@@ -903,17 +898,11 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
         self.set_up_correlation_weights()
 
-        # Configure the result logger to not do any averaging
-        # The AWG program uses userregs/0 to define the number o iterations in
-        # the loop
-        self.UHFQC.awgs_0_userregs_0(
-            int(self.nr_averages*self.nr_sweep_points))
-        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
-        self.UHFQC.acquisition_initialize(channels=self.channels, 
+        self.UHFQC.qudev_acquisition_initialize(channels=self.channels, 
                                           samples=self.nr_sweep_points,
                                           averages=self.nr_averages,
+                                          loop_cnt=int(self.nr_averages*self.nr_sweep_points),
                                           mode='rl')
 
     def define_correlation_channels(self):
@@ -1105,18 +1094,15 @@ class UHFQC_integration_logging_det(UHFQC_Base):
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots) # The AWG program uses 
-        # userregs/0 to define the number of iterations
-        # in the loop
-        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
 
         self.nr_sweep_points = self.nr_shots*len(sweep_points)
         self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
-        self.UHFQC.acquisition_initialize(channels=self.channels, 
+        self.UHFQC.qudev_acquisition_initialize(channels=self.channels, 
                                           samples=self.nr_sweep_points,
                                           averages=1, #for single shot readout
+                                          loop_cnt=int(self.nr_shots),
                                           mode='rl')
 
 
@@ -1269,16 +1255,13 @@ class UHFQC_classifier_detector(UHFQC_Base):
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(int(self.nr_shots))
-        # The AWG program uses userregs/0 to define the number of iterations
-        # in the loop
-        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
         self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
 
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
-        self.UHFQC.acquisition_initialize(channels=self.channels, 
+        self.UHFQC.qudev_acquisition_initialize(channels=self.channels, 
                                           samples=self.nr_shots*self.nr_sweep_points,
                                           averages=1, #for single shot readout
+                                          loop_cnt=int(self.nr_shots),
                                           mode='rl')
 
     def get_values(self):

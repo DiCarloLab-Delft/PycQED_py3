@@ -1152,7 +1152,7 @@ class ZI_base_instrument(Instrument):
         self.daq.unsubscribe(self._get_full_path(path))
         
     def poll(self, poll_time=0.1):
-        return self.daq.poll(poll_time, 500, 4, True)
+        return self.daq.poll(poll_time, 1, 4, True)
 
     def sync(self) -> None:
         self.daq.sync()
