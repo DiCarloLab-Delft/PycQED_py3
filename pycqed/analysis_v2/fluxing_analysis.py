@@ -240,11 +240,13 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 interp_method: str = 'linear',
                 plt_orig_pnts: bool = True,
                 plt_contour_phase: bool = True,
-                plt_contour_L1: bool = True):
+                plt_contour_L1: bool = True,
+                plt_optimal_point: bool = False):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
         self.plt_contour_L1 = plt_contour_L1
+        self.plt_optimal_point = plt_optimal_point
 
         super().__init__(
             t_start=t_start,
@@ -364,7 +366,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     .union({'offset difference'}):
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
-            if val_name in cost_func_Names:
+            if self.plt_optimal_point and val_name in cost_func_Names:
                 x_int = self.proc_data_dict['x_int']
                 y_int = self.proc_data_dict['y_int']
                 z_int = self.proc_data_dict['interpolated_values'][i]
