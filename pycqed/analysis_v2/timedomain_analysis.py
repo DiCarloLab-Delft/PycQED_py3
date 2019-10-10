@@ -315,9 +315,9 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         # and ensures that any over/under rotation is absorbed in the
         # frequency
         guess_pars['amplitude'].value = 0.5
-        guess_pars['amplitude'].vary = False
+        guess_pars['amplitude'].vary = True
         guess_pars['offset'].value = 0.5
-        guess_pars['offset'].vary = False
+        guess_pars['offset'].vary = True
 
         self.fit_dicts['cos_fit'] = {
             'fit_fn': fit_mods.CosFunc,
@@ -335,7 +335,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                                     data=self.proc_data_dict['corr_data'][:-4])
         # Constraining the line ensures that it will only give a good fit
         # if the small angle approximation holds
-        guess_pars['c0'].vary = False
+        guess_pars['c0'].vary = True
         guess_pars['c0'].value = 0.5
 
         self.fit_dicts['line_fit'] = {
@@ -906,8 +906,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         elif self.cal_points == 'ge':
             # calibration point indices are when ignoring the f-state cal pts
             cal_points = [
-                [[-4, -3], [-2, -1]],  # spec qubit
-                [[-4, -2], [-3, -1]],  # oscillating qubits
+                [[-4, -3], [-2, -1]],  # oscillating qubits
+                [[-4, -2], [-3, -1]],  # spec qubit
             ]
 
         for idx, type_str in zip([ch_idx_osc, ch_idx_spec], ['osc', 'spec']):
@@ -917,16 +917,29 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 type_str)] = self.raw_data_dict['value_names'][0][idx]
             self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
 
+            # This is in case of readout crosstalk making a difference between on and off cases
+            cals_osc_qubit = cal_points[0]
+            idx_cal_off = [c[1] for c in cals_osc_qubit]
+            idx_cal_on = [c[0] for c in cals_osc_qubit]
+            yvals_off = np.concatenate((yvals[:cals_osc_qubit[0][0]:2],
+                                        yvals[idx_cal_off]))
+            yvals_on = np.concatenate((yvals[1:cals_osc_qubit[0][0]:2],
+                                       yvals[idx_cal_on]))
+
             if normalize_to_cal_points:
-                yvals = a_tools.normalize_data_v3(
-                    yvals,
-                    cal_zero_points=cal_points[idx][0],
-                    cal_one_points=cal_points[idx][1])
+                yvals_off = a_tools.normalize_TD_data(
+                    data=yvals_off,
+                    data_zero=yvals[cals_osc_qubit[0][1]],
+                    data_one=yvals[cals_osc_qubit[1][1]])
+                yvals_on = a_tools.normalize_TD_data(
+                    data=yvals_on,
+                    data_zero=yvals[cals_osc_qubit[0][0]],
+                    data_one=yvals[cals_osc_qubit[1][0]])
 
                 self.proc_data_dict['yvals_{}_off'.format(
-                    type_str)] = yvals[::2]
+                    type_str)] = yvals_off
                 self.proc_data_dict['yvals_{}_on'.format(
-                    type_str)] = yvals[1::2]
+                    type_str)] = yvals_on
                 self.proc_data_dict['xvals_off'] = self.raw_data_dict['xvals'][0][::2]
                 self.proc_data_dict['xvals_on'] = self.raw_data_dict['xvals'][0][1::2]
 
@@ -942,7 +955,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             V0 = np.mean(yvals[cal_points[idx][0]])
             V1 = np.mean(yvals[cal_points[idx][1]])
             if self.cal_points != 'gef':
-                V2 = np.mean(yvals[cal_points[idx][2]])
+                V2 = V1#np.mean(yvals[cal_points[idx][2]])
             else:
                 V2 = V1
 

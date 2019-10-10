@@ -23,13 +23,13 @@ from scipy.ndimage.filters import gaussian_filter
 import imp
 import math
 
-try:
-    import pygsti
-except ImportError as e:
-    if str(e).find('pygsti') >= 0:
-        logging.warning('Could not import pygsti')
-    else:
-        raise
+# try:
+#     import pygsti
+# except ImportError as e:
+#     if str(e).find('pygsti') >= 0:
+#         logging.warning('Could not import pygsti')
+#     else:
+#         raise
 
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
@@ -49,14 +49,14 @@ except:
     pass
 from pycqed.analysis import composite_analysis as ca
 
-try:
-    import qutip as qtp
+# try:
+#     import qutip as qtp
 
-except ImportError as e:
-    if str(e).find('qutip') >= 0:
-        logging.warning('Could not import qutip')
-    else:
-        raise
+# except ImportError as e:
+#     if str(e).find('qutip') >= 0:
+#         logging.warning('Could not import qutip')
+#     else:
+#         raise
 
 imp.reload(dm_tools)
 
@@ -6742,8 +6742,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     Possible kw parameters:
 
-        frequency_guess         (default=None)
+        frequency_guess         (default="max")
             manually set the initial guess for qubit frequency
+            options are
+                None -> uses the peak finder to use a peak or dip
+                max -> uses the maximally measured value to guess the freq
+                float -> specify a value as the guess
 
         analyze_ef              (default=False)
             whether to look for a second peak/dip, which would be the at f_gf/2
@@ -6795,7 +6799,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def fit_data(self, analyze_ef=False, **kw):
 
-        frequency_guess = kw.get('frequency_guess', None)
+        frequency_guess = kw.get('frequency_guess', 'max')
         percentile = kw.get('percentile', 20)
         num_sigma_threshold = kw.get('num_sigma_threshold', 5)
         window_len_filter = kw.get('window_len_filter', 3)
@@ -6830,9 +6834,13 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                          optimize=optimize,
                                          window_len=0)
 
+        # Determine the guess
         # extract highest peak -> ge transition
         if frequency_guess is not None:
-            f0 = frequency_guess
+            if isinstance(frequency_guess, float):
+                f0 = frequency_guess
+            elif frequency_guess == 'max':
+                f0 = self.sweep_points[np.argmax(data_dist_smooth)]
             kappa_guess = (max(self.sweep_points)-min(self.sweep_points))/20
             key = 'peak'
         elif self.peaks['dip'] is None:
@@ -9970,7 +9978,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
     I1_no_demod = y1
     Q1_no_demod = y2
-    
+
     power1 = (I1 ** 2 + Q1 ** 2) / 50
 
     amps = np.sqrt((I1 - I0) ** 2 + (Q1 - Q0) ** 2)
@@ -9983,7 +9991,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     weight_I_no_demod = (I1_no_demod - I0_no_demod) / amp_max
     weight_Q_no_demod = (Q1_no_demod - Q0_no_demod) / amp_max
 
-    # Identical rescaling as is happening in the CCL transmon class 
+    # Identical rescaling as is happening in the CCL transmon class
     maxI_no_demod = np.max(np.abs(weight_I_no_demod))
     maxQ_no_demod = np.max(np.abs(weight_Q_no_demod))
     weight_scale_factor = 1./(4*np.max([maxI_no_demod, maxQ_no_demod]))
@@ -10113,9 +10121,17 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     f_axis_o, PSD1Q_o = func.PSD(A1Q[-1024:], 1 / Fs)
 
     n_spurious = int(round(2 * len(A0I) * abs(IF) / Fs))
-    f_spurious = f_axis[n_spurious]
+    if n_spurious>len(f_axis):
+        logging.warning('Calibrate_optimal_weights ANALYSIS: Spurious frequency not in range')
+        f_spurious = 0
+    else:
+        f_spurious = f_axis[n_spurious]
     n_offset = int(round(len(A0I[-1024:]) * abs(IF) / Fs))
-    f_offset = f_axis_o[n_offset]
+    if n_offset>len(f_axis_o):
+        logging.warning('Calibrate_optimal_weights ANALYSIS: offset frequency not in range')
+        f_offset = 0
+    else:
+        f_offset = f_axis_o[n_offset]
 
     # print('f_spurious', f_spurious)
     # print('f_offset', f_offset)
@@ -10126,8 +10142,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     cost_offset = 0
 
     for i in range(samples):
-        n_s = int(n_spurious - samples / 2 + i)
-        n_o = int(n_offset - samples / 2 + i)
+        n_s = np.clip(int(n_spurious - samples / 2 + i),0,len(PSD0I)-1)
+        n_o = np.clip(int(n_offset - samples / 2 + i),0,len(PSD0I_o)-1)
 
         cost_skew = cost_skew + \
             np.abs(PSD0I[n_s]) + np.abs(PSD1I[n_s]) + \

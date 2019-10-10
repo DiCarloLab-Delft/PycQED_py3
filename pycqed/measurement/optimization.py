@@ -1,7 +1,8 @@
 import copy
 import numpy as np
+import logging
 
-
+log = logging.getLogger(__name__)
 def nelder_mead(fun, x0,
                 initial_step=0.1,
                 no_improve_thr=10e-6, no_improv_break=10,
@@ -142,7 +143,7 @@ def SPSA(fun, x0,
          no_improve_thr=10e-6, no_improv_break=10,
          maxiter=0,
          gamma=0.101, alpha=0.602, a=0.2, c=0.3, A=300,
-         p=0.5, ctrl_min=0.,ctrl_max=np.pi,
+         p=0.5, ctrl_min=0., ctrl_max=np.pi,
          verbose=False):
     '''
     parameters:
@@ -230,6 +231,12 @@ def SPSA(fun, x0,
         x = np.where(x < ctrl_min, ctrl_min, x)
         x = np.where(x > ctrl_max, ctrl_max, x)
         score = fun(x)
+        log.warning("SPSA: Evaluated gradient at x_minus={};x_plus={}".format(x_minus,
+                                                                          x_plus))
+        log.warning("SPSA: y_minus={};y_plus={}".format(y_plus,
+                                                    y_minus))
+        log.warning("SPSA: Gradient={}".format(gradient))
+        log.warning("SPSA: Jump={};new_x={}".format(a_k*gradient, x))
         res.append([x, score])
 
     # once the loop is broken evaluate the final value one more time as

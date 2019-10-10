@@ -152,7 +152,7 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
 
                 print('Exception occurred while writing'
                       ' {}:{} of type {} at entry point {}'
-                      .format(key, item, type(item),entry_point))
+                      .format(key, item, type(item), entry_point))
                 logging.warning(e)
         elif isinstance(item, np.ndarray):
             entry_point.create_dataset(key, data=item)
@@ -290,6 +290,46 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
             raise NotImplementedError('cannot read "list_type":"{}"'.format(
                 h5_group.attrs['list_type']))
     return data_dict
+
+
+def extract_pars_from_datafile(filepath: str, param_spec: dict)-> dict:
+    """
+    Extract parameters from an hdf5 datafile.
+
+    Args:
+        filepath (str)
+            tilepath of the hfd5 datafile.
+
+        param_spec (dict)
+            specification of parameters to extract.
+                key: name used to store the extracted entry
+                value: tuple consiting of "/" separated parameter path
+                    and attribute/dataset specificiation.
+                    The attribute/dataset specification is
+                        "attr:attribute_name" or "dset".
+
+            example param_spec
+                param_spec = {
+                    'T1': ('Analysis/Fitted Params F|1>/tau', 'attr:value'),
+                    'uT1': ('Analysis/Fitted Params F|1>/tau', 'attr:stderr'),
+                    'data': ('Experimental Data/Data', 'dset'),
+                    'timestamp': ('MC settings/begintime', 'dset' )}
+
+    Return:
+        param_dict (dict)
+            dictionary containing the extracted parameters.
+    """
+    param_dict = {}
+    f = h5py.File(filepath, 'r')
+    with h5py.File(filepath, 'r') as f:
+        for par_name, par_spec in param_spec.items():
+            entry = f[par_spec[0]]
+            if par_spec[1].startswith('dset'):
+                param_dict[par_name] = entry.value
+            elif par_spec[1].startswith('attr'):
+                param_dict[par_name] = entry.attrs[par_spec[1][5:]]
+
+    return param_dict
 
 
 def RepresentsInt(s):

@@ -16,13 +16,14 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                             nr_cliffords, nr_seeds: int,
                             net_cliffords: list=[0],
                             max_clifford_idx: int=11520,
-                            flux_codeword: str='fl_cw_01',
+                            flux_codeword: str='cz',
                             simultaneous_single_qubit_RB=False,
                             initialize: bool=True,
                             interleaving_cliffords=[None],
                             program_name: str='randomized_benchmarking',
                             cal_points: bool=True,
                             f_state_cal_pts: bool=True,
+                            sim_cz_qubits: list = None,
                             recompile: bool=True):
     '''
     Input pars:
@@ -56,7 +57,11 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
         cal_points:     bool whether to replace the last two elements with
                         calibration points, set to False if you want
                         to measure a single element (for e.g. optimization)
-
+        sim_cz_qubits:
+                        A list of qubit indices on which a simultaneous cz 
+                        instruction must be applied. This is for characterizing
+                        CZ gates that are intended to be performed in parallel 
+                        with other CZ gates. 
         recompile:      True -> compiles the program,
                         'as needed' -> compares program to timestamp of config
                             and existence, if required recompile.
@@ -168,11 +173,17 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                 if isinstance(q, str):
                                     k.gate(g, [qubit_map[q]])
                                 elif isinstance(q, list):
-                                    # FIXME: This is a hack because we cannot
-                                    # properly trigger CZ gates.
-                                    k.gate("wait",  list(qubit_map.values()), 0)
-                                    k.gate(flux_codeword, [2, 0]) #hardcoded sandwhiched with wait 0's for alignment
-                                    k.gate("wait",  list(qubit_map.values()), 0)
+                                    if sim_cz_qubits is None: 
+                                        k.gate("wait",  list(qubit_map.values()), 0)
+                                        k.gate(flux_codeword, list(qubit_map.values()),) # fix for QCC
+                                        k.gate("wait",  list(qubit_map.values()), 0)
+                                    else: 
+                                        # A simultaneous CZ is applied to characterize cz gates that 
+                                        # have been calibrated to be used in parallel. 
+                                        k.gate("wait",  list(qubit_map.values())+sim_cz_qubits, 0)
+                                        k.gate(flux_codeword, list(qubit_map.values()),) # fix for QCC
+                                        k.gate(flux_codeword, sim_cz_qubits) # fix for QCC
+                                        k.gate("wait",  list(qubit_map.values())+sim_cz_qubits, 0)
 
 
                         # FIXME: This hack is required to align multiplexed RO in openQL..

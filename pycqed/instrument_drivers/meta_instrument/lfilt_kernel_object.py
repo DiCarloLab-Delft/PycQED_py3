@@ -119,11 +119,10 @@ class LinDistortionKernel(Instrument):
         
         # 'FIXME: FIR filter reset is disabled because of #148'
         if nr_filts['rt_fir_models'] == 0:
-            pass 
-            # impulse_resp = np.zeros(40)
-            # impulse_resp[0] = 1
-            # AWG.set('sigouts_{}_precompensation_fir_coefficients'.format(
-            #         self.cfg_awg_channel()-1), impulse_resp)
+            impulse_resp = np.zeros(40)
+            impulse_resp[0] = 1
+            AWG.set('sigouts_{}_precompensation_fir_coefficients'.format(
+                    self.cfg_awg_channel()-1), impulse_resp)
 
         # set bias-tee filters to 0
         pass  # Currently broken
