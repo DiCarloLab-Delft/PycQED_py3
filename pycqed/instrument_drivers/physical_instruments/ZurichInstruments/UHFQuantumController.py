@@ -1042,76 +1042,31 @@ setUserReg(4, err_cnt);"""
             self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0,
             codewords=None, timeout=5):
 
-        if codewords is None:
-            raise zibase.ziConfigurationError(
-                'Trying to define an AWG program with DIO output, but no output values are defined!')
-        else:
-            self._diocws = codewords
-
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
-        self.wait_dly(delay_samples)
-
-        # If no cases are defined, then we simply create all possible cases
-        if cases is None:
-            cases = np.arange(self._num_codewords)
-        else:
-            if len(cases) > self._num_codewords:
-                raise zibase.ziConfigurationError('More cases ({}) defined than available codewords ({})!'.format(
-                    len(cases), len(self._num_codewords)))
-
-            # There is probably a more efficient way of doing this
-            for case in cases:
-                if (case < 0) or (case >= self._num_codewords):
-                    raise zibase.ziConfigurationError(
-                        'Case {} is out of range defined by the available codewords ({})!'.format(case, len(self._num_codewords)))
-
-        # Sanity check on the parameters
-        if Iwaves is not None and (len(Iwaves) != len(cases)):
-            raise ziUHFQCSeqCError(
-                'Number of I channel waveforms ({}) does not match number of cases ({})!'.format(len(Iwaves), len(cases)))
-
-        if Qwaves is not None and (len(Qwaves) != len(cases)):
-            raise ziUHFQCSeqCError(
-                'Number of Q channel waveforms ({}) does not match number of cases ({})!'.format(len(Iwaves), len(cases)))
-
-        # Sanity check on I channel waveforms
-        if Iwaves is not None:
-            for i, Iwave in enumerate(Iwaves):
-                if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
-                    raise KeyError(
-                        "exceeding AWG range for I channel, all values should be within +/-1")
-                if len(Iwave) > 16384:
-                    raise KeyError(
-                        "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-
-                # Update waveform table
-                self.set(zibase.gen_waveform_name(0, cases[i]), Iwave)
-
-        # Sanity check on Q channel waveforms
-        if Qwaves is not None:
-            for i, Qwave in enumerate(Qwaves):
-                if np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
-                    raise KeyError(
-                        "exceeding AWG range for Q channel, all values should be within +/-1")
-                if len(Qwave) > 16384:
-                    raise KeyError(
-                        "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Qwave)))
-
-                # Update waveform table
-                self.set(zibase.gen_waveform_name(1, cases[i]), Qwave)
-
-        # Define the behavior of our program
-        self._reset_awg_program_features()
-        self._awg_program_features['loop_cnt'] = True
-        self._awg_program_features['wait_dly'] = True
-        self._awg_program_features['waves'] = True
-        self._awg_program_features['cases'] = True
-        self._awg_program_features['diocws'] = True
-
-        # Updating cases will cause our AWG program to update
-        self.cases(cases)
-
+        # setting the delay in the instrument
+        self.awgs_0_userregs_2(delay_samples)
+        sequence = (
+            'var wait_delay = getUserReg(2);\n' +
+            'cvar i = 0;\n'+
+            'const length = {};\n'.format(len(codewords))
+            )
+        sequence = sequence + self.array_to_combined_vector_string(
+                codewords, "codewords")
+        # starting the loop and switch statement
+        sequence = sequence +(
+            ' setDIO(2048);\n'+
+            'for (i = 0; i < length; i = i + 1) {\n'
+            ' var codeword =  codewords[i];\n'+
+            ' waitDIOTrigger();\n' +
+            ' setDIO(codeword);\n'+
+            ' wait(wait_delay);\n' +
+            ' setDIO(2048);\n'+
+            '}\n' 
+            ) 
+            
+        self.awg_string(sequence, timeout=timeout)
+        
     def awg_sequence_acquisition_and_pulse(self, Iwave=None, Qwave=None, acquisition_delay=0, dig_trigger=True) -> None:
         if Iwave is not None and (np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0):
             raise KeyError(
