@@ -23,13 +23,13 @@ from scipy.ndimage.filters import gaussian_filter
 import imp
 import math
 
-try:
-    import pygsti
-except ImportError as e:
-    if str(e).find('pygsti') >= 0:
-        logging.warning('Could not import pygsti')
-    else:
-        raise
+# try:
+#     import pygsti
+# except ImportError as e:
+#     if str(e).find('pygsti') >= 0:
+#         logging.warning('Could not import pygsti')
+#     else:
+#         raise
 
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
@@ -49,14 +49,14 @@ except:
     pass
 from pycqed.analysis import composite_analysis as ca
 
-try:
-    import qutip as qtp
+# try:
+#     import qutip as qtp
 
-except ImportError as e:
-    if str(e).find('qutip') >= 0:
-        logging.warning('Could not import qutip')
-    else:
-        raise
+# except ImportError as e:
+#     if str(e).find('qutip') >= 0:
+#         logging.warning('Could not import qutip')
+#     else:
+#         raise
 
 imp.reload(dm_tools)
 
@@ -10121,9 +10121,17 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     f_axis_o, PSD1Q_o = func.PSD(A1Q[-1024:], 1 / Fs)
 
     n_spurious = int(round(2 * len(A0I) * abs(IF) / Fs))
-    f_spurious = f_axis[n_spurious]
+    if n_spurious>len(f_axis):
+        logging.warning('Calibrate_optimal_weights ANALYSIS: Spurious frequency not in range')
+        f_spurious = 0
+    else:
+        f_spurious = f_axis[n_spurious]
     n_offset = int(round(len(A0I[-1024:]) * abs(IF) / Fs))
-    f_offset = f_axis_o[n_offset]
+    if n_offset>len(f_axis_o):
+        logging.warning('Calibrate_optimal_weights ANALYSIS: offset frequency not in range')
+        f_offset = 0
+    else:
+        f_offset = f_axis_o[n_offset]
 
     # print('f_spurious', f_spurious)
     # print('f_offset', f_offset)
@@ -10134,8 +10142,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     cost_offset = 0
 
     for i in range(samples):
-        n_s = int(n_spurious - samples / 2 + i)
-        n_o = int(n_offset - samples / 2 + i)
+        n_s = np.clip(int(n_spurious - samples / 2 + i),0,len(PSD0I)-1)
+        n_o = np.clip(int(n_offset - samples / 2 + i),0,len(PSD0I_o)-1)
 
         cost_skew = cost_skew + \
             np.abs(PSD0I[n_s]) + np.abs(PSD1I[n_s]) + \

@@ -1,0 +1,35 @@
+SMIS s0, { 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 }
+SMIS s1, { 1 }
+SMIS s2, { 2 }
+SMIS s3, { 3 }
+SMIS s4, { 4 }
+SMIS s5, { 5 }
+SMIS s6, { 6 }
+SMIS s7, { 7 }
+SMIS s8, { 8 }
+SMIS s9, { 9 }
+SMIS s10, { 10 }
+SMIS s11, { 11 }
+SMIS s12, { 12 }
+SMIS s13, { 13 }
+SMIS s14, { 14 }
+SMIS s15, { 15 }
+SMIS s16, { 16 }
+
+smit t0, {(3, 0), (10, 8), (14, 16)}
+
+start:
+    bs 1    prepz s0 | prepz s2
+    qwait 20
+    bs 2 FL_CW_00 s0
+    bs 2 FL_CW_01 s0
+    bs 2 FL_CW_02 s0
+    bs 2 FL_CW_03 s0
+    bs 2 FL_CW_04 s0
+    bs 2 FL_CW_05 s0
+    bs 2 FL_CW_06 s0
+    bs 2 FL_CW_07 s0
+    bs 2 CW_03 s7
+    br always, start
+    nop
+    nop

@@ -76,9 +76,9 @@ _codeword_protocol_doc = 'Configures the codeword input bits/channels per channe
 class QuTech_AWG_Module(SCPI):
     __doc__ = f"""
     Driver for a Qutech AWG Module (QWG) instrument. Will establish a connection to a module via ethernet.
-    :param name: Name of the instrument  
+    :param name: Name of the instrument
     :param address: Ethernet address of the device
-    :param port: Device port  
+    :param port: Device port
     :param reset: Set device to the default settings
     :param run_mode: {_run_mode_doc}
     :param dio_mode: {_dio_mode_doc}
@@ -126,10 +126,15 @@ class QuTech_AWG_Module(SCPI):
                           [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
                           [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
 
+            'MICROWAVE_NO_VSM': [[0, 1, 2, 3, 4, 5, 6],  # Ch1
+                                 [0, 1, 2, 3, 4, 5, 6],  # Ch2
+                                 [7, 8, 9, 10, 11, 12, 13],  # Ch3
+                                 [7, 8, 9, 10, 11, 12, 13]],  # Ch4
+
             'FLUX':      [[0, 1, 2],  # Ch1
                           [3, 4, 5],  # Ch2
                           [6, 7, 8],  # Ch3
-                          [6, 7, 8]],  # Ch4  # See limitation/fixme; will use ch 3's bitmap
+                          [9, 10, 11]],  # Ch4  # See limitation/fixme; will use ch 3's bitmap
         }
 
         # Marker trigger protocol
@@ -271,7 +276,7 @@ class QuTech_AWG_Module(SCPI):
                            set_cmd='DIO:INDexes:ACTive {}',
                            get_parser=np.uint32,
                            vals=vals.Ints(0, 20),
-                           docstring='Get and set DIO calibration index\n' 
+                           docstring='Get and set DIO calibration index\n'
                                      'See dio_calibrate() parameter\n'
                                      'Effective immediately when send'
                            )
@@ -342,7 +347,7 @@ class QuTech_AWG_Module(SCPI):
                 parameter_class=HandshakeParameter,
                 label=f'Channel {ch} Amplitude ',
                 unit='Vpp',
-                docstring=f'Amplitude channel {ch} (Vpp into 50 Ohm) \n' 
+                docstring=f'Amplitude channel {ch} (Vpp into 50 Ohm) \n'
                           'Effective immediately when send',
                 get_cmd=amp_cmd + '?',
                 set_cmd=amp_cmd + ' {:.6f}',
@@ -438,7 +443,7 @@ class QuTech_AWG_Module(SCPI):
                                                       # useful when other logic is needed
                                docstring='Reads the current input values on the all the trigger '
                                          'inputs for a channel, after the bitSelect.\nReturn:'
-                                         '\n\tuint32 where rigger 1 (T1) ' 
+                                         '\n\tuint32 where rigger 1 (T1) '
                                          'is on the Least significant bit (LSB), T2 on the second  '
                                          'bit after LSB, etc.\n\n For example, if only T3 is '
                                          'connected to a high signal, the return value is: '
@@ -521,7 +526,7 @@ class QuTech_AWG_Module(SCPI):
                            label='Codeword protocol',
                            get_cmd=self._getCodewordProtocol,
                            set_cmd=self._setCodewordProtocol,
-                           vals=vals.Enum('MICROWAVE', 'FLUX'),
+                           vals=vals.Enum('MICROWAVE', 'FLUX', 'MICROWAVE_NO_VSM'),
                            docstring=_codeword_protocol_doc + '\nEffective immediately when send')
 
         self._add_codeword_parameters()
@@ -1083,10 +1088,10 @@ class QWGMultiDevices:
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
     Usually all methods are static
     """
-    from pycqed.instrument_drivers.physical_instruments import QuTech_CCL
+    from pycqed.instrument_drivers.physical_instruments import QuTech_QCC
 
     @staticmethod
-    def dio_calibration(ccl: QuTech_CCL, qwgs: List[QuTech_AWG_Module], 
+    def dio_calibration(cc: QuTech_QCC, qwgs: List[QuTech_AWG_Module],
             verbose: bool = False):
         """
         Calibrate multiple QWG using a CCLight
@@ -1095,9 +1100,9 @@ class QWGMultiDevices:
         On failure of calibration an exception is raised.
         Will stop all QWGs before calibration
 
-        Note: Will use the QWG_DIO_Calibration.qisa, cs.txt and qisa_opcodes.qmap 
+        Note: Will use the QWG_DIO_Calibration.qisa, cs.txt and qisa_opcodes.qmap
         files to assemble a  calibration program for the CCLight. These files
-        should be located in the _QWG subfolder in the path of this file. 
+        should be located in the _QWG subfolder in the path of this file.
         :param ccl: CCLight device, connection has to be active
         :param qwgs: List of QWG which will be calibrated, all QWGs are expected to have an active connection
         :param verbose: Print the DIO calibration rapport of all QWGs
@@ -1107,33 +1112,33 @@ class QWGMultiDevices:
         for qwg in qwgs:
             qwg.stop()
 
-        if not ccl:
-            raise ValueError("Cannot calibrate QWGs; No CCL provided")
+        if not cc:
+            raise ValueError("Cannot calibrate QWGs; No CC provided")
 
-        if ccl.ask("QUTech:RUN?") == '1':
-            ccl.stop()
+        if cc.ask("QUTech:RUN?") == '1':
+            cc.stop()
 
         _qwg_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '_QWG'))
-        
 
-        qisa_qwg_dio_calibrate = os.path.join(_qwg_path, 
-            'QWG_DIO_Calibration.qisa')
 
-        cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
+        qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
+            'QCC_DIO_Calibration.qisa')
 
-        qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path, 
-            'qisa_opcodes.qmap')
+        cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
 
-        old_cs = ccl.control_store()
-        old_qisa_opcode = ccl.qisa_opcode()
+        qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
+            'qcc_qisa_opcodes.qmap')
 
-        ccl.control_store(cs_qwg_dio_calibrate)
-        ccl.qisa_opcode(qisa_opcode_qwg_dio_calibrate)
+        old_cs = cc.control_store()
+        old_qisa_opcode = cc.qisa_opcode()
 
-        ccl.eqasm_program(qisa_qwg_dio_calibrate)
-        ccl.start()
-        ccl.getOperationComplete()
+        cc.control_store(cs_qwg_dio_calibrate)
+        cc.qisa_opcode(qisa_opcode_qwg_dio_calibrate)
+
+        cc.eqasm_program(qisa_qwg_dio_calibrate)
+        cc.start()
+        cc.getOperationComplete()
 
         if not qwgs:
             raise ValueError("Can not calibrate QWGs; No QWGs provided")
@@ -1158,11 +1163,11 @@ class QWGMultiDevices:
         if verbose:
             for qwg in qwgs:
                 print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
-        ccl.stop()
+        cc.stop()
 
-        # Set the control store
-        ccl.control_store(old_cs)
-        ccl.qisa_opcode(old_qisa_opcode)
+        #Set the control store
+        cc.control_store(old_cs)
+        cc.qisa_opcode(old_qisa_opcode)
 
 
 

@@ -23,8 +23,8 @@ import colorsys as colors
 from matplotlib import cm
 from pycqed.analysis import composite_analysis as RA
 
-import qutip as qp
-import qutip.metrics as qpmetrics
+# import qutip as qp
+# import qutip.metrics as qpmetrics
 
 from matplotlib.colors import LogNorm
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabel,

@@ -36,6 +36,7 @@ import datetime
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 
+log = logging.getLogger(__name__)
 
 class CCLight_Transmon(Qubit):
 
@@ -821,10 +822,10 @@ class CCLight_Transmon(Qubit):
         predistortion_matrix = np.array(
             ((1, -alpha * np.sin(phi * 2 * np.pi / 360)),
              (0, alpha * np.cos(phi * 2 * np.pi / 360))))
-        UHFQC.quex_deskew_0_col_0(predistortion_matrix[0,0])
-        UHFQC.quex_deskew_0_col_1(predistortion_matrix[0,1])
-        UHFQC.quex_deskew_1_col_0(predistortion_matrix[1,0])
-        UHFQC.quex_deskew_1_col_1(predistortion_matrix[1,1])
+        UHFQC.qas_0_deskew_rows_0_cols_0(predistortion_matrix[0,0])
+        UHFQC.qas_0_deskew_rows_0_cols_1(predistortion_matrix[0,1])
+        UHFQC.qas_0_deskew_rows_1_cols_0(predistortion_matrix[1,0])
+        UHFQC.qas_0_deskew_rows_1_cols_1(predistortion_matrix[1,1])
         return predistortion_matrix
 
     def _prep_ro_instantiate_detectors(self):
@@ -856,7 +857,7 @@ class CCLight_Transmon(Qubit):
                 threshold = self.ro_acq_threshold()
 
             self.instr_acquisition.get_instr().set(
-                'quex_thres_{}_level'.format(acq_ch), threshold)
+                'qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
         else:
             ro_channels = [self.ro_acq_weight_chI(),
@@ -959,9 +960,9 @@ class CCLight_Transmon(Qubit):
 
         """
         if CW:
-            ro_amp=self.ro_pulse_amp_CW()
+            ro_amp = self.ro_pulse_amp_CW()
         else:
-            ro_amp=self.ro_pulse_amp()
+            ro_amp = self.ro_pulse_amp()
 
         if 'UHFQC' not in self.instr_acquisition():
             raise NotImplementedError()
@@ -1080,24 +1081,20 @@ class CCLight_Transmon(Qubit):
                             [zeros, opt_WQ[:-abs(del_sampl)]])
                     else:
                         pass
-                    UHFQC.set('quex_wint_weights_{}_real'.format(
+                    UHFQC.set('qas_0_integration_weights_{}_real'.format(
                         self.ro_acq_weight_chI()), opt_WI)
-                    UHFQC.set('quex_wint_weights_{}_imag'.format(
+                    UHFQC.set('qas_0_integration_weights_{}_imag'.format(
                         self.ro_acq_weight_chI()), opt_WQ)
-                    UHFQC.set('quex_rot_{}_real'.format(
-                        self.ro_acq_weight_chI()), 1.0)
-                    UHFQC.set('quex_rot_{}_imag'.format(
-                        self.ro_acq_weight_chI()), -1.0)
+                    UHFQC.set('qas_0_rotations_{}'.format(
+                        self.ro_acq_weight_chI()), 1.0 - 1.0j)
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
-                        UHFQC.set('quex_wint_weights_{}_real'.format(
+                        UHFQC.set('qas_0_integration_weights_{}_real'.format(
                             self.ro_acq_weight_chQ()), opt_WQ)
-                        UHFQC.set('quex_wint_weights_{}_imag'.format(
+                        UHFQC.set('qas_0_integration_weights_{}_imag'.format(
                             self.ro_acq_weight_chQ()), opt_WI)
-                        UHFQC.set('quex_rot_{}_real'.format(
-                            self.ro_acq_weight_chQ()), 1.0)
-                        UHFQC.set('quex_rot_{}_imag'.format(
-                            self.ro_acq_weight_chQ()), 1.0)
+                        UHFQC.set('qas_0_rotations_{}'.format(
+                            self.ro_acq_weight_chQ()), 1.0 + 1.0j)
 
         else:
             raise NotImplementedError(
@@ -2276,7 +2273,8 @@ class CCLight_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn(),
-                trigger_idx=0)
+                spec_instr='sf_square',
+                trigger_idx=15)
         else:
             p = sqo.pulsed_spec_seq(
                 qubit_idx=self.cfg_qubit_nr(),
@@ -2453,7 +2451,8 @@ class CCLight_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
-            trigger_idx=0)
+            spec_instr='sf_square',
+            trigger_idx=15)
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
@@ -3368,6 +3367,7 @@ class CCLight_Transmon(Qubit):
                                   disable_metadata: bool=False,
                                   nr_shots_per_case: int =2**13,
                                   post_select: bool = False,
+                                  averages: int=2**15,
                                   post_select_threshold: float = None,
                                   )->bool:
         """
@@ -3389,6 +3389,7 @@ class CCLight_Transmon(Qubit):
             update (bool):
                 specifies whether to update the weights in the qubit object
         """
+        log.info('Calibrating optimal weights for {}'.format(self.name))
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare:
@@ -3397,7 +3398,7 @@ class CCLight_Transmon(Qubit):
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.ro_acq_averages()
 
-        self.ro_acq_averages(2**15)
+        self.ro_acq_averages(averages)
         if measure_transients_CCL_switched:
             transients = self.measure_transients_CCL_switched(MC=MC,
                                                               analyze=analyze,
@@ -3438,7 +3439,7 @@ class CCLight_Transmon(Qubit):
                 self._prep_ro_instantiate_detectors()
                 ssro_dict = self.measure_ssro(
                     no_figs=no_figs, update=update,
-                    prepare=False, disable_metadata=disable_metadata,
+                    prepare=True, disable_metadata=disable_metadata,
                     nr_shots_per_case=nr_shots_per_case,
                     post_select=post_select,
                     post_select_threshold=post_select_threshold)
