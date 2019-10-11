@@ -241,12 +241,14 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_orig_pnts: bool = True,
                 plt_contour_phase: bool = True,
                 plt_contour_L1: bool = True,
-                plt_optimal_point: bool = False):
+                plt_optimal_point: bool = False,
+                deg_clim: list = None):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
         self.plt_contour_L1 = plt_contour_L1
         self.plt_optimal_point = plt_optimal_point
+        self.deg_clim = deg_clim
 
         super().__init__(
             t_start=t_start,
@@ -273,6 +275,17 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             'missing frac.', 'Missing frac', 'Missing frac.'}
         cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
             'cond phase', 'cond. phase', 'conditional phase'}
+        offset_diff_names = {'offset difference', 'offset diff',
+            'offset diff.', 'Offset difference', 'Offset diff',
+            'Offset diff.'}
+
+        # also account for possible underscores instead of a spaces between words
+        allNames = [cost_func_Names, L1_Names, MF_Names, cond_phase_names,
+            offset_diff_names]
+        [cost_func_Names, L1_Names, MF_Names, cond_phase_names,
+            offset_diff_names] = \
+            [names.union({name.replace(' ', '_') for name in names})
+                for names in allNames]
 
         for i, val_name in enumerate(self.proc_data_dict['value_names']):
 
@@ -292,6 +305,10 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 'title': '{}\n{}'.format(
                     self.timestamp, self.proc_data_dict['measurementstring'])
             }
+
+            if self.proc_data_dict['value_units'][i] == 'deg':
+                if self.deg_clim is not None:
+                    self.plot_dicts[val_name]['clim'] = self.deg_clim
 
             if self.plt_orig_pnts:
                 self.plot_dicts[val_name + '_non_interpolated'] = {
@@ -363,7 +380,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     log.warning('No data found named {}'.format(L1_Names))
 
             if val_name in set().union(L1_Names).union(MF_Names)\
-                    .union({'offset difference'}):
+                    .union(offset_diff_names):
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
             if self.plt_optimal_point and val_name in cost_func_Names:
@@ -486,3 +503,8 @@ def contour_overlay(x, y, z, colormap, transpose=False,
     ax.clabel(c, fmt='%.1f', inline='True', fontsize=fontsize)
 
     return fig, ax
+
+
+def space_to_underscore(string: str):
+    string.replace(' ', '_')
+    pass
