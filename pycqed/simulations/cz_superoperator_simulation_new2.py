@@ -24,6 +24,7 @@ def f_to_parallelize_new(arglist):
 
     fitted_stepresponse_ty = arglist['fitted_stepresponse_ty']
     fluxlutman_args = arglist['fluxlutman_args']       # see function return_instrument_args in czf
+    fluxlutman_static_args = arglist['fluxlutman_static_args']       # see function return_instrument_args in czf
     sim_control_CZ_args = arglist['sim_control_CZ_args']       # see function return_instrument_args in czf
     number = arglist['number']
     adaptive_pars = arglist['adaptive_pars']
@@ -43,10 +44,19 @@ def f_to_parallelize_new(arglist):
 
     fluxlutman = flm.HDAWG_Flux_LutMan('fluxlutman'+'{}'.format(number))
     station.add_component(fluxlutman)
+    fluxlutman_static = flm.HDAWG_Flux_LutMan('fluxlutman_static'+'{}'.format(number))
+    station.add_component(fluxlutman_static)
     sim_control_CZ = scCZ.SimControlCZ('sim_control_CZ'+'{}'.format(number))
     station.add_component(sim_control_CZ)
 
-    fluxlutman, sim_control_CZ = czf.return_instrument_from_arglist(fluxlutman,fluxlutman_args,sim_control_CZ,sim_control_CZ_args, which_gate=which_gate)
+    fluxlutman, sim_control_CZ, fluxlutman_static = czf.return_instrument_from_arglist(
+        fluxlutman,
+        fluxlutman_args,
+        sim_control_CZ,
+        sim_control_CZ_args,
+        fluxlutman_static,
+        fluxlutman_static_args,
+        which_gate=which_gate)
 
     cz_lambda_2 = fluxlutman.get('cz_lambda_2_{}'.format(which_gate))
     cz_length = fluxlutman.get('cz_length_{}'.format(which_gate))
@@ -147,12 +157,10 @@ def f_to_parallelize_new(arglist):
                 exp_metadata=exp_metadata,
                 mode='adaptive')
 
-
-
     fluxlutman.close()
+    fluxlutman_static.close()
     sim_control_CZ.close()
     MC.close()
-
 
 
 def compute_propagator(arglist):
@@ -163,6 +171,7 @@ def compute_propagator(arglist):
     fluxbias_q1 = arglist['fluxbias_q1']
     fitted_stepresponse_ty = arglist['fitted_stepresponse_ty']
     fluxlutman = arglist['fluxlutman']
+    fluxlutman_static = arglist['fluxlutman_static']
     sim_control_CZ = arglist['sim_control_CZ']
     which_gate = arglist['which_gate']
     simstep_div = arglist['simstep_div']
@@ -180,7 +189,7 @@ def compute_propagator(arglist):
                                                        # but we can use a different step for simulating the time evolution
     tlist = np.arange(0, cz_length, sim_step)
 
-    # residual_coupling=czf.conditional_frequency(0,fluxlutman,sim_control_CZ, which_gate=which_gate)      # To check residual coupling at the operating point.
+    # residual_coupling=czf.conditional_frequency(0,fluxlutman,fluxlutman_static, which_gate=which_gate)      # To check residual coupling at the operating point.
     # print(residual_coupling)                                                       # Change amp to get the residual coupling at different points
 
 
@@ -274,8 +283,6 @@ def compute_propagator(arglist):
         log.debug('Changing fluxlutman czd_double_sided_{} value back to {}'.format(which_gate, double_sided))
         fluxlutman.set('czd_double_sided_{}'.format(which_gate), double_sided)
 
-
-
     # We concatenate amp and f_pulse with the values they take during the Zrotations and idle_x
     # It comes after the previous line because of details of the function czf.shift_due_to_fluxbias_q0
     if sim_control_CZ.Z_rotations_length() != 0:
@@ -298,15 +305,20 @@ def compute_propagator(arglist):
     ### Obtain jump operators for Lindblad equation
     c_ops = czf.return_jump_operators(sim_control_CZ=sim_control_CZ, amp_final=amp_final, fluxlutman=fluxlutman, which_gate=which_gate)
 
-
     ### Compute propagator
-    U_final = czf.time_evolution_new(c_ops=c_ops, sim_control_CZ=sim_control_CZ,
-                                 fluxlutman=fluxlutman, fluxbias_q1=fluxbias_q1, amp=amp_final, sim_step=sim_step_new, intervals_list=intervals_list, which_gate=which_gate)
+    U_final = czf.time_evolution_new(
+        c_ops=c_ops,
+        sim_control_CZ=sim_control_CZ,
+        fluxlutman_static=fluxlutman_static,
+        fluxlutman=fluxlutman,
+        fluxbias_q1=fluxbias_q1,
+        amp=amp_final,
+        sim_step=sim_step_new,
+        intervals_list=intervals_list,
+        which_gate=which_gate)
     #print(czf.verify_CPTP(U_superop_average))    # simple check of CPTP property
 
     return [U_final, t_final]
-
-
 
 def get_f_pulse_double_sided(fluxlutman,theta_i, which_gate: str = 'NE'):
     cz_lambda_2 = fluxlutman.get('cz_lambda_2_{}'.format(which_gate))
@@ -315,7 +327,7 @@ def get_f_pulse_double_sided(fluxlutman,theta_i, which_gate: str = 'NE'):
     cz_theta_f = fluxlutman.get('cz_theta_f_{}'.format(which_gate))
     czd_length_ratio = fluxlutman.get('czd_length_ratio_{}'.format(which_gate))
     q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
-
+    log.warning(type(czd_length_ratio))
     thetawave_A = wfl.martinis_flux_pulse(
         length=cz_length*czd_length_ratio,
         lambda_2=cz_lambda_2,
@@ -349,6 +361,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
     def __init__(self,
         fluxlutman,
         sim_control_CZ,
+        fluxlutman_static,
         fitted_stepresponse_ty=None,
         qois='all',
         ):
@@ -369,7 +382,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         """
         super().__init__()
 
-        self.which_gate = sim_control_CZ.which_gate() # compatibility with new fluxlutman
+        self.which_gate = sim_control_CZ.which_gate()  # compatibility with new fluxlutman
         self.simstep_div = sim_control_CZ.simstep_div()
 
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
@@ -386,7 +399,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
         self.fluxlutman = fluxlutman
+        self.fluxlutman_static = fluxlutman_static
         self.sim_control_CZ = sim_control_CZ
+
         if fitted_stepresponse_ty is None:
             self.fitted_stepresponse_ty = [np.array(1), np.array(1)]
         else:
@@ -441,6 +456,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                     input_point = {'fluxbias_q0': fluxbias_q0,
                                    'fluxbias_q1': fluxbias_q1,
                                    'fluxlutman': self.fluxlutman,
+                                   'fluxlutman_static': self.fluxlutman_static,
                                    'sim_control_CZ': self.sim_control_CZ,
                                    'fitted_stepresponse_ty': self.fitted_stepresponse_ty,
                                    'which_gate': self.which_gate,
@@ -461,12 +477,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
-            #w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.sim_control_CZ, which_gate=self.which_gate)     # needed to compute phases in the rotating frame
+            #w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.fluxlutman_static, self.sim_control_CZ, which_gate=self.which_gate)     # needed to compute phases in the rotating frame
             																										 # not used anymore
 
 
             ## Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
-            #czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,self.fluxlutman,self.sim_control_CZ, which_gate=self.which_gate)
+            #czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,self.fluxlutman,self.fluxlutman_static, which_gate=self.which_gate)
 
 
             for i in range(len(U_final_vec)):
@@ -476,7 +492,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             U_superop_average = sum(U_final_vec)              # computing resulting average propagator
             #print(czf.verify_CPTP(U_superop_average))
 
-            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, sim_control_CZ=self.sim_control_CZ, which_gate=self.which_gate)
+            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, fluxlutman_static=self.fluxlutman_static, which_gate=self.which_gate)
 
             if self.sim_control_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
                                                                                         # then we optimize the search via higher-order cost function
@@ -495,10 +511,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             ## To study the effect of the coherence of leakage on repeated CZs (simpler than simulating a full RB experiment):
-            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,self.fluxlutman,self.sim_control_CZ, which_gate=self.which_gate)
+            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,self.fluxlutman,self.fluxlutman_static, which_gate=self.which_gate)
 
 
-            #czf.plot_spectrum(self.fluxlutman,self.sim_control_CZ, which_gate=self.which_gate)
+            #czf.plot_spectrum(self.fluxlutman,self.fluxlutman_static, which_gate=self.which_gate)
 
 
         qoi_plot = np.array(qoi_plot)
