@@ -16,20 +16,10 @@ SMIS s14, { 14 }
 SMIS s15, { 15 }
 SMIS s16, { 16 }
 
-smit t0, {(3, 0), (10, 8), (14, 16)}
-
 start:
-    bs 1    prepz s0 | prepz s2
-    qwait 20
-    bs 2 FL_CW_00 s0
-    bs 2 FL_CW_01 s0
-    bs 2 FL_CW_02 s0
-    bs 2 FL_CW_03 s0
-    bs 2 FL_CW_04 s0
-    bs 2 FL_CW_05 s0
-    bs 2 FL_CW_06 s0
-    bs 2 FL_CW_07 s0
-    bs 2 CW_03 s7
+    qwait 300
+    bs 3 measz s0
+
     br always, start
     nop
     nop

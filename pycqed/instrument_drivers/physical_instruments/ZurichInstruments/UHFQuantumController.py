@@ -1065,76 +1065,31 @@ setUserReg(4, err_cnt);"""
             self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0,
             codewords=None, timeout=5):
 
-        if codewords is None:
-            raise zibase.ziConfigurationError(
-                'Trying to define an AWG program with DIO output, but no output values are defined!')
-        else:
-            self._diocws = codewords
-
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
-        self.wait_dly(delay_samples)
-
-        # If no cases are defined, then we simply create all possible cases
-        if cases is None:
-            cases = np.arange(self._num_codewords)
-        else:
-            if len(cases) > self._num_codewords:
-                raise zibase.ziConfigurationError('More cases ({}) defined than available codewords ({})!'.format(
-                    len(cases), len(self._num_codewords)))
-
-            # There is probably a more efficient way of doing this
-            for case in cases:
-                if (case < 0) or (case >= self._num_codewords):
-                    raise zibase.ziConfigurationError(
-                        'Case {} is out of range defined by the available codewords ({})!'.format(case, len(self._num_codewords)))
-
-        # Sanity check on the parameters
-        if Iwaves is not None and (len(Iwaves) != len(cases)):
-            raise ziUHFQCSeqCError(
-                'Number of I channel waveforms ({}) does not match number of cases ({})!'.format(len(Iwaves), len(cases)))
-
-        if Qwaves is not None and (len(Qwaves) != len(cases)):
-            raise ziUHFQCSeqCError(
-                'Number of Q channel waveforms ({}) does not match number of cases ({})!'.format(len(Iwaves), len(cases)))
-
-        # Sanity check on I channel waveforms
-        if Iwaves is not None:
-            for i, Iwave in enumerate(Iwaves):
-                if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
-                    raise KeyError(
-                        "exceeding AWG range for I channel, all values should be within +/-1")
-                if len(Iwave) > 16384:
-                    raise KeyError(
-                        "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-
-                # Update waveform table
-                self.set(zibase.gen_waveform_name(0, cases[i]), Iwave)
-
-        # Sanity check on Q channel waveforms
-        if Qwaves is not None:
-            for i, Qwave in enumerate(Qwaves):
-                if np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
-                    raise KeyError(
-                        "exceeding AWG range for Q channel, all values should be within +/-1")
-                if len(Qwave) > 16384:
-                    raise KeyError(
-                        "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Qwave)))
-
-                # Update waveform table
-                self.set(zibase.gen_waveform_name(1, cases[i]), Qwave)
-
-        # Define the behavior of our program
-        self._reset_awg_program_features()
-        self._awg_program_features['loop_cnt'] = True
-        self._awg_program_features['wait_dly'] = True
-        self._awg_program_features['waves'] = True
-        self._awg_program_features['cases'] = True
-        self._awg_program_features['diocws'] = True
-
-        # Updating cases will cause our AWG program to update
-        self.cases(cases)
-
+        # setting the delay in the instrument
+        self.awgs_0_userregs_2(delay_samples)
+        sequence = (
+            'var wait_delay = getUserReg(2);\n' +
+            'cvar i = 0;\n'+
+            'const length = {};\n'.format(len(codewords))
+            )
+        sequence = sequence + self.array_to_combined_vector_string(
+                codewords, "codewords")
+        # starting the loop and switch statement
+        sequence = sequence +(
+            ' setDIO(2048);\n'+
+            'for (i = 0; i < length; i = i + 1) {\n'
+            ' var codeword =  codewords[i];\n'+
+            ' waitDIOTrigger();\n' +
+            ' setDIO(codeword);\n'+
+            ' wait(wait_delay);\n' +
+            ' setDIO(2048);\n'+
+            '}\n' 
+            ) 
+            
+        self.awg_string(sequence, timeout=timeout)
+        
     def awg_sequence_acquisition_and_pulse(self, Iwave=None, Qwave=None, acquisition_delay=0, dig_trigger=True) -> None:
         if Iwave is not None and (np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0):
             raise KeyError(
@@ -1363,41 +1318,6 @@ setTrigger(0);
     def plot_dio_snapshot(self, bits=range(32)):
         zibase.plot_timing_diagram(self.getv('awgs/0/dio/data'), bits, 64)
 
-    # FIXME: just starts CCL, no calibration occurs
-    def calibrate_CCL_dio_protocol(self, CCL=None, verbose=False, repetitions=1):
-        log.info('Calibrating DIO delays')
-        if verbose:
-            print("Calibrating DIO delays")
-
-        if CCL is None:
-            CCL = qtccl.CCL('CCL', address='192.168.0.11', port=5025)
-
-        cs_filepath = os.path.join(pycqed.__path__[0],
-                                   'measurement',
-                                   'openql_experiments',
-                                   'output', 'cs.txt')
-
-        opc_filepath = os.path.join(pycqed.__path__[0],
-                                    'measurement',
-                                    'openql_experiments',
-                                    'output', 'qisa_opcodes.qmap')
-
-        # Configure CCL
-        CCL.control_store(cs_filepath)
-        CCL.qisa_opcode(opc_filepath)
-
-        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                                               '..',
-                                               'examples', 'CCLight_example',
-                                               'qisa_test_assembly', 'calibration_cws_ro.qisa'))
-
-        # Start the CCL with the program configured above
-        CCL.eqasm_program(test_fp)
-        CCL.start()
-
-        # Make sure the configuration is up-to-date
-        self.assure_ext_clock()
-
     ##########################################################################
     # 'public' functions: print overview helpers
     ##########################################################################
@@ -1495,3 +1415,176 @@ setTrigger(0);
         self.print_rotations_overview()
         self.print_thresholds_overview()
         self.print_user_regs_overview()
+
+    ##########################################################################
+    # DIO calibration functions
+    ##########################################################################
+
+    def _ensure_activity(self, awg_nr, mask_value=None, timeout=5, verbose=False):
+        """
+        Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
+        """
+        if verbose: print("Testing DIO activity for AWG {}".format(awg_nr))
+
+        vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
+        vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
+        strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
+        strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
+        
+        if mask_value is None:
+            mask_value = 0x3ff
+
+        cw_mask = mask_value << 17
+
+        for i in range(timeout):
+            valid = True
+
+            data = self.getv('awgs/0/dio/data')
+            if data is None:
+                raise zibase.ziValueError('Failed to get DIO snapshot!')
+
+            vld_activity = 0
+            strb_activity = 0
+            cw_activity = 0
+            for d in data:
+                cw_activity |= (d & cw_mask)
+                vld_activity |= (d & vld_mask)
+                strb_activity |= (d & strb_mask)
+
+            if cw_activity != cw_mask:
+                print("Did not see all codeword bits toggle! Got 0x{:08x}, expected 0x{:08x}.".format(cw_activity, cw_mask))
+                valid = False
+
+            if vld_polarity != 0 and vld_activity != vld_mask:
+                print("Did not see valid bit toggle!")
+                valid = False
+
+            if strb_slope != 0 and strb_activity != strb_mask:
+                print("Did not see valid bit toggle!")
+                valid = False
+
+            if valid:
+                return True
+
+        return False
+
+    def _get_awg_dio_data(self, awg):
+        data = self.getv('awgs/' + str(awg) + '/dio/data')
+        ts = len(data)*[0]
+        cw = len(data)*[0]
+        for n, d in enumerate(data):
+            ts[n] = d >> 10
+            cw[n] = (d & ((1 << 10)-1))
+        return (ts, cw)
+
+    def _find_valid_delays(self, repetitions=1, verbose=False):
+        """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
+        configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
+        codewords are sampled incorrectly."""
+        if verbose: print("  Finding valid delays")
+        valid_delays= []
+        for delay in range(16):
+            if verbose: print('   Testing delay {}'.format(delay))
+            self.setd('raw/dios/0/delay', delay)
+            time.sleep(1)
+            valid_sequence = True
+            for awg in [0]:
+                if self.geti('raw/dios/0/error/timing') & (0x7ff << 16) != 0:
+                    valid_sequence = False
+
+            if valid_sequence:
+                valid_delays.append(delay)
+
+        return set(valid_delays)
+
+    ##########################################################################
+    # DIO calibration functions for *CC*
+    # FIXME: should not be in driver
+    ##########################################################################
+
+    def _prepare_CCL_dio_calibration(self, CCL, verbose=False):
+
+        cs_filepath = os.path.join(pycqed.__path__[0],
+                'measurement',
+                'openql_experiments',
+                'output', 'cs.txt')
+
+        opc_filepath = os.path.join(pycqed.__path__[0],
+                'measurement',
+                'openql_experiments',
+                'output', 'qisa_opcodes.qmap')
+
+        CCL.control_store(cs_filepath)
+        CCL.qisa_opcode(opc_filepath)
+
+        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','CCLight_example',
+                'qisa_test_assembly','calibration_cws_ro.qisa'))
+
+
+        # Start the CCL with the program configured above
+        CCL.eqasm_program(test_fp)
+        CCL.start()
+
+    def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
+
+        cs_filepath = os.path.join(pycqed.__path__[0],
+                'measurement',
+                'openql_experiments',
+                's17', 'cs.txt')
+
+        opc_filepath = os.path.join(pycqed.__path__[0],
+                'measurement',
+                'openql_experiments',
+                's17', 'qisa_opcodes.qmap')
+
+        QCC.control_store(cs_filepath)
+        QCC.qisa_opcode(opc_filepath)
+
+        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','QCC_example',
+                'qisa_test_assembly','ro_calibration.qisa'))
+
+        # Start the QCC with the program configured above
+        QCC.stop()
+        QCC.eqasm_program(test_fp)
+        QCC.start()
+
+    def calibrate_CC_dio_protocol(self, CC, verbose=False, repetitions=1):
+        log.info('Calibrating DIO delays')
+        if verbose: print("Calibrating DIO delays")
+
+        CC_model = CC.IDN()['Model']
+        if 'QCC' in CC_model:
+            expected_sequence = self._prepare_QCC_dio_calibration(
+                QCC=CC, verbose=verbose)
+        elif 'CCL' in CC_model:
+            expected_sequence = self._prepare_CCL_dio_calibration(
+                CCL=CC, verbose=verbose)
+        else:
+            raise ValueError('CC model ({}) not recognized.'.format(CC_model))
+
+        # Make sure the configuration is up-to-date
+        self.assure_ext_clock()
+
+        for awg in [0]:
+            if not self._ensure_activity(awg, verbose=verbose):
+                raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
+
+        valid_delays = self._find_valid_delays(repetitions, verbose=verbose)
+        if len(valid_delays) == 0:
+            raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
+
+        min_valid_delay = min(valid_delays)
+        # Heuristics to get the 'best' delay in a sequence
+        if (min_valid_delay+1) in valid_delays and (min_valid_delay+2) in valid_delays:
+            min_valid_delay = min_valid_delay + 1
+
+        # Print information
+        if verbose: print("  Valid delays are {}".format(valid_delays))
+        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+
+        # And configure the delays
+        self.setd('raw/dios/0/delays/*', min_valid_delay)
