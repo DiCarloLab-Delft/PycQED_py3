@@ -169,11 +169,6 @@ for i, dev in enumerate(conf.mw):
     # define sequence
     sequence_length = 32
 
-    # set DIO interface
-    if 0: # FIXME
-        log.warning('setting DIO interface to LVDS')
-        instr.mw[i].set('dios_0_interface', 1)
-
     # configure instrument
     instr.mw[i].clear_errors()
     instr.mw[i].load_default_settings()

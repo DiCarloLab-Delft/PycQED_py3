@@ -129,9 +129,9 @@ cw_protocols_mt = {
 class QuTech_AWG_Module(SCPI):
     __doc__ = f"""
     Driver for a Qutech AWG Module (QWG) instrument. Will establish a connection to a module via ethernet.
-    :param name: Name of the instrument
+    :param name: Name of the instrument  
     :param address: Ethernet address of the device
-    :param port: Device port
+    :param port: Device port  
     :param reset: Set device to the default settings
     :param run_mode: {_run_mode_doc}
     :param dio_mode: {_dio_mode_doc}
@@ -1168,6 +1168,10 @@ class QuTech_AWG_Module(SCPI):
                 msg.append(f"Possible wave underdrive detected on channel: {channel['id']}")
         return msg
 
+
+##########################################################################
+# Calibration with CC. FIXME: move out of driver
+##########################################################################
 
 class QWGMultiDevices:
     """

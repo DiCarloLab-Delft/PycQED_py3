@@ -55,7 +55,7 @@ def create_program(pname: str, platf_cfg: str, nregisters: int=0):
                 p.eqasm_compiler = m.group(1)
                 break
     if p.eqasm_compiler == '':
-        logging.error("key 'eqasm_compiler' not found in file '{}'".format(platf_cfg))
+        logging.error(f"key 'eqasm_compiler' not found in file '{platf_cfg}'")
 
     return p
 
@@ -71,11 +71,11 @@ def create_kernel(kname: str, program):
     return k
 
 
-def compile(p):
+def compile(p, quiet: bool = True):
     """
     Wrapper around OpenQL Program.compile() method.
     """
-    if 1:  # FIXME: allow choice, check OpenQL 0.7.0 whether warnings can now be on
+    if quiet:
         with suppress_stdout():
             p.compile()
     else:  # show warnings

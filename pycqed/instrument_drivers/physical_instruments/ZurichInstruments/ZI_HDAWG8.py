@@ -326,7 +326,7 @@ while (1) {
                 # FIXME: define DIO modes centrally in device independent way (lsb, width, channelCount)
                 dio_mode = dio_mode_list.get(self.cfg_codeword_protocol())
                 if dio_mode is None:
-                    raise ValueError("Invalid value '{}' for parameter cfg_codeword_protocol".format(self.cfg_codeword_protocol))
+                    raise ValueError("Unsupported value '{}' for parameter cfg_codeword_protocol".format(self.cfg_codeword_protocol))
                 mask = dio_mode['mask']
                 self.set(f'awgs_{awg_nr}_dio_mask_value', mask)
                 shift = dio_mode['shift'][awg_nr]
