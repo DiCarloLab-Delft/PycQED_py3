@@ -1,6 +1,6 @@
 import os
 import logging
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 import numpy as np
 from collections import OrderedDict
 import h5py
@@ -24,7 +24,7 @@ try:
     import pygsti
 except ImportError as e:
     if str(e).find('pygsti') >= 0:
-        logger.warning('Could not import pygsti')
+        log.warning('Could not import pygsti')
     else:
         raise
 
@@ -35,7 +35,7 @@ from pycqed.measurement import optimization as opt
 try:
     from pycqed.analysis import machine_learning_toolbox as mlt
 except: #ModuleNotFoundError:
-    logger.warning('Machine learning packages not loaded. '
+    log.warning('Machine learning packages not loaded. '
                    'Run from pycqed.analysis import machine_learning_toolbox '
                    'to see errors.')
 import pycqed.analysis.tools.plotting as pl_tools
@@ -47,7 +47,7 @@ try:
     import qutip as qtp
 except ImportError as e:
     if str(e).find('qutip') >= 0:
-        logger.warning('Could not import qutip')
+        log.warning('Could not import qutip')
     else:
         raise
 importlib.reload(dm_tools)
@@ -207,7 +207,7 @@ class MeasurementAnalysis(object):
                 print(e)
                 fail_counter = True
         if fail_counter:
-            logger.warning('Figure "%s" has not been saved.' % self.savename)
+            log.warning('Figure "%s" has not been saved.' % self.savename)
         if close_fig:
             plt.close(fig)
         return
@@ -414,7 +414,7 @@ class MeasurementAnalysis(object):
             fit_grp = self.analysis_group[fit_name]
 
         if len(computed_params) == 0:
-            logger.warning('Nothing to save. Parameters dictionary is empty.')
+            log.warning('Nothing to save. Parameters dictionary is empty.')
         else:
             for par_name, par_val in computed_params.items():
                 if ('std' or 'stddev' or 'stderr') not in par_name:
@@ -1021,7 +1021,7 @@ class MeasurementAnalysis(object):
             self.parameter_names = self.get_key('sweep_parameter_names')
             self.parameter_units = self.get_key('sweep_parameter_units')
             if len(self.parameter_names) != len(self.parameter_units):
-                logger.error(' Number of parameter names does not match number'
+                log.error(' Number of parameter names does not match number'
                               'of parameter units! Check sweep configuration!')
             self.sweep_names = []
             self.sweep_units = []
@@ -1712,7 +1712,7 @@ class TD_Analysis(MeasurementAnalysis):
                 if cal_zero_points is None and cal_one_points is None:
                     # a_tools.rotate_and_normalize_data_1ch does not work
                     # with 0 cal_points. Use 4 cal_points.
-                    logger.warning('a_tools.rotate_and_normalize_data_1ch '
+                    log.warning('a_tools.rotate_and_normalize_data_1ch '
                                     'does not have support for 0 cal_points. '
                                     'Setting NoCalPoints to 4.')
                     self.NoCalPoints = 4
@@ -1725,7 +1725,7 @@ class TD_Analysis(MeasurementAnalysis):
                                    NoPts))
                 ch_to_measure = \
                     0 if len(self.measured_values) == 1 else self.RO_channels[0]
-                logger.debug('ch to measure ', ch_to_measure)
+                log.debug('ch to measure ', ch_to_measure)
                 self.corr_data = a_tools.rotate_and_normalize_data_1ch(
                     self.measured_values[ch_to_measure],
                     cal_zero_points, cal_one_points)
@@ -1911,7 +1911,7 @@ class Rabi_Analysis(TD_Analysis):
             init_data_diff = np.abs(self.fit_result.init_fit[0] -
                                     self.normalized_data_points[0])
             if (self.fit_result.chisqr > .35) or (init_data_diff > offset_guess):
-                logger.warning('Fit did not converge, varying phase.')
+                log.warning('Fit did not converge, varying phase.')
 
                 fit_res_lst = []
 
@@ -1936,7 +1936,7 @@ class Rabi_Analysis(TD_Analysis):
                 self.save_fitted_parameters(self.fit_result,
                                             var_name=self.value_names[0])
             except Exception as e:
-                logger.warning(e)
+                log.warning(e)
 
             if print_fit_results:
                 print(self.fit_result.fit_report())
@@ -1973,7 +1973,7 @@ class Rabi_Analysis(TD_Analysis):
                     self.save_fitted_parameters(fit_res=self.fit_res[i],
                                                 var_name=self.value_names[i])
                 except Exception as e:
-                    logger.warning(e)
+                    log.warning(e)
 
             if print_fit_results:
                 for fit_res in self.fit_res:
@@ -2039,23 +2039,22 @@ class Rabi_Analysis(TD_Analysis):
             instr_set = self.data_file['Instrument settings']
             try:
                 if self.for_ef:
-                    pi_pulse_old = float(eval(
-                        instr_set[self.qb_name].attrs['amp180_ef']))
+                    pi_pulse_old = eval(
+                        instr_set[self.qb_name].attrs['amp180_ef'])
                     pi_half_pulse_old = \
-                        pi_pulse_old * float(eval(
-                            instr_set[self.qb_name].attrs['amp90_scale_ef']))
+                        pi_pulse_old * eval(
+                            instr_set[self.qb_name].attrs['amp90_scale_ef'])
                 else:
-                    pi_pulse_old = float(eval(
-                        instr_set[self.qb_name].attrs['amp180']))
+                    pi_pulse_old = eval(instr_set[self.qb_name].attrs['amp180'])
                     pi_half_pulse_old = \
-                        pi_pulse_old * float(eval(
-                            instr_set[self.qb_name].attrs['amp90_scale']))
+                        pi_pulse_old * eval(
+                            instr_set[self.qb_name].attrs['amp90_scale'])
                 old_vals = '\n  $\pi-Amp_{old}$ = %.3g ' % (pi_pulse_old) + \
                            self.parameter_units[0] + \
                            '\n$\pi/2-Amp_{old}$ = %.3g ' % (pi_half_pulse_old) + \
                            self.parameter_units[0]
             except(TypeError, KeyError, ValueError):
-                logger.warning('qb_name is None. Default value qb_name="qb" is '
+                log.warning('qb_name is None. Default value qb_name="qb" is '
                                 'used. Old parameter values will not be retrieved.')
                 old_vals = ''
 
@@ -2206,7 +2205,7 @@ class Rabi_Analysis(TD_Analysis):
 
             # If phase_fit<1, the piHalf amplitude<0.
             if phase_fit < 1:
-                logger.info('The data could not be fitted correctly. '
+                log.info('The data could not be fitted correctly. '
                              'The fitted phase "%s" <1, which gives '
                              'negative piHalf '
                              'amplitude.' % phase_fit)
@@ -2214,7 +2213,7 @@ class Rabi_Analysis(TD_Analysis):
             stepsize = self.sweep_points[1] - self.sweep_points[0]
             # Nyquist: wavelength>2*stepsize
             if (freq_fit) > 2 * stepsize:
-                logger.info('The data could not be fitted correctly. The '
+                log.info('The data could not be fitted correctly. The '
                              'frequency "%s" is too high.' % freq_fit)
 
             # Extract pi and pi/2 amplitudes from best fit values
@@ -2316,7 +2315,7 @@ class Rabi_Analysis(TD_Analysis):
                                     'piHalfPulse': piHalfPulse,
                                     'piHalfPulse_std': piHalfPulse_std}
         else:
-            logger.warning("Fitted frequency is zero. The pi-pulse and "
+            log.warning("Fitted frequency is zero. The pi-pulse and "
                             "pi/2-pulse will not be computed.")
             return
 
@@ -2541,14 +2540,12 @@ class QScale_Analysis(TD_Analysis):
         instr_set = self.data_file['Instrument settings']
         try:
             if self.for_ef:
-                qscale_old = float(eval(
-                    instr_set[self.qb_name].attrs['motzoi_ef']))
+                qscale_old = eval(instr_set[self.qb_name].attrs['motzoi_ef'])
             else:
-                qscale_old = float(eval(
-                    instr_set[self.qb_name].attrs['motzoi']))
+                qscale_old = eval(instr_set[self.qb_name].attrs['motzoi'])
             old_vals = '\n$qscale_{old} = $%.5g' % (qscale_old)
         except (TypeError, KeyError, ValueError):
-            logger.warning('qb_name is None. Old parameter values will '
+            log.warning('qb_name is None. Old parameter values will '
                             'not be retrieved.')
             old_vals = ''
 
@@ -2692,14 +2689,14 @@ class QScale_Analysis(TD_Analysis):
         # Warning if Xpi/2Xpi line is not within +/-threshold of 0.5
         if (b_vals0['c'] > (0.5 + threshold)) or (b_vals0['c'] < 
                                                   (0.5 - threshold)):
-            logger.warning('The trace from the X90-X180 pulses is NOT within '
+            log.warning('The trace from the X90-X180 pulses is NOT within '
                             '+/-%s of the expected value of 0.5.' % threshold)
         # Warning if optimal_qscale is not within +/-threshold of 0.5
         optimal_qscale_pop = optimal_qscale * b_vals2['slope'] + \
                              b_vals2['intercept']
         if (optimal_qscale_pop > (0.5 + threshold)) or \
                 (optimal_qscale_pop < (0.5 - threshold)):
-            logger.warning('The optimal qscale found gives a population '
+            log.warning('The optimal qscale found gives a population '
                             'that is NOT within +/-%s of the expected value '
                             'of 0.5.' % threshold)
 
@@ -2760,7 +2757,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         if channels is None:
             channels = ['I', 'Q']
 
-        logger.warning('The use of this class is deprectated!' +
+        log.warning('The use of this class is deprectated!' +
                          ' Use the new v2 analysis instead.')
 
         kw['h5mode'] = 'r+'
@@ -3560,14 +3557,12 @@ class T1_Analysis(TD_Analysis):
             instr_set = self.data_file['Instrument settings']
             try:
                 if self.for_ef:
-                    T1_old = float(eval(
-                        instr_set[self.qb_name].attrs['T1_ef'])) * 1e6
+                    T1_old = eval(instr_set[self.qb_name].attrs['T1_ef']) * 1e6
                 else:
-                    T1_old = float(eval(
-                        instr_set[self.qb_name].attrs['T1'])) * 1e6
+                    T1_old = eval(instr_set[self.qb_name].attrs['T1']) * 1e6
                 old_vals = '\nold $T_1$ = {:.5f} '.format(T1_old) + units
             except (TypeError, KeyError, ValueError):
-                logger.warning('qb_name is None. Old parameter values will '
+                log.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
                 old_vals = ''
 
@@ -3640,7 +3635,7 @@ class Ramsey_Analysis(TD_Analysis):
         self.phase_sweep_only = phase_sweep_only
         self.artificial_detuning = kw.pop('artificial_detuning', 0)
         if self.artificial_detuning == 0:
-            logger.warning('Artificial detuning is unknown. Defaults to %s MHz. '
+            log.warning('Artificial detuning is unknown. Defaults to %s MHz. '
                             'New qubit frequency might be incorrect.'
                             % self.artificial_detuning)
 
@@ -3758,7 +3753,7 @@ class Ramsey_Analysis(TD_Analysis):
                                          params=self.params)
 
             if fit_res.chisqr > .35:
-                logger.warning('Fit did not converge, varying phase')
+                log.warning('Fit did not converge, varying phase')
                 fit_res_lst = []
 
                 for phase_estimate in np.linspace(0, 2*np.pi, 8):
@@ -3884,19 +3879,19 @@ class Ramsey_Analysis(TD_Analysis):
         try:
             if self.for_ef:
                 self.qubit_freq_spec = \
-                    float(eval(instr_set[self.qb_name].attrs['f_ef_qubit']))
+                    eval(instr_set[self.qb_name].attrs['f_ef_qubit'])
             elif 'freq_qubit' in kw.keys():
                 self.qubit_freq_spec = kw['freq_qubit']
             else:
                 try:
                     self.qubit_freq_spec = \
-                        float(eval(instr_set[self.qb_name].attrs['f_qubit']))
+                        eval(instr_set[self.qb_name].attrs['f_qubit'])
                 except KeyError:
                     self.qubit_freq_spec = \
-                        float(eval(instr_set[self.qb_name].attrs['freq_qubit']))
-
+                        eval(instr_set[self.qb_name].attrs['freq_qubit'])
+                    
         except (TypeError, KeyError, ValueError):
-            logger.warning('qb_name is unknown. Setting previously measured '
+            log.warning('qb_name is unknown. Setting previously measured '
                             'value of the qubit frequency to 0. New qubit '
                             'frequency might be incorrect.')
             self.qubit_freq_spec = 0
@@ -4243,7 +4238,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         else:  # Otherwise take center of range
             f0 = np.median(self.sweep_points)
             amplitude_factor = -1.
-            logger.warning('No peaks or dips in range')
+            log.warning('No peaks or dips in range')
             # If this error is raised, it should continue the analysis but
             # not use it to update the qubit object
             # N.B. This not updating is not implemented as of 9/2017
@@ -4457,10 +4452,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         instr_set = self.data_file['Instrument settings']
         try:
-            old_RO_freq = float(eval(instr_set[self.qb_name].attrs['f_RO']))
+            old_RO_freq = eval(instr_set[self.qb_name].attrs['f_RO'])
             old_vals = '\n$f_{\mathrm{old}}$ = %.5f GHz' % (old_RO_freq * scale)
         except (TypeError, KeyError, ValueError):
-            logger.warning('qb_name is None. Old parameter values will '
+            log.warning('qb_name is None. Old parameter values will '
                             'not be retrieved.')
             old_vals = ''
 
@@ -4726,7 +4721,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         else:  # Otherwise take center of range and raise warning
             f0 = np.median(self.sweep_points)
             kappa_guess = 0.005 * 1e9
-            logger.warning('No peaks or dips have been found. Initial '
+            log.warning('No peaks or dips have been found. Initial '
                             'frequency guess taken '
                             'as median of sweep points (f_guess={}), '
                             'initial linewidth '
@@ -4935,9 +4930,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
         if analyze_ef:
             try:
-                old_freq = float(eval(instr_set[self.qb_name].attrs['f_qubit']))
-                old_freq_ef = float(eval(
-                    instr_set[self.qb_name].attrs['f_ef_qubit']))
+                old_freq = eval(instr_set[self.qb_name].attrs['f_qubit'])
+                old_freq_ef = eval(instr_set[self.qb_name].attrs['f_ef_qubit'])
                 label = 'f0={:.5f} GHz ' \
                         '\nold f0={:.5f} GHz' \
                         '\nkappa0={:.4f} MHz' \
@@ -4953,7 +4947,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                     self.fit_res.init_values['f0_gf_over_2']*scale,
                     self.fit_res.params['kappa_gf_over_2'].value / 1e6)
             except (TypeError, KeyError, ValueError):
-                logger.warning('qb_name is None. Old parameter values will '
+                log.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
                 label = 'f0={:.5f} GHz ' \
                         '\nkappa0={:.4f} MHz \n' \
@@ -4967,11 +4961,11 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             label = 'f0={:.5f} GHz '.format(
                 self.fit_res.params['f0'].value * scale)
             try:
-                old_freq = float(eval(instr_set[self.qb_name].attrs['f_qubit']))
+                old_freq = eval(instr_set[self.qb_name].attrs['f_qubit'])
                 label += '\nold f0={:.5f} GHz' .format(
                     old_freq * scale)
             except (TypeError, KeyError, ValueError):
-                logger.warning('qb_name is None. Old parameter values will '
+                log.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
             label += '\nkappa0={:.4f} MHz'.format(
                 self.fit_res.params['kappa'].value / 1e6)
@@ -5608,7 +5602,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                               params=self.params)
 
         if fit_res.chisqr > 0.35:
-            logger.warning('Fit did not converge, chi-square > 0.35')
+            log.warning('Fit did not converge, chi-square > 0.35')
 
         if print_fit_results:
             print(fit_res.fit_report())
@@ -5841,7 +5835,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
             self.parameter_names = self.get_key('sweep_parameter_names')
             self.parameter_units = self.get_key('sweep_parameter_units')
             if len(self.parameter_names) != len(self.parameter_units):
-                logger.error(' Number of parameter names does not match number'
+                log.error(' Number of parameter names does not match number'
                               'of parameter units! Check sweep configuration!')
             self.sweep_names = []
             self.sweep_units =[]
@@ -5939,7 +5933,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                               params=self.params)
 
         if fit_res.chisqr > 0.35:
-            logger.warning('Fit did not converge, chi-square > 0.35')
+            log.warning('Fit did not converge, chi-square > 0.35')
 
         if print_fit_results:
             print(fit_res.fit_report())
@@ -6577,7 +6571,7 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
                               params=self.params)
 
         if fit_res.chisqr > 0.35:
-            logger.warning('Fit did not converge, chi-square > 0.35')
+            log.warning('Fit did not converge, chi-square > 0.35')
 
         if print_fit_results:
             print(fit_res.fit_report())
@@ -6904,7 +6898,7 @@ class FluxPulse_timing_calibration(FluxPulse_Scope_Analysis):
                                                   params=params_delay_fit)
 
         if self.delay_fit_res.chisqr > 1.:
-            logger.warning('Fit did not converge, chi-square > 1.')
+            log.warning('Fit did not converge, chi-square > 1.')
 
         self.fitted_delay = (self.delay_fit_res.best_values['t_end'] +
                              self.delay_fit_res.best_values['t_start'])/2. - flux_pulse_length/2.

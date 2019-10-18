@@ -322,8 +322,8 @@ def get_param_value_from_file(file_path, instr_name, param_name, h5mode='r+'):
     instr_settings = data_file['Instrument settings']
     if instr_name in list(instr_settings.keys()):
         if param_name in list(instr_settings[instr_name].attrs):
-            param_val = float(eval(instr_settings[instr_name].attrs[
-                                       param_name]))
+            param_val = eval(instr_settings[instr_name].attrs[
+                                       param_name])
         else:
             raise KeyError('"{}" does not exist for instrument "{}"'.format(
                 param_name, instr_name))
@@ -350,11 +350,11 @@ def get_qb_channel_map_from_hdf(qb_names, file_path, value_names, h5mode='r+'):
         ro_type = 'w'
 
     for qbn in qb_names:
-        qbchs = [str(eval(instr_settings[qbn].attrs['acq_I_channel']))]
+        qbchs = [eval(instr_settings[qbn].attrs['acq_I_channel'])]
         # eval because strings are saved as representations
         ro_acq_weight_type = eval(instr_settings[qbn].attrs['acq_weights_type'])
         if ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
-            qbchs += [str(eval(instr_settings[qbn].attrs['acq_Q_channel']))]
+            qbchs += [eval(instr_settings[qbn].attrs['acq_Q_channel'])]
         channel_map[qbn] = [ch for ch in value_names for nr in qbchs
                             if ro_type+nr in ch]
 
@@ -369,11 +369,10 @@ def get_qb_thresholds_from_file(qb_names, file_path, h5mode='r+'):
     instr_settings = data_file['Instrument settings']
     thresholds = {}
     for qbn in qb_names:
-        ro_channel = int(
-            eval(instr_settings[qbn].attrs['RO_acq_weight_function_I']))
-        thresholds[qbn] = 1.5*float(
-            eval(instr_settings['UHFQC'].attrs['quex_thres_{}_level'.format(
-                ro_channel)]))
+        ro_channel = eval(instr_settings[qbn].attrs['RO_acq_weight_function_I'])
+        thresholds[qbn] = 1.5*eval(
+            instr_settings['UHFQC'].attrs['quex_thres_{}_level'.format(
+                ro_channel)])
     return thresholds
 
 
@@ -468,7 +467,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                 exec(
                     ('cal_one = %s' % (eval(temp2.attrs['cal_one_points']))),
                     locals())
-                dofs = int(eval(temp2.attrs['NoSegments'])) - \
+                dofs = eval(temp2.attrs['NoSegments']) - \
                     len(cal_zero) - len(cal_one)
             else:
                 dofs = len(ma.sweep_points)
@@ -715,8 +714,10 @@ def get_instrument_setting(analysis_object, instrument_name, parameter):
 
 def compare_instrument_settings_timestamp(timestamp_a, timestamp_b):
     '''
-    Takes two analysis objects as input and prints the differences between the instrument settings.
-    Currently it only compares settings existing in object_a, this function can be improved to not care about the order of arguments.
+    Takes two analysis objects as input and prints the differences between
+    the instrument settings. Currently it only compares settings existing in
+    object_a, this function can be improved to not care about the order of
+    arguments.
     '''
 
     h5mode = 'r+'
@@ -761,8 +762,10 @@ def compare_instrument_settings_timestamp(timestamp_a, timestamp_b):
 
 def compare_instrument_settings(analysis_object_a, analysis_object_b):
     '''
-    Takes two analysis objects as input and prints the differences between the instrument settings.
-    Currently it only compares settings existing in object_a, this function can be improved to not care about the order of arguments.
+    Takes two analysis objects as input and prints the differences between the
+    instrument settings. Currently it only compares settings existing in
+    object_a, this function can be improved to not care about the order
+    of arguments.
     '''
     sets_a = analysis_object_a.data_file['Instrument settings']
     sets_b = analysis_object_b.data_file['Instrument settings']
