@@ -246,9 +246,9 @@ def get_start_stop_time(timestamp):
     '''
     from pycqed.analysis import measurement_analysis as MA
     ma = MA.MeasurementAnalysis(timestamp=timestamp)
-    timestring_start = a_tools.get_instrument_setting(
+    timestring_start = get_instrument_setting(
         ma, 'MC', 'measurement_begintime')
-    timestring_stop = a_tools.get_instrument_setting(
+    timestring_stop = get_instrument_setting(
         ma, 'MC', 'measurement_endtime')
     date_start, time_start = timestring_start.split(' ')
     date_stop, time_stop = timestring_stop.split(' ')
@@ -291,9 +291,11 @@ def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_file
                         'This data file attribute does not exist or hasn''t been coded for extraction.')
 
             else:
-                if param.split('.')[0] in ma.data_file.get('Instrument settings', {}):
-                    data[param].append(ma.data_file['Instrument settings'][
-                                       param.split('.')[0]].attrs[param.split('.')[1]])
+                if param.split('.')[0] in ma.data_file.get(
+                        'Instrument settings', {}):
+                    data[param].append(eval(
+                        ma.data_file['Instrument settings'][
+                            param.split('.')[0]].attrs[param.split('.')[1]]))
                 elif param.split('.')[0] in ma.data_file.get('Analysis', {}):
                     temp = ma.data_file['Analysis']
                     for ii in range(len(param.split('.'))-1):
@@ -303,7 +305,10 @@ def get_data_from_timestamp_legacy(timestamps, param_names, TwoD=False, max_file
                     temp = ma.data_file
                     for ii in range(len(param.split('.'))-1):
                         temp = temp[param.split('.')[ii]]
-                    data[param].append(temp[param.split('.')[-1]])
+                    try:
+                        data[param].append(eval(temp[param.split('.')[-1]]))
+                    except KeyError:
+                        data[param].append(temp[param.split('.')[-1]])
                 else:
                     warnings.warn(
                         'This data file attribute does not exist or '
@@ -317,7 +322,8 @@ def get_param_value_from_file(file_path, instr_name, param_name, h5mode='r+'):
     instr_settings = data_file['Instrument settings']
     if instr_name in list(instr_settings.keys()):
         if param_name in list(instr_settings[instr_name].attrs):
-            param_val = float(instr_settings[instr_name].attrs[param_name])
+            param_val = eval(instr_settings[instr_name].attrs[
+                                       param_name])
         else:
             raise KeyError('"{}" does not exist for instrument "{}"'.format(
                 param_name, instr_name))
@@ -344,10 +350,11 @@ def get_qb_channel_map_from_hdf(qb_names, file_path, value_names, h5mode='r+'):
         ro_type = 'w'
 
     for qbn in qb_names:
-        qbchs = [str(instr_settings[qbn].attrs['acq_I_channel'])]
-        ro_acq_weight_type = instr_settings[qbn].attrs['acq_weights_type']
+        qbchs = [str(eval(instr_settings[qbn].attrs['acq_I_channel']))]
+        # eval because strings are saved as representations
+        ro_acq_weight_type = eval(instr_settings[qbn].attrs['acq_weights_type'])
         if ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
-            qbchs += [str(instr_settings[qbn].attrs['acq_Q_channel'])]
+            qbchs += [str(eval(instr_settings[qbn].attrs['acq_Q_channel']))]
         channel_map[qbn] = [ch for ch in value_names for nr in qbchs
                             if ro_type+nr in ch]
 
@@ -362,9 +369,8 @@ def get_qb_thresholds_from_file(qb_names, file_path, h5mode='r+'):
     instr_settings = data_file['Instrument settings']
     thresholds = {}
     for qbn in qb_names:
-        ro_channel = int(
-            instr_settings[qbn].attrs['RO_acq_weight_function_I'])
-        thresholds[qbn] = 1.5*float(
+        ro_channel = eval(instr_settings[qbn].attrs['RO_acq_weight_function_I'])
+        thresholds[qbn] = 1.5*eval(
             instr_settings['UHFQC'].attrs['quex_thres_{}_level'.format(
                 ro_channel)])
     return thresholds
@@ -392,9 +398,10 @@ def get_data_from_ma_v1(ma, param_names):
                     'This data file attribute does not exist or hasn''t been coded for extraction.')
 
         else:
-            if param.split('.')[0] in ma.data_file.get('Instrument settings', {}):
-                data[param] = ma.data_file['Instrument settings'][
-                    param.split('.')[0]].attrs[param.split('.')[1]]
+            if param.split('.')[0] in ma.data_file.get(
+                    'Instrument settings', {}):
+                data[param] = eval(ma.data_file['Instrument settings'][
+                    param.split('.')[0]].attrs[param.split('.')[1]])
             elif param.split('.')[0] in ma.data_file.get('Analysis', {}):
                 temp = ma.data_file['Analysis']
                 for ii in range(len(param.split('.'))-1):
@@ -404,10 +411,14 @@ def get_data_from_ma_v1(ma, param_names):
                 temp = ma.data_file
                 for ii in range(len(param.split('.'))-1):
                     temp = temp[param.split('.')[ii]]
-                data[param] = temp[param.split('.')[-1]]
+                try:
+                    data[param] = eval(temp[param.split('.')[-1]])
+                except KeyError:
+                    data[param] = temp[param.split('.')[-1]]
             else:
                 warnings.warn(
-                    'This data file attribute does not exist or hasn''t been coded for extraction.')
+                    'This data file attribute does not exist or '
+                    'hasn"t been coded for extraction.')
     return data
 
 
@@ -444,17 +455,19 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
             # tmp_var is a temporary fix!
             # should be removed at some point
             try:
-                tmp_var = ma.data_file['Instrument settings'][
-                    'MC'].attrs['detector_function_name']
+                tmp_var = eval(ma.data_file['Instrument settings'][
+                    'MC'].attrs['detector_function_name'])
             except:
                 tmp_var = None
             if tmp_var == 'TimeDomainDetector':
                 temp2 = ma.data_file['Instrument settings']['TD_Meas']
                 exec(
-                    ('cal_zero = %s' % (temp2.attrs['cal_zero_points'])), locals())
+                    ('cal_zero = %s' % (eval(temp2.attrs['cal_zero_points']))),
+                    locals())
                 exec(
-                    ('cal_one = %s' % (temp2.attrs['cal_one_points'])), locals())
-                dofs = int(temp2.attrs['NoSegments']) - \
+                    ('cal_one = %s' % (eval(temp2.attrs['cal_one_points']))),
+                    locals())
+                dofs = eval(temp2.attrs['NoSegments']) - \
                     len(cal_zero) - len(cal_one)
             else:
                 dofs = len(ma.sweep_points)
@@ -480,29 +493,34 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                 data[param] = np.double(ma.data_file['Analysis'][param])
             else:
                 warnings.warn(
-                    'The data file attribute %s does not exist or hasn''t been coded for extraction.' % (param))
-            # print 'boo9', data['amp']
-
+                    'The data file attribute %s does not exist or '
+                    'hasn"t been coded for extraction.' % (param))
         else:
-            if param.split('.')[0] in list(ma.data_file.get('Instrument settings', {}).keys()):
-                data[param] = ma.data_file['Instrument settings'][
-                    param.split('.')[0]].attrs[param.split('.')[1]]
+            if param.split('.')[0] in list(ma.data_file.get(
+                    'Instrument settings', {}).keys()):
+                data[param] = eval(ma.data_file['Instrument settings'][
+                    param.split('.')[0]].attrs[param.split('.')[1]])
             else:
                 extract_param = True
-                if param.split('.')[0] in list(ma.data_file.get('Analysis', {}).keys()):
+                if param.split('.')[0] in list(ma.data_file.get(
+                        'Analysis', {}).keys()):
                     temp = ma.data_file['Analysis']
                 elif param.split('.')[0] in list(ma.data_file.keys()):
                     temp = ma.data_file
                 else:
                     extract_param = False
                     warnings.warn(
-                        'The data file attribute %s does not exist or hasn''t been coded for extraction.' % (param))
+                        'The data file attribute %s does not exist or '
+                        'hasn"t been coded for extraction.' % (param))
                 if extract_param:
                     for ii in range(len(param.split('.'))-1):
                         temp = temp[param.split('.')[ii]]
                     param_end = param.split('.')[-1]
                     if param_end in list(temp.attrs.keys()):
-                        data[param] = temp.attrs[param_end]
+                        try:
+                            data[param] = eval(temp.attrs[param_end])
+                        except TypeError:
+                            data[param] = temp.attrs[param_end]
                     elif param_end in list(temp.keys()):
                         data[param] = temp[param_end].value
         if numeric_params is not None:
@@ -690,14 +708,16 @@ def get_all_msmt_filepaths(folder, suffix='hdf5', pattern=''):
 def get_instrument_setting(analysis_object, instrument_name, parameter):
     instrument_settings = analysis_object.data_file['Instrument settings']
     instrument = instrument_settings[instrument_name]
-    attr = instrument.attrs[parameter]
+    attr = eval(instrument.attrs[parameter])
     return attr
 
 
 def compare_instrument_settings_timestamp(timestamp_a, timestamp_b):
     '''
-    Takes two analysis objects as input and prints the differences between the instrument settings.
-    Currently it only compares settings existing in object_a, this function can be improved to not care about the order of arguments.
+    Takes two analysis objects as input and prints the differences between
+    the instrument settings. Currently it only compares settings existing in
+    object_a, this function can be improved to not care about the order of
+    arguments.
     '''
 
     h5mode = 'r+'
@@ -724,13 +744,13 @@ def compare_instrument_settings_timestamp(timestamp_a, timestamp_b):
                     print('Instrument "%s" does have parameter "%s"' % (
                         ins_key, par_key))
 
-                if ins_a.attrs[par_key] == ins_b.attrs[par_key]:
+                if eval(ins_a.attrs[par_key]) == eval(ins_b.attrs[par_key]):
                     pass
                 else:
                     print('    "%s" has a different value '
                           ' "%s" for %s, "%s" for %s' % (
-                              par_key, ins_a.attrs[par_key], timestamp_a,
-                              ins_b.attrs[par_key], timestamp_b))
+                              par_key, eval(ins_a.attrs[par_key]), timestamp_a,
+                              eval(ins_b.attrs[par_key]), timestamp_b))
                     diffs_found = True
 
             if not diffs_found:
@@ -742,8 +762,10 @@ def compare_instrument_settings_timestamp(timestamp_a, timestamp_b):
 
 def compare_instrument_settings(analysis_object_a, analysis_object_b):
     '''
-    Takes two analysis objects as input and prints the differences between the instrument settings.
-    Currently it only compares settings existing in object_a, this function can be improved to not care about the order of arguments.
+    Takes two analysis objects as input and prints the differences between the
+    instrument settings. Currently it only compares settings existing in
+    object_a, this function can be improved to not care about the order
+    of arguments.
     '''
     sets_a = analysis_object_a.data_file['Instrument settings']
     sets_b = analysis_object_b.data_file['Instrument settings']
@@ -764,13 +786,13 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
                     print('Instrument "%s" does have parameter "%s"' % (
                         ins_key, par_key))
 
-                if ins_a.attrs[par_key] == ins_b.attrs[par_key]:
+                if eval(ins_a.attrs[par_key]) == eval(ins_b.attrs[par_key]):
                     pass
                 else:
                     print('    "%s" has a different value '
                           ' "%s" for a, "%s" for b' % (
-                              par_key, ins_a.attrs[par_key],
-                              ins_b.attrs[par_key]))
+                              par_key, eval(ins_a.attrs[par_key]),
+                              eval(ins_b.attrs[par_key])))
                     diffs_found = True
 
             if not diffs_found:
