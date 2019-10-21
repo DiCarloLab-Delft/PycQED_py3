@@ -350,11 +350,11 @@ def get_qb_channel_map_from_hdf(qb_names, file_path, value_names, h5mode='r+'):
         ro_type = 'w'
 
     for qbn in qb_names:
-        qbchs = [eval(instr_settings[qbn].attrs['acq_I_channel'])]
+        qbchs = [str(eval(instr_settings[qbn].attrs['acq_I_channel']))]
         # eval because strings are saved as representations
         ro_acq_weight_type = eval(instr_settings[qbn].attrs['acq_weights_type'])
         if ro_acq_weight_type in ['SSB', 'DSB', 'optimal_qutrit']:
-            qbchs += [eval(instr_settings[qbn].attrs['acq_Q_channel'])]
+            qbchs += [str(eval(instr_settings[qbn].attrs['acq_Q_channel']))]
         channel_map[qbn] = [ch for ch in value_names for nr in qbchs
                             if ro_type+nr in ch]
 
