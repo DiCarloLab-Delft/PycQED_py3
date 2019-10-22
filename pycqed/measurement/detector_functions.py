@@ -15,7 +15,7 @@ from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
-
+from packaging import version
 import numpy.fft as fft
 
 
@@ -1264,14 +1264,14 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         if self.prepare_for_each_point:
             self.prepare()
         time.sleep(self.delay)
-        if qc.__version__ < '0.1.11': 
+        if version.parse(qc.__version__) < version.parse('0.1.11'):
             return self.SH.get_power_at_freq(Navg=self.Navg)
-        else: 
+        else:
             self.SH.avg(self.Navg)
             return self.SH.power()
 
     def prepare(self, **kw):
-        if qc.__version__ < '0.1.11': 
+        if qc.__version__ < '0.1.11':
             self.SH.prepare_for_measurement()
         if self.prepare_function is not None:
             self.prepare_function(**self.prepare_function_kwargs)
