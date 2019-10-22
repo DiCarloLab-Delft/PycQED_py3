@@ -3,7 +3,7 @@ import openql.openql as ql
 import pycqed.measurement.openql_experiments.openql_helpers as oqh
 from pycqed.utilities.general import int2base, suppress_stdout
 from os.path import join
-
+from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_lm as _def_lm_flux
 
 def single_flux_pulse_seq(qubit_indices: tuple,
                           platf_cfg: str):
@@ -417,46 +417,58 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
     return p
 
 
-def residual_coupling_sequence(times, q0: int, q1: int, platf_cfg: str):
+def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
+                               spectator_state: str, platf_cfg: str):
     """
     Sequence to measure the residual (ZZ) interaction between two qubits.
     Procedure is described in M18TR.
 
-        (q0) --X90--(tau/2)-Y180-(tau/2)-Xm90--RO
-        (q1) --X180-(tau/2)-X180-(tau/2)-------RO
+        (q0) --X90----(tau/2)---Y180-(tau/2)-Xm90--RO
+        (qs) --[X180]-(tau/2)-[X180]-(tau/2)-------RO
 
     Input pars:
-        times:          the list of waiting times in s for each Echo element
-        q0              Phase measurement is performed on q0
-        q1              Excitation is put in and removed on q1
-        platf_cfg:      filename of the platform config file
+        times:           the list of waiting times in s for each Echo element
+        q0               Phase measurement is performed on q0
+        q_spectator_idx  Excitation is put in and removed on these qubits
+                         as indicated
+        spectator_state  Indicates on which qubit to put excitations.
+        platf_cfg:       filename of the platform config file
     Returns:
         p:              OpenQL Program object containing
 
     """
 
     p = oqh.create_program("residual_coupling_sequence", platf_cfg)
+    all_qubits = [q0]+q_spectator_idx
+    n_qubits = len(all_qubits)
 
-    for i, time in enumerate(times[:-4]):
+    gate_spec = [s.replace('0', 'i').replace('1', 'rx180') for s in spectator_state]
+
+    for i, time in enumerate(times[:-2]):
 
         k = oqh.create_kernel("residual_coupling_seq_{}".format(i), p)
         k.prepz(q0)
-        k.prepz(q1)
+        for q_s in q_spectator_idx:
+            k.prepz(q_s)
         wait_nanoseconds = int(round(time/1e-9/2))
         k.gate('rx90', [q0])
-        k.gate('rx180', [q1])
-        k.gate("wait", [q0, q1], wait_nanoseconds)
+        for i_s, q_s in enumerate(q_spectator_idx):
+            k.gate(gate_spec[i_s], [q_s])
+        k.gate("wait", all_qubits, wait_nanoseconds)
         k.gate('ry180', [q0])
-        k.gate('rx180', [q1])
-        k.gate("wait", [q0, q1], wait_nanoseconds)
+        for i_s, q_s in enumerate(q_spectator_idx):
+            k.gate(gate_spec[i_s], [q_s])
+        k.gate("wait", all_qubits, wait_nanoseconds)
         k.gate('rxm90', [q0])
         k.measure(q0)
-        k.measure(q1)
-        k.gate("wait", [q0, q1], 0)
+        for q_s in q_spectator_idx:
+            k.measure(q_s)
+        k.gate("wait", all_qubits, 0)
         p.add_kernel(k)
 
     # adding the calibration points
-    p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1)
+    p = oqh.add_multi_q_cal_points(p, qubits=all_qubits,
+                                   combinations=['0'*n_qubits,'1'*n_qubits])
 
     p = oqh.compile(p)
     return p
@@ -464,7 +476,8 @@ def residual_coupling_sequence(times, q0: int, q1: int, platf_cfg: str):
 
 def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
               flux_cw: str='fl_cw_02',
-              platf_cfg: str=''):
+              twoq_pair=[2, 0],
+              platf_cfg: str='', cc: str='CCL'):
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -482,15 +495,27 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
 
+    if cc=='CCL':
+        wait_list = [0, 1, 2, 3, 4, 5, 6]
+        flux_target = twoq_pair
+    elif cc=='QCC':
+        wait_list = list(np.arange(17))
+        flux_target = [qubit_idx]
+        cw_idx = int(flux_cw[-2:])
+        flux_cw = 'sf_{}'.format(_def_lm_flux[cw_idx]['name'].lower())
+    else:
+        raise ValuerError('CC type not understood: {}'.format(cc))
+
+
     k = oqh.create_kernel("RamZ_X", p)
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate(flux_cw, [2, 0])
+    k.gate("wait", wait_list, 0) #alignment workaround
+    k.gate(flux_cw, flux_target)
     #k.gate(flux_cw, [10, 8])
-    
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+
+    k.gate("wait", wait_list, 0) #alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('rx90', [qubit_idx])
     k.measure(qubit_idx)
@@ -500,11 +525,11 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate(flux_cw, [2, 0])
+    k.gate("wait", wait_list, 0) #alignment workaround
+    k.gate(flux_cw, flux_target)
     #k.gate(flux_cw, [10, 8])
-    
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+
+    k.gate("wait", wait_list, 0) #alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('ry90', [qubit_idx])
     k.measure(qubit_idx)
@@ -647,9 +672,10 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
     return p
 
 
-def Chevron(qubit_idx: int, qubit_idx_spec: int,
+def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
             buffer_time, buffer_time2, flux_cw: int, platf_cfg: str,
-            target_qubit_sequence: str='ramsey'):
+            measure_parked_qubit: bool = False,
+            target_qubit_sequence: str='ramsey', cc: str='CCL'):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -659,7 +685,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         qubit_idx_spec: int specifying the spectator qubit
         buffer_time   :
         buffer_time2  :
-
+        measure_parked_qubit (bool): Whether we set a measurement on the parked qubit
         platf_cfg:      filename of the platform config file
         target_qubit_sequence: selects whether to run a ramsey sequence on
             a target qubit ('ramsey'), keep it in gorund state ('ground')
@@ -685,6 +711,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
     if flux_cw is None:
         flux_cw = 2
+    flux_cw_name = _def_lm_flux[flux_cw]['name'].lower()
 
     k = oqh.create_kernel("Chevron", p)
     k.prepz(qubit_idx)
@@ -704,9 +731,21 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
 
     # For CCLight
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-    k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
-    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    if cc=='CCL':
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+        k.gate('fl_cw_{:02}'.format(flux_cw), [2,0])
+        if qubit_idx_park is not None:
+            k.gate('fl_cw_06', [qubit_idx_park]) # square pulse
+        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+    elif cc=='QCC':
+        k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+        if qubit_idx_park is not None:
+            k.gate('sf_square', [qubit_idx_park])
+        k.gate("wait", list(np.arange(17)), 20) #alignment workaround
+        k.gate('sf_{}'.format(flux_cw_name), [qubit_idx])
+        k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+    else:
+        raise ValuerError('CC type not understood: {}'.format(cc))
 
 
     if buffer_nanoseconds2 > 0:
@@ -715,6 +754,8 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     # k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
     k.measure(qubit_idx)
     k.measure(qubit_idx_spec)
+    if (qubit_idx_park is not None) and measure_parked_qubit:
+        k.measure(qubit_idx_park)
 
     p.add_kernel(k)
 
@@ -830,9 +871,9 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate(prep_pulse_q1, [q1])
             # FIXME hardcoded edge because of
             # brainless "directed edge recources" in compiler
-            k.gate("wait", [0, 1, 2, 3, 4, 5, 6],  0) #alignment workaround
-            k.gate('fl_cw_01', [2, 0])
-            k.gate("wait", [0, 1, 2, 3, 4, 5, 6],  0) #alignment workaround
+            k.gate("wait", list(np.arange(17)),  0) #alignment workaround
+            k.gate('cz', [q0, q1])
+            k.gate("wait", list(np.arange(17)),  0) #alignment workaround
             # after-rotations
             k.gate(after_pulse_q1, [q1])
             # possibly wait
@@ -1253,20 +1294,16 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
     return p
 
 
-def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
+def conditional_oscillation_seq(q0: int, q1: int,
+                                q2: int=None, q3: int=None,
+                                platf_cfg: str=None,
                                 CZ_disabled: bool=False,
                                 angles=np.arange(0, 360, 20),
-                                wait_time_between: int=0,
                                 wait_time_after: int=0,
                                 add_cal_points: bool=True,
-                                CZ_duration: int=260,
-                                nr_of_repeated_gates: int =1,
-                                fixed_max_nr_of_repeated_gates: int=None,
                                 cases: list=('no_excitation', 'excitation'),
-                                flux_codeword: str='fl_cw_01',
-                                q2: int=None,
-                                flux_codeword2: str='fl_cw_03',
-                                q2_excited: bool=False):
+                                flux_codeword: str='cz',
+                                flux_codeword_park: str=None):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -1276,14 +1313,19 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
     Timing of the sequence:
     q0:   --   X90  C-Phase  (second C-Phase) Rphi90    RO
     q1: (X180)  --  C-Phase     --            (X180)    RO
-    q2: (X180)      C-Phase  (second C-Phase) (X180)
 
     Args:
         q0, q1      (str): names of the addressed qubits
-        RO_target   (str): can be q0, q1, or 'all'
+        q2, q3      (str): names of optional extra qubit to either park or
+            apply a CZ to.
+
+        flux_codeword (str):
+            the gate to be applied to the qubit pair q0, q1
+        flux_codeword_park (str):
+            optionally park qubits q2 (and q3) with either a 'park' pulse
+            (single qubit operation on q2) or a 'cz' pulse on q2-q3.
         CZ_disabled (bool): disable CZ gate
         angles      (array): angles of the recovery pulse
-        wait_time_between (int) wait time in ns added after each flux pulse
         wait_time_after   (int): wait time in ns after triggering all flux
             pulses
     '''
@@ -1297,38 +1339,38 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             k = oqh.create_kernel("{}_{}".format(case, angle), p)
             k.prepz(q0)
             k.prepz(q1)
-            if q2 is not None:
-                k.prepz(q2)
-                if q2_excited:
-                    k.gate('rx180', [q2])
+
             if case == 'excitation':
                 k.gate('rx180', [q1])
             k.gate('rx90', [q0])
             if not CZ_disabled:
-                for j in range(nr_of_repeated_gates):
-                    if wait_time_between > 0:
-                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-                        k.gate('wait', [2, 0], wait_time_between)
-                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-                    k.gate(flux_codeword, [2, 0])
-                    # k.gate(flux_codeword, [10, 8]) # Hack for QCC
+                k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+                k.gate(flux_codeword, [q0, q1])
 
-                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-                    if q2 is not None:
-                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-                        k.gate(flux_codeword2, [2, 0])
-                        # k.gate(flux_codeword2, [10, 8]) # Hack for QCC
+                # sometimes we want to move another qubit out of the way using
+                # a pulse.
+                if flux_codeword_park == 'cz':
+                    k.gate(flux_codeword_park, [q2, q3])
+                elif flux_codeword_park == 'park':
+                    k.gate(flux_codeword_park, [q2])
+                    if q3 is not None:
+                        raise ValueError("Expected q3 to be None")
+                elif flux_codeword_park is None:
+                    pass
+                else:
+                    raise ValueError(
+                        'flux_codeword_park "{}" not allowed'.format(
+                            flux_codeword_park))
 
-                        k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                k.gate("wait", list(np.arange(17)), 0) #alignment workaround
             else:
-                for j in range(nr_of_repeated_gates):
-                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-                    k.gate('wait', [2, 0], wait_time_between + CZ_duration)
-                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+                k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
+                k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+
             if wait_time_after > 0:
-                k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-                k.gate('wait', [2, 0], (wait_time_after))
-                k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+                k.gate('wait', [q0,q1], wait_time_after)
+
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
                 # special because the cw phase pulses go in mult of 20 deg
@@ -1342,11 +1384,8 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
 
             k.measure(q0)
             k.measure(q1)
-            k.gate('wait', [q1, q0], 0)
             # Implements a barrier to align timings
-            # k.gate('wait', [q0, q1], 0)
-            # hardcoded barrier because of openQL #104
-            # k.gate('wait', [2, 0], 0)
+            k.gate('wait', [q1, q0], 0)
 
             p.add_kernel(k)
     if add_cal_points:

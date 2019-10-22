@@ -9,7 +9,7 @@ from matplotlib import cm
 import numpy as np
 import matplotlib.colors as col
 import hsluv
-import logging 
+import logging
 
 def set_xlabel(axis, label, unit=None, **kw):
     """
@@ -381,6 +381,15 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     two sweep points.
     zvals should be a list of arrays with the measured values with shape
     (len(yvals), len(xvals)).
+
+    **grid-orientation**
+        The grid orientation for the zvals is the same as is used in
+        ax.pcolormesh.
+        Note that the column index corresponds to the x-coordinate,
+        and the row index corresponds to y.
+        This can be counterintuitive: zvals(y_idx, x_idx)
+        and can be inconsistent with some arrays of zvals
+        (such as a 2D histogram from numpy).
     """
 
     xvals = np.array(xvals)
@@ -511,3 +520,28 @@ def plot_fit(xvals, fit_res, ax, **plot_kws):
     yvals = model.eval(fit_res.params, **{independent_var: xvals})
     ax.plot(xvals, yvals, **plot_kws)
 
+
+def cmap_to_alpha(cmap):
+    """
+    Takes a cmap and makes the transparency of the cmap 
+    changes with each element.
+    """
+    my_cmap = cmap(np.arange(cmap.N))
+    # Set alpha
+    my_cmap[:,-1] = np.linspace(0, 1, cmap.N)
+    # Create new colormap
+    my_cmap = col.ListedColormap(my_cmap)
+    return my_cmap
+
+def cmap_first_to_alpha(cmap):
+    """
+    Makes the first element of a cmap transparant. 
+    """
+    my_cmap = cmap(np.arange(cmap.N))
+    # Set alpha
+    my_cmap[0,-1] = 0
+    my_cmap[1:,-1] = 1
+
+    # Create new colormap
+    my_cmap = col.ListedColormap(my_cmap)
+    return my_cmap

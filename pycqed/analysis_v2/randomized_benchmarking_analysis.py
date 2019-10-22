@@ -217,13 +217,13 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['quantities_of_interest'] = {}
         qoi = self.proc_data_dict['quantities_of_interest']
         qoi['eps_simple'] = ufloat(fr_rb_simple['eps'].value,
-                                   fr_rb_simple['eps'].stderr)
+                                   fr_rb_simple['eps'].stderr or np.NaN)
         qoi['eps_X1'] = ufloat(fr_rb['eps'].value,
-                               fr_rb['eps'].stderr)
+                               fr_rb['eps'].stderr or np.NaN)
         qoi['L1'] = ufloat(fr_dec['L1'].value,
-                           fr_dec['L1'].stderr)
+                           fr_dec['L1'].stderr or np.NaN)
         qoi['L2'] = ufloat(fr_dec['L2'].value,
-                           fr_dec['L2'].stderr)
+                           fr_dec['L2'].stderr or np.NaN)
 
     def fit_rb_decay(self, lambda_1: float, L1: float, simple: bool=False):
         """
@@ -394,7 +394,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         RandomizedBenchmarking_SingleQubit_Analysis):
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
                  options_dict: dict=None, auto=True, close_figs=True,
-                 classification_method='rates', rates_ch_idxs: list =[0, 2],
+                 classification_method='rates', rates_ch_idxs: list =[2, 0],
                  ignore_f_cal_pts: bool=False, extract_only: bool = False,
                  ):
         if options_dict is None:
@@ -583,17 +583,30 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'title': ' {}'.format(val_name_q1),
             'ax_id': 'rb_pops_q1'}
 
+        # This exists for when the order of RO of qubits is
+        # different than expected.
+        if self.rates_ch_idxs[1] > 0:
+            v0_q0 = val_names[0]
+            v1_q0 = val_names[1]
+            v0_q1 = val_names[2]
+            v1_q1 = val_names[3]
+        else:
+            v0_q0 = val_names[2]
+            v1_q0 = val_names[3]
+            v0_q1 = val_names[0]
+            v1_q1 = val_names[1]
+
         self.plot_dicts['cal_points_hexbin_q0'] = {
             'plotfn': plot_cal_points_hexbin,
-            'shots_0': (self.proc_data_dict['cal_pts_x0'][val_names[0]],
-                        self.proc_data_dict['cal_pts_x0'][val_names[1]]),
-            'shots_1': (self.proc_data_dict['cal_pts_x1'][val_names[0]],
-                        self.proc_data_dict['cal_pts_x1'][val_names[1]]),
-            'shots_2': (self.proc_data_dict['cal_pts_x2'][val_names[0]],
-                        self.proc_data_dict['cal_pts_x2'][val_names[1]]),
-            'xlabel': val_names[0],
+            'shots_0': (self.proc_data_dict['cal_pts_x0'][v0_q0],
+                        self.proc_data_dict['cal_pts_x0'][v1_q0]),
+            'shots_1': (self.proc_data_dict['cal_pts_x1'][v0_q0],
+                        self.proc_data_dict['cal_pts_x1'][v1_q0]),
+            'shots_2': (self.proc_data_dict['cal_pts_x2'][v0_q0],
+                        self.proc_data_dict['cal_pts_x2'][v1_q0]),
+            'xlabel': v0_q0,
             'xunit': self.proc_data_dict['value_units'][0],
-            'ylabel': val_names[1],
+            'ylabel': v1_q0,
             'yunit': self.proc_data_dict['value_units'][1],
             'common_clims': False,
             'title': self.proc_data_dict['timestamp_string'] +
@@ -603,15 +616,15 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         }
         self.plot_dicts['cal_points_hexbin_q1'] = {
             'plotfn': plot_cal_points_hexbin,
-            'shots_0': (self.proc_data_dict['cal_pts_0x'][val_names[2]],
-                        self.proc_data_dict['cal_pts_0x'][val_names[3]]),
-            'shots_1': (self.proc_data_dict['cal_pts_1x'][val_names[2]],
-                        self.proc_data_dict['cal_pts_1x'][val_names[3]]),
-            'shots_2': (self.proc_data_dict['cal_pts_2x'][val_names[2]],
-                        self.proc_data_dict['cal_pts_2x'][val_names[3]]),
-            'xlabel': val_names[2],
+            'shots_0': (self.proc_data_dict['cal_pts_0x'][v0_q1],
+                        self.proc_data_dict['cal_pts_0x'][v1_q1]),
+            'shots_1': (self.proc_data_dict['cal_pts_1x'][v0_q1],
+                        self.proc_data_dict['cal_pts_1x'][v1_q1]),
+            'shots_2': (self.proc_data_dict['cal_pts_2x'][v0_q1],
+                        self.proc_data_dict['cal_pts_2x'][v1_q1]),
+            'xlabel': v0_q1,
             'xunit': self.proc_data_dict['value_units'][2],
-            'ylabel': val_names[3],
+            'ylabel': v1_q1,
             'yunit': self.proc_data_dict['value_units'][3],
             'common_clims': False,
             'title': self.proc_data_dict['timestamp_string'] +
@@ -1140,7 +1153,8 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
     def __init__(self, ts_base: str, ts_int: str,
                  label_base: str='', label_int: str='',
                  options_dict: dict={}, auto=True, close_figs=True,
-                 ch_idxs: list =[0, 2]):
+                 ch_idxs: list =[2, 0],
+                 ignore_f_cal_pts: bool=False, plot_label=''):
         super().__init__(do_fitting=True, close_figs=close_figs,
                          options_dict=options_dict)
         self.ts_base = ts_base
@@ -1150,6 +1164,8 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         self.ch_idxs = ch_idxs
         self.options_dict = options_dict
         self.close_figs = close_figs
+        self.ignore_f_cal_pts = ignore_f_cal_pts
+        self.plot_label=plot_label
         if auto:
             self.run_analysis()
 
@@ -1159,13 +1175,13 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             t_start=self.ts_int, label=self.label_int,
             options_dict=self.options_dict, auto=True,
             close_figs=self.close_figs, rates_ch_idxs=self.ch_idxs,
-            extract_only=True)
+            extract_only=True, ignore_f_cal_pts=self.ignore_f_cal_pts)
 
         a_base = RandomizedBenchmarking_TwoQubit_Analysis(
             t_start=self.ts_base, label=self.label_base,
             options_dict=self.options_dict, auto=True,
             close_figs=self.close_figs, rates_ch_idxs=self.ch_idxs,
-            extract_only=True)
+            extract_only=True, ignore_f_cal_pts=self.ignore_f_cal_pts)
 
         # order is such that any information (figures, quantities of interest)
         # are saved in the interleaved file.
@@ -1199,9 +1215,15 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
 
         # This is the naive estimate, when all observed error is assigned
         # to the CZ gate
-        qoi['L1_CZ_naive'] = 1-(1-qoi_base['L1'])**(1/1.5)
-        qoi['eps_CZ_simple_naive'] = 1-(1-qoi_base['eps_X1'])**(1/1.5)
-        qoi['eps_CZ_X1_naive'] = 1-(1-qoi_base['eps_simple'])**(1/1.5)
+        try:
+            qoi['L1_CZ_naive'] = 1-(1-qoi_base['L1'])**(1/1.5)
+            qoi['eps_CZ_simple_naive'] = 1-(1-qoi_base['eps_X1'])**(1/1.5)
+            qoi['eps_CZ_X1_naive'] = 1-(1-qoi_base['eps_simple'])**(1/1.5)
+        except ValueError:
+            # prevents the analysis from crashing if the fits are bad.
+            qoi['L1_CZ_naive'] = ufloat(np.NaN, np.NaN)
+            qoi['eps_CZ_simple_naive'] = ufloat(np.NaN, np.NaN)
+            qoi['eps_CZ_X1_naive'] = ufloat(np.NaN, np.NaN)
 
     def prepare_plots(self):
         dd_base = self.raw_data_dict['analyses']['base'].proc_data_dict
@@ -1231,7 +1253,9 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             'fr_X1_int':  fr_int['leakage_decay'],
             'qoi': self.proc_data_dict['quantities_of_interest'],
             'ax1': axs[1],
-            'title': '{} - {}'.format(self.timestamps[0], self.timestamps[1])}
+            'title': '{}\n{} - {}'.format(
+                self.plot_label,
+                self.timestamps[0], self.timestamps[1])}
 
 
 class CharacterBenchmarking_TwoQubit_Analysis(ba.BaseDataAnalysis):

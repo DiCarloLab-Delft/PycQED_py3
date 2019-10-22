@@ -5,6 +5,7 @@ import warnings
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
+from pycqed.measurement import detector_functions as det
 from qcodes.instrument.parameter import ManualParameter
 
 from pycqed.utilities.general import gen_sweep_pts
@@ -63,6 +64,12 @@ class Qubit(Instrument):
         - calculate_
             calculates a quantity based on parameters specified in the qubit
             object e.g. calculate_frequency
+
+        - tune_xx_to_
+            Similar to calibrate but actively tries to set a parameter xx to a
+            specific target value. An example is tune_to_frequency where
+            several routines are used to set the qubit frequency to a desired
+            value.
 
     Naming conventions for parameters:
         (only for qubit objects after Sept 2017)
@@ -232,7 +239,7 @@ class Qubit(Instrument):
         Args:
             times (array):
                 list of total waiting time between two pi/2 pulses. Half of the delay
-                is inserted before, and half after the central pi pule.      
+                is inserted before, and half after the central pi pule.
         """
         raise NotImplementedError()
 
@@ -242,10 +249,10 @@ class Qubit(Instrument):
         """
         Performs an AllXY experiment. AllXY experiment consists of 21 pairs of
         MW control pulses folowed by the qubit measurement (in this routine
-        each pair is repeated twice). In the ideal case the result of 
+        each pair is repeated twice). In the ideal case the result of
         this measurement should be a staircase, and specific errors in the MW gate tuenup
         result in characteristic deviations from the ideal shape.
-        
+
         For detailed description of the AllXY measurement and symptomes of different errors
         see PhD thesis by Matthed Reed (2013, Schoelkopf lab), pp. 124.
         https://rsl.yale.edu/sites/default/files/files/RSL_Theses/reed.pdf
@@ -507,7 +514,7 @@ class Qubit(Instrument):
         #     return True
 
         # elif len(device.found_resonators) > len(device.resonators):
-        #     result = self.find_additional_resonators(device.resonators, 
+        #     result = self.find_additional_resonators(device.resonators,
         #                                              found_resonators,
         #                                              with_VNA=with_VNA)
         #     return result
@@ -535,7 +542,7 @@ class Qubit(Instrument):
         #                 dip = np.amin(a.data_y)
         #                 offset = a.fit_results.params['A'].value
 
-        #                 if (np.abs(dip/offset) > 0.6 or 
+        #                 if (np.abs(dip/offset) > 0.6 or
         #                     np.isnan(a.fit_results.params['Qc'].stderr)):
         #                     freq, unit = plt_tools.SI_val_to_msg_str(f_center,
         #                                                              'Hz',
@@ -739,7 +746,7 @@ class Qubit(Instrument):
                     VNA.start_frequency(res.freq_low - 10e6)
                     VNA.stop_frequency(res.freq_low + 10e6)
 
-                freqs = np.arange(res.freq_low - np.abs(res.shift) - 1e6, 
+                freqs = np.arange(res.freq_low - np.abs(res.shift) - 1e6,
                                   res.freq_low + 2e6,
                                   0.1e6)
                 for fluxline in fluxcurrent.channel_map:
@@ -766,7 +773,7 @@ class Qubit(Instrument):
                         best_amplitude = amplitude
                         res.qubit = fluxline.split('_', 1)[-1]
                         res.sweetspot = fit_res.sweet_spot_value
-                        res.fl_dc_V_per_phi0 = fit_res.current_to_flux
+                        res.fl_dc_I_per_phi0 = fit_res.current_to_flux
 
         if verbose:
             for res in self.instr_device.get_instr().resonators:
@@ -800,12 +807,12 @@ class Qubit(Instrument):
                     assigned_qubits.append(qubit.name)
                     qubit.freq_res(res.freq_low)
                     qubit.ro_freq(res.freq_low)
-                    qubit.fl_dc_V0(res.sweetspot)
-                    qubit.fl_dc_V_per_phi0(res.fl_dc_V_per_phi0)
+                    qubit.fl_dc_I0(res.sweetspot)
+                    qubit.fl_dc_I_per_phi0(res.fl_dc_I_per_phi0)
                     qubit.cfg_dc_flux_ch('FBL_' + res.qubit)
                     if qubit.freq_qubit() is None:
-                        qubit.freq_qubit(res.freq_low - 
-                                         np.abs((70e6)**2/(res.shift))) 
+                        qubit.freq_qubit(res.freq_low -
+                                         np.abs((70e6)**2/(res.shift)))
         return True
 
     def find_resonator_sweetspot(self, freqs=None, dac_values=None,
@@ -844,7 +851,7 @@ class Qubit(Instrument):
             timestamp = ma.a_tools.get_timestamps_in_range(t_start,label = 'Resonator')[0]
             fit_res = sa.VNA_DAC_Analysis(timestamp=timestamp)
             sweetspot_current = fit_res.sweet_spot_value
-            self.fl_dc_V0(sweetspot_current)
+            self.fl_dc_I0(sweetspot_current)
             fluxcurrent = self.instr_FluxCtrl.get_instr()
             fluxcurrent[self.cfg_dc_flux_ch()](sweetspot_current)
 
@@ -1011,7 +1018,7 @@ class Qubit(Instrument):
                            threshold=0.5, verbose=True):
         """
         Finds the optimal spectroscopy power for qubit spectroscopy (not pulsed)
-        by varying it in steps of 5 dBm, and ending when the peak has power 
+        by varying it in steps of 5 dBm, and ending when the peak has power
         broadened by 1+threshold (default: broadening of 10%)
         """
         if freqs is None:
@@ -1033,7 +1040,7 @@ class Qubit(Instrument):
             if np.abs(freq_peak - self.freq_qubit()) > 5e6:
                 logging.warning('Peak has shifted for some reason. Aborting.')
                 return False
-                
+
             w = a.params['kappa'].value
             power += power_step
 
@@ -1135,7 +1142,7 @@ class Qubit(Instrument):
         Runs an iterative procudere of ramsey experiments to estimate
         frequency detuning to converge to the qubit frequency up to the limit
         set by T2*.
-        
+
         Args:
             steps (array):
                 multiples of the initial stepsize on which to run the
@@ -1194,7 +1201,7 @@ class Qubit(Instrument):
             self.freq_qubit(cur_freq)
         return cur_freq
 
-    def calculate_frequency(self, calc_method=None, V_per_phi0=None, V=None):
+    def calculate_frequency(self, calc_method=None, I_per_phi0=None, I=None):
         """
         Calculates an estimate for the qubit frequency.
         Arguments are optional and parameters of the object are used if not
@@ -1207,14 +1214,14 @@ class Qubit(Instrument):
                 in fit_mods.Qubit_dac_to_freq
                 corresponding par. : cfg_qubit_freq_calc_method
 
-            V_per_phi0 (float):
+            I_per_phi0 (float):
                 dac flux coefficient, converts volts to Flux.
                 Set to 1 to reduce the model to pure flux.
-                corresponding par. : fl_dc_V_per_phi
+                corresponding par. : fl_dc_I_per_phi0)
 
-            V (flat):
+            I (float):
                 dac value used when calculating frequency
-                corresponding par. : fl_dc_V
+                corresponding par. : fl_dc_I
 
         Calculates the f01 transition frequency using the cosine arc model.
         (function available in fit_mods. Qubit_dac_to_freq)
@@ -1229,17 +1236,18 @@ class Qubit(Instrument):
             qubit_freq_est = self.freq_qubit()
 
         elif self.cfg_qubit_freq_calc_method() == 'flux':
-            if V is None:
-                V = self.fl_dc_V()
-            if V_per_phi0 is None:
-                V_per_phi0 = self.fl_dc_V_per_phi0()
+
+            if I is None:
+                I = self.fl_dc_I()
+            if I_per_phi0 is None:
+                I_per_phi0 = self.fl_dc_I_per_phi0()
 
             qubit_freq_est = fit_mods.Qubit_dac_to_freq(
-                dac_voltage=V,
+                dac_voltage=I,
                 f_max=self.freq_max(),
                 E_c=self.E_c(),
-                dac_sweet_spot=self.fl_dc_V0(),
-                V_per_phi0=V_per_phi0,
+                dac_sweet_spot=self.fl_dc_I0(),
+                V_per_phi0=I_per_phi0, # legacy naming in fit_mods function
                 asymmetry=self.asymmetry())
 
         return qubit_freq_est
@@ -1252,6 +1260,199 @@ class Qubit(Instrument):
         raise NotImplementedError()
 
         return True
+
+
+
+    def tune_freq_to_sweetspot(self, freqs=None, dac_values=None, verbose=True,
+                               fit_phase=False, use_dips=False): 
+        """
+        Tunes the qubit to the sweetspot
+        """
+
+        within_50MHz_of_sweetspot = True
+
+        # if within 50 MHz of sweetspot, we can start the iterative procedure
+        if within_50MHz_of_sweetspot:
+            pass
+
+        # Requires an estimate of I_per_phi0 (which should be a current)
+        if freqs is None:
+            freqs = self.freq_max() + np.arange(-80e6, +20e6, .5e6)
+
+        # Should be replaced by self.fl_dc_I() # which gets this automatically
+        # self.fl_dc_I()
+        fluxcontrol = self.instr_FluxCtrl.get_instr()
+        current_dac_val = fluxcontrol.parameters[(self.fl_dc_ch())].get()
+
+        # Should correspond to approx 50MHz around sweetspot.  
+        dac_range  = 0.1 * self.fl_dc_I_per_phi0() 
+        if dac_values is None:
+            dac_values = current_dac_val + np.linspace(-dac_range/2, dac_range/2, 6)
+
+        self.measure_qubit_frequency_dac_scan(freqs=freqs, dac_values=dac_values)
+
+        analysis_obj = ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=True)
+        freqs = analysis_obj.sweep_points
+        dac_vals = analysis_obj.sweep_points_2D
+        if fit_phase:
+            signal_magn = analysis_obj.measured_values[1]
+        else:
+            signal_magn = analysis_obj.measured_values[0]
+            if use_dips:
+                signal_magn = -signal_magn
+
+
+        # FIXME: This function should be moved out of the qubit object upon cleanup.
+        def quick_analyze_dac_scan(x_vals, y_vals, Z_vals):
+            def find_peaks(x_vals, y_vals, Z_vals):
+                peaks = np.zeros(len(y_vals))
+                for i in range(len(y_vals)):
+                    p_dict = a_tools.peak_finder(x_vals, Z_vals[:, i],
+                        optimize=False, num_sigma_threshold=15)
+                        # FIXME hardcoded num_sigma_threshold
+                    try:
+                        peaks[i] = p_dict['peak']
+                    except Exception as e:
+                        logging.warning(e)
+                        peaks[i] = np.NaN
+
+                return peaks
+
+            peaks = find_peaks(x_vals, y_vals, Z_vals)
+
+            dac_masked=  y_vals[~np.isnan(peaks)]
+            peaks_masked= peaks[~np.isnan(peaks)]
+            pv = np.polyfit(x=dac_masked, y=peaks_masked, deg=2)
+            sweetspot_current = -0.5*pv[1]/pv[0]
+            sweetspot_freq = np.polyval(pv,sweetspot_current)
+            return sweetspot_current, sweetspot_freq
+
+
+        dac_sweetspot, freq_sweetspot = quick_analyze_dac_scan(
+            x_vals=freqs, y_vals=dac_vals, Z_vals=signal_magn)
+
+        if dac_sweetspot>np.max(dac_values) or dac_sweetspot<np.min(dac_values):
+            warnings.warn("Fit returns something weird. Not updating flux bias")
+            procedure_success = False
+        elif freq_sweetspot > self.freq_max()+50e6:
+            warnings.warn("Fit returns something weird. Not updating flux bias")
+            procedure_success = False
+        elif freq_sweetspot < self.freq_max()-50e6:
+            warnings.warn("Fit returns something weird. Not updating flux bias")
+            procedure_success = False
+        else:
+            procedure_success = True
+        if not procedure_success:
+            # reset the current to the last known value.
+            fluxcontrol.parameters[(self.fl_dc_ch())].set(current_dac_val)
+
+
+        if verbose:
+            # FIXME replace by unit aware printing
+            print("Setting flux bias to {:.3f} mA".format(dac_sweetspot*1e3))
+            print("Setting qubit frequency to {:.4f} GHz".format(freq_sweetspot*1e-9))
+
+        # self.fl_dc_I(dac_sweetspot)
+        # FIXME, this should be included in the set of fl_dc_I
+        fluxcontrol.parameters[(self.fl_dc_ch())].set(dac_sweetspot)
+        self.freq_qubit(freq_sweetspot)
+        self.fl_dc_I(dac_sweetspot)
+        self.fl_dc_I0(dac_sweetspot)
+
+
+    def tune_freq_to(self, target_frequency, 
+                          MC=None, nested_MC=None, 
+                          calculate_initial_step: bool=False,
+                          initial_flux_step: float = None,
+                          max_repetitions=15,
+                          resonator_use_min=True,
+                          find_res=None,
+                          ): 
+        """
+        Iteratively tune the qubit frequency to a specific target frequency
+        """
+
+        if target_frequency > self.freq_max():
+            raise ValueError('Attempting to tune to a frequency ({:.2f} GHz)'
+                'larger than the sweetspot frequency ({:.2f} GHz)'.format(
+                    target_frequency, self.freq_max()))
+
+        # Current frequency
+        f_q = self.freq_qubit()
+        delta_freq = target_frequency - f_q
+
+        # User may overwrite need to find resonator
+        if abs(delta_freq) > 50e6 and find_res == None: 
+            find_res = True
+
+        fluxcontrol= self.instr_FluxCtrl.get_instr()
+        fluxpar = fluxcontrol.parameters[(self.fl_dc_ch())]
+
+        current_dac_val = fluxpar.get()
+
+        # set up ranges and parameters
+        if calculate_initial_step:
+            raise NotImplementedError()
+        #    construct predicted arch from I_per_phi0, E_c, E_j BALLPARK SHOULD SUFFICE.
+        #    predict first jump
+        #    next_dac_value =
+        else:
+            if initial_flux_step is None:
+                # If we do not calculate the initial step, we take small steps from
+                # our starting point
+                initial_flux_step = self.fl_dc_I_per_phi0()/30
+
+            next_dac_value = current_dac_val + initial_flux_step
+
+
+        def measure_qubit_freq_nested(target_frequency,spans=[100e6, 400e6, 800e6], **kw):
+
+            # measure freq
+            if find_res:
+                freq_res = self.find_resonator_frequency(
+                                    MC=nested_MC,
+                                    use_min=resonator_use_min)
+            else:
+                freq_res = self.freq_res
+
+            spec_success = False
+            for span in spans:
+                spec_succes = self.find_frequency(f_span=span,  MC=nested_MC)
+                if spec_succes:
+                    break
+
+            if not spec_succes:
+                raise ValueError("Could not find the qubit. Aborting.")
+            freq_qubit = self.freq_qubit()  # as updated in this function call
+
+
+            abs_freq_diff = abs(target_frequency-freq_qubit)
+
+            return {'abs_freq_diff': abs_freq_diff, 'freq_qubit': freq_qubit,
+                    'freq_resonator': freq_res}
+
+
+        qubit_freq_det = det.Function_Detector(measure_qubit_freq_nested,
+            msmt_kw={'target_frequency': target_frequency},
+            result_keys=['abs_freq_diff', 'freq_qubit', 'freq_resonator'],
+            value_units=['Hz']*3)
+
+
+        from scipy.optimize import minimize_scalar
+        ad_func_pars = {'adaptive_function': minimize_scalar,
+                    'method': 'brent',
+                    'bracket': [current_dac_val, next_dac_value],
+                    # 'x0': x0,
+                    'tol': 1e-6,  # Relative tolerance in brent
+                    'minimize': True,
+                    'options':{'maxiter': max_repetitions}}
+
+        MC.set_sweep_function(fluxpar)
+        MC.set_detector_function(qubit_freq_det)
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run('Tune_to_freq', mode='adaptive')
+
+
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
@@ -1428,7 +1629,7 @@ class Transmon(Qubit):
                            label='RB single qubit Clifford fidelity',
                            vals=vals.Numbers(0, 1.0),
                            parameter_class=ManualParameter)
-        self.add_parameter('V_per_phi0',
+        self.add_parameter('I_per_phi0',
                            initial_value=1,
                            label='V per phi0',
                            vals=vals.Numbers(),
@@ -1717,7 +1918,7 @@ class Transmon(Qubit):
                 amplitudes of the first Rabi if an array,
                 if a float is specified it will be treated as an estimate
                 for the amplitude to be found.
-                
+
             N_steps (list of int):
                 number of pulses used in the fine tuning
 

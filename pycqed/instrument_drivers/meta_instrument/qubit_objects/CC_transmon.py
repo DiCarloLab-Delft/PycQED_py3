@@ -436,17 +436,14 @@ class CBox_v3_driven_transmon(Transmon):
                 else:
                     # When optimal weights are used, only the RO I weight
                     # channel is used
-                    UHFQC.set('quex_wint_weights_{}_real'.format(
+                    UHFQC.set('qas_0_integration_weights_{}_real'.format(
                         self.RO_acq_weight_function_I()),
                         self.RO_optimal_weights_I())
-                    UHFQC.set('quex_wint_weights_{}_imag'.format(
+                    UHFQC.set('qas_0_integration_weights_{}_imag'.format(
                         self.RO_acq_weight_function_I()),
                         self.RO_optimal_weights_Q())
-                    UHFQC.set('quex_rot_{}_real'.format(
-                        self.RO_acq_weight_function_I()), 1.0)
-
-                    UHFQC.set('quex_rot_{}_imag'.format(
-                        self.RO_acq_weight_function_I()), -1.0)
+                    UHFQC.set('qas_0_rotations_{}'.format(
+                        self.RO_acq_weight_function_I()), 1.0 - 1.0j)
 
     def prepare_for_timedomain(self):
 
@@ -553,10 +550,10 @@ class CBox_v3_driven_transmon(Transmon):
                 # software.
                 threshold = self.RO_threshold()
                 offs = self._acquisition_instrument.get(
-                    'quex_trans_offset_weightfunction_{}'.format(acq_ch))
+                    'qas_0_trans_offset_weightfunction_{}'.format(acq_ch))
                 hw_threshold = threshold + offs
                 self._acquisition_instrument.set(
-                    'quex_thres_{}_level'.format(acq_ch), hw_threshold)
+                    'qas_0_thresholds_{}_level'.format(acq_ch), hw_threshold)
 
             else:
                 RO_channels = [self.RO_acq_weight_function_I(),

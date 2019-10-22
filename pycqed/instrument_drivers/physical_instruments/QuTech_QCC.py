@@ -27,6 +27,8 @@ import traceback
 import array
 import re
 
+import numpy as np
+
 
 try:
     # qisa_as can be installed from the qisa-as folder in the ElecPrj_QCC
@@ -51,6 +53,7 @@ CHAR_MIN = -128
 
 MAX_NUM_INSN = 2**15
 
+
 class QCC(SCPI):
     """
     This is class is used to serve as the driver between the user and the
@@ -64,7 +67,7 @@ class QCC(SCPI):
     def __init__(self, name, address, port, log_level=False, **kwargs):
         self.model = name
         self._dummy_instr = False
-        self.driver_version = "0.1.0"
+        self.driver_version = "0.2.0"
         try:
             super().__init__(name, address, port, **kwargs)
         except Exception as e:
@@ -92,7 +95,8 @@ class QCC(SCPI):
         QCC only works with version 4.0.0 of the assembler
         """
         if self.QISA.getVersion() != '4.0.0':
-            raise RuntimeError('The QISA Assembler installed in the environment does not match version 4.0.0, the only supported for running QCC.')
+            raise RuntimeError(
+                'The QISA Assembler installed in the environment does not match version 4.0.0, the only supported for running QCC.')
 
         curdir = os.path.dirname(__file__)
         qmap_fn = os.path.join(curdir, '_QCC', 'qisa_opcodes.qmap')
@@ -100,9 +104,11 @@ class QCC(SCPI):
         """
         Assembler now aditionally requires quantum layout information file
         """
-        configureinput = os.path.join(curdir, '_QCC', 'quantum_layout_information_17.txt')
+        configureinput = os.path.join(
+            curdir, '_QCC', 'quantum_layout_information_17.txt')
         if not os.path.isfile(configureinput):
-        	raise RuntimeError('The QISA Assembler supporting CC_Light and QCC now expects a quantum_layout_information file in' + configureinput)
+            raise RuntimeError(
+                'The QISA Assembler supporting CC_Light and QCC now expects a quantum_layout_information file in' + configureinput)
 
         self.QISA.read(configureinput)
 
@@ -146,6 +152,22 @@ class QCC(SCPI):
                     if (val_type == "Bool"):
                         parameter["vals"] = vals.Ints(0, 1)
                         parameter['get_parser'] = int
+
+                    elif (val_type == "IntArray"):
+                        parameter["vals"] = vals.Arrays()
+                        parameter['get_parser'] = lambda v: np.array(
+                            v.split(','), dtype=int)
+                    elif (val_type == "QECDataType"):
+                        # The QECDataType assumes a long array of ints in which groups of 6 datapoints are returned.
+                        # In this datatype every row corresponds to a timeslot
+                        # every column corresponds to a qubit index.
+                        parameter["vals"] = vals.Arrays()
+                        parameter['get_parser'] = lambda v: np.reshape( 
+                            np.array(v.split(','), dtype=int), newshape=(-1, 6))
+                    elif (val_type == "QECOCMDataType"):
+                        parameter["vals"] = vals.Anything()
+                        # parameter['get_parser'] = lambda v: np.array(
+                        #       v.split(','), dtype=int)
 
                     elif (val_type == "Non_Neg_Number"):
                         if ("range" in validator):
@@ -250,7 +272,7 @@ class QCC(SCPI):
             open_file_success = True
         except Exception as e:
             log.info("QCC local parameter file {} not found ({})".format(
-                            self.param_file_name, e))
+                self.param_file_name, e))
 
         read_file_success = False
         if open_file_success:
@@ -260,7 +282,7 @@ class QCC(SCPI):
                 read_file_success = True
             except Exception as e:
                 log.info("Error while reading QCC local parameter file."
-                        " Will update it from the hardware.")
+                         " Will update it from the hardware.")
 
         if read_file_success:
             self.saved_param_version = None
@@ -271,20 +293,20 @@ class QCC(SCPI):
             # check if the saved parameters have the same version number
             # as QCC, if yes, return the saved one.
             if (('Embedded Software Build Time' in self.version_info and
-                  (self.version_info['Embedded Software Build Time'] ==
+                 (self.version_info['Embedded Software Build Time'] ==
                   self.saved_param_version)) or
-                self._dummy_instr):
+                    self._dummy_instr):
                 results = file_content["parameters"]
                 return results
             else:
                 log.info("QCC local parameter file out of date."
-                    " Will update it from the hardware.")
+                         " Will update it from the hardware.")
 
         try:
             raw_param_string = self.ask('QUTech:PARAMeters?')
         except Exception as e:
             raise ValueError("Failed to retrieve parameter information"
-                " from QCC hardware: ", e)
+                             " from QCC hardware: ", e)
 
         raw_param_string = raw_param_string.replace('\t', '\n')
 
@@ -292,14 +314,15 @@ class QCC(SCPI):
             results = json.loads(raw_param_string)["parameters"]
         except Exception as e:
             raise ValueError("Unrecognized parameter information received from "
-                "QCC: \n {}".format(raw_param_string))
+                             "QCC: \n {}".format(raw_param_string))
 
         try:
+            # file.write(raw_param_string)
             # load dump combination is to sort and indent
             param_dict = json.loads(raw_param_string)
             file = open(self.param_file_name, 'w')
             par_str = json.dumps(param_dict,
-                                  indent=4, sort_keys=True)
+                                 indent=4, sort_keys=True)
             file.write(par_str)
             file.close()
         except Exception as e:
@@ -335,7 +358,7 @@ class QCC(SCPI):
     def print_control_store(self):
         if self.microcode is None:
             log.info("The microcode unit of QCC has not been"
-                " initialized yet.")
+                     " initialized yet.")
             return
 
         self.microcode.dump_microcode()
@@ -343,7 +366,7 @@ class QCC(SCPI):
     def print_qisa_with_control_store(self):
         if self.microcode is None:
             log.info("The microcode unit of QCC has not been"
-                " initialized yet.")
+                     " initialized yet.")
             return
 
         if self.QISA is None:
@@ -354,7 +377,7 @@ class QCC(SCPI):
 
         insn_opcodes_str = self.QISA.dumpInstructionsSpecification()
         lines = insn_opcodes_str.split('\n')
-        trimed_lines = [line.strip() for line in lines \
+        trimed_lines = [line.strip() for line in lines
                         if line.startswith('def_q')]
 
         # put every instruction with its opcode into a dict
@@ -383,7 +406,7 @@ class QCC(SCPI):
 
         print("Instruction      Codewords")
         for key, value in q_arg.items():
-            print('  {:<10s}:  '.format(key), end = '')
+            print('  {:<10s}:  '.format(key), end='')
             self.microcode.print_cs_line_no_header(value)
             print("")
 
@@ -428,16 +451,16 @@ class QCC(SCPI):
 
         if len(intarray) > MAX_NUM_INSN:
             raise OverflowError("Failed to upload instructions: program length ({})"
-                " exceeds allowed maximum value ({}).".format(len(intarray),
-                    MAX_NUM_INSN))
+                                " exceeds allowed maximum value ({}).".format(len(intarray),
+                                                                              MAX_NUM_INSN))
             return
 
-
         binBlock = bytearray(array.array('L', intarray))
-
+        # print("binblock size:", len(binBlock))
         # write binblock
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
+        # print("QCC: Sending instructions to the hardware finished.")
 
         # write to last_loaded_instructions so it can conveniently be read back
         self.last_loaded_instructions(filename)
@@ -465,11 +488,23 @@ class QCC(SCPI):
         hdr = 'QUTech:UploadMicrocode '
         self.binBlockWrite(binBlock, hdr)
 
+    # def _get_qec_output(self, filename):
+
+    #     hdr = 'QUTech:QecOutput '
+    #     intarray = [1,1]
+    #     binBlock = bytearray(array.array('L', intarray))
+    #     self.binBlockWrite(binBlock, hdr)
+
+    #     qec_out_dqb = self.binBlockRead()
+
+    #     return qec_out_dqb
+
     def _upload_opcode_qmap(self, filename: str):
         success = self.QISA.loadQuantumInstructions(filename)
         if not success:
-            logging.warning("Error: ", self.QISA.getLastErrorMessage())
-            logging.warning("Failed to load quantum instructions from dictionaries.")
+            logging.warning("Error: ", driver.getLastErrorMessage())
+            logging.warning(
+                "Failed to load quantum instructions from dictionaries.")
 
         return success
 
@@ -494,6 +529,7 @@ class QCC(SCPI):
         base_name = os.path.splitext(os.path.basename(qumis_name))[0]
         fn = os.path.join(pathname, base_name + ext)
         return fn
+
 
 class dummy_QCC(QCC):
     """

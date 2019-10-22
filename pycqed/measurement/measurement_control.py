@@ -6,7 +6,7 @@ from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
 from pycqed.utilities import general
 from pycqed.utilities.general import dict_to_ordered_tuples, \
-    delete_keys_from_dict
+    delete_keys_from_dict, check_keyboard_interrupt, KeyboardFinish
 from pycqed.utilities.get_default_datadir import get_default_datadir
 
 # Used for auto qcodes parameter wrapping
@@ -175,7 +175,7 @@ class MeasurementControl(Instrument):
                       datadir=self.datadir()) as self.data_object:
             try:
 
-                self.check_keyboard_interrupt()
+                check_keyboard_interrupt()
                 self.get_measurement_begintime()
                 if not disable_snapshot_metadata:
                     self.save_instrument_settings(self.data_object)
@@ -255,7 +255,7 @@ class MeasurementControl(Instrument):
             print(self.sweep_function.sweep_control)
             print(self.detector_function.detector_control)
 
-        self.check_keyboard_interrupt()
+        check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         if self.mode == '2D':
@@ -289,7 +289,10 @@ class MeasurementControl(Instrument):
 
         if self.adaptive_function == 'Powell':
             self.adaptive_function = fmin_powell
-        if issubclass(self.adaptive_function, BaseLearner):
+        # Added extra check to ensure self.adaptive_function is a class before checking for
+        # whether it is a subclass. Prevents Python from throwing an error if self.adaptive_function
+        # is not a class but a function
+        if isinstance(self.adaptive_function, type) and issubclass(self.adaptive_function, BaseLearner):
             Learner = self.adaptive_function
             self.learner = Learner(
                 self.optimization_function,
@@ -321,7 +324,7 @@ class MeasurementControl(Instrument):
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
-        self.check_keyboard_interrupt()
+        check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         self.update_plotmon_adaptive(force_update=True)
@@ -379,7 +382,7 @@ class MeasurementControl(Instrument):
                 # specified that you don't want to crash (e.g. on -off seq)
                 pass
 
-        self.check_keyboard_interrupt()
+        check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon()
         if self.mode == '2D':
@@ -456,7 +459,7 @@ class MeasurementControl(Instrument):
 
         self.dset[start_idx:stop_idx, :] = new_vals
         # update plotmon
-        self.check_keyboard_interrupt()
+        check_keyboard_interrupt()
         self.update_instrument_monitor()
         self.update_plotmon()
         if self.mode == '2D':
@@ -1491,20 +1494,6 @@ class MeasurementControl(Instrument):
 
         return start_idx, stop_idx
 
-    def check_keyboard_interrupt(self):
-        try:  # Try except statement is to make it work on non windows pc
-            if msvcrt.kbhit():
-                key = msvcrt.getch()
-                if b'q' in key:
-                    # this causes a KeyBoardInterrupt
-                    raise KeyboardInterrupt('Human "q" terminated experiment.')
-                elif b'f' in key:
-                    # this should not raise an exception
-                    raise KeyboardFinish(
-                        'Human "f" terminated experiment safely.')
-        except Exception:
-            pass
-
     ####################################
     # Non-parameter get/set functions  #
     ####################################
@@ -1675,12 +1664,3 @@ class MeasurementControl(Instrument):
         return {'vendor': 'PycQED', 'model': 'MeasurementControl',
                 'serial': '', 'firmware': '2.0'}
 
-
-class KeyboardFinish(KeyboardInterrupt):
-    """
-    Indicates that the user safely aborts/finishes the experiment.
-    Used to finish the experiment without raising an exception.
-    """
-
-    # FIXME: replace with version from pycqed/utilities/general
-    pass
