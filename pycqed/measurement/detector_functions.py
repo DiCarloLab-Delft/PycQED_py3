@@ -28,6 +28,8 @@ class Detector_Function(object):
         self.set_kw()
         self.value_names = ['val A', 'val B']
         self.value_units = ['arb. units', 'arb. units']
+        # to be used by MC.get_percdone()
+        self.acq_data_len_scaling = 1
 
     def set_kw(self, **kw):
         '''
@@ -421,8 +423,6 @@ class UHFQC_Base(Hard_Detector):
         self.UHFs = [d.UHFQC for d in self.detectors]
         self.UHF_map = {UHF.name: i
                    for UHF, i in zip(self.UHFs, range(len(self.detectors)))}
-        # to be used by MC.get_percdone()
-        self.acq_data_len_scaling = 1
 
     def poll_data(self):
         if self.AWG is not None:
