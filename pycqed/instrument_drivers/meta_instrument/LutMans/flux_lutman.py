@@ -1,15 +1,10 @@
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 import numpy as np
-import logging
-log = logging.getLogger(__name__)
 from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
-from pycqed.instrument_drivers.virtual_instruments import\
-noise_parameters_CZ_new as npCZ
 from pycqed.simulations import cz_superoperator_simulation_new2 as cz_main
-import warnings
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 try:
@@ -20,6 +15,9 @@ from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import time
+
+import logging
+log = logging.getLogger(__name__)
 
 _def_lm = {
     0: {"name": "i", "type": "idle"},
@@ -1052,7 +1050,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             waveform_name = self.LutMap()[wave_id]['name']
             codeword = wave_id
 
-
         if regenerate_waveforms:
             # only regenerate the one waveform that is desired
             if 'cz' in waveform_name:
@@ -1126,7 +1123,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         else:
             y_sig = waveform[:extra_samples]
         return y_sig
-
 
     def add_compensation_pulses(self, waveform):
         """
@@ -1313,11 +1309,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def _add_CZ_sim_parameters(self):
         for this_cz in ['NE', 'NW', 'SW', 'SE']:
-            self.add_parameter('anharm_q1_%s' % this_cz,
-                               docstring='[CZ simulation] Anharmonicity of static qubit.',
-                               vals=vals.Numbers(),
-                               parameter_class=ManualParameter)
-
             self.add_parameter('bus_freq_%s' % this_cz,
                                docstring='[CZ simulation] Bus frequency.',
                                vals=vals.Numbers(),
@@ -1326,12 +1317,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                docstring='Noise and other parameters for CZ simulation.',
                                parameter_class=InstrumentRefParameter)
 
-    def sim_CZ(self, which_gate=None, qois='all'):
+    def sim_CZ(self, fluxlutman_static, which_gate=None, qois='all'):
         """
         Simulates a CZ gate for the current paramenters.
+        At least one 'instr_sim_control_CZ_{which_gate}' needs to be set
+        in the current fluxlutman.
         """
         # If there is only one sim_control_CZ instrument get it
-
         if which_gate is None:
             found = []
             for this_cz in ['NE', 'NW', 'SW', 'SE']:
@@ -1352,14 +1344,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             sim_control_CZ = getattr(self, 'instr_sim_control_CZ_{}'.format(which_gate)).get_instr()
             assert which_gate == sim_control_CZ.which_gate()
 
-        # if not defined set the sweetspot freqs same as the operating
-        # point freqs
-        if sim_control_CZ.get('w_q0_sweetspot') is None:
-            sim_control_CZ.w_q0_sweetspot(self.get('q_freq_01'))
-        if sim_control_CZ.get('w_q1_sweetspot') is None:
-            sim_control_CZ.w_q1_sweetspot(self.get('q_freq_10_{}'.format(which_gate)))
-
-        detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ, qois=qois)
+        detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ,
+            fluxlutman_static=fluxlutman_static, qois=qois)
 
         sim_results = detector.acquire_data_point()
 
@@ -1377,14 +1363,12 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
 
-     def __init__(self, name, **kw):
+    def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self._wave_dict_dist = dict()
         self.sampling_rate(1e9)
 
-
-
-     def get_dac_val_to_amp_scalefactor(self):
+    def get_dac_val_to_amp_scalefactor(self):
         """
         Returns the scale factor to transform an amplitude in 'dac value' to an
         amplitude in 'V'.
@@ -1397,8 +1381,7 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
         scale_factor = channel_amp
         return scale_factor
 
-
-     def load_waveforms_onto_AWG_lookuptable(
+    def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool = True, stop_start: bool = True):
         # We inherit from the HDAWG LutMan but do not require the fancy
         # loading because the QWG is a simple device!
@@ -1406,21 +1389,21 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
             self, regenerate_waveforms=regenerate_waveforms,
             stop_start=stop_start)
 
-     def _get_awg_channel_amplitude(self):
+    def _get_awg_channel_amplitude(self):
         AWG = self.AWG.get_instr()
         awg_ch = self.cfg_awg_channel()
 
         channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
         return channel_amp
 
-     def _set_awg_channel_amplitude(self, val):
+    def _set_awg_channel_amplitude(self, val):
         AWG = self.AWG.get_instr()
         awg_ch = self.cfg_awg_channel()
 
         channel_amp = AWG.set('ch{}_amp'.format(awg_ch),val)
         return channel_amp
 
-     def _add_cfg_parameters(self):
+    def _add_cfg_parameters(self):
 
         self.add_parameter('cfg_awg_channel',
                            initial_value=1,
@@ -1465,11 +1448,9 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
                            unit='V', vals=vals.Numbers(0, 1.6))
 
 
-
 #########################################################################
 # Convenience functions below
 #########################################################################
-
 
 def phase_corr_triangle(int_val, nr_samples):
     """
