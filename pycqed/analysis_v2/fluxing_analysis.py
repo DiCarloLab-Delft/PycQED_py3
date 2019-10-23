@@ -242,13 +242,32 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_contour_phase: bool = True,
                 plt_contour_L1: bool = True,
                 plt_optimal_point: bool = False,
-                deg_clim: list = None):
+                clims: dict = None):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
         self.plt_contour_L1 = plt_contour_L1
         self.plt_optimal_point = plt_optimal_point
-        self.deg_clim = deg_clim
+        self.clims = clims
+
+        cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
+        'cost func.', 'cost function', 'Cost function', 'Cost function value'}
+        L1_Names = {'L1', 'Leakage'}
+        MF_Names = {'missing fraction', 'Missing fraction', 'missing frac',
+            'missing frac.', 'Missing frac', 'Missing frac.'}
+        cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
+            'cond phase', 'cond. phase', 'conditional phase'}
+        offset_diff_names = {'offset difference', 'offset diff',
+            'offset diff.', 'Offset difference', 'Offset diff',
+            'Offset diff.'}
+
+        # also account for possible underscores instead of a spaces between words
+        allNames = [cost_func_Names, L1_Names, MF_Names, cond_phase_names,
+            offset_diff_names]
+        [self.cost_func_Names, self.L1_Names, self.MF_Names, self.cond_phase_names,
+            self.offset_diff_names] = \
+            [names.union({name.replace(' ', '_') for name in names})
+                for names in allNames]
 
         cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
         'cost func.', 'cost function', 'Cost function', 'Cost function value'}
@@ -287,7 +306,6 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         super().prepare_plots()
         anglemap = make_anglemap()
 
-
         for i, val_name in enumerate(self.proc_data_dict['value_names']):
 
             zlabel = '{} ({})'.format(val_name,
@@ -307,9 +325,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     self.timestamp, self.proc_data_dict['measurementstring'])
             }
 
-            if self.proc_data_dict['value_units'][i] == 'deg':
-                if self.deg_clim is not None:
-                    self.plot_dicts[val_name]['clim'] = self.deg_clim
+            if self.clims is not None and val_name in self.clims.keys():
+                self.plot_dicts[val_name]['clim'] = self.clims[val_name]
 
             if self.plt_orig_pnts:
                 self.plot_dicts[val_name + '_non_interpolated'] = {
@@ -388,15 +405,19 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 optimal_pnt = self.proc_data_dict['optimal_pnt']
                 optimal_pars = 'Optimal Parameters:'
                 for key, val in optimal_pnt.items():
-                    optimal_pars += '\n{}: {:4.3f}'.format(key, val)
+                    optimal_pars += '\n{}: {:4.3f} {}'.format(key, val['value'], val['unit'])
                 self.plot_dicts[val_name + '_optimal_pars'] = {
                     'ax_id': val_name,
-                    'ypos': 0.95,
-                    'xpos': 1.65,
+                    'ypos': -0.25,
+                    'xpos': 0,
                     'plotfn': self.plot_text,
                     'box_props': 'fancy',
                     'line_kws': {'alpha': 0},
-                    'text_string': optimal_pars}
+                    'text_string': optimal_pars,
+                    'horizontalalignment': 'left',
+                    'verticalaligment': 'top',
+                    'fontsize': 16
+                }
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
@@ -421,15 +442,49 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 x = self.proc_data_dict['x']
                 y = self.proc_data_dict['y']
                 z = self.proc_data_dict['measured_values'][i]
-                optimal_idx = z.argmax()
+
+                optimal_idx = z.argmin()
                 self.proc_data_dict['optimal_pnt'] = {
-                    self.proc_data_dict['xlabel']: x[optimal_idx],
-                    self.proc_data_dict['ylabel']: y[optimal_idx],
-                    self.proc_data_dict['value_names'][i]: z[optimal_idx]
+                    self.proc_data_dict['xlabel']: {'value': x[optimal_idx], 'unit': ''},
+                    self.proc_data_dict['ylabel']: {'value': y[optimal_idx], 'unit': ''}
                 }
+                for k, measured_value in enumerate(self.proc_data_dict['measured_values']):
+                    self.proc_data_dict['optimal_pnt'][self.proc_data_dict['value_names'][k]] = {'value': measured_value[optimal_idx], 'unit': self.proc_data_dict['value_units'][k]}
 
         self.proc_data_dict['x_int'] = x_int
         self.proc_data_dict['y_int'] = y_int
+
+    def plot_text(self, pdict, axs):
+        """
+        Helper function that adds text to a plot
+        Overriding here in order to make the text bigger
+        and put it below the the cost function figure
+        """
+        pfunc = getattr(axs, pdict.get('func', 'text'))
+        plot_text_string = pdict['text_string']
+        plot_xpos = pdict.get('xpos', .98)
+        plot_ypos = pdict.get('ypos', .98)
+        fontsize = pdict.get('fontsize', 10)
+        verticalalignment = pdict.get('verticalalignment', 'top')
+        horizontalalignment = pdict.get('horizontalalignment', 'left')
+        fontdict = {
+            'horizontalalignment': horizontalalignment,
+            'verticalalignment': verticalalignment
+        }
+
+        if fontsize is not None:
+            fontdict['fontsize'] = fontsize
+
+        # fancy box props is based on the matplotlib legend
+        box_props = pdict.get('box_props', 'fancy')
+        if box_props == 'fancy':
+            box_props = self.fancy_box_props
+
+        # pfunc is expected to be ax.text
+        pfunc(x=plot_xpos, y=plot_ypos, s=plot_text_string,
+              transform=axs.transAxes,
+              bbox=box_props, fontdict=fontdict)
+
 
 def non_interpolated_overlay(x, y, fig=None, ax=None, transpose=False, **kw):
     """
