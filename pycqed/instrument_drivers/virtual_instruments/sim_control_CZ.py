@@ -195,6 +195,14 @@ class SimControlCZ(Instrument):
             initial_value=None,
         )
 
+        self.add_parameter(
+            "cost_func_str",
+            label="Not loaded automatically. Convenience parameter to store the cost function string and use `exec('sim_control_CZ.cost_func(' + sim_control_CZ.cost_func_str() + ')')` to load it.",
+            parameter_class=ManualParameter,
+            vals=vals.Strings(),
+            initial_value="lambda qoi: np.log10((1 - qoi['avgatefid_compsubspace_pc']) * (1 - 0.5) + qoi['L1'] * 0.5)",
+        )
+
         # for ramsey/Rabi simulations
 
         self.add_parameter(
