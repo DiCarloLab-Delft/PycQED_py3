@@ -251,3 +251,9 @@ class SimControlCZ(Instrument):
             vals=vals.Arrays(),
             initial_value=np.array([1, 0, 0]),
         )
+
+    def set_cost_func(self):
+        """
+        Sets the self.cost_func from the self.cost_func_str string
+        """
+        exec("self.cost_func(" + self.cost_func_str() + ")")

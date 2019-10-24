@@ -5,6 +5,9 @@ from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
 from pycqed.simulations import cz_superoperator_simulation_new2 as cz_main
+from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ as scCZ
+import adaptive
+from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 try:
@@ -1319,7 +1322,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def sim_CZ(self, fluxlutman_static, which_gate=None, qois='all'):
         """
-        Simulates a CZ gate for the current paramenters.
+        Simulates a CZ gate for the current parameters.
         At least one 'instr_sim_control_CZ_{which_gate}' needs to be set
         in the current fluxlutman.
         """
@@ -1327,11 +1330,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if which_gate is None:
             found = []
             for this_cz in ['NE', 'NW', 'SW', 'SE']:
-                try:
-                    found.append(getattr(self, 'instr_sim_control_CZ_{}'.format(this_cz)).get_instr())
-                except Exception:
-                    pass
-
+                instr_name = self.get('instr_sim_control_CZ_{}'.format(this_cz))
+                if instr_name is not None:
+                    found.append(self.parameters['instr_sim_control_CZ_{}'.format(this_cz)].get_instr())
             if len(found) == 0:
                 raise Exception('No sim_control_CZ instrument found! Define a "SimControlCZ" instrument first.')
             elif len(found) > 1:
@@ -1341,7 +1342,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 sim_control_CZ = found[0]
                 which_gate = sim_control_CZ.which_gate()
         else:
-            sim_control_CZ = getattr(self, 'instr_sim_control_CZ_{}'.format(which_gate)).get_instr()
+            sim_control_CZ = self.parameters['instr_sim_control_CZ_{}'.format(which_gate)].get_instr()
             assert which_gate == sim_control_CZ.which_gate()
 
         detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ,
@@ -1359,6 +1360,92 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             pass
 
         return values, units
+
+    def get_guesses_from_cz_sim(
+            self, MC, fluxlutman_static, which_gate,
+            n_points=200, theta_f_lims=(30, 180), lambda_2_lims=(-1.5, 1.5),
+            lambda_3_init=0, sim_control_CZ_pars=None):
+        """
+        Runs an adaptive sampling of the CZ simulation by sweeping
+        cz_theta_f_{which_gate} and and cz_lambda_2_{which_gate}
+        """
+        guesses = []
+        # Create a SimControlCZ virtual instrument if it doesn't exist or get it
+        sim_control_CZ_name = self.get('instr_sim_control_CZ_{}'.format(which_gate))
+        if sim_control_CZ_name is not None:
+            sim_control_CZ = self.parameters['instr_sim_control_CZ_{}'.format(which_gate)].get_instr()
+            assert which_gate == sim_control_CZ.which_gate()
+        else:
+            sim_control_CZ = scCZ.SimControlCZ(self.name + '_sim_control_CZ_{}'.format(which_gate))
+            sim_control_CZ.which_gate(which_gate)
+            MC.station.add_component(sim_control_CZ)
+            self.set('instr_sim_control_CZ_{}'.format(which_gate), sim_control_CZ.name)
+
+        if sim_control_CZ_pars is not None:
+            for key, val in sim_control_CZ_pars.items():
+                sim_control_CZ.set(key, val)
+
+        sim_control_CZ.set_cost_func()
+
+        # Create a CZ_trajectory_superoperator detector if it doesn't exist
+        qois = ['Cost func', 'Cond phase', 'L1']
+        detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ,
+            fluxlutman_static=fluxlutman_static, qois=qois)
+
+        MC.set_detector_function(detector)
+
+        MC.set_sweep_functions([
+            self['cz_theta_f_{}'.format(which_gate)],
+            self['cz_lambda_2_{}'.format(which_gate)]
+        ])
+
+        lambda_3_saved = self.get('cz_lambda_3_{}'.format(which_gate))
+        lambda_2_saved = self.get('cz_lambda_2_{}'.format(which_gate))
+        theta_f_saved = self.get('cz_theta_f_{}'.format(which_gate))
+        self.set('cz_lambda_3_{}'.format(which_gate), 0)
+
+        adaptive_pars = {
+            'adaptive_function': adaptive.Learner2D,
+            'n_points': n_points,
+            'bounds': [theta_f_lims, lambda_2_lims],
+            'goal': lambda l: l.npoints > n_points,
+            'loss_per_triangle': None
+        }
+        MC.set_adaptive_function_parameters(adaptive_pars)
+
+        label = 'auto_cz_sim_{}'.format(sim_control_CZ.name)
+
+        data = MC.run(
+            label,
+            mode='adaptive',
+            exp_metadata={'adaptive_pars': adaptive_pars})
+
+        coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
+            label=label,
+            close_figs=True,
+            plt_orig_pnts=True,
+            plt_contour_L1=False,
+            plt_optimal_point=True,
+            plt_contour_phase=False,
+            clims={
+                'L1': [0, 5],
+                'missing_fraction': [0, 10],
+                'Cond phase': [0, 360]
+            }
+        )
+
+        coha.proc_data_dict['optimal_pnt']['cz_lambda_3_{}'.format(which_gate)] = {
+            'value': self.get('cz_lambda_3_{}'.format(which_gate)),
+            'unit': ''
+        }
+
+        guesses.append(coha.proc_data_dict['optimal_pnt'])
+
+        self.set('cz_lambda_3_{}'.format(which_gate), lambda_3_saved)
+        self.set('cz_lambda_2_{}'.format(which_gate), lambda_2_saved)
+        self.set('cz_theta_f_{}'.format(which_gate), theta_f_saved)
+
+        return guesses, coha
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):

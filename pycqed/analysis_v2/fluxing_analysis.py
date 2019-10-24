@@ -15,6 +15,7 @@ from pycqed.analysis.fitting_models import CosFunc, Cos_guess, \
 from pycqed.analysis_v2.simple_analysis import Basic2DInterpolatedAnalysis
 
 from pycqed.analysis.analysis_toolbox import color_plot
+import scipy.cluster.hierarchy as hcluster
 
 from matplotlib import colors
 from copy import deepcopy
@@ -24,8 +25,9 @@ import logging
 
 log = logging.getLogger(__name__)
 
+
 class Chevron_Analysis(ba.BaseDataAnalysis):
-    def __init__(self, ts: str=None, label=None,
+    def __init__(self, ts: str = None, label=None,
                  ch_idx=0,
                  coupling='g', min_fit_amp=0, auto=True):
         """
@@ -225,7 +227,8 @@ def plot_chevron_FFT(x, xunit,  fft_freqs, fft_data, freq_fits, freq_fits_std,
 
 class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
     """
-    Write some docstring explaining what we analyze
+    Intended for the analysis of CZ tuneup (theta_f, lambda_2) heatmaps
+    The data can be from an experiment or simulation
     """
     def __init__(self,
                 t_start: str = None,
@@ -241,19 +244,21 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_orig_pnts: bool = True,
                 plt_contour_phase: bool = True,
                 plt_contour_L1: bool = True,
-                plt_optimal_point: bool = False,
-                clims: dict = None):
+                plt_optimal_points: bool = False,
+                clims: dict = None,
+                find_local_optimals: bool = True):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
         self.plt_contour_L1 = plt_contour_L1
-        self.plt_optimal_point = plt_optimal_point
+        self.plt_optimal_points = plt_optimal_points
         self.clims = clims
+        self.find_local_optimals = find_local_optimals
 
         cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
         'cost func.', 'cost function', 'Cost function', 'Cost function value'}
-        L1_Names = {'L1', 'Leakage'}
-        MF_Names = {'missing fraction', 'Missing fraction', 'missing frac',
+        L1_names = {'L1', 'Leakage'}
+        ms_names = {'missing fraction', 'Missing fraction', 'missing frac',
             'missing frac.', 'Missing frac', 'Missing frac.'}
         cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
             'cond phase', 'cond. phase', 'conditional phase'}
@@ -262,17 +267,17 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             'Offset diff.'}
 
         # also account for possible underscores instead of a spaces between words
-        allNames = [cost_func_Names, L1_Names, MF_Names, cond_phase_names,
+        allNames = [cost_func_Names, L1_names, ms_names, cond_phase_names,
             offset_diff_names]
-        [self.cost_func_Names, self.L1_Names, self.MF_Names, self.cond_phase_names,
+        [self.cost_func_Names, self.L1_names, self.ms_names, self.cond_phase_names,
             self.offset_diff_names] = \
             [names.union({name.replace(' ', '_') for name in names})
                 for names in allNames]
 
         cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
         'cost func.', 'cost function', 'Cost function', 'Cost function value'}
-        L1_Names = {'L1', 'Leakage'}
-        MF_Names = {'missing fraction', 'Missing fraction', 'missing frac',
+        L1_names = {'L1', 'Leakage'}
+        ms_names = {'missing fraction', 'Missing fraction', 'missing frac',
             'missing frac.', 'Missing frac', 'Missing frac.'}
         cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
             'cond phase', 'cond. phase', 'conditional phase'}
@@ -281,9 +286,9 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             'Offset diff.'}
 
         # also account for possible underscores instead of a spaces between words
-        allNames = [cost_func_Names, L1_Names, MF_Names, cond_phase_names,
+        allNames = [cost_func_Names, L1_names, ms_names, cond_phase_names,
             offset_diff_names]
-        [self.cost_func_Names, self.L1_Names, self.MF_Names, self.cond_phase_names,
+        [self.cost_func_Names, self.L1_names, self.ms_names, self.cond_phase_names,
             self.offset_diff_names] = \
             [names.union({name.replace(' ', '_') for name in names})
                 for names in allNames]
@@ -367,8 +372,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 # Find index of Leakage or Missing Fraction
                 z_L1 = None
                 for j, val_name_j in enumerate(self.proc_data_dict['value_names']):
-                    pass
-                    if val_name_j in self.L1_Names or val_name_j in self.MF_Names:
+                    if val_name_j in self.L1_names or val_name_j in self.ms_names:
                         z_L1 = self.proc_data_dict['interpolated_values'][j]
                         break
 
@@ -379,7 +383,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     contour_levels = np.array([1, 5, 10])
                     # Leakage is estimated as (Missing fraction/2)
                     contour_levels = contour_levels if \
-                        self.proc_data_dict['value_names'][j] in self.L1_Names \
+                        self.proc_data_dict['value_names'][j] in self.L1_names \
                         else 2 * contour_levels
 
                     self.plot_dicts[val_name + '_L1_contour'] = {
@@ -395,17 +399,19 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                         'linestyles': 'dashdot'
                     }
                 else:
-                    log.warning('No data found named {}'.format(self.L1_Names))
+                    log.warning('No data found named {}'.format(self.L1_names))
 
-            if val_name in set().union(self.L1_Names).union(self.MF_Names)\
+            if val_name in set().union(self.L1_names).union(self.ms_names)\
                     .union(self.offset_diff_names):
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
-            if self.plt_optimal_point and val_name in self.cost_func_Names:
-                optimal_pnt = self.proc_data_dict['optimal_pnt']
+            if self.plt_optimal_points and val_name in self.cost_func_Names:
+                optimal_pnts = self.proc_data_dict['optimal_pnts']
                 optimal_pars = 'Optimal Parameters:'
-                for key, val in optimal_pnt.items():
-                    optimal_pars += '\n{}: {:4.3f} {}'.format(key, val['value'], val['unit'])
+                for optimal_pnt in optimal_pnts:
+                    optimal_pars += '\n'
+                    for key, val in optimal_pnt.items():
+                        optimal_pars += '\n{}: {:4.4f} {}'.format(key, val['value'], val['unit'])
                 self.plot_dicts[val_name + '_optimal_pars'] = {
                     'ax_id': val_name,
                     'ypos': -0.25,
@@ -416,7 +422,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     'text_string': optimal_pars,
                     'horizontalalignment': 'left',
                     'verticalaligment': 'top',
-                    'fontsize': 16
+                    'fontsize': 14
                 }
 
     def process_data(self):
@@ -437,19 +443,41 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             self.proc_data_dict['interpolated_values'].append(z_int)
 
             if self.proc_data_dict['value_names'][i] in self.cost_func_Names:
-                # Find the optimal point acording to the cost function
-                # optimal = max of cost func
+                # Find the optimal point(s)
                 x = self.proc_data_dict['x']
                 y = self.proc_data_dict['y']
                 z = self.proc_data_dict['measured_values'][i]
 
-                optimal_idx = z.argmin()
-                self.proc_data_dict['optimal_pnt'] = {
-                    self.proc_data_dict['xlabel']: {'value': x[optimal_idx], 'unit': ''},
-                    self.proc_data_dict['ylabel']: {'value': y[optimal_idx], 'unit': ''}
-                }
-                for k, measured_value in enumerate(self.proc_data_dict['measured_values']):
-                    self.proc_data_dict['optimal_pnt'][self.proc_data_dict['value_names'][k]] = {'value': measured_value[optimal_idx], 'unit': self.proc_data_dict['value_units'][k]}
+                if not self.find_local_optimals:
+                    optimal_idxs = np.array([z.argmin()])
+                    self.proc_data_dict['clusters_by_indx'] = None
+                else:
+                    where = [(name in self.cond_phase_names) for name in self.proc_data_dict['value_names']]
+                    cond_phase_indx = np.where(where)[0][0]
+                    cond_phase_arr = self.proc_data_dict['measured_values'][cond_phase_indx]
+
+                    where = [(name in self.L1_names) for name in self.proc_data_dict['value_names']]
+                    L1_indx = np.where(where)[0][0]
+                    L1_arr = self.proc_data_dict['measured_values'][L1_indx]
+                    optimal_idxs, clusters_by_indx = get_optimal_pnts_indxs(
+                        theta_f_arr=x,
+                        lambda_2_arr=y,
+                        cost_func_arr=z,
+                        cond_phase_arr=cond_phase_arr,
+                        L1_arr=L1_arr)
+                    self.proc_data_dict['clusters_by_indx'] = clusters_by_indx
+
+                self.proc_data_dict['optimal_idxs'] = optimal_idxs
+
+                self.proc_data_dict['optimal_pnts'] = []
+                for optimal_idx in optimal_idxs:
+                    optimal_pnt = {
+                        self.proc_data_dict['xlabel']: {'value': x[optimal_idx], 'unit': self.proc_data_dict['xunit']},
+                        self.proc_data_dict['ylabel']: {'value': y[optimal_idx], 'unit': self.proc_data_dict['yunit']}
+                    }
+                    for k, measured_value in enumerate(self.proc_data_dict['measured_values']):
+                        optimal_pnt[self.proc_data_dict['value_names'][k]] = {'value': measured_value[optimal_idx], 'unit': self.proc_data_dict['value_units'][k]}
+                    self.proc_data_dict['optimal_pnts'].append(optimal_pnt)
 
         self.proc_data_dict['x_int'] = x_int
         self.proc_data_dict['y_int'] = y_int
@@ -561,3 +589,72 @@ def contour_overlay(x, y, z, colormap, transpose=False,
     ax.clabel(c, fmt='%.1f', inline='True', fontsize=fontsize)
 
     return fig, ax
+
+
+def get_optimal_pnts_indxs(
+        theta_f_arr,
+        lambda_2_arr,
+        cost_func_arr,
+        cond_phase_arr,
+        L1_arr,
+        target_phase=180,
+        phase_thr=10,
+        L1_thr=1,
+        clustering_thr=10):
+    """
+    target_phase and low L1 need to match roughtly cost function's minimums
+
+    Args:
+    cost_func_arr: bestter = lower values
+
+    target_phase: unit = deg
+
+    L1_thr: unit = %
+
+    clustering_thr: unit = deg, represents distance between points on the
+        landscape (lambda_2 gets normalized to [0, 360])
+    """
+    x_pnts = np.array(theta_f_arr)
+    y_pnts = np.array(lambda_2_arr)
+
+    # Select points based low leakage and on how close to the
+    # target_phase they are
+    sel = (cond_phase_arr > (target_phase - phase_thr)) & (cond_phase_arr < (target_phase + phase_thr))
+    sel = sel * (L1_arr < L1_thr)
+    selected_point_indx = np.where(sel)[0]
+    x_pnts_filtered = x_pnts[selected_point_indx]
+    y_pnts_filtered = y_pnts[selected_point_indx]
+
+    # Cluster point based on distance
+
+    # Normalize distance
+    x_pnts_norm = x_pnts_filtered / 360.
+    y_pnts_norm = y_pnts_filtered / (2 * np.pi)
+    x_y_pnts_norm = np.transpose([x_pnts_norm, y_pnts_norm])
+
+    # clustering
+    thresh = clustering_thr / 360.
+    clusters = hcluster.fclusterdata(x_y_pnts_norm, thresh, criterion="distance")
+
+    cluster_id_min = np.min(clusters)
+    cluster_id_max = np.max(clusters)
+    clusters_by_indx = []
+    optimal_indxs = []
+    optimal_cost_func_values = []
+    for cluster_id in range(cluster_id_min, cluster_id_max + 1):
+        cluster_pnts_indxs = np.where(clusters == cluster_id)
+        indxs_in_orig_array = selected_point_indx[cluster_pnts_indxs]
+
+        clusters_by_indx.append(indxs_in_orig_array)
+        min_indx = np.argmin(cost_func_arr[indxs_in_orig_array])
+
+        optimal_indxs.append(indxs_in_orig_array[min_indx])
+        optimal_cost_func_values.append(cost_func_arr[indxs_in_orig_array[min_indx]])
+
+    # Sorting
+    # NB: Maybe the sorting should be a weighted by the number
+    # of point in each cluster
+    optimal_indxs = np.array(optimal_indxs)[np.argsort(optimal_cost_func_values)]
+    clusters_by_indx = np.array(clusters_by_indx)[np.argsort(optimal_cost_func_values)]
+
+    return optimal_indxs, clusters_by_indx
