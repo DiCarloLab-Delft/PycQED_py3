@@ -1363,13 +1363,12 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def get_guesses_from_cz_sim(
             self, MC, fluxlutman_static, which_gate,
-            n_points=200, theta_f_lims=(30, 180), lambda_2_lims=(-1.5, 1.5),
+            n_points=200, theta_f_lims=[30, 180], lambda_2_lims=[-1.5, 1.5],
             lambda_3_init=0, sim_control_CZ_pars=None):
         """
         Runs an adaptive sampling of the CZ simulation by sweeping
         cz_theta_f_{which_gate} and and cz_lambda_2_{which_gate}
         """
-        guesses = []
         # Create a SimControlCZ virtual instrument if it doesn't exist or get it
         sim_control_CZ_name = self.get('instr_sim_control_CZ_{}'.format(which_gate))
         if sim_control_CZ_name is not None:
@@ -1425,8 +1424,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             close_figs=True,
             plt_orig_pnts=True,
             plt_contour_L1=False,
-            plt_optimal_point=True,
-            plt_contour_phase=False,
+            plt_optimal_values=True,
+            plt_contour_phase=True,
+            find_local_optimals=True,
             clims={
                 'L1': [0, 5],
                 'missing_fraction': [0, 10],
@@ -1434,18 +1434,17 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             }
         )
 
-        coha.proc_data_dict['optimal_pnt']['cz_lambda_3_{}'.format(which_gate)] = {
-            'value': self.get('cz_lambda_3_{}'.format(which_gate)),
-            'unit': ''
-        }
-
-        guesses.append(coha.proc_data_dict['optimal_pnt'])
+        for optimal_pnt in coha.proc_data_dict['optimal_pnts']:
+            optimal_pnt['cz_lambda_3_{}'.format(which_gate)] = {
+                'value': self.get('cz_lambda_3_{}'.format(which_gate)),
+                'unit': ''
+            }
 
         self.set('cz_lambda_3_{}'.format(which_gate), lambda_3_saved)
         self.set('cz_lambda_2_{}'.format(which_gate), lambda_2_saved)
         self.set('cz_theta_f_{}'.format(which_gate), theta_f_saved)
 
-        return guesses, coha
+        return coha.proc_data_dict['optimal_pnts']
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):

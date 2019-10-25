@@ -243,15 +243,15 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 interp_method: str = 'linear',
                 plt_orig_pnts: bool = True,
                 plt_contour_phase: bool = True,
-                plt_contour_L1: bool = True,
-                plt_optimal_points: bool = False,
+                plt_contour_L1: bool = False,
+                plt_optimal_values: bool = True,
                 clims: dict = None,
                 find_local_optimals: bool = True):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
         self.plt_contour_L1 = plt_contour_L1
-        self.plt_optimal_points = plt_optimal_points
+        self.plt_optimal_values = plt_optimal_values
         self.clims = clims
         self.find_local_optimals = find_local_optimals
 
@@ -336,7 +336,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             if self.plt_orig_pnts:
                 self.plot_dicts[val_name + '_non_interpolated'] = {
                     'ax_id': val_name,
-                    'plotfn': non_interpolated_overlay,
+                    'plotfn': scatter_pnts_overlay,
                     'x': self.proc_data_dict['x'],
                     'y': self.proc_data_dict['y']
                 }
@@ -405,11 +405,11 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     .union(self.offset_diff_names):
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
-            if self.plt_optimal_points and val_name in self.cost_func_Names:
+            if self.plt_optimal_values and val_name in self.cost_func_Names:
                 optimal_pnts = self.proc_data_dict['optimal_pnts']
                 optimal_pars = 'Optimal Parameters:'
-                for optimal_pnt in optimal_pnts:
-                    optimal_pars += '\n'
+                for m, optimal_pnt in enumerate(optimal_pnts):
+                    optimal_pars += '\nPoint #{}'.format(m)
                     for key, val in optimal_pnt.items():
                         optimal_pars += '\n{}: {:4.4f} {}'.format(key, val['value'], val['unit'])
                 self.plot_dicts[val_name + '_optimal_pars'] = {
@@ -423,6 +423,41 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     'horizontalalignment': 'left',
                     'verticalaligment': 'top',
                     'fontsize': 14
+                }
+
+            if self.find_local_optimals:
+                clusters_pnts_x = np.array([])
+                clusters_pnts_y = np.array([])
+                clusters_pnts_colors = np.array([])
+                clusters_by_indx = self.proc_data_dict['clusters_by_indx']
+                x = self.proc_data_dict['x']
+                y = self.proc_data_dict['y']
+                for l, cluster_by_indx in enumerate(clusters_by_indx):
+                    clusters_pnts_x = np.concatenate((clusters_pnts_x, x[cluster_by_indx]))
+                    clusters_pnts_y = np.concatenate((clusters_pnts_y, y[cluster_by_indx]))
+                    clusters_pnts_colors = np.concatenate((clusters_pnts_colors,
+                        np.full(np.shape(cluster_by_indx)[0], l)))
+                self.plot_dicts[val_name + '_clusters'] = {
+                    'ax_id': val_name,
+                    'plotfn': scatter_pnts_overlay,
+                    'x': clusters_pnts_x,
+                    'y': clusters_pnts_y,
+                    'color': None,
+                    'edgecolors': 'black',
+                    'marker': 'o',
+                    'linewidth': 1,
+                    'c': clusters_pnts_colors
+                }
+
+                x_optimal = self.proc_data_dict['x'][self.proc_data_dict['optimal_idxs']]
+                y_optimal = self.proc_data_dict['y'][self.proc_data_dict['optimal_idxs']]
+
+                self.plot_dicts[val_name + '_optimal_pnts_annotate'] = {
+                    'ax_id': val_name,
+                    'plotfn': annotate_pnts,
+                    'txt': np.arange(np.shape(x_optimal)[0]),
+                    'x': x_optimal,
+                    'y': y_optimal
                 }
 
     def process_data(self):
@@ -514,8 +549,21 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
               bbox=box_props, fontdict=fontdict)
 
 
-def non_interpolated_overlay(x, y, fig=None, ax=None, transpose=False, **kw):
+def scatter_pnts_overlay(
+        x,
+        y,
+        fig=None,
+        ax=None,
+        transpose=False,
+        color='w',
+        edgecolors='gray',
+        linewidth=0.5,
+        marker='.',
+        s=None,
+        c=None,
+        **kw):
     """
+    Adds a scattered overlay of the provided data points
     x, and y are lists.
     Args:
         x (array [shape: n*1]):     x data
@@ -526,17 +574,13 @@ def non_interpolated_overlay(x, y, fig=None, ax=None, transpose=False, **kw):
     if ax is None:
         fig, ax = plt.subplots()
 
-    color = 'w'
-    edgecolors = 'gray'
-    linewidth = 0.5
-
     if transpose:
         log.debug('Inverting x and y axis for non-interpolated points')
-        ax.scatter(y, x, marker='.',
-            color=color, edgecolors=edgecolors, linewidth=linewidth)
+        ax.scatter(y, x, marker=marker,
+            color=color, edgecolors=edgecolors, linewidth=linewidth, s=s, c=c)
     else:
-        ax.scatter(x, y, marker='.',
-            color=color, edgecolors=edgecolors, linewidth=linewidth)
+        ax.scatter(x, y, marker=marker,
+            color=color, edgecolors=edgecolors, linewidth=linewidth, s=s, c=c)
 
     return fig, ax
 
@@ -591,6 +635,39 @@ def contour_overlay(x, y, z, colormap, transpose=False,
     return fig, ax
 
 
+def annotate_pnts(txt, x, y,
+        textcoords='offset points',
+        ha='center',
+        va='center',
+        xytext=(0, 0),
+        bbox=dict(boxstyle='circle, pad=0.2', fc='white', alpha=0.7),
+        arrowprops=None,
+        transpose=False,
+        fig=None,
+        ax=None,
+        **kw):
+    """
+    A handy for loop for the ax.annotate
+    """
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    if transpose:
+        y_tmp = np.copy(y)
+        y = np.copy(x)
+        x = y_tmp
+
+    for i, text in enumerate(txt):
+            ax.annotate(text,
+                xy=(x[i], y[i]),
+                textcoords=textcoords,
+                ha=ha,
+                va=va,
+                xytext=xytext,
+                bbox=bbox)
+    return fig, ax
+
+
 def get_optimal_pnts_indxs(
         theta_f_arr,
         lambda_2_arr,
@@ -622,39 +699,46 @@ def get_optimal_pnts_indxs(
     sel = (cond_phase_arr > (target_phase - phase_thr)) & (cond_phase_arr < (target_phase + phase_thr))
     sel = sel * (L1_arr < L1_thr)
     selected_point_indx = np.where(sel)[0]
-    x_pnts_filtered = x_pnts[selected_point_indx]
-    y_pnts_filtered = y_pnts[selected_point_indx]
+    if np.shape(selected_point_indx)[0] == 0:
+        log.warning('No optimal points found with {} < target_phase < {} and L1 < {}.'.format(
+            target_phase - phase_thr, target_phase + phase_thr, L1_thr
+        ))
+        return np.array([]), np.array([])
+    elif np.shape(selected_point_indx)[0] == 1:
+        return np.array(selected_point_indx), np.array([])
+    else:
+        x_pnts_filtered = x_pnts[selected_point_indx]
+        y_pnts_filtered = y_pnts[selected_point_indx]
 
-    # Cluster point based on distance
+        # Cluster point based on distance
 
-    # Normalize distance
-    x_pnts_norm = x_pnts_filtered / 360.
-    y_pnts_norm = y_pnts_filtered / (2 * np.pi)
-    x_y_pnts_norm = np.transpose([x_pnts_norm, y_pnts_norm])
+        # Normalize distance
+        x_pnts_norm = x_pnts_filtered / 360.
+        y_pnts_norm = y_pnts_filtered / (2 * np.pi)
+        x_y_pnts_norm = np.transpose([x_pnts_norm, y_pnts_norm])
+        # clustering
+        thresh = clustering_thr / 360.
+        clusters = hcluster.fclusterdata(x_y_pnts_norm, thresh, criterion="distance")
 
-    # clustering
-    thresh = clustering_thr / 360.
-    clusters = hcluster.fclusterdata(x_y_pnts_norm, thresh, criterion="distance")
+        cluster_id_min = np.min(clusters)
+        cluster_id_max = np.max(clusters)
+        clusters_by_indx = []
+        optimal_idxs = []
+        optimal_cost_func_values = []
+        for cluster_id in range(cluster_id_min, cluster_id_max + 1):
+            cluster_pnts_indxs = np.where(clusters == cluster_id)
+            indxs_in_orig_array = selected_point_indx[cluster_pnts_indxs]
 
-    cluster_id_min = np.min(clusters)
-    cluster_id_max = np.max(clusters)
-    clusters_by_indx = []
-    optimal_indxs = []
-    optimal_cost_func_values = []
-    for cluster_id in range(cluster_id_min, cluster_id_max + 1):
-        cluster_pnts_indxs = np.where(clusters == cluster_id)
-        indxs_in_orig_array = selected_point_indx[cluster_pnts_indxs]
+            clusters_by_indx.append(indxs_in_orig_array)
+            min_indx = np.argmin(cost_func_arr[indxs_in_orig_array])
 
-        clusters_by_indx.append(indxs_in_orig_array)
-        min_indx = np.argmin(cost_func_arr[indxs_in_orig_array])
-
-        optimal_indxs.append(indxs_in_orig_array[min_indx])
-        optimal_cost_func_values.append(cost_func_arr[indxs_in_orig_array[min_indx]])
+            optimal_idxs.append(indxs_in_orig_array[min_indx])
+            optimal_cost_func_values.append(cost_func_arr[indxs_in_orig_array[min_indx]])
 
     # Sorting
     # NB: Maybe the sorting should be a weighted by the number
     # of point in each cluster
-    optimal_indxs = np.array(optimal_indxs)[np.argsort(optimal_cost_func_values)]
+    optimal_idxs = np.array(optimal_idxs)[np.argsort(optimal_cost_func_values)]
     clusters_by_indx = np.array(clusters_by_indx)[np.argsort(optimal_cost_func_values)]
 
-    return optimal_indxs, clusters_by_indx
+    return optimal_idxs, clusters_by_indx

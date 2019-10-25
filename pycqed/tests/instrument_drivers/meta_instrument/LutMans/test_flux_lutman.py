@@ -625,8 +625,8 @@ class TestMultiQubitFluxLutMan:
             MC=self.MC,
             which_gate='SE',
             n_points=6,
-            theta_f_lims=(100, 140),
-            lambda_2_lims=(-0.5, 0.3))
+            theta_f_lims=(115, 120),
+            lambda_2_lims=(-0.3, -0.2))
 
-        np.testing.assert_almost_equal(guesses[0]['cz_theta_f_SE']['value'], 100)
-        np.testing.assert_almost_equal(guesses[0]['cz_lambda_2_SE']['value'], 0.3)
+        np.testing.assert_almost_equal(guesses[0]['cz_theta_f_SE']['value'], 115.5555555555555)
+        np.testing.assert_almost_equal(guesses[0]['cz_lambda_2_SE']['value'], -0.24444444444444444)
