@@ -693,7 +693,7 @@ class QuTech_AWG_Module(SCPI):
         return json.loads(result)
 
     ##########################################################################
-    # QCoDeS parameter definitions
+    # QCoDeS parameter definitions: codewords
     ##########################################################################
 
     def _add_codeword_parameters(self, add_extra: bool=True):
@@ -737,6 +737,10 @@ class QuTech_AWG_Module(SCPI):
                 vals=vals.Strings(),
                 get_parser=int,
                 docstring='Reads the maximum number of codeword bits for all channels')
+
+    ##########################################################################
+    # QCoDeS parameter definitions: DIO
+    ##########################################################################
 
     def _add_dio_parameters(self, add_extra: bool=True):
         self.add_parameter(
@@ -818,7 +822,10 @@ class QuTech_AWG_Module(SCPI):
                          '\tFalse: No interboard connection detected'
                 )
 
-    # parameters not used in normal lab setup
+    ##########################################################################
+    # QCoDeS parameter definitions: parameters not used in normal lab setup
+    ##########################################################################
+
     def _add_extra_parameters(self):
         self.add_parameter(
             'status_frontIO_temperature',
@@ -900,11 +907,11 @@ class QuTech_AWG_Module(SCPI):
                           'Set parameter:\n\tInteger: Value to write to the DAC, min: 0, max: 4095\n'
                           '\tWhere 0 is minimal DAC scale and 4095 is maximum DAC scale \n')
 
-    def _add_parameters(self):
-        #######################################################################
-        # QWG specific
-        #######################################################################
+    ##########################################################################
+    # QCoDeS parameter definitions: AWG related
+    ##########################################################################
 
+    def _add_awg_parameters(self):
         # Channel pair parameters
         for i in range(self._dev_desc.numChannels//2):
             ch_pair = i*2+1
@@ -952,7 +959,7 @@ class QuTech_AWG_Module(SCPI):
                           'Used for mixer correction\n'
                           'Effective immediately when sent')
 
-        # Channel parameters #
+        # Channel parameters
         for ch in range(1, self._dev_desc.numChannels+1):
             amp_cmd = f'SOUR{ch}:VOLT:LEV:IMM:AMPL'
             offset_cmd = f'SOUR{ch}:VOLT:LEV:IMM:OFFS'
@@ -1109,8 +1116,10 @@ class QuTech_AWG_Module(SCPI):
                       'status: on or off, overflow, underdrive.\n'
                       'Return:\n     JSON object with system status')
 
+    def _add_parameters(self):
+        self._add_awg_parameters()
         self._add_codeword_parameters()
-        self._add_dio_parameters()
+        self._add_dio_parameters()  # FIXME: conditional on QWG SW version?
         self._add_extra_parameters()
 
         self.add_function(

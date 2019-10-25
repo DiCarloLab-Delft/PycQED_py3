@@ -13,10 +13,12 @@ from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from scipy.interpolate import interp1d
 import qutip as qtp
 import cma
-#np.set_printoptions(threshold=np.inf)
+
+np.set_printoptions(threshold=np.inf)
 
 import logging
 log = logging.getLogger(__name__)
+
 
 def f_to_parallelize_new(arglist):
     # cluster wants a list as an argument.
@@ -173,8 +175,9 @@ def compute_propagator(arglist):
     fluxlutman = arglist['fluxlutman']
     fluxlutman_static = arglist['fluxlutman_static']
     sim_control_CZ = arglist['sim_control_CZ']
-    which_gate = arglist['which_gate']
-    simstep_div = arglist['simstep_div']
+    which_gate = sim_control_CZ.which_gate()
+    gates_num = sim_control_CZ.gates_num()  # repeat the same gate this number of times
+    gates_interval = sim_control_CZ.gates_interval()  # idle time between repeated gates
 
     q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
     czd_double_sided = fluxlutman.get('czd_double_sided_{}'.format(which_gate))
@@ -184,15 +187,13 @@ def compute_propagator(arglist):
     cz_theta_f = fluxlutman.get('cz_theta_f_{}'.format(which_gate))
 
     sim_step=1/fluxlutman.sampling_rate()
-    subdivisions_of_simstep=simstep_div                # 4 is a good one, corresponding to a time step of 0.1 ns
+    subdivisions_of_simstep=sim_control_CZ.simstep_div()  # 4 is a good one, corresponding to a time step of 0.1 ns
     sim_step_new=sim_step/subdivisions_of_simstep      # waveform is generated according to sampling rate of AWG,
                                                        # but we can use a different step for simulating the time evolution
     tlist = np.arange(0, cz_length, sim_step)
 
     # residual_coupling=czf.conditional_frequency(0,fluxlutman,fluxlutman_static, which_gate=which_gate)      # To check residual coupling at the operating point.
     # print(residual_coupling)                                                       # Change amp to get the residual coupling at different points
-
-
 
     eps_i = fluxlutman.calc_amp_to_eps(0, state_A='11', state_B='02', which_gate=which_gate)
     theta_i = wfl.eps_to_theta(eps_i, g=q_J2)           # Beware theta in radian!
@@ -211,8 +212,6 @@ def compute_propagator(arglist):
     else:
         amp = get_f_pulse_double_sided(fluxlutman,theta_i, which_gate=which_gate)
 
-
-
     # For better accuracy in simulations, redefine amp in terms of sim_step_new.
     # We split here below in two cases to keep into account that certain times net-zero is one AWG time-step longer
     # than the conventional pulse with the same pulse length.
@@ -228,17 +227,13 @@ def compute_propagator(arglist):
     amp_interp=interp1d(tlist_temp,amp_temp)
     amp=amp_interp(tlist_new)
 
-
     if czd_double_sided and sim_control_CZ.waiting_at_sweetspot()!=0:
         tlist_new, amp = czf.add_waiting_at_sweetspot(tlist_new,amp, sim_control_CZ.waiting_at_sweetspot())
-
-
 
     # Apply voltage scaling
     amp = amp * sim_control_CZ.voltage_scaling_factor()
 
-
-    ### Apply distortions
+    # Apply distortions
     if sim_control_CZ.distortions():
         amp_final = czf.distort_amplitude(fitted_stepresponse_ty=fitted_stepresponse_ty,amp=amp,tlist_new=tlist_new,sim_step_new=sim_step_new)
     else:
@@ -252,18 +247,15 @@ def compute_propagator(arglist):
     #                          title='Pulse with distortions, difference',
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
 
-    ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
+    # The fluxbias_q0 affects the pulse shape after the distortions have been taken into account
     if sim_control_CZ.sigma_q0() != 0:
         amp_final = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_final,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
 
-
-
     intervals_list = np.zeros(np.size(tlist_new)) + sim_step_new
-
 
     # We add the single qubit rotations at the end of the pulse
     if sim_control_CZ.Z_rotations_length() != 0:
-        actual_Z_rotations_length = np.arange(0,sim_control_CZ.Z_rotations_length(),sim_step_new)[-1]+sim_step_new
+        actual_Z_rotations_length = np.arange(0, sim_control_CZ.Z_rotations_length(), sim_step_new)[-1] + sim_step_new
         intervals_list = np.append(intervals_list,[actual_Z_rotations_length/2,actual_Z_rotations_length/2])
         amp_Z_rotation=[0,0]
         if sim_control_CZ.sigma_q0() != 0:
@@ -273,9 +265,10 @@ def compute_propagator(arglist):
     if sim_control_CZ.total_idle_time() != 0:
         actual_total_idle_time = np.arange(0,sim_control_CZ.total_idle_time(),sim_step_new)[-1]+sim_step_new
         intervals_list = np.append(intervals_list,[actual_total_idle_time/2,actual_total_idle_time/2])
-        amp_idle_time=[0,0]
-        double_sided = czd_double_sided                # idle time is single-sided so we save the czd_double_sided value, set it to False
-                                                                    # and later restore it to the original value
+        amp_idle_time = [0, 0]
+        # idle time is single-sided so we save the czd_double_sided value, set it to False
+        # and later restore it to the original value
+        double_sided = czd_double_sided
         log.debug('Changing fluxlutman czd_double_sided_{} value to {}'.format(which_gate, False))
         fluxlutman.set('czd_double_sided_{}'.format(which_gate), False)
         if sim_control_CZ.sigma_q0() != 0:
@@ -298,14 +291,42 @@ def compute_propagator(arglist):
     #                          title='Pulse with distortions and shift due to fluxbias_q0, difference',
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
 
+    # if gates_num > 1:
+    #     orig_size = np.size(intervals_list)
+    #     idle_size = int(gates_interval / sim_step_new)
+    #     intervals_list = np.full(orig_size * gates_num + idle_size * (gates_num - 1), sim_step_new)
+    #     amp_append = np.concatenate((np.zeros(idle_size), amp_final[:orig_size]))
+    #     for gate in range(gates_num - 1):
+    #         amp_final = np.append(amp_final, amp_append)
+
+    if gates_num > 1:
+        # This is intended to make the simulation faster by skipping
+        # all the amp = 0 steps, verified to encrease sim speed
+        # 4.7s/data point -> 4.0s/data point
+        # Errors in simulation outcomes are < 1e-10
+
+        actual_gates_interval = np.arange(0, gates_interval, sim_step_new)[-1] + sim_step_new
+
+        # We add an extra small step to ensure the amp signal goes to
+        # zero first
+        interval_append = np.concatenate(([sim_step_new, actual_gates_interval - sim_step_new], intervals_list))
+        amp_append = np.concatenate(([0, 0], amp_final))
+
+        # Append arbitrary number of same gate
+        for gate in range(gates_num - 1):
+            amp_final = np.append(amp_final, amp_append)
+            intervals_list = np.append(intervals_list, interval_append)
 
     t_final = np.sum(intervals_list)        # actual overall gate length
 
 
-    ### Obtain jump operators for Lindblad equation
+    # Obtain jump operators for Lindblad equation
     c_ops = czf.return_jump_operators(sim_control_CZ=sim_control_CZ, amp_final=amp_final, fluxlutman=fluxlutman, which_gate=which_gate)
 
-    ### Compute propagator
+    # for waveformcomparizon purposes
+    # sim_control_CZ.sim_waveform(amp_final)
+
+    # Compute propagator
     U_final = czf.time_evolution_new(
         c_ops=c_ops,
         sim_control_CZ=sim_control_CZ,
@@ -316,9 +337,10 @@ def compute_propagator(arglist):
         sim_step=sim_step_new,
         intervals_list=intervals_list,
         which_gate=which_gate)
-    #print(czf.verify_CPTP(U_superop_average))    # simple check of CPTP property
+    # print(czf.verify_CPTP(U_superop_average))    # simple check of CPTP property
 
     return [U_final, t_final]
+
 
 def get_f_pulse_double_sided(fluxlutman,theta_i, which_gate: str = 'NE'):
     cz_lambda_2 = fluxlutman.get('cz_lambda_2_{}'.format(which_gate))
@@ -327,7 +349,6 @@ def get_f_pulse_double_sided(fluxlutman,theta_i, which_gate: str = 'NE'):
     cz_theta_f = fluxlutman.get('cz_theta_f_{}'.format(which_gate))
     czd_length_ratio = fluxlutman.get('czd_length_ratio_{}'.format(which_gate))
     q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
-    log.warning(type(czd_length_ratio))
     thetawave_A = wfl.martinis_flux_pulse(
         length=cz_length*czd_length_ratio,
         lambda_2=cz_lambda_2,
@@ -356,15 +377,15 @@ def get_f_pulse_double_sided(fluxlutman,theta_i, which_gate: str = 'NE'):
     return amp
 
 
-
 class CZ_trajectory_superoperator(det.Soft_Detector):
-    def __init__(self,
+    def __init__(
+        self,
         fluxlutman,
         sim_control_CZ,
         fluxlutman_static,
         fitted_stepresponse_ty=None,
-        qois='all',
-        ):
+        qois='all'
+    ):
         """
         Detector for simulating a CZ trajectory.
         Args:
@@ -380,10 +401,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         Structure: compute input parameters necessary to compute time evolution (propagator), then compute quantities of interest
         Returns: quantities of interest
         """
-        super().__init__()
 
-        self.which_gate = sim_control_CZ.which_gate()  # compatibility with new fluxlutman
-        self.simstep_div = sim_control_CZ.simstep_div()
+        super().__init__()
 
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
@@ -397,7 +416,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             self.value_names = list(np.array(self.value_names)[self.qoi_mask])
             self.value_units = list(np.array(self.value_units)[self.qoi_mask])
 
-
         self.fluxlutman = fluxlutman
         self.fluxlutman_static = fluxlutman_static
         self.sim_control_CZ = sim_control_CZ
@@ -405,22 +423,23 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         if fitted_stepresponse_ty is None:
             self.fitted_stepresponse_ty = [np.array(1), np.array(1)]
         else:
-            self.fitted_stepresponse_ty = fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
-                                                                      # as a function of time (=t)
+            # list of 2 elements: stepresponse (=y) as a function of time (=t)
+            self.fitted_stepresponse_ty = fitted_stepresponse_ty
 
     def acquire_data_point(self, **kw):
 
-        ### Discretize average (integral) over a Gaussian distribution
+        # Discretize average (integral) over a Gaussian distribution
         mean = 0
         sigma_q0 = self.sim_control_CZ.sigma_q0()
         sigma_q1 = self.sim_control_CZ.sigma_q1()          # one for each qubit, in units of Phi_0
 
         qoi_plot = []    # used to verify convergence properties. If len(n_sampling_gaussian_vec)==1, it is useless
-        n_sampling_gaussian_vec = self.sim_control_CZ.n_sampling_gaussian_vec()      # 11 guarantees excellent convergence.
-                                                                                          # We choose it odd so that the central point of the Gaussian is included.
-                                                                                          # Always choose it odd
 
-        # This for seems useless...
+        # 11 guarantees excellent convergence.
+        # We choose it odd so that the central point of the Gaussian is included.
+        # Always choose it odd
+        n_sampling_gaussian_vec = self.sim_control_CZ.n_sampling_gaussian_vec()
+
         for n_sampling_gaussian in n_sampling_gaussian_vec:
             # If sigma=0 there's no need for sampling
             if sigma_q0 != 0:
@@ -440,13 +459,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 delta_x_q1 = 1
                 values_gaussian_q1 = np.array([1])
 
+            # This is actually the input that was parallelized in an old version.
+            # Currently it just creates a list that is provided sequentially to compute_propagator
+            input_to_parallelize = []
 
-
-            input_to_parallelize = []               # This is actually the input that was parallelized in an old version.
-                                                    # Currently it just creates a list that is provided sequentially to compute_propagator
             weights=[]
             number=-1           # used to number instruments that are created in the parallelization, to avoid conflicts in the cluster
-
 
             for j_q0 in range(len(samplingpoints_gaussian_q0)):
                 fluxbias_q0 = samplingpoints_gaussian_q0[j_q0]                     # q0 fluxing qubit
@@ -458,15 +476,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                                    'fluxlutman': self.fluxlutman,
                                    'fluxlutman_static': self.fluxlutman_static,
                                    'sim_control_CZ': self.sim_control_CZ,
-                                   'fitted_stepresponse_ty': self.fitted_stepresponse_ty,
-                                   'which_gate': self.which_gate,
-                                   'simstep_div': self.simstep_div}
+                                   'fitted_stepresponse_ty': self.fitted_stepresponse_ty}
 
                     weight = values_gaussian_q0[j_q0]*delta_x_q0 * values_gaussian_q1[j_q1]*delta_x_q1
                     weights.append(weight)
 
                     input_to_parallelize.append(input_point)
-
 
             U_final_vec = []
             t_final_vec = []
@@ -475,51 +490,49 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 U_final_vec.append(result_list[0])
                 t_final_vec.append(result_list[1])
 
+            t_final = t_final_vec[0]  # equal for all entries, we need it to compute phases in the rotating frame
+            # needed to compute phases in the rotating frame, not used anymore
+            # w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.fluxlutman_static, self.sim_control_CZ, which_gate=self.sim_control_CZ.which_gate())
 
-            t_final = t_final_vec[0]                                        # equal for all entries, we need it to compute phases in the rotating frame
-            #w_q0, w_q1, alpha_q0, alpha_q1 = czf.dressed_frequencies(self.fluxlutman, self.fluxlutman_static, self.sim_control_CZ, which_gate=self.which_gate)     # needed to compute phases in the rotating frame
-            																										 # not used anymore
-
-
-            ## Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
-            #czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,self.fluxlutman,self.fluxlutman_static, which_gate=self.which_gate)
-
+            # Reproducing Leo's plots of cond_phase and leakage vs. flux offset (I order vs II order)
+            # czf.sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,self.fluxlutman,self.fluxlutman_static, which_gate=self.sim_control_CZ.which_gate())
 
             for i in range(len(U_final_vec)):
                 if U_final_vec[i].type == 'oper':
                     U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
                 U_final_vec[i] = U_final_vec[i] * weights[i]
             U_superop_average = sum(U_final_vec)              # computing resulting average propagator
-            #print(czf.verify_CPTP(U_superop_average))
+            # print(czf.verify_CPTP(U_superop_average))
 
-            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, fluxlutman_static=self.fluxlutman_static, which_gate=self.which_gate)
+            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, fluxlutman_static=self.fluxlutman_static, which_gate=self.sim_control_CZ.which_gate())
 
-            if self.sim_control_CZ.look_for_minimum():                             # if we look only for the minimum avgatefid_pc in the heat maps,
-                                                                                        # then we optimize the search via higher-order cost function
-                cost_func_val = (np.log10(1-qoi['avgatefid_compsubspace_pc']))**4       # sign removed for even powers
+            # if we look only for the minimum avgatefid_pc in the heat maps,
+            # then we optimize the search via higher-order cost function
+            if self.sim_control_CZ.cost_func() is not None:
+                cost_func_val = self.sim_control_CZ.cost_func()(qoi)
+            elif self.sim_control_CZ.look_for_minimum():
+                cost_func_val = (np.log10(1 - qoi['avgatefid_compsubspace_pc']))**4  # sign removed for even powers
             else:
-                cost_func_val = (-np.log10(1-qoi['avgatefid_compsubspace_pc']))
+                cost_func_val = (-np.log10(1 - qoi['avgatefid_compsubspace_pc']))
 
             quantities_of_interest = [cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100,
-                             qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'],
-                             qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100,
-                             qoi['cond_phase02'], qoi['coherent_leakage11']*100, qoi['offset_difference']*100, qoi['missing_fraction']*100,
-                             qoi['population_transfer_12_21']*100,qoi['population_transfer_12_03']*100,
-                             qoi['phase_diff_12_02'], qoi['phase_diff_21_20'], qoi['cond_phase12'], qoi['cond_phase21'], qoi['cond_phase03'], qoi['cond_phase20']]
-            qoi_vec=np.array(quantities_of_interest)
+                qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'],
+                qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100,
+                qoi['cond_phase02'], qoi['coherent_leakage11']*100, qoi['offset_difference']*100, qoi['missing_fraction']*100,
+                qoi['population_transfer_12_21']*100,qoi['population_transfer_12_03']*100,
+                qoi['phase_diff_12_02'], qoi['phase_diff_21_20'], qoi['cond_phase12'], qoi['cond_phase21'], qoi['cond_phase03'], qoi['cond_phase20']
+            ]
+            qoi_vec = np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
 
+            # To study the effect of the coherence of leakage on repeated CZs (simpler than simulating a full RB experiment):
+            # czf.repeated_CZs_decay_curves(U_superop_average,t_final,self.fluxlutman,self.fluxlutman_static, which_gate=self.sim_control_CZ.which_gate())
 
-            ## To study the effect of the coherence of leakage on repeated CZs (simpler than simulating a full RB experiment):
-            #czf.repeated_CZs_decay_curves(U_superop_average,t_final,self.fluxlutman,self.fluxlutman_static, which_gate=self.which_gate)
-
-
-            #czf.plot_spectrum(self.fluxlutman,self.fluxlutman_static, which_gate=self.which_gate)
-
+            # czf.plot_spectrum(self.fluxlutman,self.fluxlutman_static, which_gate=self.sim_control_CZ.which_gate())
 
         qoi_plot = np.array(qoi_plot)
 
-        ## Uncomment to study the convergence properties of averaging over a Gaussian
+        # Uncomment to study the convergence properties of averaging over a Gaussian
         # for i in range(len(qoi_plot[0])):
         #     czf.plot(x_plot_vec=[n_sampling_gaussian_vec],
         #                   y_plot_vec=[qoi_plot[:,i]],
@@ -536,3 +549,4 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         else:
             return return_values
+

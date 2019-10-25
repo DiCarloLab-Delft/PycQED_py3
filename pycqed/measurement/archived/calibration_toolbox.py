@@ -548,3 +548,38 @@ def mixer_skewness_calibration(generator_frequency, sideband_frequency=.1,
     return phi, alpha
 
 
+
+def fine_reso_freq_range(start_freq,stop_freq,target_freq=None,precise_range=5e6,verbose = False):
+    '''
+    Create a finer frequency range around the resonator based on the previous resonator position.
+    Please use start_freq < stop_freq.
+    start_freq and stop_freq are both in Hertz
+    '''
+    if (target_freq == None):
+        previous_timestamp = a_tools.latest_data(contains='Resonator_scan', return_timestamp=True)[0]
+        reso_dict = {'f_res_fit':'Fitted Params HM.f0.value'}
+        numeric_params = ['f_res_fit']
+        data = (a_tools.get_data_from_timestamp_list([previous_timestamp], reso_dict,
+                                        numeric_params=numeric_params, filter_no_analysis=False))
+        precise_range = precise_range
+        reso_freq = data['f_res_fit'][0]*1e9
+    else:
+        reso_freq = target_freq
+    if verbose:
+        print('Making a fine list around '+str(reso_freq/1e9)+' GHz')
+    if reso_freq == None:
+        freq_list_res = np.arange(start_freq,stop_freq,2e5) # Straight part fast, because reso = None
+    elif reso_freq < start_freq or reso_freq > stop_freq:
+        freq_list_res = np.arange(start_freq,stop_freq,2e5) # Straight part fast, because reso out of range
+    elif reso_freq <= start_freq + precise_range/2.:
+        freq_list_res = np.hstack([np.arange(start_freq,reso_freq+precise_range/2.,2.5e4), # Reso part precise
+              np.arange(reso_freq+precise_range/2.,stop_freq,2e5)]) # Straight part fast
+    elif reso_freq >= stop_freq - precise_range/2.:
+        freq_list_res = np.hstack([np.arange(start_freq,reso_freq-precise_range/2.,2e5), # Straight part fast
+              np.arange(reso_freq-precise_range/2.,stop_freq,2.5e4)]) # Reso part precise
+    else:
+        freq_list_res = np.hstack([np.arange(start_freq,reso_freq-precise_range/2.,2e5), # Straight part fast
+              np.arange(reso_freq-precise_range/2.,reso_freq+precise_range/2.,2.5e4), # Reso part precise
+              np.arange(reso_freq+precise_range/2.,stop_freq,2e5)]) # Straight part fast
+
+    return freq_list_res
