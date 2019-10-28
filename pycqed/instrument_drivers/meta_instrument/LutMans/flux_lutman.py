@@ -1364,7 +1364,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
     def get_guesses_from_cz_sim(
             self, MC, fluxlutman_static, which_gate,
             n_points=200, theta_f_lims=[30, 180], lambda_2_lims=[-1.5, 1.5],
-            lambda_3_init=0, sim_control_CZ_pars=None):
+            lambda_3_init=0, sim_control_CZ_pars=None, label=None):
         """
         Runs an adaptive sampling of the CZ simulation by sweeping
         cz_theta_f_{which_gate} and and cz_lambda_2_{which_gate}
@@ -1412,7 +1412,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         }
         MC.set_adaptive_function_parameters(adaptive_pars)
 
-        label = 'auto_cz_sim_{}'.format(sim_control_CZ.name)
+        if label is None:
+            label = 'auto_cz_sim_{}'.format(sim_control_CZ.name)
 
         data = MC.run(
             label,

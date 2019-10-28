@@ -245,6 +245,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_contour_phase: bool = True,
                 plt_contour_L1: bool = False,
                 plt_optimal_values: bool = True,
+                plt_optimal_values_max: int = None,
                 clims: dict = None,
                 find_local_optimals: bool = True):
 
@@ -252,6 +253,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.plt_contour_phase = plt_contour_phase
         self.plt_contour_L1 = plt_contour_L1
         self.plt_optimal_values = plt_optimal_values
+        self.plt_optimal_values_max = plt_optimal_values_max
         self.clims = clims
         self.find_local_optimals = find_local_optimals
 
@@ -409,6 +411,10 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 optimal_pnts = self.proc_data_dict['optimal_pnts']
                 optimal_pars = 'Optimal Parameters:'
                 for m, optimal_pnt in enumerate(optimal_pnts):
+                    # Handy to limit the number of optimal pnts
+                    # being printed when a lot of optimal values are found
+                    if self.plt_optimal_values_max is not None and m > self.plt_optimal_values_max:
+                        break
                     optimal_pars += '\nPoint #{}'.format(m)
                     for key, val in optimal_pnt.items():
                         optimal_pars += '\n{}: {:4.4f} {}'.format(key, val['value'], val['unit'])
@@ -426,6 +432,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 }
 
             if self.find_local_optimals:
+                # if np.size(self.proc_data_dict['optimal_idxs']) != 0:
                 clusters_pnts_x = np.array([])
                 clusters_pnts_y = np.array([])
                 clusters_pnts_colors = np.array([])
@@ -449,8 +456,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     'c': clusters_pnts_colors
                 }
 
-                x_optimal = self.proc_data_dict['x'][self.proc_data_dict['optimal_idxs']]
-                y_optimal = self.proc_data_dict['y'][self.proc_data_dict['optimal_idxs']]
+                x_optimal = x[self.proc_data_dict['optimal_idxs']]
+                y_optimal = y[self.proc_data_dict['optimal_idxs']]
 
                 self.plot_dicts[val_name + '_optimal_pnts_annotate'] = {
                     'ax_id': val_name,
@@ -675,8 +682,8 @@ def get_optimal_pnts_indxs(
         cond_phase_arr,
         L1_arr,
         target_phase=180,
-        phase_thr=10,
-        L1_thr=1,
+        phase_thr=5,
+        L1_thr=0.5,
         clustering_thr=10):
     """
     target_phase and low L1 need to match roughtly cost function's minimums
@@ -691,54 +698,68 @@ def get_optimal_pnts_indxs(
     clustering_thr: unit = deg, represents distance between points on the
         landscape (lambda_2 gets normalized to [0, 360])
     """
-    x_pnts = np.array(theta_f_arr)
-    y_pnts = np.array(lambda_2_arr)
+    x = np.array(theta_f_arr)
+    y = np.array(lambda_2_arr)
+
+    # Normalize distance
+    x_norm = x / 360.
+    y_norm = y / (2 * np.pi)
 
     # Select points based low leakage and on how close to the
     # target_phase they are
-    sel = (cond_phase_arr > (target_phase - phase_thr)) & (cond_phase_arr < (target_phase + phase_thr))
-    sel = sel * (L1_arr < L1_thr)
-    selected_point_indx = np.where(sel)[0]
-    if np.shape(selected_point_indx)[0] == 0:
-        log.warning('No optimal points found with {} < target_phase < {} and L1 < {}.'.format(
-            target_phase - phase_thr, target_phase + phase_thr, L1_thr
-        ))
-        return np.array([]), np.array([])
-    elif np.shape(selected_point_indx)[0] == 1:
-        return np.array(selected_point_indx), np.array([])
-    else:
-        x_pnts_filtered = x_pnts[selected_point_indx]
-        y_pnts_filtered = y_pnts[selected_point_indx]
+    tolerances = [1, 2, 3, 4]
+    for tol in tolerances:
+        target_phase_min = target_phase - phase_thr * tol
+        target_phase_max = target_phase + phase_thr * tol
+        L1_thr *= tol
+        sel = (cond_phase_arr > (target_phase_min)) & (cond_phase_arr < (target_phase_max))
+        sel = sel * (L1_arr < L1_thr)
+        selected_point_indx = np.where(sel)[0]
+        if np.size(selected_point_indx) == 0:
+            log.warning('No optimal points found with {} < target_phase < {} and L1 < {}.'.format(
+                target_phase_min, target_phase_max, L1_thr))
+            if tol == tolerances[-1]:
+                return np.array([], dtype=int), np.array([], dtype=int)
+            log.warning('Increasing tolerance for phase_thr and L1 to x{}.'.format(tol + 1))
+        elif np.size(selected_point_indx) == 1:
+            return np.array(selected_point_indx), np.array([selected_point_indx])
+        else:
+            x_filt = x_norm[selected_point_indx]
+            y_filt = y_norm[selected_point_indx]
+            break
 
-        # Cluster point based on distance
+    # Cluster points based on distance
+    x_y_filt = np.transpose([x_filt, y_filt])
+    thresh = clustering_thr / 360.
+    clusters = hcluster.fclusterdata(x_y_filt, thresh, criterion="distance")
 
-        # Normalize distance
-        x_pnts_norm = x_pnts_filtered / 360.
-        y_pnts_norm = y_pnts_filtered / (2 * np.pi)
-        x_y_pnts_norm = np.transpose([x_pnts_norm, y_pnts_norm])
-        # clustering
-        thresh = clustering_thr / 360.
-        clusters = hcluster.fclusterdata(x_y_pnts_norm, thresh, criterion="distance")
+    cluster_id_min = np.min(clusters)
+    cluster_id_max = np.max(clusters)
+    clusters_by_indx = []
+    optimal_idxs = []
+    optimal_cost_func_values = []
+    av_costfn_vals = []
+    av_L1 = []
+    for cluster_id in range(cluster_id_min, cluster_id_max + 1):
+        cluster_indxs = np.where(clusters == cluster_id)
+        indxs_in_orig_array = selected_point_indx[cluster_indxs]
 
-        cluster_id_min = np.min(clusters)
-        cluster_id_max = np.max(clusters)
-        clusters_by_indx = []
-        optimal_idxs = []
-        optimal_cost_func_values = []
-        for cluster_id in range(cluster_id_min, cluster_id_max + 1):
-            cluster_pnts_indxs = np.where(clusters == cluster_id)
-            indxs_in_orig_array = selected_point_indx[cluster_pnts_indxs]
+        min_indx = np.argmin(cost_func_arr[indxs_in_orig_array])
+        clusters_by_indx.append(indxs_in_orig_array)
 
-            clusters_by_indx.append(indxs_in_orig_array)
-            min_indx = np.argmin(cost_func_arr[indxs_in_orig_array])
+        optimal_idxs.append(indxs_in_orig_array[min_indx])
+        optimal_cost_func_values.append(cost_func_arr[indxs_in_orig_array[min_indx]])
 
-            optimal_idxs.append(indxs_in_orig_array[min_indx])
-            optimal_cost_func_values.append(cost_func_arr[indxs_in_orig_array[min_indx]])
+        sq_dist = (x_norm - x_norm[min_indx])**2 + (y_norm - y_norm[min_indx])**2
+        neighbors_indx = np.where(sq_dist < (thresh * 2.5)**2)
+        av_L1.append(np.average(L1_arr[neighbors_indx]))
+        av_costfn_vals.append(np.average(cost_func_arr[neighbors_indx]))
 
-    # Sorting
-    # NB: Maybe the sorting should be a weighted by the number
-    # of point in each cluster
-    optimal_idxs = np.array(optimal_idxs)[np.argsort(optimal_cost_func_values)]
-    clusters_by_indx = np.array(clusters_by_indx)[np.argsort(optimal_cost_func_values)]
+    w1 = 0.5 * np.array(av_costfn_vals) / np.min(av_costfn_vals)
+    w2 = 0.5 * np.array(av_L1) / np.max(av_L1)
+
+    sort_by = w1 + w2
+    optimal_idxs = np.array(optimal_idxs)[np.argsort(sort_by)]
+    clusters_by_indx = np.array(clusters_by_indx)[np.argsort(sort_by)]
 
     return optimal_idxs, clusters_by_indx
