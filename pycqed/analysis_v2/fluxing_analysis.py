@@ -20,6 +20,8 @@ import scipy.cluster.hierarchy as hcluster
 from matplotlib import colors
 from copy import deepcopy
 from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
+from pycqed.utilities import general as gen
+from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 
 import logging
 
@@ -247,7 +249,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_optimal_values: bool = True,
                 plt_optimal_values_max: int = None,
                 clims: dict = None,
-                find_local_optimals: bool = True):
+                find_local_optimals: bool = True,
+                plt_optimal_waveforms: bool = False):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
@@ -256,6 +259,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.plt_optimal_values_max = plt_optimal_values_max
         self.clims = clims
         self.find_local_optimals = find_local_optimals
+        self.plt_optimal_waveforms = plt_optimal_waveforms
 
         cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
         'cost func.', 'cost function', 'Cost function', 'Cost function value'}
@@ -466,6 +470,42 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     'x': x_optimal,
                     'y': y_optimal
                 }
+        if self.plt_optimal_waveforms and self.proc_data_dict['optimal_waveforms_amp']:
+            # Plot individual waveforms
+            for opt_id, optimal_waveform in enumerate(self.proc_data_dict['optimal_waveforms_amp']):
+                ax_id = 'waveform_optimal_{}'.format(opt_id)
+                self.plot_dicts[ax_id] = {
+                    'ax_id': ax_id,
+                    'plotfn': self.plot_line,
+                    'yvals': self.proc_data_dict['optimal_waveforms_amp'][opt_id],
+                    'xvals': self.proc_data_dict['optimal_waveforms_time'][opt_id],
+                    'xlabel': self.proc_data_dict['xlabel'],
+                    'x_unit': self.proc_data_dict['xunit'],
+                    'ylabel': self.proc_data_dict['ylabel'],
+                    'y_unit': self.proc_data_dict['yunit'],
+                    'title': '{}\n{}\nOptimal #{} waveform'.format(
+                        self.timestamp,
+                        self.proc_data_dict['measurementstring'],
+                        opt_id),
+                    'marker': '.'
+                }
+            # Plot all together for comparison
+            ax_id = 'waveform_optimal_all'
+            self.plot_dicts[ax_id] = {
+                'ax_id': ax_id,
+                'plotfn': self.plot_line,
+                'yvals': self.proc_data_dict['optimal_waveforms_amp'],
+                'xvals': self.proc_data_dict['optimal_waveforms_time'],
+                'xlabel': self.proc_data_dict['xlabel'],
+                'x_unit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['ylabel'],
+                'y_unit': self.proc_data_dict['yunit'],
+                'title': '{}\n{}\nOptimal waveforms'.format(
+                    self.timestamp,
+                    self.proc_data_dict['measurementstring']),
+                'marker': '.',
+                'do_legend': True
+            }
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
@@ -504,7 +544,6 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     optimal_idxs, clusters_by_indx = get_optimal_pnts_indxs(
                         theta_f_arr=x,
                         lambda_2_arr=y,
-                        cost_func_arr=z,
                         cond_phase_arr=cond_phase_arr,
                         L1_arr=L1_arr)
                     self.proc_data_dict['clusters_by_indx'] = clusters_by_indx
@@ -520,6 +559,43 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     for k, measured_value in enumerate(self.proc_data_dict['measured_values']):
                         optimal_pnt[self.proc_data_dict['value_names'][k]] = {'value': measured_value[optimal_idx], 'unit': self.proc_data_dict['value_units'][k]}
                     self.proc_data_dict['optimal_pnts'].append(optimal_pnt)
+
+                # Generate waveforms for best optimal_pnts
+                try:
+                    timestamp = self.raw_data_dict['timestamps'][0]
+                    fluxlutman = flm.HDAWG_Flux_LutMan('flux_lm_auto')
+                    ignore_pars = {'AWG', 'instr_distortion_kernel', 'instr_partner_lutman'}
+                    waveform_flux_lm_name = 'flux_lm'
+                    gen.load_settings_onto_instrument_v2(
+                        fluxlutman,
+                        load_from_instr=waveform_flux_lm_name,
+                        timestamp=timestamp,
+                        ignore_pars=ignore_pars)
+                    x_par_name = self.proc_data_dict['xlabel']
+                    y_par_name = self.proc_data_dict['ylabel']
+                    # Maybe there is a better way to figure out which gate was simulated
+                    which_gates = {'NE', 'SE', 'NW', 'SW'}
+                    which_gate = x_par_name[-2:]
+                    if which_gate not in which_gates:
+                        which_gate = y_par_name[-2:]
+                    fluxlutman.set('cz_phase_corr_length_{}'.format(which_gate), 0)
+                    waveforms = []
+                    times = []
+                    for optimal_pnt in self.proc_data_dict['optimal_pnts']:
+                        for par_name in [x_par_name, y_par_name]:
+                            fluxlutman.set(par_name, optimal_pnt[par_name]['value'])
+                        fluxlutman.generate_standard_waveforms()
+                        waveform = fluxlutman._gen_cz(which_gate=which_gate)
+                        waveforms.append(waveform)
+                        time = np.cumsum(np.full(np.size(waveform), 1 / fluxlutman.sampling_rate()))
+                        times.append(time)
+                    self.proc_data_dict['optimal_waveforms_amp'] = waveforms
+                    self.proc_data_dict['optimal_waveforms_time'] = times
+                    fluxlutman.close()
+                except Exception as e:
+                    log.warning('Could not generate optimal_pnts wave forms.')
+                    # log.warning(e)
+                    raise e
 
         self.proc_data_dict['x_int'] = x_int
         self.proc_data_dict['y_int'] = y_int
@@ -678,7 +754,6 @@ def annotate_pnts(txt, x, y,
 def get_optimal_pnts_indxs(
         theta_f_arr,
         lambda_2_arr,
-        cost_func_arr,
         cond_phase_arr,
         L1_arr,
         target_phase=180,
@@ -690,11 +765,12 @@ def get_optimal_pnts_indxs(
     target_phase and low L1 need to match roughtly cost function's minimums
 
     Args:
-    cost_func_arr: bestter = lower values
-
     target_phase: unit = deg
+    phase_thr: unit = deg, only points with cond phase below this threshold
+        will be used for clustering
 
-    L1_thr: unit = %
+    L1_thr: unit = %, only points with leakage below this threshold
+        will be used for clustering
 
     clustering_thr: unit = deg, represents distance between points on the
         landscape (lambda_2 gets normalized to [0, 360])
@@ -748,7 +824,6 @@ def get_optimal_pnts_indxs(
 
         cluster_indxs = np.where(clusters == cluster_id)
         indxs_in_orig_array = selected_points_indxs[cluster_indxs]
-        # min_indx = np.argmin(cost_func_arr[indxs_in_orig_array])
         min_indx = np.argmin(L1_arr[indxs_in_orig_array])
 
         optimal_idx = indxs_in_orig_array[min_indx]
