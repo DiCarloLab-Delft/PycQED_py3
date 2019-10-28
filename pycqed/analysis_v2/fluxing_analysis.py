@@ -415,7 +415,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     # being printed when a lot of optimal values are found
                     if self.plt_optimal_values_max is not None and m > self.plt_optimal_values_max:
                         break
-                    optimal_pars += '\nPoint #{}'.format(m)
+                    optimal_pars += '\nOptimal #{}'.format(m)
                     for key, val in optimal_pnt.items():
                         optimal_pars += '\n{}: {:4.4f} {}'.format(key, val['value'], val['unit'])
                 self.plot_dicts[val_name + '_optimal_pars'] = {
@@ -682,9 +682,10 @@ def get_optimal_pnts_indxs(
         cond_phase_arr,
         L1_arr,
         target_phase=180,
-        phase_thr=5,
-        L1_thr=0.5,
-        clustering_thr=10):
+        phase_thr=10,
+        L1_thr=0.2,
+        clustering_thr=10,
+        tolerances=[1, 2, 3, 4]):
     """
     target_phase and low L1 need to match roughtly cost function's minimums
 
@@ -697,6 +698,10 @@ def get_optimal_pnts_indxs(
 
     clustering_thr: unit = deg, represents distance between points on the
         landscape (lambda_2 gets normalized to [0, 360])
+
+    tolerances: phase_thr and L1_thr will be multiplied by the values in
+    this list successively if no points are found for the first element
+    in the list
     """
     x = np.array(theta_f_arr)
     y = np.array(lambda_2_arr)
@@ -707,25 +712,24 @@ def get_optimal_pnts_indxs(
 
     # Select points based low leakage and on how close to the
     # target_phase they are
-    tolerances = [1, 2, 3, 4]
     for tol in tolerances:
-        target_phase_min = target_phase - phase_thr * tol
-        target_phase_max = target_phase + phase_thr * tol
+        phase_thr *= tol
         L1_thr *= tol
-        sel = (cond_phase_arr > (target_phase_min)) & (cond_phase_arr < (target_phase_max))
-        sel = sel * (L1_arr < L1_thr)
-        selected_point_indx = np.where(sel)[0]
-        if np.size(selected_point_indx) == 0:
-            log.warning('No optimal points found with {} < target_phase < {} and L1 < {}.'.format(
-                target_phase_min, target_phase_max, L1_thr))
+        cond_phase_abs_diff = np.abs(cond_phase_arr - target_phase)
+        sel = cond_phase_abs_diff <= phase_thr
+        sel = sel * (L1_arr <= L1_thr)
+        selected_points_indxs = np.where(sel)[0]
+        if np.size(selected_points_indxs) == 0:
+            log.warning('No optimal points found with  |target_phase - cond phase| < {} and L1 < {}.'.format(
+                phase_thr, L1_thr))
             if tol == tolerances[-1]:
                 return np.array([], dtype=int), np.array([], dtype=int)
             log.warning('Increasing tolerance for phase_thr and L1 to x{}.'.format(tol + 1))
-        elif np.size(selected_point_indx) == 1:
-            return np.array(selected_point_indx), np.array([selected_point_indx])
+        elif np.size(selected_points_indxs) == 1:
+            return np.array(selected_points_indxs), np.array([selected_points_indxs])
         else:
-            x_filt = x_norm[selected_point_indx]
-            y_filt = y_norm[selected_point_indx]
+            x_filt = x_norm[selected_points_indxs]
+            y_filt = y_norm[selected_points_indxs]
             break
 
     # Cluster points based on distance
@@ -737,28 +741,38 @@ def get_optimal_pnts_indxs(
     cluster_id_max = np.max(clusters)
     clusters_by_indx = []
     optimal_idxs = []
-    optimal_cost_func_values = []
-    av_costfn_vals = []
     av_L1 = []
+    av_cp_diff = []
+    neighbors_num = []
     for cluster_id in range(cluster_id_min, cluster_id_max + 1):
-        cluster_indxs = np.where(clusters == cluster_id)
-        indxs_in_orig_array = selected_point_indx[cluster_indxs]
 
-        min_indx = np.argmin(cost_func_arr[indxs_in_orig_array])
+        cluster_indxs = np.where(clusters == cluster_id)
+        indxs_in_orig_array = selected_points_indxs[cluster_indxs]
+        # min_indx = np.argmin(cost_func_arr[indxs_in_orig_array])
+        min_indx = np.argmin(L1_arr[indxs_in_orig_array])
+
+        optimal_idx = indxs_in_orig_array[min_indx]
+        optimal_idxs.append(optimal_idx)
+
         clusters_by_indx.append(indxs_in_orig_array)
 
-        optimal_idxs.append(indxs_in_orig_array[min_indx])
-        optimal_cost_func_values.append(cost_func_arr[indxs_in_orig_array[min_indx]])
-
-        sq_dist = (x_norm - x_norm[min_indx])**2 + (y_norm - y_norm[min_indx])**2
-        neighbors_indx = np.where(sq_dist < (thresh * 2.5)**2)
+        sq_dist = (x_norm - x_norm[optimal_idx])**2 + (y_norm - y_norm[optimal_idx])**2
+        neighbors_indx = np.where(sq_dist <= (thresh * 1.5)**2)
+        neighbors_num.append(np.size(neighbors_indx))
         av_L1.append(np.average(L1_arr[neighbors_indx]))
-        av_costfn_vals.append(np.average(cost_func_arr[neighbors_indx]))
+        av_cp_diff.append(np.average(cond_phase_abs_diff[neighbors_indx]))
 
-    w1 = 0.5 * np.array(av_costfn_vals) / np.min(av_costfn_vals)
-    w2 = 0.5 * np.array(av_L1) / np.max(av_L1)
+    # low leakage is best
+    w1 = 0.5 * np.array(av_L1) / np.max(av_L1)
+    # value more the points with more neighbors as a confirmation of
+    # low leakage area and also scores less points near the boundaries
+    # of the sampling area
+    w2 = 0.2 * (1 - np.flip(np.array(neighbors_num) / np.max(neighbors_num)))
+    # low phase diff is best
+    w3 = 0.3 * np.array(av_cp_diff) / np.max(av_cp_diff)
 
-    sort_by = w1 + w2
+    sort_by = w1 + w2 + w3
+
     optimal_idxs = np.array(optimal_idxs)[np.argsort(sort_by)]
     clusters_by_indx = np.array(clusters_by_indx)[np.argsort(sort_by)]
 
