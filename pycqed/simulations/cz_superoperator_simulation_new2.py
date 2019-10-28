@@ -256,15 +256,15 @@ def compute_propagator(arglist):
     # We add the single qubit rotations at the end of the pulse
     if sim_control_CZ.Z_rotations_length() != 0:
         actual_Z_rotations_length = np.arange(0, sim_control_CZ.Z_rotations_length(), sim_step_new)[-1] + sim_step_new
-        intervals_list = np.append(intervals_list,[actual_Z_rotations_length/2,actual_Z_rotations_length/2])
-        amp_Z_rotation=[0,0]
+        intervals_list = np.append(intervals_list, [sim_step_new, actual_Z_rotations_length - sim_step_new])
+        amp_Z_rotation = [0, 0]
         if sim_control_CZ.sigma_q0() != 0:
             amp_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
 
     # We add the idle time at the end of the pulse (even if it's not at the end. It doesn't matter)
     if sim_control_CZ.total_idle_time() != 0:
-        actual_total_idle_time = np.arange(0,sim_control_CZ.total_idle_time(),sim_step_new)[-1]+sim_step_new
-        intervals_list = np.append(intervals_list,[actual_total_idle_time/2,actual_total_idle_time/2])
+        actual_total_idle_time = np.arange(0, sim_control_CZ.total_idle_time(), sim_step_new)[-1] + sim_step_new
+        intervals_list = np.append(intervals_list, [sim_step_new, actual_total_idle_time - sim_step_new])
         amp_idle_time = [0, 0]
         # idle time is single-sided so we save the czd_double_sided value, set it to False
         # and later restore it to the original value
@@ -279,9 +279,9 @@ def compute_propagator(arglist):
     # We concatenate amp and f_pulse with the values they take during the Zrotations and idle_x
     # It comes after the previous line because of details of the function czf.shift_due_to_fluxbias_q0
     if sim_control_CZ.Z_rotations_length() != 0:
-        amp_final=np.concatenate((amp_final,amp_Z_rotation))
+        amp_final = np.concatenate((amp_final, amp_Z_rotation))
     if sim_control_CZ.total_idle_time() != 0:
-        amp_final=np.concatenate((amp_final,amp_idle_time))
+        amp_final = np.concatenate((amp_final, amp_idle_time))
 
     # czf.plot(x_plot_vec=[np.arange(0,np.size(intervals_list))],y_plot_vec=[amp_final],
     #                          title='Pulse with (possibly) single qubit rotations and idle time',
@@ -317,8 +317,10 @@ def compute_propagator(arglist):
             amp_final = np.append(amp_final, amp_append)
             intervals_list = np.append(intervals_list, interval_append)
 
-    t_final = np.sum(intervals_list)        # actual overall gate length
+    # plt.plot(np.cumsum(intervals_list), amp_final)
+    # plt.show()
 
+    t_final = np.sum(intervals_list)        # actual overall gate length
 
     # Obtain jump operators for Lindblad equation
     c_ops = czf.return_jump_operators(sim_control_CZ=sim_control_CZ, amp_final=amp_final, fluxlutman=fluxlutman, which_gate=which_gate)
