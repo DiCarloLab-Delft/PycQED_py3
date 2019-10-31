@@ -257,3 +257,24 @@ class SimControlCZ(Instrument):
         Sets the self.cost_func from the self.cost_func_str string
         """
         exec("self.cost_func(" + self.cost_func_str() + ")")
+
+
+def LJP(r, R_min, depth=1., p12=12, p6=6):
+    """
+    Lennard-Jones potential function
+    Added here to be used with adaptive sampling of a cost function that
+    diverges at zero and might get the adaptive learner stucked from
+    samping the rest of the landscape
+    """
+    return depth * ((R_min / r)**p12 - 2 * (R_min / r)**p6)
+
+
+def LJP_mod(r, R_min, depth=100., p12=12, p6=6):
+    """
+    Modiefied Lennard-Jones potential function
+    Modification: moved minum at zero and made positive
+    Added here to be used with adaptive sampling of a cost function that
+    diverges at zero and might get the adaptive learner stucked from
+    samping the rest of the landscape
+    """
+    return LJP(r + R_min, R_min, depth=depth, p12=p12, p6=p6) + depth

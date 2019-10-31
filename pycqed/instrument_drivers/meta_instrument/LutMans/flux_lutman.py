@@ -1363,8 +1363,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def get_guesses_from_cz_sim(
             self, MC, fluxlutman_static, which_gate,
-            n_points=200, theta_f_lims=[30, 180], lambda_2_lims=[-1.5, 1.5],
-            lambda_3_init=0, sim_control_CZ_pars=None, label=None):
+            n_points=200, theta_f_lims=[35, 180], lambda_2_lims=[-1.5, 1.5],
+            lambda_3_init=0, sim_control_CZ_pars=None, label=None,
+            min_distance=None):
         """
         Runs an adaptive sampling of the CZ simulation by sweeping
         cz_theta_f_{which_gate} and and cz_lambda_2_{which_gate}
@@ -1375,7 +1376,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             sim_control_CZ = self.parameters['instr_sim_control_CZ_{}'.format(which_gate)].get_instr()
             assert which_gate == sim_control_CZ.which_gate()
         else:
-            sim_control_CZ = scCZ.SimControlCZ(self.name + '_sim_control_CZ_{}'.format(which_gate))
+            sim_control_CZ = scCZ.SimControlCZ('sim_control_CZ_{}_{}'.format(which_gate, self.name))
             sim_control_CZ.which_gate(which_gate)
             MC.station.add_component(sim_control_CZ)
             self.set('instr_sim_control_CZ_{}'.format(which_gate), sim_control_CZ.name)
@@ -1387,7 +1388,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         sim_control_CZ.set_cost_func()
 
         # Create a CZ_trajectory_superoperator detector if it doesn't exist
-        qois = ['Cost func', 'Cond phase', 'L1']
+        qois = ['Cost func', 'Cond phase', 'L1', 'phase_q0']
         detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ,
             fluxlutman_static=fluxlutman_static, qois=qois)
 
@@ -1403,12 +1404,17 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         theta_f_saved = self.get('cz_theta_f_{}'.format(which_gate))
         self.set('cz_lambda_3_{}'.format(which_gate), 0)
 
+        if min_distance is None:
+            min_distance = 1 / np.sqrt(n_points) / 5
+
+        loss = adaptive.learner.learner2D.resolution_loss_function(min_distance=min_distance)
+
         adaptive_pars = {
             'adaptive_function': adaptive.Learner2D,
             'n_points': n_points,
             'bounds': [theta_f_lims, lambda_2_lims],
             'goal': lambda l: l.npoints > n_points,
-            'loss_per_triangle': None
+            'loss_per_triangle': loss
         }
         MC.set_adaptive_function_parameters(adaptive_pars)
 
@@ -1429,8 +1435,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt_contour_phase=True,
             find_local_optimals=True,
             clims={
-                'L1': [0, 5],
-                'missing_fraction': [0, 10],
+                'L1': [0, 1],
+                'missing_fraction': [0, 2],
                 'Cond phase': [0, 360]
             }
         )
@@ -1444,6 +1450,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self.set('cz_lambda_3_{}'.format(which_gate), lambda_3_saved)
         self.set('cz_lambda_2_{}'.format(which_gate), lambda_2_saved)
         self.set('cz_theta_f_{}'.format(which_gate), theta_f_saved)
+
+        # FIXME: Shouldn't you close the parameters???
 
         return coha.proc_data_dict['optimal_pnts']
 
