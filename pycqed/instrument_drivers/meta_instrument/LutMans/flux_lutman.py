@@ -8,6 +8,7 @@ from pycqed.simulations import cz_superoperator_simulation_new2 as cz_main
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ as scCZ
 import adaptive
 from pycqed.analysis_v2 import measurement_analysis as ma2
+from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 try:
@@ -18,6 +19,8 @@ from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import time
+from datetime import datetime
+import cma
 
 import logging
 log = logging.getLogger(__name__)
@@ -125,7 +128,7 @@ class Base_Flux_LutMan(Base_LutMan):
                     xlabel=xlab[0], xunit=xlab[1], ylabel='Amplitude',
                     yunit='dac val.')
             else:
-                logging.warning('Wave not in distorted wave dict')
+                log.warning('Wave not in distorted wave dict')
         # Plotting the normal one second ensures it is on top.
         QtPlot_win.add(
             x=x, y=y, name=wave_name,
@@ -424,7 +427,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             corr_pulse = phase_corr_square(
                 int_val=corr_int, nr_samples=corr_samples)
             if np.max(corr_pulse) > 0.5:
-                logging.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
+                log.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
                     np.max(corr_pulse)))
         else:
             corr_pulse = np.zeros(corr_samples)
@@ -918,7 +921,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         N.B. the implementation is specific to this type of AWG
         """
         if self.AWG() is None:
-            logging.warning('No AWG present, returning unity scale factor.')
+            log.warning('No AWG present, returning unity scale factor.')
             return 1
         channel_amp = self.cfg_awg_channel_amplitude()
         channel_range_pp = self.cfg_awg_channel_range()
@@ -930,7 +933,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if self.get_dac_val_to_amp_scalefactor() == 0:
                 # Give a warning and don't raise an error as things should not
                 # break because of this.
-            logging.warning('AWG amp to dac scale factor is 0, check "{}" '
+            log.warning('AWG amp to dac scale factor is 0, check "{}" '
                             'output amplitudes'.format(self.AWG()))
             return 1
         return 1/self.get_dac_val_to_amp_scalefactor()
@@ -973,7 +976,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             corr_pulse = phase_corr_square(
                 int_val=corr_int, nr_samples=corr_samples)
             if np.max(corr_pulse) > 0.5:
-                logging.warning('net-zero integral correction({:.2f}) larger than 0.5'.format(
+                log.warning('net-zero integral correction({:.2f}) larger than 0.5'.format(
                     np.max(corr_pulse)))
         else:
             corr_pulse = np.zeros(corr_samples)
@@ -1362,10 +1365,17 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         return values, units
 
     def get_guesses_from_cz_sim(
-            self, MC, fluxlutman_static, which_gate,
-            n_points=200, theta_f_lims=[35, 180], lambda_2_lims=[-1.5, 1.5],
-            lambda_3_init=0, sim_control_CZ_pars=None, label=None,
-            min_distance=None):
+            self,
+            MC,
+            fluxlutman_static,
+            which_gate,
+            n_points=199,
+            theta_f_lims=[35, 180],
+            lambda_2_lims=[-1., 1.],
+            sim_control_CZ_pars=None,
+            label=None,
+            min_distance=None,
+            optimize_phase_q0=False):
         """
         Runs an adaptive sampling of the CZ simulation by sweeping
         cz_theta_f_{which_gate} and and cz_lambda_2_{which_gate}
@@ -1380,6 +1390,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             sim_control_CZ.which_gate(which_gate)
             MC.station.add_component(sim_control_CZ)
             self.set('instr_sim_control_CZ_{}'.format(which_gate), sim_control_CZ.name)
+
+        if sim_control_CZ_pars is None or 'cost_func_str' not in sim_control_CZ_pars:
+            cost_func_str = "lambda qoi: LJP_mod(np.abs(qoi['phi_cond'] - 180) + qoi['L1'] * 100 /0.1, 180)"
+            sim_control_CZ.set('cost_func_str', cost_func_str)
 
         if sim_control_CZ_pars is not None:
             for key, val in sim_control_CZ_pars.items():
@@ -1419,9 +1433,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         MC.set_adaptive_function_parameters(adaptive_pars)
 
         if label is None:
-            label = 'auto_cz_sim_{}'.format(sim_control_CZ.name)
+            time_string = datetime.now().strftime('%f')
+            label = 'auto_cz_sim_{}_{}'.format(sim_control_CZ.name, time_string)
 
-        data = MC.run(
+        MC.run(
             label,
             mode='adaptive',
             exp_metadata={'adaptive_pars': adaptive_pars})
@@ -1433,27 +1448,75 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt_contour_L1=False,
             plt_optimal_values=True,
             plt_contour_phase=True,
+            plt_optimal_values_max=3,
             find_local_optimals=True,
+            plt_clusters=True,
+            cluster_from_interp=True,
+            rescore_spiked_optimals=True,
+            plt_optimal_waveforms_all=True,
+            waveform_flux_lm_name=self.name,
             clims={
                 'L1': [0, 1],
                 'missing_fraction': [0, 2],
-                'Cond phase': [0, 360]
+                'Cond phase': [0, 360],
+                'phase_q0': [0, 360]
             }
         )
+        print(coha.optimals_str(optimal_end=2))
 
-        for optimal_pnt in coha.proc_data_dict['optimal_pnts']:
-            optimal_pnt['cz_lambda_3_{}'.format(which_gate)] = {
-                'value': self.get('cz_lambda_3_{}'.format(which_gate)),
-                'unit': ''
+        if optimize_phase_q0:
+            log.info('Starting optimizer...')
+
+            cost_func_str = "lambda qoi: LJP_mod("
+            "np.abs(qoi['phi_cond'] - 180) + "
+            "qoi['L1'] * 100 /0.05 + "
+            "np.min([(qoi['phase_q0'] % 90), ((360 - qoi['phase_q0']) % 90)])"
+            ", 180)"
+            sim_control_CZ.set('cost_func_str', cost_func_str)
+
+            MC.set_sweep_functions([self['cz_theta_f_{}'.format(which_gate)],
+                                    self['cz_lambda_2_{}'.format(which_gate)],
+                                    self['cz_lambda_3_{}'.format(which_gate)]])
+
+            lambda_3_start = self.get('cz_lambda_3_{}'.format(which_gate))
+
+            optimal_pars_values = coha.proc_data_dict['optimal_pars_values']
+            lambda_2_start = optimal_pars_values['cz_lambda_2_{}'.format(which_gate)][0]
+            theta_f_start = optimal_pars_values['cz_theta_f_{}'.format(which_gate)][0]
+
+            adaptive_pars = {
+                'adaptive_function': cma.fmin,
+                'x0': [theta_f_start, lambda_2_start, lambda_3_start],
+                'sigma0': 1,
+                # options for the CMA algorithm can be found using
+                # "cma.CMAOptions()"
+                'minimize': True,
+                'options': {
+                    'maxfevals': 250,  # maximum function cals
+                    'ftarget': 5,
+                    # Scaling for individual sigma's
+                    'cma_stds': [5, 0.05, .1]},
             }
+
+            MC.set_adaptive_function_parameters(adaptive_pars)
+
+            optimizer_label = label + '_optimizer'
+
+            MC.run(optimizer_label,
+                    mode='adaptive',
+                    exp_metadata={'adaptive_pars': adaptive_pars})
+            a = ma.OptimizationAnalysis(label=optimizer_label, plot_all=True)
+            par_res = {par_name: a.optimization_result[0][i] for i, par_name in enumerate(a.parameter_names)}
+            mv_res = {mv: a.optimization_result[1][i] for i, mv in enumerate(a.value_names)}
 
         self.set('cz_lambda_3_{}'.format(which_gate), lambda_3_saved)
         self.set('cz_lambda_2_{}'.format(which_gate), lambda_2_saved)
         self.set('cz_theta_f_{}'.format(which_gate), theta_f_saved)
 
-        # FIXME: Shouldn't you close the parameters???
-
-        return coha.proc_data_dict['optimal_pnts']
+        if not optimize_phase_q0:
+            return coha.proc_data_dict['optimal_pars_values'], coha.proc_data_dict['optimal_measured_values']
+        else:
+            return par_res, mv_res
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):

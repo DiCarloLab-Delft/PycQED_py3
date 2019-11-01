@@ -22,6 +22,7 @@ from copy import deepcopy
 from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
 from pycqed.utilities import general as gen
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
+from datetime import datetime
 
 import logging
 
@@ -248,9 +249,12 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_contour_L1: bool = False,
                 plt_optimal_values: bool = True,
                 plt_optimal_values_max: int = None,
+                plt_clusters: bool = True,
                 clims: dict = None,
                 find_local_optimals: bool = True,
-                cluster_interp: bool = False,
+                cluster_from_interp: bool = False,
+
+                rescore_spiked_optimals: bool = False,
                 plt_optimal_waveforms_all: bool = False,
                 plt_optimal_waveforms: bool = False,
                 waveform_flux_lm_name: str = None):
@@ -260,15 +264,24 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.plt_contour_L1 = plt_contour_L1
         self.plt_optimal_values = plt_optimal_values
         self.plt_optimal_values_max = plt_optimal_values_max
+        self.plt_clusters = plt_clusters
 
         self.clims = clims
 
         self.find_local_optimals = find_local_optimals
-        self.cluster_interp = cluster_interp
+        self.cluster_from_interp = cluster_from_interp
 
+        self.rescore_spiked_optimals = rescore_spiked_optimals
         self.plt_optimal_waveforms = plt_optimal_waveforms
         self.plt_optimal_waveforms_all = plt_optimal_waveforms_all
         self.waveform_flux_lm_name = waveform_flux_lm_name
+
+        self._generate_waveform = False
+        if plt_optimal_waveforms or \
+                plt_optimal_waveforms_all or \
+                rescore_spiked_optimals:
+            self._generate_waveform = True
+            assert waveform_flux_lm_name is not None
 
         cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
         'cost func.', 'cost function', 'Cost function', 'Cost function value'}
@@ -420,22 +433,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     .union(self.offset_diff_names):
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
-            if self.plt_optimal_values and val_name in self.cost_func_Names:
-                if 'optimal_pnts' in self.proc_data_dict.keys():
-                    optimal_pnts = self.proc_data_dict['optimal_pnts']
-                    if 'optimal_warnings' in self.proc_data_dict.keys():
-                        optimal_warnings = self.proc_data_dict['optimal_warnings']
-                    else:
-                        optimal_warnings = np.full('', np.shape(optimal_pnts)[0])
-                    optimal_pars = 'Optimal Parameters:'
-                    for m, optimal_pnt in enumerate(optimal_pnts):
-                        # Handy to limit the number of optimal pnts
-                        # being printed when a lot of optimal values are found
-                        if self.plt_optimal_values_max is not None and m > self.plt_optimal_values_max:
-                            break
-                        optimal_pars += '\nOptimal #{}{}'.format(m, optimal_warnings[m])
-                        for key, val in optimal_pnt.items():
-                            optimal_pars += '\n{}: {:4.4f} {}'.format(key, val['value'], val['unit'])
+            if self.plt_optimal_values and \
+                    val_name in self.cost_func_Names:
                     self.plot_dicts[val_name + '_optimal_pars'] = {
                         'ax_id': val_name,
                         'ypos': -0.25,
@@ -443,49 +442,33 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                         'plotfn': self.plot_text,
                         'box_props': 'fancy',
                         'line_kws': {'alpha': 0},
-                        'text_string': optimal_pars,
+                        'text_string': self.optimals_str(optimal_end=self.plt_optimal_values_max),
                         'horizontalalignment': 'left',
                         'verticalaligment': 'top',
                         'fontsize': 14
                     }
 
-            if self.find_local_optimals and 'clusters_by_indx' in self.proc_data_dict.keys():
-                clusters_pnts_x = np.array([])
-                clusters_pnts_y = np.array([])
-                clusters_pnts_colors = np.array([])
-                clusters_by_indx = self.proc_data_dict['clusters_by_indx']
-                if self.cluster_interp:
-                    x_arr = self.proc_data_dict['x_int']
-                    y_arr = self.proc_data_dict['y_int']
-                else:
-                    x_arr = self.proc_data_dict['x']
-                    y_arr = self.proc_data_dict['y']
-                for l, cluster_by_indx in enumerate(clusters_by_indx):
-                    clusters_pnts_x = np.concatenate((clusters_pnts_x, x_arr[cluster_by_indx]))
-                    clusters_pnts_y = np.concatenate((clusters_pnts_y, y_arr[cluster_by_indx]))
-                    clusters_pnts_colors = np.concatenate((clusters_pnts_colors,
-                        np.full(np.shape(cluster_by_indx)[0], l)))
+            if self.plt_clusters:
                 self.plot_dicts[val_name + '_clusters'] = {
                     'ax_id': val_name,
                     'plotfn': scatter_pnts_overlay,
-                    'x': clusters_pnts_x,
-                    'y': clusters_pnts_y,
+                    'x': self.proc_data_dict['clusters_pnts_x'],
+                    'y': self.proc_data_dict['clusters_pnts_y'],
                     'color': None,
-                    'edgecolors': 'black',
+                    'edgecolors': None if self.cluster_from_interp else 'black',
                     'marker': 'o',
-                    'linewidth': 1,
-                    'c': clusters_pnts_colors
+                    # 'linewidth': 1,
+                    'c': self.proc_data_dict['clusters_pnts_colors']
                 }
-                x_optimal = x_arr[self.proc_data_dict['optimal_idxs']]
-                y_optimal = y_arr[self.proc_data_dict['optimal_idxs']]
-
+            if self.plt_optimal_values:
                 self.plot_dicts[val_name + '_optimal_pnts_annotate'] = {
                     'ax_id': val_name,
                     'plotfn': annotate_pnts,
-                    'txt': np.arange(np.shape(x_optimal)[0]),
-                    'x': x_optimal,
-                    'y': y_optimal
+                    'txt': np.arange(np.size(self.proc_data_dict['x_optimal'])),
+                    'x': self.proc_data_dict['x_optimal'],
+                    'y': self.proc_data_dict['y_optimal']
                 }
+
         if self.plt_optimal_waveforms_all:
             try:
                 # Plot all together for comparison
@@ -493,7 +476,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 self.plot_dicts[ax_id] = {
                     'ax_id': ax_id,
                     'plotfn': self.plot_line,
-                    'yvals': self.proc_data_dict['optimal_waveforms_amp'],
+                    'yvals': self.proc_data_dict['optimal_waveforms'],
                     'xvals': self.proc_data_dict['optimal_waveforms_time'],
                     'xlabel': 't',
                     'x_unit': 's',
@@ -510,12 +493,12 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         if self.plt_optimal_waveforms:
             try:
                 # Plot individual waveforms
-                for opt_id, optimal_waveform in enumerate(self.proc_data_dict['optimal_waveforms_amp']):
+                for opt_id, optimal_waveform in enumerate(self.proc_data_dict['optimal_waveforms']):
                     ax_id = 'waveform_optimal_{}'.format(opt_id)
                     self.plot_dicts[ax_id] = {
                         'ax_id': ax_id,
                         'plotfn': self.plot_line,
-                        'yvals': self.proc_data_dict['optimal_waveforms_amp'][opt_id],
+                        'yvals': self.proc_data_dict['optimal_waveforms'][opt_id],
                         'xvals': self.proc_data_dict['optimal_waveforms_time'][opt_id],
                         'xlabel': 't',
                         'x_unit': 's',
@@ -555,85 +538,77 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.proc_data_dict['x_int'] = x_int
         self.proc_data_dict['y_int'] = y_int
 
+        vln = self.proc_data_dict['value_names']
+        measured_vals = self.proc_data_dict['measured_values']
+        interp_vals = self.proc_data_dict['interpolated_values']
         # Processing for optimal points
-        if not self.cluster_interp:
-            where = [(name in self.cost_func_Names) for name in self.proc_data_dict['value_names']]
+        if not self.cluster_from_interp:
+            where = [(name in self.cost_func_Names) for name in vln]
             cost_func_indxs = np.where(where)[0][0]
-            cost_func = self.proc_data_dict['measured_values'][cost_func_indxs]
+            cost_func = measured_vals[cost_func_indxs]
 
-            where = [(name in self.cond_phase_names) for name in self.proc_data_dict['value_names']]
+            where = [(name in self.cond_phase_names) for name in vln]
             cond_phase_indx = np.where(where)[0][0]
-            cond_phase_arr = self.proc_data_dict['measured_values'][cond_phase_indx]
+            cond_phase_arr = measured_vals[cond_phase_indx]
 
-            where = [(name in self.L1_names) for name in self.proc_data_dict['value_names']]
+            where = [(name in self.L1_names) for name in vln]
             L1_indx = np.where(where)[0][0]
-            L1_arr = self.proc_data_dict['measured_values'][L1_indx]
+            L1_arr = measured_vals[L1_indx]
 
             theta_f_arr = self.proc_data_dict['x']
             lambda_2_arr = self.proc_data_dict['y']
 
             extract_optimals_from = 'measured_values'
         else:
-            where = [(name in self.cost_func_Names) for name in self.proc_data_dict['value_names']]
+            where = [(name in self.cost_func_Names) for name in vln]
             cost_func_indxs = np.where(where)[0][0]
-            cost_func = self.proc_data_dict['interpolated_values'][cost_func_indxs]
+            cost_func = interp_vals[cost_func_indxs]
             cost_func = interp_to_1D(z_int=cost_func)
 
-            where = [(name in self.cond_phase_names) for name in self.proc_data_dict['value_names']]
+            where = [(name in self.cond_phase_names) for name in vln]
             cond_phase_indx = np.where(where)[0][0]
-            cond_phase_arr = self.proc_data_dict['interpolated_values'][cond_phase_indx]
+            cond_phase_arr = interp_vals[cond_phase_indx]
             cond_phase_arr = interp_to_1D(z_int=cond_phase_arr)
 
-            where = [(name in self.L1_names) for name in self.proc_data_dict['value_names']]
+            where = [(name in self.L1_names) for name in vln]
             L1_indx = np.where(where)[0][0]
-            L1_arr = self.proc_data_dict['interpolated_values'][L1_indx]
+            L1_arr = interp_vals[L1_indx]
             L1_arr = interp_to_1D(z_int=L1_arr)
 
             theta_f_arr = self.proc_data_dict['x_int']
             lambda_2_arr = self.proc_data_dict['y_int']
 
-            theta_f_arr, lambda_2_arr = interp_to_1D(x_int=theta_f_arr, y_int=lambda_2_arr)
+            theta_f_arr, lambda_2_arr = interp_to_1D(x_int=theta_f_arr,
+                y_int=lambda_2_arr)
 
             extract_optimals_from = 'interpolated_values'
 
-        max_orig_indx = np.size(self.proc_data_dict['x_int'])
-
         if not self.find_local_optimals:
             optimal_idxs = np.array([cost_func.argmin()])
-            self.proc_data_dict['clusters_by_indx'] = None
+            clusters_by_indx = np.array([optimal_idxs])
         else:
             optimal_idxs, clusters_by_indx = get_optimal_pnts_indxs(
                 theta_f_arr=theta_f_arr,
                 lambda_2_arr=lambda_2_arr,
                 cond_phase_arr=cond_phase_arr,
-                L1_arr=L1_arr)
-            if self.cluster_interp:
-                clusters_by_indx = clusters_by_indx % max_orig_indx
-            if np.size(clusters_by_indx) != 0:
-                self.proc_data_dict['clusters_by_indx'] = clusters_by_indx
+                L1_arr=L1_arr
+            )
 
-        if np.size(optimal_idxs) != 0:
+        if self.cluster_from_interp:
+            x_arr = theta_f_arr
+            y_arr = lambda_2_arr
+        else:
+            x_arr = self.proc_data_dict['x']
+            y_arr = self.proc_data_dict['y']
 
-            optimal_pnts = []
-            for optimal_idx in optimal_idxs:
-                optimal_pnt = {
-                    self.proc_data_dict['xlabel']: {'value': theta_f_arr[optimal_idx], 'unit': self.proc_data_dict['xunit']},
-                    self.proc_data_dict['ylabel']: {'value': lambda_2_arr[optimal_idx], 'unit': self.proc_data_dict['yunit']}
-                }
-                for k, interp_values in enumerate(self.proc_data_dict[extract_optimals_from]):
-                    optimal_pnt[self.proc_data_dict['value_names'][k]] = {'value': np.ravel(interp_values)[optimal_idx], 'unit': self.proc_data_dict['value_units'][k]}
-                optimal_pnts.append(optimal_pnt)
-            self.proc_data_dict['optimal_pnts'] = optimal_pnts
-
-            if self.cluster_interp:
-                optimal_idxs = optimal_idxs % max_orig_indx
-
-            self.proc_data_dict['optimal_idxs'] = optimal_idxs
-
-            # Generate waveforms for best optimal_pnts
+        # Generate waveforms for best optimal_pnts
+        if self._generate_waveform:
             try:
                 timestamp = self.raw_data_dict['timestamps'][0]
-                fluxlutman = flm.HDAWG_Flux_LutMan('flux_lm_auto')
+                # In case the code breaks and the dummy fluxlutman is not closed
+                # We give it a "random" time based name
+                time_string = datetime.now().strftime('%Y%d%m_%H%M%S_%f')
+                fluxlutman = flm.HDAWG_Flux_LutMan('flux_lm_auto_{}'.format(time_string))
                 ignore_pars = {'AWG', 'instr_distortion_kernel', 'instr_partner_lutman'}
                 if self.waveform_flux_lm_name is None:
                     waveform_flux_lm_name = 'flux_lm'
@@ -651,13 +626,16 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 which_gate = x_par_name[-2:]
                 if which_gate not in which_gates:
                     which_gate = y_par_name[-2:]
+                # We don't simulate this
                 fluxlutman.set('cz_phase_corr_length_{}'.format(which_gate), 0)
                 waveforms = []
                 times = []
-                overly_spiked = []
-                for optimal_pnt in self.proc_data_dict['optimal_pnts']:
-                    for par_name in [x_par_name, y_par_name]:
-                        fluxlutman.set(par_name, optimal_pnt[par_name]['value'])
+                spiked_optimals = []
+
+                for ii in range(np.size(optimal_idxs)):
+                    fluxlutman.set(x_par_name, x_arr[optimal_idxs][ii])
+                    fluxlutman.set(y_par_name, y_arr[optimal_idxs][ii])
+
                     fluxlutman.generate_standard_waveforms()
                     waveform = fluxlutman._gen_cz(which_gate=which_gate)
                     waveforms.append(waveform)
@@ -666,32 +644,91 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     # NB: it is assumed 'No AWG present, returning unity scale factor.'
                     # NB2: this sorting very empirical
                     waveform_max = np.max(waveform)
-                    # overly_spiked.append(0)  # switch to this line to ignore spikes downscoring
-                    overly_spiked.append(np.any(waveform > 1.25) * (waveform_max - np.average(np.abs(waveform))) / waveform_max)
-                # The intended effect is to downscore optimal points
-                # with peaks but will affect any waveform with
-                # amplitude above 1
 
-                # Not very good to have this extrar rescoring here
-                # but otherwise too much would have to change
-                sort_by = overly_spiked
-                waveforms = np.array(waveforms)[np.argsort(sort_by)]
-                times = np.array(times)[np.argsort(sort_by)]
-                self.proc_data_dict['optimal_pnts'] = np.array(self.proc_data_dict['optimal_pnts'])[np.argsort(sort_by)]
-                self.proc_data_dict['optimal_idxs'] = np.array(self.proc_data_dict['optimal_idxs'])[np.argsort(sort_by)]
+                    # spiked_optimals.append(0)  # switch to this line to ignore spikes downscoring
+                    spiked_optimals.append(np.any(waveform > 1.25) * (waveform_max - np.average(np.abs(waveform))) / waveform_max)
 
-                if self.proc_data_dict['clusters_by_indx'] is not None:
-                    self.proc_data_dict['clusters_by_indx'] = np.array(self.proc_data_dict['clusters_by_indx'])[np.argsort(sort_by)]
-
-                self.proc_data_dict['optimal_warnings'] = ['[Likely too spiked!]' if spiked else '' for spiked in np.sort(overly_spiked)]
-
-                self.proc_data_dict['optimal_waveforms_amp'] = waveforms
-                self.proc_data_dict['optimal_waveforms_time'] = times
                 fluxlutman.close()
+
             except Exception as e:
                 log.warning('Could not generate optimal_pnts wave forms.')
-                # log.warning(e)
-                raise e
+                log.warning(e)
+
+            if self.rescore_spiked_optimals:
+
+                sort_indxs = np.argsort(spiked_optimals)
+                optimal_idxs = np.array(optimal_idxs)[sort_indxs]
+
+                clusters_by_indx = np.array(clusters_by_indx)[sort_indxs]
+                waveforms = np.array(waveforms)[sort_indxs]
+                times = np.array(times)[sort_indxs]
+
+        clusters_pnts_x = np.array([])
+        clusters_pnts_y = np.array([])
+        clusters_pnts_colors = np.array([])
+
+        for l, cluster_by_indx in enumerate(clusters_by_indx):
+            clusters_pnts_x = np.concatenate(
+                (clusters_pnts_x, x_arr[cluster_by_indx]))
+            clusters_pnts_y = np.concatenate(
+                (clusters_pnts_y, y_arr[cluster_by_indx]))
+            clusters_pnts_colors = np.concatenate(
+                (clusters_pnts_colors,
+                np.full(np.shape(cluster_by_indx)[0], l)))
+
+        # Add qoi in the proc_data_dict
+        self.proc_data_dict['optimal_waveforms'] = waveforms
+        self.proc_data_dict['optimal_waveforms_time'] = times
+
+        self.proc_data_dict['spiked_optimals'] = spiked_optimals
+
+        self.proc_data_dict['clusters_pnts_x'] = clusters_pnts_x
+        self.proc_data_dict['clusters_pnts_y'] = clusters_pnts_y
+        self.proc_data_dict['clusters_pnts_colors'] = clusters_pnts_colors
+
+        self.proc_data_dict['x_optimal'] = x_arr[optimal_idxs]
+        self.proc_data_dict['y_optimal'] = y_arr[optimal_idxs]
+
+        self.proc_data_dict['optimal_pars_values'] = {
+            self.proc_data_dict['xlabel']: x_arr[optimal_idxs],
+            self.proc_data_dict['ylabel']: y_arr[optimal_idxs]
+        }
+        self.proc_data_dict['optimal_pars_units'] = {
+            self.proc_data_dict['xlabel']: self.proc_data_dict['xunit'],
+            self.proc_data_dict['ylabel']: self.proc_data_dict['yunit']
+        }
+        vlu = self.proc_data_dict['value_units']
+        optimal_measured_values = {}
+        optimal_measured_units = {}
+        for k, quantity_arr in enumerate(self.proc_data_dict[extract_optimals_from]):
+            optimal_measured_values[vln[k]] = np.ravel(quantity_arr)[optimal_idxs]
+            optimal_measured_units[vln[k]] = vlu[k]
+        self.proc_data_dict['optimal_measured_values'] = optimal_measured_values
+        self.proc_data_dict['optimal_measured_units'] = optimal_measured_units
+
+        # Save qois
+
+        # Save quantities of interest
+        save_these = {
+            'optimal_pars_values',
+            'optimal_pars_units',
+            'optimal_measured_values',
+            'optimal_measured_units',
+            'spiked_optimals',
+            'optimal_waveforms',
+            'optimal_waveforms_time',
+            'clusters_pnts_y',
+            'clusters_pnts_x',
+            'clusters_pnts_colors'
+        }
+        pdd = self.proc_data_dict
+        quantities_of_interest = dict()
+        for save_this in save_these:
+            if save_this in pdd.keys():
+                if pdd[save_this] is not None:
+                    quantities_of_interest[save_this] = pdd[save_this]
+        if bool(quantities_of_interest):
+            self.proc_data_dict['quantities_of_interest'] = quantities_of_interest
 
     def plot_text(self, pdict, axs):
         """
@@ -723,6 +760,23 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         pfunc(x=plot_xpos, y=plot_ypos, s=plot_text_string,
               transform=axs.transAxes,
               bbox=box_props, fontdict=fontdict)
+
+    def optimals_str(self, optimal_start: int = 0, optimal_end: int = np.inf):
+        x_optimals = self.proc_data_dict['x_optimal']
+        y_optimals = self.proc_data_dict['y_optimal']
+        spiked = self.proc_data_dict['spiked_optimals']
+        optimals_max = np.size(x_optimals)
+        string = ''
+        for opt_idx in range(optimal_start, int(min(optimal_end + 1, optimals_max))):
+            string += '========================\n'
+            string += 'Optimal #{}{}\n'.format(opt_idx, '[Spiked]' if spiked[opt_idx] else '')
+            string += '========================\n'
+            string += '{} = {:.4g}\n'.format(self.proc_data_dict['xlabel'], x_optimals[opt_idx])
+            string += '{} = {:.4g}\n'.format(self.proc_data_dict['ylabel'], y_optimals[opt_idx])
+            string += '------------\n'
+            for mv_name, mv_values in self.proc_data_dict['optimal_measured_values'].items():
+                string += '{} = {:.4g}\n'.format(mv_name, mv_values[opt_idx])
+        return string
 
 
 def scatter_pnts_overlay(
@@ -914,35 +968,47 @@ def get_optimal_pnts_indxs(
     clusters_by_indx = []
     optimal_idxs = []
     av_L1 = []
-    av_cp_diff = []
-    neighbors_num = []
+    # av_cp_diff = []
+    # neighbors_num = []
     for cluster_id in range(cluster_id_min, cluster_id_max + 1):
 
         cluster_indxs = np.where(clusters == cluster_id)
         indxs_in_orig_array = selected_points_indxs[cluster_indxs]
-        min_indx = np.argmin(L1_arr[indxs_in_orig_array])
+        L1_av_around = [av_around(x_norm, y_norm, L1_arr, idx, thresh * 1.5)[0] for idx in indxs_in_orig_array]
+        min_idx = np.argmin(L1_av_around)
 
-        optimal_idx = indxs_in_orig_array[min_indx]
+        optimal_idx = indxs_in_orig_array[min_idx]
         optimal_idxs.append(optimal_idx)
 
         clusters_by_indx.append(indxs_in_orig_array)
 
-        sq_dist = (x_norm - x_norm[optimal_idx])**2 + (y_norm - y_norm[optimal_idx])**2
-        neighbors_indx = np.where(sq_dist <= (thresh * 1.5)**2)
-        neighbors_num.append(np.size(neighbors_indx))
-        av_L1.append(np.average(L1_arr[neighbors_indx]))
-        av_cp_diff.append(np.average(cond_phase_abs_diff[neighbors_indx]))
+        # sq_dist = (x_norm - x_norm[optimal_idx])**2 + (y_norm - y_norm[optimal_idx])**2
+        # neighbors_indx = np.where(sq_dist <= (thresh * 1.5)**2)
+        # neighbors_num.append(np.size(neighbors_indx))
+        # av_cp_diff.append(np.average(cond_phase_abs_diff[neighbors_indx]))
+        # av_L1.append(np.average(L1_arr[neighbors_indx]))
 
+        av_L1.append(L1_av_around[min_idx])
+
+    av_L1_w = 1.
+    # This would be biased towards the original adpative sampling cost func
+    # neighbors_num_w = 0.
+    # Very few points will actually be precisely on the target phase contour
+    # Therefore not used
+    # av_cp_diff_w = 0.
     # low leakage is best
-    w1 = 0.5 * np.array(av_L1) / np.max(av_L1)
+    w1 = av_L1_w * np.array(av_L1) / np.max(av_L1)
     # value more the points with more neighbors as a confirmation of
     # low leakage area and also scores less points near the boundaries
     # of the sampling area
-    w2 = 0.2 * (1 - np.flip(np.array(neighbors_num) / np.max(neighbors_num)))
+    # w2 = neighbors_num_w * (1 - np.flip(np.array(neighbors_num) / np.max(neighbors_num)))
     # low phase diff is best
-    w3 = 0.3 * np.array(av_cp_diff) / np.max(av_cp_diff)
+    # w3 = av_cp_diff_w * np.array(av_cp_diff) / np.max(av_cp_diff)
 
-    sort_by = w1 + w2 + w3
+    sort_by = w1  # + w2 + w3
+
+    if np.any(np.array(sort_by) != np.sort(sort_by)):
+        log.debug(' Optimal points rescored based on low leakage areas.')
 
     optimal_idxs = np.array(optimal_idxs)[np.argsort(sort_by)]
     clusters_by_indx = np.array(clusters_by_indx)[np.argsort(sort_by)]
@@ -950,22 +1016,44 @@ def get_optimal_pnts_indxs(
     return optimal_idxs, clusters_by_indx
 
 
-def interp_to_1D(x_int=None, y_int=None, z_int=None):
+def av_around(x, y, z, idx, radius):
+    sq_dist = (x - x[idx])**2 + (y - y[idx])**2
+    neighbors_indx = np.where(sq_dist <= radius**2)
+    return np.average(z[neighbors_indx]), neighbors_indx
+
+
+def interp_to_1D(x_int=None, y_int=None, z_int=None, slice_above_len=None):
     """
     Turns interpolated heatmaps into linear 1D array
     Intended for data reshaping for get_optimal_pnts_indxs
     """
-    if x_int is not None and y_int is not None:
+    if slice_above_len is not None:
+        if x_int is not None:
+            size = np.size(x_int)
+            slice_step = np.int(np.ceil(size / slice_above_len))
+            x_int = np.array(x_int)[::slice_step]
+        if y_int is not None:
+            size = np.size(y_int)
+            slice_step = np.int(np.ceil(size / slice_above_len))
+            y_int = np.array(y_int)[::slice_step]
+        if z_int is not None:
+            size_0 = np.shape(z_int)[0]
+            size_1 = np.shape(z_int)[1]
+            slice_step_0 = np.int(np.ceil(size_0 / slice_above_len))
+            slice_step_1 = np.int(np.ceil(size_1 / slice_above_len))
+            z_int = np.array(z_int)[::slice_step_0, ::slice_step_1]
+
+    if x_int is not None and y_int is not None and z_int is not None:
         x_int_1D = np.ravel(np.repeat([x_int], np.size(y_int), axis=0))
-        y_int_1D = np.ravel(np.repeat([y_int], np.size(x_int), axis=0))
-        return x_int_1D, y_int_1D
+        y_int_1D = np.ravel(np.repeat([y_int], np.size(x_int), axis=1))
+        z_int_1D = np.ravel(z_int)
+        return x_int_1D, y_int_1D, z_int
     elif z_int is not None:
         z_int_1D = np.ravel(z_int)
         return z_int_1D
-    elif x_int is not None and y_int is not None and z_int is not None:
+    elif x_int is not None and y_int is not None:
         x_int_1D = np.ravel(np.repeat([x_int], np.size(y_int), axis=0))
-        y_int_1D = np.ravel(np.repeat([y_int], np.size(x_int), axis=0))
-        z_int_1D = np.ravel(z_int)
-        return x_int_1D, y_int_1D, z_int
+        y_int_1D = np.ravel(np.repeat([y_int], np.size(x_int), axis=1))
+        return x_int_1D, y_int_1D
     else:
         return None
