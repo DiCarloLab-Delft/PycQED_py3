@@ -23,6 +23,7 @@ from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
 from pycqed.utilities import general as gen
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from datetime import datetime
+from pycqed.measurement.optimization import multi_targets_phase_offset
 
 import logging
 
@@ -248,7 +249,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_contour_phase: bool = True,
                 plt_contour_L1: bool = False,
                 plt_optimal_values: bool = True,
-                plt_optimal_values_max: int = None,
+                plt_optimal_values_max: int = np.inf,
                 plt_clusters: bool = True,
                 clims: dict = None,
                 find_local_optimals: bool = True,
@@ -257,7 +258,9 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 rescore_spiked_optimals: bool = False,
                 plt_optimal_waveforms_all: bool = False,
                 plt_optimal_waveforms: bool = False,
-                waveform_flux_lm_name: str = None):
+                waveform_flux_lm_name: str = None,
+
+                target_cond_phase: float = 180.):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
@@ -275,6 +278,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.plt_optimal_waveforms = plt_optimal_waveforms
         self.plt_optimal_waveforms_all = plt_optimal_waveforms_all
         self.waveform_flux_lm_name = waveform_flux_lm_name
+
+        self.target_cond_phase = target_cond_phase
 
         self._generate_waveform = False
         if plt_optimal_waveforms or \
@@ -563,22 +568,22 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             where = [(name in self.cost_func_Names) for name in vln]
             cost_func_indxs = np.where(where)[0][0]
             cost_func = interp_vals[cost_func_indxs]
-            cost_func = interp_to_1D(z_int=cost_func)
+            cost_func = interp_to_1D_arr(z_int=cost_func)
 
             where = [(name in self.cond_phase_names) for name in vln]
             cond_phase_indx = np.where(where)[0][0]
             cond_phase_arr = interp_vals[cond_phase_indx]
-            cond_phase_arr = interp_to_1D(z_int=cond_phase_arr)
+            cond_phase_arr = interp_to_1D_arr(z_int=cond_phase_arr)
 
             where = [(name in self.L1_names) for name in vln]
             L1_indx = np.where(where)[0][0]
             L1_arr = interp_vals[L1_indx]
-            L1_arr = interp_to_1D(z_int=L1_arr)
+            L1_arr = interp_to_1D_arr(z_int=L1_arr)
 
             theta_f_arr = self.proc_data_dict['x_int']
             lambda_2_arr = self.proc_data_dict['y_int']
 
-            theta_f_arr, lambda_2_arr = interp_to_1D(x_int=theta_f_arr,
+            theta_f_arr, lambda_2_arr = interp_to_1D_arr(x_int=theta_f_arr,
                 y_int=lambda_2_arr)
 
             extract_optimals_from = 'interpolated_values'
@@ -591,7 +596,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 theta_f_arr=theta_f_arr,
                 lambda_2_arr=lambda_2_arr,
                 cond_phase_arr=cond_phase_arr,
-                L1_arr=L1_arr
+                L1_arr=L1_arr,
+                target_phase=self.target_cond_phase
             )
 
         if self.cluster_from_interp:
@@ -662,6 +668,10 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 clusters_by_indx = np.array(clusters_by_indx)[sort_indxs]
                 waveforms = np.array(waveforms)[sort_indxs]
                 times = np.array(times)[sort_indxs]
+            # Add qoi in the proc_data_dict
+            self.proc_data_dict['optimal_waveforms'] = waveforms
+            self.proc_data_dict['optimal_waveforms_time'] = times
+            self.proc_data_dict['spiked_optimals'] = spiked_optimals
 
         clusters_pnts_x = np.array([])
         clusters_pnts_y = np.array([])
@@ -675,12 +685,6 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             clusters_pnts_colors = np.concatenate(
                 (clusters_pnts_colors,
                 np.full(np.shape(cluster_by_indx)[0], l)))
-
-        # Add qoi in the proc_data_dict
-        self.proc_data_dict['optimal_waveforms'] = waveforms
-        self.proc_data_dict['optimal_waveforms_time'] = times
-
-        self.proc_data_dict['spiked_optimals'] = spiked_optimals
 
         self.proc_data_dict['clusters_pnts_x'] = clusters_pnts_x
         self.proc_data_dict['clusters_pnts_y'] = clusters_pnts_y
@@ -764,7 +768,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
     def optimals_str(self, optimal_start: int = 0, optimal_end: int = np.inf):
         x_optimals = self.proc_data_dict['x_optimal']
         y_optimals = self.proc_data_dict['y_optimal']
-        spiked = self.proc_data_dict['spiked_optimals']
+        spiked = self.proc_data_dict['spiked_optimals'] if 'spiked_optimals'\
+            in self.proc_data_dict else np.full(np.size(y_optimals), False)
         optimals_max = np.size(x_optimals)
         string = ''
         for opt_idx in range(optimal_start, int(min(optimal_end + 1, optimals_max))):
@@ -774,6 +779,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             string += '{} = {:.4g}\n'.format(self.proc_data_dict['xlabel'], x_optimals[opt_idx])
             string += '{} = {:.4g}\n'.format(self.proc_data_dict['ylabel'], y_optimals[opt_idx])
             string += '------------\n'
+            if self.cluster_from_interp:
+                string += '[!!! Interpolated values !!!]\n'
             for mv_name, mv_values in self.proc_data_dict['optimal_measured_values'].items():
                 string += '{} = {:.4g}\n'.format(mv_name, mv_values[opt_idx])
         return string
@@ -938,7 +945,9 @@ def get_optimal_pnts_indxs(
     for tol in tolerances:
         phase_thr *= tol
         L1_thr *= tol
-        cond_phase_abs_diff = np.abs(cond_phase_arr - target_phase)
+        cond_phase_dev_f = multi_targets_phase_offset(target_phase, 180)
+        # np.abs(cond_phase_arr - target_phase)
+        cond_phase_abs_diff = cond_phase_dev_f(cond_phase_arr)
         sel = cond_phase_abs_diff <= phase_thr
         sel = sel * (L1_arr <= L1_thr)
         # sel = sel * (x_norm > y_norm)
@@ -997,7 +1006,7 @@ def get_optimal_pnts_indxs(
     # Therefore not used
     # av_cp_diff_w = 0.
     # low leakage is best
-    w1 = av_L1_w * np.array(av_L1) / np.max(av_L1)
+    w1 = av_L1_w * np.array(av_L1) / np.max(av_L1) / np.array([it for it in map(np.size, clusters_by_indx)])
     # value more the points with more neighbors as a confirmation of
     # low leakage area and also scores less points near the boundaries
     # of the sampling area
@@ -1022,7 +1031,7 @@ def av_around(x, y, z, idx, radius):
     return np.average(z[neighbors_indx]), neighbors_indx
 
 
-def interp_to_1D(x_int=None, y_int=None, z_int=None, slice_above_len=None):
+def interp_to_1D_arr(x_int=None, y_int=None, z_int=None, slice_above_len=None):
     """
     Turns interpolated heatmaps into linear 1D array
     Intended for data reshaping for get_optimal_pnts_indxs

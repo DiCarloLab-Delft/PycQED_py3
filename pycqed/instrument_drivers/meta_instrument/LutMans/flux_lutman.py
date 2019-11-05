@@ -21,6 +21,7 @@ from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import time
 from datetime import datetime
 import cma
+from pycqed.measurement.optimization import nelder_mead, multi_targets_phase_offset
 
 import logging
 log = logging.getLogger(__name__)
@@ -1369,13 +1370,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             MC,
             fluxlutman_static,
             which_gate,
-            n_points=199,
+            n_points=249,
             theta_f_lims=[35, 180],
             lambda_2_lims=[-1., 1.],
+            lambda_3=0.,
             sim_control_CZ_pars=None,
             label=None,
             min_distance=None,
-            optimize_phase_q0=False):
+            target_cond_phase=180,
+            optimize_phase_q0=False,
+            evaluate_local_optimals=True):
         """
         Runs an adaptive sampling of the CZ simulation by sweeping
         cz_theta_f_{which_gate} and and cz_lambda_2_{which_gate}
@@ -1392,8 +1396,11 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             self.set('instr_sim_control_CZ_{}'.format(which_gate), sim_control_CZ.name)
 
         if sim_control_CZ_pars is None or 'cost_func_str' not in sim_control_CZ_pars:
-            cost_func_str = "lambda qoi: LJP_mod(np.abs(qoi['phi_cond'] - 180) + qoi['L1'] * 100 /0.1, 180)"
-            sim_control_CZ.set('cost_func_str', cost_func_str)
+            cost_func_str = "lambda qoi: LJP_mod({} + qoi['L1'] * 100 / {}, {})".format(
+                            multi_targets_phase_offset(target=target_cond_phase, spacing=180, phase_name="qoi['phi_cond']"),
+                            str(0.05),  # 0.05% L1 equiv. to 1 deg in cond phase
+                            str(180))
+            sim_control_CZ.set_cost_func(cost_func_str=cost_func_str)
 
         if sim_control_CZ_pars is not None:
             for key, val in sim_control_CZ_pars.items():
@@ -1416,9 +1423,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         lambda_3_saved = self.get('cz_lambda_3_{}'.format(which_gate))
         lambda_2_saved = self.get('cz_lambda_2_{}'.format(which_gate))
         theta_f_saved = self.get('cz_theta_f_{}'.format(which_gate))
-        self.set('cz_lambda_3_{}'.format(which_gate), 0)
+
+        log.debug('Setting cz_lambda_3_{} to {}.'.format(which_gate, lambda_3))
+        self.set('cz_lambda_3_{}'.format(which_gate), lambda_3)
 
         if min_distance is None:
+            # Allow for regions with sampling denisties up to 5 times
+            # the uniform sampling
             min_distance = 1 / np.sqrt(n_points) / 5
 
         loss = adaptive.learner.learner2D.resolution_loss_function(min_distance=min_distance)
@@ -1426,7 +1437,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         adaptive_pars = {
             'adaptive_function': adaptive.Learner2D,
             'n_points': n_points,
-            'bounds': [theta_f_lims, lambda_2_lims],
+            'bounds': np.array([theta_f_lims, lambda_2_lims]),
             'goal': lambda l: l.npoints > n_points,
             'loss_per_triangle': loss
         }
@@ -1434,12 +1445,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         if label is None:
             time_string = datetime.now().strftime('%f')
-            label = 'auto_cz_sim_{}_{}'.format(sim_control_CZ.name, time_string)
+            label = 'auto_{}_{}'.format(sim_control_CZ.name, time_string)
 
         MC.run(
             label,
             mode='adaptive',
             exp_metadata={'adaptive_pars': adaptive_pars})
+
+        cluster_from_interp = True
 
         coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
             label=label,
@@ -1451,7 +1464,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt_optimal_values_max=3,
             find_local_optimals=True,
             plt_clusters=True,
-            cluster_from_interp=True,
+            cluster_from_interp=cluster_from_interp,
             rescore_spiked_optimals=True,
             plt_optimal_waveforms_all=True,
             waveform_flux_lm_name=self.name,
@@ -1459,64 +1472,183 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 'L1': [0, 1],
                 'missing_fraction': [0, 2],
                 'Cond phase': [0, 360],
-                'phase_q0': [0, 360]
-            }
+                'phase_q0': [0, 360],
+                'Cost func': [0, 100]
+            },
+            target_cond_phase=target_cond_phase
         )
+        print('Adaptive sampling finished.')
         print(coha.optimals_str(optimal_end=2))
 
+        if evaluate_local_optimals and cluster_from_interp:
+            eval_opt_pvs = dict(coha.proc_data_dict['optimal_pars_values'])
+            eval_opt_mvs = dict(coha.proc_data_dict['optimal_measured_values'])
+            print('Evaluating best local minima...')
+            opt_num = np.size(eval_opt_pvs[list(eval_opt_pvs.keys())[0]])
+            eval_max = np.min([opt_num, 4])
+            if eval_max < opt_num:
+                log.debug('Evaluating only the best 3 optimals!'
+                    'The rest will contain interpolated measured values!')
+            for opt_idx in range(eval_max):
+                adaptive_pars = {'adaptive_function': nelder_mead,
+                    'x0': [
+                        eval_opt_pvs['cz_theta_f_{}'.format(which_gate)][opt_idx],
+                        eval_opt_pvs['cz_lambda_2_{}'.format(which_gate)][opt_idx],
+                    ],
+                    'initial_step': [1, 0.01],
+                    'maxiter': 10  # Just a few points to evaluate near the minimum
+                }
+                MC.set_adaptive_function_parameters(adaptive_pars)
+                MC.set_detector_function(detector)
+
+                MC.set_sweep_functions([
+                    self['cz_theta_f_{}'.format(which_gate)],
+                    self['cz_lambda_2_{}'.format(which_gate)]
+                ])
+
+                if label is None:
+                    time_string = datetime.now().strftime('%f')
+                    label = 'auto_{}_eval_{}_{}'.format(sim_control_CZ.name, opt_idx, time_string)
+
+                MC.run(
+                    label,
+                    mode='adaptive',
+                    exp_metadata={'adaptive_pars': adaptive_pars})
+
+                eval_coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
+                    label=label,
+                    close_figs=True,
+                    plt_orig_pnts=True,
+                    plt_contour_L1=False,
+                    plt_optimal_values=True,
+                    plt_contour_phase=True,
+                    find_local_optimals=False,
+                    cluster_from_interp=False,
+                    rescore_spiked_optimals=False,
+                    plt_optimal_waveforms_all=True,
+                    waveform_flux_lm_name=self.name,
+                    clims={
+                        'L1': [0, 1],
+                        'missing_fraction': [0, 2],
+                        'Cond phase': [0, 360],
+                        'phase_q0': [0, 360],
+                        'Cost func': [0, 100]
+                    },
+                    target_cond_phase=target_cond_phase
+                )
+                # Save the best point
+                for par, pvs in eval_opt_pvs.items():
+                    eval_opt_pvs[par][opt_idx] = eval_coha.proc_data_dict['optimal_pars_values'][par][0]
+                for mv_name, mvs in eval_opt_mvs.items():
+                    eval_opt_mvs[mv_name][opt_idx] = eval_coha.proc_data_dict['optimal_measured_values'][mv_name][0]
+
         if optimize_phase_q0:
-            log.info('Starting optimizer...')
 
-            cost_func_str = "lambda qoi: LJP_mod("
-            "np.abs(qoi['phi_cond'] - 180) + "
-            "qoi['L1'] * 100 /0.05 + "
-            "np.min([(qoi['phase_q0'] % 90), ((360 - qoi['phase_q0']) % 90)])"
-            ", 180)"
-            sim_control_CZ.set('cost_func_str', cost_func_str)
-
-            MC.set_sweep_functions([self['cz_theta_f_{}'.format(which_gate)],
-                                    self['cz_lambda_2_{}'.format(which_gate)],
-                                    self['cz_lambda_3_{}'.format(which_gate)]])
+            cost_func_str = "lambda qoi: LJP_mod({} + qoi['L1'] * 100 / {} + {} / {}, {})".format(
+                multi_targets_phase_offset(target=target_cond_phase, spacing=180, phase_name="qoi['phi_cond']"),
+                str(0.05),  # 0.05% L1 equiv. to 1 deg in cond phase
+                multi_targets_phase_offset(target=0, spacing=90, phase_name="qoi['phase_q0']"),
+                str(1),
+                str(180))
+            sim_control_CZ.set_cost_func(cost_func_str=cost_func_str)
 
             lambda_3_start = self.get('cz_lambda_3_{}'.format(which_gate))
 
+            # 6 = 3 * 2 deg, if we get 2 deg of deviation from the target it is
+            # good enough
+            ftarget = scCZ.LJP_mod(6, 180)
+            maxfevals = 300
+            cost_func_values = coha.proc_data_dict['optimal_measured_values']['Cost func']
+            cost_func = cost_func_values[0]
+            optimals_num = np.size(cost_func_values)
             optimal_pars_values = coha.proc_data_dict['optimal_pars_values']
-            lambda_2_start = optimal_pars_values['cz_lambda_2_{}'.format(which_gate)][0]
-            theta_f_start = optimal_pars_values['cz_theta_f_{}'.format(which_gate)][0]
+            best_par_res = {}
+            best_mv_res = {}
+            k = 0
+            for k in range(optimals_num):
+                if cost_func < ftarget:
+                    break
+                elif k > 0:
+                    print('Target value not reached under {} evaluations trying next optimal guess...'.format(maxfevals))
+                print('Starting optimizer for Optimal #{}'.format(k))
 
-            adaptive_pars = {
-                'adaptive_function': cma.fmin,
-                'x0': [theta_f_start, lambda_2_start, lambda_3_start],
-                'sigma0': 1,
-                # options for the CMA algorithm can be found using
-                # "cma.CMAOptions()"
-                'minimize': True,
-                'options': {
-                    'maxfevals': 250,  # maximum function cals
-                    'ftarget': 5,
-                    # Scaling for individual sigma's
-                    'cma_stds': [5, 0.05, .1]},
-            }
+                lambda_2_start = optimal_pars_values['cz_lambda_2_{}'.format(which_gate)][k]
+                theta_f_start = optimal_pars_values['cz_theta_f_{}'.format(which_gate)][k]
 
-            MC.set_adaptive_function_parameters(adaptive_pars)
+                adaptive_pars = {
+                    'adaptive_function': cma.fmin,
+                    'x0': [theta_f_start, lambda_2_start, lambda_3_start],
+                    'sigma0': 1,
+                    # options for the CMA algorithm can be found using
+                    # "cma.CMAOptions()"
+                    'minimize': True,
+                    'options': {
+                        'maxfevals': maxfevals,  # maximum function cals
+                        'ftarget': ftarget,
+                        # Scaling for individual sigma's
+                        # Allow for bigger exploration of lambda_3
+                        'cma_stds': [10, 0.05, .3]},
+                }
 
-            optimizer_label = label + '_optimizer'
+                MC.set_sweep_functions([self['cz_theta_f_{}'.format(which_gate)],
+                                        self['cz_lambda_2_{}'.format(which_gate)],
+                                        self['cz_lambda_3_{}'.format(which_gate)]])
 
-            MC.run(optimizer_label,
-                    mode='adaptive',
-                    exp_metadata={'adaptive_pars': adaptive_pars})
-            a = ma.OptimizationAnalysis(label=optimizer_label, plot_all=True)
-            par_res = {par_name: a.optimization_result[0][i] for i, par_name in enumerate(a.parameter_names)}
-            mv_res = {mv: a.optimization_result[1][i] for i, mv in enumerate(a.value_names)}
+                MC.set_adaptive_function_parameters(adaptive_pars)
+
+                optimizer_label = label + '_optimizer'
+
+                MC.run(optimizer_label,
+                        mode='adaptive',
+                        exp_metadata={'adaptive_pars': adaptive_pars})
+
+                a = ma.OptimizationAnalysis(label=optimizer_label, plot_all=True)
+                par_res = {par_name: a.optimization_result[0][i] for i, par_name in enumerate(a.parameter_names)}
+                mv_res = {mv: a.optimization_result[1][i] for i, mv in enumerate(a.value_names)}
+
+                best_seen_idx = np.argmin(a.data[np.size(a.parameter_names)])
+                best_seen_pars = a.data[:np.size(a.parameter_names), best_seen_idx]
+                best_senn_mvs = a.data[np.size(a.parameter_names):, best_seen_idx]
+                best_seen_par_res = {par_name: best_seen_pars[i] for i, par_name in enumerate(a.parameter_names)}
+                best_seen_mv_res = {mv: best_senn_mvs[i] for i, mv in enumerate(a.value_names)}
+
+                if not bool(best_par_res) or best_seen_mv_res['Cost func'] < cost_func:
+                    best_par_res = best_seen_par_res
+                    best_mv_res = best_seen_mv_res
+
+                cost_func = best_seen_mv_res['Cost func']
+
+                print('\nConverged to:')
+                print('Parameters:')
+                print(par_res)
+                print('Measured quantities:')
+                print(mv_res)
+                print('\nBest seen:')
+                print('Parameters:')
+                print(best_seen_par_res)
+                print('Measured quantities:')
+                print(best_seen_mv_res)
 
         self.set('cz_lambda_3_{}'.format(which_gate), lambda_3_saved)
         self.set('cz_lambda_2_{}'.format(which_gate), lambda_2_saved)
         self.set('cz_theta_f_{}'.format(which_gate), theta_f_saved)
 
         if not optimize_phase_q0:
-            return coha.proc_data_dict['optimal_pars_values'], coha.proc_data_dict['optimal_measured_values']
+            if not evaluate_local_optimals:
+                print(coha.proc_data_dict['optimal_pars_values'])
+                print(coha.proc_data_dict['optimal_measured_values'])
+                return coha.proc_data_dict['optimal_pars_values'], coha.proc_data_dict['optimal_measured_values']
+            else:
+                print(eval_opt_pvs)
+                print(eval_opt_mvs)
+                return eval_opt_pvs, eval_opt_mvs
         else:
-            return par_res, mv_res
+            print('\nFinished optimizations with:')
+            print('Parameters:')
+            print(best_par_res)
+            print('Measured quantities:')
+            print(best_mv_res)
+            return best_par_res, best_mv_res
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
