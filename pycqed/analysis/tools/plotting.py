@@ -489,12 +489,12 @@ def make_segmented_cmap():
     return anglemap
 
 
-def make_anglemap(N=256, use_hpl=True):
+def make_anglemap_colorlist(N=256, use_hpl=True):
     h = np.ones(N)  # hue
-    h[:N//2] = 11.6  # red
-    h[N//2:] = 258.6  # blue
+    h[:N // 2] = 11.6  # red
+    h[N // 2:] = 258.6  # blue
     s = 100  # saturation
-    l = np.linspace(0, 100, N//2)  # luminosity
+    l = np.linspace(0, 100, N // 2)  # luminosity
     l = np.hstack((l, l[::-1]))
 
     colorlist = np.zeros((N, 3))
@@ -505,6 +505,11 @@ def make_anglemap(N=256, use_hpl=True):
             colorlist[ii, :] = hsluv.hsluv_to_rgb((h[ii], s, l[ii]))
     colorlist[colorlist > 1] = 1  # correct numeric errors
     colorlist[colorlist < 0] = 0
+    return colorlist
+
+
+def make_anglemap(N=256, use_hpl=True):
+    colorlist = make_anglemap_colorlist(N=N, use_hpl=True)
     return col.ListedColormap(colorlist)
 
 
@@ -523,7 +528,7 @@ def plot_fit(xvals, fit_res, ax, **plot_kws):
 
 def cmap_to_alpha(cmap):
     """
-    Takes a cmap and makes the transparency of the cmap 
+    Takes a cmap and makes the transparency of the cmap
     changes with each element.
     """
     my_cmap = cmap(np.arange(cmap.N))
@@ -535,7 +540,7 @@ def cmap_to_alpha(cmap):
 
 def cmap_first_to_alpha(cmap):
     """
-    Makes the first element of a cmap transparant. 
+    Makes the first element of a cmap transparant.
     """
     my_cmap = cmap(np.arange(cmap.N))
     # Set alpha
