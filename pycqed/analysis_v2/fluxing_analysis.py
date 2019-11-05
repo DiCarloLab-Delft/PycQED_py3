@@ -447,7 +447,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                         'plotfn': self.plot_text,
                         'box_props': 'fancy',
                         'line_kws': {'alpha': 0},
-                        'text_string': self.optimals_str(optimal_end=self.plt_optimal_values_max),
+                        'text_string': self.get_readable_str(optimal_end=self.plt_optimal_values_max),
                         'horizontalalignment': 'left',
                         'verticalaligment': 'top',
                         'fontsize': 14
@@ -686,6 +686,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 (clusters_pnts_colors,
                 np.full(np.shape(cluster_by_indx)[0], l)))
 
+        self.proc_data_dict['optimal_idxs'] = optimal_idxs
+
         self.proc_data_dict['clusters_pnts_x'] = clusters_pnts_x
         self.proc_data_dict['clusters_pnts_y'] = clusters_pnts_y
         self.proc_data_dict['clusters_pnts_colors'] = clusters_pnts_colors
@@ -693,24 +695,34 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.proc_data_dict['x_optimal'] = x_arr[optimal_idxs]
         self.proc_data_dict['y_optimal'] = y_arr[optimal_idxs]
 
-        self.proc_data_dict['optimal_pars_values'] = {
-            self.proc_data_dict['xlabel']: x_arr[optimal_idxs],
-            self.proc_data_dict['ylabel']: y_arr[optimal_idxs]
-        }
+        optimal_pars_values = []
+        for x, y in zip(self.proc_data_dict['x_optimal'], self.proc_data_dict['y_optimal']):
+            optimal_pars_values.append({self.proc_data_dict['xlabel']: x,
+                                        self.proc_data_dict['ylabel']: y})
+        self.proc_data_dict['optimal_pars_values'] = optimal_pars_values
+
         self.proc_data_dict['optimal_pars_units'] = {
             self.proc_data_dict['xlabel']: self.proc_data_dict['xunit'],
             self.proc_data_dict['ylabel']: self.proc_data_dict['yunit']
         }
+        # vlu = self.proc_data_dict['value_units']
+        # optimal_measured_values = {}
+        # optimal_measured_units = {}
+        # for k, quantity_arr in enumerate(self.proc_data_dict[extract_optimals_from]):
+        #     optimal_measured_values[vln[k]] = np.ravel(quantity_arr)[optimal_idxs]
+        #     optimal_measured_units[vln[k]] = vlu[k]
+        # self.proc_data_dict['optimal_measured_values'] = optimal_measured_values
+        # self.proc_data_dict['optimal_measured_units'] = optimal_measured_units
+
         vlu = self.proc_data_dict['value_units']
-        optimal_measured_values = {}
-        optimal_measured_units = {}
-        for k, quantity_arr in enumerate(self.proc_data_dict[extract_optimals_from]):
-            optimal_measured_values[vln[k]] = np.ravel(quantity_arr)[optimal_idxs]
-            optimal_measured_units[vln[k]] = vlu[k]
+        optimal_measured_values = []
+        optimal_measured_units = []
+        mvs = self.proc_data_dict[extract_optimals_from]
+        for optimal_idx in optimal_idxs:
+            optimal_measured_values.append({name: np.ravel(mvs[ii])[optimal_idx] for ii, name in enumerate(vln)})
+        optimal_measured_units = {name: vlu[ii] for ii, name in enumerate(vln)}
         self.proc_data_dict['optimal_measured_values'] = optimal_measured_values
         self.proc_data_dict['optimal_measured_units'] = optimal_measured_units
-
-        # Save qois
 
         # Save quantities of interest
         save_these = {
@@ -765,24 +777,25 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
               transform=axs.transAxes,
               bbox=box_props, fontdict=fontdict)
 
-    def optimals_str(self, optimal_start: int = 0, optimal_end: int = np.inf):
-        x_optimals = self.proc_data_dict['x_optimal']
-        y_optimals = self.proc_data_dict['y_optimal']
+    def get_readable_str(self,
+            optimal_start: int = 0,
+            optimal_end: int = np.inf,
+            sig_digits=4):
+        optimals_max = len(self.proc_data_dict['optimal_pars_values'])
         spiked = self.proc_data_dict['spiked_optimals'] if 'spiked_optimals'\
-            in self.proc_data_dict else np.full(np.size(y_optimals), False)
-        optimals_max = np.size(x_optimals)
+            in self.proc_data_dict else np.full(np.size(optimals_max), False)
         string = ''
         for opt_idx in range(optimal_start, int(min(optimal_end + 1, optimals_max))):
             string += '========================\n'
             string += 'Optimal #{}{}\n'.format(opt_idx, '[Spiked]' if spiked[opt_idx] else '')
             string += '========================\n'
-            string += '{} = {:.4g}\n'.format(self.proc_data_dict['xlabel'], x_optimals[opt_idx])
-            string += '{} = {:.4g}\n'.format(self.proc_data_dict['ylabel'], y_optimals[opt_idx])
+            for pv_name, pv_value in self.proc_data_dict['optimal_pars_values'][opt_idx].items():
+                string += '{} = {:.{sig_digits}g} {}\n'.format(pv_name, pv_value, self.proc_data_dict['optimal_pars_units'][pv_name], sig_digits=sig_digits)
             string += '------------\n'
             if self.cluster_from_interp:
                 string += '[!!! Interpolated values !!!]\n'
-            for mv_name, mv_values in self.proc_data_dict['optimal_measured_values'].items():
-                string += '{} = {:.4g}\n'.format(mv_name, mv_values[opt_idx])
+            for mv_name, mv_value in self.proc_data_dict['optimal_measured_values'][opt_idx].items():
+                string += '{} = {:.{sig_digits}g} {}\n'.format(mv_name, mv_value, self.proc_data_dict['optimal_measured_units'][mv_name], sig_digits=sig_digits)
         return string
 
 

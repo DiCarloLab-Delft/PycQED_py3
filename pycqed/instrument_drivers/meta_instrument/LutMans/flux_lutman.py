@@ -1478,13 +1478,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             target_cond_phase=target_cond_phase
         )
         print('Adaptive sampling finished.')
-        print(coha.optimals_str(optimal_end=2))
+        print(coha.get_readable_str(optimal_end=2))
 
         if evaluate_local_optimals and cluster_from_interp:
-            eval_opt_pvs = dict(coha.proc_data_dict['optimal_pars_values'])
-            eval_opt_mvs = dict(coha.proc_data_dict['optimal_measured_values'])
+            eval_opt_pvs = list(coha.proc_data_dict['optimal_pars_values'])
+            eval_opt_mvs = list(coha.proc_data_dict['optimal_measured_values'])
             print('Evaluating best local minima...')
-            opt_num = np.size(eval_opt_pvs[list(eval_opt_pvs.keys())[0]])
+            opt_num = len(eval_opt_pvs)
             eval_max = np.min([opt_num, 4])
             if eval_max < opt_num:
                 log.debug('Evaluating only the best 3 optimals!'
@@ -1492,8 +1492,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             for opt_idx in range(eval_max):
                 adaptive_pars = {'adaptive_function': nelder_mead,
                     'x0': [
-                        eval_opt_pvs['cz_theta_f_{}'.format(which_gate)][opt_idx],
-                        eval_opt_pvs['cz_lambda_2_{}'.format(which_gate)][opt_idx],
+                        eval_opt_pvs[opt_idx]['cz_theta_f_{}'.format(which_gate)],
+                        eval_opt_pvs[opt_idx]['cz_lambda_2_{}'.format(which_gate)],
                     ],
                     'initial_step': [1, 0.01],
                     'maxiter': 10  # Just a few points to evaluate near the minimum
@@ -1537,10 +1537,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                     target_cond_phase=target_cond_phase
                 )
                 # Save the best point
-                for par, pvs in eval_opt_pvs.items():
-                    eval_opt_pvs[par][opt_idx] = eval_coha.proc_data_dict['optimal_pars_values'][par][0]
-                for mv_name, mvs in eval_opt_mvs.items():
-                    eval_opt_mvs[mv_name][opt_idx] = eval_coha.proc_data_dict['optimal_measured_values'][mv_name][0]
+                eval_opt_pvs[opt_idx] = eval_coha.proc_data_dict['optimal_pars_values'][0]
+                eval_opt_mvs[opt_idx] = eval_coha.proc_data_dict['optimal_measured_values'][0]
 
         if optimize_phase_q0:
 
@@ -1558,9 +1556,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             # good enough
             ftarget = scCZ.LJP_mod(6, 180)
             maxfevals = 300
-            cost_func_values = coha.proc_data_dict['optimal_measured_values']['Cost func']
-            cost_func = cost_func_values[0]
-            optimals_num = np.size(cost_func_values)
+            cost_func = coha.proc_data_dict['optimal_measured_values'][0]['Cost func']
+            optimals_num = np.len(coha.proc_data_dict['optimal_measured_values'])
             optimal_pars_values = coha.proc_data_dict['optimal_pars_values']
             best_par_res = {}
             best_mv_res = {}
@@ -1648,7 +1645,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             print(best_par_res)
             print('Measured quantities:')
             print(best_mv_res)
-            return best_par_res, best_mv_res
+            return [best_par_res], [best_mv_res]
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
