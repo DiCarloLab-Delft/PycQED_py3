@@ -13,12 +13,13 @@ import logging
 import scipy.interpolate
 import numpy as np
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
+
 
 def martinis_flux_pulse(length: float,
                         theta_i: float, theta_f: float,
-                        lambda_2: float, lambda_3: float=0, lambda_4: float=0,
-                        sampling_rate: float =2.4e9):
+                        lambda_2: float, lambda_3: float = 0, lambda_4: float = 0,
+                        sampling_rate: float = 2.4e9):
     """
     Returns the pulse specified by Martinis and Geller as θ(t) specified in
         Phys. Rev. A 90 022307 (2014).
@@ -43,21 +44,22 @@ def martinis_flux_pulse(length: float,
 
     """
     if theta_f < theta_i:
-        raise ValueError(
+        log.warning(
             'theta_f ({:.2f} deg) < theta_i ({:.2f} deg):'.format(
                 np.rad2deg(theta_f), np.rad2deg(theta_i))
             + 'final coupling weaker than initial coupling')
+        theta_f = np.clip(theta_f, theta_i, np.pi - .01)
 
     # 1. Generate a time grid, may include fine sampling.
 
     # Pulse is generated at a denser grid to allow for good interpolation
     # N.B. Not clear why interpolation is needed at all... -MAR July 2018
     fine_sampling_factor = 2  # 10
-    nr_samples = int(np.round((length)*sampling_rate * fine_sampling_factor))
-    rounded_length = nr_samples/(fine_sampling_factor * sampling_rate)
-    tau_step = 1/(fine_sampling_factor * sampling_rate)  # denser points
+    nr_samples = int(np.round((length) * sampling_rate * fine_sampling_factor))
+    rounded_length = nr_samples / (fine_sampling_factor * sampling_rate)
+    tau_step = 1 / (fine_sampling_factor * sampling_rate)  # denser points
     # tau is a virtual time/proper time
-    taus = np.arange(0, rounded_length-tau_step/2, tau_step)
+    taus = np.arange(0, rounded_length - tau_step / 2, tau_step)
     # -tau_step/2 is to make sure final pt is excluded
 
     # lambda_1 is scaled such that the final ("center") angle is theta_f
@@ -72,23 +74,23 @@ def martinis_flux_pulse(length: float,
     theta_wave += lambda_4 * (1 - np.cos(8 * np.pi * taus / rounded_length))
 
     # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
-    theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
+    theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi - .01)
     if not np.array_equal(theta_wave, theta_wave_clipped):
-        logger.warning(
+        log.warning(
             'Martinis flux wave form has been clipped to [{}, 180 deg]'
             .format(np.rad2deg(theta_i)))
 
     # 3. Transform from proper time τ to real time t using interpolation, eqs. 17-20
-    t = np.array([np.trapz(np.sin(theta_wave_clipped)[:i+1],
-                           dx=1/(fine_sampling_factor*sampling_rate))
+    t = np.array([np.trapz(np.sin(theta_wave_clipped)[: i + 1],
+                           dx=1 / (fine_sampling_factor * sampling_rate))
                   for i in range(len(theta_wave_clipped))])
 
     # Interpolate pulse at physical sampling distance
-    t_samples = np.arange(0, length, 1/sampling_rate)
+    t_samples = np.arange(0, length, 1 / sampling_rate)
     # Scaling factor for time-axis to get correct pulse length again
-    scale = t[-1]/t_samples[-1]
+    scale = t[-1] / t_samples[-1]
     interp_wave = scipy.interpolate.interp1d(
-        t/scale, theta_wave_clipped, bounds_error=False,
+        t / scale, theta_wave_clipped, bounds_error=False,
         fill_value='extrapolate')(t_samples)
 
     # Theta is returned in radians here
@@ -110,7 +112,7 @@ def eps_to_theta(eps: float, g: float):
     """
     # Ignore divide by zero as it still gives a meaningful angle
     with np.errstate(divide='ignore'):
-        theta = np.arctan(np.divide(2*g, eps))
+        theta = np.arctan(np.divide(2 * g, eps))
     return theta
 
 
