@@ -243,3 +243,33 @@ def SPSA(fun, x0,
     # verification
     fun(res[0][0])
     return res[0]
+
+
+def multi_targets_phase_offset(target, spacing, phase_name: str = None):
+    """
+    Intended to be used in cost functions that targets several phases
+    at the same time equaly spaced
+
+    Args:
+        target(float): unit = deg, target phase for which the output
+            will be zero
+
+        spacing(float): unit = deg, spacing > 0, spacing to other phases
+            for which the output will be zero
+
+        phase_name(str): if specified a string version of the function
+            will be returned, inteded for the construction of a custom
+            cost lambda function including other terms, e.g. some
+            other target phase using this funtion.
+            NB: numpy needs to be defined as "np" in the file the string
+            function will be executed
+    """
+    target = np.asarray(target)
+    if phase_name is not None:
+        string = 'np.min([({phase_name} - {target}) % {spacing}, (360 - ({phase_name} - {target})) % {spacing}])'
+        return string.format(
+            phase_name=phase_name,
+            target=str(target),
+            spacing=str(spacing))
+    else:
+        return lambda phase: np.min([(phase - target) % spacing, (360 - (phase - target)) % spacing], axis=0)
