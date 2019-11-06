@@ -365,7 +365,7 @@ def get_qb_thresholds_from_file(qb_names, file_path, h5mode='r+'):
         ro_channel = int(
             instr_settings[qbn].attrs['RO_acq_weight_function_I'])
         thresholds[qbn] = 1.5*float(
-            instr_settings['UHFQC'].attrs['quex_thres_{}_level'.format(
+            instr_settings['UHFQC'].attrs['qas_0_thresholds_{}_level'.format(
                 ro_channel)])
     return thresholds
 

@@ -19,7 +19,6 @@ from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQ
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
 
-
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
@@ -37,7 +36,6 @@ except:
 
 
 class Test_QO(unittest.TestCase):
-
     @classmethod
     def setUpClass(self):
         self.station = station.Station()
@@ -73,7 +71,8 @@ class Test_QO(unittest.TestCase):
         self.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
         self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
 
-        self.ro_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=5, feedline_number=0)
+        self.ro_lutman = UHFQC_RO_LutMan(
+            'RO_lutman', num_res=5, feedline_number=0)
         self.ro_lutman.AWG(self.UHFQC.name)
 
         # Assign instruments
@@ -113,8 +112,8 @@ class Test_QO(unittest.TestCase):
 
     @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_instantiate_QuDevTransmon(self):
-        QDT = QuDev_transmon('QuDev_transmon',
-                             MC=None, heterodyne_instr=None, cw_source=None)
+        QDT = QuDev_transmon(
+            'QuDev_transmon', MC=None, heterodyne_instr=None, cw_source=None)
         QDT.close()
 
     def test_instantiate_TekTransmon(self):
@@ -190,7 +189,8 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.ro_soft_avg(4)
         detector_attributes = [
             'int_avg_det', 'int_log_det', 'int_avg_det_single',
-            'input_average_detector']
+            'input_average_detector'
+        ]
         for det_attr in detector_attributes:
             if hasattr(self.CCL_qubit, det_attr):
                 delattr(self.CCL_qubit, det_attr)
@@ -219,7 +219,7 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.prepare_readout()
 
         self.assertEqual(LO.status(), 'on')
-        self.assertEqual(LO.frequency(), 5.43e9-200e6)
+        self.assertEqual(LO.frequency(), 5.43e9 - 200e6)
         self.assertEqual(LO.power(), 20)
 
     @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
@@ -255,44 +255,37 @@ class Test_QO(unittest.TestCase):
         trace_length = 4096
         self.CCL_qubit.ro_acq_weight_type('SSB')
         self.CCL_qubit.prepare_readout()
-        tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
+        tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
+        cosI = np.array(np.cos(2 * np.pi * IF * tbase))
 
-        self.assertEqual(self.UHFQC.quex_rot_3_real(), 1)
-        self.assertEqual(self.UHFQC.quex_rot_3_imag(), 1)
-        self.assertEqual(self.UHFQC.quex_rot_4_real(), 1)
-        self.assertEqual(self.UHFQC.quex_rot_4_imag(), -1)
+        self.assertEqual(self.UHFQC.qas_0_rotations_3(), 1 + 1j)
+        self.assertEqual(self.UHFQC.qas_0_rotations_4(), 1 - 1j)
 
-        uploaded_wf = self.UHFQC.quex_wint_weights_3_real()
+        uploaded_wf = self.UHFQC.qas_0_integration_weights_3_real()
         np.testing.assert_array_almost_equal(cosI, uploaded_wf)
         # Testing DSB case
         self.CCL_qubit.ro_acq_weight_type('DSB')
         self.CCL_qubit.prepare_readout()
-        self.assertEqual(self.UHFQC.quex_rot_3_real(), 2)
-        self.assertEqual(self.UHFQC.quex_rot_3_imag(), 0)
-        self.assertEqual(self.UHFQC.quex_rot_4_real(), 2)
-        self.assertEqual(self.UHFQC.quex_rot_4_imag(), 0)
+        self.assertEqual(self.UHFQC.qas_0_rotations_3(), 2 + 0j)
+        self.assertEqual(self.UHFQC.qas_0_rotations_4(), 2 + 0j)
 
         # Testing Optimal weight uploading
         test_I = np.ones(10)
-        test_Q = 0.5*test_I
+        test_Q = 0.5 * test_I
         self.CCL_qubit.ro_acq_weight_func_I(test_I)
         self.CCL_qubit.ro_acq_weight_func_Q(test_Q)
 
         self.CCL_qubit.ro_acq_weight_type('optimal')
         self.CCL_qubit.prepare_readout()
 
-        self.UHFQC.quex_rot_4_real(.21)
-        self.UHFQC.quex_rot_4_imag(.108)
-        upl_I = self.UHFQC.quex_wint_weights_3_real()
-        upl_Q = self.UHFQC.quex_wint_weights_3_imag()
+        self.UHFQC.qas_0_rotations_4(0.21 + 0.108j)
+        upl_I = self.UHFQC.qas_0_integration_weights_3_real()
+        upl_Q = self.UHFQC.qas_0_integration_weights_3_imag()
         np.testing.assert_array_almost_equal(test_I, upl_I)
         np.testing.assert_array_almost_equal(test_Q, upl_Q)
-        self.assertEqual(self.UHFQC.quex_rot_3_real(), 1)
-        self.assertEqual(self.UHFQC.quex_rot_3_imag(), -1)
+        self.assertEqual(self.UHFQC.qas_0_rotations_3(), 1 - 1j)
         # These should not have been touched by optimal weights
-        self.assertEqual(self.UHFQC.quex_rot_4_real(), .21)
-        self.assertEqual(self.UHFQC.quex_rot_4_imag(), .108)
+        self.assertEqual(self.UHFQC.qas_0_rotations_4(), 0.21 + 0.108j)
 
         self.CCL_qubit.ro_acq_weight_type('SSB')
 
@@ -356,7 +349,6 @@ class Test_QO(unittest.TestCase):
 
         self.assertEqual(self.VSM.mod5_ch2_gaussian_att_raw(), 10234)
         self.assertEqual(self.VSM.mod5_ch2_derivative_phase_raw(), 10206)
-
 
     ###################################################
     #          Test basic experiments                 #
@@ -429,8 +421,8 @@ class Test_QO(unittest.TestCase):
     @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_Ramsey(self):
         self.CCL_qubit.mw_freq_mod(100e6)
-        self.CCL_qubit.measure_ramsey(times=np.arange(0, 1e-6, 20e-9),
-                                      update=False)
+        self.CCL_qubit.measure_ramsey(
+            times=np.arange(0, 1e-6, 20e-9), update=False)
         self.CCL_qubit.T2_star(20e-6)
         self.CCL_qubit.measure_ramsey(update=False)
 

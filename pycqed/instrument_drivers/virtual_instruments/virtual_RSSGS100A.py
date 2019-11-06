@@ -1,8 +1,9 @@
 from qcodes.instrument.parameter import ManualParameter
 from qcodes import VisaInstrument, validators as vals
+from qcodes import Instrument
 
 
-class virtualRohdeSchwarz_SGS100A(VisaInstrument):
+class virtualRohdeSchwarz_SGS100A(Instrument):
     """
     This is the qcodes driver for the Rohde & Schwarz SGS100A signal generator
 
@@ -29,59 +30,69 @@ class virtualRohdeSchwarz_SGS100A(VisaInstrument):
     """
 
     def __init__(self, name, address, **kwargs):
-
+        super().__init__(name, **kwargs)
         self.name = name
-        self.parameters={}
-        self.functions={}
+        self.parameters = {}
+        self.functions = {}
 
-        self.add_parameter(name='frequency',
-                           label='Frequency',
-                           unit='Hz',
-                           parameter_class=ManualParameter,
-                           get_parser=float,
-                           vals=vals.Numbers(1e6, 20e9))
-        self.add_parameter(name='phase',
-                           label='Phase',
-                           unit='deg',
-                           parameter_class=ManualParameter,
-                           get_parser=float,
-                           vals=vals.Numbers(0, 360))
-        self.add_parameter(name='power',
-                           label='Power',
-                           unit='dBm',
-                           parameter_class=ManualParameter,
-                           get_parser=float,
-                           vals=vals.Numbers(-120, 25))
-        self.add_parameter('status',
-                           parameter_class=ManualParameter,
-                           get_parser=self.parse_on_off,
-                           vals=vals.Strings())
-        self.add_parameter('pulsemod_state',
-                           parameter_class=ManualParameter,
-                           get_parser=self.parse_on_off,
-                           vals=vals.Strings())
-        self.add_parameter('pulsemod_source',
-                           parameter_class=ManualParameter,
-                           vals=vals.Strings())
-        self.add_parameter('ref_osc_source',
-                           label='Reference oscillator source',
-                           parameter_class=ManualParameter,
-                           vals=vals.Enum('INT', 'EXT'))
+        self.add_parameter(
+            name='frequency',
+            label='Frequency',
+            unit='Hz',
+            parameter_class=ManualParameter,
+            get_parser=float,
+            vals=vals.Numbers(1e6, 20e9))
+        self.add_parameter(
+            name='phase',
+            label='Phase',
+            unit='deg',
+            parameter_class=ManualParameter,
+            get_parser=float,
+            vals=vals.Numbers(0, 360))
+        self.add_parameter(
+            name='power',
+            label='Power',
+            unit='dBm',
+            parameter_class=ManualParameter,
+            get_parser=float,
+            vals=vals.Numbers(-120, 25))
+        self.add_parameter(
+            'status',
+            parameter_class=ManualParameter,
+            get_parser=self.parse_on_off,
+            vals=vals.Strings())
+        self.add_parameter(
+            'pulsemod_state',
+            parameter_class=ManualParameter,
+            get_parser=self.parse_on_off,
+            vals=vals.Strings())
+        self.add_parameter(
+            'pulsemod_source',
+            parameter_class=ManualParameter,
+            vals=vals.Strings())
+        self.add_parameter(
+            'ref_osc_source',
+            label='Reference oscillator source',
+            parameter_class=ManualParameter,
+            vals=vals.Enum('INT', 'EXT'))
         # Frequency mw_source outputs when used as a reference
-        self.add_parameter('ref_osc_output_freq',
-                           label='Reference oscillator output frequency',
-                           parameter_class=ManualParameter,
-                           vals=vals.Enum('10MHz', '100MHz', '1000MHz'))
+        self.add_parameter(
+            'ref_osc_output_freq',
+            label='Reference oscillator output frequency',
+            parameter_class=ManualParameter,
+            vals=vals.Enum('10MHz', '100MHz', '1000MHz'))
         # Frequency of the external reference mw_source uses
-        self.add_parameter('ref_osc_external_freq',
-                           label='Reference oscillator external frequency',
-                           parameter_class=ManualParameter,
-                           vals=vals.Enum('10MHz', '100MHz', '1000MHz'))
+        self.add_parameter(
+            'ref_osc_external_freq',
+            label='Reference oscillator external frequency',
+            parameter_class=ManualParameter,
+            vals=vals.Enum('10MHz', '100MHz', '1000MHz'))
 
         self.add_function('reset', call_cmd='*RST')
         self.add_function('run_self_tests', call_cmd='*TST?')
 
         self.connect_message()
+
     def connect_message(self):
         return 'virtualRohdeSchwarz_SGS100A'
 

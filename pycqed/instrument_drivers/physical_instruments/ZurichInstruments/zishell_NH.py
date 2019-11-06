@@ -252,12 +252,18 @@ class ziShellEnvironment:
 
         # Handle absolute path
         if path[0] == '/':
-            self.daq.vectorWrite(path, value)
+            if 'setVector' in dir(self.daq):
+                self.daq.setVector(path, value)
+            else:
+                self.daq.vectorWrite(path, value)
         else:
             for device in self.devices:
-                self.daq.vectorWrite('/' + device + '/' + path, value)
+                if 'setVector' in dir(self.daq):
+                    self.daq.setVector('/' + device + '/' + path, value)
+                else:
+                    self.daq.vectorWrite('/' + device + '/' + path, value)
 
-    def geti(self, paths, deep=False):
+    def geti(self, paths, deep=True):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -303,7 +309,7 @@ class ziShellEnvironment:
         else:
             return values
 
-    def getd(self, paths, deep=False):
+    def getd(self, paths, deep=True):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -318,16 +324,7 @@ class ziShellEnvironment:
             if p[0] == '/':
                 if deep:
                     env.daq.getAsEvent(p)
-                    tries = 0
-                    while tries < 10:
-                        tmp = env.daq.poll(1.0, 500, 4, True)
-                        if tmp:
-                            break
-                        else:
-                            tries += 1
-                            if tries >= 10:
-                                raise TimeoutError('Timeout while trying to read from {}'.format(p))
-
+                    tmp = env.daq.poll(0.2, 500, 4, True)
                     if p in tmp:
                         values.append(tmp[p]['value'][0])
                 else:
@@ -558,12 +555,12 @@ def setv(path, value):
     env.setv(path, value)
 
 
-def getd(paths, deep=False):
+def getd(paths, deep=True):
     global env
     return env.getd(paths, deep)
 
 
-def geti(paths, deep=False):
+def geti(paths, deep=True):
     global env
     return env.geti(paths, deep)
 
@@ -851,7 +848,7 @@ class ziShellDevice:
             '/' + self.device + '/features/options')).split('\n') if len(s)])
         return rv
 
-    def setd(self, path, value, sync=False):
+    def setd(self, path, value, synchronous=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -859,17 +856,17 @@ class ziShellDevice:
 
         # Handle absolute path
         if path[0] == '/':
-            if sync:
+            if synchronous:
                 self.daq.syncSetDouble(path, value)
             else:
                 self.daq.setDouble(path, value)
         else:
-            if sync:
+            if synchronous:
                 self.daq.syncSetDouble('/' + self.device + '/' + path, value)
             else:
                 self.daq.setDouble('/' + self.device + '/' + path, value)
 
-    def seti(self, path, value, sync=False):
+    def seti(self, path, value, synchronous=False):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -877,12 +874,12 @@ class ziShellDevice:
 
         # Handle absolute path
         if path[0] == '/':
-            if sync:
+            if synchronous:
                 self.daq.syncSetInt(path, value)
             else:
                 self.daq.setInt(path, value)
         else:
-            if sync:
+            if synchronous:
                 self.daq.syncSetInt('/' + self.device + '/' + path, value)
             else:
                 self.daq.setInt('/' + self.device + '/' + path, value)
@@ -895,11 +892,23 @@ class ziShellDevice:
 
         # Handle absolute path
         if path[0] == '/':
-            self.daq.vectorWrite(path, value)
+            self.daq.setVector(path, value)
         else:
-            self.daq.vectorWrite('/' + self.device + '/' + path, value)
+            self.daq.setVector('/' + self.device + '/' + path, value)
 
-    def geti(self, path, deep=False):
+    def sets(self, path, value, sync=False):
+        if not self.daq:
+            raise(ziShellDAQError())
+
+        path = path.lower()
+
+        # Handle absolute path
+        if path[0] == '/':
+            self.daq.setString(path, value)
+        else:
+            self.daq.setString('/' + self.device + '/' + path, value)
+
+    def geti(self, path, deep=True):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -920,7 +929,7 @@ class ziShellDevice:
         else:
             return self.daq.getInt(path)
 
-    def getd(self, path, deep=False):
+    def getd(self, path, deep=True):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -931,16 +940,7 @@ class ziShellDevice:
 
         if deep:
             self.daq.getAsEvent(path)
-            tries = 0
-            while tries < 10:
-                tmp = self.daq.poll(0.1, 500, 4, True)
-                if tmp:
-                    break
-                else:
-                    tries += 1
-                    if tries >= 10:
-                        raise TimeoutError('Timeout while trying to read from {}'.format(path))
-
+            tmp = self.daq.poll(0.1, 500, 4, True)
             if path in tmp:
                 return tmp[path]['value'][0]
             else:
@@ -963,6 +963,27 @@ class ziShellDevice:
             return tmp[path][0]['vector']
         else:
             return None
+
+    def gets(self, path, deep=True):
+        if not self.daq:
+            raise(ziShellDAQError())
+
+        path = path.lower()
+        if path[0] != '/':
+            path = '/' + self.device + '/' + path
+
+        if deep:
+            self.daq.getAsEvent(path)
+            timeout = 1.0
+            while timeout > 0.0:
+                tmp = self.daq.poll(0.1, 500, 4, True)
+                if path in tmp:
+                    return tmp[path][0]
+                else:
+                    timeout -= 0.1
+            return None
+        else:
+            return self.daq.getString(path)
 
     def find(self, *args):
         if not self.daq:
@@ -1051,7 +1072,6 @@ class ziShellDevice:
         success_and_ready = False
         # This check (and while loop) is added as a workaround for #9
         while not success_and_ready:
-            print('Disabling codeword triggering')
             self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 0)
             self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 0)
 
@@ -1070,7 +1090,7 @@ class ziShellDevice:
             # Success is set to False when either a timeout or a bad compilation
             # message is encountered.
             success = True
-            # while ("compilation not completed"):
+            # while ("compilation not completft1ed"):
             while len(self.awgModule.get('awgModule/compiler/sourcestring')
                       ['compiler']['sourcestring'][0]) > 0:
                 time.sleep(0.01)
@@ -1086,64 +1106,26 @@ class ziShellDevice:
             if not comp_msg.endswith(succes_msg):
                 success = False
 
-            # print('Reenabling codeword triggering')
-            # self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
-            # self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
-
-            if not success:
-                print(repr(program_string))
-                t_start = time.time()
-                for i in range(5):
-                    self.awgModule.set('awgModule/compiler/sourcestring',
-                                       program_string + ''.join(i*[' ']))
-                    while len(self.awgModule.get('awgModule/compiler/sourcestring')
-                              ['compiler']['sourcestring'][0]) > 0:
-                        time.sleep(0.01)
-                        comp_msg = (self.awgModule.get(
-                            'awgModule/compiler/statusstring')['compiler']
-                                    ['statusstring'][0])
-                        # if (time.time()-t0 >= timeout):
-                        #     success = False
-                        #     # print('Timeout encountered during compilation.')
-                        #     raise TimeoutError()
-                        #     break
-
-                        if comp_msg.endswith(succes_msg):
-                            success = True
-                            break
-                print(time.time()-t_start)
-                # if not comp_msg.endswith(succes_msg):
-                if not success:
-                    print("Compilation failed, printing program:")
-                    for i, line in enumerate(program_string.splitlines()):
-                        print(i+1, '\t', line)
-                    print('\n')
-                    raise ziShellCompilationError(comp_msg)
-
-            print('Reenabling codeword triggering')
             self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
             self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
 
-            # # if not comp_msg.endswith(succes_msg):
-            # if not success:
-            #     print("Compilation failed, printing program:")
-            #     for i, line in enumerate(program_string.splitlines()):
-            #         print(i+1, '\t', line)
-            #     print('\n')
-            #     raise ziShellCompilationError(comp_msg)
+            if not success:
+                print("Compilation failed, printing program:")
+                for i, line in enumerate(program_string.splitlines()):
+                    print(i+1, '\t', line)
+                print('\n')
+                raise ziShellCompilationError(comp_msg)
 
 
             # This check (and while loop) is added as a workaround for #9
             if self.geti('awgs/'+str(awg_nr)+'/ready')!= 1:
                 logging.warning('AWG not ready')
                 success_and_ready = False
-                print('not ready')
             else:
                 success_and_ready = True
-                print('ready')
 
-        print('AWG {} ready: {}'.format(awg_nr,
-                                     self.geti('awgs/'+str(awg_nr)+'/ready')))
+        # print('AWG {} ready: {}'.format(awg_nr,
+        #                              self.geti('awgs/'+str(awg_nr)+'/ready')))
         t1 = time.time()
         print(self.awgModule.get('awgModule/compiler/statusstring')
               ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))

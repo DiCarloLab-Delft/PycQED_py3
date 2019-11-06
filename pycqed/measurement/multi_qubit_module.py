@@ -355,7 +355,7 @@ def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
         max_ro_len = max(max_ro_len, qb.RO_pulse_length())
         max_int_length = max(max_int_length, qb.RO_acq_integration_length())
 
-    ro_spacing = 2 * UHFQC.quex_wint_delay() / 1.8e9
+    ro_spacing = 2 * UHFQC.qas_0_delay() / 1.8e9
     ro_spacing += max_int_length
     ro_spacing += ro_slack
     ro_spacing -= drive_pulse_len
@@ -376,8 +376,8 @@ def measure_multiplexed_readout(qubits, liveplot=False,
 
     if RO_spacing is None:
         UHFQC = qubits[0].instr_uhf.get_instr()
-        RO_spacing = UHFQC.quex_wint_delay() * 2 / 1.8e9
-        RO_spacing += UHFQC.quex_wint_length() / 1.8e9
+        RO_spacing = UHFQC.qas_0_delay() * 2 / 1.8e9
+        RO_spacing += UHFQC.qas_0_integration_length() / 1.8e9
         RO_spacing += 50e-9  # for slack
         RO_spacing = np.ceil(RO_spacing * 225e6 / 3) / 225e6 * 3
 
@@ -2954,7 +2954,7 @@ def measure_pygsti(qubits, f_LO, pygsti_gateset=None,
             MA = ma.MeasurementAnalysis(TwoD=(MC_run_mode == '2D'))
         else:
             thresholds = {qb.name: 1.5 * UHFQC.get(
-                'quex_thres_{}_level'.format(
+                'qas_0_thresholds_{}_level'.format(
                     qb.RO_acq_weight_function_I())) for qb in qubits}
             channel_map = {qb.name: det_func.value_names[0] for qb in qubits}
             MA = ra.MultiQubit_SingleShot_Analysis(options_dict=dict(
