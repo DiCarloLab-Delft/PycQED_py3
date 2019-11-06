@@ -1459,6 +1459,7 @@ def _zi_wave_dir():
     return os.path.join(_basedir, 'Zurich Instruments', 'LabOne', 
         'WebServer', 'awg', 'waves')
 
+
 def _zi_clear_waves():
     wave_dir = _zi_wave_dir()
     for f in os.listdir(wave_dir):
@@ -1466,6 +1467,7 @@ def _zi_clear_waves():
             os.remove(os.path.join(wave_dir, f))
         elif f.endswith('.cache'):
             shutil.rmtree(os.path.join(wave_dir, f))
+
 
 def _zi_wavename_pair_to_argument(w1, w2):
     if w1 is not None and w2 is not None:

@@ -192,7 +192,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
         if return_timestamp is False:
             return os.path.join(search_dir, daydir, measdir)
         else:
-            return str(daydir)+str(measdir[:6]), os.path.join(
+            return str(daydir)+'_'+str(measdir[:6]), os.path.join(
                 search_dir, daydir, measdir)
 
 

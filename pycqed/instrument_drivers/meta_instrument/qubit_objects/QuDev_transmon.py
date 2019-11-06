@@ -761,7 +761,8 @@ class QuDev_transmon(Qubit):
         exp_metadata.update({'sweep_points_dict': {self.name: amps},
                              'preparation_params': prep_params,
                              'cal_points': repr(cp),
-                             'rotate': len(cp.states) != 0,
+                             'rotate': False if classified_ro else
+                                len(cp.states) != 0,
                              'last_ge_pulses': [last_ge_pulse],
                              'data_to_fit': {self.name: 'pf' if for_ef else 'pe'},
                              "sweep_name": "Amplitude",
@@ -800,8 +801,9 @@ class QuDev_transmon(Qubit):
                         'The units should be seconds.')
 
         self.prepare(drive='timedomain')
-
         MC = self.instr_mc.get_instr()
+        if prep_params is None:
+            prep_params = self.preparation_params()
 
         # Define the measurement label
         if label is None:
@@ -827,7 +829,8 @@ class QuDev_transmon(Qubit):
         exp_metadata.update({'sweep_points_dict': {self.name: times},
                              'preparation_params': prep_params,
                              'cal_points': repr(cp),
-                             'rotate': False if classified_ro else True,
+                             'rotate': False if classified_ro else
+                                len(cp.states) != 0,
                              'last_ge_pulses': [last_ge_pulse],
                              'data_to_fit': {self.name: 'pf' if for_ef else 'pe'},
                              "sweep_name": "Time",
@@ -888,7 +891,7 @@ class QuDev_transmon(Qubit):
              'sweep_unit': '',
              'preparation_params': prep_params,
              'cal_points': repr(cp),
-             'rotate': len(cp.states) != 0,
+             'rotate': False if classified_ro else len(cp.states) != 0,
              'last_ge_pulses': [last_ge_pulse],
              'data_to_fit': {self.name: 'pf' if for_ef else 'pe'}})
         MC.run(label, exp_metadata=exp_metadata)
@@ -1067,7 +1070,7 @@ class QuDev_transmon(Qubit):
              'preparation_params': prep_params,
              'last_ge_pulses': [last_ge_pulse],
              'artificial_detuning': artificial_detunings,
-             'rotate': len(cp.states) != 0,
+             'rotate': False if classified_ro else len(cp.states) != 0,
              'data_to_fit': {self.name: 'pf' if for_ef else 'pe'}})
 
         MC.run(label, exp_metadata=exp_metadata)
@@ -1113,12 +1116,11 @@ class QuDev_transmon(Qubit):
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
                              'use_cal_points': cal_points,
-                             'rotate': True, # needs to be changed when adapting sequence; only true if not classified_ro
+                             'rotate': cal_points,
                              'cal_states_dict': cal_states_dict,
                              'cal_states_rotations': cal_states_rotations if
                                 self.acq_weights_type() != 'optimal_qutrit'
                                 else None,
-                             'rotate': cal_points,
                              'data_to_fit': {self.name: 'pe'},
                              'artificial_detuning': artificial_detuning})
         MC.run(label, exp_metadata=exp_metadata)
@@ -1192,7 +1194,7 @@ class QuDev_transmon(Qubit):
         if exp_metadata is None:
             exp_metadata = {}
         exp_metadata.update({'sweep_points_dict': {self.name: sweep_points},
-                             'use_cal_points': cal_points,
+                             'rotate': cal_points,
                              'last_ge_pulse': last_ge_pulse,
                              'data_to_fit': {self.name: 'pf'},
                              'cal_states_dict': cal_states_dict,
@@ -1236,16 +1238,10 @@ class QuDev_transmon(Qubit):
         cp = CalibrationPoints.single_qubit(self.name, cal_states,
                                             n_per_state=n_cal_points_per_state)
 
-        if thresholded:
-            if self.instr_uhf.get_instr().get('quex_thres_{}_level'.format(
-                    self.acq_I_channel())) == 0.0:
-                raise ValueError('The threshold value is not set.')
-
         sequences, hard_sweep_points, soft_sweep_points = \
             sq.randomized_renchmarking_seqs(
                 qb_name=self.name, operation_dict=self.get_operation_dict(),
                 cliffords=cliffords, nr_seeds=np.arange(nr_seeds),
-                uhf_name=self.instr_uhf.get_instr().name,
                 gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate, upload=False,
                 cal_points=cp, prep_params=prep_params)
@@ -2422,18 +2418,6 @@ class QuDev_transmon(Qubit):
                               upload=True, analyze=True,
                               prep_params=None, exp_metadata=None, **kw):
 
-        T1 = kw.pop('T1', None)
-        T2 = kw.pop('T1', None)
-
-        if T1 is None and self.T1() is not None:
-            T1 = self.T1()
-        if T2 is None:
-            if self.T2() is not None:
-                T2 = self.T2()
-            elif self.T2_star() is not None:
-                print('T2 is None. Using T2_star.')
-                T2 = self.T2_star()
-
         if cliffords is None:
             raise ValueError("Unspecified cliffords array")
 
@@ -2446,11 +2430,6 @@ class QuDev_transmon(Qubit):
                 label = 'IRB_{}_{}_{}_seeds_{}_cliffords'.format(
                     interleaved_gate, gate_decomposition,
                     nr_seeds, cliffords[-1]) + self.msmt_suffix
-
-        if thresholded:
-            if self.instr_uhf.get_instr().get('quex_thres_{}_level'.format(
-                    self.acq_weights_I())) == 0.0:
-                raise ValueError('The threshold value is not set.')
 
         #Perform measurement
         self.measure_randomized_benchmarking(

@@ -426,7 +426,6 @@ class UHFQC_Base(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
-
         for UHF in self.UHFs:
             UHF._daq.setInt('/' + UHF._device + '/quex/rl/readout', 1)
 
@@ -481,11 +480,12 @@ class UHFQC_Base(Hard_Detector):
 
         return data_raw
 
+
 class UHFQC_multi_detector(UHFQC_Base):
     """
     Combines several UHF detectors into a single detector
     """
-    def __init__(self, detectors):
+    def __init__(self, detectors, **kw):
         super().__init__(detectors=detectors)
         self.AWG = None
         self.value_names = []
@@ -498,9 +498,23 @@ class UHFQC_multi_detector(UHFQC_Base):
                 if self.AWG is None:
                     self.AWG = d.AWG
                 elif self.AWG != d.AWG:
-                    raise Exception('Not all AWG instances in UHFQC_multi_...  '
-                                    'are the same')
+                    raise Exception('Not all AWG instances in UHFQC_multi_detector'
+                                    ' are the same')
                 d.AWG = None
+
+        # currently only has support for classifier detector data
+        self.correlated = kw.get('correlated', False)
+        self.averaged = kw.get('averaged', True)
+        if 'classifier' in self.detectors[0].name:
+            print(self.detectors[0].name)
+            self.correlated = self.detectors[0].get_values_function_kwargs.get(
+                'correlated', True)
+            self.averaged = self.detectors[0].get_values_function_kwargs.get(
+                'averaged', True)
+            print(self.correlated)
+        if self.correlated:
+            self.value_names += ['correlation']
+            self.value_units += ['']
 
     def prepare(self, sweep_points):
         for d in self.detectors:
@@ -511,9 +525,64 @@ class UHFQC_multi_detector(UHFQC_Base):
 
         processed_data = [self.detectors[self.UHF_map[UHF]].process_data(d)
                           for UHF, d in raw_data.items()]
+        processed_data = np.concatenate(processed_data)
+        if self.correlated:
+            corr_data = self.get_correlations_classif_det(np.concatenate([
+                d for d in raw_data.values()]))
+            processed_data = np.concatenate([processed_data, corr_data], axis=0)
 
-        return np.concatenate(processed_data)
+        print('final ', processed_data.shape)
+        return processed_data
 
+    def get_correlations_classif_det(self, data):
+        classifier_params_list = []
+        state_prob_mtx_list = []
+        for d in self.detectors:
+            classifier_params_list += d.classifier_params_list
+            state_prob_mtx_list += d.state_prob_mtx_list
+        print('data ', data.shape)
+
+        nr_states = len(self.detectors[0].state_labels)
+        len_ch_pairs = sum([len(d.channel_str_pairs) for d in self.detectors])
+        clf_data_all = np.zeros(
+            (self.detectors[0].nr_sweep_points * self.detectors[0].nr_shots,
+             nr_states * len_ch_pairs))
+        for i in range(len_ch_pairs):
+            clf_data = a_tools.predict_gm_proba_from_clf(
+                data[2 * i: 2 * i + 2, :].T, classifier_params_list[i])
+            if self.detectors[0].get_values_function_kwargs.get(
+                    'thresholded', True):
+                # clf_data must be 2 dimensional, rows are shots*sweep_points,
+                # columns are nr_states
+                clf_data = np.isclose(np.repeat([np.arange(nr_states)],
+                                                clf_data.shape[0], axis=0).T,
+                                      np.argmax(clf_data, axis=1)).T
+            if state_prob_mtx_list is not None:
+                clf_data = (np.linalg.inv(
+                    state_prob_mtx_list[i]).T @ clf_data.T).T
+                log.info('Correlated data corrected based on state_prob_mtx.')
+            else:
+                log.info('not correcting correlated data')
+            clf_data_all[:, nr_states * i: nr_states * i + nr_states] = clf_data
+
+        print('clf_data_all1 ', clf_data_all.shape)
+        # can only correlate corresponding probabilities on all channels;
+        # it cannot correlate selected channels
+        nr_states = len(self.detectors[0].state_labels)
+        q = clf_data_all.shape[1] // nr_states
+        qb_states_list = [np.argmax(
+            clf_data_all[:, i * nr_states: i * nr_states + nr_states],
+            axis=1) for i in range(q)]
+        corr_data = np.sum(np.array(qb_states_list) % 2, axis=0) % 2
+        if self.averaged:
+            corr_data = np.reshape(
+                corr_data, (self.detectors[0].nr_shots,
+                            self.detectors[0].nr_sweep_points))
+            corr_data = np.mean(corr_data, axis=0)
+        corr_data = np.reshape(corr_data, (1, corr_data.size))
+        print('corr_data ', corr_data.shape)
+
+        return corr_data
 
     def finish(self):
         if self.AWG is not None:
@@ -521,6 +590,7 @@ class UHFQC_multi_detector(UHFQC_Base):
 
         for d in self.detectors:
             d.finish()
+
 
 class UHFQC_input_average_detector(UHFQC_Base):
 
@@ -550,7 +620,8 @@ class UHFQC_input_average_detector(UHFQC_Base):
         return processed_data
 
     def process_data(self, raw_data):
-        # IMPORTANT: No re-scaling factor needed for input average mode as the UHFQC returns volts
+        # IMPORTANT: No re-scaling factor needed for input average mode as
+        # the UHFQC returns volts
         # Verified January 2018 by Xavi
         return raw_data
 
@@ -1112,8 +1183,8 @@ class UHFQC_integration_logging_det(UHFQC_Base):
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
 
-        self.UHFQC.quex_rl_length(self.nr_shots*len(sweep_points))
-        self.nr_sweep_points = self.nr_shots*len(sweep_points)
+        self.UHFQC.quex_rl_length(len(sweep_points)*self.nr_shots)
+        self.nr_sweep_points = len(sweep_points)*self.nr_shots
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
 
@@ -1209,11 +1280,11 @@ class UHFQC_classifier_detector(UHFQC_Base):
         """
         super().__init__(UHFQC)
 
-        self.name = '{}_UHFQC_integration_logging_det'.format(
+        self.name = '{}_UHFQC_classifier_det'.format(
             result_logging_mode)
         self.state_labels = ['pg', 'pe', 'pf']
         self.channels = channels
-        self.correlated = get_values_function_kwargs.get('correlated', False)
+        self.correlated = get_values_function_kwargs.get('correlated', True)
 
         # Currently doesn't work with single readout channel;
         # assumes 2 channels per data point
@@ -1229,8 +1300,8 @@ class UHFQC_classifier_detector(UHFQC_Base):
                     state, ch_pair)
                 idx += 1
 
-        if self.correlated:
-            self.value_names += ['correlation']
+        # if self.correlated:
+        #     self.value_names += ['correlation']
 
         if result_logging_mode == 'raw':
             self.value_units = ['']*len(self.value_names)
@@ -1284,17 +1355,6 @@ class UHFQC_classifier_detector(UHFQC_Base):
     def get_values(self):
         if self.always_prepare:
             self.prepare()
-        # if self.AWG is not None:
-        #     self.AWG.stop()
-        # self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-        #
-        # # starting AWG
-        # if self.AWG is not None:
-        #     self.AWG.start()
-        #
-        # data_raw = self.UHFQC.acquisition_poll(
-        #     samples=self.nr_shots*self.nr_sweep_points,
-        #     arm=False, acquisition_time=0.01)
         data_raw = self.poll_data()
         processed_data = self.process_data(data_raw[self.UHFQC.name])
         return processed_data
@@ -1308,37 +1368,41 @@ class UHFQC_classifier_detector(UHFQC_Base):
                 data[i] = data[i]-self.UHFQC.get(
                     'quex_trans_offset_weightfunction_{}'.format(channel))
 
-        # Classify data into qutrit states
-        classifier_params_list = self.get_values_function_kwargs.get(
-                    'classifier_params', None)
-        if not isinstance(classifier_params_list, list):
-            classifier_params_list = [classifier_params_list]
-        state_prob_mtx_list = self.get_values_function_kwargs.get(
-                    'state_prob_mtx', None)
-        if state_prob_mtx_list is not None and \
-                not isinstance(state_prob_mtx_list, list):
-            state_prob_mtx_list = [state_prob_mtx_list]
-
         classified_data = data
         if self.get_values_function_kwargs.get('classified', True):
+            # Classify data into qutrit states
+            classifier_params_list = self.get_values_function_kwargs.get(
+                'classifier_params', None)
+            if not isinstance(classifier_params_list, list):
+                classifier_params_list = [classifier_params_list]
+            state_prob_mtx_list = self.get_values_function_kwargs.get(
+                'state_prob_mtx', None)
+            if state_prob_mtx_list is not None and \
+                    not isinstance(state_prob_mtx_list, list):
+                state_prob_mtx_list = [state_prob_mtx_list]
+
+            self.classifier_params_list = classifier_params_list
+            self.state_prob_mtx_list = state_prob_mtx_list
+
             classified_data = self.classify_shots(
-                data, classifier_params_list, state_prob_mtx_list,
+                data, self.classifier_params_list, self.state_prob_mtx_list,
                 self.get_values_function_kwargs.get('averaged', True),
-                self.correlated,
                 self.get_values_function_kwargs.get('thresholded', True))
 
         return classified_data.T
 
     def classify_shots(self, data, classifier_params_list,
                        state_prob_mtx_list=None, averaged=False,
-                       correlated=False, thresholded=True):
+                       thresholded=True):
 
         if classifier_params_list is None:
             raise ValueError('Please specify the classifier parameters list.')
 
         nr_states = len(self.state_labels)
         classified_data = np.zeros(
-            (nr_states*len(self.channel_str_pairs), self.nr_sweep_points))
+            (nr_states*len(self.channel_str_pairs),
+             self.nr_sweep_points if averaged else
+             self.nr_sweep_points*self.nr_shots))
 
         clf_data_all = np.zeros((self.nr_sweep_points*self.nr_shots,
                                 nr_states*len(self.channel_str_pairs)))
@@ -1354,11 +1418,11 @@ class UHFQC_classifier_detector(UHFQC_Base):
                                       np.argmax(clf_data, axis=1)).T
             clf_data_all[:, nr_states*i: nr_states*i+nr_states] = clf_data
 
-            # reshape into (nr_shots, nr_sweep_points, nr_data_columns)
-            clf_data = np.reshape(
-                clf_data, (self.nr_shots, self.nr_sweep_points,
-                                  clf_data.shape[-1]))
             if averaged:
+                # reshape into (nr_shots, nr_sweep_points, nr_data_columns)
+                clf_data = np.reshape(
+                    clf_data, (self.nr_shots, self.nr_sweep_points,
+                               clf_data.shape[-1]))
                 clf_data = np.mean(clf_data, axis=0)
             if state_prob_mtx_list is not None:
                 clf_data = np.linalg.inv(
@@ -1367,24 +1431,26 @@ class UHFQC_classifier_detector(UHFQC_Base):
             else:
                 log.info('not correcting data')
                 clf_data = clf_data.T
+
             classified_data[nr_states * i: nr_states * i + nr_states, :] = \
                 clf_data
-
-        if correlated:
-            # can only correlate corresponding probabilities on all channels;
-            # it cannot correlate selected channels
-            q = clf_data_all.shape[1] // nr_states
-            qb_states_list = [np.argmax(
-                clf_data_all[:, i*nr_states: i*nr_states + nr_states],
-                axis=1) for i in range(q)]
-            corr_data = np.sum(np.array(qb_states_list) % 2, axis=0) % 2
-            if averaged:
-                corr_data = np.reshape(
-                    corr_data, (self.nr_shots, self.nr_sweep_points))
-                corr_data = np.mean(corr_data, axis=0)
-            corr_data = np.reshape(corr_data, (1, corr_data.size))
-            classified_data = np.concatenate([classified_data, corr_data],
-                                             axis=0)
+        # if True:
+        #     # can only correlate corresponding probabilities on all channels;
+        #     # it cannot correlate selected channels
+        #     q = clf_data_all.shape[1] // nr_states
+        #     print(clf_data_all.shape[1])
+        #     print(nr_states, q)
+        #     qb_states_list = [np.argmax(
+        #         clf_data_all[:, i*nr_states: i*nr_states + nr_states],
+        #         axis=1) for i in range(q)]
+        #     corr_data = np.sum(np.array(qb_states_list) % 2, axis=0) % 2
+        #     if averaged:
+        #         corr_data = np.reshape(
+        #             corr_data, (self.nr_shots, self.nr_sweep_points))
+        #         corr_data = np.mean(corr_data, axis=0)
+        #     corr_data = np.reshape(corr_data, (1, corr_data.size))
+        #     classified_data = np.concatenate([classified_data, corr_data],
+        #                                      axis=0)
         return classified_data.T
 
     def finish(self):

@@ -683,7 +683,7 @@ def single_state_active_reset(operation_dict, qb_name,
 
 
 def randomized_renchmarking_seqs(
-        qb_name, operation_dict, cliffords, nr_seeds, uhf_name, net_clifford=0,
+        qb_name, operation_dict, cliffords, nr_seeds, net_clifford=0,
         gate_decomposition='HZ', interleaved_gate=None, upload=True,
         cal_points=None, prep_params=dict()):
 
