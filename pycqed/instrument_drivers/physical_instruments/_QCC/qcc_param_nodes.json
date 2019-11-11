@@ -399,10 +399,10 @@
             }
         },
         {
-            "docstring": "This parameter modifies the reset register of the QEC decoder submodule. Valid input: 1 = reset, 0 = idle",
+            "docstring": "This parameter modifies the reset register of the QEC decoder submodule",
             "get_cmd": "QUTech:QecCtrlReset?",
             "label": "Reset QEC Decoder",
-            "name": "qec_submodule_control_reset",
+            "name": "qec_reset",
             "vals": {
                 "type": "Bool"
             }
@@ -411,7 +411,7 @@
             "docstring": "This parameter modifies the enable register of the processor. Valid input: 1 = reset, 0 = idle",
             "get_cmd": "QUTech:QecCtrlEnable?",
             "label": "Enable QEC Decoder",
-            "name": "qec_submodule_control_enable",
+            "name": "qec_enable",
             "set_cmd": "QUTech:QecCtrlEnable {}",
             "vals": {
                 "type": "Bool"
@@ -421,7 +421,7 @@
             "docstring": "This parameter modifies the initial values of ancilla qubit states for QEC. Decimal-encoded binary value representing one-hot encoding of ancilla qubit states.",
             "get_cmd": "QUTech:QecCtrlInitAQB?",
             "label": "Initialize QEC Decoder Ancillas",
-            "name": "qec_submodule_init_aqb",
+            "name": "qec_init_aqb",
             "set_cmd": "QUTech:QecCtrlInitAQB {}",
             "vals": {
                 "range": [
@@ -432,20 +432,10 @@
             }
         },
         {
-            "docstring": "This parameter modifies the data qubit readout type. Valid input: 0 = Z, 1 = X",
-            "get_cmd": "QUTech:QecCtrlDQbXZN?",
-            "label": "Data qubit readout type",
-            "name": "qec_submodule_dqb_xzn",
-            "set_cmd": "QUTech:QecCtrlDQbXZN {}",
-            "vals": {
-                "type": "Bool"
-            }
-        },
-        {
             "docstring": "This parameter determines all the outputs resulting from the QEC submodule.",
             "get_cmd": "QUTech:QecOutput?",
             "label": "QEC result readout",
-            "name": "qec_submodule_output",
+            "name": "qec_output",
             "vals": {
                 "type": "QECDataType"
             }
@@ -461,59 +451,39 @@
             }
         },
         {
-            "docstring": "This parameter controls the operation of the software decoder framework.",
-            "get_cmd": "QUTech:QecOCMCtrlEnable?",
-            "label": "Enable Software QEC Decoder",
-            "name": "qec_ocm_enable",
-            "set_cmd": "QUTech:QecOCMCtrlEnable {}",
+            "docstring": "This parameter allows configuration of the software decoder framework.",
+            "label": "Configure Software QEC Decoder",
+            "name": "qec_blossomx_config",
+            "set_cmd": "QUTech:QecBlossom1Config {}",
             "vals": {
-                "type": "Bool"
-            }
-        },
-        {
-            "docstring": "This parameter resets the software decoder framework.",
-            "get_cmd": "QUTech:QecOCMCtrlReset?",
-            "label": "Reset Software QEC Decoder",
-            "name": "qec_ocm_reset",
-            "vals": {
-                "type": "Bool"
+                "type": "QECDataType"
             }
         },
         {
             "docstring": "This parameter allows configuration of the software decoder framework.",
-            "get_cmd": "QUTech:QecOCMCtrlConfig?",
             "label": "Configure Software QEC Decoder",
-            "name": "qec_ocm_config",
-            "set_cmd": "QUTech:QecOCMCtrlConfig {}",
+            "name": "qec_blossomz_config",
+            "set_cmd": "QUTech:QecBlossom2Config {}",
             "vals": {
-                "type": "QECOCMDataType"
+                "type": "QECDataType"
             }
         },
         {
             "docstring": "This parameter queries the status of the software decoder framework.",
-            "get_cmd": "QUTech:QecOCMCtrlStatus?",
+            "get_cmd": "QUTech:QecBlossomStatus?",
             "label": "Status of Software QEC Decoder",
-            "name": "qec_ocm_status",
+            "name": "qec_blossom_status",
             "vals": {
                 "type": "Non_Neg_Number"
             }
         },
         {
             "docstring": "This parameter queries any exceptions on the software decoder framework.",
-            "get_cmd": "QUTech:QecOCMCtrlExcept?",
+            "get_cmd": "QUTech:QecBlossomExcept?",
             "label": "Exceptions on Software QEC Decoder",
-            "name": "qec_ocm_except",
+            "name": "qec_blossom_except",
             "vals": {
                 "type": "Bool"
-            }
-        },
-        {
-            "docstring": "This parameter queries for parity output from the software decoder framework.",
-            "get_cmd": "QUTech:QecOCMCtrlOutput?",
-            "label": "Parity Output for Software QEC Decoder",
-            "name": "qec_ocm_output",
-            "vals": {
-                "type": "QECOCMDataType"
             }
         },
         {
@@ -770,32 +740,17 @@
                 ],
                 "type": "Non_Neg_Number"
             }
-        },
-        {
-            "docstring": "It sets/gets the delay for VSM channel 17. Acceptable range is [0,127]. The unit is 2.5 ns.",
-            "get_cmd": "QUTech:VSMChannelDelay17?",
-            "label": "VSM Channel 17 delay",
-            "name": "vsm_channel_delay17",
-            "set_cmd": "QUTech:VSMChannelDelay17 {}",
-            "unit": "2.5 ns",
-            "vals": {
-                "range": [
-                    0,
-                    127
-                ],
-                "type": "Non_Neg_Number"
-            }
         }
     ],
     "version": {
-        "Embedded Software Build Time": "20191004-10:55:02",
+        "Embedded Software Build Time": "20191024-17:55:29",
         "Embedded Software Version": "0.2.0",
-        "Firmware": "0.2.0",
         "Firmware Build Time": "24/10/2016-13:27:47",
-        "Kernel Module Build Time": "20190925-18:57:42",
+        "Kernel Module Build Time": "20191024-13:53:41",
         "Kernel Module Version": "0.0.1",
-        "Model": " QCC",
-        "Serial": "QCC1",
-        "Vendor": "QuTech"
+        "firmware": "0.2.0",
+        "model": "QCC",
+        "serial": "QCC1",
+        "vendor": "QuTech"
     }
 }
