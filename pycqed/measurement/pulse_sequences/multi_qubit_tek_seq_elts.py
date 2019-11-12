@@ -1644,7 +1644,8 @@ def generate_mux_ro_pulse_list(qubit_names, operation_dict, element_name='RO',
 
 def interleaved_pulse_list_equatorial_seg(
         qubit_names, operation_dict, interleaved_pulse_list, phase, 
-        pihalf_spacing=None, segment_name='segment'):
+        pihalf_spacing=None, prep_params=None, segment_name='equatorial_segment'):
+    prep_params = {} if prep_params is None else prep_params
     pulse_list = []
     for notfirst, qbn in enumerate(qubit_names):
         pulse_list.append(deepcopy(operation_dict['X90 ' + qbn])) 
@@ -1662,41 +1663,33 @@ def interleaved_pulse_list_equatorial_seg(
             pulse_list[-1]['ref_point'] = 'start'
             pulse_list[-1]['pulse_delay'] = pihalf_spacing
     pulse_list += generate_mux_ro_pulse_list(qubit_names, operation_dict)
+    pulse_list = add_preparation_pulses(pulse_list, operation_dict, qubit_names, **prep_params)
     return segment.Segment(segment_name, pulse_list)
 
 
 def interleaved_pulse_list_list_equatorial_seq(
         qubit_names, operation_dict, interleaved_pulse_list_list, phases, 
-        pihalf_spacing=None, cal_points=True,
+        pihalf_spacing=None, prep_params=None, cal_points=None,
         sequence_name='equatorial_sequence', upload=True):
+    prep_params = {} if prep_params is None else prep_params
     seq = sequence.Sequence(sequence_name)
     for i, interleaved_pulse_list in enumerate(interleaved_pulse_list_list):
         for j, phase in enumerate(phases):
             seg = interleaved_pulse_list_equatorial_seg(
                 qubit_names, operation_dict, interleaved_pulse_list, phase,
-                pihalf_spacing=pihalf_spacing, segment_name=f'segment_{i}_{j}')
+                pihalf_spacing=pihalf_spacing, prep_params=prep_params, segment_name=f'segment_{i}_{j}')
             seq.add(seg)
-    if cal_points:
-        # TODO: replace this part of code with more general cal point code
-        for i, cal_pulse in enumerate(['I ', 'I ', 'X180 ', 'X180 ']):
-            pulse_list = []
-            for notfirst, qbn in enumerate(qubit_names):
-                pulse_list.append(deepcopy(operation_dict[cal_pulse + qbn])) 
-                pulse_list[-1]['ref_point'] = 'start'
-            pulse_list += \
-                generate_mux_ro_pulse_list(qubit_names, operation_dict)
-            
-            seg = segment.Segment(f'calibration_{i}', pulse_list)
-            seq.add(seg)
+    if cal_points is not None:
+        seq.extend(cal_points.create_segments(operation_dict, **prep_params))
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
-    return seq
+    return seq, np.arange(seq.n_acq_elements())
 
 
 def measurement_induced_dephasing_seq(
         measured_qubit_names, dephased_qubit_names, operation_dict, 
-        ro_amp_scales, phases, pihalf_spacing=None, cal_points=True,
-        sequence_name='measurement_induced_dephasing_seq', upload=True):
+        ro_amp_scales, phases, pihalf_spacing=None, prep_params=None,
+        cal_points=None, upload=True, sequence_name='measurement_induced_dephasing_seq'):
     interleaved_pulse_list_list = []
     for i, ro_amp_scale in enumerate(ro_amp_scales):
         interleaved_pulse_list = generate_mux_ro_pulse_list(
@@ -1708,5 +1701,5 @@ def measurement_induced_dephasing_seq(
         interleaved_pulse_list_list.append(interleaved_pulse_list)
     return interleaved_pulse_list_list_equatorial_seq(
         dephased_qubit_names, operation_dict, interleaved_pulse_list_list, 
-        phases, pihalf_spacing=pihalf_spacing, cal_points=cal_points,
-        sequence_name=sequence_name, upload=upload)
+        phases, pihalf_spacing=pihalf_spacing, prep_params=prep_params,
+        cal_points=cal_points, sequence_name=sequence_name, upload=upload)

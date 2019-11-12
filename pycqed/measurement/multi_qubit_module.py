@@ -1414,59 +1414,67 @@ def cphase_finetune_parameters(qbc, qbt, qbr, flux_length, flux_amplitudes,
 
 
 def measure_measurement_induced_dephasing(qb_dephased, qb_targeted, phases, amps,
-                                          readout_separation, f_LO, nr_readouts=1,
-                                          label=None,
-                                          cal_points=((-4, -3), (-2, -1)), MC=None,
-                                          UHFQC=None, pulsar=None,
-                                          upload=True):
+                                          readout_separation, nr_readouts=1,
+                                          label=None, n_cal_points_per_state=1, cal_states='auto',
+                                          prep_params=None, exp_metadata=None, label=None,
+                                          analyze=True, upload=True, **kw):
+    classified = kw.get('classified', False)
+    predictive_label = kw.pop('predictive_label', False)
+    if prep_params is None:
+        prep_params = get_multi_qubit_prep_params(
+            [qb.preparation_params() for qb in qb_dephased])
+
     if label is None:
         label = 'measurement_induced_dephasing_x{}_{}_{}'.format(
             nr_readouts, qb_dephased.name, qb_targeted.name)
-    if MC is None:
-        MC = qb_dephased.MC
-    if UHFQC is None:
-        UHFQC = qb_dephased.UHFQC
-    if pulsar is None:
-        pulsar = qb_dephased.AWG
-    operation_dict = get_operation_dict([qb_dephased, qb_targeted])
-    for qb in [qb_targeted, qb_dephased]:
-        qb.prepare_for_timedomain(multiplexed=True)
-    sf = awg_swf2.Measurement_Induced_Dephasing_Phase_Swf(
-        qbn_dephased=qb_dephased.name,
-        ro_op='RO ' + qb_targeted.name,
-        operation_dict=operation_dict,
-        readout_separation=readout_separation,
-        nr_readouts=nr_readouts,
-        cal_points=cal_points,
-        upload=upload)
-    MC.set_sweep_function(sf)
-    MC.set_sweep_points(phases)
-    sf2 = awg_swf2.Measurement_Induced_Dephasing_Amplitude_Swf(
-        qb_dephased=qb_dephased,
-        qb_targeted=qb_targeted,
-        nr_readouts=nr_readouts,
-        multiplexed_pulse_fn=multiplexed_pulse,
-        f_LO=f_LO
-    )
-    MC.set_sweep_function_2D(sf2)
-    MC.set_sweep_points_2D(amps)
-    channels = qb_dephased.int_avg_det.channels
-    suffixes = ['_probe_{}'.format(i + 1) for i in range(nr_readouts)] + \
-               ['_measure']
-    df = det.UHFQC_integrated_average_detector(
-        UHFQC=UHFQC, AWG=pulsar, channels=channels,
-        integration_length=qb_dephased.RO_acq_integration_length(),
-        nr_averages=qb_dephased.RO_acq_averages(),
-        values_per_point=nr_readouts + 1,
-        values_per_point_suffex=suffixes)
-    MC.set_detector_function(df)
-    exp_metadata = {'readout_separation': readout_separation,
-                    'nr_readouts': nr_readouts,
-                    'cal_points': cal_points,
-                    'f_LO': f_LO
-                    }
-    MC.run_2D(label, exp_metadata=exp_metadata)
-    tda.MeasurementInducedDephasingAnalysis(do_fitting=True)
+
+    hard_sweep_params = {
+        'phase': {'unit': 'rad',
+            'values': np.tile(phases, len(amps))},
+        'ro_amp_scale': {'unit': 'deg',
+            'values': np.repeat(amps, len(phases))}
+    }
+
+    for qb in set(qb_targeted) + set(qb_dephased):
+        MC = qb.instr_mc.get_instr()
+        qb.prepare(drive='timedomain')
+
+    cal_states = CalibrationPoints.guess_cal_states(cal_states)
+    cp = CalibrationPoints.multi_qubit([qb.name for qb in qb_dephased], cal_states,
+                                       n_per_state=n_cal_points_per_state)
+
+    operation_dict = get_operation_dict(list(set(qb_dephased + qb_targeted)))
+    seq, sweep_points = mqs.measurement_induced_dephasing_seq(
+        [qb.name for qb in qb_targeted], [qb.name for qb in qb_dephased], operation_dict,
+        amps, phases, pihalf_spacing=readout_separation, prep_params=prep_params,
+        cal_points=cp, upload=False, sequence_name=label)
+
+    hard_sweep_func = awg_swf.SegmentHardSweep(
+        sequence=seq, upload=upload,
+        parameter_name='readout_idx', unit='')
+    MC.set_sweep_function(hard_sweep_func)
+    MC.set_sweep_points(sweep_points)
+
+    det_name = 'int_avg{}_det'.format('_classif' if classified else '')
+    det_func = get_multiplexed_readout_detector_functions(
+        qb_dephased, nr_averages=max(qb.acq_averages() for qb in qb_dephased)
+    )[det_name]
+    MC.set_detector_function(det_func)
+
+    if exp_metadata is None:
+        exp_metadata = {}
+    exp_metadata.update({'qb_dephased': [qb.name for qb in qb_dephased],
+                         'qb_targeted': [qb.name for qb in qb_targeted],
+                         'preparation_params': prep_params,
+                         'cal_points': repr(cp),
+                         'classified_ro': classified,
+                         'rotate': len(cal_states) != 0 and not classified,
+                         'data_to_fit': {qb.name: 'pe' for qb in qb_targeted},
+                         'hard_sweep_params': hard_sweep_params})
+
+    MC.run(label, exp_metadata=exp_metadata)
+
+    tda.MultiQubit_TimeDomain_Analysis(qb_names=[qb.name for qb in qb_targeted])
 
 
 def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
