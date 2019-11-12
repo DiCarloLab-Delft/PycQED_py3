@@ -139,7 +139,7 @@ class dummy_UHFQC(Instrument):
         print('Initialized dummy UHFQC', self.name,
               'in %.2fs' % (t1-t0))
 
-    def load_default_settings(self):
+    def load_default_settings(self, upload_sequence=True):
         # standard configurations adapted from Haendbaek's notebook
         # Run this block to do some standard configuration
 
@@ -153,7 +153,8 @@ class dummy_UHFQC(Instrument):
 
         # Load an AWG program (from Zurich
         # Instruments/LabOne/WebServer/awg/src)
-        self.awg_sequence_acquisition()
+        if upload_sequence:
+            self.awg_sequence_acquisition()
 
         # Turn on both outputs
         self.sigouts_0_on(1)
@@ -218,8 +219,8 @@ class dummy_UHFQC(Instrument):
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
         # these signals on the output here.
-        self.sigouts_0_enables_3(0)
-        self.sigouts_1_enables_7(0)
+        self.sigouts_0_enables_0(0)
+        self.sigouts_1_enables_1(0)
 
     def _gen_set_func(self, dev_set_type, cmd_str):
         def set_func(val):
@@ -399,16 +400,16 @@ class dummy_UHFQC(Instrument):
         else:
             return '/' + self._device + '/' + path
 
-    def seti(self, path, value, async=False):
-        if async:
+    def seti(self, path, value, asynchronous=False):
+        if asynchronous:
             func = self._daq.asyncSetInt
         else:
             func = self._daq.setInt
 
         func(self._make_full_path(path), int(value))
 
-    def setd(self, path, value, async=False):
-        if async:
+    def setd(self, path, value, asynchronous=False):
+        if asynchronous:
             func = self._daq.asyncSetDouble
         else:
             func = self._daq.setDouble
@@ -600,8 +601,7 @@ setTrigger(0);"""
         self.awg_string(string)
 
     def array_to_combined_vector_string(self, array, name):
-        # this function cuts up arrays into several vectors of maximum length
-        # 1024 that are joined.
+        # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
         # this is to avoid python crashes (was found to crash for vectors of
         # lenght> 1490)
         string = 'vect('
@@ -657,7 +657,7 @@ setTrigger(0);"""
         self._daq.sync()
 
     def awg_sequence_acquisition_and_pulse_SSB(
-            self, f_RO_mod, RO_amp, RO_pulse_length):
+            self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
         array = np.arange(int(samples))
@@ -665,8 +665,9 @@ setTrigger(0);"""
         coswave = RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
         Iwave = (coswave+sinwave)/np.sqrt(2)
         Qwave = (coswave-sinwave)/np.sqrt(2)
+        # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
         self.awg_sequence_acquisition_and_pulse(
-            Iwave, Qwave)
+            Iwave, Qwave, acquisition_delay)
 
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows

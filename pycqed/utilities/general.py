@@ -741,7 +741,7 @@ def temporary_value(*param_value_pairs):
             log.debug('Entered TemporaryValueContext')
             self.old_value_pairs = \
                 [(param, param()) for param, value in self.param_value_pairs]
-            for param, value in param_value_pairs: 
+            for param, value in self.param_value_pairs:
                 param(value)
     
         def __exit__(self, type, value, traceback):

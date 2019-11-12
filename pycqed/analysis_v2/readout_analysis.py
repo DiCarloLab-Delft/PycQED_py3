@@ -1859,7 +1859,10 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
         self.observables = options_dict.get('observables', None)
 
         if self.observables is None:
-            combination_list = list(itertools.product([False, True],
+            inverted_thresholds = options_dict.get('inverted_thresholds', False)
+            combination_list = list(itertools.product(([True, False] if
+                                                       inverted_thresholds else
+                                                       [False, True]),
                                                       repeat=len(qubits)))
             preselection_condition = dict(zip(
                 [(qb, -1) for qb in qubits],  # keys contain shift

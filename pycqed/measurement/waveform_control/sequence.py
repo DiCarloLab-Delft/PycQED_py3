@@ -111,7 +111,10 @@ class Sequence:
         applied.
         :return:
         """
-        pulse = operation_dict[pulse_name]
+        if operation_dict==None:
+            pulse=pulse_name
+        else:
+            pulse = operation_dict[pulse_name]
         repeat = dict()
         for ch in pulse_channel_names:
             repeat[pulse[ch]] = pattern

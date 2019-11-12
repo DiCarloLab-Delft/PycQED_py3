@@ -1158,7 +1158,8 @@ class MeasurementControl(Instrument):
                 parameter_list = dict_to_ordered_tuples(par_snap)
                 for (p_name, p) in parameter_list:
                     try:
-                        val = repr(p['value'])
+                        # val = repr(p['value'])
+                        val = str(p['value'])
                     except KeyError:
                         val = ''
                     instrument_grp.attrs[p_name] = val
@@ -1207,7 +1208,7 @@ class MeasurementControl(Instrument):
         h5d.write_dict_to_hdf5(metadata, entry_point=metadata_group)
 
     def get_percdone(self):
-        percdone = (self.total_nr_acquired_values)/(
+        percdone = (self.total_nr_acquired_values) / (
             np.shape(self.get_sweep_points())[0]*self.soft_avg())*100
         return percdone
 

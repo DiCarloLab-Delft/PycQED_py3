@@ -210,8 +210,8 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                             self.weight_function_I, self.weight_function_Q]
                 #copy pasted from input average prepare
                 self.AWG.stop()
-                self.UHFQC.quex_iavg_length(self.nr_samples)
-                self.UHFQC.quex_iavg_avgcnt(int(np.log2(self.nr_averages)))
+                self.UHFQC.qas_0_monitor_length(self.nr_samples)
+                self.UHFQC.qas_0_monitor_averages(self.nr_averages)
                 self.UHFQC.awgs_0_userregs_1(1)  # 0 for rl, 1 for iavg
                 self.UHFQC.awgs_0_userregs_0(
                     int(self.nr_averages))  # 0 for rl, 1 for iavg
@@ -227,7 +227,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 SWF.prepare()
 
                 #get values detector
-                self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
+                self.UHFQC.qas_0_result_enable(0) # resets UHFQC internal readout counters
                 self.UHFQC.acquisition_arm()
                 # starting AWG
                 if self.AWG is not None:
@@ -250,7 +250,7 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 SWF.prepare()
 
                  #get values detector
-                self.UHFQC.quex_rl_readout(0) # resets UHFQC internal readout counters
+                self.UHFQC.qas_0_result_enable(0) # resets UHFQC internal readout counters
                 self.UHFQC.acquisition_arm()
                 # starting AWG
                 if self.AWG is not None:
@@ -279,55 +279,46 @@ class SSRO_Fidelity_Detector_Tek(det.Soft_Detector):
                 optimized_weights_Q = np.array(
                     weight_scale_factor*optimized_weights_Q)
 
-                eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(
+                eval('self.UHFQC.qas_0_integration_weights_{}_real(np.array(optimized_weights_I))'.format(
                     self.weight_function_I))
                 if self.SSB:
-                    eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(
+                    eval('self.UHFQC.qas_0_integration_weights_{}_imag(np.array(optimized_weights_Q))'.format(
                         self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
-                        eval('self.UHFQC.quex_wint_weights_{}_real(np.array(optimized_weights_I))'.format(
+                        eval('self.UHFQC.qas_0_integration_weights_{}_real(np.array(optimized_weights_I))'.format(
                             self.weight_function_Q))
-                        eval('self.UHFQC.quex_wint_weights_{}_imag(np.array(optimized_weights_Q))'.format(
+                        eval('self.UHFQC.qas_0_integration_weights_{}_imag(np.array(optimized_weights_Q))'.format(
                             self.weight_function_Q))
                     eval(
-                        'self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_I))
-                    eval(
-                        'self.UHFQC.quex_rot_{}_imag(-1.0)'.format(self.weight_function_I))
+                        'self.UHFQC.qas_0_rotations_{}(1.0-1.0j)'.format(self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
                         eval(
-                            'self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_Q))
-                        eval(
-                            'self.UHFQC.quex_rot_{}_imag(1.0)'.format(self.weight_function_Q))
+                            'self.UHFQC.qas_0_rotations_{}(1.0+1.0j)'.format(self.weight_function_Q))
                 else:
                     # disabling the other weight fucntions
                     eval(
-                        'self.UHFQC.quex_wint_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_I))
+                        'self.UHFQC.qas_0_integration_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
                         eval(
-                            'self.UHFQC.quex_wint_weights_{}_real(0*np.array(optimized_weights_I))'.format(self.weight_function_Q))
+                            'self.UHFQC.qas_0_integration_weights_{}_real(0*np.array(optimized_weights_I))'.format(self.weight_function_Q))
                         eval(
-                            'self.UHFQC.quex_wint_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_Q))
+                            'self.UHFQC.qas_0_integration_weights_{}_imag(0*np.array(optimized_weights_Q))'.format(self.weight_function_Q))
                     eval(
-                        'self.UHFQC.quex_rot_{}_real(1.0)'.format(self.weight_function_I))
-                    eval(
-                        'self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_I))
+                        'self.UHFQC.qas_0_rotations_{}(1.0+0j)'.format(self.weight_function_I))
                     if not self.one_weight_function_UHFQC:
-
                         eval(
-                            'self.UHFQC.quex_rot_{}_real(0.0)'.format(self.weight_function_Q))
-                        eval(
-                            'self.UHFQC.quex_rot_{}_imag(0.0)'.format(self.weight_function_Q))
+                            'self.UHFQC.qas_0_rotations_{}(0+0j)'.format(self.weight_function_Q))
                 # reading out weights as check
-                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(
+                eval('self.UHFQC.qas_0_integration_weights_{}_real()'.format(
                     self.weight_function_I))
                 # reading out weights as check
-                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(
+                eval('self.UHFQC.qas_0_integration_weights_{}_imag()'.format(
                     self.weight_function_I))
                 # reading out weights as check
-                eval('self.UHFQC.quex_wint_weights_{}_real()'.format(
+                eval('self.UHFQC.qas_0_integration_weights_{}_real()'.format(
                     self.weight_function_Q))
                 # reading out weights as check
-                eval('self.UHFQC.quex_wint_weights_{}_imag()'.format(
+                eval('self.UHFQC.qas_0_integration_weights_{}_imag()'.format(
                     self.weight_function_Q))
 
                 self.MC.set_sweep_function(awg_swf.SingleLevel(

@@ -1,222 +1,465 @@
-import zhinst.ziPython as zi
-import zhinst.utils as zi_utils
+"""
+To do:
+- split off application dependent code, as done for ZI_HDAWG8.py
+
+Notes:
+
+
+Changelog:
+
+20190113 WJV
+- started Changelog
+- addressed many warnings identified by PyCharm
+- started adding type annotations
+- split of stuff into _add_node_pars()
+- made some properties 'private'
+
+20190219 WJV
+- tagged some dead code with FIXM.
+
+20190219:
+- made _array_to_combined_vector_string() a @staticmethod
+
+20190417 WJV
+- merged branch 'develop' into 'feature/cc', changes:
+    spec_mode_on
+    spec_mode_off
+
+20190429 WJV
+- merged branch 'QCC_testing' into 'feature/cc', changes:
+    load_default_settings(): awgs_0_dio_strobe_index changed from 31 (CCL) to 15 (QCC)
+
+20190612 WJV
+- merged branch 'QCC_testing' into 'feature/cc', changes:
+    adds awg_sequence_acquisition_and_DIO_RED_test()
+
+20190618 WJV
+- merged branch 'develop' into 'feature/cc', changes:
+
+20190813 NH
+- merged branch 'develop' into 'feature/ZIupdateDrivers'
+- Updated driver to use new UHFQA nodes
+- Updated to support dynamic waveform upload properly. The AWG is configured when start() is called and the
+    driver then chooses whether it is necessary to recompile the AWG program. The program will be recompiled
+    if waveform lengths have changed. Otherwise, if waveforms have been updated they will just be downloaded
+    directly to the instrument.
+
+"""
+
 import time
 import json
 import os
-import sys
+import logging
 import numpy as np
-from qcodes.instrument.base import Instrument
-from qcodes.utils import validators as vals
+import re
+import pycqed
 from fnmatch import fnmatch
+
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
+
+from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
-import ctypes
-from ctypes.wintypes import MAX_PATH
 
+log = logging.getLogger(__name__)
 
-class UHFQC(Instrument):
+##########################################################################
+# Exceptions
+##########################################################################
 
+class ziUHFQCSeqCError(Exception):
+    """Exception raised when the configured SeqC program does
+       not match the structure needed for a given measurement in terms
+       of number of samples, number of averages or the use of a delay."""
+    pass
+
+class ziUHFQCHoldoffError(Exception):
+    """Exception raised when a holdoff error has occurred in either the
+    input monitor or result logging unit. Increase the delay between triggers
+    sent to these units to solve the problem."""
+    pass
+
+##########################################################################
+# Module level functions
+##########################################################################
+
+def awg_sequence_acquisition_preamble():
     """
-    This is the qcodes driver for the 1.8 Gsample/s UHF-QC developed
+    This function defines a standard AWG program preamble, which is used
+    regardless of the specific acquisition mode. The preamble defines standard
+    functionality of the user registers, which are used for dynamically
+    controlling e.g. number of iterations in a loop, etc.
+    The preamble also defines a standard way of selecting between triggering
+    the readout units or the time-domain input monitor.
+    """
+    preamble = """
+// Reset error counter
+setUserReg(4, 0);
+
+// Define standard variables
+var loop_cnt = getUserReg(0);
+var ro_mode  = getUserReg(1);
+var wait_dly = getUserReg(2);
+var avg_cnt  = getUserReg(3);
+var ro_arm;
+var ro_trig;
+
+// Configure readout mode
+if (ro_mode) {
+  ro_arm  = 0;
+  ro_trig = AWG_MONITOR_TRIGGER;
+} else {
+  ro_arm  = AWG_INTEGRATION_ARM;
+  ro_trig = AWG_INTEGRATION_ARM + AWG_INTEGRATION_TRIGGER;
+}"""
+    return preamble
+
+def array2vect(array, name):
+    # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
+    # this is to avoid python crashes (was found to crash for vectors of
+    # length> 1490)
+    if len(array) > 1024:
+        splitted_array =  np.array_split(array, len(array)//1024)
+        string_array = ['\nvect(' + ','.join(['{:.8f}'.format(x) for x in sub_array]) + ')' for sub_array in splitted_array]
+        return 'wave ' + name + ' = join(' + ','.join(string_array) + ');\n'
+    else:
+        return 'wave ' + name + ' = ' + 'vect(' + ','.join(['{:.8f}'.format(x) for x in array]) + ');\n'
+
+##########################################################################
+# Class
+##########################################################################
+
+class UHFQC(zibase.ZI_base_instrument):
+    """
+    This is the PycQED driver for the 1.8 Gsample/s UHFQA developed
     by Zurich Instruments.
 
     Requirements:
     Installation instructions for Zurich Instrument Libraries.
-    1. install ziPython 3.5/3.6 ucs4 16.04 for 64bit Windows from
+    1. install ziPython 3.5/3.6 ucs4 19.05 for 64bit Windows from
         http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
-    2. pip install dependencies: httplib2, plotly, pyqtgraph
-    3. upload the latest firmware to the UHFQC by opening reboot.bat in
-    'Transmon\Inventory\ZurichInstruments\firmware_UHFLI\firmware_x\reboot_dev'.
-        With x the highest available number and dev the device number.
-    4. find out where sequences are stored by saving a sequence from the
-        GUI and then check :"showLog" to see where it is stored. This is the
-        location where AWG sequences can be loaded from.
-    misc: when device crashes, check the log file in
-    EOM
+    2. upload the latest firmware to the UHFQA usingthe LabOne GUI
     """
 
-    def __init__(self, name, device='auto', interface='USB',
-                 address='127.0.0.1', port=8004, DIO=True,
-                 nr_integration_channels=9, **kw):
-        '''
+    # Define minimum required revisions
+    MIN_FWREVISION = 63210
+    MIN_FPGAREVISION = 63133
+
+    # Define user registers
+    USER_REG_LOOP_CNT = 0
+    USER_REG_RO_MODE  = 1
+    USER_REG_WAIT_DLY = 2
+    USER_REG_AVG_CNT  = 3
+    USER_REG_ERR_CNT  = 4
+
+    ##########################################################################
+    # 'public' functions: device control
+    ##########################################################################
+
+    def __init__(self,
+                 name,
+                 device:                  str,
+                 interface:               str  = 'USB',
+                 address:                 str  = '127.0.0.1',
+                 port:                    int  = 8004,
+                 use_dio:                 bool = True,
+                 nr_integration_channels: int  = 9,
+                 server:                  str  = '',
+                 **kw) -> None:
+        """
         Input arguments:
             name:           (str) name of the instrument
-            server_name:    (str) qcodes instrument server
-            address:        (int) the address of the data server e.g. 8006
-        '''
-        # self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        # #suggestion W vlothuizen
+            device          (str) the name of the device e.g., "dev8008"
+            interface       (str) the name of the interface to use ('1GbE' or 'USB')
+            address         (str) the host where the ziDataServer is running (for compatibility)
+            port            (int) the port to connect to for the ziDataServer (don't change)
+            use_dio         (bool) assert to enable the DIO interface
+            nr_integration_channels (int) the number of integration channels to use (max 10)
+            server:         (str) the host where the ziDataServer is running (if not '' then used instead of address)
+        """
         t0 = time.time()
-        super().__init__(name, **kw)
-        self.nr_integration_channels = nr_integration_channels
-        self.DIO = DIO
-        self._daq = zi.ziDAQServer(address, int(port), 5)
-        # self._daq.setDebugLevel(5)
-        if device.lower() == 'auto':
-            self._device = zi_utils.autoDetect(self._daq)
-        else:
-            self._device = device
-            self._daq.connectDevice(self._device, interface)
-            #self._device = zi_utils.autoDetect(self._daq)
-        self._awgModule = self._daq.awgModule()
-        self._awgModule.set('awgModule/device', self._device)
-        self._awgModule.execute()
 
-        self.acquisition_paths = []
+        # Override server with the old-style address argument
+        if server == '':
+            server = address
 
-        s_node_pars = []
-        d_node_pars = []
+        # save some parameters
+        self._nr_integration_channels = nr_integration_channels
+        self._use_dio = use_dio
 
-        path = os.path.abspath(__file__)
-        dir_path = os.path.dirname(path)
-        self._s_file_name = os.path.join(
-            dir_path, 'zi_parameter_files', 's_node_pars.txt')
-        self._d_file_name = os.path.join(
-            dir_path, 'zi_parameter_files', 'd_node_pars.txt')
+        # Used for keeping track of which nodes we are monitoring for data
+        self._acquisition_nodes = []
 
-        init = True
-        try:
-            with open(self._s_file_name) as f:
-                s_node_pars = json.loads(f.read())
-        except:
-            print("parameter file for gettable parameters {} not found".format(
-                self._s_file_name))
-            init = False
-        try:
-            with open(self._d_file_name) as f:
-                d_node_pars = json.loads(f.read())
-        except:
-            print("parameter file for settable parameters {} not found".format(
-                self._d_file_name))
-            init = False
+        # The following members define the characteristics of the configured
+        # AWG program
+        self._reset_awg_program_features()
 
-        self.add_parameter('timeout', unit='s',
-                           initial_value=30,
-                           parameter_class=ManualParameter)
-        for parameter in s_node_pars:
-            parname = parameter[0].replace("/", "_")
-            parfunc = "/"+self._device+"/"+parameter[0]
-            if parameter[1] == 'float':
-                self.add_parameter(
-                    parname,
-                    set_cmd=self._gen_set_func(self.setd, parfunc),
-                    get_cmd=self._gen_get_func(self.getd, parfunc),
-                    vals=vals.Numbers(parameter[2], parameter[3]))
-            elif parameter[1] == 'float_small':
-                self.add_parameter(
-                    parname,
-                    set_cmd=self._gen_set_func(self.setd, parfunc),
-                    get_cmd=self._gen_get_func(self.getd, parfunc),
-                    vals=vals.Numbers(parameter[2], parameter[3]))
-            elif parameter[1] == 'int_8bit':
-                self.add_parameter(
-                    parname,
-                    set_cmd=self._gen_set_func(self.seti, parfunc),
-                    get_cmd=self._gen_get_func(self.geti, parfunc),
-                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
-            elif parameter[1] == 'int':
-                self.add_parameter(
-                    parname,
-                    set_cmd=self._gen_set_func(self.seti, parfunc),
-                    get_cmd=self._gen_get_func(self.geti, parfunc),
-                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
-            elif parameter[1] == 'int_64':
-                self.add_parameter(
-                    parname,
-                    set_cmd=self._gen_set_func(self.seti, parfunc),
-                    get_cmd=self._gen_get_func(self.geti, parfunc),
-                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
-            elif parameter[1] == 'bool':
-                self.add_parameter(
-                    parname,
-                    set_cmd=self._gen_set_func(self.seti, parfunc),
-                    get_cmd=self._gen_get_func(self.geti, parfunc),
-                    vals=vals.Ints(int(parameter[2]), int(parameter[3])))
-            else:
-                print("parameter {} type {} from from s_node_pars not recognized".format(
-                    parname, parameter[1]))
+        # The actual codeword cases used in a given program
+        self._cases = None
 
-        for parameter in d_node_pars:
-            parname = parameter[0].replace("/", "_")
-            parfunc = "/"+self._device+"/"+parameter[0]
-            if parameter[1] == 'float':
-                self.add_parameter(
-                    parname,
-                    get_cmd=self._gen_get_func(self.getd, parfunc))
-            elif parameter[1] == 'vector_g':
-                self.add_parameter(
-                    parname,
-                    get_cmd=self._gen_get_func(self.getv, parfunc))
-            elif parameter[1] == 'vector_s':
-                self.add_parameter(
-                    parname,
-                    set_cmd=self._gen_set_func(self.setv, parfunc),
-                    vals=vals.Anything())
-            elif parameter[1] == 'vector_gs':
-                self.add_parameter(
-                    parname,
-                    set_cmd=self._gen_set_func(self.setv, parfunc),
-                    get_cmd=self._gen_get_func(self.getv, parfunc),
-                    vals=vals.Anything())
-            else:
-                print("parameter {} type {} from d_node_pars not recognized".format(
-                    parname, parameter[1]))
+        # Used for extra DIO output to CC for debugging
+        self._diocws = None
 
-        self.add_parameter('AWG_file',
-                           set_cmd=self._do_set_AWG_file,
-                           vals=vals.Anything())
+        # Our base class includes all the functionality needed to initialize the parameters
+        # of the object. Those parameters are read from instrument-specific JSON files stored
+        # in the zi_parameter_files folder.
+        super().__init__(name=name, device=device, interface=interface, server=server, port=port, **kw)
+
+        # Set default waveform length to 20 ns at 1.8 GSa/s
+        self._default_waveform_length = 32
+
+        t1 = time.time()
+        print('Initialized UHFQC', self.devname, 'in %.2fs' % (t1-t0))
+
+    ##########################################################################
+    # Private methods
+    ##########################################################################
+
+    def _check_devtype(self):
+        if self.devtype != 'UHFQA':
+            raise zibase.ziDeviceError('Device {} of type {} is not a UHFQA instrument!'.format(self.devname, self.devtype))
+
+    def _check_options(self):
+        """
+        Checks that the correct options are installed on the instrument.
+        """
+        options = self.gets('features/options').split('\n')
+        if 'FF' in options:
+            return
+        if 'QA' not in options:
+            raise zibase.ziOptionsError('Device {} is missing the QA option!'.format(self.devname))
+        if 'AWG' not in options:
+            raise zibase.ziOptionsError('Device {} is missing the AWG option!'.format(self.devname))
+
+    def _check_awg_nr(self, awg_nr):
+        """
+        Checks that the given AWG index is valid for the device.
+        """
+        if (awg_nr != 0):
+            raise zibase.ziValueError('Invalid AWG index of {} detected!'.format(awg_nr))
+
+    def _check_versions(self):
+        """
+        Checks that sufficient versions of the firmware are available.
+        """
+        if self.geti('system/fwrevision') < UHFQC.MIN_FWREVISION:
+            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(UHFQC.MIN_FWREVISION, self.geti('system/fwrevision')))
+
+        if self.geti('system/fpgarevision') < UHFQC.MIN_FPGAREVISION:
+            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(UHFQC.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
+
+    def _num_channels(self):
+        return 2
+
+    def _reset_awg_program_features(self):
+        """
+        Resets the self._awg_program_features to disable all features. The UHFQC can be configured with a number
+        of application-specific AWG programs using this driver. However, all the programs share some characteristics that
+        are described in the _awg_program_features dictionary. For example, all of the programs include a main loop
+        that runs for a number of iterations given by a user register. This feature is indicated by the 'loop_cnt'
+        item in the dictionary. In contrast, not all program include an extra loop for the number of averages that
+        should be done. Therefore, the 'awg_cnt' item in the dictionary is not automatically set. The driver
+        uses these features to keep track of what the current AWG program can do. It then raises errors in case
+        the user tries to do something that is not supported.
+        """
+        self._awg_program_features = {
+            'loop_cnt' : False,
+            'avg_cnt'  : False,
+            'wait_dly' : False,
+            'waves'    : False,
+            'cases'    : False,
+            'diocws'   : False}
+
+    def _add_extra_parameters(self) -> None:
+        """
+        We add a few additional custom parameters on top of the ones defined in the device files. These are:
+          qas_0_trans_offset_weightfunction - an offset correction parameter for all weight functions,
+            this allows normalized calibration when performing cross-talk suppressed readout. The parameter
+            is not actually used in this driver, but in some of the support classes that make use of the driver.
+          AWG_file - allows the user to configure the AWG with a SeqC program from a specific file.
+            Provided only because the old version of the driver had this parameter. It is discouraged to use
+            it.
+          wait_dly - a parameter that enables the user to set a delay in AWG clocks cycles (4.44 ns) to be
+            applied between when the AWG starts playing the readout waveform, and when it triggers the
+            actual readout.
+          cases - a parameter that can be used to define which combination of readout waveforms to actually
+            download to the instrument. As the instrument has a limited amount of memory available, it is
+            not currently possible to store all 1024 possible combinations of readout waveforms that would
+            be required to address the maximum number of qubits supported by the instrument (10). Therefore,
+            the 'cases' mechanism is used to reduce that number to the combinations actually needed by
+            an experiment.
+        """
+        super()._add_extra_parameters()
+
         # storing an offset correction parameter for all weight functions,
         # this allows normalized calibration when performing cross-talk suppressed
         # readout
-        for i in range(self.nr_integration_channels):
-            self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
+        for i in range(self._nr_integration_channels):
+            self.add_parameter("qas_0_trans_offset_weightfunction_{}".format(i),
                                unit='',  # unit is adc value
                                label='RO normalization offset',
                                initial_value=0.0,
+                               docstring='an offset correction parameter for all weight functions, '\
+                                         'this allows normalized calibration when performing cross-talk suppressed readout. The parameter '\
+                                         'is not actually used in this driver, but in some of the support classes that make use of the driver.',
                                parameter_class=ManualParameter)
-        if init:
-            self.load_default_settings()
-        t1 = time.time()
 
-        print('Initialized UHFQC', self._device,
-              'in %.2fs' % (t1-t0))
-        
-        if os.name == 'nt':
-            dll = ctypes.windll.shell32
-            buf = ctypes.create_unicode_buffer(MAX_PATH + 1)
-            if dll.SHGetSpecialFolderPathW(None, buf, 0x0005, False):
-                _basedir = buf.value
-            else:
-                logging.warning('Could not extract my documents folder')
+        self.add_parameter('AWG_file',
+                           set_cmd=self._do_set_AWG_file,
+                           docstring='Configures the AWG with a SeqC program from a specific file. '\
+                                     'Provided only for backwards compatibility. It is discouraged to use '\
+                                     'this parameter unless you know what you are doing',
+                           vals=validators.Anything())
+
+        self.add_parameter('wait_dly',
+                            set_cmd=self._set_wait_dly,
+                            get_cmd=self._get_wait_dly,
+                            unit='',
+                            label='AWG cycle delay',
+                            docstring='Configures a delay in AWG clocks cycles (4.44 ns) to be '\
+                                      'applied between when the AWG starts playing the readout waveform, and when it triggers the '\
+                                      'actual readout.',
+                            vals=validators.Ints())
+
+        self.add_parameter('cases',
+            set_cmd=self._set_cases,
+            get_cmd=self._get_cases,
+            docstring='Configures which combination of readout waveforms to actually '\
+                      'download to the instrument. As the instrument has a limited amount of memory available, it is '\
+                      'not currently possible to store all 1024 possible combinations of readout waveforms that would '\
+                      'be required to address the maximum number of qubits supported by the instrument (10). Therefore, '\
+                      'the \'cases\' mechanism is used to reduce that number to the combinations actually needed by '\
+                      'an experiment. The parameter must be set to a list of integers. The list defines the codewords '\
+                      'to be handled by the AWG program. For example, setting the parameter to [1, 5, 7] would result in '\
+                      'an AWG program that handles only codewords 1, 5 and 7. When running, if the AWG receives a codeword '\
+                      'that is not part of this list, an error will be triggered.',
+            vals=validators.Lists())
+
+    def _set_wait_dly(self, value):
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), value)
+
+    def _get_wait_dly(self):
+        return self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY))
+
+    def _set_cases(self, value):
+        # Generate error if we don't have an AWG program that supports cases
+        if not self._awg_program_features['cases']:
+            raise zibase.ziValueError('Trying to define cases for an AWG program that does not support them!')
+
+        # Check against number of codewords
+        if len(value) > self._num_codewords:
+            raise zibase.ziValueError('Trying to define a number of cases ({}) greater than configured number of codewords ({})!'.format(len(value), self._num_codewords))
+
+        self._cases = value
+
+        if self._awg_program_features['diocws'] and self._diocws is None:
+            raise zibase.ziValueError('AWG program defines DIO output, but no output values have been defined!')
+
+        self._awg_program[0] = \
+            awg_sequence_acquisition_preamble() + """
+// Mask for selecting our codeword bits
+const CW_MASK = (0x1f << 17);
+// Counts wrong codewords
+var err_cnt = 0;
+"""
+
+        if self._awg_program_features['diocws']:
+            self._awg_program[0] += \
+                array2vect(self._diocws, "diocws") + """
+// Loop once for each DIO codeword to output
+for (cvar i = 0; i < {}; i = i + 1) {{""".format(len(self._diocws))
         else:
-            _basedir = os.path.expanduser('~')
-        self.lab_one_webserver_path = os.path.join(
-            _basedir, 'Zurich Instruments', 'LabOne', 'WebServer')
+            self._awg_program[0] += """
+// Loop for all measurements
+repeat (loop_cnt) {"""
 
-    def load_default_settings(self):
+        self._awg_program[0] += """
+    waitDIOTrigger();
+    // Get codeword and apply mask
+    var cw = getDIOTriggered() & CW_MASK;
+    // Generate waveforms based on codeword output
+    switch (cw) {"""
+        # Add each of the cases
+        for case in self._cases:
+            self._awg_program[0] += """
+        case 0x{:08x}: playWave({}, {});""".format(case << 17, zibase.gen_waveform_name(0, case), zibase.gen_waveform_name(1, case))
+
+        # Add a default for ensuring we see something when the other cases fail
+        self._awg_program[0] += """
+        default: playWave(ones(32), ones(32)); err_cnt += 1;
+    }
+    wait(wait_dly);"""
+
+        if self._awg_program_features['diocws']:
+            self._awg_program[0] += """
+    setDIO(diocws[i]);
+"""
+        self._awg_program[0] += """
+    setTrigger(ro_trig);
+    setTrigger(ro_arm);
+}
+wait(300);
+setTrigger(0);
+setUserReg(4, err_cnt);"""
+
+        self._awg_needs_configuration[0] = True
+
+    def _get_cases(self):
+        return self._cases
+
+    def _codeword_table_preamble(self, awg_nr):
+        """
+        Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
+        The generated code depends on the instrument type. For the UHF-QA we simply define the raw waveforms.
+        """
+        program = ''
+
+        # If the program doesn't need waveforms, just return here
+        if not self._awg_program_features['waves']:
+            return
+
+        # If the program needs cases, but none are defined, flag it as an error
+        if self._awg_program_features['cases'] and self._cases is None:
+            raise zibase.ziConfigurationError('Missing definition of cases for AWG program!')
+
+        # because awg_channels come in pairs
+        ch = awg_nr*2
+
+        for cw in range(self._num_codewords):
+            # Filter based on configured cases
+            if self._awg_program_features['cases'] and cw not in self._cases:
+                continue
+
+            parnames = 2*['']
+            csvnames = 2*['']
+            # Every AWG drives two channels
+            for i in range(2):
+                parnames[i] = zibase.gen_waveform_name(ch+i, cw)  # NB: parameter naming identical to QWG
+                csvnames[i] = self.devname + '_' + parnames[i]
+                program += 'wave ' + parnames[i] + ' = \"' + csvnames[i] + '\";\n'
+
+        return program
+
+    def load_default_settings(self, upload_sequence=True) -> None:
         # standard configurations adapted from Haendbaek's notebook
-        # Run this block to do some standard configuration
 
         # The averaging-count is used to specify how many times the AWG program
         # should run
         LOG2_AVG_CNT = 10
 
-        # This averaging count specifies how many measurements the result
-        # logger should average
-        LOG2_RL_AVG_CNT = 0
+        # Load an AWG program
+        if upload_sequence:
+            self.awg_sequence_acquisition()
 
-        # Load an AWG program (from Zurich
-        # Instruments/LabOne/WebServer/awg/src)
-        self.awg_sequence_acquisition()
+        # Setting the clock to external
+        self.system_extclk(1)
 
         # Turn on both outputs
         self.sigouts_0_on(1)
         self.sigouts_1_on(1)
 
-        # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode ==
-        # 1)
-        self.dios_0_mode(2)
-        # Drive DIO bits 15 to 0
-        self.dios_0_drive(0x3)
+        # Set the output channels to 50 ohm
+        self.sigouts_0_imp50(True)
+        self.sigouts_1_imp50(True)
 
         # Configure the analog trigger input 1 of the AWG to assert on a rising
         # edge on Ref_Trigger 1 (front-panel of the instrument)
@@ -226,313 +469,221 @@ class UHFQC(Instrument):
 
         # Configure the digital trigger to be a rising-edge trigger
         self.awgs_0_auxtriggers_0_slope(1)
+
         # Straight connection, signal input 1 to channel 1, signal input 2 to
         # channel 2
 
-        self.quex_deskew_0_col_0(1.0)
-        self.quex_deskew_0_col_1(0.0)
-        self.quex_deskew_1_col_0(0.0)
-        self.quex_deskew_1_col_1(1.0)
+        self.qas_0_deskew_rows_0_cols_0(1.0)
+        self.qas_0_deskew_rows_0_cols_1(0.0)
+        self.qas_0_deskew_rows_1_cols_0(0.0)
+        self.qas_0_deskew_rows_1_cols_1(1.0)
 
-        self.quex_wint_delay(0)
-
-        # Setting the clock to external
-        self.system_extclk(1)
+        # Set DIO mode:
+        # - QuExpress thresholds on DIO (mode == 2)
+        # - AWG control of DIO (mode == 1)
+        self.dios_0_mode(2)
+        # Drive DIO bits 15 to 0
+        self.dios_0_drive(0x3)
+        # 50 MHz clocking of the DIO
+        self.dios_0_extclk(2)
 
         # Configure the codeword protocol
-        if self.DIO:
-            self.awgs_0_dio_strobe_index(31)
-            self.awgs_0_dio_strobe_slope(1)  # rising edge
+        if self._use_dio:
+            self.awgs_0_dio_strobe_index(15) # FIXME: 15 for QCC, 31 for CCL
+            self.awgs_0_dio_strobe_slope(0)  # no edge, not used anymore
             self.awgs_0_dio_valid_index(16)
             self.awgs_0_dio_valid_polarity(2)  # high polarity
 
-        # setting the output channels to 50 ohm
-        self.sigouts_0_imp50(True)
-        self.sigouts_1_imp50(True)
-
-        # We probably need to adjust some delays here...
-        # self.awgs_0_dio_delay_index(31)
-        # self.awgs_0_dio_delay_value(1)
-
         # No rotation on the output of the weighted integration unit, i.e. take
         # real part of result
-        for i in range(0, self.nr_integration_channels):
-            self.set('quex_rot_{0}_real'.format(i), 1.0)
-            self.set('quex_rot_{0}_imag'.format(i), 0.0)
+        for i in range(0, self._nr_integration_channels):
+            self.set('qas_0_rotations_{}'.format(i), 1.0 + 0.0j)
             # remove offsets to weight function
-            self.set('quex_trans_offset_weightfunction_{}'.format(i), 0.0)
-
-        # No thresholding or correlation modes
-        for i in range(0, self.nr_integration_channels):
-            eval('self.quex_thres_{0}_level(0)'.format(i))
-            eval('self.quex_corr_{0}_mode(0)'.format(i))
-            eval('self.quex_corr_{0}_source(0)'.format(i))
+            self.set('qas_0_trans_offset_weightfunction_{}'.format(i), 0.0)
 
         # No cross-coupling in the matrix multiplication (identity matrix)
-        for i in range(0, self.nr_integration_channels):
-            for j in range(0, self.nr_integration_channels):
+        for i in range(0, self._nr_integration_channels):
+            for j in range(0, self._nr_integration_channels):
                 if i == j:
-                    self.set('quex_trans_{0}_col_{1}_real'.format(i, j), 1)
+                    self.set('qas_0_crosstalk_rows_{0}_cols_{1}'.format(i, j), 1)
                 else:
-                    self.set('quex_trans_{0}_col_{1}_real'.format(i, j), 0)
+                    self.set('qas_0_crosstalk_rows_{0}_cols_{1}'.format(i, j), 0)
+
+        # disable correlation mode on all channels
+        for i in range(0, self._nr_integration_channels):
+            self.set('qas_0_correlations_{0}_enable'.format(i), 0)
 
         # Configure the result logger to not do any averaging
-        self.quex_rl_length(pow(2, LOG2_AVG_CNT)-1)
-        self.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
-        self.quex_rl_source(2)
+        self.qas_0_result_length(1000)
+        self.qas_0_result_averages(pow(2, LOG2_AVG_CNT))
+        self.qas_0_result_source(2)
 
-        # Ready for readout. Writing a '1' to these nodes activates the
-        # automatic readout of results. This functionality should be used once
-        # the ziPython driver has been improved to handle the 'poll' commands
-        # of these results correctly. Until then, we write a '0' to the nodes
-        # to prevent automatic result readout. It is then necessary to poll
-        # e.g. the AWG in order to detect when the measurement is complete, and
-        # then manually fetch the results using the 'get' command. Disabling
-        # the automatic result readout speeds up the operation a bit, since we
-        # avoid sending the same data twice.
-        self.quex_iavg_readout(0)
-        self.quex_rl_readout(0)
-
-        # The custom firmware will feed through the signals on Signal Input 1
-        # to Signal Output 1 and Signal Input 2 to Signal Output 2 when the AWG
-        # is OFF. For most practical applications this is not really useful.
-        # We, therefore, disable the generation of these signals on the output
-        # here.
-        self.sigouts_0_enables_3(0)
-        self.sigouts_1_enables_7(0)
-
-    def _gen_set_func(self, dev_set_type, cmd_str):
-        def set_func(val):
-            dev_set_type(cmd_str, val)
-            return dev_set_type(cmd_str, value=val)
-        return set_func
-
-    def _gen_get_func(self, dev_get_type, ch):
-        def get_func():
-            return dev_get_type(ch)
-        return get_func
+        # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
+        # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
+        # these signals on the output here.
+        self.sigouts_0_enables_0(0)
+        self.sigouts_0_enables_1(0)
+        self.sigouts_1_enables_0(0)
+        self.sigouts_1_enables_1(0)
 
     def clock_freq(self):
-        return 1.8e9/(2**self.awgs_0_time())
+        return 1.8e9
 
-    def reconnect(self):
-        zi_utils.autoDetect(self._daq)
-
-    def awg(self, filename):
+    def assure_ext_clock(self) -> None:
         """
-        Loads an awg sequence onto the UHFQC from a text file.
+        Make sure the instrument is using an external reference clock
+        """
+        # get source:
+        #   1: external
+        #   0: internal (commanded so, or because of failure to sync to external clock)
+        source = self.system_extclk()
+        if source == 1:
+            return
+
+        print('Switching to external clock. This could take a while!')
+        while True:
+            self.system_extclk(1)
+            timeout = 10
+            while timeout > 0:
+                time.sleep(0.1)
+                status = self.system_extclk()
+                if status == 1:             # synced
+                    break
+                else:                       # sync failed
+                    timeout -= 0.1
+                    print('X', end='')
+            if self.system_extclk() != 1:
+                print(' Switching to external clock failed. Trying again.')
+            else:
+                break
+        print('\nDone')
+
+    ##########################################################################
+    # 'public' functions: generic AWG/waveform support
+    ##########################################################################
+
+    def load_awg_program_from_file(self, filename) -> None:
+        """
+        Loads an awg sequence onto the UHFQA from a text file.
         File needs to obey formatting specified in the manual.
+        Only provided for backwards compatibility purposes.
         """
         print(filename)
         with open(filename, 'r') as awg_file:
-            sourcestring = awg_file.read()
-            self.awg_string(sourcestring)
-    
-    def _write_csv_waveform(self, wf_name: str, waveform):
-        filename = os.path.join(
-            self.lab_one_webserver_path, 'awg', 'waves',
-            self._device+'_'+wf_name+'.csv')
-        # with open(filename, 'w') as f:
-        np.savetxt(filename, waveform, delimiter=",")
+            self._awg_program[0] = awg_file.read()
+            self._awg_needs_configuration[0] = True
 
-    def _do_set_AWG_file(self, filename):
-        self.awg('UHFLI_AWG_sequences/'+filename)
+    def _do_set_AWG_file(self, filename) -> None:
+        self.load_awg_program_from_file('UHFLI_AWG_sequences/'+filename)
 
-    def awg_file(self, filename):
-        self._awgModule.set('awgModule/compiler/sourcefile', filename)
-        self._awgModule.set('awgModule/compiler/start', 1)
-        #self._awgModule.set('awgModule/elf/file', '')
-        while self._awgModule.get('awgModule/progress')['progress'][0] < 1.0:
-            time.sleep(0.1)
-        print(self._awgModule.get('awgModule/compiler/statusstring')
-              ['compiler']['statusstring'][0])
-        self._daq.sync()
+    def awg_file(self, filename) -> None:
+        """Only provided for backwards compatibility purposes."""
+        self.load_awg_program_from_file(filename)
 
-    def awg_string(self, program_string: str, timeout: float=5):
-        t0 = time.time()
-        awg_nr = 0  # hardcoded for UHFQC
-        print('Configuring AWG of {}'.format(self.name))
-        if not self._awgModule:
-            raise(ziShellModuleError())
+    def awg_update_waveform(self, index, data) -> None:
+        raise NotImplementedError('Method not implemented! Please use the corresponding waveform parameters \'wave_chN_cwM\' to update waveforms!')
 
-        self._awgModule.set('awgModule/index', awg_nr)
-        self._awgModule.set('awgModule/compiler/sourcestring', program_string)
+    ##########################################################################
+    # 'public' functions: acquisition support
+    ##########################################################################
 
-        t0 = time.time()
+    def acquisition(self, samples=100, averages=1, acquisition_time=0.010, timeout=10,
+                    channels=(0, 1), mode='rl') -> None:
+        self.timeout(timeout)
+        self.acquisition_initialize(samples, averages, channels, mode)
+        data = self.acquisition_poll(samples, True, acquisition_time)
+        self.acquisition_finalize()
 
-        succes_msg = 'File successfully uploaded'
-        # Success is set to False when either a timeout or a bad compilation
-        # message is encountered.
-        success = True
-        # while ("compilation not completed"):
-        while len(self._awgModule.get('awgModule/compiler/sourcestring')
-                  ['compiler']['sourcestring'][0]) > 0:
-            time.sleep(0.01)
-            comp_msg = (self._awgModule.get(
-                'awgModule/compiler/statusstring')['compiler']
-                ['statusstring'][0])
-            if (time.time()-t0 >= timeout):
-                success = False
-                print('Timeout encountered during compilation.')
-                break
-            time.sleep(0.01)
-
-        comp_msg = (self._awgModule.get(
-            'awgModule/compiler/statusstring')['compiler']
-            ['statusstring'][0])
-
-        if not comp_msg.endswith(succes_msg):
-            success = False
-
-        if not success:
-            # Printing is disabled because we put the waveform in the program
-            # this should be changed when .csv waveforms are supported for UHFQC
-            print("Compilation failed, printing program:")
-            for i, line in enumerate(program_string.splitlines()):
-                print(i+1, '\t', line)
-            print('\n')
-            raise ziShellCompilationError(comp_msg)
-            print("Possible error:", comp)
-            pass
-        # If succesful the comipilation success message is printed
-        t1 = time.time()
-        print(self._awgModule.get('awgModule/compiler/statusstring')
-              ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))
-
-        # path = '/' + self._device + '/awgs/0/ready'
-        # self._daq.subscribe(path)
-        # self._awgModule.set('awgModule/compiler/sourcestring', program_string)
-        # #self._awgModule.set('awgModule/elf/file', '')
-        # while self._awgModule.get('awgModule/progress')['progress'][0] < 1.0:
-        #     time.sleep(0.1)
-        # print(self._awgModule.get('awgModule/compiler/statusstring')
-        #       ['compiler']['statusstring'][0])
-        # while self._awgModule.get('awgModule/progress')['progress'][0] < 1.0:
-        #     time.sleep(0.01)
-        # ready = False
-        # timeout = 0
-        # while not ready and timeout < 1.0:
-        #     data = self._daq.poll(0.1, 1, 4, True)
-        #     timeout += 0.1
-        #     if path in data:
-        #         if data[path]['value'][-1] == 1:
-        #             ready = True
-        # self._daq.unsubscribe(path)
-
-    def close(self):
-        self._daq.disconnectDevice(self._device)
-        super().close()
-
-    def find(self, *args):
-        nodes = self._daq.listNodes('/', 7)
-        if len(args) and args[0]:
-            for m in args:
-                nodes = [k.lower()
-                         for k in nodes if fnmatch(k.lower(), m.lower())]
-
-        return nodes
-
-    def finds(self, *args):
-        nodes = self._daq.listNodes('/', 15)
-        if len(args) and args[0]:
-            for m in args:
-                nodes = [k.lower()
-                         for k in nodes if fnmatch(k.lower(), m.lower())]
-        nodes = [k.lower() for k in nodes if 'weights' not in k.lower()]
-        nodes = [k.lower() for k in nodes if 'statemap' not in k.lower()]
-        return nodes
-
-    def sync(self):
-        self._daq.sync()
-
-    def acquisition_arm(self, single=True):
-        # time.sleep(0.01)
-        self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', single)
-        self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
-        # t0=time.time()
-        # time.sleep(0.001)
-        self._daq.sync()
-        # deltat=time.time()-t0
-        # print('UHFQC syncing took {}'.format(deltat))
-
-    def start(self):
-        """Tektronix-style start command"""
-        # self._daq.sync()
-        # self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', True)
-        self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
-        # time.sleep(0.25)
-        # self._daq.sync()
-
-    def stop(self):
-        """Tektronix-style stop command"""
-        self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 0)
-
-    def acquisition_get(self, samples, acquisition_time=0.010,
-                        timeout=0, channels=set([0, 1]), mode='rl'):
-        logging.warning(
-            "acquisition_get is deprecated (Nov 2017). Dont' use it!")
-        # Define the channels to use
-        paths = dict()
-        data = dict()
-        if mode == 'rl':
-            for c in channels:
-                paths[c] = '/' + self._device + '/quex/rl/data/{}'.format(c)
-                data[c] = []
-                self._daq.subscribe(paths[c])
-        else:
-            for c in channels:
-                paths[c] = '/' + self._device + '/quex/iavg/data/{}'.format(c)
-                data[c] = []
-
-        # Disable automatic readout
-        self._daq.setInt('/' + self._device + '/quex/rl/readout', 0)
-        # It would be better to move this call in to the initialization function
-        # in order to save time here
-        enable_path = '/' + self._device + '/awgs/0/enable'
-        self._daq.subscribe(enable_path)
-
-        # Added for testing purposes, remove again according to how the AWG is
-        # started
-        self._daq.setInt('/' + self._device + '/awgs/0/single', 1)
-        self._daq.setInt(enable_path, 1)
-
-        # Wait for the AWG to finish
-        gotit = False
-        accumulated_time = 0
-        while not gotit and accumulated_time < timeout:
-            dataset = self._daq.poll(acquisition_time, 1, 4, True)
-            if enable_path in dataset and dataset[enable_path]['value'][0] == 0:
-                gotit = True
-            else:
-                accumulated_time += acquisition_time
-
-        if not gotit:
-            print("Error: AWG did not finish in time!")
-            return None
-
-        # Acquire data
-        gotem = [False]*len(channels)
-        for n, c in enumerate(channels):
-            p = paths[c]
-            dataset = self._daq.get(p, True, 0)
-            if p in dataset:
-                for v in dataset[p]:
-                    data[c] = np.concatenate((data[c], v['vector']))
-                if len(data[c]) >= samples:
-                    gotem[n] = True
-
-        if not all(gotem):
-            print("Error: Didn't get all results!")
-            for n, c in enumerate(channels):
-                print("    : Channel {}: Got {} of {} samples",
-                      c, len(data[c]), samples)
-            return None
-
-        # print("data type {}".format(type(data)))
         return data
 
+    def acquisition_initialize(self, samples, averages, channels=(0, 1), mode='rl') -> None:
+        # Define the channels to use and subscribe to them
+        self._acquisition_nodes = []
+
+        # Loop counter of AWG
+        loop_cnt = samples
+
+        # Make some checks on the configured AWG program
+        if samples > 1 and not self._awg_program_features['loop_cnt']:
+            raise ziUHFQCSeqCError('Trying to acquire {} samples using an AWG program that does not use \'loop_cnt\'.'.format(samples))
+
+        if averages > 1 and not self._awg_program_features['avg_cnt']:
+            # Adjust the AWG loop counter according to the configured program
+            loop_cnt *= averages
+
+        if mode == 'rl':
+            for c in channels:
+                path = self._get_full_path('qas/0/result/data/{}/wave'.format(c))
+                self._acquisition_nodes.append(path)
+                self.subs(path)
+            # Enable automatic readout
+            self.qas_0_result_reset(1)
+            self.qas_0_result_enable(1)
+            self.qas_0_result_length(samples)
+            self.qas_0_result_averages(averages)
+            ro_mode = 0
+        else:
+            for c in channels:
+                path = self._get_full_path('qas/0/monitor/inputs/{}/wave'.format(c))
+                self._acquisition_nodes.append(path)
+                self.subs(path)
+            # Enable automatic readout
+            self.qas_0_monitor_reset(1)
+            self.qas_0_monitor_enable(1)
+            self.qas_0_monitor_length(samples)
+            self.qas_0_monitor_averages(averages)
+            ro_mode = 1
+
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_LOOP_CNT), loop_cnt)
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_RO_MODE), ro_mode)
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_AVG_CNT), averages)
+        if self.wait_dly() > 0 and not self._awg_program_features['wait_dly']:
+            raise ziUHFQCSeqCError('Trying to use a delay of {} using an AWG program that does not use \'wait_dly\'.'.format(self.wait_dly()))
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), self.wait_dly())
+        self.subs(self._get_full_path('auxins/0/sample'))
+
+        # Generate more dummy data
+        self.auxins_0_averaging(8)
+    
+    def qudev_acquisition_initialize(self, samples, averages, loop_cnt, channels=(0, 1), mode='rl') -> None:
+        # Define the channels to use and subscribe to them
+        self._acquisition_nodes = []
+
+        if mode == 'rl':
+            for c in channels:
+                path = self._get_full_path('qas/0/result/data/{}/wave'.format(c))
+                self._acquisition_nodes.append(path)
+                self.subs(path)
+            # Enable automatic readout
+            self.qas_0_result_reset(1)
+            self.qas_0_result_enable(0)
+            self.qas_0_result_length(samples)
+            self.qas_0_result_averages(averages)
+            ro_mode = 0
+        else:
+            for c in channels:
+                path = self._get_full_path('qas/0/monitor/inputs/{}/wave'.format(c))
+                self._acquisition_nodes.append(path)
+                self.subs(path)
+            # Enable automatic readout
+            self.qas_0_monitor_reset(1)
+            self.qas_0_monitor_enable(1)
+            self.qas_0_monitor_length(samples)
+            self.qas_0_monitor_averages(averages)
+            ro_mode = 1
+
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_LOOP_CNT), loop_cnt)
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_RO_MODE), ro_mode)
+        if self.wait_dly() > 0 and not self._awg_program_features['wait_dly']:
+            raise ziUHFQCSeqCError('Trying to use a delay of {} using an AWG program that does not use \'wait_dly\'.'.format(self.wait_dly()))
+
+    def acquisition_arm(self, single=True) -> None:
+        # time.sleep(0.01)
+        self.awgs_0_single(single)
+        self.start()
+
     def acquisition_poll(self, samples, arm=True,
-                         acquisition_time=0.010):
+                         acquisition_time=0.010) -> None:
         """
         Polls the UHFQC for data.
 
@@ -544,31 +695,38 @@ class UHFQC(Instrument):
             timeout (float): time in seconds before timeout Error is raised.
 
         """
-
-        data = {k: [] for k, dummy in enumerate(self.acquisition_paths)}
+        data = {k: [] for k, dummy in enumerate(self._acquisition_nodes)}
 
         # Start acquisition
         if arm:
             self.acquisition_arm()
 
         # Acquire data
-        gotem = [False]*len(self.acquisition_paths)
+        gotem = [False]*len(self._acquisition_nodes)
         accumulated_time = 0
 
         while accumulated_time < self.timeout() and not all(gotem):
-            dataset = self._daq.poll(acquisition_time, 1, 4, True)
+            dataset = self.poll(acquisition_time)
 
-            for n, p in enumerate(self.acquisition_paths):
+            # Enable the user to interrupt long (or buggy) acquisitions
+            try:
+                check_keyboard_interrupt()
+            except KeyboardInterrupt as e:
+                # Finalize acquisition before raising exception
+                self.acquisition_finalize()
+                raise e
+
+            for n, p in enumerate(self._acquisition_nodes):
                 if p in dataset:
                     for v in dataset[p]:
-                        data[n] = np.concatenate((data[n], v['vector']))
+                        data[n] =  np.concatenate((data[n], v['vector']))
                         if len(data[n]) >= samples:
                             gotem[n] = True
             accumulated_time += acquisition_time
 
         if not all(gotem):
             self.acquisition_finalize()
-            for n, c in enumerate(self.acquisition_paths):
+            for n, _c in enumerate(self._acquisition_nodes):
                 if n in data:
                     print("\t: Channel {}: Got {} of {} samples".format(
                           n, len(data[n]), samples))
@@ -576,772 +734,555 @@ class UHFQC(Instrument):
 
         return data
 
-    def acquisition(self, samples, acquisition_time=0.010, timeout=0,
-                    channels=(0, 1), mode='rl'):
-        self.timeout(timeout)
-        self.acquisition_initialize(channels, mode)
-        data = self.acquisition_poll(samples, True, acquisition_time)
-        self.acquisition_finalize()
+    def acquisition_finalize(self) -> None:
+        self.stop()
 
-        return data
+        for p in self._acquisition_nodes:
+            self.unsubs(p)
+        self.unsubs(self._get_full_path('auxins/0/sample'))
 
-    def acquisition_initialize(self, channels=(0, 1), mode='rl'):
-        # Define the channels to use and subscribe to them
-        self.acquisition_paths = []
-
-        if mode == 'rl':
-            readout = 0
-            for c in channels:
-                path = f'/{self._device}/quex/rl/data/{c}'
-                self.acquisition_paths.append(path)
-                self._daq.subscribe(path)
-                print(path, 'subscribed')
-                readout += (1 << c)
-            # Enable automatic readout
-            self._daq.setInt('/' + self._device + '/quex/rl/readout', readout)
+    def check_errors(self) -> None:
+        """
+        Checks the instrument for errors. As the UHFQA does not yet support the same error
+        stack as the HDAWG instruments we do the checks by reading specific nodes
+        in the system and then constructing similar messages as on the HDAWG.
+        """
+        # If this is the first time we are called, log the detected errors, but don't raise
+        # any exceptions
+        if self._errors is None:
+            raise_exceptions = False
+            self._errors = {}
         else:
-            for c in channels:
-                path = f'/{self._device}/quex/iavg/data/{c}'
-                self.acquisition_paths.append(path)
-                self._daq.subscribe(path)
-                print(path, 'subscribed')
-            # Enable automatic readout
-            self._daq.setInt('/' + self._device + '/quex/iavg/readout', 1)
+            raise_exceptions = True
 
-        # self._daq.subscribe('/' + self._device + '/auxins/0/sample')
+        # Stores the errors before processing
+        errors = {'messages': []}
 
-        # Generate more dummy data
-        # self._daq.setInt('/' + self._device + '/auxins/0/averaging', 8)
+        # Now check for errors from the different functional units
+        if self.qas_0_result_errors() > 0:
+            errors['messages'].append({
+              'code' : 'RESHOLDOFF',
+              'severity' : 1.0,
+              'count' : self.qas_0_result_errors(),
+              'message' : 'Holdoff error detected when reading Quantum Analyzer Results! '\
+                          'Increase the delay between trigger signals from the AWG!'})
 
-    def acquisition_finalize(self):
-        for p in self.acquisition_paths:
-            self._daq.unsubscribe(p)
-            print(p, 'unsubscribed')
-        # self._daq.unsubscribe('/' + self._device + '/auxins/0/sample')
+        if self.qas_0_monitor_errors() > 0:
+            errors['messages'].append({
+              'code' : 'MONHOLDOFF',
+              'severity' : 1.0,
+              'count' : self.qas_0_monitor_errors(),
+              'message' : 'Holdoff error detected when reading Quantum Analyzer Input Monitor! '\
+                          'Increase the delay between trigger signals from the AWG!'})
 
-    def create_parameter_files(self):
-        # this functions retrieves all possible settable and gettable
-        # parameters from the device. Additionally, iot gets all minimum and
-        # maximum values for the parameters by trial and error
+        # Check optional codeword-based errors
+        if self._awg_program_features['cases'] and self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_ERR_CNT)) > 0:
+            errors['messages'].append({
+              'code' : 'DIOCWCASE',
+              'severity' : 1.0,
+              'count' : self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_ERR_CNT)),
+              'message' : 'AWG detected invalid codewords not covered by the configured cases!'})
 
-        s_node_pars = []
-        d_node_pars = []
-        # ["quex/iavg", "quex/wint"]
-        patterns = [
-            "awgs", "sigins", "sigouts", "quex", "dios", "system/extclk",
-            'triggers/in']
-        # json.dump([, s_file, default=int)
-        # json.dump([, d_file, default=int)
-        for pattern in patterns:
-            print("extracting parameters of type", pattern)
-            all_nodes = set(self.find('/{}/*{}*'.format(self._device, pattern)))
-            s_nodes = set(self.finds('/{}/*{}*'.format(self._device, pattern)))
-            d_nodes = all_nodes.difference(s_nodes)
-            print(len(all_nodes))
-            # extracting info from the setting nodes
-            s_nodes = list(s_nodes)
-            default_values = self.getd(s_nodes)
-            for s_node in s_nodes:
-                self.setd(s_node,  1e12)
-            max_values = self.getd(s_nodes)
-            for s_node in s_nodes:
-                self.setd(s_node, -1e12)
-            min_values = self.getd(s_nodes)
-            float_values = dict.fromkeys(s_nodes)
-            for s_node in s_nodes:
-                if np.pi > max_values[s_node]:
-                    float_values[s_node] = max_values[s_node]/np.pi
+        # Asserted in case errors were found
+        found_errors = False
+
+        # Go through the errors and update our structure, raise exceptions if anything changed
+        for m in errors['messages']:
+            code     = m['code']
+            count    = m['count']
+            severity = m['severity']
+            message  = m['message']
+
+            if not raise_exceptions:
+                self._errors[code] = {
+                    'count'   : count,
+                    'severity': severity,
+                    'message' : message}
+                log.warning('{}: Code {}: "{}" ({})'.format(self.devname, code, message, severity))
+            else:
+                # Optionally skip the error completely
+                if code in self._errors_to_ignore:
+                    continue
+
+                # Check if there are new errors
+                if code not in self._errors or count > self._errors[code]['count']:
+                    log.error('{}: {} ({}/{})'.format(self.devname, message, code, severity))
+                    found_errors = True
+
+                if code in self._errors:
+                    self._errors[code]['count'] = count
                 else:
-                    float_values[s_node] = np.pi
-                self.setd(s_node, float_values[s_node])
-            actual_float_values = self.getd(s_nodes)
+                    self._errors[code] = {
+                        'count'   : count,
+                        'severity': severity,
+                        'message' : message}
 
-            node_types = dict.fromkeys(s_nodes)
-            for s_node in sorted(s_nodes):
-                # self.setd(node,default_values[s_node])
-                fraction, integer = np.modf(actual_float_values[s_node])
-                if fraction != 0:
-                    node_types[s_node] = 'float'
-                    if min_values[s_node] == max_values[s_node]:
-                        node_types[s_node] = 'float_small'
-                        min_values[s_node] = 0
-                    elif abs(min_values[s_node]) < 0.01:
-                        min_values[s_node] = 0
-                else:
-                    node_types[s_node] = 'int'
-                    min_values[s_node] = 0
-                    if max_values[s_node] == 3567587328:
-                        node_types[s_node] = 'int_64'
-                        max_values[s_node] = 4294967295
-                    elif max_values[s_node] == 1:
-                        node_types[s_node] = 'bool'
-                    elif max_values[s_node] == 0:
-                        max_values[s_node] = 255
-                        node_types[s_node] = 'int_8bit'
-                    elif max_values[s_node] > 4294967295:
-                        node_types[s_node] = 'float'
+        if found_errors:
+            raise zibase.ziRuntimeError('Errors detected during run-time!')
 
-                line = [s_node.replace(
-                    '/' + self._device + '/', ''), node_types[s_node], min_values[s_node], max_values[s_node]]
-                print(line)
-                s_node_pars.append(line)
-                #json.dump(line, s_file, indent=2, default=int)
+    def clear_errors(self) -> None:
+        self.qas_0_result_reset(1)
+        self.qas_0_monitor_reset(1)
 
-            # extracting info from the data nodes
-            d_nodes = list(d_nodes)
-            # default_values=self.getd(d_nodes)
-            default_values = np.zeros(len(d_nodes))
-            node_types = ['']*len(d_nodes)
+    ##########################################################################
+    # 'public' functions: DIO support
+    ##########################################################################
 
-            for i, d_node in enumerate(d_nodes):
-                try:
-                    answer = self.getv(d_node)
-                    if isinstance(answer, dict):
-                        value = answer['value'][0]
-                        node_types[i] = 'float'
-                    elif isinstance(answer, list):
-                        try:
-                            self.setv(d_node, np.array([0, 0, 0]))
-                            node_types[i] = 'vector_gs'
-                        except:
-                            value = answer[0]['vector']
-                            node_types[i] = 'vector_g'
-                    else:
-                        print("unknown type")
-                except:
-                    node_types[i] = 'vector_s'
-                # , default_values[i]]
-                line = [
-                    d_node.replace('/' + self._device + '/', ''), node_types[i]]
-                print(line)
-                d_node_pars.append(line)
-                #json.dump(line, d_file, indent=2, default=int)
+    def plot_dio(self, bits=range(32), line_length=64):
+        data = self.getv('awgs/0/dio/data')
+        zibase.plot_timing_diagram(data, bits, line_length)
 
-        with open(self._s_file_name, 'w') as s_file:
-            json.dump(s_node_pars, s_file, default=int, indent=2)
-
-        with open(self._d_file_name, 'w') as d_file:
-            json.dump(d_node_pars, d_file, default=int, indent=2)
+    ##########################################################################
+    # 'public' functions: weight & matrix function helpers
+    ##########################################################################
 
     def prepare_SSB_weight_and_rotation(self, IF,
                                         weight_function_I=0,
-                                        weight_function_Q=1):
+                                        weight_function_Q=1,
+                                        rotation_angle=0,
+                                        length=4096 / 1.8e9,
+                                        scaling_factor=1) -> None:
         """
-        Sets defualt integration weights for SSB modulation, beware does not
+        Sets default integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
         """
         trace_length = 4096
-        tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        print(len(tbase))
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
-        self.set('quex_wint_weights_{}_real'.format(weight_function_I),
-                 np.array(cosI))
-        self.set('quex_wint_weights_{}_imag'.format(weight_function_I),
-                 np.array(sinI))
-        self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
-                 np.array(sinI))
-        self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
-                 np.array(cosI))
-        self.set('quex_rot_{}_real'.format(weight_function_I), 1.0)
-        self.set('quex_rot_{}_imag'.format(weight_function_I), 1.0)
-        self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
-        self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
+        tbase =  np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
+        cosI =  np.array( np.cos(2 *  np.pi * IF * tbase + rotation_angle))
+        sinI =  np.array( np.sin(2 *  np.pi * IF * tbase + rotation_angle))
+        if length < 4096 / 1.8e9:
+            max_sample = int(length * 1.8e9)
+            # setting the samples beyond the length to 0
+            cosI[max_sample:] = 0
+            sinI[max_sample:] = 0
+        self.set('qas_0_integration_weights_{}_real'.format(weight_function_I),
+                  np.array(cosI))
+        self.set('qas_0_integration_weights_{}_imag'.format(weight_function_I),
+                  np.array(sinI))
+        self.set('qas_0_rotations_{}'.format(weight_function_I), scaling_factor*(1.0 + 1.0j))
+        if weight_function_Q != None:
+            self.set('qas_0_integration_weights_{}_real'.format(weight_function_Q),
+                      np.array(sinI))
+            self.set('qas_0_integration_weights_{}_imag'.format(weight_function_Q),
+                      np.array(cosI))
+            self.set('qas_0_rotations_{}'.format(weight_function_Q), scaling_factor*(1.0 - 1.0j))
 
-    def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
+    def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1) -> None:
         trace_length = 4096
-        tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
-        self.set('quex_wint_weights_{}_real'.format(weight_function_I),
-                 np.array(cosI))
-        self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
-                 np.array(sinI))
+        tbase =  np.arange(0, trace_length/1.8e9, 1/1.8e9)
+        cosI =  np.array( np.cos(2* np.pi*IF*tbase))
+        sinI =  np.array( np.sin(2* np.pi*IF*tbase))
+        self.set('qas_0_integration_weights_{}_real'.format(weight_function_I),
+                  np.array(cosI))
+        self.set('qas_0_integration_weights_{}_real'.format(weight_function_Q),
+                  np.array(sinI))
         # the factor 2 is needed so that scaling matches SSB downconversion
-        self.set('quex_rot_{}_real'.format(weight_function_I), 2.0)
-        self.set('quex_rot_{}_imag'.format(weight_function_I), 0.0)
-        self.set('quex_rot_{}_real'.format(weight_function_Q), 2.0)
-        self.set('quex_rot_{}_imag'.format(weight_function_Q), 0.0)
+        self.set('qas_0_rotations_{}'.format(weight_function_I), 2.0 + 0.0j)
+        self.set('qas_0_rotations_{}'.format(weight_function_Q), 2.0 + 0.0j)
 
-    def _make_full_path(self, path):
-        if path[0] == '/':
-            return path
-        else:
-            return '/' + self._device + '/' + path
-
-    def seti(self, path, value, async=False):
-        if async:
-            func = self._daq.asyncSetInt
-        else:
-            func = self._daq.setInt
-
-        func(self._make_full_path(path), int(value))
-
-    def setd(self, path, value, async=False):
-        if async:
-            func = self._daq.asyncSetDouble
-        else:
-            func = self._daq.setDouble
-
-        func(self._make_full_path(path), float(value))
-
-    def _get(self, paths, convert=None):
-        if type(paths) is not list:
-            paths = [paths]
-            single = 1
-        else:
-            single = 0
-
-        values = {}
-
-        for p in paths:
-            values[p] = convert(self._daq.getDouble(self._make_full_path(p)))
-
-        if single:
-            return values[paths[0]]
-        else:
-            return values
-
-    def geti(self, paths):
-        return self._get(paths, int)
-
-    def getd(self, paths):
-        return self._get(paths, float)
-
-    def getv(self, paths):
-        if type(paths) is not list:
-            paths = [paths]
-            single = 1
-        else:
-            single = 0
-
-        paths = [self._make_full_path(p) for p in paths]
-        values = {}
-
-        for p in paths:
-            timeout = 0
-            while p not in values and timeout < 5:
-                try:
-                    tmp = self._daq.get(p, True, 0)
-                    values[p] = tmp[p]
-                except:
-                    print("Unexpected error:", sys.exc_info()[0])
-                    timeout += 1
-
-        if single:
-            return values[paths[0]]
-        else:
-            return values
-
-    def setv(self, path, value):
-        # Handle absolute path
-        if path[0] == '/':
-            self._daq.vectorWrite(path, value)
-        else:
-            self._daq.vectorWrite('/' + self._device + '/' + path, value)
-
-    # sequencer functions
-    def awg_sequence_acquisition_and_DIO_triggered_pulse(
-            self, Iwaves, Qwaves, cases, acquisition_delay, timeout=5):
-        # setting the acquisition delay samples
-        delay_samples = int(acquisition_delay*1.8e9/8)
-        # setting the delay in the instrument
-        self.awgs_0_userregs_2(delay_samples)
-
-        sequence = (
-            'const TRIGGER1  = 0x000001;\n' +
-            'const WINT_TRIG = 0x000010;\n' +
-            'const IAVG_TRIG = 0x000020;\n' +
-            'const WINT_EN   = 0x1ff0000;\n' +
-            'const DIO_VALID = 0x00010000;\n' +
-            'setTrigger(WINT_EN);\n' +
-            'var loop_cnt = getUserReg(0);\n' +
-            'var wait_delay = getUserReg(2);\n' +
-            'var RO_TRIG;\n' +
-            'if(getUserReg(1)){\n' +
-            ' RO_TRIG=IAVG_TRIG;\n' +
-            '}else{\n' +
-            ' RO_TRIG=WINT_TRIG;\n' +
-            '}\n' +
-            'var trigvalid = 0;\n' +
-            'var dio_in = 0;\n' +
-            'var cw = 0;\n')
-
-        # loop to generate the wave list
-        for i in range(len(Iwaves)):
-            Iwave = Iwaves[i]
-            Qwave = Qwaves[i]
-            if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
-                raise KeyError(
-                    "exceeding AWG range for I channel, all values should be within +/-1")
-            elif np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
-                raise KeyError(
-                    "exceeding AWG range for Q channel, all values should be within +/-1")
-            elif len(Iwave) > 16384:
-                raise KeyError(
-                    "exceeding max AWG wave lenght of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-            elif len(Qwave) > 16384:
-                raise KeyError(
-                    "exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
-            wave_I_string = self.array_to_combined_vector_string(
-                Iwave, "Iwave{}".format(i))
-            wave_Q_string = self.array_to_combined_vector_string(
-                Qwave, "Qwave{}".format(i))
-            sequence = sequence+wave_I_string+wave_Q_string
-        # starting the loop and switch statement
-        sequence = sequence+(
-            'repeat(loop_cnt) {\n' +
-            ' waitDIOTrigger();\n' +
-            ' var dio = getDIOTriggered();\n' +
-            # now hardcoded for 7 bits (cc-light)
-            ' cw = (dio >> 17) & 0x1f;\n' +
-            '  switch(cw) {\n')
-        # adding the case statements
-        for i in range(len(Iwaves)):
-            # generating the case statement string
-            case = '  case {}:\n'.format(int(cases[i]))
-            case_play = '   playWave(Iwave{}, Qwave{});\n'.format(i, i)
-            # adding the individual case statements to the sequence
-            # FIXME: this is a hack to work around missing timing in OpenQL
-            # Oct 2017
-            sequence = sequence + case+case_play
-
-        # adding the final part of the sequence including a default wave
-        sequence = (sequence +
-                    '  default:\n' +
-                    '   playWave(ones(36), ones(36));\n' +
-                    ' }\n' +
-                    ' wait(wait_delay);\n' +
-                    ' setTrigger(WINT_EN + RO_TRIG);\n' +
-                    ' setTrigger(WINT_EN);\n' +
-                    ' wait(100);'
-                    #' waitWave();\n'+ #removing this waitwave for now
-                    '}\n' +
-                    'wait(300);\n' +
-                    'setTrigger(0);\n')
-        self.awg_string(sequence, timeout=timeout)
-
-    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, trigger=True):
-        if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
-            raise KeyError(
-                "exceeding AWG range for I channel, all values should be withing +/-1")
-        elif np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
-            raise KeyError(
-                "exceeding AWG range for Q channel, all values should be withing +/-1")
-        elif len(Iwave) > 16384:
-            raise KeyError(
-                "exceeding max AWG wave lenght of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
-        elif len(Qwave) > 16384:
-            raise KeyError(
-                "exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
-
-        wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
-        wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
-        preamble = """
-const TRIGGER1  = 0x000001;
-const WINT_TRIG = 0x000010;
-const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x1ff0000;
-setTrigger(WINT_EN);
-var loop_cnt = getUserReg(0);
-var wait_delay = getUserReg(2);
-var RO_TRIG;
-if(getUserReg(1)){
-  RO_TRIG=IAVG_TRIG;
-}else{
-  RO_TRIG=WINT_TRIG;
-}\n"""
-        loop_start = """
-repeat(loop_cnt) {
-""" + ("\twaitDigTrigger(1, 1);" if trigger else "") + """
-\tplayWave(Iwave, Qwave);\n"""
-        end_string = """
-\tsetTrigger(WINT_EN + RO_TRIG);
-\tsetTrigger(WINT_EN);
-\twaitWave();
-}
-wait(300);
-setTrigger(0);"""
-
-        string = preamble+wave_I_string+wave_Q_string + \
-            loop_start+end_string
-        self.awg_string(string)
-
-    def awg_sequence_acquisition_and_pulse_multi_segment(self, readout_pulses):
-
-        wave_defs = ""
-
-        for i, pulse in enumerate(readout_pulses):
-            Iwave = pulse.real.copy()
-            Qwave = pulse.imag.copy()
-            if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
-                raise KeyError("exceeding AWG range for I channel, all values "
-                               "should be withing +/-1")
-            elif np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
-                raise KeyError("exceeding AWG range for Q channel, all values "
-                               "should be withing +/-1")
-            elif len(Iwave) > 16384:
-                raise KeyError("exceeding max AWG wave lenght of 16384 samples "
-                               "for I channel, trying to upload {} samples"
-                               .format(len(Iwave)))
-            elif len(Qwave) > 16384:
-                raise KeyError("exceeding max AWG wave lenght of 16384 samples "
-                               "for Q channel, trying to upload {} samples"
-                               .format(len(Qwave)))
-            wave_defs += self.array_to_combined_vector_string(
-                Iwave, "Iwave{}".format(i))
-            wave_defs += self.array_to_combined_vector_string(
-                Qwave, "Qwave{}".format(i))
-
-        preamble = """
-        const TRIGGER1  = 0x0000001;
-        const WINT_TRIG = 0x0000010;
-        const IAVG_TRIG = 0x0000020;
-        const WINT_EN   = 0x1ff0000;
-        setTrigger(WINT_EN);
-        var loop_cnt = getUserReg(0);
-        var wait_delay = getUserReg(2);
-        var RO_TRIG;
-        if (getUserReg(1)) {{
-          RO_TRIG = IAVG_TRIG;
-        }} else {{
-          RO_TRIG = WINT_TRIG;
-        }}\n"""
-
-        loop = """for (var i = 0; i < loop_cnt; i = i + {}) {{
-        """.format(len(readout_pulses))
-
-        for i, _ in enumerate(readout_pulses):
-            loop += """
-            \twaitDigTrigger(1, 1);
-            \tplayWave(Iwave{0}, Qwave{0});\n""".format(i)
-            loop += """
-            \tsetTrigger(WINT_EN + RO_TRIG);
-            \tsetTrigger(WINT_EN);
-            \twaitWave();\n"""
-
-        end_string = """
-        }
-        wait(300);
-        setTrigger(0);\n"""
-
-        string = preamble + wave_defs + loop + end_string
-        self.awg_string(string)
-
-
-    def array_to_combined_vector_string(self, array, name):
-        # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
-        # this is to avoid python crashes (was found to crash for vectors of
-        # lenght> 1490)
-        string = 'vect('
-        join = False
-        n = 0
-        while n < len(array):
-            string += '{:.10f}'.format(array[n])
-            if ((n+1) % 1024 != 0) and n < len(array)-1:
-                string += ','
-
-            if ((n+1) % 1024 == 0):
-                string += ')'
-                if n < len(array)-1:
-                    string += ',\nvect('
-                    join = True
-            n += 1
-
-        string += ')'
-        if join:
-            string = 'wave ' + name + ' = join(' + string + ');\n'
-        else:
-            string = 'wave ' + name + ' = ' + string + ';\n'
-        return string
-
-    def awg_sequence_acquisition(self, trigger=True):
-        string = """
-const TRIGGER1  = 0x0000001;
-const WINT_TRIG = 0x0000010;
-const IAVG_TRIG = 0x0000020;
-const WINT_EN   = 0x1ff0000;
-setTrigger(WINT_EN);
-var loop_cnt = getUserReg(0);
-var RO_TRIG;
-if(getUserReg(1)){
-  RO_TRIG=IAVG_TRIG;
-}else{
-  RO_TRIG=WINT_TRIG;
-}
-repeat(loop_cnt) {
-""" + ("\twaitDigTrigger(1, 1);" if trigger else "") + """
-\tsetTrigger(WINT_EN + RO_TRIG);
-\twait(5);
-\tsetTrigger(WINT_EN);
-""" + ("\twait(2250);" if not trigger else "") + """
-}
-wait(1000);
-setTrigger(0);"""
-        self.awg_string(string)
-
-    def awg_update_waveform(self, index, data1, data2=None):
-        """Immediately updates the waveform with the given index.
-
-        The waveform in the waveform viewer in the LabOne web interface is not
-        updated. If data for both AWG channels is given, then the lengths must
-        match.
-
-        Warning! This method should be used with care.
-        Note that the waveform get's overwritten if a new program is uploaded.
-
-        Args:
-            index: Index of the waveform to update. Corresponds to the order of
-                   waveforms in the AWG/Waveform tab in the web interface.
-                   Starts from 0.
-            data1: Waveform data for channel 1.
-            data2: Optional waveform data for channel 2.
-        """
-        if data1 is None and data2 is None:
-            return
-        elif data1 is None:
-            data = data2
-        elif data2 is None:
-            data = data1
-        else:
-            data = np.vstack((data1, data2,)).reshape((-1,), order='F')
-        self.awgs_0_waveform_index(index)
-        self.awgs_0_waveform_data(data)
-        self._daq.sync()
-
-    def awg_sequence_acquisition_and_pulse_SSB(
-            self, f_RO_mod, RO_amp, RO_pulse_length,
-            alpha=1, phi_skew=0):
-        f_sampling = 1.8e9
-        samples = RO_pulse_length*f_sampling
-        sample_idxs = np.arange(int(samples))
-        Iwave = RO_amp * alpha * np.cos(
-            2 * np.pi * sample_idxs * f_RO_mod / f_sampling + phi_skew * np.pi / 180)
-        Qwave = - RO_amp * np.sin(2 * np.pi * sample_idxs * f_RO_mod / f_sampling)
-        self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
-
-
-    def awg_sequence_acquisition_and_pulse_SSB_gaussian_filtered(
-            self, f_RO_mod, RO_amp, RO_pulse_length, filter_sigma, nr_sigma,
-            alpha=1, phi_skew=0):
-        f_sampling = 1.8e9
-        samples = RO_pulse_length*f_sampling
-
-        wave = RO_amp*np.ones(int(samples))
-
-        waveFiltered = gaussian_filter(wave, filter_sigma, nr_sigma,
-                                       sampling_rate=f_sampling)
-
-        Iwave, Qwave = IQ_split(waveFiltered, f_RO_mod, phi_skew=phi_skew,
-                                alpha=alpha, sampling_rate=f_sampling)
-
-        self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
-
-
-    def awg_sequence_acquisition_and_pulse_SSB_CLEAR_pulse(
-            self, amp_base, length_total, delta_amp_segments, length_segments, f_RO_mod,
-            sampling_rate = 1.8e9, phase = 0, alpha=1):
-        '''
-        Generates the envelope of a CLEAR pulse.
-            length_total in s
-            length_segments list of length 4 in s
-            amp_base in V
-            delta_amp_segments list of length 4 in V
-            sampling_rate in Hz
-            empty delay in s
-            phase in degrees
-        '''
-
-        amp_pulse = CLEAR_shape(  amp_base, length_total, delta_amp_segments,
-                                length_segments, sampling_rate=sampling_rate)
-
-
-        Iwave, Qwave = IQ_split(amp_pulse, f_RO_mod, phi_skew= phase, alpha = alpha,
-                                sampling_rate =  sampling_rate)
-
-        self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
-
-
-    def awg_sequence_acquisition_and_pulse_SSB_gauss_CLEAR_pulse(self,
-                          amp_base, length_total, delta_amp_segments,
-                          length_segments, sigma, nr_sigma, f_RO_mod,
-                          alpha=1, sampling_rate=1.8e9, phase=0):
-        """
-        Generates the envelope of a gaussian filtered CLEAR pulse.
-            length_total in s
-            length_segments list of length 4 in s
-            amp_base in V
-            delta_amp_segments list of length 4 in V
-            gauss_amp in V
-            sigma in s
-            sampling_rate in Hz
-            empty delay in s
-            phase in degrees
-        """
-        amp_pulse = CLEAR_shape(amp_base, length_total, delta_amp_segments,
-                                length_segments, sampling_rate=sampling_rate)
-
-        amp_filtered = gaussian_filter( amp_pulse, sigma, nr_sigma,
-                                        sampling_rate=sampling_rate)
-
-        pulse_I, pulse_Q = IQ_split(amp_filtered, f_RO_mod, phi_skew=phase,
-                                alpha=alpha, sampling_rate=sampling_rate)
-
-        self.awg_sequence_acquisition_and_pulse(pulse_I, pulse_Q)
-
-
-    def upload_transformation_matrix(self, matrix):
-        for i in range(np.shape(matrix)[0]):  # looping over the rows
-            for j in range(np.shape(matrix)[1]):  # looping over the colums
-                self.set('quex_trans_{}_col_{}_real'.format(
+    def upload_transformation_matrix(self, matrix) -> None:
+        for i in range( np.shape(matrix)[0]):  # looping over the rows
+            for j in range( np.shape(matrix)[1]):  # looping over the colums
+                self.set('qas_0_crosstalk_rows_{}_cols_{}'.format(
                     j, i), matrix[i][j])
 
     def download_transformation_matrix(self, nr_rows=None, nr_cols=None):
         if not nr_rows or not nr_cols:
-            nr_rows = self.nr_integration_channels
-            nr_cols = self.nr_integration_channels
-        matrix = np.zeros([nr_rows, nr_cols])
-        for i in range(np.shape(matrix)[0]):  # looping over the rows
-            for j in range(np.shape(matrix)[1]):  # looping over the colums
+            nr_rows = self._nr_integration_channels
+            nr_cols = self._nr_integration_channels
+        matrix =  np.zeros([nr_rows, nr_cols])
+        for i in range( np.shape(matrix)[0]):  # looping over the rows
+            for j in range( np.shape(matrix)[1]):  # looping over the colums
                 matrix[i][j] = self.get(
-                    'quex_trans_{}_col_{}_real'.format(j, i))
+                    'qas_0_crosstalk_rows_{}_cols_{}'.format(j, i))
         return matrix
 
-    def spec_mode_on(self, acq_length=1/1500, IF=20e6, ro_amp=0.1):
-        awg_code = """
-const TRIGGER1  = 0x000001;
-const WINT_TRIG = 0x000010;
-const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x1f0000;
-setTrigger(WINT_EN);
-var loop_cnt = getUserReg(0);
+    ##########################################################################
+    # 'public' functions: sequencer functions
+    ##########################################################################
 
-const Fsample = 1.8e9;
-const triggerdelay = {}; //seconds
+    def awg_sequence_acquisition_and_DIO_triggered_pulse(
+            self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0, timeout=5) -> None:
+        # setting the acquisition delay samples
+        delay_samples = int(acquisition_delay*1.8e9/8)
+        self.wait_dly(delay_samples)
 
-repeat(loop_cnt) {{
-setTrigger(WINT_EN + WINT_TRIG + TRIGGER1);
-wait(5);
-setTrigger(WINT_EN);
-wait(triggerdelay*Fsample/8 - 5);
-}}
-wait(1000);
+        # If no cases are defined, then we simply create all possible cases
+        if cases is None:
+            cases =  np.arange(self._num_codewords)
+        else:
+            if len(cases) > self._num_codewords:
+                raise zibase.ziConfigurationError('More cases ({}) defined than available codewords ({})!'.format(len(cases), len(self._num_codewords)))
+
+            # There is probably a more efficient way of doing this
+            for case in cases:
+                if (case < 0) or (case >= self._num_codewords):
+                    raise zibase.ziConfigurationError('Case {} is out of range defined by the available codewords ({})!'.format(case, len(self._num_codewords)))
+
+        # Sanity check on the parameters
+        if Iwaves is not None and (len(Iwaves) != len(cases)):
+            raise ziUHFQCSeqCError('Number of I channel waveforms ({}) does not match number of cases ({})!'.format(len(Iwaves), len(cases)))
+
+        if Qwaves is not None and (len(Qwaves) != len(cases)):
+            raise ziUHFQCSeqCError('Number of Q channel waveforms ({}) does not match number of cases ({})!'.format(len(Iwaves), len(cases)))
+
+        # Sanity check on I channel waveforms
+        if Iwaves is not None:
+            for i, Iwave in enumerate(Iwaves):
+                if  np.max(Iwave) > 1.0 or  np.min(Iwave) < -1.0:
+                    raise KeyError(
+                        "exceeding AWG range for I channel, all values should be within +/-1")
+                if len(Iwave) > 16384:
+                    raise KeyError(
+                        "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+
+                # Update waveform table
+                self.set(zibase.gen_waveform_name(0, cases[i]), Iwave)
+
+        # Sanity check on Q channel waveforms
+        if Qwaves is not None:
+            for i, Qwave in enumerate(Qwaves):
+                if  np.max(Qwave) > 1.0 or  np.min(Qwave) < -1.0:
+                    raise KeyError(
+                        "exceeding AWG range for Q channel, all values should be within +/-1")
+                if len(Qwave) > 16384:
+                    raise KeyError(
+                        "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Qwave)))
+
+                # Update waveform table
+                self.set(zibase.gen_waveform_name(1, cases[i]), Qwave)
+
+        # Define the behavior of our program
+        self._reset_awg_program_features()
+        self._awg_program_features['loop_cnt'] = True
+        self._awg_program_features['wait_dly'] = True
+        self._awg_program_features['waves']    = True
+        self._awg_program_features['cases']    = True
+
+        # Updating cases will cause our AWG program to update
+        self.cases(cases)
+
+    def awg_sequence_acquisition_and_DIO_RED_test(
+            self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0,
+            codewords=None, timeout=5):
+
+        if codewords is None:
+            raise zibase.ziConfigurationError('Trying to define an AWG program with DIO output, but no output values are defined!')
+        else:
+            self._diocws = codewords
+
+        # setting the acquisition delay samples
+        delay_samples = int(acquisition_delay*1.8e9/8)
+        self.wait_dly(delay_samples)
+
+        # If no cases are defined, then we simply create all possible cases
+        if cases is None:
+            cases =  np.arange(self._num_codewords)
+        else:
+            if len(cases) > self._num_codewords:
+                raise zibase.ziConfigurationError('More cases ({}) defined than available codewords ({})!'.format(len(cases), len(self._num_codewords)))
+
+            # There is probably a more efficient way of doing this
+            for case in cases:
+                if (case < 0) or (case >= self._num_codewords):
+                    raise zibase.ziConfigurationError('Case {} is out of range defined by the available codewords ({})!'.format(case, len(self._num_codewords)))
+
+        # Sanity check on the parameters
+        if Iwaves is not None and (len(Iwaves) != len(cases)):
+            raise ziUHFQCSeqCError('Number of I channel waveforms ({}) does not match number of cases ({})!'.format(len(Iwaves), len(cases)))
+
+        if Qwaves is not None and (len(Qwaves) != len(cases)):
+            raise ziUHFQCSeqCError('Number of Q channel waveforms ({}) does not match number of cases ({})!'.format(len(Iwaves), len(cases)))
+
+        # Sanity check on I channel waveforms
+        if Iwaves is not None:
+            for i, Iwave in enumerate(Iwaves):
+                if  np.max(Iwave) > 1.0 or  np.min(Iwave) < -1.0:
+                    raise KeyError(
+                        "exceeding AWG range for I channel, all values should be within +/-1")
+                if len(Iwave) > 16384:
+                    raise KeyError(
+                        "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+
+                # Update waveform table
+                self.set(zibase.gen_waveform_name(0, cases[i]), Iwave)
+
+        # Sanity check on Q channel waveforms
+        if Qwaves is not None:
+            for i, Qwave in enumerate(Qwaves):
+                if  np.max(Qwave) > 1.0 or  np.min(Qwave) < -1.0:
+                    raise KeyError(
+                        "exceeding AWG range for Q channel, all values should be within +/-1")
+                if len(Qwave) > 16384:
+                    raise KeyError(
+                        "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Qwave)))
+
+                # Update waveform table
+                self.set(zibase.gen_waveform_name(1, cases[i]), Qwave)
+
+        # Define the behavior of our program
+        self._reset_awg_program_features()
+        self._awg_program_features['loop_cnt'] = True
+        self._awg_program_features['wait_dly'] = True
+        self._awg_program_features['waves']    = True
+        self._awg_program_features['cases']    = True
+        self._awg_program_features['diocws']   = True
+
+        # Updating cases will cause our AWG program to update
+        self.cases(cases)
+
+    def awg_sequence_acquisition_and_pulse(self, Iwave=None, Qwave=None, acquisition_delay=0, dig_trigger=True) -> None:
+        if Iwave is not None and ( np.max(Iwave) > 1.0 or  np.min(Iwave) < -1.0):
+            raise KeyError(
+                "exceeding AWG range for I channel, all values should be within +/-1")
+
+        if Qwave is not None and ( np.max(Qwave) > 1.0 or  np.min(Qwave) < -1.0):
+            raise KeyError(
+                "exceeding AWG range for Q channel, all values should be within +/-1")
+
+        if Iwave is not None and (len(Iwave) > 16384):
+            raise KeyError(
+                "exceeding max AWG wave length of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+
+        if Qwave is not None and (len(Qwave) > 16384):
+            raise KeyError(
+                "exceeding max AWG wave length of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
+
+        # Check the we have sufficient codewords defined
+        if self._num_codewords < 1:
+            raise zibase.ziConfigurationError('Insufficient number of codewords defined! Need at least 1 codeword.')
+
+        # Configure the actual waveforms
+        if Iwave is not None:
+            self.set(zibase.gen_waveform_name(0, 0), Iwave)
+
+        if Qwave is not None:
+            self.set(zibase.gen_waveform_name(1, 0), Qwave)
+
+        # Configure the delay
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), int(acquisition_delay*1.8e9/8))
+
+        delay_string = """
+    wait(wait_dly);
+"""
+
+        playWave_string = """
+    playWave({}, {});
+        """.format(zibase.gen_waveform_name(0, 0), zibase.gen_waveform_name(1, 0))
+
+        if dig_trigger:
+            loop_start = """
+repeat (loop_cnt) {
+    waitDigTrigger(1, 1);
+"""
+        else:
+            loop_start = """
+repeat (loop_cnt) {
+"""
+        loop_end = """
+    setTrigger(ro_trig);
+    setTrigger(ro_arm);
+    waitWave();
+    wait(4000);
+}
 setTrigger(0);
-        """.format(acq_length)
+"""
+
+        self._reset_awg_program_features()
+        self._awg_program_features['loop_cnt'] = True
+        self._awg_program_features['wait_dly'] = True
+        self._awg_program_features['waves']    = True
+
+        self._awg_program[0] = \
+            awg_sequence_acquisition_preamble() + \
+            loop_start + \
+            playWave_string + \
+            delay_string + \
+            loop_end
+
+        self._awg_needs_configuration[0] = True
+
+    def awg_sequence_acquisition(self):
+        self._reset_awg_program_features()
+        self._awg_program_features['loop_cnt'] = True
+
+        self._awg_program[0] = awg_sequence_acquisition_preamble() + """
+repeat (loop_cnt) {
+    waitDigTrigger(1, 1);
+    setTrigger(ro_trig);
+    setTrigger(ro_arm);
+}
+setTrigger(0);
+"""
+        # Reset delay
+        self.wait_dly(0)
+        self._awg_needs_configuration[0] = True
+
+    def awg_sequence_acquisition_and_pulse_SSB(
+            self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay, dig_trigger=True) -> None:
+        f_sampling = 1.8e9
+        samples = RO_pulse_length*f_sampling
+        array =  np.arange(int(samples))
+        sinwave = RO_amp* np.sin(2* np.pi*array*f_RO_mod/f_sampling)
+        coswave = RO_amp* np.cos(2* np.pi*array*f_RO_mod/f_sampling)
+        Iwave = (coswave+sinwave)/ np.sqrt(2)
+        Qwave = (coswave-sinwave)/ np.sqrt(2)
+        self.awg_sequence_acquisition_and_pulse(
+            Iwave, Qwave, acquisition_delay, dig_trigger=dig_trigger)
+
+    def spec_mode_on(self, acq_length=1/1500, IF=20e6, ro_amp=0.1, wint_length=2**14) -> None:
+        self._reset_awg_program_features()
+        self._awg_program_features['loop_cnt'] = True
+        self._awg_program_features['avg_cnt']  = True
+        self._awg_program_features['waves']    = True
+
+        # Reset delay
+        self.wait_dly(0)
+
+        # Check the we have sufficient codewords defined
+        if self._num_codewords < 1:
+            raise zibase.ziConfigurationError('Insufficient number of codewords defined! Need at least 1 codeword.')
+
+        # Define number of samples
+        N = 16
+
+        # Define alpha parameter
+        alpha = 0.2
+
+        # Define support parameters
+        a0 = (1-alpha)/2
+        a1 = 1/2
+        a2 = alpha/2
+
+        # Generate window function
+        w = a0 - \
+            a1* np.cos(2* np.pi* np.arange(N)/(N-1)) + \
+            a2* np.cos(4* np.pi* np.arange(N)/(N-1))
+
+        # Configure the actual waveforms
+        self.set(zibase.gen_waveform_name(0, 0), w)
+        self.set(zibase.gen_waveform_name(1, 0), w)
+
+        playWave_string = """
+    playWave({}, {});
+        """.format(zibase.gen_waveform_name(0, 0), zibase.gen_waveform_name(1, 0))
+
+        wait_string = """
+    waitQAResultTrigger();
+    wait(16);
+        """
+
+        self._awg_program[0] = awg_sequence_acquisition_preamble() + """
+repeat (avg_cnt) {
+  var wait_time = 0;
+
+  repeat(loop_cnt) {
+    wait_time = wait_time + 1;
+    setTrigger(ro_trig);
+    setTrigger(ro_arm);
+    wait(wait_time);
+""" + playWave_string + wait_string + """
+  }
+}
+setTrigger(0);
+"""
+
+        # Also added by us
+        self.awgs_0_outputs_0_mode(1)
+        self.awgs_0_outputs_1_mode(1)
+
         # setting the internal oscillator to the IF
         self.oscs_0_freq(IF)
-        # setting the integration path to use the oscillator instead of integration functions
-        self.quex_wint_mode(1)
-        # just below the
-        self.quex_wint_length(int(acq_length*0.99*1.8e9))
-        # uploading the sequence
-        self.awg_string(awg_code)
-        # setting the integration rotation to single sideband
-        self.quex_rot_0_real(1)
-        self.quex_rot_0_imag(1)
-        self.quex_rot_1_real(1)
-        self.quex_rot_1_imag(-1)
-        # setting the mixer deskewing to identity
-        self.quex_deskew_0_col_0(1)
-        self.quex_deskew_1_col_0(0)
-        self.quex_deskew_0_col_1(0)
-        self.quex_deskew_1_col_1(1)
 
-        self.sigouts_0_enables_3(1)
-        self.sigouts_1_enables_7(1)
-        # setting
-        self.sigouts_1_amplitudes_7(ro_amp)  # magic scale factor
-        self.sigouts_0_amplitudes_3(ro_amp)
+        self.sigouts_0_on(1)
+        self.sigouts_1_on(1)
 
-    def spec_mode_off(self):
+        # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
+        self.dios_0_mode(2)
+        # Drive DIO bits 31 to 16
+        self.dios_0_drive(0xc)
+
+        # setting the integration path to use the oscillator instead of
+        # integration functions. Should be done before modifying the length.
+        self.qas_0_integration_mode(1)
+
+        self.qas_0_deskew_rows_0_cols_0(1.0)
+        self.qas_0_deskew_rows_0_cols_1(0.0)
+        self.qas_0_deskew_rows_1_cols_0(0.0)
+        self.qas_0_deskew_rows_1_cols_1(1.0)
+        self.qas_0_integration_length(wint_length)
+        self.qas_0_delay(0)
+
+        # Copy from the manual
+        self.qas_0_rotations_0(1.0 + 0.0j)
+        self.qas_0_rotations_1(0.0 + 1.0j)
+
+        for i in range(0, 10):
+            for j in range(0, 10):
+                self.set('qas_0_crosstalk_rows_{0}_cols_{1}'.format(i,j), 1.0*(i == j))
+
+        # Configure some thresholds
+        for i in range(0, 10):
+            self.set('qas_0_thresholds_{}_level'.format(i), 0.01)
+
+        # Also adder by us
+        self.qas_0_result_source(0)
+        self.qas_0_result_enable(1)
+        self.qas_0_result_statistics_enable(0)
+
+        self._awg_needs_configuration[0] = True
+
+    def spec_mode_off(self) -> None:
         # Resetting To regular Mode
         # changing int length
-        self.quex_wint_mode(0)
+        self.qas_0_integration_mode(0)
+
         # Default settings copied
-        self.quex_rot_0_imag(0)
-        self.quex_rot_0_real(1)
-        self.quex_rot_1_imag(0)
-        self.quex_rot_1_real(1)
+        self.qas_0_rotations_0(1.0 + 0.0j)
+        self.qas_0_rotations_1(1.0 + 0.0j)
+
         # setting to DSB by default
-        self.quex_deskew_0_col_0(1)
-        self.quex_deskew_1_col_0(0)
-        self.quex_deskew_0_col_1(0)
-        self.quex_deskew_1_col_1(1)
+        self.qas_0_deskew_rows_0_cols_0(1.0)
+        self.qas_0_deskew_rows_0_cols_1(0.0)
+        self.qas_0_deskew_rows_1_cols_0(0.0)
+        self.qas_0_deskew_rows_1_cols_1(1.0)
+
         # switching off the modulation tone
-        self.sigouts_0_enables_3(0)
-        self.sigouts_1_enables_7(0)
+        self.awgs_0_outputs_0_mode(0)
+        self.awgs_0_outputs_1_mode(0)
 
+    def plot_dio_snapshot(self, bits=range(32)):
+        zibase.plot_timing_diagram(self.getv('awgs/0/dio/data'), bits, 64)
 
-class ziShellError(Exception):
-    """Base class for exceptions in this module."""
-    pass
+    def calibrate_CCL_dio_protocol(self, CCL=None, verbose=False, repetitions=1):
+        log.info('Calibrating DIO delays')
+        if verbose: print("Calibrating DIO delays")
 
+        if CCL is None:
+            CCL = qtccl.CCL('CCL', address='192.168.0.11', port=5025)
 
-class ziShellDAQError(ziShellError):
-    """Exception raised when no DAQ has been connected."""
-    pass
+        cs_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            'output', 'cs.txt')
 
+        opc_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            'output', 'qisa_opcodes.qmap')
 
-class ziShellModuleError(ziShellError):
-    """Exception raised when a module has not been started."""
-    pass
+        # Configure CCL
+        CCL.control_store(cs_filepath)
+        CCL.qisa_opcode(opc_filepath)
 
+        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+            '..',
+            'examples','CCLight_example',
+            'qisa_test_assembly','calibration_cws_ro.qisa'))
 
-class ziShellCompilationError(ziShellError):
-    """
-    Exception raised when the zi AWG-8 compiler encounters an error.
-    """
-    pass
+        # Start the CCL with the program configured above
+        CCL.eqasm_program(test_fp)
+        CCL.start()
 
-####################
-# Helper Functions #
-####################
-def gaussian_filter(wave, filter_sigma, nr_sigma, sampling_rate=1.8e9):
-
-    filter_samples = int(filter_sigma*nr_sigma*sampling_rate)
-    filter_sample_idxs = np.arange(filter_samples)
-    gauss_filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
-                          (filter_sigma*sampling_rate)**2)
-    gauss_filter /= gauss_filter.sum()
-    waveFiltered = np.convolve(wave, gauss_filter, mode='full')
-    return waveFiltered
-
-
-def IQ_split(wave, f_RO_mod, phi_skew=0, alpha=1, sampling_rate=1.8e9):
-    Iwave = alpha * wave * np.cos(2 * np.pi *
-                                  np.arange(len(wave)) * f_RO_mod /sampling_rate +
-                                  phi_skew * np.pi / 180)
-    Qwave = -wave * np.sin(2 * np.pi *
-                           np.arange(len(wave)) * f_RO_mod /sampling_rate)
-
-    return Iwave, Qwave
-
-
-def CLEAR_shape(amp_base, length_total, delta_amp_segments,
-                 length_segments, sampling_rate=1.8e9):
-    
-    delta_amp_segments = list(delta_amp_segments)
-    if type(length_segments) == float:
-        length_segments = [length_segments]*4
-    elif type(length_segments) == list:
-        pass
-    else:
-        raise TypeError('The type of length_segments needs to be list or float')
-
-    if len(delta_amp_segments) == len( length_segments) == 4:
-        pass
-    else:
-        raise ValueError(
-            'delta_amp_segments and length_segments need to be lists of length 4')
-
-
-    pulse_samples = (length_total)*sampling_rate
-    segments_samples = list(map(lambda x: int(x*sampling_rate), length_segments))
-    amp_pulse = np.concatenate(
-        ((np.ones(segments_samples[0])*(amp_base+delta_amp_segments[0])),
-         (np.ones(segments_samples[1])*(amp_base+delta_amp_segments[1])),
-         (np.ones(int(pulse_samples-sum(segments_samples)))*amp_base),
-         (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[2])),
-         (np.ones(segments_samples[3])*(amp_base+delta_amp_segments[3]))))
-
-    return amp_pulse
+        # Make sure the configuration is up-to-date
+        self.assure_ext_clock()

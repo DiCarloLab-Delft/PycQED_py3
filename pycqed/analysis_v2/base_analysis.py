@@ -237,7 +237,6 @@ class BaseDataAnalysis(object):
 
     def get_data_from_timestamp_list(self):
         raw_data_dict = []
-        print(self.timestamps)
         for timestamp in self.timestamps:
             raw_data_dict_ts = OrderedDict([(param, []) for param in
                                            self.params_dict])
@@ -246,6 +245,7 @@ class BaseDataAnalysis(object):
             h5mode = self.options_dict.get('h5mode', 'r+')
             h5filepath = a_tools.measurement_filename(folder)
             data_file = h5py.File(h5filepath, h5mode)
+            self.data_file = data_file
 
             if 'timestamp' in raw_data_dict_ts:
                 raw_data_dict_ts['timestamp'] = timestamp
@@ -340,7 +340,6 @@ class BaseDataAnalysis(object):
              'folder': 'folder',
              'exp_metadata':
                  'Experimental Data.Experimental Metadata'})
-
 
         self.raw_data_dict = self.get_data_from_timestamp_list()
         if len(self.timestamps) == 1:
@@ -1479,7 +1478,6 @@ class BaseDataAnalysis(object):
                                     **{independent_var: pdict['xvals']})
         if not hasattr(pdict['yvals'], '__iter__'):
             pdict['yvals'] = np.array([pdict['yvals']])
-            print('here', type(pdict['yvals']))
         self.plot_line(pdict, axs)
 
         if plot_init:

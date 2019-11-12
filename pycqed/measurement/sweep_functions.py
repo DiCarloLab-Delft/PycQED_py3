@@ -2,11 +2,10 @@ import logging
 import time
 import numpy as np
 from pycqed.measurement import mc_parameter_wrapper
-import qcodes 
+import qcodes
 
 
 class Sweep_function(object):
-
     '''
     sweep_functions class for MeasurementControl(Instrument)
     '''
@@ -39,12 +38,13 @@ class Sweep_function(object):
 
 
 class Soft_Sweep(Sweep_function):
-
     def __init__(self, **kw):
         self.set_kw()
         self.sweep_control = 'soft'
 
+
 ##############################################################################
+
 
 class Elapsed_Time_Sweep(Soft_Sweep):
     """
@@ -53,8 +53,10 @@ class Elapsed_Time_Sweep(Soft_Sweep):
     detector function.
     """
 
-    def __init__(self, sweep_control='soft',
-                 as_fast_as_possible: bool=False, **kw):
+    def __init__(self,
+                 sweep_control='soft',
+                 as_fast_as_possible: bool = False,
+                 **kw):
         super().__init__()
         self.sweep_control = sweep_control
         self.name = 'Elapsed_Time_Sweep'
@@ -62,7 +64,6 @@ class Elapsed_Time_Sweep(Soft_Sweep):
         self.unit = 's'
         self.as_fast_as_possible = as_fast_as_possible
         self.time_first_set = None
-
 
     def set_parameter(self, val):
         if self.time_first_set is None:
@@ -73,8 +74,9 @@ class Elapsed_Time_Sweep(Soft_Sweep):
             return elapsed_time
 
         if elapsed_time > val:
-            logging.warning('Elapsed time {:.2f}s larger than desired {:2f}s'
-                            .format(elapsed_time, val))
+            logging.warning(
+                'Elapsed time {:.2f}s larger than desired {:2f}s'.format(
+                    elapsed_time, val))
             return elapsed_time
 
         while (time.time() - self.time_first_set) < val:
@@ -82,10 +84,12 @@ class Elapsed_Time_Sweep(Soft_Sweep):
         elapsed_time = time.time() - self.time_first_set
         return elapsed_time
 
-class Heterodyne_Frequency_Sweep(Soft_Sweep):
 
-    def __init__(self, RO_pulse_type,
-                 LO_source, IF,
+class Heterodyne_Frequency_Sweep(Soft_Sweep):
+    def __init__(self,
+                 RO_pulse_type,
+                 LO_source,
+                 IF,
                  RF_source=None,
                  sweep_control='soft',
                  sweep_points=None,
@@ -104,7 +108,7 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
 
     def set_parameter(self, val):
         # RF = LO + IF
-        self.LO_source.frequency(val-self.IF)
+        self.LO_source.frequency(val - self.IF)
         if 'gated' in self.RO_pulse_type.lower():
             self.RF_source.frequency(val)
 
@@ -112,9 +116,7 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
 class Heterodyne_Frequency_Sweep_simple(Soft_Sweep):
     # Same as above but less input arguments
 
-    def __init__(self, MW_LO_source, IF,
-                 sweep_points=None,
-                 **kw):
+    def __init__(self, MW_LO_source, IF, sweep_points=None, **kw):
         super().__init__()
         self.name = 'Heterodyne frequency'
         self.parameter_name = 'Frequency'
@@ -125,14 +127,16 @@ class Heterodyne_Frequency_Sweep_simple(Soft_Sweep):
 
     def set_parameter(self, val):
         # RF = LO + IF
-        self.MW_LO_source.frequency(val-self.IF)
+        self.MW_LO_source.frequency(val - self.IF)
 
 
 class None_Sweep(Soft_Sweep):
-
-    def __init__(self, sweep_control='soft', sweep_points=None,
-                 name: str='None_Sweep', parameter_name: str='pts',
-                 unit: str='arb. unit',
+    def __init__(self,
+                 sweep_control='soft',
+                 sweep_points=None,
+                 name: str = 'None_Sweep',
+                 parameter_name: str = 'pts',
+                 unit: str = 'arb. unit',
                  **kw):
         super(None_Sweep, self).__init__()
         self.sweep_control = sweep_control
@@ -149,7 +153,6 @@ class None_Sweep(Soft_Sweep):
 
 
 class None_Sweep_idx(None_Sweep):
-
     def __init__(self, **kw):
         super().__init__(**kw)
         self.num_calls = 0
@@ -159,7 +162,6 @@ class None_Sweep_idx(None_Sweep):
 
 
 class QX_Sweep(Soft_Sweep):
-
     """
     QX Input Test
     """
@@ -178,15 +180,16 @@ class QX_Sweep(Soft_Sweep):
     def set_parameter(self, val):
         circuit_name = ("circuit%i" % self.__cnt)
         self.__qxc.create_circuit(circuit_name, [
-                                  "prepz q0", "h q0", "x q0", "z q0", "y q0",
-            "y q0", "z q0", "x q0", "h q0", "measure q0"])
-        self.__cnt = self.__cnt+1
+            "prepz q0", "h q0", "x q0", "z q0", "y q0", "y q0", "z q0", "x q0",
+            "h q0", "measure q0"
+        ])
+        self.__cnt = self.__cnt + 1
         # pass
 
 
 class Delayed_None_Sweep(Soft_Sweep):
-
-    def __init__(self, sweep_control='soft', delay=0, mode='cycle_delay', **kw):
+    def __init__(self, sweep_control='soft', delay=0, mode='cycle_delay',
+                 **kw):
         super().__init__()
         self.sweep_control = sweep_control
         self.name = 'None_Sweep'
@@ -213,8 +216,8 @@ class Delayed_None_Sweep(Soft_Sweep):
 
 ###################################
 
-class AWG_amp(Soft_Sweep):
 
+class AWG_amp(Soft_Sweep):
     def __init__(self, channel, AWG):
         super().__init__()
         self.name = 'AWG Channel Amplitude'
@@ -236,7 +239,6 @@ class AWG_amp(Soft_Sweep):
 
 
 class AWG_multi_channel_amplitude(Soft_Sweep):
-
     '''
     Sweep function to sweep multiple AWG channels simultaneously
     '''
@@ -255,13 +257,13 @@ class AWG_multi_channel_amplitude(Soft_Sweep):
             self.AWG.set('ch{}_amp'.format(ch), val)
         time.sleep(self.delay)
 
+
 ###############################################################################
 ####################          Hardware Sweeps      ############################
 ###############################################################################
 
 
 class Hard_Sweep(Sweep_function):
-
     def __init__(self, **kw):
         super().__init__()
         self.sweep_control = 'hard'
@@ -275,6 +277,7 @@ class Hard_Sweep(Sweep_function):
     def set_parameter(self, value):
         logging.warning('set_parameter called for hardware sweep.')
 
+
 class Segment_Sweep(Hard_Sweep):
     def __init__(self, **kw):
         super().__init__()
@@ -282,11 +285,14 @@ class Segment_Sweep(Hard_Sweep):
         self.name = 'Segment_Sweep'
         self.unit = ''
 
-class OpenQL_Sweep(Hard_Sweep):
 
-    def __init__(self, openql_program, CCL,
-                 parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True):
+class OpenQL_Sweep(Hard_Sweep):
+    def __init__(self,
+                 openql_program,
+                 CCL,
+                 parameter_name: str = 'Points',
+                 unit: str = 'a.u.',
+                 upload: bool = True):
         super().__init__()
         self.name = 'OpenQL_Sweep'
         self.openql_program = openql_program
@@ -301,10 +307,12 @@ class OpenQL_Sweep(Hard_Sweep):
 
 
 class OpenQL_File_Sweep(Hard_Sweep):
-
-    def __init__(self, filename: str, CCL,
-                 parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True):
+    def __init__(self,
+                 filename: str,
+                 CCL,
+                 parameter_name: str = 'Points',
+                 unit: str = 'a.u.',
+                 upload: bool = True):
         super().__init__()
         self.name = 'OpenQL_Sweep'
         self.filename = filename
@@ -319,12 +327,15 @@ class OpenQL_File_Sweep(Hard_Sweep):
 
 
 class ZNB_VNA_sweep(Hard_Sweep):
-
-    def __init__(self, VNA,
-                 start_freq=None, stop_freq=None,
-                 center_freq=None, span=None,
+    def __init__(self,
+                 VNA,
+                 start_freq=None,
+                 stop_freq=None,
+                 center_freq=None,
+                 span=None,
                  segment_list=None,
-                 npts=100, force_reset=False):
+                 npts=100,
+                 force_reset=False):
         '''
         Frequencies are in Hz.
         Defines the frequency sweep using one of the following methods:
@@ -386,9 +397,11 @@ class ZNB_VNA_sweep(Hard_Sweep):
 
             # Load segments in reverse order to have them executed properly
             for idx_segment in range(len(self.segment_list), 0, -1):
-                current_segment = self.segment_list[idx_segment-1]
-                str_to_write = 'SENSE:SEGMENT:INSERT %s, %s, %s, %s, %s, %s, %s' % (current_segment[0], current_segment[
-                                                                                    1], current_segment[2], current_segment[3], current_segment[4], current_segment[5], current_segment[6])
+                current_segment = self.segment_list[idx_segment - 1]
+                str_to_write = 'SENSE:SEGMENT:INSERT %s, %s, %s, %s, %s, %s, %s' % (
+                    current_segment[0], current_segment[1], current_segment[2],
+                    current_segment[3], current_segment[4], current_segment[5],
+                    current_segment[6])
                 self.VNA.write(str_to_write)
 
             self.VNA.sweep_type('segment')  # set a segment sweep
@@ -398,7 +411,6 @@ class ZNB_VNA_sweep(Hard_Sweep):
 
 
 class QWG_lutman_par(Soft_Sweep):
-
     def __init__(self, LutMan, LutMan_parameter, **kw):
         self.set_kw()
         self.name = LutMan_parameter.name
@@ -411,7 +423,8 @@ class QWG_lutman_par(Soft_Sweep):
     def set_parameter(self, val):
         self.LutMan.AWG.get_instr().stop()
         self.LutMan_parameter.set(val)
-        self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        self.LutMan.load_waveforms_onto_AWG_lookuptable(
+            regenerate_waveforms=True)
         self.LutMan.AWG.get_instr().start()
         self.LutMan.AWG.get_instr().getOperationComplete()
 
@@ -431,7 +444,7 @@ class QWG_flux_amp(Soft_Sweep):
         self.sweep_control = 'soft'
 
         # Amp = frac * Vpp/2
-        self.scale_factor = 2/frac_amp
+        self.scale_factor = 2 / frac_amp
 
     def set_parameter(self, val):
         Vpp = val * self.scale_factor
@@ -447,9 +460,14 @@ class QWG_lutman_par_chunks(Soft_Sweep):
     different chunks. Pulses are re-uploaded between chunks.
     '''
 
-    def __init__(self, LutMan, LutMan_parameter,
-                 sweep_points, chunk_size, codewords=np.arange(128),
-                 flux_pulse_type='square', **kw):
+    def __init__(self,
+                 LutMan,
+                 LutMan_parameter,
+                 sweep_points,
+                 chunk_size,
+                 codewords=np.arange(128),
+                 flux_pulse_type='square',
+                 **kw):
         super().__init__(**kw)
         self.sweep_points = sweep_points
         self.chunk_size = chunk_size
@@ -472,8 +490,8 @@ class QWG_lutman_par_chunks(Soft_Sweep):
         QWG = self.LutMan.QWG.get_instr()
         QWG.stop()
 
-        for i, paramVal in enumerate(self.sweep_points[ind:ind +
-                                                       self.chunk_size]):
+        for i, paramVal in enumerate(
+                self.sweep_points[ind:ind + self.chunk_size]):
             pulseName = 'pulse_{}'.format(i)
 
             # Generate new pulse
@@ -488,11 +506,13 @@ class QWG_lutman_par_chunks(Soft_Sweep):
             # Load onto QWG
             QWG.createWaveformReal(
                 pulseName,
-                self.LutMan._wave_dict[self.flux_pulse_type]/scaleFac)
+                self.LutMan._wave_dict[self.flux_pulse_type] / scaleFac)
 
             # Assign codeword
-            QWG.set('codeword_{}_ch{}_waveform'
-                    .format(self.codewords[i], self.LutMan.F_ch()), pulseName)
+            QWG.set(
+                'codeword_{}_ch{}_waveform'.format(self.codewords[i],
+                                                   self.LutMan.F_ch()),
+                pulseName)
 
         QWG.start()
         QWG.getOperationComplete()
@@ -509,7 +529,11 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
     QWG_lutman in the usual way).
      '''
 
-    def __init__(self, LutMan, wave_func, sweep_points, chunk_size,
+    def __init__(self,
+                 LutMan,
+                 wave_func,
+                 sweep_points,
+                 chunk_size,
                  codewords=None,
                  param_name='flux pulse parameter',
                  param_unit='a.u.',
@@ -537,17 +561,18 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
             raise ValueError('Value {} is not in the sweep points'.format(val))
         ind = ind[0]  # set index to the first occurence of val in sweep points
 
-        for i, paramVal in enumerate(self.custom_swp_pts[ind:ind +
-                                                         self.chunk_size]):
+        for i, paramVal in enumerate(
+                self.custom_swp_pts[ind:ind + self.chunk_size]):
             pulseName = 'pulse_{}'.format(i)
 
             self.LutMan.load_custom_pulse_onto_AWG_lookuptable(
-                self.wave_func(paramVal), append_compensation=True,
-                pulse_name=pulseName, codeword=self.codewords[i])
+                self.wave_func(paramVal),
+                append_compensation=True,
+                pulse_name=pulseName,
+                codeword=self.codewords[i])
 
 
 class lutman_par_dB_attenuation_QWG(Soft_Sweep):
-
     def __init__(self, LutMan, LutMan_parameter, **kw):
         self.set_kw()
         self.name = LutMan_parameter.name
@@ -558,14 +583,14 @@ class lutman_par_dB_attenuation_QWG(Soft_Sweep):
         self.LutMan_parameter = LutMan_parameter
 
     def set_parameter(self, val):
-        self.LutMan_parameter.set(10**(val/20))
+        self.LutMan_parameter.set(10**(val / 20))
         self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
         self.LutMan.QWG.get_instr().start()
         self.LutMan.QWG.get_instr().getOperationComplete()
 
-class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
 
-    def __init__(self, LutMan, LutMan_parameter, run=False, single=True,**kw):
+class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
+    def __init__(self, LutMan, LutMan_parameter, run=False, single=True, **kw):
         self.set_kw()
         self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
@@ -573,20 +598,21 @@ class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
         self.sweep_control = 'soft'
         self.LutMan = LutMan
         self.LutMan_parameter = LutMan_parameter
-        self.run=run
+        self.run = run
         self.single = single
 
     def set_parameter(self, val):
-        self.LutMan_parameter.set(10**(val/20))
+        self.LutMan_parameter.set(10**(val / 20))
         if self.run:
             self.LutMan.UHFQC.awgs_0_enable(False)
-        self.LutMan.load_pulse_onto_AWG_lookuptable('M_square',regenerate_pulses=True)
+        self.LutMan.load_pulse_onto_AWG_lookuptable(
+            'M_square', regenerate_pulses=True)
         if self.run:
             self.LutMan.UHFQC.acquisition_arm(single=self.single)
 
 
 class lutman_par_UHFQC_dig_trig(Soft_Sweep):
-    def __init__(self, LutMan, LutMan_parameter, single=True, run=False,**kw):
+    def __init__(self, LutMan, LutMan_parameter, single=True, run=False, **kw):
         self.set_kw()
         self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
@@ -607,14 +633,19 @@ class lutman_par_UHFQC_dig_trig(Soft_Sweep):
 
 
 class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
-    def __init__(self, LutMan, resonator_numbers, optimization_M_amps,
-                    optimization_M_amp_down0s, optimization_M_amp_down1s,
-                    upload=True, **kw):
+    def __init__(self,
+                 LutMan,
+                 resonator_numbers,
+                 optimization_M_amps,
+                 optimization_M_amp_down0s,
+                 optimization_M_amp_down1s,
+                 upload=True,
+                 **kw):
         # sweeps the readout-and depletion pules of the listed resonators.
         # sets the remaining readout and depletion pulses to 0 amplitude.
 
         self.set_kw()
-        self.name= 'depletion_pulse_sweeper'
+        self.name = 'depletion_pulse_sweeper'
         self.parameter_name = 'relative_depletion_pulse_scaling_amp'
         self.unit = 'a.u.'
         self.sweep_control = 'soft'
@@ -623,7 +654,7 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
         self.optimization_M_amp_down0s = optimization_M_amp_down0s
         self.optimization_M_amp_down1s = optimization_M_amp_down1s
         self.resonator_numbers = resonator_numbers
-        self.upload=upload
+        self.upload = upload
 
     def set_parameter(self, val):
         '''
@@ -636,17 +667,18 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
             if resonator_number in self.resonator_numbers:
                 i = self.resonator_numbers.index(resonator_number)
                 self.LutMan.set('M_amp_R{}'.format(resonator_number),
-                    val*self.optimization_M_amps[i])
+                                val * self.optimization_M_amps[i])
                 self.LutMan.set('M_down_amp0_R{}'.format(resonator_number),
-                    val*self.optimization_M_amp_down0s[i])
+                                val * self.optimization_M_amp_down0s[i])
                 self.LutMan.set('M_down_amp1_R{}'.format(resonator_number),
-                    val*self.optimization_M_amp_down1s[i])
+                                val * self.optimization_M_amp_down1s[i])
             else:
                 self.LutMan.set('M_amp_R{}'.format(resonator_number), 0)
                 self.LutMan.set('M_down_amp0_R{}'.format(resonator_number), 0)
                 self.LutMan.set('M_down_amp1_R{}'.format(resonator_number), 0)
         if self.upload:
-            self.LutMan.load_DIO_triggered_sequence_onto_UHFQC(regenerate_waveforms=True)
+            self.LutMan.load_DIO_triggered_sequence_onto_UHFQC(
+                regenerate_waveforms=True)
 
 
 class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
@@ -661,7 +693,7 @@ class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         self.run = run
 
     def set_parameter(self, val):
-        self.LutMan_parameter.set(10**(val/20))
+        self.LutMan_parameter.set(10**(val / 20))
         if self.run:
             self.LutMan.AWG.get_instr().awgs_0_enable(False)
         self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
@@ -681,16 +713,16 @@ class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         self.run = run
 
     def set_parameter(self, val):
-        self.LutMan_parameter.set(10**(val/20))
+        self.LutMan_parameter.set(10**(val / 20))
         if self.run:
             self.LutMan.AWG.get_instr().awgs_0_enable(False)
         self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
-class UHFQC_pulse_dB_attenuation(Soft_Sweep):
 
-    def __init__(self, UHFQC, IF, dig_trigger=True,**kw):
+class UHFQC_pulse_dB_attenuation(Soft_Sweep):
+    def __init__(self, UHFQC, IF, dig_trigger=True, **kw):
         self.set_kw()
         self.name = 'UHFQC pulse attenuation'
         self.parameter_name = 'pulse attenuation'
@@ -700,17 +732,27 @@ class UHFQC_pulse_dB_attenuation(Soft_Sweep):
         self.dig_trigger = dig_trigger
         self.IF = IF
 
-
     def set_parameter(self, val):
-        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.IF,RO_amp=10**(val/20),RO_pulse_length=2e-6,acquisition_delay=200e-9,dig_trigger=self.dig_trigger)
+        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+            f_RO_mod=self.IF,
+            RO_amp=10**(val / 20),
+            RO_pulse_length=2e-6,
+            acquisition_delay=200e-9,
+            dig_trigger=self.dig_trigger)
         time.sleep(1)
         #print('refreshed UHFQC')
+
 
 class multi_sweep_function(Soft_Sweep):
     '''
     cascades several sweep functions into a single joint sweep functions.
     '''
-    def __init__(self, sweep_functions: list, parameter_name=None,name=None,**kw):
+
+    def __init__(self,
+                 sweep_functions: list,
+                 parameter_name=None,
+                 name=None,
+                 **kw):
         self.set_kw()
         self.sweep_functions = sweep_functions
         self.sweep_control = 'soft'
@@ -725,13 +767,15 @@ class multi_sweep_function(Soft_Sweep):
         for sweep_function in self.sweep_functions:
             sweep_function.set_parameter(val)
 
+
 class two_par_joint_sweep(Soft_Sweep):
     """
     Allows jointly sweeping two parameters while preserving their
     respective ratios.
     Allows par_A and par_B to be arrays of parameters
     """
-    def __init__(self, par_A, par_B, preserve_ratio: bool=True, **kw):
+
+    def __init__(self, par_A, par_B, preserve_ratio: bool = True, **kw):
         self.set_kw()
         self.unit = par_A.unit
         self.sweep_control = 'soft'
@@ -741,147 +785,28 @@ class two_par_joint_sweep(Soft_Sweep):
         self.parameter_name = par_A.name
         if preserve_ratio:
             try:
-                self.par_ratio = self.par_B.get()/self.par_A.get()
+                self.par_ratio = self.par_B.get() / self.par_A.get()
             except:
-                self.par_ratio = (self.par_B.get_latest()/
-                                  self.par_A.get_latest())
+                self.par_ratio = (
+                    self.par_B.get_latest() / self.par_A.get_latest())
         else:
             self.par_ratio = 1
 
     def set_parameter(self, val):
         self.par_A.set(val)
-        self.par_B.set(val*self.par_ratio)
+        self.par_B.set(val * self.par_ratio)
 
-
-class FLsweep(Soft_Sweep):
-    """
-    Special sweep function for AWG8 flux pulses, includes "hack" program
-    required because of bad triggering of DIO pulses.
-    """
-    def __init__(self, lm, par, waveform_name, realtime_loading=True,
-                 other_waveform=None, **kw):
-        super().__init__(**kw)
-        self.lm = lm
-        self.par = par
-        self.waveform_name = waveform_name
-        self.parameter_name = par.name
-        self.unit = par.unit
-        self.name = par.name
-        self.realtime_loading = realtime_loading
-        self.other_waveform = other_waveform
-
-    def prepare(self):
-        awg_hack_program = """
-        while (1) {
-          waitDIOTrigger();
-          playWave("dev8005_wave_ch1_cw002", "dev8005_wave_ch2_cw002");
-        }
-        """
-        awg_hack_program_cz = """
-        while (1) {
-          waitDIOTrigger();
-          playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
-        }
-        """
-        awg_hack_program_multi_cz = """
-        while (1) {
-          waitDIOTrigger();
-          playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
-        }
-        """
-        awg_hack_program_custom_wf = """
-        while (1) {
-          waitDIOTrigger();
-          playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
-        }
-        """
-        awg = self.lm.AWG.get_instr()
-        self.lm.load_waveform_onto_AWG_lookuptable(
-            self.waveform_name, regenerate_waveforms=True)
-        if 'multi' in self.waveform_name:
-            awg.configure_awg_from_string(0, awg_hack_program_multi_cz)
-        elif 'z' in self.waveform_name:
-            awg.configure_awg_from_string(0, awg_hack_program_cz)
-        elif 'custom' in self.waveform_name:
-            awg.configure_awg_from_string(0, awg_hack_program_custom_wf)
-
-        else:
-            awg.configure_awg_from_string(0, awg_hack_program)
-
-        awg.configure_codeword_protocol()
-        awg.start()
-
-    def set_parameter(self, val):
-        self.par(val)
-        if self.realtime_loading:
-            self.lm.load_waveform_realtime(
-                self.waveform_name, other_waveform=self.other_waveform)
-        else:
-            awg = self.lm.AWG.get_instr()
-            awg_hack_program = """
-            while (1) {
-              waitDIOTrigger();
-              playWave("dev8005_wave_ch1_cw002", "dev8005_wave_ch2_cw002");
-            }
-            """
-            awg_hack_program_cz = """
-            while (1) {
-              waitDIOTrigger();
-              playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
-            }
-            """
-            awg_hack_program_multi_cz = """
-            while (1) {
-              waitDIOTrigger();
-              playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
-            }
-            """
-            self.lm.load_waveform_onto_AWG_lookuptable(
-                self.waveform_name, regenerate_waveforms=True)
-            if 'z' in self.waveform_name:
-                awg.configure_awg_from_string(0, awg_hack_program_cz)
-            else:
-                awg.configure_awg_from_string(0, awg_hack_program)
-            awg.configure_codeword_protocol()
-            awg.start()
-
-
-class FLsweep_QWG(Soft_Sweep):
-    """
-    Special sweep function for QWG flux pulses.
-    """
-    def __init__(self, lm, par, waveform_name, realtime_loading=True,
-                 other_waveform=None, **kw):
-        super().__init__(**kw)
-        self.lm = lm
-        self.par = par
-        self.waveform_name = waveform_name
-        self.parameter_name = par.name
-        self.unit = par.unit
-        self.name = par.name
-        self.realtime_loading = realtime_loading
-        self.other_waveform = other_waveform
-
-    def prepare(self):
-        awg = self.lm.AWG.get_instr()
-        awg.stop()
-        self.lm.load_waveform_onto_AWG_lookuptable(
-            self.waveform_name, regenerate_waveforms=True)
-        awg.start()
-
-    def set_parameter(self, val):
-        self.par(val)
-        awg = self.lm.AWG.get_instr()
-        awg.stop()
-        self.lm.load_waveform_onto_AWG_lookuptable(
-            self.waveform_name, regenerate_waveforms=True)
-        awg.start()
 
 class Offset_Sweep(Soft_Sweep):
     """A sweep soft sweep function that calls an other sweep function with
     an offset."""
-    def __init__(self, sweep_function, offset,
-                 name=None, parameter_name=None, unit=None):
+
+    def __init__(self,
+                 sweep_function,
+                 offset,
+                 name=None,
+                 parameter_name=None,
+                 unit=None):
         super().__init__()
         if isinstance(sweep_function, qcodes.Parameter):
             sweep_function = mc_parameter_wrapper.wrap_par_to_swf(
