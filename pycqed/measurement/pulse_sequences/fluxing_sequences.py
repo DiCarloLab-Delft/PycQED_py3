@@ -588,6 +588,11 @@ def cphase_seqs(qbc_name, qbt_name, hard_sweep_dict, soft_sweep_dict,
                                                   **prep_params))
         sequences.append(seq)
 
+    # reuse sequencer memory by repeating readout pattern
+    for s in sequences:
+        s.repeat_ro(f"RO {qbc_name}", operation_dict)
+        s.repeat_ro(f"RO {qbt_name}", operation_dict)
+
     if upload:
         ps.Pulsar.get_instance().program_awgs(sequences[0])
 

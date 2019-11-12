@@ -1504,9 +1504,10 @@ def cphase_finetune_parameters(qbc, qbt, qbr, flux_length, flux_amplitudes,
 
 def measure_measurement_induced_dephasing(qb_dephased, qb_targeted, phases, amps,
                                           readout_separation, nr_readouts=1,
-                                          label=None, n_cal_points_per_state=1, cal_states='auto',
-                                          prep_params=None, exp_metadata=None, label=None,
-                                          analyze=True, upload=True, **kw):
+                                          label=None, n_cal_points_per_state=1,
+                                          cal_states='auto', prep_params=None,
+                                          exp_metadata=None, analyze=True,
+                                          upload=True, **kw):
     classified = kw.get('classified', False)
     predictive_label = kw.pop('predictive_label', False)
     if prep_params is None:
@@ -1515,16 +1516,18 @@ def measure_measurement_induced_dephasing(qb_dephased, qb_targeted, phases, amps
 
     if label is None:
         label = 'measurement_induced_dephasing_x{}_{}_{}'.format(
-            nr_readouts, qb_dephased.name, qb_targeted.name)
+            nr_readouts,
+            ''.join([qb.name for qb in qb_dephased]),
+            ''.join([qb.name for qb in qb_targeted]))
 
     hard_sweep_params = {
-        'phase': {'unit': 'rad',
+        'phase': {'unit': 'deg',
             'values': np.tile(phases, len(amps))},
         'ro_amp_scale': {'unit': 'deg',
             'values': np.repeat(amps, len(phases))}
     }
 
-    for qb in set(qb_targeted) + set(qb_dephased):
+    for qb in set(qb_targeted) | set(qb_dephased):
         MC = qb.instr_mc.get_instr()
         qb.prepare(drive='timedomain')
 
@@ -1558,12 +1561,12 @@ def measure_measurement_induced_dephasing(qb_dephased, qb_targeted, phases, amps
                          'cal_points': repr(cp),
                          'classified_ro': classified,
                          'rotate': len(cal_states) != 0 and not classified,
-                         'data_to_fit': {qb.name: 'pe' for qb in qb_targeted},
+                         'data_to_fit': {qb.name: 'pe' for qb in qb_dephased},
                          'hard_sweep_params': hard_sweep_params})
 
     MC.run(label, exp_metadata=exp_metadata)
 
-    tda.MultiQubit_TimeDomain_Analysis(qb_names=[qb.name for qb in qb_targeted])
+    tda.MultiQubit_TimeDomain_Analysis(qb_names=[qb.name for qb in qb_dephased])
 
 
 def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
@@ -2275,10 +2278,14 @@ def measure_cphase(qbc, qbt, soft_sweep_params, cz_pulse_name,
         channels_to_upload=channels_to_upload))
     MC.set_sweep_points_2D(soft_sweep_points)
 
+    det_get_values_kws = {'classified': classified,
+                          'correlated': False,
+                          'thresholded': True,
+                          'averaged': True}
     det_name = 'int_avg{}_det'.format('_classif' if classified else '')
     det_func = get_multiplexed_readout_detector_functions(
-        [qbc, qbt], nr_averages=max(qb.acq_averages() for qb in [qbc, qbt])
-    )[det_name]
+        [qbc, qbt], nr_averages=max(qb.acq_averages() for qb in [qbc, qbt]),
+        det_get_values_kws=det_get_values_kws)[det_name]
     MC.set_detector_function(det_func)
 
     if exp_metadata is None:
@@ -3075,7 +3082,7 @@ def measure_multi_parity_multi_round(ancilla_qubits, data_qubits,
                                  parity_map,
                                  CZ_map,
                                  prep,
-                                 operation_dict = get_operation_dict(qubits),
+                                 operation_dict=get_operation_dict(qubits),
                                  mode=mode,
                                  parity_seperation=parity_seperation,
                                  rots_basis=rots_basis,

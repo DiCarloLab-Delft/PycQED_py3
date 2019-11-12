@@ -415,7 +415,7 @@ class UHFQC_Base(Hard_Detector):
         else:
             # in multi uhf mode several detectors are passed.
             self.detectors = [p[1] for p in sorted(
-                [(d.UHFQC._device, d) for d in detectors], reverse=True)]
+                [(d.UHFQC.devname, d) for d in detectors], reverse=True)]
         self.AWG = None
 
         self.UHFs = [d.UHFQC for d in self.detectors]
@@ -879,9 +879,7 @@ class UHFQC_integrated_average_detector(UHFQC_Base):
         # Do not enable the rerun button; the AWG program uses userregs/0 to
         # define the number of iterations in the loop
         self.UHFQC.awgs_0_single(1)
-        print(self.nr_sweep_points)
-        print(self.nr_averages)
-        self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*1.8e9))
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
         self.UHFQC.qudev_acquisition_initialize(channels=self.channels, 
                                           samples=self.nr_sweep_points,
@@ -1175,7 +1173,6 @@ class UHFQC_integration_logging_det(UHFQC_Base):
                                           averages=1, #for single shot readout
                                           loop_cnt=int(self.nr_shots),
                                           mode='rl')
-
 
     def get_values(self):
         if self.always_prepare:

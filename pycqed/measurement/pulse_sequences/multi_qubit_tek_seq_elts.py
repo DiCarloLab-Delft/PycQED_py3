@@ -1223,6 +1223,9 @@ def ramsey_add_pulse_seq_active_reset(
     # add calibration segments
     seq.extend(cal_points.create_segments(operation_dict, **prep_params))
 
+    # reuse sequencer memory by repeating readout pattern
+    seq.repeat_ro(f"RO {measured_qubit_name}", operation_dict)
+
     log.debug(seq)
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
@@ -1769,7 +1772,6 @@ def measurement_induced_dephasing_seq(
         phases, pihalf_spacing=pihalf_spacing, prep_params=prep_params,
         cal_points=cal_points, sequence_name=sequence_name, upload=upload)
 
-
 def multi_parity_multi_round_seq(ancilla_qubit_names,
                                  data_qubit_names,
                                  parity_map,
@@ -1976,7 +1978,7 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
                 all_pulses[-1]['ref_point'] = 'start'
             # if  (m!=parity_loops-1)  or ( (parity_loops%2==0)
             #                               and  m==parity_loops-1):
-            if  (m!=parity_loops-1):
+            if m != parity_loops - 1:
                 # print('Logical Echo')
                 for i, op in enumerate(echo_pulses):
                     all_pulses.append(deepcopy(operation_dict[op]))
@@ -1989,7 +1991,7 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
             pulse['element_name'] = f'drive_tomo_{t}'
             pulse['ref_pulse'] = f'first_ro_{rounds}' + \
                                  f'_loop_{parity_loops-1}_tomo_{t}'
-            pulse['pulse_delay'] = 250e-9 # to account for UHF deadtime
+            pulse['pulse_delay'] = 200e-9 # to account for UHF deadtime
             pulse['ref_point'] = 'end'
         all_pulses += end_pulses
         all_pulses += generate_mux_ro_pulse_list(qb_names, operation_dict)
@@ -2020,7 +2022,6 @@ def multi_parity_multi_round_seq(ancilla_qubit_names,
 
     if upload:
         ps.Pulsar.get_instance().program_awgs(seq)
-
 
     log.debug('sweep_points: ', seq.n_acq_elements())
     return seq, np.arange(seq.n_acq_elements())
@@ -2135,6 +2136,3 @@ def ro_dynamic_phase_seq(hard_sweep_dict, qbp_name, qbr_names,
         ps.Pulsar.get_instance().program_awgs(seq)
 
     return seq, np.arange(seq.n_acq_elements())
-
-        phases, pihalf_spacing=pihalf_spacing, prep_params=prep_params,
-        cal_points=cal_points, sequence_name=sequence_name, upload=upload)
