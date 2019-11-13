@@ -1461,7 +1461,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt_contour_L1=False,
             plt_optimal_values=True,
             plt_contour_phase=True,
-            plt_optimal_values_max=3,
+            plt_optimal_values_max=2,
             find_local_optimals=True,
             plt_clusters=True,
             cluster_from_interp=cluster_from_interp,
@@ -1557,7 +1557,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             ftarget = scCZ.LJP_mod(6, 180)
             maxfevals = 300
             cost_func = coha.proc_data_dict['optimal_measured_values'][0]['Cost func']
-            optimals_num = np.len(coha.proc_data_dict['optimal_measured_values'])
+            optimals_num = len(coha.proc_data_dict['optimal_measured_values'])
             optimal_pars_values = coha.proc_data_dict['optimal_pars_values']
             best_par_res = {}
             best_mv_res = {}
@@ -1569,8 +1569,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                     print('Target value not reached under {} evaluations trying next optimal guess...'.format(maxfevals))
                 print('Starting optimizer for Optimal #{}'.format(k))
 
-                lambda_2_start = optimal_pars_values['cz_lambda_2_{}'.format(which_gate)][k]
-                theta_f_start = optimal_pars_values['cz_theta_f_{}'.format(which_gate)][k]
+                lambda_2_start = optimal_pars_values[k]['cz_lambda_2_{}'.format(which_gate)]
+                theta_f_start = optimal_pars_values[k]['cz_theta_f_{}'.format(which_gate)]
 
                 adaptive_pars = {
                     'adaptive_function': cma.fmin,
