@@ -1566,7 +1566,7 @@ def measure_measurement_induced_dephasing(qb_dephased, qb_targeted, phases, amps
 
     MC.run(label, exp_metadata=exp_metadata)
 
-    tda.MultiQubit_TimeDomain_Analysis(qb_names=[qb.name for qb in qb_dephased])
+    tda.MeasurementInducedDephasingAnalysis(qb_names=[qb.name for qb in qb_dephased])
 
 
 def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
