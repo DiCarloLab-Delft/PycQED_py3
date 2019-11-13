@@ -8,7 +8,7 @@ import numpy as np
 from pycqed.analysis.tools.data_manipulation import \
     populations_using_rate_equations
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, plot_fit, \
-    make_anglemap, make_segmented_cmap
+    hpluv_anglemap45, hsluv_anglemap45
 import matplotlib.pyplot as plt
 from pycqed.analysis.fitting_models import CosFunc, Cos_guess, \
     avoided_crossing_freq_shift
@@ -342,7 +342,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
         super().prepare_plots()
-        anglemap = make_anglemap()
+        anglemap = hsluv_anglemap45
 
         for i, val_name in enumerate(self.proc_data_dict['value_names']):
 
@@ -376,6 +376,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
 
             if self.proc_data_dict['value_units'][i] == 'deg':
                 self.plot_dicts[val_name]['cmap_chosen'] = anglemap
+                self.plot_dicts[val_name]['cbarticks'] = np.arange(0., 360.1, 45)
 
             if self.plt_contour_phase:
                 # Find index of Conditional Phase
@@ -783,7 +784,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             sig_digits=4):
         optimals_max = len(self.proc_data_dict['optimal_pars_values'])
         spiked = self.proc_data_dict['spiked_optimals'] if 'spiked_optimals'\
-            in self.proc_data_dict else np.full(np.size(optimals_max), False)
+            in self.proc_data_dict else np.full(optimals_max, False)
         string = ''
         for opt_idx in range(optimal_start, int(min(optimal_end + 1, optimals_max))):
             string += '========================\n'
