@@ -1455,7 +1455,7 @@ setTrigger(0);
         self.print_thresholds_overview()
         self.print_user_regs_overview()
 
-    def _ensure_activity(self, awg_nr, mask_value=None, timeout=5, verbose=False):
+    def _ensure_activity(self, awg_nr, timeout=5, verbose=False):
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
@@ -1466,9 +1466,11 @@ setTrigger(0);
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
         
-        if mask_value is None:
-            mask_value = 0x3ff
+        # Make sure the DIO calibration mask is configured
+        if self._dio_calibration_mask is None:
+            raise ValueError('DIO calibration bit mask not defined.')
 
+        mask_value = self._dio_calibration_mask
         cw_mask = mask_value << 17
 
         for i in range(timeout):
@@ -1512,11 +1514,31 @@ setTrigger(0);
             cw[n] = (d & ((1 << 10)-1))
         return (ts, cw)
 
-    def _find_valid_delays(self, repetitions=1, verbose=False):
+    def _find_valid_delays(self, awg_nr, repetitions=1, verbose=False):
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
         if verbose: print("  Finding valid delays")
+
+        vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
+        vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
+        strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
+        strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
+        
+        # Make sure the DIO calibration mask is configured
+        if self._dio_calibration_mask is None:
+            raise ValueError('DIO calibration bit mask not defined.')
+
+        mask_value = self._dio_calibration_mask
+        cw_mask = mask_value << 17
+
+        combined_mask = cw_mask
+        if vld_polarity != 0:
+            combined_mask |= vld_mask
+        if strb_slope != 0:
+            combined_mask |= strb_mask
+        if verbose: print("  Using a mask value of 0x{:08x}".format(combined_mask))
+
         valid_delays= []
         for delay in range(16):
             if verbose: print('   Testing delay {}'.format(delay))
@@ -1524,7 +1546,7 @@ setTrigger(0);
             time.sleep(1)
             valid_sequence = True
             for awg in [0]:
-                if self.geti('raw/dios/0/error/timing') & (0x7ff << 16) != 0:
+                if self.geti('raw/dios/0/error/timing') & combined_mask != 0:
                     valid_sequence = False
 
             if valid_sequence:
@@ -1532,7 +1554,7 @@ setTrigger(0);
 
         return set(valid_delays)
 
-    def _prepare_CCL_dio_calibration(self, CCL, verbose=False):
+    def _prepare_CCL_dio_calibration(self, CCL, feedline=1, verbose=False):
 
         cs_filepath = os.path.join(pycqed.__path__[0],
                 'measurement',
@@ -1552,10 +1574,17 @@ setTrigger(0);
                 'examples','CCLight_example',
                 'qisa_test_assembly','calibration_cws_ro.qisa'))
 
-
         # Start the CCL with the program configured above
         CCL.eqasm_program(test_fp)
         CCL.start()
+
+        # Set the DIO calibration mask to enable 5 bit measurement
+        if feedline == 1:
+            self._dio_calibration_mask = 0x1f
+        elif feedline == 2:
+            self._dio_calibration_mask = 0x3
+        else:
+            raise ziValueError('Invalid feedline {} selected for calibration.'.format(feedline))
 
     def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
 
@@ -1582,9 +1611,14 @@ setTrigger(0);
         QCC.eqasm_program(test_fp)
         QCC.start()
 
-    def calibrate_CC_dio_protocol(self, CC, verbose=False, repetitions=1):
+        # Set the DIO calibration mask to enable 9 bit measurement
+        self._dio_calibration_mask = 0x1ff
+
+    def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False, repetitions=1):
         log.info('Calibrating DIO delays')
         if verbose: print("Calibrating DIO delays")
+        if feedline is None: 
+            raise ziUHFQCDIOCalibrationError('No feedline specified for calibration')
 
         CC_model = CC.IDN()['model']
         if 'QCC' in CC_model:
@@ -1592,7 +1626,7 @@ setTrigger(0);
                 QCC=CC, verbose=verbose)
         elif 'CCL' in CC_model:
             expected_sequence = self._prepare_CCL_dio_calibration(
-                CCL=CC, verbose=verbose)
+                CCL=CC, feedline=feedline, verbose=verbose)
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
@@ -1603,7 +1637,7 @@ setTrigger(0);
             if not self._ensure_activity(awg, verbose=verbose):
                 raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
-        valid_delays = self._find_valid_delays(repetitions, verbose=verbose)
+        valid_delays = self._find_valid_delays(awg, repetitions, verbose=verbose)
         if len(valid_delays) == 0:
             raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
 
@@ -1617,5 +1651,5 @@ setTrigger(0);
         if verbose: print("  Setting delay to {}".format(min_valid_delay))
 
         # And configure the delays
-        self.setd('raw/dios/0/delays/*', min_valid_delay)
+        self.setd('raw/dios/0/delay', min_valid_delay)
 
