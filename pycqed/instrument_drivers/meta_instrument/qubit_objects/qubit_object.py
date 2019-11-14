@@ -1236,6 +1236,7 @@ class Qubit(Instrument):
             qubit_freq_est = self.freq_qubit()
 
         elif self.cfg_qubit_freq_calc_method() == 'flux':
+
             if I is None:
                 I = self.fl_dc_I()
             if I_per_phi0 is None:
@@ -1282,6 +1283,7 @@ class Qubit(Instrument):
         # self.fl_dc_I()
         fluxcontrol = self.instr_FluxCtrl.get_instr()
         current_dac_val = fluxcontrol.parameters[(self.fl_dc_ch())].get()
+
         # Should correspond to approx 50MHz around sweetspot.  
         dac_range  = 0.1 * self.fl_dc_I_per_phi0() 
         if dac_values is None:
@@ -1358,13 +1360,14 @@ class Qubit(Instrument):
         self.fl_dc_I0(dac_sweetspot)
 
 
-
-    def tune_freq_to(self, target_frequency,
-                          MC, nested_MC,
+    def tune_freq_to(self, target_frequency, 
+                          MC=None, nested_MC=None, 
                           calculate_initial_step: bool=False,
                           initial_flux_step: float = None,
                           max_repetitions=15,
-                          resonator_use_min=True):
+                          resonator_use_min=True,
+                          find_res=None,
+                          ): 
         """
         Iteratively tune the qubit frequency to a specific target frequency
         """
@@ -1378,10 +1381,9 @@ class Qubit(Instrument):
         f_q = self.freq_qubit()
         delta_freq = target_frequency - f_q
 
-
-        if abs(delta_freq) > 50e6:
+        # User may overwrite need to find resonator
+        if abs(delta_freq) > 50e6 and find_res == None: 
             find_res = True
-
 
         fluxcontrol= self.instr_FluxCtrl.get_instr()
         fluxpar = fluxcontrol.parameters[(self.fl_dc_ch())]
@@ -1403,8 +1405,7 @@ class Qubit(Instrument):
             next_dac_value = current_dac_val + initial_flux_step
 
 
-        def measure_qubit_freq_nested(target_frequency,
-                spans=[100e6, 400e6, 800e6], **kw):
+        def measure_qubit_freq_nested(target_frequency,spans=[100e6, 400e6, 800e6], **kw):
 
             # measure freq
             if find_res:

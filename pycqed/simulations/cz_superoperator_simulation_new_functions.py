@@ -2,21 +2,20 @@
 import numpy as np
 import qutip as qtp
 import scipy
-import time
-import logging
-log = logging.getLogger(__name__)
 
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+
+import logging
+log = logging.getLogger(__name__)
+
 np.set_printoptions(threshold=np.inf)
 
 # Hardcoded number of levels for the two transmons.
 # Currently only 3,3 or 4,3 are supported. The bottleneck is the function
 # that changes to the dressed basis at sweet spot (matrix_change_of_variables)
-n_levels_q0 = 4
+n_levels_q0 = 3
 n_levels_q1 = 3
-
-
 
 # operators
 b = qtp.tensor(qtp.destroy(n_levels_q1), qtp.qeye(n_levels_q0))  # spectator qubit
@@ -25,35 +24,47 @@ n_q0 = a.dag() * a
 n_q1 = b.dag() * b
 
 
-
-
-def basis_state(i,j,to_vector=True):
+def basis_state(i, j, to_vector=True):
     # Returns ket |ij> as ket or vector in Liouville representation
-    ket = qtp.tensor(qtp.ket([i], dim=[n_levels_q1]),
-                                   qtp.ket([j], dim=[n_levels_q0])) #notice it's a ket
+    ket = qtp.tensor(
+        qtp.ket([i],
+        dim=[n_levels_q1]),
+        qtp.ket([j],
+        dim=[n_levels_q0]))  # notice it's a ket
     if to_vector:
         rho = qtp.operator_to_vector(qtp.ket2dm(ket))
     else:
-        rho=ket
+        rho = ket
     return rho
 
 # target in the case with no noise
 # note that the Hilbert space is H_q1 /otimes H_q0
 # E.g. for two qutrits the ordering of basis states is 00,01,02,10,11,12,20,21,22
-def target_CZ():
-    # ideal CZ performed with avoided crossing 11-02
-    # (note that both states receive a minus)
-    U_target = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0))
-    state11 = basis_state(1,1,to_vector=False)
-    state02 = basis_state(0,2,to_vector=False)
-    U_target = U_target - 2*state11*state11.dag()
-    U_target = U_target - 2*state02*state02.dag()
-    return U_target
 
-U_target = target_CZ()
 
-U_target_diffdims = target_CZ()     # otherwise average_gate_fidelity doesn't work
-U_target_diffdims.dims = [[n_levels_q0*n_levels_q1],[n_levels_q0*n_levels_q1]]
+def target_cond_phase(cond_phase=180):
+    # Ideal conditional gate performed with avoided crossing 11-02
+    # note that both states receive the same phase
+    target_U = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0))
+    state11 = basis_state(1, 1, to_vector=False)
+    state02 = basis_state(0, 2, to_vector=False)
+
+    phase_factor = np.exp(1j * np.deg2rad(cond_phase % 360))
+
+    target_U = target_U + (-1 + phase_factor) * state11 * state11.dag()
+    target_U = target_U + (-1 + phase_factor) * state02 * state02.dag()
+
+    return target_U
+
+
+U_target = target_cond_phase()
+
+# otherwise average_gate_fidelity doesn't work
+U_target_diffdims = target_cond_phase()
+U_target_diffdims.dims = [
+    [n_levels_q0 * n_levels_q1],
+    [n_levels_q0 * n_levels_q1]
+]
 
 
 '''
@@ -64,6 +75,7 @@ rho_{xy,x'y'}=rho[3*x+y,3*x'+y']
 rho_{xy,x'y'}=operator_to_vector(rho)[3*x+y+27*x'+9*y']
 where xy is the row and x'y' is the column
 '''
+
 
 def index_in_ket(indeces):
     # returns vector index of ket |xy>
@@ -109,7 +121,6 @@ def list_of_vector_indeces(subspace):
     return return_list
 
 
-
 def qubit_to_2qutrit_unitary(U_2q,right_or_left):
     # Transforms a unitary for a qubit into a unitary for a two-qudit system (possibly different qudits).
     # right_or_left ('right' or 'left') specifies whether U_2q acts on q0 or q1
@@ -143,9 +154,11 @@ def bloch_sphere_rotation(angle, unit_vector):
     return np.cos(angle/2)*qtp.qeye(2) - 1j * np.sin(angle/2) * sigma_scalar_unit_vector
 
 
+########################################################################
+# Functions to construct hamiltonian, collapse operators,
+# and compute single quantities of interest
+########################################################################
 
-
-##### Functions to construct hamiltonian, collapse operators, and compute single quantities of interest
 
 def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
     """
@@ -174,22 +187,21 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
 
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(adag*adag*a*a) + 1/2*alpha_q1*(bdag*bdag*b*b) +\
-        J * (-1)*(adag*b+a*bdag) \
+        J * (-1)*(adag*b+a*bdag)  # \
         # + J * (basis_state(0,1,to_vector=False)*basis_state(1,0,to_vector=False).dag() + \
-        #        basis_state(1,0,to_vector=False)*basis_state(0,1,to_vector=False).dag())
-        #(a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
+        # basis_state(1,0,to_vector=False)*basis_state(0,1,to_vector=False).dag())
+        # (a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
     H = H * (2*np.pi)
     return H
 
 
-def calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
+def calc_hamiltonian(amp, fluxlutman, fluxlutman_static, which_gate: str = 'NE'):
     # all inputs should be given in terms of frequencies, i.e. without the 2*np.pi factor
     # instead, the output H includes already that factor
-
     w_q0=fluxlutman.calc_amp_to_freq(amp,'01', which_gate=which_gate)
     w_q1=fluxlutman.calc_amp_to_freq(amp,'10', which_gate=which_gate)
     alpha_q0=fluxlutman.calc_amp_to_freq(amp,'02', which_gate=which_gate)-2*w_q0
-    alpha_q1=fluxlutman.get('anharm_q1_{}'.format(which_gate))
+    alpha_q1= fluxlutman_static.q_polycoeffs_anharm()[-1]
     w_q0_intpoint=w_q1-alpha_q0
 
     q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
@@ -774,15 +786,9 @@ def offset_difference_and_missing_fraction(U):
 
     return offset_difference, missing_fraction
 
-
-
-
-
-
-
-
-
-##### functions called by the main program
+########################################################################
+# Functions called by the main program
+########################################################################
 
 
 def distort_amplitude(fitted_stepresponse_ty,amp,tlist_new,sim_step_new):
@@ -806,7 +812,6 @@ def distort_amplitude(fitted_stepresponse_ty,amp,tlist_new,sim_step_new):
     amp_final=convolved_amp[0:np.size(tlist_convol1)]    # consider only amp during the gate time
 
     return amp_final
-
 
 
 def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,sim_control_CZ, which_gate: str = 'NE'):
@@ -849,13 +854,12 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,sim_control_CZ, wh
 
 
         amp_final = np.concatenate([amp_A, amp_B])
-        f_pulse_final=np.concatenate([f_pulse_A, f_pulse_B])
 
-    return amp_final, f_pulse_final
-
+    return amp_final
 
 
-def return_jump_operators(sim_control_CZ, f_pulse_final, fluxlutman):
+
+def return_jump_operators(sim_control_CZ, amp_final, fluxlutman, which_gate: str = 'NE'):
 
     T1_q0 = sim_control_CZ.T1_q0()
     T1_q1 = sim_control_CZ.T1_q1()
@@ -876,8 +880,11 @@ def return_jump_operators(sim_control_CZ, f_pulse_final, fluxlutman):
     # time-dependent jump operators on q0
     if T2_q0_amplitude_dependent[0] != -1:
 
-        f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot()))
-        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot()))
+        omega_0 = compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot())
+        f_pulse = fluxlutman.calc_amp_to_freq(amp_final,'01', which_gate=which_gate)
+        f_pulse_final = np.clip(f_pulse,a_min=None,a_max=omega_0)
+
+        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],omega_0))
         for i in range(len(sensitivity)):
             if sensitivity[i] < 0.1:
                 sensitivity[i] = 0.1
@@ -899,13 +906,12 @@ def return_jump_operators(sim_control_CZ, f_pulse_final, fluxlutman):
     else:
         Tphi01_q0_vec = []
 
-
     c_ops = c_ops_amplitudedependent(T1_q0 * sim_control_CZ.T2_scaling(),T1_q1 * sim_control_CZ.T2_scaling(),
                                     Tphi01_q0_vec * sim_control_CZ.T2_scaling(),Tphi01_q1 * sim_control_CZ.T2_scaling())
     return c_ops
 
 
-def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxbias_q1, amp, sim_step, intervals_list=[-1], which_gate: str = 'NE'):
+def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxlutman_static, fluxbias_q1, amp, sim_step, intervals_list=None, which_gate: str = 'NE'):
     """
     Calculates the propagator (either unitary or superoperator)
 
@@ -925,22 +931,25 @@ def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxbias_q1, amp, sim_
 
     # We change the basis from the standard basis to the basis of eigenvectors of H_0
     # The columns of S are the eigenvectors of H_0, appropriately ordered
-    if intervals_list[0]==-1:
-        intervals_list = np.zeros(np.size(amp))+sim_step
+    if intervals_list is None:
+        intervals_list = np.zeros(np.size(amp)) + sim_step
 
-    H_0 = calc_hamiltonian(0,fluxlutman,sim_control_CZ, which_gate=which_gate)
+    H_0 = calc_hamiltonian(0,fluxlutman,fluxlutman_static, which_gate=which_gate)
     if sim_control_CZ.dressed_compsub():
         S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[n_levels_q1, n_levels_q0], [n_levels_q1, n_levels_q0]])
     else:
         S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S
 
     w_q1 = q_freq_10    # we 'save' the input value of w_q1
-    w_q1_sweetspot = sim_control_CZ.w_q1_sweetspot()
-    if w_q1 > w_q1_sweetspot:
-        log.warning('operating frequency of q1 should be lower than its sweet spot frequency.')
-        w_q1 = w_q1_sweetspot
+    if sim_control_CZ.sigma_q1() != 0:
+        w_q1_sweetspot = sim_control_CZ.w_q1_sweetspot()
+        if w_q1 > w_q1_sweetspot:
+            log.warning('operating frequency of q1 should be lower than its sweet spot frequency.')
+            w_q1 = w_q1_sweetspot
 
-    w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
+        w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
+    else:
+    	w_q1_biased = w_q1
 
     log.debug('Changing fluxlutman q_freq_10_{} value to {}'.format(which_gate, w_q1_biased))
     fluxlutman.set('q_freq_10_{}'.format(which_gate), w_q1_biased)     # we insert the change to w_q1 in this way because then J1 is also tuned appropriately
@@ -949,7 +958,7 @@ def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxbias_q1, amp, sim_
     exp_L_total=1
     # tt = 0
     for i in range(len(amp)):
-        H=calc_hamiltonian(amp[i],fluxlutman,sim_control_CZ, which_gate=which_gate)
+        H=calc_hamiltonian(amp[i],fluxlutman,fluxlutman_static, which_gate=which_gate)
         H=S.dag()*H*S
         S_H = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])
                                                    # Alternative for collapse operators that follow the basis of H
@@ -980,7 +989,7 @@ def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxbias_q1, amp, sim_
     return U_final
 
 
-def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, sim_control_CZ, which_gate: str = 'NE'):
+def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, fluxlutman_static, which_gate: str = 'NE'):
     """
     Calculates the quantities of interest from the propagator (either unitary or superoperator)
 
@@ -1008,9 +1017,8 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, si
     else:
         population_transfer_12_03 = 0
 
-
     H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=q_freq_10,
-                                                        alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=fluxlutman.get('anharm_q1_{}'.format(which_gate)), J=0)  # old wrong way
+                                                        alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=fluxlutman_static.q_polycoeffs_anharm()[-1], J=0)  # old wrong way
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
     avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_new,L1)
@@ -1034,7 +1042,6 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, si
     phase_diff_12_02 = (phases[6]-phases[4]-phase_q1) % 360
     phase_diff_21_20 = (phases[7]-phases[5]-phase_q0) % 360
 
-
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid,
             'avgatefid_compsubspace_pc': avgatefid_compsubspace, 'phase_q0': phase_q0, 'phase_q1': phase_q1,
             'avgatefid_compsubspace': avgatefid_compsubspace_notphasecorrected,
@@ -1045,12 +1052,10 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, si
             'cond_phase12': cond_phase12, 'cond_phase21': cond_phase21, 'cond_phase03': cond_phase03, 'cond_phase20': cond_phase20,
             'population_transfer_12_21': population_transfer_12_21, 'population_transfer_12_03': population_transfer_12_03}
 
+########################################################################
+# Support functions
+########################################################################
 
-
-
-
-
-##### Support functions
 
 def plot(x_plot_vec,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No ylabel',legend_labels=list(),yscale='linear'):
     # tool for plotting
@@ -1099,8 +1104,8 @@ def concatenate_CZpulse_and_Zrotations(Z_rotations_length,sim_step,tlist):
     return tlist
 
 
-def dressed_frequencies(fluxlutman, sim_control_CZ, which_gate: str = 'NE'):
-    H_0=calc_hamiltonian(0,fluxlutman,sim_control_CZ, which_gate=which_gate)   # computed at 0 amplitude
+def dressed_frequencies(fluxlutman, fluxlutman_static, sim_control_CZ, which_gate: str = 'NE'):
+    H_0 = calc_hamiltonian(0, fluxlutman, fluxlutman_static, which_gate=which_gate)   # computed at 0 amplitude
 
     # We change the basis from the standard basis to the basis of eigenvectors of H_0
     # The columns of S are the eigenvectors of H_0, appropriately ordered
@@ -1224,7 +1229,7 @@ def verify_phicond(U):          # benchmark to check that cond phase is computed
     return phi_cond
 
 
-## phases need to be averaged carefully, e.g. average of 45 and 315 degrees is 0, not 180
+# phases need to be averaged carefully, e.g. average of 45 and 315 degrees is 0, not 180
 def average_phases(phases,weights):
     # phases has to be passed in degrees
     sines=np.sin(np.deg2rad(phases))
@@ -1263,7 +1268,7 @@ def verify_CPTP(U):
     return ptrace
 
 
-def return_instrument_args(fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
+def return_instrument_args(fluxlutman, sim_control_CZ, fluxlutman_static, which_gate: str = 'NE'):
 
     fluxlutman_args = {'sampling_rate': fluxlutman.sampling_rate(),
                            'cz_length_' + which_gate: fluxlutman.get('cz_length_{}'.format(which_gate)),
@@ -1277,7 +1282,6 @@ def return_instrument_args(fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
                            'q_polycoeffs_anharm': fluxlutman.q_polycoeffs_anharm(),
                            'q_freq_01': fluxlutman.q_freq_01(),
                            'bus_freq_' + which_gate: fluxlutman.get('bus_freq_{}'.format(which_gate)),
-                           'alpha_q1': fluxlutman.get('anharm_q1_{}'.format(which_gate)),
                            'q_freq_10_' + which_gate: fluxlutman.get('q_freq_10_{}'.format(which_gate))}
 
     sim_control_CZ_args = {'Z_rotations_length': sim_control_CZ.Z_rotations_length(),
@@ -1305,10 +1309,12 @@ def return_instrument_args(fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
                                 'overrotation_sims': sim_control_CZ.overrotation_sims(),
                                 'axis_overrotation': sim_control_CZ.axis_overrotation()}
 
-    return fluxlutman_args, sim_control_CZ_args
+    fluxlutman_static_args = {'q_polycoeffs_anharm': fluxlutman_static.q_polycoeffs_anharm()}
+
+    return fluxlutman_args, sim_control_CZ_args, fluxlutman_static_args
 
 
-def return_instrument_from_arglist(fluxlutman,fluxlutman_args,sim_control_CZ,sim_control_CZ_args, which_gate: str = 'NE'):
+def return_instrument_from_arglist(fluxlutman, fluxlutman_args, sim_control_CZ, sim_control_CZ_args, fluxlutman_static, fluxlutman_static_args, which_gate: str = 'NE'):
 
     fluxlutman.sampling_rate(fluxlutman_args['sampling_rate'])
     fluxlutman.set('cz_length_{}'.format(which_gate), fluxlutman_args['cz_length_' + which_gate])
@@ -1319,7 +1325,6 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,sim_control_CZ,sim
     fluxlutman.set('cz_theta_f_{}'.format(which_gate), fluxlutman_args['cz_theta_f_' + which_gate])
     fluxlutman.set('czd_length_ratio_{}'.format(which_gate), fluxlutman_args['czd_length_ratio_' + which_gate])
     fluxlutman.set('bus_freq_{}'.format(which_gate), fluxlutman_args['bus_freq_' + which_gate])
-    fluxlutman.set('anharm_q1_{}'.format(which_gate), fluxlutman_args['anharm_q1_' + which_gate])
     fluxlutman.set('q_freq_10_{}'.format(which_gate), fluxlutman_args['q_freq_10_' + which_gate])
     fluxlutman.q_polycoeffs_freq_01_det(fluxlutman_args['q_polycoeffs_freq_01_det'])
     fluxlutman.q_polycoeffs_anharm(fluxlutman_args['q_polycoeffs_anharm'])
@@ -1350,14 +1355,16 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,sim_control_CZ,sim
     sim_control_CZ.overrotation_sims(sim_control_CZ_args['overrotation_sims'])
     sim_control_CZ.axis_overrotation(sim_control_CZ_args['axis_overrotation'])
 
-    return fluxlutman, sim_control_CZ
+    fluxlutman_static.q_polycoeffs_anharm(fluxlutman_static_args['q_polycoeffs_anharm'])
+
+    return fluxlutman, sim_control_CZ, fluxlutman_static
 
 
-def plot_spectrum(fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
+def plot_spectrum(fluxlutman, fluxlutman_static, which_gate: str = 'NE'):
     eig_vec=[]
     amp_vec=np.arange(0,1.5,.01)
     for amp in amp_vec:
-        H=calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate=which_gate)
+        H = calc_hamiltonian(amp, fluxlutman, fluxlutman_static, which_gate=which_gate)
         eigs=H.eigenenergies()
         eig_vec.append(eigs)
     eig_vec=np.array(eig_vec)/1e9/(2*np.pi)
@@ -1370,11 +1377,11 @@ def plot_spectrum(fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
                           xlabel=r'$\omega_{q0}$ (GHz)',ylabel='Frequency (GHz)')
 
 
-def conditional_frequency(amp,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
+def conditional_frequency(amp, fluxlutman, fluxlutman_static, which_gate: str = 'NE'):
     # returns the energy difference (in Hz) between the actual 11 state and the bare 11 state
     #              (whose energy is equal to the sum of the energies of the 01 and 10 states)
     # amp=0 returns the residual coupling
-    H=calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate=which_gate)
+    H = calc_hamiltonian(amp, fluxlutman, fluxlutman_static, which_gate=which_gate)
     eigs=H.eigenenergies()
     cond_frequency = eigs[4]-eigs[1]-eigs[2]+eigs[0]
     cond_frequency = cond_frequency/(2*np.pi)
@@ -1387,6 +1394,7 @@ def steady_state_populations(gamma12,gamma21,gamma23=0,gamma32=0.00001):
     p_2_star = (gamma12*gamma32) / normalization
     p_3_star = (gamma12*gamma23) / normalization
     return p_1_star, p_2_star, p_3_star
+
 def calc_rates(L_1,L_12to03,t_cycle,T_1):
     gamma12 = L_1
     gamma21 = 2*L_1 + (1-np.exp(-t_cycle/(T_1/2)))
@@ -1395,8 +1403,7 @@ def calc_rates(L_1,L_12to03,t_cycle,T_1):
     return gamma12,gamma21,gamma23,gamma32
 
 
-
-def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
+def sensitivity_to_fluxoffsets(U_final_vec, input_to_parallelize, t_final, fluxlutman, fluxlutman_static, which_gate: str = 'NE'):
     '''
     Function used to study the effect of constant flux offsets on the quantities of interest.
     The input should be a series of propagators computed for different flux offsets,
@@ -1416,7 +1423,7 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,fluxlutm
     for i in range(len(U_final_vec)):
         if U_final_vec[i].type == 'oper':
             U_final_vec[i] = qtp.to_super(U_final_vec[i])
-        qoi_temp = simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i],t_final=t_final,fluxlutman=fluxlutman,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
+        qoi_temp = simulate_quantities_of_interest_superoperator_new(U=U_final_vec[i], t_final=t_final, fluxlutman=fluxlutman, fluxlutman_static=fluxlutman_static, which_gate=which_gate)
         if i==mid_index:
             print('qoi_temp =',qoi_temp)
         leakage_vec.append(qoi_temp['L1'])
@@ -1459,8 +1466,7 @@ def sensitivity_to_fluxoffsets(U_final_vec,input_to_parallelize,t_final,fluxlutm
     print('infid_vec =',infid_vec.tolist())
 
 
-
-def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
+def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,fluxlutman_static, which_gate: str = 'NE'):
     '''
     Function used to study how the leakage accumulation differs from the case in which we use directly the gate that comes out of the simulations
     and the case in which we artificially dephase the leakage subspace wrt the computational subspace.
@@ -1510,8 +1516,8 @@ def repeated_CZs_decay_curves(U_superop_average,t_final,fluxlutman,sim_control_C
     for n in range(1,number_CZ_repetitions,step_repetitions):        # we consider only odd n so that in theory it should be always a CZ
         U_superop_n=U_superop_average**n
         U_superop_dephased_n = U_superop_dephased**n
-        qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,fluxlutman=fluxlutman,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
-        qoi_dephased=simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,fluxlutman=fluxlutman,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
+        qoi=simulate_quantities_of_interest_superoperator_new(U=U_superop_n,t_final=t_final*n,fluxlutman=fluxlutman,fluxlutman_static=fluxlutman_static, which_gate=which_gate)
+        qoi_dephased=simulate_quantities_of_interest_superoperator_new(U=U_superop_dephased_n,t_final=t_final*n,fluxlutman=fluxlutman,fluxlutman_static=fluxlutman_static, which_gate=which_gate)
         leakage_vec.append(qoi['L1'])
         infid_vec.append(1-qoi['avgatefid_compsubspace_pc'])
         leakage_dephased_vec.append(qoi_dephased['L1'])
@@ -1671,7 +1677,10 @@ def compute_sweetspot_frequency(polycoeff,freq_at_0_amp):
 
 
 
-## functions for Ramsey/Rabi simulations
+########################################################################
+# functions for Ramsey/Rabi simulations
+########################################################################
+
 
 def calc_populations(U):
     # calculate populations for Ram/Echo-Z experiment
@@ -1700,12 +1709,12 @@ def calc_populations_new(rho_out,population_states):
     return populations
 
 
-def quantities_of_interest_ramsey(U,initial_state,fluxlutman,sim_control_CZ, which_gate: str = 'NE'):
+def quantities_of_interest_ramsey(U, initial_state, fluxlutman, fluxlutman_static, sim_control_CZ, which_gate: str = 'NE'):
 
     if initial_state == '11_dressed':
         freq = sim_control_CZ.w_q0_sweetspot() + sim_control_CZ.detuning()
         amp = fluxlutman.calc_freq_to_amp(freq, which_gate=which_gate)
-        H = calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate=which_gate)
+        H = calc_hamiltonian(amp, fluxlutman, fluxlutman_static, which_gate=which_gate)
         eigs,eigvectors = H.eigenstates()
         psi_in = eigvectors[4]
 
@@ -1717,7 +1726,7 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,sim_control_CZ, whi
 
     elif initial_state == '11_bare':
         amp = 0
-        H = calc_hamiltonian(amp,fluxlutman,sim_control_CZ, which_gate=which_gate)
+        H = calc_hamiltonian(amp, fluxlutman, fluxlutman_static, which_gate=which_gate)
         eigs,eigvectors = H.eigenstates()
         psi_in = eigvectors[4]
 
@@ -1733,12 +1742,11 @@ def quantities_of_interest_ramsey(U,initial_state,fluxlutman,sim_control_CZ, whi
     else:
         print('invalid keyword for initial state')
 
-
     return populations
 
-
-
-## effective Pauli error rates
+########################################################################
+# effective Pauli error rates
+########################################################################
 
 def calc_chi_matrix(U):
 
@@ -1812,9 +1820,9 @@ def calc_diag_pauli_transfer_matrix(U,U_target):
                   xlabel='Pauli index',ylabel='Value')
 
 
-
-
-### Study of leakage
+########################################################################
+# Study of leakage
+########################################################################
 
 
 def population_transfer(U_superop,state_in,state_out):
@@ -1868,7 +1876,6 @@ def nullify_coherence(U_temp,state_A,state_B):
                     U_temp[index_in_vector_of_dm_matrix_element(state_B,state_A),index_in_vector_of_dm_matrix_element([x,y],[x_prime,y_prime])]=0
 
     return U_temp
-
 
 
 

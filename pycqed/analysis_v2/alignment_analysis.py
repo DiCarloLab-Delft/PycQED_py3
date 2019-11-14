@@ -17,7 +17,6 @@ class AlignmentAnalysis(ba.BaseDataAnalysis):
                                 do_fitting=do_fitting,
                                 extract_only=extract_only)
 
-        # self.single_timestamp = True
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
                             'xvals': 'sweep_points',
@@ -85,7 +84,3 @@ class AlignmentAnalysis(ba.BaseDataAnalysis):
                 self.plot_dicts[key]['xunit'] = self.proc_data_dict['xunit']
                 self.plot_dicts[key]['xvals'] = self.proc_data_dict['xvals']
                 self.plot_dicts[key]['xlabel'] = r'B$_{\perp}$'
-
-
-def get_datetimestamp():
-    return time.strftime('%Y%m%d_%H%M%S', time.localtime())

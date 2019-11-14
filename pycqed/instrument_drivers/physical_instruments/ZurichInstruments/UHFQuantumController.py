@@ -55,6 +55,7 @@ import pycqed
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 
 from qcodes.utils import validators
+from qcodes.utils.helpers import full_class
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.utilities.general import check_keyboard_interrupt
 
@@ -76,6 +77,16 @@ class ziUHFQCHoldoffError(Exception):
     """Exception raised when a holdoff error has occurred in either the
     input monitor or result logging unit. Increase the delay between triggers
     sent to these units to solve the problem."""
+    pass
+
+class ziUHFQCDIOActivityError(Exception):
+    """Exception raised when insufficient activity is detected on the bits
+    of the DIO to be used for controlling which qubits to measure."""
+    pass
+
+class ziUHFQCDIOCalibrationError(Exception):
+    """Exception raised when the DIO calibration fails, meaning no signal
+    delay can be found where no timing violations are detected."""
     pass
 
 ##########################################################################
@@ -202,8 +213,8 @@ class UHFQC(zibase.ZI_base_instrument):
 
         # Used for extra DIO output to CC for debugging
         self._diocws = None
-
-         # Define parameters that should not be part of the snapshot
+        
+        # Define parameters that should not be part of the snapshot
         self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable'])
 
         # Our base class includes all the functionality needed to initialize the parameters
@@ -219,10 +230,63 @@ class UHFQC(zibase.ZI_base_instrument):
         # Set default waveform length to 20 ns at 1.8 GSa/s
         self._default_waveform_length = 32
 
+        # Mask used for detecting codeword activity during DIO calibration
+        self._dio_calibration_mask = None
+
         t1 = time.time()
         print('Initialized UHFQC', self.devname, 'in %.2fs' % (t1-t0))
 
      ##########################################################################
+    # Overriding Qcodes methods
+    ##########################################################################
+
+    def snapshot_base(self, update: bool=False,
+                      params_to_skip_update =None,
+                      params_to_exclude = None ):
+        """
+        State of the instrument as a JSON-compatible dict.
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+        Returns:
+            dict: base snapshot
+        """
+
+        if params_to_exclude is None:
+            params_to_exclude = self._params_to_exclude
+
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                pass
+            elif params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+                try:
+                    snap['parameters'][name] = param.snapshot(update=update_par)
+                except:
+                    logging.info("Snapshot: Could not update parameter: {}".format(name))
+                    snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
+        return snap
+
+    ##########################################################################
     # Overriding Qcodes methods
     ##########################################################################
 
@@ -419,6 +483,9 @@ class UHFQC(zibase.ZI_base_instrument):
                 len(value), self._num_codewords))
 
         self._cases = value
+        self._cw_mask = 0
+        for case in self._cases:
+            self._cw_mask |= case
 
         if self._awg_program_features['diocws'] and self._diocws is None:
             raise zibase.ziValueError(
@@ -427,10 +494,10 @@ class UHFQC(zibase.ZI_base_instrument):
         self._awg_program[0] = \
             awg_sequence_acquisition_preamble() + """
 // Mask for selecting our codeword bits
-const CW_MASK = (0x1ff << 17);
+const CW_MASK = ({:08x} << 17);
 // Counts wrong codewords
 var err_cnt = 0;
-"""
+""".format(self._cw_mask)
 
         if self._awg_program_features['diocws']:
             self._awg_program[0] += \
@@ -906,8 +973,8 @@ setUserReg(4, err_cnt);"""
                         'severity': severity,
                         'message': message}
 
-        if found_errors:
-            raise zibase.ziRuntimeError('Errors detected during run-time!')
+        # if found_errors:
+        #     raise zibase.ziRuntimeError('Errors detected during run-time!')
 
     def clear_errors(self) -> None:
         self.qas_0_result_reset(1)
@@ -1585,7 +1652,7 @@ setTrigger(0);
             self._dio_calibration_mask = 0x3
         else:
             raise ziValueError('Invalid feedline {} selected for calibration.'.format(feedline))
-
+            
     def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
 
         cs_filepath = os.path.join(pycqed.__path__[0],
