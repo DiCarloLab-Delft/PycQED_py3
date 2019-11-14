@@ -125,7 +125,7 @@ class Multi_Detector(Detector_Function):
         detectors     (list):
             a list of detectors to combine.
         det_idx_prefix(bool):
-            if True suffixes the value names with
+            if True prefixes the value names with
         detector_labels (list):
             if not None, will be used instead instead of
             "det{idx}_" as a prefix for the different channels
@@ -142,6 +142,8 @@ class Multi_Detector(Detector_Function):
                     else:
                         val_name = detector_labels[i] + \
                             ' ' + detector_value_name
+                else:
+                    val_name = detector_value_name
                 self.value_names.append(val_name)
             for detector_value_unit in detector.value_units:
                 self.value_units.append(detector_value_unit)
