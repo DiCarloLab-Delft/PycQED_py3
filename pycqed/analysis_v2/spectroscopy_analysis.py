@@ -936,6 +936,8 @@ class VNA_DAC_Analysis(VNA_TwoD_Analysis):
             self.save_fig(fig, figname=savename, **kw)
 
 
+
+
 class VNA_DAC_Analysis_v2(VNA_TwoD_Analysis):
     """
     This function can be called with timestamp as its only argument. It will fit
@@ -1118,10 +1120,13 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
 
       # Remove duplicates:
       final_peaks = []
-      for peak in self.peaks:
+      final_heights = []
+      for peak, height in zip(self.peaks, self.peak_height):
           if peak not in final_peaks:
               final_peaks.append(peak)
+              final_heights.append(height)
       self.peaks = final_peaks
+      self.peak_height = final_heights
 
     def plot_fit_result(self, normalize=False,
                         save_fig=True, figsize=None, **kw):

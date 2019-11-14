@@ -1700,6 +1700,12 @@ class Rabi_Analysis(TD_Analysis):
             cos_mod.set_param_hint('period',
                                    expr='1/frequency',
                                    vary=False)
+            # cos_mod.set_param_hint('piPulse',
+            #                        value=self.rabi_amplitudes['piPulse'],
+            #                        vary=False)
+            # cos_mod.set_param_hint('piHalfPulse',
+            #                        value=self.rabi_amplitudes['piHalfPulse'],
+            #                        vary=False)
             self.params = cos_mod.make_params()
             self.fit_result = cos_mod.fit(data=self.normalized_data_points,
                                           t=self.sweep_pts_wo_cal_pts,
@@ -1809,7 +1815,6 @@ class Rabi_Analysis(TD_Analysis):
             self.get_amplitudes(**kw)
             self.save_computed_parameters(self.rabi_amplitudes,
                                           var_name=self.value_names[0])
-
         # Plot results
         if self.make_fig:
             self.make_figures(show=show, show_guess=show_guess,
@@ -7556,6 +7561,151 @@ class Mixer_Skewness_Analysis(TwoD_Analysis):
         return self.QI_min, self.phase_min
 
 
+class Three_Tone_Spectroscopy_Analysis_test(MeasurementAnalysis):
+    '''
+    Analysis for 2D measurement Three tone spectroscopy.
+    **kwargs:
+        f01: fuess for f01
+        f12: guess for f12
+
+    '''
+
+    def __init__(self, label='Three_tone', **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'  # Read write mode, file must exist
+        super(self.__class__, self).__init__(**kw)
+
+    def fit_twin_lorentz(self, x, data,
+                         f01, f12, **kw):
+        vary_f01 = kw.pop('vary_f01', False)
+        twin_lor_m = fit_mods.TwinLorentzModel
+        twin_lor_m.set_param_hint('center_a', value=f01,
+                                  vary=vary_f01)
+        twin_lor_m.set_param_hint('center_b', value=f12,
+                                  vary=True)
+        twin_lor_m.set_param_hint('amplitude_a', value=max(data),
+                                  vary=True)
+        twin_lor_m.set_param_hint('amplitude_b', value=max(data),
+                                  vary=True)
+        twin_lor_m.set_param_hint('sigma_a', value=0.001,
+                                  vary=True)
+        twin_lor_m.set_param_hint('sigma_b', value=0.001,
+                                  vary=True)
+        twin_lor_m.set_param_hint('background', value=0,
+                                  vary=True)
+        self.params = twin_lor_m.make_params()
+        fit_res = twin_lor_m.fit(data=data, x=x, params=self.params)
+        return fit_res
+
+    def run_default_analysis(self, f01=None, f12=None,
+                             amp_lims=[None, None], line_color='k',
+                             phase_lims=[None, None], **kw):
+        self.get_naming_and_values_2D()
+        # figsize wider for colorbar
+        self.add_analysis_datagroup_to_file()
+        fig1, ax1 = self.default_ax(figsize=(8, 5))
+        measured_powers = self.measured_values[0]
+        measured_phases = self.measured_values[1]
+
+        fig1_title = self.timestamp_string + \
+            self.measurementstring + '_' + 'Amplitude'
+        a_tools.color_plot(x=self.sweep_points,
+                           y=self.sweep_points_2D,
+                           z=measured_powers.transpose(),
+                           plot_title=fig1_title,
+                           xlabel=self.xlabel,
+                           ylabel=self.ylabel,
+                           zlabel=self.zlabels[0],
+                           clim=amp_lims,
+                           fig=fig1, ax=ax1, **kw)
+
+
+        # figsize wider for colorbar
+        fig2, ax2 = self.default_ax(figsize=(8, 5))
+        fig2_title = self.timestamp_string + self.measurementstring + '_' + 'Phase'
+        if (measured_phases>170).any() and (measured_phases<-170).any():
+            measured_phases = np.mod(measured_phases, 360)
+        a_tools.color_plot(x=self.sweep_points,
+                           y=self.sweep_points_2D,
+                           z=measured_phases.transpose(),
+                           xlabel=self.xlabel,
+                           ylabel=self.ylabel,
+                           zlabel=self.zlabels[1],
+                           plot_title=fig2_title,
+                           fig=fig2, ax=ax2)
+
+        if f01 is not None:
+            ax1.vlines(f01, min(self.sweep_points_2D),
+                       max(self.sweep_points_2D),
+                       linestyles='dashed', lw=2, colors=line_color, alpha=.5)
+            ax2.vlines(f01, min(self.sweep_points_2D),
+                       max(self.sweep_points_2D),
+                       linestyles='dashed', lw=2, colors=line_color, alpha=.5)
+        if f12 is not None:
+            ax1.plot((min(self.sweep_points),
+                      max(self.sweep_points)),
+                     (f01 + f12 - min(self.sweep_points),
+                      f01 + f12 - max(self.sweep_points)),
+                     linestyle='dashed', lw=2, color=line_color, alpha=.5)
+            ax2.plot((min(self.sweep_points),
+                      max(self.sweep_points)),
+                     (f01 + f12 - min(self.sweep_points),
+                      f01 + f12 - max(self.sweep_points)),
+                     linestyle='dashed', lw=2, color=line_color, alpha=.5)
+        if (f01 is not None) and (f12 is not None):
+            anharm = f01 - f12
+            EC, EJ = a_tools.fit_EC_EJ(f01, f12)
+            # EC *= 1000
+
+        # self.fit_res = self.fit_twin_lorentz(x,**kw)
+        # self.save_fitted_parameters(fit_res=self.fit_res, var_name='anharm')
+        # self.get_measured_anha()  
+        # self.save_computed_parameters(
+        #     self.Anharm_dict, var_name=self.anharm)
+        self.Anharm_dict = {'f01':f01,
+                            'f12':f12,
+                            'anharmonicity':anharm,
+                            'EC':EC,
+                            'EJ':EJ}
+        self.save_dict_to_analysis_group(
+            save_dict=self.Anharm_dict, group_name='Anharmonicity')
+
+        textstr = 'f01 = {:.4g} GHz'.format(f01 * 1e-9) + '\n' + \
+                  'f12 = {:.4g} GHz'.format(f12 * 1e-9) + '\n' + \
+                  'anharm = {:.4g} MHz'.format(anharm * 1e-6) + '\n' + \
+                  'EC ~= {:.4g} MHz'.format(EC * 1e-6) + '\n' + \
+                  'EJ = {:.4g} GHz'.format(EJ * 1e-9)
+        ax1.text(0.95, 0.95, textstr, transform=ax1.transAxes,
+                 fontsize=11,
+                 verticalalignment='top',
+                 horizontalalignment='right',
+                 bbox=self.box_props)
+        ax2.text(0.95, 0.95, textstr, transform=ax2.transAxes,
+                 fontsize=11,
+                 verticalalignment='top',
+                 horizontalalignment='right',
+                 bbox=self.box_props)
+        self.save_fig(fig1, figname=fig1_title, **kw)
+        self.save_fig(fig2, figname=fig2_title, **kw)
+        self.finish()
+
+    
+
+    def get_measured_anha(self):
+        fitted_pars = self.data_file['Analysis']['Fitted Params anharm']
+
+        self.anharmonicity = fitted_pars['anharm'].attrs['value']
+        # T1_stderr = fitted_pars['tau'].attrs['stderr']
+        Anhrm = self.fit_res.params['anharm'].value
+        # T1_stderr = self.fit_res.params['tau'].stderr
+
+        # return as dict for use with "save_computed_parameters"; units are
+        # seconds
+        self.Anharm_dict = {'Anhm': self.Anhrm}
+
+        return self.anharmonicity
+
+
 class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
     '''
     Analysis for 2D measurement Three tone spectroscopy.
@@ -7668,7 +7818,6 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
         params = twin_lor_m.make_params()
         fit_res = twin_lor_m.fit(data=data, x=x, params=params)
         return fit_res
-
 
 class Resonator_Powerscan_Analysis(MeasurementAnalysis):
 
@@ -7838,6 +7987,7 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
         # High power regime: just use the value at highest power
         f_high = f0[-1]
 
+
         if (f_high < f_low):
             shift = f_high - f_low
         else:
@@ -7908,6 +8058,300 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                                   params=params)
 
         return fit_res
+
+
+class Resonator_Powerscan_Analysis_test(MeasurementAnalysis):
+
+    def __init__(self, label='powersweep', **kw):
+        super(self.__class__, self).__init__(**kw)
+
+    # def run_default_analysis(self,  normalize=True, w_low_power=None,
+    #                          w_high_power=None, **kw):
+    # super(self.__class__, self).run_default_analysis(close_file=False,
+    #     save_fig=False, **kw)
+    # close_file = kw.pop('close_file', True)
+    def run_default_analysis(self, normalize=True, plot_Q=True, plot_f0=True,
+                             plot_linecuts=True, linecut_log=True,
+                             plot_all=False, save_fig=True, use_min=False,
+                             **kw):
+        close_file = kw.pop('close_file', True)
+        self.add_analysis_datagroup_to_file()
+
+        self.get_naming_and_values_2D()
+        self.fig_array = []
+        self.ax_array = []
+        fits = {}  # Dictionary to store the fit results in. Fit results are a
+        # dictionary themselfes -> Dictionary of Dictionaries
+
+        A = 10
+        f01 = np.zeros(len(self.sweep_points_2D))
+        f02 = np.zeros(len(self.sweep_points_2D))
+        index = np.zeros(A)
+        for u, power in enumerate(self.sweep_points_2D):
+                    fit_res = self.fit_hanger_model(
+                        self.sweep_points, self.measured_values[0][:, u])
+                    self.save_fitted_parameters(
+                        fit_res, var_name='Powersweep' + str(u))
+                    fits[str(power)] = fit_res
+                    if use_min:
+                        index = np.argsort(self.measured_values[0][:, u])[:A]
+                        min_index = np.min(index)
+                        max_index = np.max(index)
+                        f01[u] = np.min(self.sweep_points[min_index])
+                        f02[u] = np.max(self.sweep_points[max_index])
+                    else:
+                        f01[u] = fits[str(power)].values['f0']
+                        f02[u] = fits[str(power)].values['f0']
+                    self.f01 = f01
+                    self.f02 = f02
+
+
+
+        self.fit_results = fits
+
+        xlabel = kw.pop("xlabel", self.sweep_name)
+        ylabel = kw.pop("ylabel", self.sweep_name_2D)
+        x_unit = kw.pop("x_unit", self.sweep_unit)
+        y_unit = kw.pop("y_unit", self.sweep_unit_2D)
+        z_unit_linecuts = self.value_units[0]
+
+        for i, meas_vals in enumerate(self.measured_values):
+            if "zlabel" not in kw:
+                kw["zlabel"] = self.value_names[i]
+            if "z_unit" not in kw:
+                if normalize:
+                    kw["z_unit"] = 'normalized'
+                else:
+                    kw["z_unit"] = self.value_units[i]
+
+            if (not plot_all) & (i >= 1):
+                break
+            # Linecuts are above because normalization changes the values of the
+            # object. Thus it affects both colorplot and linecuts otherwise.
+            if plot_Q:
+                Q = np.zeros(len(self.sweep_points_2D))
+                Qc = np.zeros(len(self.sweep_points_2D))
+                for u, power in enumerate(self.sweep_points_2D):
+                    Q[u] = self.fit_results[str(power)].values['Q']
+                    Qc[u] = self.fit_results[str(power)].values['Qc']
+                fig, ax = self.default_ax(figsize=(8, 5))
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                fig_title = '{timestamp}_{measurement}_{val_name}_QvsPower'.format(
+                    timestamp=self.timestamp_string,
+                    measurement=self.measurementstring,
+                    val_name=self.zlabels[i])
+                ax.plot(
+                    self.sweep_points_2D, Q, 'blue', label='Loaded Q-Factor')
+                ax.plot(
+                    self.sweep_points_2D, Qc, 'green', label='Coupling Q-Factor')
+                ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
+                ax.set_position([0.1, 0.1, 0.5, 0.8])
+                set_ylabel(ax, 'Quality Factor')
+                set_xlabel(ax, ylabel, y_unit)
+
+                if save_fig:
+                    self.save_fig(
+                        fig, figname=fig_title, fig_tight=False, **kw)
+
+            if plot_f0:
+                fig, ax = self.default_ax(figsize=(8, 5))
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                fig_title = '{timestamp}_{measurement}_{val_name}_f0vsPower'.format(
+                    timestamp=self.timestamp_string,
+                    measurement=self.measurementstring,
+                    val_name=self.zlabels[i])
+                ax.plot(self.sweep_points_2D, f01, 'blue', marker='o',
+                        label='Cavity Frequency 1')
+                ax.plot(self.sweep_points_2D, f02, 'green', marker='o',
+                        label='Cavity Frequency 2')
+                ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
+                ax.set_position([0.15, 0.1, 0.5, 0.8])
+                set_ylabel(ax, xlabel, x_unit)
+                set_xlabel(ax, ylabel, y_unit)
+
+                if save_fig:
+                    self.save_fig(
+                        fig, figname=fig_title, fig_tight=False, **kw)
+
+            if plot_linecuts:
+                fig, ax = self.default_ax(figsize=(8, 5))
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                fig_title = '{timestamp}_{measurement}_{val_name}_linecut'.format(
+                    timestamp=self.timestamp_string,
+                    measurement=self.measurementstring,
+                    val_name=self.zlabels[i])
+                a_tools.linecut_plot(x=self.sweep_points,
+                                     y=self.sweep_points_2D,
+                                     z=self.measured_values[i],
+                                     plot_title=fig_title,
+                                     log=linecut_log,
+                                     xlabel=xlabel,
+                                     x_unit=x_unit,
+                                     y_name=ylabel,
+                                     y_unit=y_unit,
+                                     z_unit_linecuts=z_unit_linecuts,
+                                     fig=fig, ax=ax, **kw)
+                if save_fig:
+                    self.save_fig(
+                        fig, figname=fig_title, fig_tight=False, **kw)
+
+            fig, ax = self.default_ax(figsize=(8, 5))
+            self.fig_array.append(fig)
+            self.ax_array.append(ax)
+            if normalize:
+                meas_vals = a_tools.normalize_2D_data(meas_vals)
+            fig_title = '{timestamp}_{measurement}_{val_name}'.format(
+                timestamp=self.timestamp_string,
+                measurement=self.measurementstring,
+                val_name=self.zlabels[i])
+
+            a_tools.color_plot(x=self.sweep_points,
+                               y=self.sweep_points_2D,
+                               z=meas_vals.transpose(),
+                               plot_title=fig_title,
+                               xlabel=xlabel,
+                               x_unit=x_unit,
+                               ylabel=ylabel,
+                               y_unit=y_unit,
+                               fig=fig, ax=ax, **kw)
+            if save_fig:
+                self.save_fig(fig, figname=fig_title, **kw)
+
+        if close_file:
+            self.finish()
+
+        # Find low power regime
+        threshold = 0.1e6  # Gotta love hardcoded stuff
+        f_low1 = f01[0]
+        f_low2 = f02[0]
+        P_result = self.sweep_points_2D[0]
+        try:
+            for u, f in enumerate(f01):
+                if np.abs(f01[0] - f01[u+1]) < threshold:
+                    f_low = f01[u+1]
+                    P_result = self.sweep_points_2D[u]
+                else:
+                    break
+        except IndexError:
+            pass
+
+        try:
+            for u, f in enumerate(f02):
+                if np.abs(f02[0] - f02[u+1]) < threshold:
+                    f_low = f02[u+1]
+                    P_result = self.sweep_points_2D[u]
+                else:
+                    break
+        except IndexError:
+            pass
+        # High power regime: just use the value at highest power
+        f_high1 = f01[-1]
+        f_high2 = f02[-1]
+        
+
+        # if (f_high < f_low):
+        #     shift = f_high - f_low
+        # else:
+        #     shift = 0
+        #     logging.warning('No power shift found. Consider attenuation')
+        #     # raise Exception('High power regime frequency found to be higher than'
+        #     #                 'low power regime frequency')
+
+        shift1 = 0
+        shift_data1=[]
+        for i in range (len(f01)):
+            if (f01[0] - f01[-1]) > 100e3: 
+                shift1 = f01[0] - f01[-1]
+            elif (f01[0] - f01[i]) > 100e3 : 
+                shifts1= f01[0] - f01[i]
+                shift_data1.append(shifts1)
+                shift1=np.amax(shift_data1)
+            else:
+                logging.warning('No power shift found. Consider attenuation')
+
+        shift2 = 0
+        shift_data2=[]
+        for i in range (len(f02)):
+            if (f02[0] - f02[-1]) > 200e3: 
+                shift2 = f02[0] - f02[-1]
+            elif (f02[0] - f02[i]) > 200e3 : 
+                shifts2= f02[0] - f02[i]
+                shift_data2.append(shifts2)
+                shift2=np.amax(shift_data2)
+            else:
+                logging.warning('No power shift found. Consider attenuation')
+
+
+
+        self.f_low1 = f_low1
+        self.f_high1 = f_high1
+        self.f_low2 = f_low2
+        self.f_high2 = f_high2
+        self.shift1 = shift1
+        self.shift2 = shift2
+        self.power = P_result
+
+    def fit_hanger_model(self, sweep_values, measured_values):
+        HangerModel = fit_mods.SlopedHangerAmplitudeModel
+
+        # amplitude_guess = np.pi*sigma_guess * abs(
+        #     max(self.measured_powers)-min(self.measured_powers))
+
+        # Fit Power to a Lorentzian
+        measured_powers = measured_values ** 2
+
+        min_index = np.argmin(measured_powers)
+        max_index = np.argmax(measured_powers)
+
+        min_frequency = sweep_values[min_index]
+        max_frequency = sweep_values[max_index]
+
+        peaks = a_tools.peak_finder((sweep_values),
+                                    measured_values)
+
+        if peaks['dip'] is not None:  # look for dips first
+            f0 = peaks['dip']
+            amplitude_factor = -1.
+        elif peaks['peak'] is not None:  # then look for peaks
+            f0 = peaks['peak']
+            amplitude_factor = 1.
+        else:  # Otherwise take center of range
+            f0 = np.median(sweep_values)
+            amplitude_factor = -1.
+            logging.error('No peaks or dips in range')
+            # If this error is raised, it should continue the analysis but
+            # not use it to update the qubit object
+
+        amplitude_guess = max(measured_powers) - min(measured_powers)
+        # Creating parameters and estimations
+        S21min = min(measured_values) / max(measured_values)
+
+        Q = f0 / abs(min_frequency - max_frequency)
+        Qe = abs(Q / abs(1 - S21min))
+
+        HangerModel.set_param_hint('f0', value=f0,
+                                   min=min(sweep_values),
+                                   max=max(sweep_values))
+        HangerModel.set_param_hint('A', value=amplitude_guess)
+        HangerModel.set_param_hint('Q', value=Q)
+        HangerModel.set_param_hint('Qe', value=Qe)
+        HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
+                                   vary=False)
+        HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
+        HangerModel.set_param_hint('theta', value=0, min=-np.pi / 2,
+                                   max=np.pi / 2)
+        HangerModel.set_param_hint('slope', value=0, vary=True,
+                                   min=-1, max=1)
+        params = HangerModel.make_params()
+        fit_res = HangerModel.fit(data=measured_powers,
+                                  f=sweep_values * 1.e9,
+                                  params=params)
+
+        return fit_res
+
 
 
 class time_trace_analysis(MeasurementAnalysis):

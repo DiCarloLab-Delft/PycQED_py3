@@ -388,6 +388,9 @@ class CCLight_Transmon(Qubit):
                            initial_value='int',
                            vals=vals.Enum('ext', 'int'),
                            parameter_class=ManualParameter)
+        self.add_parameter('mw_pulse_duration', unit='s',
+                           initial_value=20e-9,
+                           parameter_class=ManualParameter)
 
         self.add_parameter(
             'mw_vsm_delay', label='CCL VSM trigger delay',
@@ -1177,7 +1180,7 @@ class CCLight_Transmon(Qubit):
 
         # 4. reloads the waveforms
         if do_prepare:
-            MW_LutMan.load_waveforms_onto_AWG_lookuptable()
+            MW_LutMan.load_waveforms_onto_AWG_lookuptable(force_load_sequencer_program=True)
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
@@ -1227,10 +1230,16 @@ class CCLight_Transmon(Qubit):
 
         Will ignore any qubit whose name (string) is in 'exceptions'
         """
-
+       
         fluxcurrent = self.instr_FluxCtrl.get_instr()
         device = self.instr_device.get_instr()
+    
         exceptions.append('fakequbit')
+        Qs= device.qubits()
+        for Q in Qs:
+            if device.find_instrument(Q).fl_dc_V_per_phi0() == 1 :
+                exceptions.append(Q)
+        # exceptions.append('D2')
         # First park all other qubits to anti sweetspot
         print('Moving other qubits away ...')
         for qubit_name in device.qubits():
@@ -1238,6 +1247,7 @@ class CCLight_Transmon(Qubit):
                 qubit = device.find_instrument(qubit_name)
                 channel = qubit.cfg_dc_flux_ch()
                 current = qubit.fl_dc_V0() + qubit.fl_dc_V_per_phi0()/2
+                # current = qubit.fl_dc_V0() + 20e-3
                 fluxcurrent[channel](current)
                 if verbose:
                     print('\t Moving {} to {:.3f} mA'
@@ -1250,7 +1260,7 @@ class CCLight_Transmon(Qubit):
     ####################################################
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
-    def find_frequency_adaptive(self, f_start=None, f_span=200e6, f_step=0.25e6,
+    def find_frequency_adaptive(self, f_start=None, f_span=750e6, f_step=0.50e6,
                                 MC=None, update=True, use_max=False,
                                 spec_mode='pulsed_marked', verbose=True):
         """
@@ -1266,9 +1276,10 @@ class CCLight_Transmon(Qubit):
             f_start = self.freq_qubit()
 
         # Set high power and averages to be sure we find the peak.
-        self.spec_pow(-20)
+        self.spec_pow(-30)
+        self.ro_pulse_amp_CW(0.06)
         old_avg = self.ro_acq_averages()
-        self.ro_acq_averages(32768)
+        self.ro_acq_averages(2**15)
         # Repeat measurement while no peak is found:
         success = False
         f_center = f_start
@@ -1381,10 +1392,13 @@ class CCLight_Transmon(Qubit):
                  'tracked - uses tracked spectroscopy (not really implemented)'
         TODO: If spectroscopy does not yield a peak, it should discard it
         """
+        self.spec_pow(-30)
+        self.ro_acq_averages(2**14)
+
         if freqs is None:
             freq_center = self.freq_qubit()
-            freq_range = 100e6
-            freqs = np.arange(freq_center - freq_range, freq_center + 5e6,
+            freq_range = 30e6
+            freqs = np.arange(freq_center - freq_range, freq_center + 20e6,
                               0.5e6)
         if dac_values is None:
             if self.fl_dc_V0() is not None:
@@ -1475,7 +1489,13 @@ class CCLight_Transmon(Qubit):
         TODO: if spec_pow is too low/high, it should adjust it to approx the
               ideal spec_pow + 25 dBm
         """
+        self.spec_pow(-30)
+        old_avg=self.ro_acq_averages()
+        old_avg_s=self.ro_soft_avg()
+        self.ro_acq_averages(2**14)
+        self.ro_soft_avg(1)
 
+        # self.mw_gauss_width(5e-9)
         if anharmonicity is None:
             # Standard estimate, negative by convention
             anharmonicity = self.anharmonicity()
@@ -1488,15 +1508,18 @@ class CCLight_Transmon(Qubit):
             freqs = np.arange(freq_center-1/2*freq_range, self.freq_qubit()+1/2*freq_range,
                               0.5e6)
         old_spec_pow = self.spec_pow()
-        self.spec_pow(self.spec_pow()+10)
+        self.spec_pow(self.spec_pow()+18)
         self.measure_spectroscopy(freqs=freqs, mode=mode, analyze=False)
 
         a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            analyze_ef=True)
         f02 = 2*a.params['f0_gf_over_2'].value
         self.spec_pow(old_spec_pow)
+        self.ro_acq_averages(old_avg)
+        self.ro_soft_avg(old_avg_s)
         if update:
             self.anharmonicity(f02-2*self.freq_qubit())
+            # f12_cal = self.freq_qubit()+ self.anharmonicity()
             return True
 
 
@@ -1512,6 +1535,8 @@ class CCLight_Transmon(Qubit):
 
         For details see self.measure_rabi
         """
+        # self.ro_acq_averages(2**10)
+        # self.ro_soft_avg(3)
         if amps is None:
             if self.cfg_with_vsm():
                 amps = np.linspace(0.1, 1, 31)
@@ -1521,6 +1546,48 @@ class CCLight_Transmon(Qubit):
         self.measure_rabi(amps=amps, MC=MC, analyze=False,
                           all_modules=all_modules)
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
+        try:
+            if self.cfg_with_vsm():
+                self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
+            else:
+                self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
+        except(ValueError):
+                warnings.warn("Extracted piPulse amplitude out of parameter range. " \
+                "Keeping previous value.")
+        return True
+
+    def calibrate_mw_pulse_amplitude_coarse_test(self,
+                                            amps=None,
+                                            close_fig=True, verbose=False,
+                                            MC=None, update=True,
+                                            all_modules=False):
+        """
+        Calibrates the pulse amplitude using a single rabi oscillation.
+        Depending on self.cfg_with_vsm uses VSM or AWG channel amplitude
+        to sweep the amplitude of the pi pulse
+
+        For details see self.measure_rabi
+        """
+        self.ro_acq_averages(2**10)
+        self.ro_soft_avg(3)
+        # self.mw_gauss_width(10e-9)
+        # self.mw_pulse_duration()=4*self.mw_gauss_width()
+        if amps is None:
+            if self.cfg_with_vsm():
+                amps = np.linspace(0.1, 1, 31)
+            else:
+                amps = np.linspace(0, 1, 31)
+
+        self.measure_rabi(amps=amps, MC=MC, analyze=False,
+                          all_modules=all_modules)
+        a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
+        old_gw=self.mw_gauss_width()
+        if a.rabi_amplitudes['piPulse'] > 1 or a.rabi_amplitudes['piHalfPulse'] > a.rabi_amplitudes['piPulse'] : 
+            self.mw_gauss_width(2*old_gw)
+            self.prepare_for_timedomain()
+            mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                    force_load_sequencer_program=False)
+
         try:
             if self.cfg_with_vsm():
                 self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
@@ -2670,7 +2737,6 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-
     def measure_anharmonicity(self, freqs_01, freqs_12, f_01_power=None,
                               f_12_power=None,
                               MC=None, spec_source_2=None,
@@ -2756,7 +2822,117 @@ class CCLight_Transmon(Qubit):
         ma.Three_Tone_Spectroscopy_Analysis(
             label='Two_tone',  f01=np.mean(freqs_01), f12=np.mean(freqs_12))
 
+        
+    def measure_anharmonicity_test(self, freqs_01=None, freqs_12=None, f_01_power=None,
+                              f_12_power=None,
+                              MC=None, spec_source_2=None,
+                              mode='pulsed_marked'):
+        """
+        Measures the qubit spectroscopy as a function of frequency of the two
+        driving tones. The qubit transitions are observed when frequency of one
+        drive matches the qubit frequency, or when sum of frequencies matches
+        energy difference between ground and second excited state. Consequently
+        frequency of 01 and 12  transitions can be extracted simultaneously
+        yoielding anharmonicity measurement.
 
+        Typically a good guess for the 12 transition frequencies is
+        f01 + alpha where alpha is the anharmonicity and typically ~ -300 MHz
+
+        Args:
+            freqs_01: frequencies of the first qubit drive
+            freqs_12: frequencies of the second qubit drive
+            f_01_power: power of the first qubit drive. By default the power
+                is set to self.spec_pow
+            f_12_power: power of the second qubit drive. By default the power
+                is set to self.spec_pow. Likely it needs to be increased
+                by 10-20 dB to yield meaningful result
+            spec_source_2: instrument used to apply second MW drive.
+                By default instrument specified by self.instr_spec_source_2 is used
+            mode (str):
+                if pulsed_marked uses pulsed spectroscopy sequence assuming
+                that the sources are pulsed using a marker.
+                Otherwise, uses CW spectroscopy.
+        """
+        old_spec_pow1=self.spec_pow()
+        self.spec_pow(-30)
+        if freqs_01 is None:
+            freqs_01=self.freq_qubit()+np.arange(-30e6,30.1e6,0.5e6)
+        if freqs_12 is None:
+            freqs_12=self.freq_qubit()+ self.anharmonicity()+np.arange(-30e6,30.1e6,0.5e6)
+        f_anharmonicity = np.mean(freqs_01) - np.mean(freqs_12)
+        if f_01_power == None:
+            f_01_power = self.spec_pow()
+        if f_12_power == None:
+            f_12_power = f_01_power+20
+
+
+
+        # if spec_source_2 == None :
+        #     spec_source_2=spec_source2
+        print('f_anharmonicity estimation', f_anharmonicity)
+        print('f_12 estimations', np.mean(freqs_12))
+        CCL = self.instr_CC.get_instr()
+        # p = sqo.pulsed_spec_seq(
+        #     qubit_idx=self.cfg_qubit_nr(),
+        #     spec_pulse_length=self.spec_pulse_length(),
+        #     platf_cfg=self.cfg_openql_platform_fn())
+        p = sqo.pulsed_spec_seq_marked(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            trigger_idx=0)
+        CCL.eqasm_program(p.filename)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if spec_source_2 is None:
+            spec_source_2 = self.instr_spec_source_2.get_instr()
+        spec_source = self.instr_spec_source.get_instr()
+
+        self.prepare_for_continuous_wave()
+        self.int_avg_det_single._set_real_imag(False)
+        spec_source.on()
+        if mode == 'pulsed_marked':
+            spec_source.pulsemod_state('On')
+        else:
+            spec_source.pulsemod_state('Off')
+
+        spec_source.power(f_01_power)
+
+        spec_source_2.on()
+        if mode == 'pulsed_marked':
+            spec_source_2.pulsemod_state('On')
+        else:
+            spec_source_2.pulsemod_state('Off')
+        spec_source_2.power(f_12_power)
+
+        MC.set_sweep_function(wrap_par_to_swf(
+                              spec_source.frequency, retrieve_value=True))
+        MC.set_sweep_points(freqs_01)
+        MC.set_sweep_function_2D(wrap_par_to_swf(
+            spec_source_2.frequency, retrieve_value=True))
+        MC.set_sweep_points_2D(freqs_12)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run_2D(name='Two_tone_'+self.msmt_suffix)
+        ma.TwoD_Analysis(auto=True)
+        spec_source.off()
+        spec_source_2.off()
+        self.spec_pow(old_spec_pow1)
+
+
+
+        # if analyze:
+        #     a = ma.Three_Tone_Spectroscopy_Analysis(label='Two_tone',  f01=np.mean(freqs_01), f12=np.mean(freqs_12))
+        #     if update:
+        #         self.anharmonicity(a.anharm)
+        #     return a.T1
+
+        ma_obj = ma.Three_Tone_Spectroscopy_Analysis_test(label='Two_tone',  f01=np.mean(freqs_01), f12=np.mean(freqs_12))
+        rel_change = (abs(self.anharmonicity())-ma_obj.Anharm_dict['anharmonicity'])/self.anharmonicity()
+        threshold_for_change=0.1
+        if np.abs(rel_change)> threshold_for_change:
+            return False
+        else:
+            return True
     def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None,
                 powers=np.arange(-10, 10, 1), MC=None, spec_source_2=None):
         """
@@ -3384,13 +3560,13 @@ class CCLight_Transmon(Qubit):
         """
 
         if self.cfg_with_vsm():
-            self.measure_rabi_vsm(MC, amps,
-                                  analyze, close_fig, real_imag,
-                                  prepare_for_timedomain, all_modules)
+            return self.measure_rabi_vsm(MC, amps,
+                                         analyze, close_fig, real_imag,
+                                         prepare_for_timedomain, all_modules)
         else:
-            self.measure_rabi_channel_amp(MC, amps,
-                                          analyze, close_fig, real_imag,
-                                          prepare_for_timedomain)
+            return self.measure_rabi_channel_amp(MC, amps,
+                                                 analyze, close_fig, real_imag,
+                                                 prepare_for_timedomain)
 
     def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.1, 1.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
@@ -3710,6 +3886,12 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_optimization_method('nelder_mead')
         nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
         ma.OptimizationAnalysis(label='gate_tuneup_allxy')
+        
+        if a2.optimization_result[1][0] > 0.07:
+            return False
+        else:
+            return True
+
 
     def calibrate_depletion_pulse(
             self, nested_MC=None, amp0=None,
@@ -4872,11 +5054,11 @@ class CCLight_Transmon(Qubit):
         dag.add_node(self.name + ' DAC Arc Polynomial',
                      calibrate_function=cal_True_delayed)
 
-        # Validate qubit calibration
-        dag.add_node(self.name + ' ALLXY',
-                     calibrate_function=self.name + '.measure_allxy')
-        dag.add_node(self.name + ' MOTZOI Calibration',
-                     calibrate_function=self.name + '.calibrate_motzoi')
+        # # Validate qubit calibration
+        # dag.add_node(self.name + ' ALLXY',
+        #              calibrate_function=self.name + '.measure_allxy')
+        # dag.add_node(self.name + ' MOTZOI Calibration',
+        #              calibrate_function=self.name + '.calibrate_motzoi')
 
         # If all goes well, the qubit is fully 'calibrated' and can be controlled
 
@@ -4947,20 +5129,27 @@ class CCLight_Transmon(Qubit):
         dag.add_edge(self.name + ' Frequency at Sweetspot',
                      self.name + ' Sweetspot')
 
-        dag.add_edge(self.name + ' ALLXY',
-                     self.name + ' Rabi')
-        dag.add_edge(self.name + ' ALLXY',
+        # dag.add_edge(self.name + ' ALLXY',
+        #              self.name + ' Rabi')
+        # dag.add_edge(self.name + ' ALLXY',
+        #              self.name + ' Frequency Fine')
+        # dag.add_edge(self.name + ' ALLXY',
+        #              self.name + ' MOTZOI Calibration')
+
+        dag.add_edge(self.name + ' T1',
                      self.name + ' Frequency Fine')
-        dag.add_edge(self.name + ' ALLXY',
-                     self.name + ' MOTZOI Calibration')
+        dag.add_edge(self.name + ' T2_Echo',
+                     self.name + ' Frequency Fine')
+        dag.add_edge(self.name + ' T2_Star',
+                     self.name + ' Frequency Fine')
 
         # Perform initial measurements to see if they make sense
-        dag.add_edge(self.name + ' T1',
-                     self.name + ' ALLXY')
-        dag.add_edge(self.name + ' T2_Echo',
-                     self.name + ' ALLXY')
-        dag.add_edge(self.name + ' T2_Star',
-                     self.name + ' ALLXY')
+        # dag.add_edge(self.name + ' T1',
+        #              self.name + ' ALLXY')
+        # dag.add_edge(self.name + ' T2_Echo',
+        #              self.name + ' ALLXY')
+        # dag.add_edge(self.name + ' T2_Star',
+        #              self.name + ' ALLXY')
 
         # Measure as function of frequency and time
         dag.add_edge(self.name + ' T1(frequency)',

@@ -92,11 +92,12 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     return p
 
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
-                           platf_cfg: str, trigger_idx: int):
+                           platf_cfg: str, trigger_idx: int, wait_before_mmt: int = 0):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
     this one triggers the 0th trigger port of the CCLight and usus the zeroth
     wave output on the AWG (currently hardcoded, should be improved)
+    wait_before_mmt (int): ns wait-time before measurement
     
     """
     p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
@@ -110,7 +111,8 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
         k.gate('spec', [trigger_idx])
     if trigger_idx != qubit_idx:    
         k.wait([trigger_idx, qubit_idx], 0)
-        
+    # if wait_before_mmt >0:
+        # k.wait([trigger_idx, qubit_idx], 100)
     k.measure(qubit_idx)
     p.add_kernel(k)
 

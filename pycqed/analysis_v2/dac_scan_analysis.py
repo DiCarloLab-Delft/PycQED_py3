@@ -677,7 +677,7 @@ class DAC_analysis(ma.TwoD_Analysis):
                  extract_only=False,
                  auto=True,
                  **kw):
-        super(ma.TwoD_Analysis, self).__init__(timestamp=timestamp,
+        super().__init__(timestamp=timestamp,
                                                options_dict=options_dict,
                                                extract_only=extract_only,
                                                auto=auto,

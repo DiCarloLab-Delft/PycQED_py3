@@ -1244,7 +1244,7 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
 
     def __init__(self, signal_hound, frequency=None, Navg=1, delay=0.1,
                  prepare_for_each_point=False,
-                 prepare_function=None,
+                 prepare_function=None, 
                  prepare_function_kwargs: dict={}):
         super().__init__()
         self.frequency = frequency
@@ -1264,14 +1264,14 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         if self.prepare_for_each_point:
             self.prepare()
         time.sleep(self.delay)
-        if qc.__version__ < '0.1.11': 
+        if qc.__version__ <= '0.1.11': 
             return self.SH.get_power_at_freq(Navg=self.Navg)
         else: 
             self.SH.avg(self.Navg)
             return self.SH.power()
 
     def prepare(self, **kw):
-        if qc.__version__ < '0.1.11': 
+        if qc.__version__ <= '0.1.11': 
             self.SH.prepare_for_measurement()
         if self.prepare_function is not None:
             self.prepare_function(**self.prepare_function_kwargs)
