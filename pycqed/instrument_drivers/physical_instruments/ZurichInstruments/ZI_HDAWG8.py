@@ -718,7 +718,7 @@ while (1) {
             verbose (bool): if True prints to stdout
         """
 
-        CC_model = CC.IDN()['Model']
+        CC_model = CC.IDN()['model']
         if 'QCC' in CC_model:
             expected_sequence = self._prepare_QCC_dio_calibration(
                 QCC=CC, verbose=verbose)
