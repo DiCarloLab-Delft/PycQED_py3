@@ -242,13 +242,51 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_contour_phase: bool = True,
                 plt_contour_L1: bool = True,
                 plt_optimal_point: bool = False,
-                deg_clim: list = None):
+                clims: dict = None):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
         self.plt_contour_L1 = plt_contour_L1
         self.plt_optimal_point = plt_optimal_point
-        self.deg_clim = deg_clim
+        self.clims = clims
+
+        cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
+        'cost func.', 'cost function', 'Cost function', 'Cost function value'}
+        L1_Names = {'L1', 'Leakage'}
+        MF_Names = {'missing fraction', 'Missing fraction', 'missing frac',
+            'missing frac.', 'Missing frac', 'Missing frac.'}
+        cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
+            'cond phase', 'cond. phase', 'conditional phase'}
+        offset_diff_names = {'offset difference', 'offset diff',
+            'offset diff.', 'Offset difference', 'Offset diff',
+            'Offset diff.'}
+
+        # also account for possible underscores instead of a spaces between words
+        allNames = [cost_func_Names, L1_Names, MF_Names, cond_phase_names,
+            offset_diff_names]
+        [self.cost_func_Names, self.L1_Names, self.MF_Names, self.cond_phase_names,
+            self.offset_diff_names] = \
+            [names.union({name.replace(' ', '_') for name in names})
+                for names in allNames]
+
+        cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
+        'cost func.', 'cost function', 'Cost function', 'Cost function value'}
+        L1_Names = {'L1', 'Leakage'}
+        MF_Names = {'missing fraction', 'Missing fraction', 'missing frac',
+            'missing frac.', 'Missing frac', 'Missing frac.'}
+        cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
+            'cond phase', 'cond. phase', 'conditional phase'}
+        offset_diff_names = {'offset difference', 'offset diff',
+            'offset diff.', 'Offset difference', 'Offset diff',
+            'Offset diff.'}
+
+        # also account for possible underscores instead of a spaces between words
+        allNames = [cost_func_Names, L1_Names, MF_Names, cond_phase_names,
+            offset_diff_names]
+        [self.cost_func_Names, self.L1_Names, self.MF_Names, self.cond_phase_names,
+            self.offset_diff_names] = \
+            [names.union({name.replace(' ', '_') for name in names})
+                for names in allNames]
 
         super().__init__(
             t_start=t_start,
@@ -267,25 +305,6 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         # assumes that value names are unique in an experiment
         super().prepare_plots()
         anglemap = make_anglemap()
-
-        cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
-        'cost func.', 'cost function', 'Cost function', 'Cost function value'}
-        L1_Names = {'L1', 'Leakage'}
-        MF_Names = {'missing fraction', 'Missing fraction', 'missing frac',
-            'missing frac.', 'Missing frac', 'Missing frac.'}
-        cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
-            'cond phase', 'cond. phase', 'conditional phase'}
-        offset_diff_names = {'offset difference', 'offset diff',
-            'offset diff.', 'Offset difference', 'Offset diff',
-            'Offset diff.'}
-
-        # also account for possible underscores instead of a spaces between words
-        allNames = [cost_func_Names, L1_Names, MF_Names, cond_phase_names,
-            offset_diff_names]
-        [cost_func_Names, L1_Names, MF_Names, cond_phase_names,
-            offset_diff_names] = \
-            [names.union({name.replace(' ', '_') for name in names})
-                for names in allNames]
 
         for i, val_name in enumerate(self.proc_data_dict['value_names']):
 
@@ -306,9 +325,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     self.timestamp, self.proc_data_dict['measurementstring'])
             }
 
-            if self.proc_data_dict['value_units'][i] == 'deg':
-                if self.deg_clim is not None:
-                    self.plot_dicts[val_name]['clim'] = self.deg_clim
+            if self.clims is not None and val_name in self.clims.keys():
+                self.plot_dicts[val_name]['clim'] = self.clims[val_name]
 
             if self.plt_orig_pnts:
                 self.plot_dicts[val_name + '_non_interpolated'] = {
@@ -326,7 +344,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 z_cond_phase = None
                 for j, val_name_j in enumerate(self.proc_data_dict['value_names']):
                     pass
-                    if val_name_j in cond_phase_names:
+                    if val_name_j in self.cond_phase_names:
                         z_cond_phase = self.proc_data_dict['interpolated_values'][j]
                         break
 
@@ -343,14 +361,14 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                         'vlim': (0, 360)
                     }
                 else:
-                    log.warning('No data found named {}'.format(cond_phase_names))
+                    log.warning('No data found named {}'.format(self.cond_phase_names))
 
             if self.plt_contour_L1:
                 # Find index of Leakage or Missing Fraction
                 z_L1 = None
                 for j, val_name_j in enumerate(self.proc_data_dict['value_names']):
                     pass
-                    if val_name_j in L1_Names or val_name_j in MF_Names:
+                    if val_name_j in self.L1_Names or val_name_j in self.MF_Names:
                         z_L1 = self.proc_data_dict['interpolated_values'][j]
                         break
 
@@ -361,7 +379,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     contour_levels = np.array([1, 5, 10])
                     # Leakage is estimated as (Missing fraction/2)
                     contour_levels = contour_levels if \
-                        self.proc_data_dict['value_names'][j] in L1_Names \
+                        self.proc_data_dict['value_names'][j] in self.L1_Names \
                         else 2 * contour_levels
 
                     self.plot_dicts[val_name + '_L1_contour'] = {
@@ -377,35 +395,29 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                         'linestyles': 'dashdot'
                     }
                 else:
-                    log.warning('No data found named {}'.format(L1_Names))
+                    log.warning('No data found named {}'.format(self.L1_Names))
 
-            if val_name in set().union(L1_Names).union(MF_Names)\
-                    .union(offset_diff_names):
+            if val_name in set().union(self.L1_Names).union(self.MF_Names)\
+                    .union(self.offset_diff_names):
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
 
-            if self.plt_optimal_point and val_name in cost_func_Names:
-                x_int = self.proc_data_dict['x_int']
-                y_int = self.proc_data_dict['y_int']
-                z_int = self.proc_data_dict['interpolated_values'][i]
-                argmax = np.unravel_index(z_int.argmax(), z_int.shape)
-                # to be called as e.g. z_int[argmax[0]][argmax[1]]
-                optimal_pars = (
-                    'Optimal Parameters:\n'
-                    'Cost func: {:4.2f}\n'
-                    'Theta_f: {:4.1f}\n'
-                    'lambda_2: {:4.3f}'
-                    .format(z_int[argmax[0]][argmax[1]],
-                        x_int[argmax[1]],
-                        y_int[argmax[0]])
-                )
+            if self.plt_optimal_point and val_name in self.cost_func_Names:
+                optimal_pnt = self.proc_data_dict['optimal_pnt']
+                optimal_pars = 'Optimal Parameters:'
+                for key, val in optimal_pnt.items():
+                    optimal_pars += '\n{}: {:4.3f} {}'.format(key, val['value'], val['unit'])
                 self.plot_dicts[val_name + '_optimal_pars'] = {
                     'ax_id': val_name,
-                    'ypos': 0.95,
-                    'xpos': 1.55,
+                    'ypos': -0.25,
+                    'xpos': 0,
                     'plotfn': self.plot_text,
                     'box_props': 'fancy',
                     'line_kws': {'alpha': 0},
-                    'text_string': optimal_pars}
+                    'text_string': optimal_pars,
+                    'horizontalalignment': 'left',
+                    'verticalaligment': 'top',
+                    'fontsize': 16
+                }
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
@@ -424,8 +436,54 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 interp_method=interp_method)
             self.proc_data_dict['interpolated_values'].append(z_int)
 
+            if self.proc_data_dict['value_names'][i] in self.cost_func_Names:
+                # Find the optimal point acording to the cost function
+                # optimal = max of cost func
+                x = self.proc_data_dict['x']
+                y = self.proc_data_dict['y']
+                z = self.proc_data_dict['measured_values'][i]
+
+                optimal_idx = z.argmin()
+                self.proc_data_dict['optimal_pnt'] = {
+                    self.proc_data_dict['xlabel']: {'value': x[optimal_idx], 'unit': ''},
+                    self.proc_data_dict['ylabel']: {'value': y[optimal_idx], 'unit': ''}
+                }
+                for k, measured_value in enumerate(self.proc_data_dict['measured_values']):
+                    self.proc_data_dict['optimal_pnt'][self.proc_data_dict['value_names'][k]] = {'value': measured_value[optimal_idx], 'unit': self.proc_data_dict['value_units'][k]}
+
         self.proc_data_dict['x_int'] = x_int
         self.proc_data_dict['y_int'] = y_int
+
+    def plot_text(self, pdict, axs):
+        """
+        Helper function that adds text to a plot
+        Overriding here in order to make the text bigger
+        and put it below the the cost function figure
+        """
+        pfunc = getattr(axs, pdict.get('func', 'text'))
+        plot_text_string = pdict['text_string']
+        plot_xpos = pdict.get('xpos', .98)
+        plot_ypos = pdict.get('ypos', .98)
+        fontsize = pdict.get('fontsize', 10)
+        verticalalignment = pdict.get('verticalalignment', 'top')
+        horizontalalignment = pdict.get('horizontalalignment', 'left')
+        fontdict = {
+            'horizontalalignment': horizontalalignment,
+            'verticalalignment': verticalalignment
+        }
+
+        if fontsize is not None:
+            fontdict['fontsize'] = fontsize
+
+        # fancy box props is based on the matplotlib legend
+        box_props = pdict.get('box_props', 'fancy')
+        if box_props == 'fancy':
+            box_props = self.fancy_box_props
+
+        # pfunc is expected to be ax.text
+        pfunc(x=plot_xpos, y=plot_ypos, s=plot_text_string,
+              transform=axs.transAxes,
+              bbox=box_props, fontdict=fontdict)
 
 
 def non_interpolated_overlay(x, y, fig=None, ax=None, transpose=False, **kw):
@@ -466,7 +524,7 @@ def contour_overlay(x, y, z, colormap, transpose=False,
     Args:
         x (array [shape: n*1]):     x data
         y (array [shape: m*1]):     y data
-        z_cond_phase (array [shape: n*m]):     z data for the contour
+        z (array [shape: n*m]):     z data for the contour
         colormap (matplotlib.colors.Colormap or str): colormap to be used
         unit (str): 'deg' is a special case
         vlim (tuple(vmin, vmax)): required for the colormap nomalization
@@ -503,8 +561,3 @@ def contour_overlay(x, y, z, colormap, transpose=False,
     ax.clabel(c, fmt='%.1f', inline='True', fontsize=fontsize)
 
     return fig, ax
-
-
-def space_to_underscore(string: str):
-    string.replace(' ', '_')
-    pass
