@@ -8,7 +8,7 @@ import numpy as np
 from pycqed.analysis.tools.data_manipulation import \
     populations_using_rate_equations
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, plot_fit, \
-    hpluv_anglemap45, hsluv_anglemap45
+    hsluv_anglemap45
 import matplotlib.pyplot as plt
 from pycqed.analysis.fitting_models import CosFunc, Cos_guess, \
     avoided_crossing_freq_shift
@@ -928,7 +928,7 @@ def get_optimal_pnts_indxs(
         phase_thr=10,
         L1_thr=0.3,
         clustering_thr=10,
-        tolerances=[1, 2, 3, 4]):
+        tolerances=[1, 2, 3]):
     """
     target_phase and low L1 need to match roughtly cost function's minimums
 
