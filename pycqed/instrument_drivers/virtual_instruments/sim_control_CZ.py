@@ -179,7 +179,7 @@ class SimControlCZ(Instrument):
 
         self.add_parameter(
             "gates_interval",
-            label="Time interval that separates the the gates if gates_num > 1.",
+            label="Time interval that separates the gates if gates_num > 1.",
             parameter_class=ManualParameter,
             unit='s',
             vals=vals.Numbers(min_value=0),
@@ -201,6 +201,14 @@ class SimControlCZ(Instrument):
             parameter_class=ManualParameter,
             vals=vals.Strings(),
             initial_value="lambda qoi: np.log10((1 - qoi['avgatefid_compsubspace_pc']) * (1 - 0.5) + qoi['L1'] * 0.5)",
+        )
+
+        self.add_parameter(
+            "double_cz_pi_pulses",
+            label="If set to 'no_pi_pulses' or 'with_pi_pulses' will simulate two sequential CZs with or without Pi pulses simulated as an ideal superoperator multiplication.",
+            parameter_class=ManualParameter,
+            vals=vals.Strings(),
+            initial_value="",  # Use empty string to evaluate to false
         )
 
         # for ramsey/Rabi simulations
@@ -255,6 +263,7 @@ class SimControlCZ(Instrument):
     def set_cost_func(self, cost_func_str=None):
         """
         Sets the self.cost_func from the self.cost_func_str string
+        or from the provided string
         """
         if cost_func_str is None:
             cost_func_str = self.cost_func_str()
@@ -280,5 +289,13 @@ def LJP_mod(r, R_min, depth=100., p12=12, p6=6):
     Added here to be used with adaptive sampling of a cost function that
     diverges at zero and might get the adaptive learner stucked from
     samping the rest of the landscape
+    It is a nice wrapping of a cost function because it bounds the
+    [0, +inf] output of any other cost function always between
+    [0, depth] so that there is always an intuition of how good an
+    optimization is doing
+    The derivative at zero is zero and that should help not getting the
+    adaptive sampling stuck
+    arctan could be used for a similar purpose but is more useful in
+    experiment to have high slope at zero
     """
     return LJP(r + R_min, R_min, depth=depth, p12=p12, p6=p6) + depth

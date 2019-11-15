@@ -493,8 +493,26 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             t_final_vec = []
             for input_arglist in input_to_parallelize:
                 result_list = compute_propagator(input_arglist)
-                U_final_vec.append(result_list[0])
-                t_final_vec.append(result_list[1])
+                if self.sim_control_CZ.double_cz_pi_pulses():
+                    # Experimenting with single qubit ideal pi pulses
+                    if self.sim_control_CZ.double_cz_pi_pulses() == 'with_pi_pulses':
+                        pi_single_qubit = qtp.Qobj([[0, 1, 0],
+                                                    [1, 0, 0],
+                                                    [0, 0, 1]])
+                        # pi_pulse = qtp.tensor(pi_single_qubit, qtp.qeye(n_levels_q0))
+                        pi_op = qtp.tensor(pi_single_qubit, pi_single_qubit)
+                        # pi_super_op = qtp.to_super(pi_op)
+                        U_final = result_list[0]
+                        U_final = pi_op * U_final * pi_op * U_final
+                    elif self.sim_control_CZ.double_cz_pi_pulses() == 'no_pi_pulses':
+                        U_final = result_list[0]
+                        U_final = U_final * U_final
+                    t_final = 2 * result_list[1]
+                else:
+                    U_final = result_list[0]
+                    t_final = result_list[1]
+                U_final_vec.append(U_final)
+                t_final_vec.append(t_final)
 
             t_final = t_final_vec[0]  # equal for all entries, we need it to compute phases in the rotating frame
             # needed to compute phases in the rotating frame, not used anymore
