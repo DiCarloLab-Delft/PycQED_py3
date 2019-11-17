@@ -15,6 +15,7 @@ from matplotlib.patches import Rectangle, ConnectionPatch
 golden_mean = (np.sqrt(5)-1.0)/2.0    # Aesthetic ratio
 single_col_figsize = (3.39, golden_mean*3.39)
 double_col_figsize = (6.9, golden_mean*6.9)
+thesis_col_figsize = (12.2/2.54, golden_mean*12.2/2.54)
 
 
 def set_xlabel(axis, label, unit=None, **kw):
