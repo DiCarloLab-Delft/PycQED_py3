@@ -284,7 +284,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                vals=vals.Numbers(),
                                parameter_class=ManualParameter)
             self.add_parameter('cz_length_%s' % this_cz,
-                               vals=vals.Numbers(),
+                               vals=vals.Numbers(0.5e-9, 500e-9),
                                unit='s', initial_value=35e-9,
                                parameter_class=ManualParameter)
             self.add_parameter('cz_lambda_2_%s' % this_cz,
@@ -696,9 +696,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             polycoeffs += self.q_polycoeffs_freq_01_det()
             polycoeffs[2] += self.q_freq_01()
         elif state == '02':
-            polycoeffs += 2*self.q_polycoeffs_freq_01_det()
+            polycoeffs += 2 * self.q_polycoeffs_freq_01_det()
             polycoeffs += self.q_polycoeffs_anharm()
-            polycoeffs[2] += 2*self.q_freq_01()
+            polycoeffs[2] += 2 * self.q_freq_01()
         elif state == '10':
             polycoeffs[2] += freq_10
         elif state == '11':
@@ -1379,7 +1379,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             min_distance=None,
             target_cond_phase=180,
             optimize_phase_q0=False,
-            evaluate_local_optimals=True):
+            evaluate_local_optimals=True,
+            qois=['Cost func', 'Cond phase', 'L1', 'phase_q0', 'phase_q1'],
+            sweep_mode='adaptive'):
         """
         Runs an adaptive sampling of the CZ simulation by sweeping
         cz_theta_f_{which_gate} and and cz_lambda_2_{which_gate}
@@ -1397,7 +1399,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         if sim_control_CZ_pars is None or 'cost_func_str' not in sim_control_CZ_pars:
             cost_func_str = "lambda qoi: LJP_mod({} + qoi['L1'] * 100 / {}, {})".format(
-                            multi_targets_phase_offset(target=target_cond_phase, spacing=180, phase_name="qoi['phi_cond']"),
+                            multi_targets_phase_offset(target=target_cond_phase, spacing=2 * target_cond_phase, phase_name="qoi['phi_cond']"),
                             str(0.05),  # 0.05% L1 equiv. to 1 deg in cond phase
                             str(180))
             sim_control_CZ.set_cost_func(cost_func_str=cost_func_str)
@@ -1409,7 +1411,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         sim_control_CZ.set_cost_func()
 
         # Create a CZ_trajectory_superoperator detector if it doesn't exist
-        qois = ['Cost func', 'Cond phase', 'L1', 'phase_q0']
         detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ,
             fluxlutman_static=fluxlutman_static, qois=qois)
 
@@ -1427,30 +1428,38 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         log.debug('Setting cz_lambda_3_{} to {}.'.format(which_gate, lambda_3))
         self.set('cz_lambda_3_{}'.format(which_gate), lambda_3)
 
-        if min_distance is None:
-            # Allow for regions with sampling denisties up to 5 times
-            # the uniform sampling
-            min_distance = 1 / np.sqrt(n_points) / 5
-
-        loss = adaptive.learner.learner2D.resolution_loss_function(min_distance=min_distance)
-
-        adaptive_pars = {
-            'adaptive_function': adaptive.Learner2D,
-            'n_points': n_points,
-            'bounds': np.array([theta_f_lims, lambda_2_lims]),
-            'goal': lambda l: l.npoints > n_points,
-            'loss_per_triangle': loss
-        }
-        MC.set_adaptive_function_parameters(adaptive_pars)
-
         if label is None:
             time_string = datetime.now().strftime('%f')
             label = 'auto_{}_{}'.format(sim_control_CZ.name, time_string)
 
-        MC.run(
-            label,
-            mode='adaptive',
-            exp_metadata={'adaptive_pars': adaptive_pars})
+        if sweep_mode == 'linear':
+            n_pnts_per_dim = np.int(np.ceil(np.sqrt(n_points)))
+            MC.set_sweep_points(np.linspace(*theta_f_lims, n_pnts_per_dim))
+            MC.set_sweep_points_2D(np.linspace(*lambda_2_lims, n_pnts_per_dim))
+            MC.run(label, mode='2D')
+
+        elif sweep_mode == 'adaptive':
+            if min_distance is None:
+                # Allow for regions with sampling denisties up to 5 times
+                # the uniform sampling
+                min_distance = 1 / np.sqrt(n_points) / 5
+
+            loss = adaptive.learner.learner2D.resolution_loss_function(min_distance=min_distance)
+
+            adaptive_pars = {
+                'adaptive_function': adaptive.Learner2D,
+                'n_points': n_points,
+                'bounds': np.array([theta_f_lims, lambda_2_lims]),
+                'goal': lambda l: l.npoints > n_points,
+                'loss_per_triangle': loss
+            }
+            MC.set_adaptive_function_parameters(adaptive_pars)
+            MC.run(
+                label,
+                mode='adaptive',
+                exp_metadata={'adaptive_pars': adaptive_pars})
+        else:
+            raise ValueError('sweep_mode not recognized!')
 
         cluster_from_interp = True
 
@@ -1470,24 +1479,21 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             waveform_flux_lm_name=self.name,
             clims={
                 'L1': [0, 1],
-                'missing_fraction': [0, 2],
-                'Cond phase': [0, 360],
-                'phase_q0': [0, 360],
                 'Cost func': [0, 100]
             },
             target_cond_phase=target_cond_phase
         )
         print('Adaptive sampling finished.')
-        print(coha.get_readable_str(optimal_end=2))
+        print(coha.get_readable_optimals(optimal_end=2))
 
         if evaluate_local_optimals and cluster_from_interp:
             eval_opt_pvs = list(coha.proc_data_dict['optimal_pars_values'])
             eval_opt_mvs = list(coha.proc_data_dict['optimal_measured_values'])
             print('Evaluating best local minima...')
             opt_num = len(eval_opt_pvs)
-            eval_max = np.min([opt_num, 4])
+            eval_max = np.min([opt_num, 7])
             if eval_max < opt_num:
-                log.debug('Evaluating only the best 3 optimals!'
+                log.debug('Evaluating only the best 7 optimals!'
                     'The rest will contain interpolated measured values!')
             for opt_idx in range(eval_max):
                 adaptive_pars = {'adaptive_function': nelder_mead,
@@ -1508,15 +1514,17 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
                 if label is None:
                     time_string = datetime.now().strftime('%f')
-                    label = 'auto_{}_eval_{}_{}'.format(sim_control_CZ.name, opt_idx, time_string)
+                    label_eval = 'auto_{}_eval_{}_{}'.format(sim_control_CZ.name, opt_idx, time_string)
+                else:
+                    label_eval = label + '_#{}'.format(opt_idx)
 
                 MC.run(
-                    label,
+                    label_eval,
                     mode='adaptive',
                     exp_metadata={'adaptive_pars': adaptive_pars})
 
                 eval_coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
-                    label=label,
+                    label=label_eval,
                     close_figs=True,
                     plt_orig_pnts=True,
                     plt_contour_L1=False,
@@ -1529,9 +1537,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                     waveform_flux_lm_name=self.name,
                     clims={
                         'L1': [0, 1],
-                        'missing_fraction': [0, 2],
-                        'Cond phase': [0, 360],
-                        'phase_q0': [0, 360],
                         'Cost func': [0, 100]
                     },
                     target_cond_phase=target_cond_phase
@@ -1543,7 +1548,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if optimize_phase_q0:
 
             cost_func_str = "lambda qoi: LJP_mod({} + qoi['L1'] * 100 / {} + {} / {}, {})".format(
-                multi_targets_phase_offset(target=target_cond_phase, spacing=180, phase_name="qoi['phi_cond']"),
+                multi_targets_phase_offset(target=target_cond_phase, spacing=2 * target_cond_phase, phase_name="qoi['phi_cond']"),
                 str(0.05),  # 0.05% L1 equiv. to 1 deg in cond phase
                 multi_targets_phase_offset(target=0, spacing=90, phase_name="qoi['phase_q0']"),
                 str(1),
@@ -1638,6 +1643,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             else:
                 print(eval_opt_pvs)
                 print(eval_opt_mvs)
+                print(coha.get_readable_optimals(optimal_pars_values=eval_opt_pvs,
+                    optimal_measured_values=eval_opt_mvs))
                 return eval_opt_pvs, eval_opt_mvs
         else:
             print('\nFinished optimizations with:')
