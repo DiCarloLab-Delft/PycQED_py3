@@ -208,7 +208,7 @@ def compute_propagator(arglist):
             sampling_rate=fluxlutman.sampling_rate())    # return in terms of theta
         epsilon = wfl.theta_to_eps(thetawave, q_J2)
         amp = fluxlutman.calc_eps_to_amp(epsilon, state_A='11', state_B='02', which_gate=which_gate)
-                 # transform detuning frequency to (positive) amplitude
+        # transform detuning frequency to (positive) amplitude
     else:
         amp = get_f_pulse_double_sided(fluxlutman,theta_i, which_gate=which_gate)
 
@@ -227,7 +227,7 @@ def compute_propagator(arglist):
     amp_interp=interp1d(tlist_temp,amp_temp)
     amp=amp_interp(tlist_new)
 
-    if czd_double_sided and sim_control_CZ.waiting_at_sweetspot()!=0:
+    if czd_double_sided and sim_control_CZ.waiting_at_sweetspot() > 0:
         tlist_new, amp = czf.add_waiting_at_sweetspot(tlist_new,amp, sim_control_CZ.waiting_at_sweetspot())
 
     # Apply voltage scaling
@@ -300,17 +300,20 @@ def compute_propagator(arglist):
     #         amp_final = np.append(amp_final, amp_append)
 
     if gates_num > 1:
-        # This is intended to make the simulation faster by skipping
-        # all the amp = 0 steps, verified to encrease sim speed
-        # 4.7s/data point -> 4.0s/data point
-        # Errors in simulation outcomes are < 1e-10
+        if gates_interval > 0:
+            # This is intended to make the simulation faster by skipping
+            # all the amp = 0 steps, verified to encrease sim speed
+            # 4.7s/data point -> 4.0s/data point
+            # Errors in simulation outcomes are < 1e-10
+            actual_gates_interval = np.arange(0, gates_interval, sim_step_new)[-1] + sim_step_new
 
-        actual_gates_interval = np.arange(0, gates_interval, sim_step_new)[-1] + sim_step_new
-
-        # We add an extra small step to ensure the amp signal goes to
-        # zero first
-        interval_append = np.concatenate(([sim_step_new, actual_gates_interval - sim_step_new], intervals_list))
-        amp_append = np.concatenate(([0, 0], amp_final))
+            # We add an extra small step to ensure the amp signal goes to
+            # zero first
+            interval_append = np.concatenate(([sim_step_new, actual_gates_interval - sim_step_new], intervals_list))
+            amp_append = np.concatenate(([0, 0], amp_final))
+        else:
+            interval_append = intervals_list
+            amp_append = amp_final
 
         # Append arbitrary number of same gate
         for gate in range(gates_num - 1):
@@ -493,7 +496,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             t_final_vec = []
             for input_arglist in input_to_parallelize:
                 result_list = compute_propagator(input_arglist)
-                if self.sim_control_CZ.double_cz_pi_pulses():
+                if self.sim_control_CZ.double_cz_pi_pulses() != '':
                     # Experimenting with single qubit ideal pi pulses
                     if self.sim_control_CZ.double_cz_pi_pulses() == 'with_pi_pulses':
                         pi_single_qubit = qtp.Qobj([[0, 1, 0],
@@ -528,7 +531,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             U_superop_average = sum(U_final_vec)              # computing resulting average propagator
             # print(czf.verify_CPTP(U_superop_average))
 
-            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, fluxlutman_static=self.fluxlutman_static, which_gate=self.sim_control_CZ.which_gate())
+            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average, t_final=t_final, fluxlutman=self.fluxlutman, fluxlutman_static=self.fluxlutman_static, which_gate=self.sim_control_CZ.which_gate())
 
             # if we look only for the minimum avgatefid_pc in the heat maps,
             # then we optimize the search via higher-order cost function
