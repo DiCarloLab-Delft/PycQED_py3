@@ -1626,13 +1626,13 @@ class QuDev_transmon(Qubit):
         return ch_1_min, ch_2_min
 
     def calibrate_drive_mixer_skewness(self, update=True, amplitude=0.5, 
-                                       trigger_sep=5e-6,
+                                       trigger_sep=5e-6, no_improv_break=50,
                                        initial_stepsize=(0.15, 10)):
         MC = self.instr_mc.get_instr()
         ad_func_pars = {'adaptive_function': opti.nelder_mead,
                         'x0': [self.ge_alpha(), self.ge_phi_skew()],
                         'initial_step': initial_stepsize,
-                        'no_improv_break': 12,
+                        'no_improv_break': no_improv_break,
                         'minimize': True,
                         'maxiter': 500}
         MC.set_sweep_functions([self.ge_alpha, self.ge_phi_skew])
