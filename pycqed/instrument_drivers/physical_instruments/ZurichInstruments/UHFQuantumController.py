@@ -214,7 +214,7 @@ class UHFQC(zibase.ZI_base_instrument):
 
         # Used for extra DIO output to CC for debugging
         self._diocws = None
-        
+
         # Holds the DIO calibration delay
         self._dio_calibration_delay = 0
 
@@ -1177,16 +1177,16 @@ setUserReg(4, err_cnt);"""
             ' setDIO(codeword);\n'+
             ' wait(wait_delay);\n' +
             ' setDIO(2048);\n'+
-            '}\n' 
-            ) 
-        
+            '}\n'
+            )
+
         # Define the behavior of our program
         self._reset_awg_program_features()
 
         self._awg_program[0] = sequence
         self._awg_needs_configuration[0] = True
         # self.awg_string(sequence, timeout=timeout)
-        
+
     def awg_sequence_acquisition_and_pulse(self, Iwave=None, Qwave=None, acquisition_delay=0, dig_trigger=True) -> None:
         if Iwave is not None and (np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0):
             raise KeyError(
@@ -1527,7 +1527,7 @@ setTrigger(0);
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
-        
+
         # Make sure the DIO calibration mask is configured
         if self._dio_calibration_mask is None:
             raise ValueError('DIO calibration bit mask not defined.')
@@ -1586,7 +1586,7 @@ setTrigger(0);
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
-        
+
         # Make sure the DIO calibration mask is configured
         if self._dio_calibration_mask is None:
             raise ValueError('DIO calibration bit mask not defined.')
@@ -1705,7 +1705,7 @@ while (1) {
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False, repetitions=1):
         log.info('Calibrating DIO delays')
         if verbose: print("Calibrating DIO delays")
-        if feedline is None: 
+        if feedline is None:
             raise ziUHFQCDIOCalibrationError('No feedline specified for calibration')
 
         CC_model = CC.IDN()['model']
@@ -1717,6 +1717,10 @@ while (1) {
                 CCL=CC, feedline=feedline, verbose=verbose)
         elif 'HDAWG8' in CC_model:
             self._prepare_HDAWG8_dio_calibration(HDAWG=CC, verbose=verbose)
+        elif 'cc' in CC_model:
+            # expected_sequence = self._prepare_CC_dio_calibration(
+            #     CC=CC, verbose=verbose)
+            return
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 

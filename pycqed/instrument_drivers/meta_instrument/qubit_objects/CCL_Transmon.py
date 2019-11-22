@@ -2583,7 +2583,7 @@ class CCLight_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC(),
-            trigger_idx=0 if self.instr_CC()=="CCL" else 15,
+            trigger_idx=15 if self.instr_CC()=="QCC" else 0,
             wait_time_ns=wait_time_ns)
 
         CCL.eqasm_program(p.filename)
