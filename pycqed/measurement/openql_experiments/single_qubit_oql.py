@@ -109,6 +109,8 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
         spec_instr = 'spec'
     elif cc=='QCC':
         spec_instr = 'sf_square'
+    elif cc=='cc':
+        spec_instr = 'spec'
     else:
         raise ValuerError('CC type not understood: {}'.format(cc))
 
@@ -257,7 +259,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}".format(i+j//2), p) # FIXME: generates 2 identical kernel names if js=2. This does work, but is still undesirable
+            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
