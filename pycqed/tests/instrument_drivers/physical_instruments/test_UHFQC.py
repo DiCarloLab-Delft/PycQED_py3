@@ -160,3 +160,9 @@ class Test_UHFQC(unittest.TestCase):
         self.uhf.qas_0_rotations_3(1-1j)
         assert self.uhf.qas_0_rotations_3() == (1-1j)
         self.uhf.reset_rotation_params
+
+    def test_close_open(self):
+        # Close the instrument, then reopen to make sure that we can reconnect
+        Test_UHFQC.uhf.close()
+        self.setup_class()
+        self.assertEqual(Test_UHFQC.uhf.devname, 'dev2109')

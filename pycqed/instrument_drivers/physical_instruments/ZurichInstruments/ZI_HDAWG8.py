@@ -125,6 +125,11 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         """
         t0 = time.time()
         super().__init__(name=name, device=device, interface=interface, server=server, port=port, num_codewords=num_codewords, **kw)
+        # Set default waveform length to 20 ns at 2.4 GSa/s
+        self._default_waveform_length = 48
+        
+        # Holds the DIO calibration delay
+        self._dio_calibration_delay = 0
 
         # show some info
         log.info('{}: DIO interface found in mode {}'
@@ -152,6 +157,41 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
 
         t1 = time.time()
         log.info(f'{self.devname}: Initialized ZI_HDAWG in {t1 - t0}s')
+
+    def _add_extra_parameters(self):
+        """
+        We add a few additional custom parameters on top of the ones defined in the device files. These are:
+        timeout - A specific timeout value in seconds used for the various timeconsuming operations on the device
+          such as waiting for an upload to complete.
+        cfg_num_codewords - determines the maximum number of codewords to be supported by the program that will
+          be uploaded using the "upload_codeword_program" method.
+        cfg_codeword_protocol - determines the specific codeword protocol to use, for example 'microwave' or 'flux'.
+          It determines which bits transmitted over the 32-bit DIO interface are used as actual codeword bits.
+        awgs_[0-3]_sequencer_program_crc32_hash - CRC-32 hash of the currently uploaded sequencer program to enable
+          changes in program to be detected.
+        dio_calibration_delay - the delay that is programmed on the DIO lines as part of the DIO calibration
+            process in order for the instrument to reliably sample data from the CC. Can be used to detect
+            unexpected changes in timing of the entire system. The parameter can also be used to force a specific
+            delay to be used on the DIO although that is not generally recommended.
+        """
+        super()._add_extra_parameters()
+
+        self.add_parameter(
+            'cfg_codeword_protocol', initial_value='identical',
+            vals=validators.Enum('identical', 'microwave', 'new_microwave', 'new_novsm_microwave', 'flux'), docstring=(
+                'Used in the configure codeword method to determine what DIO'
+                ' pins are used in for which AWG numbers.'),
+            parameter_class=ManualParameter)
+
+        self.add_parameter('dio_calibration_delay',
+                    set_cmd=self._set_dio_calibration_delay,
+                    get_cmd=self._get_dio_calibration_delay,
+                    unit='',
+                    label='DIO Calibration delay',
+                    docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
+                    'to be applied on the DIO interface in order to achieve reliable sampling'
+                    ' of the codewords. The valid range is 0 to 15.',
+                    vals=validators.Ints())
 
     def snapshot_base(self, update: bool=False,
                       params_to_skip_update =None,
@@ -401,7 +441,8 @@ while (1) {
         # Turn on device
         ####################################################
         time.sleep(.05)
-        self.daq.setInt('/' + self.devname + '/awgs/*/enable', 1)
+        for awg_nr in range(int(self._num_channels()//2)):
+            self.set('awgs_{}_enable'.format(awg_nr), 1)
 
         # Disable all function generators
         for param in [key for key in self.parameters.keys() if
@@ -433,20 +474,23 @@ while (1) {
         # AWGS/0/DIO/DATA
 
     ##########################################################################
-    # 'private' functions: parameter support for codewords, override ZI_base_instrument
+    # 'private' functions: parameter support for DIO calibration delay
     ##########################################################################
 
-    def _add_extra_parameters(self) -> None:
-        super()._add_extra_parameters()
+    def _set_dio_calibration_delay(self, value):
+        # Sanity check the value
+        if value < 0 or value > 15:
+            raise zibase.ziValueError('Trying to set DIO calibration delay to invalid value! Expected value in range 0 to 15. Got {}.'.format(value))
 
-        self.add_parameter(
-            'cfg_codeword_protocol',
-            initial_value='identical',
-            vals=validators.Enum('identical', 'microwave', 'flux', 'new_microwave', 'new_novsm_microwave'),
-            docstring=(
-                'Used in the configure codeword method to determine what DIO'
-                ' pins are used in for which AWG numbers.'),
-            parameter_class=ManualParameter)
+        log.info('Setting DIO calibration delay to {}'.format(value))
+        # Store the value
+        self._dio_calibration_delay = value
+        
+        # And configure the delays
+        self.setd('raw/dios/0/delays/*', self._dio_calibration_delay)
+
+    def _get_dio_calibration_delay(self):
+        return self._dio_calibration_delay
 
     ##########################################################################
     # 'private' functions: DIO calibration
@@ -774,7 +818,28 @@ while (1) {
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
-        self.calibrate_dio_protocol(expected_sequence, verbose, repetitions)
-        # If successful return True
+        # Make sure the configuration is up-to-date
+        self.assure_ext_clock()
+        self.upload_codeword_program()
+
+        for awg, sequence in expected_sequence:
+            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence), verbose=verbose):
+                raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
+
+        valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
+        if len(valid_delays) == 0:
+            raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
+
+        min_valid_delay = min(valid_delays)
+
+        # Print information
+        if verbose: print("  Valid delays are {}".format(valid_delays))
+        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+
+        # And configure the delays
+        self._set_dio_calibration_delay(min_valid_delay)
+
+        # If successful clear all errors and return True
+        self.clear_errors()
         return True
 
