@@ -350,9 +350,9 @@ class UHFQC(zibase.ZI_base_instrument):
         Checks that the correct options are installed on the instrument.
         """
         options = self.gets('features/options').split('\n')
-        if 'QA' not in options:
+        if 'QA' not in options and 'QC' not in options:
             raise zibase.ziOptionsError(
-                'Device {} is missing the QA option!'.format(self.devname))
+                'Device {} is missing the QA or QC option!'.format(self.devname))
         if 'AWG' not in options:
             raise zibase.ziOptionsError(
                 'Device {} is missing the AWG option!'.format(self.devname))
@@ -1719,4 +1719,7 @@ setTrigger(0);
 
         # And configure the delays
         self.setd('raw/dios/0/delay', min_valid_delay)
+
+        # Clear all detected errors (caused by DIO timing calibration)
+        self.clear_errors()
 

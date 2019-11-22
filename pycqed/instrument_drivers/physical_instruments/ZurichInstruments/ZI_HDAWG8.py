@@ -749,5 +749,8 @@ while (1) {
 
         # And configure the delays
         self.setd('raw/dios/0/delays/*', min_valid_delay)
-        # If succesful return True
+
+        # If succesful clear all errors and return True
+        self.clear_errors()
+        
         return True
