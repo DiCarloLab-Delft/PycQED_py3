@@ -93,7 +93,7 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
 
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
                            platf_cfg: str, trigger_idx: int,
-                           wait_time_ns: int = 0, cc: str='CCL'):
+                           wait_time_ns: int = 0, cc: str='CCL',spec_instr:float ='spec'):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
     this one triggers the 0th trigger port of the CCLight and usus the zeroth

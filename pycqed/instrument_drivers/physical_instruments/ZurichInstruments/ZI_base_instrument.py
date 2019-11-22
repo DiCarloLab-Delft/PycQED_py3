@@ -636,7 +636,7 @@ class ZI_base_instrument(Instrument):
         # Handle absolute path
         self.use_setVector = "setVector" in dir(self.daq)
 
-        # Connect a device (if not already connected)
+        # Connect a device
         if not self._is_device_connected(device):
             log.info(f'Connecting to device {device}')
             self.daq.connectDevice(device, interface)

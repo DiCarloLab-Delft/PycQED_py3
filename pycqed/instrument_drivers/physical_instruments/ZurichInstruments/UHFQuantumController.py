@@ -225,6 +225,9 @@ class UHFQC(zibase.ZI_base_instrument):
                          server=server, port=port, num_codewords=2**nr_integration_channels,
                          **kw)
 
+        # Disable disfunctional parameters from snapshot
+        self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable'])
+
         # Set default waveform length to 20 ns at 1.8 GSa/s
         self._default_waveform_length = 32
 
@@ -233,6 +236,56 @@ class UHFQC(zibase.ZI_base_instrument):
 
         t1 = time.time()
         log.info(f'{self.devname}: Initialized UHFQC in {t1 - t0}s')
+
+     ##########################################################################
+    # Overriding Qcodes methods
+    ##########################################################################
+
+    def snapshot_base(self, update: bool=False,
+                      params_to_skip_update =None,
+                      params_to_exclude = None ):
+        """
+        State of the instrument as a JSON-compatible dict.
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+        Returns:
+            dict: base snapshot
+        """
+
+        if params_to_exclude is None:
+            params_to_exclude = self._params_to_exclude
+
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                pass
+            elif params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+                try:
+                    snap['parameters'][name] = param.snapshot(update=update_par)
+                except:
+                    logging.info("Snapshot: Could not update parameter: {}".format(name))
+                    snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
+        return snap
 
     ##########################################################################
     # Overriding Qcodes methods
@@ -406,7 +459,7 @@ class UHFQC(zibase.ZI_base_instrument):
 
         # If the program doesn't need waveforms, just return here
         if not self._awg_program_features['waves']:
-            return
+            return program
 
         # If the program needs cases, but none are defined, flag it as an error
         if self._awg_program_features['cases'] and self._cases is None:
@@ -501,7 +554,7 @@ class UHFQC(zibase.ZI_base_instrument):
             self.dios_0_drive(0x3)  # Drive DIO bits 15 to 0
             self.dios_0_extclk(2)  # 50 MHz clocking of the DIO
             self.awgs_0_dio_strobe_slope(0)  # no edge, replaced by dios_0_extclk(2)
-            self.awgs_0_dio_strobe_index(15)  # NB: 15 for QCC, 31 for CCL. Irrelevant now we use 50 MHz clocking
+            self.awgs_0_dio_strobe_index(15)  # NB: 15 for QCC (was 31 for CCL). Irrelevant now we use 50 MHz clocking
             self.awgs_0_dio_valid_polarity(2)  # high polarity
             self.awgs_0_dio_valid_index(16)
 
@@ -532,7 +585,7 @@ class UHFQC(zibase.ZI_base_instrument):
         self.sigouts_1_enables_0(0)
         self.sigouts_1_enables_1(0)
 
-    ##########################################################################
+##########################################################################
     # Private methods
     ##########################################################################
 
@@ -651,9 +704,10 @@ setUserReg(4, err_cnt);"""
         """
         ch = awg_nr*2
         wf_table = []
-        for case in self.cases():
-            wf_table.append((zibase.gen_waveform_name(ch, case),
-                             zibase.gen_waveform_name(ch+1, case)))
+        if self.cases() is not None:
+            for case in self.cases():
+                wf_table.append((zibase.gen_waveform_name(ch, case),
+                                 zibase.gen_waveform_name(ch+1, case)))
         return wf_table
 
     ##########################################################################
@@ -1145,7 +1199,7 @@ setUserReg(4, err_cnt);"""
             'cvar i = 0;\n'+
             'const length = {};\n'.format(len(codewords))
             )
-        sequence = sequence + self.array_to_combined_vector_string(
+        sequence = sequence + array2vect(
                 codewords, "codewords")
         # starting the loop and switch statement
         sequence = sequence +(
@@ -1159,7 +1213,12 @@ setUserReg(4, err_cnt);"""
             '}\n'
             )
 
-        self.awg_string(sequence, timeout=timeout)
+        # Define the behavior of our program
+        self._reset_awg_program_features()
+
+        self._awg_program[0] = sequence
+        self._awg_needs_configuration[0] = True
+        # self.awg_string(sequence, timeout=timeout)
 
     def awg_sequence_acquisition_and_pulse(self, Iwave=None, Qwave=None, acquisition_delay=0, dig_trigger=True) -> None:
         if Iwave is not None and (np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0):
@@ -1625,7 +1684,6 @@ setTrigger(0);
             self._dio_calibration_mask = 0x3
         else:
             raise ValueError('Invalid feedline {} selected for calibration.'.format(feedline))
-
 
     def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
 
