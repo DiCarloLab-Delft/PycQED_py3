@@ -176,7 +176,7 @@ def compute_propagator(arglist):
     fluxlutman_static = arglist['fluxlutman_static']
     sim_control_CZ = arglist['sim_control_CZ']
     which_gate = sim_control_CZ.which_gate()
-    gates_num = sim_control_CZ.gates_num()  # repeat the same gate this number of times
+    gates_num = int(sim_control_CZ.gates_num())  # repeat the same gate this number of times
     gates_interval = sim_control_CZ.gates_interval()  # idle time between repeated gates
 
     q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
