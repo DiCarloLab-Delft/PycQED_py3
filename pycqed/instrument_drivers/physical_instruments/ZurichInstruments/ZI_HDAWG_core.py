@@ -89,7 +89,13 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         """
         t0 = time.time()
         super().__init__(name=name, device=device, interface=interface, server=server, port=port, num_codewords=num_codewords, **kw)
-        self._default_waveform_length = 48  # Override default waveform length to 20 ns at 2.4 GSa/s
+
+        # Set default waveform length to 20 ns at 2.4 GSa/s
+        self._default_waveform_length = 48
+
+        # show some info
+        log.info('{}: DIO interface found in mode {}'
+                 .format(self.devname, 'CMOS' if self.get('dios_0_interface') == 0 else 'LVDS')) # NB: mode is persistent across device restarts
 
         # NB: we don't want to load defaults automatically, but leave it up to the user
 
@@ -98,7 +104,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         self.seti('raw/error/blinkforever', 1)
 
         t1 = time.time()
-        log.info('{}: Initialized ZI_HDAWG_core in {}s'.format(self.devname, t1-t0))
+        print('Initialized ZI_HDAWG_core', self.devname, 'in %.2fs' % (t1-t0))
 
     def _check_devtype(self):
         if self.devtype != 'HDAWG8' and self.devtype != 'HDAWG4':
@@ -174,10 +180,9 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         #   0: internal (commanded so, or because of failure to sync to external clock)
         source = self.system_clocks_referenceclock_source()
         if source == 1:
-            log.info(f'{self.devname}: Already using external clock')
             return
 
-        log.info(f'{self.devname}: Switching to external clock. This could take a while')
+        print('Switching to external clock. This could take a while!')
         while True:
             self.system_clocks_referenceclock_source(1)
             while True:
@@ -194,10 +199,10 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
                     print('X', end='')
                 time.sleep(0.1)
             if self.system_clocks_referenceclock_source() != 1:
-                log.error(f'{self.devname}: Switching to external clock failed. Trying again')
+                print(' Switching to external clock failed. Trying again.')
             else:
                 break
-        log.info(f'{self.devname}: Successfully switched to external clock')
+        print('\nDone')
 
     # FIXME: add check_virt_mem_use(self)
     # AWGS/0/SEQUENCER/MEMORYUSAGE
@@ -216,7 +221,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
 
         # First report if anything has changed
         if errors['new_errors'] > 0:
-            log.warning('{}: Found {} new errors'.format(self.devname, errors['new_errors']))
+            log.warning('{}: Found {} new errors!'.format(self.devname, errors['new_errors']))
 
         # Asserted in case errors were found
         found_errors = False
@@ -233,16 +238,16 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
                     'count'   : count,
                     'severity': severity,
                     'message' : message}
-                log.warning(f'{self.devname}: Code {code}: "{message}" ({severity})')
+                log.warning('{}: Code {}: "{}" ({})'.format(self.devname, code, message, severity))
             else:
                 # Optionally skip the error completely
                 if code in self._errors_to_ignore:
-                    log.warning(f'{self.devname}: {message} ({code}/{severity})')
+                    log.warning('{}: {} ({}/{})'.format(self.devname, message, code, severity))
                     continue
 
                 # Check if there are new errors
                 if code not in self._errors or count > self._errors[code]['count']:
-                    log.error(f'{self.devname}: {message} ({code}/{severity})')
+                    log.error('{}: {} ({}/{})'.format(self.devname, message, code, severity))
                     found_errors = True
 
                 if code in self._errors:
@@ -254,7 +259,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
                         'message' : message}
 
         if found_errors:
-            log.error('Errors detected during run-time!')
+            raise zibase.ziRuntimeError('Errors detected during run-time!')
 
     def clear_errors(self):
         self.seti('raw/error/clear', 1)
@@ -307,7 +312,6 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
     # 'private' functions, internal to the driver
     ##########################################################################
 
-    # FIXME: no longer used
     def _set_dio_delay(self, delay):
         """
         The function sets the DIO delay for the instrument. The valid delay range is
