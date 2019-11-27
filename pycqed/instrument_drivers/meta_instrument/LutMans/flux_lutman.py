@@ -232,7 +232,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                initial_value=6e9,
                                unit='Hz', parameter_class=ManualParameter)
             self.add_parameter(
-                'q_J2_%s' % this_cz, vals=vals.Numbers(), unit='Hz',
+                'q_J2_%s' % this_cz, vals=vals.Numbers(1e3, 500e6), unit='Hz',
                 docstring='effective coupling between the 11 and 02 states.',
                 # initial value is chosen to not raise errors
                 initial_value=15e6, parameter_class=ManualParameter)
@@ -1318,7 +1318,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         for this_cz in ['NE', 'NW', 'SW', 'SE']:
             self.add_parameter('bus_freq_%s' % this_cz,
                                docstring='[CZ simulation] Bus frequency.',
-                               vals=vals.Numbers(),
+                               vals=vals.Numbers(0.1e9, 1000e9),
+                               initial_value=7.77e9,
                                parameter_class=ManualParameter)
             self.add_parameter('instr_sim_control_CZ_%s' % this_cz,
                                docstring='Noise and other parameters for CZ simulation.',
@@ -1386,20 +1387,34 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Runs an adaptive sampling of the CZ simulation by sweeping
         cz_theta_f_{which_gate} and and cz_lambda_2_{which_gate}
         """
+        # Sanity checks for the parameters
+        sim_pars_sanity_check(MC.station, self, fluxlutman_static, which_gate)
+
         # Create a SimControlCZ virtual instrument if it doesn't exist or get it
-        sim_control_CZ_name = self.get('instr_sim_control_CZ_{}'.format(which_gate))
-        if sim_control_CZ_name is not None:
-            sim_control_CZ = self.parameters['instr_sim_control_CZ_{}'.format(which_gate)].get_instr()
+        sim_control_CZ_par_name = 'instr_sim_control_CZ_{}'.format(which_gate)
+        sim_control_CZ_name = self.get(sim_control_CZ_par_name)
+        found_name = sim_control_CZ_name is not None
+        found_instr = self._all_instruments.get(sim_control_CZ_name) is not None
+        if found_name and found_instr:
+            sim_control_CZ = self.find_instrument(sim_control_CZ_name)
             assert which_gate == sim_control_CZ.which_gate()
         else:
-            sim_control_CZ = scCZ.SimControlCZ('sim_control_CZ_{}_{}'.format(which_gate, self.name))
+            intr_name = 'sim_control_CZ_{}_{}'.format(which_gate, self.name)
+            sim_control_CZ = scCZ.SimControlCZ(intr_name)
             sim_control_CZ.which_gate(which_gate)
             MC.station.add_component(sim_control_CZ)
-            self.set('instr_sim_control_CZ_{}'.format(which_gate), sim_control_CZ.name)
+            if found_name:
+                log.debug('Changing {} from {} to {}.'.format(
+                    sim_control_CZ_par_name,
+                    sim_control_CZ_name,
+                    intr_name))
+            self.set(sim_control_CZ_par_name, sim_control_CZ.name)
 
         if sim_control_CZ_pars is None or 'cost_func_str' not in sim_control_CZ_pars:
             cost_func_str = "lambda qoi: LJP_mod({} + qoi['L1'] * 100 / {}, {})".format(
-                            multi_targets_phase_offset(target=target_cond_phase, spacing=2 * target_cond_phase, phase_name="qoi['phi_cond']"),
+                            multi_targets_phase_offset(target=target_cond_phase,
+                                spacing=2 * target_cond_phase,
+                                phase_name="qoi['phi_cond']"),
                             str(0.05),  # 0.05% L1 equiv. to 1 deg in cond phase
                             str(180))
             sim_control_CZ.set_cost_func(cost_func_str=cost_func_str)
@@ -1803,3 +1818,54 @@ def phase_corr_sine_series_half(a_i, nr_samples):
 
 def roundup1024(n):
     return int(np.ceil(n/1024)*1024)
+
+
+def sim_pars_sanity_check(station, flm, flm_static, which_gate):
+    dummy_flm_default_name = 'dummy_flm_default'
+    if dummy_flm_default_name in flm._all_instruments:
+        dummy_flm_default = flm.find_instrument(dummy_flm_default_name)
+
+    if dummy_flm_default is None:
+        dummy_flm_default = HDAWG_Flux_LutMan(dummy_flm_default_name)
+        station.add_component(dummy_flm_default)
+    which_gate_pars = {
+        'bus_freq_',
+        'czd_double_sided_',
+        'cz_length_',
+        'q_freq_10_',
+        'q_J2_',
+    }
+    msg_str = '\n{} has default value!'
+
+    for par_prefix in which_gate_pars:
+        par_name = par_prefix + which_gate
+        val = flm.get(par_name)
+        val_default = dummy_flm_default.get(par_name)
+        if np.equal(val, val_default):
+            log.warning(msg_str.format(par_name))
+
+    np_pars = {
+        'q_polycoeffs_anharm',
+        'q_polycoeffs_freq_01_det'
+    }
+    for par_name in np_pars:
+        val = flm.get(par_name)
+        val_default = dummy_flm_default.get(par_name)
+        if np.any(np.equal(val, val_default)):
+            log.warning(msg_str.format(par_name))
+
+    pars = {'q_freq_01'}
+    for par_name in pars:
+        val = flm.get(par_name)
+        val_default = dummy_flm_default.get(par_name)
+        if np.equal(val, val_default):
+            log.warning(msg_str.format(par_name))
+
+    static_np_pars = {'q_polycoeffs_anharm'}
+    for par_name in static_np_pars:
+        val = flm_static.get(par_name)
+        val_default = dummy_flm_default.get(par_name)
+        if np.any(np.equal(val, val_default)):
+            log.warning(msg_str.format(par_name))
+
+    return True
