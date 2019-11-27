@@ -44,7 +44,7 @@ def martinis_flux_pulse(length: float,
 
     """
     if theta_f < theta_i:
-        log.warning(
+        log.debug(
             'theta_f ({:.2f} deg) < theta_i ({:.2f} deg):'.format(
                 np.rad2deg(theta_f), np.rad2deg(theta_i))
             + 'final coupling weaker than initial coupling')
@@ -76,7 +76,7 @@ def martinis_flux_pulse(length: float,
     # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
     theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi - .01)
     if not np.array_equal(theta_wave, theta_wave_clipped):
-        log.warning(
+        log.debug(
             'Martinis flux wave form has been clipped to [{}, 180 deg]'
             .format(np.rad2deg(theta_i)))
 
