@@ -2326,8 +2326,10 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(freqs)
         if nested_resonator_calibration:
             dac_par = swf.Nested_resonator_tracker(qubit=self,
-                                                   nested_MC=self.instr_nested_MC.get_instr(), freqs=resonator_freqs,
-                                                   par=dac_par, use_min = nested_resonator_calibration_use_min)
+                                                   nested_MC=self.instr_nested_MC.get_instr(),
+                                                   freqs=resonator_freqs,
+                                                   par=dac_par,
+                                                   use_min=nested_resonator_calibration_use_min)
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)

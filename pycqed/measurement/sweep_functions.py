@@ -1158,10 +1158,10 @@ class FLsweep(Soft_Sweep):
         self.awg_model_QWG = self.AWG.IDN()['model'] == 'QWG'
 
 
-    def set_parameter(self, val): 
-        if self.awg_model_QWG: 
+    def set_parameter(self, val):
+        if self.awg_model_QWG:
             self.set_parameter_QWG(val)
-        else: 
+        else:
             self.set_parameter_HDAWG(val)
 
     def set_parameter_HDAWG(self, val):
@@ -1172,9 +1172,9 @@ class FLsweep(Soft_Sweep):
         self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name,
                                                    regenerate_waveforms=True)
         self.AWG.start()
-        return 
+        return
 
-    def set_parameter_QWG(self, val): 
+    def set_parameter_QWG(self, val):
         self.par(val)
         self.AWG.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
@@ -1183,12 +1183,11 @@ class FLsweep(Soft_Sweep):
         self.AWG.start()
 
 
-
 class Nested_resonator_tracker(Soft_Sweep):
     """
     For resonator tr.
     """
-    def __init__(self, qubit, nested_MC, par, use_min = False, freqs=None, **kw):
+    def __init__(self, qubit, nested_MC, par, use_min=False, freqs=None, **kw):
         super().__init__(**kw)
         self.qubit = qubit
         self.freqs = freqs
@@ -1201,12 +1200,10 @@ class Nested_resonator_tracker(Soft_Sweep):
 
     def set_parameter(self, val):
         self.par(val)
-        self.qubit.find_resonator_frequency(freqs=self.freqs, MC=self.nested_MC,use_min = self.use_min)
+        self.qubit.find_resonator_frequency(freqs=self.freqs, MC=self.nested_MC, use_min=self.use_min)
         self.qubit._prep_ro_sources()
         spec_source = self.qubit.instr_spec_source.get_instr()
         spec_source.on()
-
-
 
 
 class tim_flux_latency_sweep(Soft_Sweep):
@@ -1259,6 +1256,6 @@ class tim_mw_latency_sweep(Soft_Sweep):
         self.dev.tim_mw_latency_3(val)
         self.dev.tim_mw_latency_4(val)
         self.dev.prepare_timing()
-        
+
         time.sleep(.5)
         return val
