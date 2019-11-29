@@ -32,5 +32,12 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
+        pip install coverage
+        pip install codacy-coverage
         pip install pytest
-        pytest pycqed/tests # ensures only tests in test dir are run
+        pytest pycqed/tests --cov=pycqed --cov-report xml --cov-report html
+        --cov-config=.coveragerc
+    - name: Upload code quality reports
+      run: |
+        python-codacy-coverage -r coverage.xml
+        codecov
