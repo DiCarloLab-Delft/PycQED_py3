@@ -1385,7 +1385,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             sweep_mode='adaptive'):
         """
         Runs an adaptive sampling of the CZ simulation by sweeping
-        cz_theta_f_{which_gate} and and cz_lambda_2_{which_gate}
+        cz_theta_f_{which_gate} and cz_lambda_2_{which_gate}
         """
         # Sanity checks for the parameters
         sim_pars_sanity_check(MC.station, self, fluxlutman_static, which_gate)
@@ -1481,6 +1481,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
             label=label,
             close_figs=True,
+            extract_only=True,
+            save_qois=False,
             plt_orig_pnts=True,
             plt_contour_L1=False,
             plt_optimal_values=True,
@@ -1492,6 +1494,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             rescore_spiked_optimals=True,
             plt_optimal_waveforms_all=True,
             waveform_flux_lm_name=self.name,
+            opt_are_interp=not (evaluate_local_optimals and cluster_from_interp),
             clims={
                 'L1': [0, 1],
                 'Cost func': [0, 100]
@@ -1499,18 +1502,15 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             target_cond_phase=target_cond_phase
         )
         print('Adaptive sampling finished.')
-        print(coha.get_readable_optimals(optimal_end=2))
+        # print(coha.get_readable_optimals(optimal_end=2))
 
-        if evaluate_local_optimals and cluster_from_interp:
-            eval_opt_pvs = list(coha.proc_data_dict['optimal_pars_values'])
-            eval_opt_mvs = list(coha.proc_data_dict['optimal_measured_values'])
-            print('Evaluating best local minima...')
-            opt_num = len(eval_opt_pvs)
-            eval_max = np.min([opt_num, 7])
-            if eval_max < opt_num:
-                log.debug('Evaluating only the best 7 optimals!'
-                    'The rest will contain interpolated measured values!')
-            for opt_idx in range(eval_max):
+        eval_opt_pvs = list(coha.proc_data_dict['optimal_pars_values'])
+        eval_opt_mvs = list(coha.proc_data_dict['optimal_measured_values'])
+        opt_num = len(eval_opt_pvs)
+        if evaluate_local_optimals and cluster_from_interp and opt_num > 0:
+            print('Found {} optima from interpolated data'.format(opt_num))
+            print('Evaluating optima...')
+            for opt_idx in range(opt_num):
                 adaptive_pars = {'adaptive_function': nelder_mead,
                     'x0': [
                         eval_opt_pvs[opt_idx]['cz_theta_f_{}'.format(which_gate)],
@@ -1559,6 +1559,11 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 # Save the best point
                 eval_opt_pvs[opt_idx] = eval_coha.proc_data_dict['optimal_pars_values'][0]
                 eval_opt_mvs[opt_idx] = eval_coha.proc_data_dict['optimal_measured_values'][0]
+
+            # Save the evaluated values in the main analysis object
+            # So that the evaluated values are included in the plot
+            coha.proc_data_dict['optimal_pars_values'] = eval_opt_pvs
+            coha.proc_data_dict['optimal_measured_values'] = eval_opt_mvs
 
         if optimize_phase_q0:
 
@@ -1650,23 +1655,21 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self.set('cz_lambda_2_{}'.format(which_gate), lambda_2_saved)
         self.set('cz_theta_f_{}'.format(which_gate), theta_f_saved)
 
+        coha.save_quantities_of_interest()
+        coha.run_post_extract()
+
         if not optimize_phase_q0:
-            if not evaluate_local_optimals:
-                print(coha.proc_data_dict['optimal_pars_values'])
-                print(coha.proc_data_dict['optimal_measured_values'])
-                return coha.proc_data_dict['optimal_pars_values'], coha.proc_data_dict['optimal_measured_values']
-            else:
-                print(eval_opt_pvs)
-                print(eval_opt_mvs)
-                print(coha.get_readable_optimals(optimal_pars_values=eval_opt_pvs,
-                    optimal_measured_values=eval_opt_mvs))
-                return eval_opt_pvs, eval_opt_mvs
+            print(coha.proc_data_dict['optimal_pars_values'])
+            print(coha.proc_data_dict['optimal_measured_values'])
+            print(coha.get_readable_optimals())
+            return coha.proc_data_dict['optimal_pars_values'], coha.proc_data_dict['optimal_measured_values']
         else:
             print('\nFinished optimizations with:')
             print('Parameters:')
             print(best_par_res)
             print('Measured quantities:')
             print(best_mv_res)
+            # Returning same shapes as above for uniformity
             return [best_par_res], [best_mv_res]
 
 
@@ -1822,8 +1825,8 @@ def roundup1024(n):
 
 def sim_pars_sanity_check(station, flm, flm_static, which_gate):
     dummy_flm_default_name = 'dummy_flm_default'
-    if dummy_flm_default_name in flm._all_instruments:
-        dummy_flm_default = flm.find_instrument(dummy_flm_default_name)
+    found_dummy = dummy_flm_default_name in flm._all_instruments
+    dummy_flm_default = flm.find_instrument(dummy_flm_default_name) if found_dummy else None
 
     if dummy_flm_default is None:
         dummy_flm_default = HDAWG_Flux_LutMan(dummy_flm_default_name)

@@ -10,6 +10,7 @@ from pycqed.analysis.tools.data_manipulation import \
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, plot_fit, \
     hsluv_anglemap45
 import matplotlib.pyplot as plt
+import matplotlib.colors as col
 from pycqed.analysis.fitting_models import CosFunc, Cos_guess, \
     avoided_crossing_freq_shift
 from pycqed.analysis_v2.simple_analysis import Basic2DInterpolatedAnalysis
@@ -243,8 +244,10 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 options_dict: dict = None,
                 extract_only: bool = False,
                 do_fitting: bool = False,
+                save_qois: bool = True,
                 auto: bool = True,
                 interp_method: str = 'linear',
+
                 plt_orig_pnts: bool = True,
                 plt_contour_phase: bool = True,
                 plt_contour_L1: bool = False,
@@ -253,7 +256,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_clusters: bool = True,
                 clims: dict = None,
                 find_local_optimals: bool = True,
-                cluster_from_interp: bool = False,
+                cluster_from_interp: bool = True,
+                opt_are_interp: bool = True,
 
                 rescore_spiked_optimals: bool = False,
                 plt_optimal_waveforms_all: bool = False,
@@ -261,7 +265,11 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 waveform_flux_lm_name: str = None,
 
                 target_cond_phase: float = 180.,
-                single_q_phase_offset: bool = False):
+                single_q_phase_offset: bool = False,
+                calc_L1_from_missing_frac: bool = True,
+                calc_L1_from_offset_diff: bool = False,
+
+                comparison_timestamp: str = None):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
@@ -269,6 +277,10 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.plt_optimal_values = plt_optimal_values
         self.plt_optimal_values_max = plt_optimal_values_max
         self.plt_clusters = plt_clusters
+        # Optimals are interpolated
+        # Manually set to false if the default analysis flow is changed
+        # e.g. in get_guesses_from_cz_sim in flux_lutman
+        self.opt_are_interp = opt_are_interp
 
         self.clims = clims
 
@@ -284,6 +296,13 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         # Used when applying Pi pulses to check if both single qubits
         # have the same phase as in the ideal case
         self.single_q_phase_offset = single_q_phase_offset
+        # Handy calculation for comparing experiment and simulations
+        # but using the same analysis code
+        self.calc_L1_from_missing_frac = calc_L1_from_missing_frac
+        self.calc_L1_from_offset_diff = calc_L1_from_offset_diff
+        # Compare to any other dataset that has the same shape for
+        # 'measured_values'
+        self.comparison_timestamp = comparison_timestamp
 
         self._generate_waveform = False
         if plt_optimal_waveforms or \
@@ -294,7 +313,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
 
         cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
         'cost func.', 'cost function', 'Cost function', 'Cost function value'}
-        L1_names = {'L1', 'Leakage'}
+        L1_names = {'L1', 'Leakage', 'half missing fraction'}
         ms_names = {'missing fraction', 'Missing fraction', 'missing frac',
             'missing frac.', 'Missing frac', 'Missing frac.'}
         cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
@@ -302,33 +321,18 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         offset_diff_names = {'offset difference', 'offset diff',
             'offset diff.', 'Offset difference', 'Offset diff',
             'Offset diff.'}
+        phase_q0_names = {'Q0 phase', 'phase q0'}
 
         # also account for possible underscores instead of a spaces between words
         allNames = [cost_func_Names, L1_names, ms_names, cond_phase_names,
-            offset_diff_names]
-        [self.cost_func_Names, self.L1_names, self.ms_names, self.cond_phase_names,
-            self.offset_diff_names] = \
-            [names.union({name.replace(' ', '_') for name in names})
+                offset_diff_names, phase_q0_names]
+        allNames = [names.union({name.replace(' ', '_') for name in names})
                 for names in allNames]
-
-        cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
-        'cost func.', 'cost function', 'Cost function', 'Cost function value'}
-        L1_names = {'L1', 'Leakage'}
-        ms_names = {'missing fraction', 'Missing fraction', 'missing frac',
-            'missing frac.', 'Missing frac', 'Missing frac.'}
-        cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
-            'cond phase', 'cond. phase', 'conditional phase'}
-        offset_diff_names = {'offset difference', 'offset diff',
-            'offset diff.', 'Offset difference', 'Offset diff',
-            'Offset diff.'}
-
-        # also account for possible underscores instead of a spaces between words
-        allNames = [cost_func_Names, L1_names, ms_names, cond_phase_names,
-            offset_diff_names]
-        [self.cost_func_Names, self.L1_names, self.ms_names, self.cond_phase_names,
-            self.offset_diff_names] = \
-            [names.union({name.replace(' ', '_') for name in names})
-                for names in allNames]
+        allNames = [names.union({name + ' 1' for name in names}.union(
+            {name + ' 2' for name in names})) for names in allNames]
+        [self.cost_func_Names, self.L1_names, self.ms_names,
+            self.cond_phase_names, self.offset_diff_names,
+            self.phase_q0_names] = allNames
 
         super().__init__(
             t_start=t_start,
@@ -339,6 +343,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             options_dict=options_dict,
             extract_only=extract_only,
             do_fitting=do_fitting,
+            save_qois=save_qois,
             auto=auto,
             interp_method=interp_method
         )
@@ -347,7 +352,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         # assumes that value names are unique in an experiment
         super().prepare_plots()
         anglemap = hsluv_anglemap45
-
+        found_optimals = np.size(self.proc_data_dict['x_optimal']) > 0
         for i, val_name in enumerate(self.proc_data_dict['value_names']):
 
             zlabel = '{} ({})'.format(val_name,
@@ -374,11 +379,28 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     'x': self.proc_data_dict['x'],
                     'y': self.proc_data_dict['y']
                 }
-
-            if self.proc_data_dict['value_units'][i] == 'deg':
+            unit = self.proc_data_dict['value_units'][i]
+            if unit == 'deg':
                 self.plot_dicts[val_name]['cbarticks'] = np.arange(0., 360.1, 45)
                 self.plot_dicts[val_name]['cmap_chosen'] = anglemap
                 self.plot_dicts[val_name]['clim'] = [0., 360.]
+            elif unit == '%':
+                self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
+            elif unit.startswith('∆ '):
+                self.plot_dicts[val_name]['cmap_chosen'] = 'RdBu'
+                vmin = np.min(self.proc_data_dict['interpolated_values'][i])
+                vmax = np.max(self.proc_data_dict['interpolated_values'][i])
+                vcenter = 0
+                if (vmin * vmax < 0):
+                    divnorm = col.DivergingNorm(
+                        vmin=vmin,
+                        vcenter=vcenter,
+                        vmax=vmax)
+                    self.plot_dicts[val_name]['norm'] = divnorm
+                else:
+                    self.plot_dicts[val_name]['clim'] = [
+                        np.max((vcenter, vmin)),
+                        np.min((vcenter, vmax))]
 
             if self.clims is not None and val_name in self.clims.keys():
                 self.plot_dicts[val_name]['clim'] = self.clims[val_name]
@@ -440,12 +462,9 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 else:
                     log.warning('No data found named {}'.format(self.L1_names))
 
-            if val_name in set().union(self.L1_names).union(self.ms_names)\
-                    .union(self.offset_diff_names):
-                self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
-
-            if self.plt_optimal_values and \
-                    val_name in self.cost_func_Names:
+            if (self.plt_optimal_values and
+                    found_optimals and
+                    val_name in self.cost_func_Names):
                     self.plot_dicts[val_name + '_optimal_pars'] = {
                         'ax_id': val_name,
                         'ypos': -0.25,
@@ -453,13 +472,14 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                         'plotfn': self.plot_text,
                         'box_props': 'fancy',
                         'line_kws': {'alpha': 0},
-                        'text_string': self.get_readable_optimals(optimal_end=self.plt_optimal_values_max),
+                        'text_string': self.get_readable_optimals(
+                            optimal_end=self.plt_optimal_values_max),
                         'horizontalalignment': 'left',
                         'verticalaligment': 'top',
                         'fontsize': 14
                     }
 
-            if self.plt_clusters:
+            if self.plt_clusters and found_optimals:
                 self.plot_dicts[val_name + '_clusters'] = {
                     'ax_id': val_name,
                     'plotfn': scatter_pnts_overlay,
@@ -471,7 +491,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     # 'linewidth': 1,
                     'c': self.proc_data_dict['clusters_pnts_colors']
                 }
-            if self.plt_optimal_values:
+            if self.plt_optimal_values and found_optimals:
                 self.plot_dicts[val_name + '_optimal_pnts_annotate'] = {
                     'ax_id': val_name,
                     'plotfn': annotate_pnts,
@@ -480,7 +500,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     'y': self.proc_data_dict['y_optimal']
                 }
 
-        if self.plt_optimal_waveforms_all:
+        if self.plt_optimal_waveforms_all and found_optimals:
             try:
                 # Plot all together for comparison
                 ax_id = 'waveform_optimal_all'
@@ -501,7 +521,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             except Exception as e:
                 log.error('Could not plot all waveforms.')
                 log.error(e)
-        if self.plt_optimal_waveforms:
+        if self.plt_optimal_waveforms and found_optimals:
             try:
                 # Plot individual waveforms
                 for opt_id, optimal_waveform in enumerate(self.proc_data_dict['optimal_waveforms']):
@@ -525,19 +545,57 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
-
         phase_q0_name = 'phase_q0'
         phase_q1_name = 'phase_q1'
         if self.single_q_phase_offset and {phase_q0_name, phase_q1_name} <= set(self.proc_data_dict['value_names']):
+            # This was used for some debugging
             self.proc_data_dict['value_names'].append('phase_q1 - phase_q0')
             self.proc_data_dict['value_units'].append('deg')
             phase_q0 = self.proc_data_dict['measured_values'][self.proc_data_dict['value_names'].index(phase_q0_name)]
             phase_q1 = self.proc_data_dict['measured_values'][self.proc_data_dict['value_names'].index(phase_q1_name)]
             self.proc_data_dict['measured_values'] = np.vstack((self.proc_data_dict['measured_values'], (phase_q1 - phase_q0) % 360))
 
+        # Calculate L1 from missing fraction and/or offset differece if available
+        vln_set = set(self.proc_data_dict['value_names'])
+        for names, do_calc in [(self.ms_names, self.calc_L1_from_missing_frac),
+                (self.offset_diff_names, self.calc_L1_from_offset_diff)]:
+            found_name = len(vln_set.intersection(names)) > 0
+            if (do_calc and found_name):
+                name = vln_set.intersection(names).pop()
+                self.proc_data_dict['value_names'].append('half ' + name)
+                self.proc_data_dict['value_units'].append('%')
+                L1_equiv = self.proc_data_dict['measured_values'][self.proc_data_dict['value_names'].index(name)] / 2
+                self.proc_data_dict['measured_values'] = np.vstack((self.proc_data_dict['measured_values'], L1_equiv))
+
         vln = self.proc_data_dict['value_names']
         measured_vals = self.proc_data_dict['measured_values']
         vlu = self.proc_data_dict['value_units']
+
+        # Calculate comparison heastmaps
+        if self.comparison_timestamp is not None:
+            coha_comp = Conditional_Oscillation_Heatmap_Analysis(
+                t_start=self.comparison_timestamp,
+                extract_only=True
+            )
+            # Because there is no standart what measured quantities are named
+            # have to do some magic name matching here
+            for names in [self.cost_func_Names, self.L1_names, self.ms_names, self.cond_phase_names,
+                    self.offset_diff_names, self.phase_q0_names]:
+                inters_this = names.intersection(self.proc_data_dict['value_names'])
+                inters_comp = names.intersection(coha_comp.proc_data_dict['value_names'])
+                if len(inters_this) > 0 and len(inters_comp) > 0:
+                    this_name = inters_this.pop()
+                    comp_name = inters_comp.pop()
+                    indx_this_name = self.proc_data_dict['value_names'].index(this_name)
+                    self.proc_data_dict['value_names'].append('[{}]\n{} - {}'.format(
+                        self.comparison_timestamp,
+                        comp_name,
+                        this_name))
+                    self.proc_data_dict['value_units'].append('∆ ' + self.proc_data_dict['value_units'][indx_this_name])
+                    this_mv = self.proc_data_dict['measured_values'][indx_this_name]
+                    ref_mv = coha_comp.proc_data_dict['measured_values'][coha_comp.proc_data_dict['value_names'].index(comp_name)]
+                    delta_mv = ref_mv - this_mv
+                    self.proc_data_dict['measured_values'] = np.vstack((self.proc_data_dict['measured_values'], delta_mv))
 
         self.proc_data_dict['interpolated_values'] = []
         for i in range(len(self.proc_data_dict['value_names'])):
@@ -552,12 +610,6 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 self.proc_data_dict['measured_values'][i],
                 interp_method=interp_method)
             self.proc_data_dict['interpolated_values'].append(z_int)
-
-            # if self.proc_data_dict['value_names'][i] in self.cost_func_Names:
-            #     # Find the optimal point(s)
-            #     x = self.proc_data_dict['x']
-            #     y = self.proc_data_dict['y']
-            #     z = self.proc_data_dict['measured_values'][i]
 
         interp_vals = self.proc_data_dict['interpolated_values']
         self.proc_data_dict['x_int'] = x_int
@@ -613,10 +665,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
 
             extract_optimals_from = 'interpolated_values'
 
-        if not self.find_local_optimals:
-            optimal_idxs = np.array([cost_func.argmin()])
-            clusters_by_indx = np.array([optimal_idxs])
-        else:
+        if self.find_local_optimals:
             optimal_idxs, clusters_by_indx = get_optimal_pnts_indxs(
                 theta_f_arr=theta_f_arr,
                 lambda_2_arr=lambda_2_arr,
@@ -624,6 +673,9 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 L1_arr=L1_arr,
                 target_phase=self.target_cond_phase
             )
+        else:
+            optimal_idxs = np.array([cost_func.argmin()])
+            clusters_by_indx = np.array([optimal_idxs])
 
         if self.cluster_from_interp:
             x_arr = theta_f_arr
@@ -679,10 +731,14 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     # spiked_optimals.append(0)  # switch to this line to ignore spikes downscoring
                     spiked_optimals.append(np.any(waveform > 1.25) * (waveform_max - np.average(np.abs(waveform))) / waveform_max)
 
+                # Change to np format for compatibility with hdf5
+                waveforms = np.array(waveforms)
+                times = np.array(times)
+                spiked_optimals = np.array(spiked_optimals)
                 fluxlutman.close()
 
             except Exception as e:
-                log.warning('Could not generate optimal_pnts wave forms.')
+                log.warning('Could not generate optimal wave forms.')
                 log.warning(e)
 
             if self.rescore_spiked_optimals:
@@ -693,6 +749,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 clusters_by_indx = np.array(clusters_by_indx)[sort_indxs]
                 waveforms = np.array(waveforms)[sort_indxs]
                 times = np.array(times)[sort_indxs]
+                spiked_optimals = np.array(spiked_optimals)[sort_indxs]
             # Add qoi in the proc_data_dict
             self.proc_data_dict['optimal_waveforms'] = waveforms
             self.proc_data_dict['optimal_waveforms_time'] = times
@@ -730,14 +787,6 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             self.proc_data_dict['xlabel']: self.proc_data_dict['xunit'],
             self.proc_data_dict['ylabel']: self.proc_data_dict['yunit']
         }
-        # vlu = self.proc_data_dict['value_units']
-        # optimal_measured_values = {}
-        # optimal_measured_units = {}
-        # for k, quantity_arr in enumerate(self.proc_data_dict[extract_optimals_from]):
-        #     optimal_measured_values[vln[k]] = np.ravel(quantity_arr)[optimal_idxs]
-        #     optimal_measured_units[vln[k]] = vlu[k]
-        # self.proc_data_dict['optimal_measured_values'] = optimal_measured_values
-        # self.proc_data_dict['optimal_measured_units'] = optimal_measured_units
 
         optimal_measured_values = []
         optimal_measured_units = []
@@ -806,11 +855,14 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             optimal_measured_values=None,
             optimal_start: int = 0,
             optimal_end: int = np.inf,
-            sig_digits=4):
+            sig_digits: int = 4,
+            opt_are_interp=None):
         if not optimal_pars_values:
             optimal_pars_values = self.proc_data_dict['optimal_pars_values']
         if not optimal_measured_values:
             optimal_measured_values = self.proc_data_dict['optimal_measured_values']
+        if opt_are_interp is None:
+            opt_are_interp = self.opt_are_interp
 
         optimals_max = len(optimal_pars_values)
         spiked = self.proc_data_dict['spiked_optimals'] if 'spiked_optimals'\
@@ -823,7 +875,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             for pv_name, pv_value in optimal_pars_values[opt_idx].items():
                 string += '{} = {:.{sig_digits}g} {}\n'.format(pv_name, pv_value, self.proc_data_dict['optimal_pars_units'][pv_name], sig_digits=sig_digits)
             string += '------------\n'
-            if self.cluster_from_interp and optimal_pars_values is self.proc_data_dict['optimal_pars_values']:
+            if (self.cluster_from_interp and opt_are_interp and
+                    optimal_pars_values is self.proc_data_dict['optimal_pars_values']):
                 string += '[!!! Interpolated values !!!]\n'
             for mv_name, mv_value in optimal_measured_values[opt_idx].items():
                 string += '{} = {:.{sig_digits}g} {}\n'.format(mv_name, mv_value, self.proc_data_dict['optimal_measured_units'][mv_name], sig_digits=sig_digits)
