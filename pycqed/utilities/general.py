@@ -722,11 +722,15 @@ itb = AutoFormattedTB(mode='Verbose', tb_offset=1)
 
 
 def print_exception():
+    print(get_formatted_exception())
+
+
+def get_formatted_exception():
     """
-    Prints the last exception in a beautiful rainbow with extra sugar
+    Retunr the last exception in a beautiful rainbow with extra sugar
     and a cherry on top
     Extra sugar = it tries to detect all variables on the line that
-    triggered the exception and prints them
+    triggered the exception and includes them in the traceback
 
     Typical usecase: You set a for loop or sequential independent jobs
     that will take a lot of time and if one fails you still want the
@@ -739,8 +743,8 @@ def print_exception():
             try:
                 job()
             except Exception:
-                print_exception()
-        print('Thank you Victor!')
+                log.error(get_formatted_exception())
+                print('Thank you Victor!')
 
     Inspired from https://stackoverflow.com/questions/40110540/jupyter-magic-to-handle-notebook-exceptions
     """
@@ -753,4 +757,4 @@ def print_exception():
     stb = itb.structured_traceback(etype, evalue, tb)
     sstb = itb.stb2text(stb)
 
-    print(sstb)
+    return sstb
