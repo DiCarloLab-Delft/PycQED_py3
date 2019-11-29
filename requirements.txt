@@ -20,3 +20,5 @@ autodepgraph
 networkx
 scikit-learn
 qutechopenql
+zhinst
+plotly<3.8
