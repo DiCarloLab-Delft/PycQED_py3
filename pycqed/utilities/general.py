@@ -22,6 +22,8 @@ import operator
 import string
 from contextlib import ContextDecorator
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
+import traceback
+from IPython.core.ultratb import AutoFormattedTB
 
 
 try:
@@ -710,3 +712,46 @@ def delete_keys_from_dict(dictionary: dict, keys: set):
             else:
                 modified_dict[key] = value
     return modified_dict
+
+
+# Handy things to print the traceback of exceptions
+
+
+# initialize the formatter for making the tracebacks into strings
+# mode = 'Plain' # for printing like in the interactive python tracebake
+itb = AutoFormattedTB(mode='Verbose', tb_offset=1)
+
+
+def print_exception():
+    """
+    Prints the last exception in a beautiful rainbow with extra sugar
+    and a cherry on top
+    Extra sugar = it tries to detect all variables on the line that
+    triggered the exception and prints them
+
+    Typical usecase: You set a for loop or sequential independent jobs
+    that will take a lot of time and if one fails you still want the
+    rest to run and when you come back you also want to know why did it
+    fail. Just doing a print(exception) is useless, same for a full
+    traceback.
+
+    Example:
+        for job in list_of_long_jobs:
+            try:
+                job()
+            except Exception:
+                print_exception()
+        print('Thank you Victor!')
+
+    Inspired from https://stackoverflow.com/questions/40110540/jupyter-magic-to-handle-notebook-exceptions
+    """
+    etype, evalue, tb = sys.exc_info()
+    if tb:
+        elist = traceback.extract_tb(tb)
+    else:
+        elist = None
+
+    stb = itb.structured_traceback(etype, evalue, tb)
+    sstb = itb.stb2text(stb)
+
+    print(sstb)
