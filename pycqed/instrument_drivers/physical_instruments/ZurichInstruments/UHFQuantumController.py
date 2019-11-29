@@ -213,6 +213,9 @@ class UHFQC(zibase.ZI_base_instrument):
 
         # Used for extra DIO output to CC for debugging
         self._diocws = None
+        
+        # Holds the DIO calibration delay
+        self._dio_calibration_delay = 0
 
         # Define parameters that should not be part of the snapshot
         self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable'])
@@ -224,6 +227,9 @@ class UHFQC(zibase.ZI_base_instrument):
                          server=server, port=port, num_codewords=2**nr_integration_channels,
                          **kw)
 
+        # Disable disfunctional parameters from snapshot
+        self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable'])
+
         # Set default waveform length to 20 ns at 1.8 GSa/s
         self._default_waveform_length = 32
 
@@ -232,6 +238,56 @@ class UHFQC(zibase.ZI_base_instrument):
 
         t1 = time.time()
         print('Initialized UHFQC', self.devname, 'in %.2fs' % (t1-t0))
+
+     ##########################################################################
+    # Overriding Qcodes methods
+    ##########################################################################
+
+    def snapshot_base(self, update: bool=False,
+                      params_to_skip_update =None,
+                      params_to_exclude = None ):
+        """
+        State of the instrument as a JSON-compatible dict.
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+        Returns:
+            dict: base snapshot
+        """
+
+        if params_to_exclude is None:
+            params_to_exclude = self._params_to_exclude
+
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                pass
+            elif params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+                try:
+                    snap['parameters'][name] = param.snapshot(update=update_par)
+                except:
+                    logging.info("Snapshot: Could not update parameter: {}".format(name))
+                    snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
+        return snap
 
     ##########################################################################
     # Overriding Qcodes methods
@@ -297,9 +353,9 @@ class UHFQC(zibase.ZI_base_instrument):
         Checks that the correct options are installed on the instrument.
         """
         options = self.gets('features/options').split('\n')
-        if 'QA' not in options:
+        if 'QA' not in options and 'QC' not in options:
             raise zibase.ziOptionsError(
-                'Device {} is missing the QA option!'.format(self.devname))
+                'Device {} is missing the QA or QC option!'.format(self.devname))
         if 'AWG' not in options:
             raise zibase.ziOptionsError(
                 'Device {} is missing the AWG option!'.format(self.devname))
@@ -364,6 +420,10 @@ class UHFQC(zibase.ZI_base_instrument):
             be required to address the maximum number of qubits supported by the instrument (10). Therefore,
             the 'cases' mechanism is used to reduce that number to the combinations actually needed by
             an experiment.
+          dio_calibration_delay - the delay that is programmed on the DIO lines as part of the DIO calibration
+            process in order for the instrument to reliably sample data from the CC. Can be used to detect
+            unexpected changes in timing of the entire system. The parameter can also be used to force a specific
+            delay to be used on the DIO although that is not generally recommended.
         """
         super()._add_extra_parameters()
 
@@ -411,6 +471,31 @@ class UHFQC(zibase.ZI_base_instrument):
             'an AWG program that handles only codewords 1, 5 and 7. When running, if the AWG receives a codeword '
             'that is not part of this list, an error will be triggered.',
             vals=validators.Lists())
+
+        self.add_parameter('dio_calibration_delay',
+                           set_cmd=self._set_dio_calibration_delay,
+                           get_cmd=self._get_dio_calibration_delay,
+                           unit='',
+                           label='DIO Calibration delay',
+                           docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
+                           'to be applied on the DIO interface in order to achieve reliable sampling'
+                           ' of the codewords. The valid range is 0 to 15.',
+                           vals=validators.Ints())
+
+    def _set_dio_calibration_delay(self, value):
+        # Sanity check the value
+        if value < 0 or value > 15:
+            raise zibase.ziValueError('Trying to set DIO calibration delay to invalid value! Expected value in range 0 to 15. Got {}.'.format(value))
+
+        log.info('Setting DIO calibration delay to {}'.format(value))
+        # Store the value
+        self._dio_calibration_delay = value
+        
+        # And configure the delays
+        self.setd('raw/dios/0/delay', self._dio_calibration_delay)
+
+    def _get_dio_calibration_delay(self):
+        return self._dio_calibration_delay
 
     def _set_wait_dly(self, value):
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), value)
@@ -508,9 +593,10 @@ setUserReg(4, err_cnt);"""
         """
         ch = awg_nr*2
         wf_table = []
-        for case in self.cases():
-            wf_table.append((zibase.gen_waveform_name(ch, case),
-                             zibase.gen_waveform_name(ch+1, case)))
+        if self.cases() is not None:
+            for case in self.cases():
+                wf_table.append((zibase.gen_waveform_name(ch, case),
+                                 zibase.gen_waveform_name(ch+1, case)))
         return wf_table
 
     def _codeword_table_preamble(self, awg_nr):
@@ -522,7 +608,7 @@ setUserReg(4, err_cnt);"""
 
         # If the program doesn't need waveforms, just return here
         if not self._awg_program_features['waves']:
-            return
+            return program
 
         # If the program needs cases, but none are defined, flag it as an error
         if self._awg_program_features['cases'] and self._cases is None:
@@ -1121,7 +1207,7 @@ setUserReg(4, err_cnt);"""
             'cvar i = 0;\n'+
             'const length = {};\n'.format(len(codewords))
             )
-        sequence = sequence + self.array_to_combined_vector_string(
+        sequence = sequence + array2vect(
                 codewords, "codewords")
         # starting the loop and switch statement
         sequence = sequence +(
@@ -1134,8 +1220,13 @@ setUserReg(4, err_cnt);"""
             ' setDIO(2048);\n'+
             '}\n' 
             ) 
-            
-        self.awg_string(sequence, timeout=timeout)
+        
+        # Define the behavior of our program
+        self._reset_awg_program_features()
+
+        self._awg_program[0] = sequence
+        self._awg_needs_configuration[0] = True
+        # self.awg_string(sequence, timeout=timeout)
         
     def awg_sequence_acquisition_and_pulse(self, Iwave=None, Qwave=None, acquisition_delay=0, dig_trigger=True) -> None:
         if Iwave is not None and (np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0):
@@ -1554,7 +1645,8 @@ setTrigger(0);
             time.sleep(1)
             valid_sequence = True
             for awg in [0]:
-                if self.geti('raw/dios/0/error/timing') & combined_mask != 0:
+                error_timing = self.geti('raw/dios/0/error/timing')
+                if error_timing & combined_mask != 0:
                     valid_sequence = False
 
             if valid_sequence:
@@ -1563,7 +1655,8 @@ setTrigger(0);
         return set(valid_delays)
 
     def _prepare_CCL_dio_calibration(self, CCL, feedline=1, verbose=False):
-
+        """Configures a CCL with a default program that generates data suitable for DIO calibration.
+        Also starts the program."""
         cs_filepath = os.path.join(pycqed.__path__[0],
                 'measurement',
                 'openql_experiments',
@@ -1593,9 +1686,9 @@ setTrigger(0);
             self._dio_calibration_mask = 0x3
         else:
             raise ziValueError('Invalid feedline {} selected for calibration.'.format(feedline))
-
-
+            
     def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
+        """Configures a QCC with a default program that generates data suitable for DIO calibration. Also starts the QCC."""
 
         cs_filepath = os.path.join(pycqed.__path__[0],
                 'measurement',
@@ -1623,6 +1716,24 @@ setTrigger(0);
         # Set the DIO calibration mask to enable 9 bit measurement
         self._dio_calibration_mask = 0x1ff
 
+    def _prepare_HDAWG8_dio_calibration(self, HDAWG, verbose=False):
+        """Configures an HDAWG with a default program that generates data suitable for DIO calibration. Also starts the HDAWG."""
+        program = '''
+var A = 0xffff0000;
+var B = 0x00000000;
+
+while (1) {
+  setDIO(A);
+  wait(2);
+  setDIO(B);
+  wait(2);
+}
+'''
+        HDAWG.configure_awg_from_string(0, program)
+        HDAWG.seti('awgs/0/enable', 1)
+
+        self._dio_calibration_mask = 0x7fff
+
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False, repetitions=1):
         log.info('Calibrating DIO delays')
         if verbose: print("Calibrating DIO delays")
@@ -1631,11 +1742,13 @@ setTrigger(0);
 
         CC_model = CC.IDN()['model']
         if 'QCC' in CC_model:
-            expected_sequence = self._prepare_QCC_dio_calibration(
+            self._prepare_QCC_dio_calibration(
                 QCC=CC, verbose=verbose)
         elif 'CCL' in CC_model:
-            expected_sequence = self._prepare_CCL_dio_calibration(
+            self._prepare_CCL_dio_calibration(
                 CCL=CC, feedline=feedline, verbose=verbose)
+        elif 'HDAWG8' in CC_model:
+            self._prepare_HDAWG8_dio_calibration(HDAWG=CC, verbose=verbose)
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
@@ -1660,5 +1773,8 @@ setTrigger(0);
         if verbose: print("  Setting delay to {}".format(min_valid_delay))
 
         # And configure the delays
-        self.setd('raw/dios/0/delay', min_valid_delay)
+        self._set_dio_calibration_delay(min_valid_delay)
+
+        # Clear all detected errors (caused by DIO timing calibration)
+        self.clear_errors()
 

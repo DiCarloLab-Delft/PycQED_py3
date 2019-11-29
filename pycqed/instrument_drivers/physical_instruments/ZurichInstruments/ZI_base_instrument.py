@@ -636,7 +636,7 @@ class ZI_base_instrument(Instrument):
         # Handle absolute path
         self.use_setVector = "setVector" in dir(self.daq)
 
-        # Connect a device (if not already connected)
+        # Connect a device
         if not self._is_device_connected(device):
             log.info('Connecting to device')
             self.daq.connectDevice(device, interface)
@@ -1331,15 +1331,6 @@ class ZI_base_instrument(Instrument):
 
     def close(self) -> None:
         try:
-            if self._is_device_connected(self.devname):
-                # Stop all AWG's. In case errors are flagged we demote them
-                # to warnings.
-                try:
-                    self.stop()
-                except ziRuntimeError as err:
-                    log.error(str(err))
-                # Disconnect device from server
-                self.daq.disconnectDevice(self.devname)
             # Disconnect application server
             self.daq.disconnect()
         except AttributeError:
