@@ -1812,21 +1812,22 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
             combination of letters x, y, z for scaling of the according axis.
             Remember to set the labels correctly.
     """
-    if ax == None:
+    if ax is None:
         fig, ax = plt.subplots()
 
-    norm = None
-    try:
-        if log is True or 'z' in log:
-            norm = LogNorm()
+    norm = kw.get('norm', None)
+    if norm is None:
+        try:
+            if log is True or 'z' in log:
+                norm = LogNorm()
 
-        if 'y' in log:
-            y = np.log10(y)
+            if 'y' in log:
+                y = np.log10(y)
 
-        if 'x' in log:
-            x = np.log10(x)
-    except TypeError:  # log is not iterable
-        pass
+            if 'x' in log:
+                x = np.log10(x)
+        except TypeError:  # log is not iterable
+            pass
 
     # calculate coordinates for corners of color blocks
     # x coordinates
