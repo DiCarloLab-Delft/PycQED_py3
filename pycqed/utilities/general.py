@@ -22,7 +22,6 @@ import operator
 import string
 from contextlib import ContextDecorator
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
-import traceback
 from IPython.core.ultratb import AutoFormattedTB
 
 
@@ -721,10 +720,15 @@ def delete_keys_from_dict(dictionary: dict, keys: set):
 # mode = 'Plain' # for printing like in the interactive python traceback
 # TODO: Not sure if this line needs to be run in the highest level
 # python file in order to get a full traceback
-itb = AutoFormattedTB(mode='Verbose', tb_offset=1)
+itb = AutoFormattedTB(mode='Verbose', tb_offset=None)
 
 
 def print_exception():
+    """
+    Prints the output of get_formatted_exception()
+    """
+    # This should print the same output, not sure when nesting code
+    # itb()
     print(get_formatted_exception())
 
 
@@ -751,11 +755,11 @@ def get_formatted_exception():
 
     Inspired from https://stackoverflow.com/questions/40110540/jupyter-magic-to-handle-notebook-exceptions
     """
+    # Not sure if using sys.exc_info() is a good idea but it works
+    # Maybe using logging in a more fancy ways is an alternative
+    # See https://stackoverflow.com/questions/3702675/how-to-print-the-full-traceback-without-halting-the-program
+    # for more opinions
     etype, evalue, tb = sys.exc_info()
-    if tb:
-        elist = traceback.extract_tb(tb)
-    else:
-        elist = None
 
     stb = itb.structured_traceback(etype, evalue, tb)
     sstb = itb.stb2text(stb)
