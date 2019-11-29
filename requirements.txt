@@ -12,8 +12,8 @@ PyQt5
 pyqtgraph
 pygsti==0.9.6
 pyvisa>=1.8
-numpy
-cython
+numpy<1.14
+Cython
 scipy==1.2.1
 qutip
 spirack
