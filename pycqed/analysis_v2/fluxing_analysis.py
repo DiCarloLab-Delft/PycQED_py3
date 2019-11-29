@@ -256,6 +256,9 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 plt_clusters: bool = True,
                 clims: dict = None,
                 find_local_optimals: bool = True,
+                phase_thr=5,
+                L1_thr=0.3,
+                clustering_thr=10,
                 cluster_from_interp: bool = True,
                 opt_are_interp: bool = True,
 
@@ -285,6 +288,9 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.clims = clims
 
         self.find_local_optimals = find_local_optimals
+        self.phase_thr = phase_thr
+        self.L1_thr = L1_thr
+        self.clustering_thr = clustering_thr
         self.cluster_from_interp = cluster_from_interp
 
         self.rescore_spiked_optimals = rescore_spiked_optimals
@@ -387,7 +393,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             elif unit == '%':
                 self.plot_dicts[val_name]['cmap_chosen'] = 'hot'
             elif unit.startswith('∆ '):
-                self.plot_dicts[val_name]['cmap_chosen'] = 'RdBu'
+                self.plot_dicts[val_name]['cmap_chosen'] = 'terrain'
+                # self.plot_dicts[val_name]['cmap_chosen'] = 'RdBu'
                 vmin = np.min(self.proc_data_dict['interpolated_values'][i])
                 vmax = np.max(self.proc_data_dict['interpolated_values'][i])
                 vcenter = 0
@@ -670,7 +677,10 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 lambda_2_arr=lambda_2_arr,
                 cond_phase_arr=cond_phase_arr,
                 L1_arr=L1_arr,
-                target_phase=self.target_cond_phase
+                target_phase=self.target_cond_phase,
+                phase_thr=self.phase_thr,
+                L1_thr=self.L1_thr,
+                clustering_thr=self.clustering_thr
             )
         else:
             optimal_idxs = np.array([cost_func.argmin()])
