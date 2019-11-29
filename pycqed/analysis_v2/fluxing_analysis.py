@@ -409,7 +409,6 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 # Find index of Conditional Phase
                 z_cond_phase = None
                 for j, val_name_j in enumerate(self.proc_data_dict['value_names']):
-                    pass
                     if val_name_j in self.cond_phase_names:
                         z_cond_phase = self.proc_data_dict['interpolated_values'][j]
                         break
@@ -627,7 +626,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 cond_phase_arr = measured_vals[cond_phase_indx]
             except Exception:
                 # Ignore if was not measured
-                pass
+                log.error('\n' + gen.get_formatted_exception())
 
             try:
                 where = [(name in self.L1_names) for name in vln]
@@ -635,7 +634,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 L1_arr = measured_vals[L1_indx]
             except Exception:
                 # Ignore if was not measured
-                pass
+                log.error('\n' + gen.get_formatted_exception())
 
             theta_f_arr = self.proc_data_dict['x']
             lambda_2_arr = self.proc_data_dict['y']
