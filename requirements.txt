@@ -12,10 +12,9 @@ PyQt5
 pyqtgraph
 pygsti==0.9.6
 pyvisa>=1.8
-numpy<1.14
+numpy
 Cython
-scipy==1.2.1
-qutip
+scipy
 spirack
 autodepgraph
 networkx
