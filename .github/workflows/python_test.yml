@@ -34,7 +34,3 @@ jobs:
       run: |
         pip install pytest
         pytest pycqed/tests/
-    - name: Upload code quality reports
-      run: |
-        python-codacy-coverage -r coverage.xml
-        codecov
