@@ -718,7 +718,9 @@ def delete_keys_from_dict(dictionary: dict, keys: set):
 
 
 # initialize the formatter for making the tracebacks into strings
-# mode = 'Plain' # for printing like in the interactive python tracebake
+# mode = 'Plain' # for printing like in the interactive python traceback
+# TODO: Not sure if this line needs to be run in the highest level
+# python file in order to get a full traceback
 itb = AutoFormattedTB(mode='Verbose', tb_offset=1)
 
 
