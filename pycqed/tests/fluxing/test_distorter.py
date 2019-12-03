@@ -1,6 +1,7 @@
 import unittest
 import os
 import pycqed as pq
+import pytest
 
 
 import pycqed.instrument_drivers.meta_instrument.distortions_corrector as dc

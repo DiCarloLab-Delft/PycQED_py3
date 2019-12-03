@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import pytest
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 import pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module as qwg
 
