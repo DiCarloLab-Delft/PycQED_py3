@@ -6,7 +6,7 @@ import pycqed as pq
 import pycqed.instrument_drivers.meta_instrument.distortions_corrector as dc
 import pycqed.instrument_drivers.meta_instrument.kernel_object as ko
 
-
+pytestmark = pytest.mark.skip
 class Test_distorter(unittest.TestCase):
 
     @classmethod
