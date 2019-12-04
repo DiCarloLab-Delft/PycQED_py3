@@ -393,6 +393,7 @@ class TestMultiQubitFluxLutMan:
 
         signs = self.fluxlutman.czd_signs_SE(['+', '-'])
 
+    @pytest.mark.skip(reason="pyqtgraph seems to have issues on the test machine")
     def test_render_wave(self):
         self.fluxlutman.render_wave('cz_SE', time_units='lut_index')
         self.fluxlutman.render_wave('cz_SE', time_units='s')
