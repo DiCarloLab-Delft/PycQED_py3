@@ -539,7 +539,7 @@ class MeasurementControl(Instrument):
         if len(np.shape(vals)) == 2:
             vals = np.array(vals)[:, 0]
         if self.minimize_optimization:
-            if (self.f_termination is not None):
+            if self.f_termination is not None:
                 if (vals < self.f_termination):
                     raise StopIteration()
         else:
