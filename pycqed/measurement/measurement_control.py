@@ -33,6 +33,7 @@ except:
     print('Could not import msvcrt (used for detecting keystrokes)')
 
 try:
+    import PyQt5
     from qcodes.plots.pyqtgraph import QtPlot, TransformState
 except Exception:
     print('pyqtgraph plotting not supported, '
