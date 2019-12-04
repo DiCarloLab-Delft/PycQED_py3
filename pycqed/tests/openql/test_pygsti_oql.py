@@ -1,5 +1,6 @@
 import os
 import unittest
+import pytest
 from openql import openql as ql
 from pycqed.measurement.openql_experiments.pygsti_oql import \
     poor_mans_2q_gst, single_qubit_gst, two_qubit_gst
