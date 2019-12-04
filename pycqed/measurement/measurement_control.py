@@ -24,6 +24,13 @@ from qcodes.plots.colors import color_cycle
 
 # Used for adaptive sampling
 from adaptive.learner import BaseLearner
+from adaptive.learner import Learner1D
+from adaptive.learner import Learner2D
+from adaptive.learner import LearnerND
+# In the future should be replaced by `adaptive.learner.SKOptLearner`
+# SKOptLearnerND is a modified version of SKOptLearner
+# to fix a data type matching problem
+from pycqed.measurement.optimization import SKOptLearnerND
 from adaptive import runner
 # from adaptive import BlockingRunner
 
@@ -280,6 +287,8 @@ class MeasurementControl(Instrument):
         '''
         self.save_optimization_settings()
         self.adaptive_function = self.af_pars.pop('adaptive_function')
+        # Not sure where this line belongs, but for now is only used here
+        self.opt_func_expetcs_scalar = issubclass(self.adaptive_function, SKOptLearnerND)
         if self.live_plot_enabled():
             self.initialize_plot_monitor_adaptive()
         for sweep_function in self.sweep_functions:
@@ -294,10 +303,41 @@ class MeasurementControl(Instrument):
         # is not a class but a function
         if isinstance(self.adaptive_function, type) and issubclass(self.adaptive_function, BaseLearner):
             Learner = self.adaptive_function
-            self.learner = Learner(
-                self.optimization_function,
-                loss_per_triangle=self.af_pars.get('loss_per_triangle'),
-                bounds=self.af_pars['bounds'])
+            # Pass the rigth parameters two each type of learner
+            if issubclass(self.adaptive_function, Learner1D):
+                self.learner = Learner(
+                    self.optimization_function,
+                    bounds=self.af_pars['bounds'],
+                    loss_per_interval=self.af_pars.get('loss_per_interval', None))
+            elif issubclass(self.adaptive_function, Learner2D):
+                self.learner = Learner(
+                    self.optimization_function,
+                    bounds=self.af_pars['bounds'],
+                    loss_per_triangle=self.af_pars.get('loss_per_triangle', None))
+            elif issubclass(self.adaptive_function, LearnerND):
+                self.learner = Learner(
+                    self.optimization_function,
+                    bounds=self.af_pars['bounds'],
+                    loss_per_simplex=self.af_pars.get('loss_per_simplex', None))
+            elif issubclass(self.adaptive_function, SKOptLearnerND):
+                # NB: SKOptLearnerND is a modified version of SKOptLearner
+                # to fix a data type matching problem
+                # NB2: This learner expects the `optimization_function`
+                # to be scalar
+                self.learner = Learner(
+                    self.optimization_function,
+                    dimensions=self.af_pars['dimensions'],
+                    base_estimator=self.af_pars.get('base_estimator', 'gp'),
+                    n_initial_points=self.af_pars.get('n_initial_points', 10),
+                    acq_func=self.af_pars.get('acq_func', 'gp_hedge'),
+                    acq_optimizer=self.af_pars.get('acq_optimizer', 'auto'),
+                    n_random_starts=self.af_pars.get('n_random_starts', None),
+                    random_state=self.af_pars.get('random_state', None),
+                    acq_func_kwargs=self.af_pars.get('acq_func_kwargs', None),
+                    acq_optimizer_kwargs=self.af_pars.get('acq_optimizer_kwargs', None))
+            else:
+                raise NotImplementedError('Learner subclass type not supported.')
+
             # N.B. the runner that is used is not an `adaptive.Runner` object
             # rather it is the `adaptive.runner.simple` function. This
             # ensures that everything runs in a single process, as is
@@ -491,11 +531,15 @@ class MeasurementControl(Instrument):
                 x[i] = float(x[i])/float(self.x_scale[i])
 
         vals = self.measurement_function(x)
+        logging.error('A')
+        logging.error(vals)
         # This takes care of data that comes from a "single" segment of a
         # detector for a larger shape such as the UFHQC single int avg detector
         # that gives back data in the shape [[I_val_seg0, Q_val_seg0]]
         if len(np.shape(vals)) == 2:
             vals = np.array(vals)[:, 0]
+        logging.error('B')
+        logging.error(vals)
         if self.minimize_optimization:
             if (self.f_termination is not None):
                 if (vals < self.f_termination):
@@ -508,12 +552,18 @@ class MeasurementControl(Instrument):
                 if (vals > self.f_termination):
                     raise StopIteration()
             vals = np.multiply(-1, vals)
+        logging.error('C')
+        logging.error(vals)
 
         # to check if vals is an array with multiple values
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
                 vals = vals[self.par_idx]
-
+        logging.error('D')
+        logging.error(vals)
+        # return a scalar for optmizer learners
+        if self.opt_func_expetcs_scalar:
+            vals = vals[0]
         return vals
 
     def finish(self, result):
@@ -1663,4 +1713,3 @@ class MeasurementControl(Instrument):
         """
         return {'vendor': 'PycQED', 'model': 'MeasurementControl',
                 'serial': '', 'firmware': '2.0'}
-

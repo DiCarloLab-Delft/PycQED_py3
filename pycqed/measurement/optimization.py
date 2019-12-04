@@ -1,8 +1,13 @@
 import copy
 import numpy as np
 import logging
+from skopt import Optimizer
+from adaptive.utils import cache_latest
+from adaptive.learner.base_learner import BaseLearner
 
 log = logging.getLogger(__name__)
+
+
 def nelder_mead(fun, x0,
                 initial_step=0.1,
                 no_improve_thr=10e-6, no_improv_break=10,
@@ -243,6 +248,89 @@ def SPSA(fun, x0,
     # verification
     fun(res[0][0])
     return res[0]
+
+
+class SKOptLearnerND(Optimizer, BaseLearner):
+    """
+    [Victor 2019-12-04]
+    This is an modification of the original
+    ``adaptive.learner.skopt_learner.SKOptLearner``
+    It is here because the original one uses set() and was not
+    compatible with the SKOpt optimizer that expects list()
+    Original docstring below
+    --------------------------------------------------------------------
+
+    Learn a function minimum using ``skopt.Optimizer``.
+
+    This is an ``Optimizer`` from ``scikit-optimize``,
+    with the necessary methods added to make it conform
+    to the ``adaptive`` learner interface.
+
+    Parameters
+    ----------
+    function : callable
+        The function to learn.
+    **kwargs :
+        Arguments to pass to ``skopt.Optimizer``.
+    """
+
+    def __init__(self, function, **kwargs):
+        self.function = function
+        self.pending_points = list()
+        super().__init__(**kwargs)
+
+    def tell(self, x, y, fit=True):
+        x = list(x)
+        super().tell(x, y, fit)
+
+    def tell_pending(self, x):
+        # 'skopt.Optimizer' takes care of points we
+        # have not got results for.
+        x = list(x)
+        self.pending_points.append(x)
+
+    def remove_unfinished(self):
+        pass
+
+    @cache_latest
+    def loss(self, real=True):
+        if not self.models:
+            return np.inf
+        else:
+            model = self.models[-1]
+            # Return the in-sample error (i.e. test the model
+            # with the training data). This is not the best
+            # estimator of loss, but it is the cheapest.
+            return 1 - model.score(self.Xi, self.yi)
+
+    def ask(self, n, tell_pending=True):
+        if not tell_pending:
+            raise NotImplementedError(
+                "Asking points is an irreversible "
+                "action, so use `ask(n, tell_pending=True`."
+            )
+        points = super().ask(n)
+        # TODO: Choose a better estimate for the loss improvement.
+        if self.space.n_dims > 1:
+            return points, [self.loss() / n] * n
+        else:
+            return [p[0] for p in points], [self.loss() / n] * n
+
+    @property
+    def npoints(self):
+        """Number of evaluated points."""
+        return len(self.Xi)
+
+    def _get_data(self):
+        return [x[0] for x in self.Xi], self.yi
+
+    def _set_data(self, data):
+        xs, ys = data
+        self.tell_many(xs, ys)
+
+# ######################################################################
+# Some utilities
+# ######################################################################
 
 
 def multi_targets_phase_offset(target, spacing, phase_name: str = None):
