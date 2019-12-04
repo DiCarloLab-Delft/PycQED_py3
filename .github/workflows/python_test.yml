@@ -19,10 +19,11 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Setup headless display
       run: |
+        sudo apt-get update
         sudo apt-get install xvfb
-        sudo Xvfb :1 -screen 0 1024x768x24 </dev/null &
-        export DISPLAY=":1"
-        sleep 3 # give xvfb some time to start
+        sudo apt-get clean
+        sudo xvfb :99 -ac -screen 0 1024x768x16 +extension RANDR
+        sleep 3
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
