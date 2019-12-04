@@ -294,9 +294,6 @@ class MeasurementControl(Instrument):
             return isinstance(obj, type) and issubclass(obj, test_obj)
         self.save_optimization_settings()
         self.adaptive_function = self.af_pars.pop('adaptive_function')
-        # Not sure where this line belongs, but for now is only used here
-        self.expects_scalar = is_subclass(self.adaptive_function,
-                                                    SKOptLearnerND)
         if self.live_plot_enabled():
             self.initialize_plot_monitor_adaptive()
         for sweep_function in self.sweep_functions:
@@ -533,7 +530,7 @@ class MeasurementControl(Instrument):
         '''
         if self.x_scale is not None:
             for i in range(len(x)):
-                x[i] = float(x[i])/float(self.x_scale[i])
+                x[i] = float(x[i]) / float(self.x_scale[i])
 
         vals = self.measurement_function(x)
         # This takes care of data that comes from a "single" segment of a
@@ -558,9 +555,6 @@ class MeasurementControl(Instrument):
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
                 vals = vals[self.par_idx]
-        # return a scalar for optmizer learners
-        if self.expects_scalar:
-            vals = vals[0]
         return vals
 
     def finish(self, result):
