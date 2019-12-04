@@ -39,4 +39,5 @@ jobs:
     - name: Test with pytest
       run: |
         pip install pytest
-        pytest pycqed/tests/
+        pip install pytest-xvfb
+        xvfb-run pytest pycqed/tests/
