@@ -50,10 +50,10 @@ class MeasurementControl(Instrument):
     '''
 
     def __init__(self, name: str,
-                 plotting_interval: float=3,
-                 datadir: str=get_default_datadir(),
-                 live_plot_enabled: bool=True, verbose: bool=True):
-        super().__init__(name=name, server_name=None)
+                 plotting_interval: float = 3,
+                 datadir: str = get_default_datadir(),
+                 live_plot_enabled: bool = True, verbose: bool = True):
+        super().__init__(name=name)
 
         self.add_parameter('datadir',
                            initial_value=datadir,
@@ -122,8 +122,8 @@ class MeasurementControl(Instrument):
     # Functions used to control the measurements #
     ##############################################
 
-    def run(self, name: str=None, exp_metadata: dict=None,
-            mode: str='1D', disable_snapshot_metadata: bool=False, **kw):
+    def run(self, name: str = None, exp_metadata: dict = None,
+            mode: str = '1D', disable_snapshot_metadata: bool = False, **kw):
         '''
         Core of the Measurement control.
 
@@ -1459,7 +1459,7 @@ class MeasurementControl(Instrument):
         return start_idx
 
     def get_datawriting_indices_update_ctr(self, new_data,
-                                           update: bool=True):
+                                           update: bool = True):
         """
         Calculates the start and stop indices required for
         storing a hard measurement.
@@ -1663,4 +1663,3 @@ class MeasurementControl(Instrument):
         """
         return {'vendor': 'PycQED', 'model': 'MeasurementControl',
                 'serial': '', 'firmware': '2.0'}
-
