@@ -543,7 +543,6 @@ class MeasurementControl(Instrument):
                 if (vals < self.f_termination):
                     raise StopIteration()
         else:
-            vals = self.measurement_function(x)
             # when maximizing interrupt when larger than condition before
             # inverting
             if (self.f_termination is not None):
@@ -553,8 +552,7 @@ class MeasurementControl(Instrument):
 
         # to check if vals is an array with multiple values
         if hasattr(vals, '__iter__'):
-            if len(vals) > 1:
-                vals = vals[self.par_idx]
+            vals = vals[self.par_idx]
         return vals
 
     def finish(self, result):
