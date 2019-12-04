@@ -596,6 +596,8 @@ class Test_MeasurementControl(unittest.TestCase):
         dat = self.MC.run('2D adaptive sampling test', mode='adaptive')
 
     def test_adaptive_SKOptLearnerND(self):
+        # NB cool stuff: this can also optimize integers and other
+        # hyper-parameters
         self.MC.soft_avg(1)
         self.mock_parabola.noise(0.5)
         self.MC.set_sweep_functions(

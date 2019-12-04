@@ -285,10 +285,18 @@ class MeasurementControl(Instrument):
         Uses the adaptive function and keywords for that function as
         specified in self.af_pars()
         '''
+        def is_subclass(obj, test_obj):
+            """
+            Added extra check to ensure test_obj is a class before
+            checking for whether it is a subclass. Prevents Python from
+            throwing an error if test_obj is not a class but a function
+            """
+            return isinstance(obj, type) and issubclass(obj, test_obj)
         self.save_optimization_settings()
         self.adaptive_function = self.af_pars.pop('adaptive_function')
         # Not sure where this line belongs, but for now is only used here
-        self.opt_func_expetcs_scalar = issubclass(self.adaptive_function, SKOptLearnerND)
+        self.expects_scalar = is_subclass(self.adaptive_function,
+                                                    SKOptLearnerND)
         if self.live_plot_enabled():
             self.initialize_plot_monitor_adaptive()
         for sweep_function in self.sweep_functions:
@@ -298,10 +306,7 @@ class MeasurementControl(Instrument):
 
         if self.adaptive_function == 'Powell':
             self.adaptive_function = fmin_powell
-        # Added extra check to ensure self.adaptive_function is a class before checking for
-        # whether it is a subclass. Prevents Python from throwing an error if self.adaptive_function
-        # is not a class but a function
-        if isinstance(self.adaptive_function, type) and issubclass(self.adaptive_function, BaseLearner):
+        if is_subclass(self.adaptive_function, BaseLearner):
             Learner = self.adaptive_function
             # Pass the rigth parameters two each type of learner
             if issubclass(self.adaptive_function, Learner1D):
@@ -531,15 +536,11 @@ class MeasurementControl(Instrument):
                 x[i] = float(x[i])/float(self.x_scale[i])
 
         vals = self.measurement_function(x)
-        logging.error('A')
-        logging.error(vals)
         # This takes care of data that comes from a "single" segment of a
         # detector for a larger shape such as the UFHQC single int avg detector
         # that gives back data in the shape [[I_val_seg0, Q_val_seg0]]
         if len(np.shape(vals)) == 2:
             vals = np.array(vals)[:, 0]
-        logging.error('B')
-        logging.error(vals)
         if self.minimize_optimization:
             if (self.f_termination is not None):
                 if (vals < self.f_termination):
@@ -552,17 +553,13 @@ class MeasurementControl(Instrument):
                 if (vals > self.f_termination):
                     raise StopIteration()
             vals = np.multiply(-1, vals)
-        logging.error('C')
-        logging.error(vals)
 
         # to check if vals is an array with multiple values
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
                 vals = vals[self.par_idx]
-        logging.error('D')
-        logging.error(vals)
         # return a scalar for optmizer learners
-        if self.opt_func_expetcs_scalar:
+        if self.expects_scalar:
             vals = vals[0]
         return vals
 
