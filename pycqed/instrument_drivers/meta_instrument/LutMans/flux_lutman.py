@@ -11,6 +11,8 @@ try:
     from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
 except ImportError:
     pass  # This is to make the lutman work if no OpenQL is installed.
+
+import PyQt5
 from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel

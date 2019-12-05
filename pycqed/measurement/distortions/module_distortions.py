@@ -72,6 +72,7 @@ output_dict = kf.get_all_sampled_vector(convolution,
 try:
     vw.clear()
 except Exception:
+    import PyQt5
     from qcodes.plots.pyqtgraph import QtPlot
     vw = QtPlot(windowTitle='Seq_plot', figsize=(600, 400))
 

@@ -43,4 +43,4 @@ jobs:
         echo ${PYTHON}
         pip install pytest
         pip install pytest-xvfb
-        Xvfb-run pytest pycqed/tests/
+        pytest pycqed/tests/
