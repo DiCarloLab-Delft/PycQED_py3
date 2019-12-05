@@ -1,5 +1,5 @@
 # PycQED 
-[![Build Status](https://github.com/DiCarloLab-Delft/pycqed_py3/actions)
+[![Build Status](https://github.com/DiCarloLab-Delft/pycqed_py3/workflows/Build%20Status/badge.svg)](https://github.com/DiCarloLab-Delft/pycqed_py3/actions)
 [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179)
 <!-- FIXME: add code coverage badges again after updating github actions -->
 <!-- [![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger)
