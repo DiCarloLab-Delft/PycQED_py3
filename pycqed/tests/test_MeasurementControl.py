@@ -620,7 +620,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_functions(
             [self.mock_parabola.x, self.mock_parabola.y])
         self.MC.set_adaptive_function_parameters({'adaptive_function': SKOptLearnerND,
-                                                    'goal': lambda l: l.npoints > 24,
+                                                    'goal': lambda l: l.npoints > 14,
                                                     'dimensions': [(-50.0, +50.0),
                                                                 (-20.0, +30.0)],
                                                     'base_estimator': 'gp',
