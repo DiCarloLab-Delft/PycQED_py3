@@ -838,7 +838,6 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             after-rotation before tomographic rotations
     '''
     tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
-    num_qubits_in_platf = 7 # FIXME FOR NOT CCL PLATFORMS
 
     # Choose a bell state and set the corresponding preparation pulses
     if bell_state == 0:  # |Phi_m>=|00>-|11>
@@ -872,9 +871,9 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate(prep_pulse_q1, [q1])
             # FIXME hardcoded edge because of
             # brainless "directed edge recources" in compiler
-            k.gate("wait", list(np.arange(num_qubits_in_platf)),  0) #alignment workaround
+            k.gate("wait", [],  0)# Empty list generates barrier for all qubits in platf. only works with 0.8.0
             k.gate('cz', [q0, q1])
-            k.gate("wait", list(np.arange(num_qubits_in_platf)),  0) #alignment workaround
+            k.gate("wait", [],  0)
             # after-rotations
             k.gate(after_pulse_q1, [q1])
             # possibly wait
@@ -1332,7 +1331,6 @@ def conditional_oscillation_seq(q0: int, q1: int,
     '''
     p = oqh.create_program("conditional_oscillation_seq", platf_cfg)
 
-    num_qubits_in_platf = 7 # FIXME FOR NOT CCL STUFF!
     # These angles correspond to special pi/2 pulses in the lutman
     for i, angle in enumerate(angles):
         for case in cases:
@@ -1347,7 +1345,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 k.gate('rx180', [q1])
             k.gate('rx90', [q0])
             if not CZ_disabled:
-                k.gate("wait", list(np.arange(num_qubits_in_platf)), 0) #alignment workaround
+                k.gate("wait", [], 0) # Empty list generates barrier for all qubits in platf. only works with 0.8.0
                 k.gate(flux_codeword, [q0, q1])
 
                 # sometimes we want to move another qubit out of the way using
@@ -1365,11 +1363,11 @@ def conditional_oscillation_seq(q0: int, q1: int,
                         'flux_codeword_park "{}" not allowed'.format(
                             flux_codeword_park))
 
-                k.gate("wait", list(np.arange(num_qubits_in_platf)), 0) #alignment workaround
+                k.gate("wait", [], 0) #alignment workaround
             else:
-                k.gate("wait", list(np.arange(num_qubits_in_platf)), 0) #alignment workaround
+                k.gate("wait", [], 0) #alignment workaround
                 k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
-                k.gate("wait", list(np.arange(num_qubits_in_platf)), 0) #alignment workaround
+                k.gate("wait", [], 0) #alignment workaround
 
             if wait_time_after > 0:
                 k.gate('wait', [q0,q1], wait_time_after)

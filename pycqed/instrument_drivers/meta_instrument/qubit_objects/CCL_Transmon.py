@@ -1457,7 +1457,7 @@ class CCLight_Transmon(Qubit):
 
         if method == 'DAC':
             t_start = time.strftime('%Y%m%d_%H%M%S')
-            self.measure_qubit_frequency_dac_scan_test(freqs=freqs,
+            self.measure_qubit_frequency_dac_scan(freqs=freqs,
                                                   dac_values=dac_values,
                                                   fluxChan=fluxChan,
                                                   analyze=False,

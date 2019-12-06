@@ -36,7 +36,7 @@ class Test_base_analysis(unittest.TestCase):
 
         a.fit_res = {}
         a.save_fit_results()
-        assert exp_val == saved_val
+        np.testing.assert_almost_equal(exp_val, saved_val, decimal=3)
 
     def test_save_quantities_of_interest(self):
         # Test based on test below to get a dummy dataset
