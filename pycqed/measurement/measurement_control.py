@@ -2,6 +2,7 @@ import types
 import logging
 import time
 import numpy as np
+import collections
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
 from pycqed.utilities import general
@@ -30,7 +31,12 @@ from adaptive.learner import LearnerND
 # In the future should be replaced by `adaptive.learner.SKOptLearner`
 # SKOptLearnerND is a modified version of SKOptLearner
 # to fix a data type matching problem
+# [Victor 2019-12-04] my pull request should be merged soon
+# when an adaptive stable version 0.10.0+ is available replace all
+# SKOptLearnerND with `adaptive.learner.SKOptLearner` and
+# cleanup the comments about this
 from pycqed.measurement.optimization import SKOptLearnerND
+from skopt import Optimizer  # imported for checking types
 from adaptive import runner
 # from adaptive import BlockingRunner
 
@@ -47,6 +53,15 @@ except Exception:
           'to see the full error')
     print('When instantiating an MC object,'
           ' be sure to set live_plot_enabled=False')
+
+
+def is_subclass(obj, test_obj):
+    """
+    Extra check to ensure test_obj is a class before
+    checking for whether it is a subclass. Prevents Python from
+    throwing an error if test_obj is not a class but a function
+    """
+    return isinstance(obj, type) and issubclass(obj, test_obj)
 
 
 class MeasurementControl(Instrument):
@@ -285,13 +300,6 @@ class MeasurementControl(Instrument):
         Uses the adaptive function and keywords for that function as
         specified in self.af_pars()
         '''
-        def is_subclass(obj, test_obj):
-            """
-            Added extra check to ensure test_obj is a class before
-            checking for whether it is a subclass. Prevents Python from
-            throwing an error if test_obj is not a class but a function
-            """
-            return isinstance(obj, type) and issubclass(obj, test_obj)
         self.save_optimization_settings()
         self.adaptive_function = self.af_pars.pop('adaptive_function')
         if self.live_plot_enabled():
@@ -346,6 +354,14 @@ class MeasurementControl(Instrument):
             # required by QCoDeS (May 2018) and makes things simpler.
             self.runner = runner.simple(learner=self.learner,
                                         goal=self.af_pars['goal'])
+            if issubclass(self.adaptive_function, SKOptLearnerND):
+                # NB: Having an optmizer that also complies with the adaptive
+                # interface breaks a bit the previous structure
+                # now there are many checks for this case
+                # Because this is also an optimizer we save the result
+                # Pass the learner because it contains all the points
+                self.save_optimization_results(self.adaptive_function,
+                    self.learner)
 
         elif (isinstance(self.adaptive_function, types.FunctionType) or
                 isinstance(self.adaptive_function, np.ufunc)):
@@ -551,7 +567,7 @@ class MeasurementControl(Instrument):
             vals = np.multiply(-1, vals)
 
         # to check if vals is an array with multiple values
-        if hasattr(vals, '__iter__'):
+        if isinstance(vals, collections.abc.Iterable):
             vals = vals[self.par_idx]
         return vals
 
@@ -1316,8 +1332,8 @@ class MeasurementControl(Instrument):
         opt_res_grp = self.data_object.create_group('Optimization_result')
 
         if adaptive_function.__module__ == 'cma.evolution_strategy':
-            res_dict = {'xopt':  result[0],
-                        'fopt':  result[1],
+            res_dict = {'xopt': result[0],
+                        'fopt': result[1],
                         'evalsopt': result[2],
                         'evals': result[3],
                         'iterations': result[4],
@@ -1327,11 +1343,18 @@ class MeasurementControl(Instrument):
             # entries below cannot be stored
             # 'cmaes': result[-2],
             # 'logger': result[-1]}
+        elif is_subclass(adaptive_function, Optimizer):
+            # Because MC saves all the datapoints we save only the best point
+            # for convenience
+            opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
+            opt_indx = opt_idx_selector(result.yi)
+            res_dict = {'xopt': result.Xi[opt_indx],
+                        'fopt': result.yi[opt_indx]}
         elif adaptive_function.__module__ == 'pycqed.measurement.optimization':
-            res_dict = {'xopt':  result[0],
-                        'fopt':  result[1]}
+            res_dict = {'xopt': result[0],
+                        'fopt': result[1]}
         else:
-            res_dict = {'opt':  result}
+            res_dict = {'opt': result}
         h5d.write_dict_to_hdf5(res_dict, entry_point=opt_res_grp)
 
     def save_instrument_settings(self, data_object=None, *args):
