@@ -38,7 +38,6 @@ from adaptive.learner import LearnerND
 from pycqed.measurement.optimization import SKOptLearnerND
 from skopt import Optimizer  # imported for checking types
 from adaptive import runner
-# from adaptive import BlockingRunner
 
 try:
     import msvcrt  # used on windows to catch keyboard input
