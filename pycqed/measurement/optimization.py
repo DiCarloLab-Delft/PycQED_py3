@@ -1,7 +1,7 @@
 import copy
 import numpy as np
 import logging
-from collections import OrderedDict
+import collections
 from skopt import Optimizer
 from adaptive.utils import cache_latest
 from adaptive.notebook_integration import ensure_holoviews
@@ -279,11 +279,11 @@ class SKOptLearnerND(Optimizer, BaseLearner):
     def __init__(self, function, **kwargs):
         self.function = function
         self.pending_points = set()
-        self.data = OrderedDict()
+        self.data = collections.OrderedDict()
         super().__init__(**kwargs)
 
     def tell(self, x, y, fit=True):
-        if hasattr(x, "__iter__"):
+        if isinstance(x, collections.abc.Iterable):
             self.pending_points.discard(tuple(x))
             self.data[tuple(x)] = y
             super().tell(x, y, fit)
