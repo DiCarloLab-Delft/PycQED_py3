@@ -1180,6 +1180,7 @@ class Mock_QWG(QuTech_AWG_Module):
 
         # AWG properties
         self.device_descriptor = type('', (), {})()
+        self._socket = None  # exists so close method of IP instrument works
         self.device_descriptor.model = 'QWG'
         self.device_descriptor.numChannels = 4
         self.device_descriptor.numDacBits = 12
