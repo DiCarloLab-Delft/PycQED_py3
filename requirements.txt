@@ -1,4 +1,4 @@
-qcodes==0.4.0
+qcodes
 adaptive
 cma
 h5py>=2.6
