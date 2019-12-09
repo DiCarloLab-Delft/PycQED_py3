@@ -533,6 +533,7 @@ class dummy_QCC(QCC):
 
     def __init__(self, name, **kw):
         Instrument.__init__(self, name=name, **kw)
+        self._socket = None  # exists so close method of IP instrument works
         self._ensure_connection = True
         self._dummy_instr = True
         self.model = name
