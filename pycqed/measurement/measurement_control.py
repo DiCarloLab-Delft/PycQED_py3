@@ -58,7 +58,8 @@ except Exception:
         'try "from qcodes.plots.pyqtgraph import QtPlot" '
         "to see the full error"
     )
-    print("When instantiating an MC object," " be sure to set live_plot_enabled=False")
+    print("When instantiating an MC object," 
+          " be sure to set live_plot_enabled=False")
 
 
 def is_subclass(obj, test_obj):
@@ -75,7 +76,7 @@ class MeasurementControl(Instrument):
     """
     New version of Measurement Control that allows for adaptively determining
     data points.
-    '''
+    """
 
     def __init__(self, name: str,
                  plotting_interval: float = 3,
@@ -172,7 +173,7 @@ class MeasurementControl(Instrument):
 
     def run(self, name: str = None, exp_metadata: dict = None,
             mode: str = '1D', disable_snapshot_metadata: bool = False, **kw):
-        '''
+        """
         Core of the Measurement control.
 
         Args:
