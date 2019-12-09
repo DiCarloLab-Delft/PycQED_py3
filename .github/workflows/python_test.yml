@@ -50,6 +50,6 @@ jobs:
       run: |
         python-codacy-coverage -r coverage.xml
         codecov
-      env: # Or as an environment variable
-        codacy_token: ${{ secrets.CODACY_PROJECT_TOKEN }}
-        codecov_token: ${{ secrets.CODECOV_TOKEN }}
+      env: # set secrets as environmental variables
+        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
