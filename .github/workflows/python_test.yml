@@ -9,7 +9,7 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [3.6]
+        python-version: [3.6, 3.7]
 
     steps:
     - uses: actions/checkout@v1
@@ -28,8 +28,14 @@ jobs:
         python -m pip install --upgrade pip
         sudo apt-get install python3-pyqt5
         pip install -r requirements.txt
-        pip install qutip  # Ensure all dependencies installed before qutip
-        pip install -e .   # Installs pycqed itself
+        pip install qutip  # ensure all dependencies installed before qutip
+        pip install -e .   # installs pycqed itself
+        pip install coverage
+        pip install pytest-cov
+        pip install codecov
+        pip install codacy-coverage
+        pip install pytest
+        pip install pytest-xvfb
     - name: Lint with flake8
       run: |
         pip install flake8
@@ -39,13 +45,6 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        pip install coverage
-        pip install pytest-cov
-        pip install codecov
-        pip install codacy-coverage
-        pip install pytest
-        pip install pytest-xvfb
-        pytest pycqed/tests/
         py.test pycqed/tests --cov=pycqed --cov-report xml --cov-report html --cov-config=.coveragerc
     - name: Upload code coverage report
       run: |
