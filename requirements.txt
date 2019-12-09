@@ -1,6 +1,7 @@
 qcodes
 adaptive
 cma
+scikit-optimize>=0.5.2
 h5py>=2.6
 hsluv
 IPython>=4.0
