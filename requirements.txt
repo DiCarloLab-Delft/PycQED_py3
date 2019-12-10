@@ -1,6 +1,7 @@
-qcodes>=0.1.0
+qcodes
 adaptive
 cma
+scikit-optimize>=0.5.2
 h5py>=2.6
 hsluv
 IPython>=4.0
@@ -12,9 +13,13 @@ PyQt5
 pyqtgraph
 pygsti==0.9.6
 pyvisa>=1.8
-qutip
-scipy>=0.17
+numpy
+Cython
+scipy
 spirack
 autodepgraph
 networkx
 scikit-learn
+qutechopenql
+zhinst
+plotly<3.8

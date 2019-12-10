@@ -259,7 +259,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
+            k = oqh.create_kernel("AllXY_{}".format(int(i*js+j)), p)
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
@@ -773,9 +773,9 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
     # don't use last 4 points if calibration points are used
     if cal_points:
         times = times[:-4]
-    for t in times:
+    for i_t,t in enumerate(times):
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi_flux_pi', p)
+        k = oqh.create_kernel('pi_flux_pi_{}'.format(i_t), p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
@@ -807,10 +807,10 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
 
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
 
-    for t in times:
+    for i_t,t in enumerate(times):
 
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel("pi-flux-pi", p)
+        k = oqh.create_kernel("pi-flux-pi_{}".format(i_t), p)
         k.prepz(q0)
         k.prepz(q1)
 

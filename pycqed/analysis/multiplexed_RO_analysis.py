@@ -1,6 +1,7 @@
 # Based on Niels analysis
 from os.path import join
 from pycqed.analysis import measurement_analysis as ma
+from scipy import stats
 import numpy as np
 import pylab
 # %matplotlib inline
@@ -107,16 +108,16 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
         ax.plot(bins[:-1]+0.5*(bins[1]-bins[0]), n, color=color,
                 linestyle='None', marker=marker, label='|{}>'.format(state))
 
-    y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
-        frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-    # y1_0 = frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-    # y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
+    y0 = (1-frac1_0)*stats.norm.pdf(bins0, mu0_0, sigma0_0) + \
+        frac1_0*stats.norm.pdf(bins0, mu1_0, sigma1_0)
+    # y1_0 = frac1_0*stats.norm.pdf(bins0, mu1_0, sigma1_0)
+    # y0_0 = (1-frac1_0)*stats.norm.pdf(bins0, mu0_0, sigma0_0)
 
     # building up the histogram fits for on measurements
-    y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \
-        frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-    # y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-    # y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
+    y1 = (1-frac1_1)*stats.norm.pdf(bins1, mu0_1, sigma0_1) + \
+        frac1_1*stats.norm.pdf(bins1, mu1_1, sigma1_1)
+    # y1_1 = frac1_1*stats.norm.pdf(bins1, mu1_1, sigma1_1)
+    # y0_1 = (1-frac1_1)*stats.norm.pdf(bins1, mu0_1, sigma0_1)
 
     ax.semilogy(bins0, y0, 'b', linewidth=1.5, label='fit |00>')
     ax.semilogy(bins1, y1, 'r', linewidth=1.5, label='fit |01>')
@@ -194,14 +195,14 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
         pylab.plot(bins[:-1]+0.5*(bins[1]-bins[0]), n,
                    color=color, linestyle='None', marker=marker)
 
-    y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
-        frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
+    y0 = (1-frac1_0)*stats.norm.pdf(bins0, mu0_0, sigma0_0) + \
+        frac1_0*stats.norm.pdf(bins0, mu1_0, sigma1_0)
 
     # building up the histogram fits for on measurements
-    y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \
-        frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-    # y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-    # y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
+    y1 = (1-frac1_1)*stats.norm.pdf(bins1, mu0_1, sigma0_1) + \
+        frac1_1*stats.norm.pdf(bins1, mu1_1, sigma1_1)
+    # y1_1 = frac1_1*stats.norm.pdf(bins1, mu1_1, sigma1_1)
+    # y0_1 = (1-frac1_1)*stats.norm.pdf(bins1, mu0_1, sigma0_1)
 
     plt.semilogy(bins0, y0, 'b', linewidth=1.5, label='fit |00>')
 
