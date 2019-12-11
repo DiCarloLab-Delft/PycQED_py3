@@ -44,32 +44,32 @@ class QuTechCC_core(SCPIBase):
 
     def set_q1_reg(self, ccio: int, reg: int, val: int) -> None:
         # only possible if CC is stopped
-        self._transport.write('QUTech:CCIO{}:Q1REG{} {}'.format(ccio, reg, val))
+        self._transport.write(f'QUTech:CCIO{ccio}:Q1REG{reg} {val}')
 
     def get_q1_reg(self, ccio: int, reg: int) -> int:
         # only possible if CC is stopped
-        return self.ask_int('QUTech:CCIO{}:Q1REG{}'.format(ccio, reg))
+        return self.ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
-        self._transport.write('QUTech:CCIO{}:VSMbit{}:RISEDELAY {}'.format(ccio, bit, cnt_in_833_ps_steps))
+        self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY {cnt_in_833_ps_steps}')
 
     def get_vsm_delay_rise(self, ccio: int, bit: int) -> int:
-        return self._ask_int('QUTech:CCIO#:VSMbit#:RISEDELAY?'.format(ccio, bit))
+        return self._ask_int(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY?')
 
     def set_vsm_delay_fall(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
-        self._transport.write('QUTech:CCIO{}:VSMbit{}:FALLDELAY {}'.format(ccio, bit, cnt_in_833_ps_steps))
+        self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:FALLDELAY {cnt_in_833_ps_steps}')
 
     def get_vsm_delay_fall(self, ccio: int, bit: int) -> int:
-        return self._transport._ask_int('QUTech:CCIO{}:VSMbit{}:FALLDELAY?'.format(ccio, bit))
+        return self._transport._ask_int(f'QUTech:CCIO{ccio}:VSMbit{bit}:FALLDELAY?')
 
     def debug_marker_off(self, ccio: int) -> None:
-        self._transport.write('QUTech:DEBUG:CCIO{}:MARKER:OFF'.format(ccio))
+        self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:MARKER:OFF')
 
     def debug_marker_in(self, ccio: int, bit: int) -> None:
-        self._transport.write('QUTech:DEBUG:CCIO{}:MARKER:IN {}'.format(ccio, bit))
+        self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:MARKER:IN {bit}')
 
     def debug_marker_out(self, ccio: int, bit: int) -> None:
-        self._transport.write('QUTech:DEBUG:CCIO{}:MARKER:OUT {}'.format(ccio, bit))
+        self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:MARKER:OUT {bit}')
 
     def start(self) -> None:
         self._transport.write('awgcontrol:run:immediate')
@@ -85,7 +85,7 @@ class QuTechCC_core(SCPIBase):
         return self._ask_int('STATus:QUEStionable:FREQ:EVENt?')
 
     def set_status_questionable_frequency_enable(self, val) -> None:
-        self._transport.write('STATus:QUEStionable:FREQ:ENABle {}'.format(val))
+        self._transport.write(f'STATus:QUEStionable:FREQ:ENABle {val}')
 
     def get_status_questionable_frequency_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:FREQ:ENABle?')

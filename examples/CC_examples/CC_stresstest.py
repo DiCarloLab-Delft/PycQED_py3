@@ -34,13 +34,13 @@ cc.reset()
 cc.clear_status()
 cc.status_preset()
 
-for iter in range(num_iter):
+for i in range(num_iter):
     cc.sequence_program_assemble(prog)
 
     for run in range(num_run_per_iter):
-        print(f'starting CC iter={iter}, run={run}')
+        print(f'starting CC iter={i}, run={run}')
         cc.start()
         cc.stop()
         err_cnt = cc.get_system_error_count()
-        for i in range(err_cnt):
+        for j in range(err_cnt):
             print(cc.get_error())

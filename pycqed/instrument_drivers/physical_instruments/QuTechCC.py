@@ -151,14 +151,14 @@ class QuTechCC(QuTechCC_core, Instrument):
         self.set_vsm_delay_rise(self._ccio_slots_driving_vsm[0], bit, cnt_in_833_ps_steps)
 
     def _get_vsm_rise_delay(self, bit: int) -> int:
-        return self.set_vsm_delay_rise(self._ccio_slots_driving_vsm[0], bit)
+        return self.get_vsm_delay_rise(self._ccio_slots_driving_vsm[0], bit)
 
     # helper for parameter 'vsm_fall_delay{}'
     def _set_vsm_fall_delay(self, bit: int, cnt_in_833_ps_steps: int) -> None:
         self.set_vsm_delay_fall(self._ccio_slots_driving_vsm[0], bit, cnt_in_833_ps_steps)
 
     def _get_vsm_fall_delay(self, bit: int) -> int:
-        return self.set_vsm_delay_fall(self._ccio_slots_driving_vsm[0], bit)
+        return self.get_vsm_delay_fall(self._ccio_slots_driving_vsm[0], bit)
 
     ##########################################################################
     # CC-light compatibility support
@@ -195,11 +195,16 @@ class QuTechCC(QuTechCC_core, Instrument):
         if dio_mode == "microwave":
             cc_prog = _cc_prog_dio_cal_microwave
         elif dio_mode == "new_microwave":
+            # FIXME
             pass
         elif dio_mode == "new_novsm_microwave":
+            # FIXME
             pass
         elif dio_mode == "flux":
+            # FIXME
             pass
+        else:
+            raise ValueError("unsupported DIO mode")
 
         log.debug(f"uploading DIO calibration program for mode '{dio_mode}' to CC")
         self.sequence_program_assemble(cc_prog)

@@ -1,6 +1,3 @@
-from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
-    import QuTech_AWG_Module
-from pycqed.analysis import tomography as tomo
 import numpy as np
 import time
 import logging
@@ -9,7 +6,6 @@ import adaptive
 import networkx as nx
 import datetime
 from collections import OrderedDict
-from collections import defaultdict
 from importlib import reload
 
 from qcodes.instrument.base import Instrument
@@ -24,6 +20,8 @@ from pycqed.analysis import tomography as tomo
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.utilities.general import check_keyboard_interrupt
 
+from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
+    import QuTech_AWG_Module
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
@@ -298,9 +296,9 @@ class DeviceCCL(Instrument):
         latencies on the DIO ports of the CCL or QCC.
 
         N.B. latencies are set in multiples of 20ns in the DIO.
-        Latencies shorter than 20ns are set as channel delays in the AWGs. 
+        Latencies shorter than 20ns are set as channel delays in the AWGs.
         These are set globally. If individual (per channel) setting of latency
-        is required in the future, we can add this. 
+        is required in the future, we can add this.
 
         """
         # 2. Setting the latencies

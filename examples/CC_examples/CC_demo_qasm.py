@@ -4,9 +4,9 @@
 import CC_logging
 
 import logging
-from qiskit.qasm.qasm import Qasm
+#from qiskit.qasm.qasm import Qasm
 from qiskit.circuit.quantumcircuit import QuantumCircuit
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 
 # configure our logger
