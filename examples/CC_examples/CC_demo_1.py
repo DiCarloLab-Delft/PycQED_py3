@@ -73,7 +73,7 @@ if 1:
     else:
         with open(p.filename, 'r') as f:
             prog = f.read()
-        cc.sequence_program(prog)
+        cc.sequence_program_assemble(prog)
 
     err_cnt = cc.get_system_error_count()
     for i in range(err_cnt):
