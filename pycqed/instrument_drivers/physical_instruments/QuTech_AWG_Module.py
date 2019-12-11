@@ -1289,6 +1289,7 @@ class Mock_QWG(QuTech_AWG_Module):
 
         # AWG properties
         self._dev_desc = type('', (), {})()
+        self._socket = None  # exists so close method of IP instrument works
         self._dev_desc.model = 'QWG'
         self._dev_desc.numChannels = 4
         self._dev_desc.numDacBits = 12
@@ -1297,7 +1298,6 @@ class Mock_QWG(QuTech_AWG_Module):
         self._dev_desc.numTriggers = 8
 
         self._dev_desc.numMaxCwBits = 32  # Some random mock val
-
         self._dev_desc.numSelectCwInputs = 10  # mock val based on DIO
         self._dev_desc.numCodewords = pow(2, 5)  # Some random mock val
 
