@@ -125,7 +125,7 @@ class Multi_Detector(Detector_Function):
         detectors     (list):
             a list of detectors to combine.
         det_idx_prefix(bool):
-            if True suffixes the value names with
+            if True prefixes the value names with
         detector_labels (list):
             if not None, will be used instead instead of
             "det{idx}_" as a prefix for the different channels
@@ -142,6 +142,8 @@ class Multi_Detector(Detector_Function):
                     else:
                         val_name = detector_labels[i] + \
                             ' ' + detector_value_name
+                else:
+                    val_name = detector_value_name
                 self.value_names.append(val_name)
             for detector_value_unit in detector.value_units:
                 self.value_units.append(detector_value_unit)
@@ -1842,9 +1844,15 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
-
-        data = np.array([data_raw[key]
+        if len(data_raw[next(iter(data_raw))])>1:
+            print('[DEBUG UHF SWF] SHOULD HAVE HAD AN ERROR')
+        # data = np.array([data_raw[key]
+        data = np.array([data_raw[key][-1]
+        # data = np.array([data_raw[key][-1]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
+        # print('[DEBUG UHF SWF] RAW shape',[data_raw[key]
+        #                  for key in sorted(data_raw.keys())])
+        # print('[DEBUG UHF SWF] shape 1',data.shape)
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -1859,6 +1867,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data = np.reshape(data.T,
                           (-1, no_virtual_channels, len(self.channels))).T
         data = data.reshape((len(self.value_names), -1))
+        # print('[DEBUG UHF SWF] shape 6',data.shape)
+        # if data.shape[1]>1:
+        #     print('[DEBUG UHF SWF] data',data)
 
         return data
 

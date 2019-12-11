@@ -149,7 +149,7 @@ class SimControlCZ(Instrument):
             unit="s",
             label="time spent at sweetspot during the two halves of a netzero pulse",
             parameter_class=ManualParameter,
-            vals=vals.Numbers(),
+            vals=vals.Numbers(min_value=0),
             initial_value=0,
         )
 
@@ -165,8 +165,42 @@ class SimControlCZ(Instrument):
             "simstep_div",
             label="Division of the simulation time step. 4 is a good one, corresponding to a time step of 0.1 ns. For smaller values landscapes can deviate significantly from experiment.",
             parameter_class=ManualParameter,
-            vals=vals.Numbers(),
+            vals=vals.Numbers(min_value=1),
             initial_value=4,
+        )
+
+        self.add_parameter(
+            "gates_num",
+            label="Chain the same gate gates_num times.",
+            parameter_class=ManualParameter,
+            vals=vals.Ints(min_value=1),
+            initial_value=1,
+        )
+
+        self.add_parameter(
+            "gates_interval",
+            label="Time interval that separates the the gates if gates_num > 1.",
+            parameter_class=ManualParameter,
+            unit='s',
+            vals=vals.Numbers(min_value=0),
+            initial_value=0,
+        )
+
+        self.add_parameter(
+            "cost_func",
+            label="Used to calculate the cost function based on the quantities of interest (qoi). Signature: cost_func(qoi). NB: qoi's that represent percentages will be in [0, 1] range. Inspect 'pycqed.simulations.cz_superoperator_simulation_new_functions.simulate_quantities_of_interest_superoperator_new??' in notebook for available qoi's.",
+            parameter_class=ManualParameter,
+            unit='a.u.',
+            vals=vals.Callable(),
+            initial_value=None,
+        )
+
+        self.add_parameter(
+            "cost_func_str",
+            label="Not loaded automatically. Convenience parameter to store the cost function string and use `exec('sim_control_CZ.cost_func(' + sim_control_CZ.cost_func_str() + ')')` to load it.",
+            parameter_class=ManualParameter,
+            vals=vals.Strings(),
+            initial_value="lambda qoi: np.log10((1 - qoi['avgatefid_compsubspace_pc']) * (1 - 0.5) + qoi['L1'] * 0.5)",
         )
 
         # for ramsey/Rabi simulations

@@ -12,6 +12,7 @@ from pycqed.analysis import fitting_models as fit_mods
 import pycqed.measurement.hdf5_data as h5d
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.optimize as optimize
+from scipy import stats
 import lmfit
 from collections import Counter  # used in counting string fractions
 import textwrap
@@ -4177,18 +4178,18 @@ class SSRO_Analysis(MeasurementAnalysis):
             norm0 = (bins0[1] - bins0[0]) * min_len
             norm1 = (bins1[1] - bins1[0]) * min_len
 
-            y0 = norm0 * (1 - frac1_0) * pylab.normpdf(bins0, mu0_0, sigma0_0) + \
-                norm0 * frac1_0 * pylab.normpdf(bins0, mu1_0, sigma1_0)
-            y1_0 = norm0 * frac1_0 * pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y0 = norm0 * (1 - frac1_0) * stats.norm.pdf(bins0, mu0_0, sigma0_0) + \
+                norm0 * frac1_0 * stats.norm.pdf(bins0, mu1_0, sigma1_0)
+            y1_0 = norm0 * frac1_0 * stats.norm.pdf(bins0, mu1_0, sigma1_0)
             y0_0 = norm0 * (1 - frac1_0) * \
-                pylab.normpdf(bins0, mu0_0, sigma0_0)
+                stats.norm.pdf(bins0, mu0_0, sigma0_0)
 
             # building up the histogram fits for on measurements
-            y1 = norm1 * (1 - frac1_1) * pylab.normpdf(bins1, mu0_1, sigma0_1) + \
-                norm1 * frac1_1 * pylab.normpdf(bins1, mu1_1, sigma1_1)
-            y1_1 = norm1 * frac1_1 * pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y1 = norm1 * (1 - frac1_1) * stats.norm.pdf(bins1, mu0_1, sigma0_1) + \
+                norm1 * frac1_1 * stats.norm.pdf(bins1, mu1_1, sigma1_1)
+            y1_1 = norm1 * frac1_1 * stats.norm.pdf(bins1, mu1_1, sigma1_1)
             y0_1 = norm1 * (1 - frac1_1) * \
-                pylab.normpdf(bins1, mu0_1, sigma0_1)
+                stats.norm.pdf(bins1, mu0_1, sigma0_1)
 
             pylab.semilogy(bins0, y0, 'C0', linewidth=1.5)
             pylab.semilogy(bins0, y1_0, 'C0--', linewidth=3.5)
@@ -4411,15 +4412,15 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
-                ax.ticklabel_format(style='sci', fontsize=4,
+                ax.ticklabel_format(style='sci', 
                                     scilimits=(0, 0))
                 set_xlabel(ax, 'I', self.value_units[0])
                 edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
-                # ax.set_axis_bgcolor(plt.cm.viridis(0))
+                
             set_ylabel(axs[0], 'Q', self.value_units[1])
-            # axs[0].ticklabel_format(style = 'sci',  fontsize=4)
+            
 
             self.save_fig(
                 fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
@@ -7906,6 +7907,259 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                                   params=params)
 
         return fit_res
+
+class Resonator_Powerscan_Analysis_test(MeasurementAnalysis):
+
+    def __init__(self, label='powersweep', **kw):
+        super(self.__class__, self).__init__(**kw)
+
+    # def run_default_analysis(self,  normalize=True, w_low_power=None,
+    #                          w_high_power=None, **kw):
+    # super(self.__class__, self).run_default_analysis(close_file=False,
+    #     save_fig=False, **kw)
+    # close_file = kw.pop('close_file', True)
+    def run_default_analysis(self, normalize=True, plot_Q=True, plot_f0=True,
+                             plot_linecuts=True, linecut_log=True,
+                             plot_all=False, save_fig=True, use_min=False,
+                             **kw):
+        close_file = kw.pop('close_file', True)
+        self.add_analysis_datagroup_to_file()
+
+        self.get_naming_and_values_2D()
+        self.fig_array = []
+        self.ax_array = []
+        fits = {}  # Dictionary to store the fit results in. Fit results are a
+        # dictionary themselfes -> Dictionary of Dictionaries
+
+        f0 = np.zeros(len(self.sweep_points_2D))
+        for u, power in enumerate(self.sweep_points_2D):
+            fit_res = self.fit_hanger_model(
+                self.sweep_points, self.measured_values[0][:, u])
+            self.save_fitted_parameters(
+                fit_res, var_name='Powersweep' + str(u))
+            fits[str(power)] = fit_res
+            if use_min:
+                min_index = np.argmin(self.measured_values[0][:, u])
+                f0[u] = np.min(self.sweep_points[min_index])
+            else:
+                f0[u] = fits[str(power)].values['f0']
+            self.f0 = f0
+
+        self.fit_results = fits
+
+        xlabel = kw.pop("xlabel", self.sweep_name)
+        ylabel = kw.pop("ylabel", self.sweep_name_2D)
+        x_unit = kw.pop("x_unit", self.sweep_unit)
+        y_unit = kw.pop("y_unit", self.sweep_unit_2D)
+        z_unit_linecuts = self.value_units[0]
+
+        for i, meas_vals in enumerate(self.measured_values):
+            if "zlabel" not in kw:
+                kw["zlabel"] = self.value_names[i]
+            if "z_unit" not in kw:
+                if normalize:
+                    kw["z_unit"] = 'normalized'
+                else:
+                    kw["z_unit"] = self.value_units[i]
+
+            if (not plot_all) & (i >= 1):
+                break
+            # Linecuts are above because normalization changes the values of the
+            # object. Thus it affects both colorplot and linecuts otherwise.
+            if plot_Q:
+                Q = np.zeros(len(self.sweep_points_2D))
+                Qc = np.zeros(len(self.sweep_points_2D))
+                for u, power in enumerate(self.sweep_points_2D):
+                    Q[u] = self.fit_results[str(power)].values['Q']
+                    Qc[u] = self.fit_results[str(power)].values['Qc']
+                fig, ax = self.default_ax(figsize=(8, 5))
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                fig_title = '{timestamp}_{measurement}_{val_name}_QvsPower'.format(
+                    timestamp=self.timestamp_string,
+                    measurement=self.measurementstring,
+                    val_name=self.zlabels[i])
+                ax.plot(
+                    self.sweep_points_2D, Q, 'blue', label='Loaded Q-Factor')
+                ax.plot(
+                    self.sweep_points_2D, Qc, 'green', label='Coupling Q-Factor')
+                ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
+                ax.set_position([0.1, 0.1, 0.5, 0.8])
+                set_ylabel(ax, 'Quality Factor')
+                set_xlabel(ax, ylabel, y_unit)
+
+                if save_fig:
+                    self.save_fig(
+                        fig, figname=fig_title, fig_tight=False, **kw)
+
+            if plot_f0:
+                fig, ax = self.default_ax(figsize=(8, 5))
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                fig_title = '{timestamp}_{measurement}_{val_name}_f0vsPower'.format(
+                    timestamp=self.timestamp_string,
+                    measurement=self.measurementstring,
+                    val_name=self.zlabels[i])
+                ax.plot(self.sweep_points_2D, f0, 'blue', marker='o',
+                        label='Cavity Frequency')
+                ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
+                ax.set_position([0.15, 0.1, 0.5, 0.8])
+                set_ylabel(ax, xlabel, x_unit)
+                set_xlabel(ax, ylabel, y_unit)
+
+                if save_fig:
+                    self.save_fig(
+                        fig, figname=fig_title, fig_tight=False, **kw)
+
+            if plot_linecuts:
+                fig, ax = self.default_ax(figsize=(8, 5))
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                fig_title = '{timestamp}_{measurement}_{val_name}_linecut'.format(
+                    timestamp=self.timestamp_string,
+                    measurement=self.measurementstring,
+                    val_name=self.zlabels[i])
+                a_tools.linecut_plot(x=self.sweep_points,
+                                     y=self.sweep_points_2D,
+                                     z=self.measured_values[i],
+                                     plot_title=fig_title,
+                                     log=linecut_log,
+                                     xlabel=xlabel,
+                                     x_unit=x_unit,
+                                     y_name=ylabel,
+                                     y_unit=y_unit,
+                                     z_unit_linecuts=z_unit_linecuts,
+                                     fig=fig, ax=ax, **kw)
+                if save_fig:
+                    self.save_fig(
+                        fig, figname=fig_title, fig_tight=False, **kw)
+
+            fig, ax = self.default_ax(figsize=(8, 5))
+            self.fig_array.append(fig)
+            self.ax_array.append(ax)
+            if normalize:
+                meas_vals = a_tools.normalize_2D_data(meas_vals)
+            fig_title = '{timestamp}_{measurement}_{val_name}'.format(
+                timestamp=self.timestamp_string,
+                measurement=self.measurementstring,
+                val_name=self.zlabels[i])
+
+            a_tools.color_plot(x=self.sweep_points,
+                               y=self.sweep_points_2D,
+                               z=meas_vals.transpose(),
+                               plot_title=fig_title,
+                               xlabel=xlabel,
+                               x_unit=x_unit,
+                               ylabel=ylabel,
+                               y_unit=y_unit,
+                               fig=fig, ax=ax, **kw)
+            if save_fig:
+                self.save_fig(fig, figname=fig_title, **kw)
+
+        if close_file:
+            self.finish()
+
+
+        # Find low power regime
+        threshold = 0.1e6  # Gotta love hardcoded stuff
+        f_low = f0[0]
+        P_result = self.sweep_points_2D[0]
+        try:
+            for u, f in enumerate(f0):
+                if np.abs(f0[0] - f0[u+1]) < threshold:
+                    f_low = f0[u+1]
+                    P_result = self.sweep_points_2D[u]
+                else:
+                    break
+        except IndexError:
+            pass
+
+        # High power regime: just use the value at highest power
+        f_high = f0[-1]
+
+        shift = 0
+        shift_data=[]
+        for i in range(len(f0)):
+            if (f0[0] - f0[-1]) > 200e3: 
+                shift = f0[0] - f0[-1]
+            elif (f0[0] - f0[i]) > 200e3 : 
+                shifts= f0[0] - f0[i]
+                shift_data.append(shifts)
+                shift=np.amax(shift_data)
+            else:
+                logging.warning('No power shift found. Consider attenuation')
+                
+        # if (f_high < f_low):
+        #     shift = f_high - f_low
+        # else:
+        #     shift = 0
+        #     logging.warning('No power shift found. Consider attenuation')
+        #     # raise Exception('High power regime frequency found to be higher than'
+        #     #                 'low power regime frequency')
+
+        self.f_low = f_low
+        self.f_high = f_high
+        self.shift = shift
+        self.power = P_result
+
+    def fit_hanger_model(self, sweep_values, measured_values):
+        HangerModel = fit_mods.SlopedHangerAmplitudeModel
+
+        # amplitude_guess = np.pi*sigma_guess * abs(
+        #     max(self.measured_powers)-min(self.measured_powers))
+
+        # Fit Power to a Lorentzian
+        measured_powers = measured_values ** 2
+
+        min_index = np.argmin(measured_powers)
+        max_index = np.argmax(measured_powers)
+
+        min_frequency = sweep_values[min_index]
+        max_frequency = sweep_values[max_index]
+
+        peaks = a_tools.peak_finder((sweep_values),
+                                    measured_values)
+
+        if peaks['dip'] is not None:  # look for dips first
+            f0 = peaks['dip']
+            amplitude_factor = -1.
+        elif peaks['peak'] is not None:  # then look for peaks
+            f0 = peaks['peak']
+            amplitude_factor = 1.
+        else:  # Otherwise take center of range
+            f0 = np.median(sweep_values)
+            amplitude_factor = -1.
+            logging.error('No peaks or dips in range')
+            # If this error is raised, it should continue the analysis but
+            # not use it to update the qubit object
+
+        amplitude_guess = max(measured_powers) - min(measured_powers)
+        # Creating parameters and estimations
+        S21min = min(measured_values) / max(measured_values)
+
+        Q = f0 / abs(min_frequency - max_frequency)
+        Qe = abs(Q / abs(1 - S21min))
+
+        HangerModel.set_param_hint('f0', value=f0,
+                                   min=min(sweep_values),
+                                   max=max(sweep_values))
+        HangerModel.set_param_hint('A', value=amplitude_guess)
+        HangerModel.set_param_hint('Q', value=Q)
+        HangerModel.set_param_hint('Qe', value=Qe)
+        HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
+                                   vary=False)
+        HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
+        HangerModel.set_param_hint('theta', value=0, min=-np.pi / 2,
+                                   max=np.pi / 2)
+        HangerModel.set_param_hint('slope', value=0, vary=True,
+                                   min=-1, max=1)
+        params = HangerModel.make_params()
+        fit_res = HangerModel.fit(data=measured_powers,
+                                  f=sweep_values * 1.e9,
+                                  params=params)
+
+        return fit_res
+
 
 
 class time_trace_analysis(MeasurementAnalysis):

@@ -1,3 +1,4 @@
+import numpy as np
 from pycqed.analysis_v2 import tfd_analysis as tfda
 
 
@@ -46,33 +47,33 @@ def test_calc_tfd_hamiltonian_terms():
     energy_terms = tfda.calc_tfd_hamiltonian(
         pauli_terms=pauli_terms,
         g=1, T=0)
-    assert energy_terms['H'] == 2
-    assert energy_terms['H_A'] == 1
-    assert energy_terms['H_B'] == 1
-    assert energy_terms['H_AB'] == 1
+    assert np.isclose(energy_terms['H'],3.14)
+    assert np.isclose(energy_terms['H_A'],1.57)
+    assert np.isclose(energy_terms['H_B'],1.57)
+    assert np.isclose(energy_terms['H_AB'],1)
 
     energy_terms = tfda.calc_tfd_hamiltonian(
         pauli_terms=pauli_terms,
         g=1, T=2)
-    assert energy_terms['H'] == 0
-    assert energy_terms['H_A'] == 1
-    assert energy_terms['H_B'] == 1
-    assert energy_terms['H_AB'] == 1
+    assert np.isclose(energy_terms['H'],0.1709528587419018)
+    assert np.isclose(energy_terms['H_A'],1.57)
+    assert np.isclose(energy_terms['H_B'],1.57)
+    assert np.isclose(energy_terms['H_AB'],1)
 
     # Test scaling the coupling term g
     pauli_terms['XIII'] = 1
     energy_terms = tfda.calc_tfd_hamiltonian(
         pauli_terms=pauli_terms,
         g=0, T=2)
-    assert energy_terms['H'] == 0
-    assert energy_terms['H_A'] == 1
-    assert energy_terms['H_B'] == 1
-    assert energy_terms['H_AB'] == 1
+    assert np.isclose(energy_terms['H'],0.1709528587419018)
+    assert np.isclose(energy_terms['H_A'],1.57)
+    assert np.isclose(energy_terms['H_B'],1.57)
+    assert np.isclose(energy_terms['H_AB'],1)
 
     energy_terms = tfda.calc_tfd_hamiltonian(
         pauli_terms=pauli_terms,
         g=1, T=2)
-    assert energy_terms['H'] == 1
-    assert energy_terms['H_A'] == 2
-    assert energy_terms['H_B'] == 1
-    assert energy_terms['H_AB'] == 1
+    assert np.isclose(energy_terms['H'],1.1709528587419022)
+    assert np.isclose(energy_terms['H_A'],2.57)
+    assert np.isclose(energy_terms['H_B'],1.57)
+    assert np.isclose(energy_terms['H_AB'],1)
