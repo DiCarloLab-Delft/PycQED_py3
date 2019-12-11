@@ -62,14 +62,14 @@ class test_SI_unit_aware_labels(unittest.TestCase):
 
 class test_format_lmfit_par(unittest.TestCase):
     def test_format_lmfit_par(self):
-        p = lmfit.Parameter()
+        p = lmfit.Parameter('p')
         p.value = 5.12
         p.stderr = 0.024
         test_str = format_lmfit_par('test_par', p, end_char='\n')
         self.assertEqual(test_str, 'test_par: 5.1200$\\pm$0.0240\n')
 
     def test_format_lmfit_par_missing_stderr(self):
-        p = lmfit.Parameter()
+        p = lmfit.Parameter('p')
         p.value = 5.12
         test_str = format_lmfit_par('test_par', p, end_char='')
         self.assertEqual(test_str, 'test_par: 5.1200$\\pm$NaN')

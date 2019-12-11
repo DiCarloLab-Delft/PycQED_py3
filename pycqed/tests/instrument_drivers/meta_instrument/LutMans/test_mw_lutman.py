@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import pytest
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 import pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module as qwg
 
@@ -8,6 +9,7 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import \
     get_redundant_codewords, get_wf_idx_from_name
 
+# pytestmark = pytest.mark.skip
 def adjust_array_len(x, multiple_of_n):
     """Adjust the length of a numpy array x to be a multiple of multiple_of_n samples by appending zeros."""
     if len(x) % multiple_of_n != 0:

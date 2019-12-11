@@ -1,6 +1,7 @@
 import qcodes as qc
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
+import PyQt5
 from qcodes.plots.pyqtgraph import QtPlot
 station = qc.station
 

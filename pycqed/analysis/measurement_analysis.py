@@ -12,6 +12,7 @@ from pycqed.analysis import fitting_models as fit_mods
 import pycqed.measurement.hdf5_data as h5d
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.optimize as optimize
+from scipy import stats
 import lmfit
 from collections import Counter  # used in counting string fractions
 import textwrap
@@ -4177,18 +4178,18 @@ class SSRO_Analysis(MeasurementAnalysis):
             norm0 = (bins0[1] - bins0[0]) * min_len
             norm1 = (bins1[1] - bins1[0]) * min_len
 
-            y0 = norm0 * (1 - frac1_0) * pylab.normpdf(bins0, mu0_0, sigma0_0) + \
-                norm0 * frac1_0 * pylab.normpdf(bins0, mu1_0, sigma1_0)
-            y1_0 = norm0 * frac1_0 * pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y0 = norm0 * (1 - frac1_0) * stats.norm.pdf(bins0, mu0_0, sigma0_0) + \
+                norm0 * frac1_0 * stats.norm.pdf(bins0, mu1_0, sigma1_0)
+            y1_0 = norm0 * frac1_0 * stats.norm.pdf(bins0, mu1_0, sigma1_0)
             y0_0 = norm0 * (1 - frac1_0) * \
-                pylab.normpdf(bins0, mu0_0, sigma0_0)
+                stats.norm.pdf(bins0, mu0_0, sigma0_0)
 
             # building up the histogram fits for on measurements
-            y1 = norm1 * (1 - frac1_1) * pylab.normpdf(bins1, mu0_1, sigma0_1) + \
-                norm1 * frac1_1 * pylab.normpdf(bins1, mu1_1, sigma1_1)
-            y1_1 = norm1 * frac1_1 * pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y1 = norm1 * (1 - frac1_1) * stats.norm.pdf(bins1, mu0_1, sigma0_1) + \
+                norm1 * frac1_1 * stats.norm.pdf(bins1, mu1_1, sigma1_1)
+            y1_1 = norm1 * frac1_1 * stats.norm.pdf(bins1, mu1_1, sigma1_1)
             y0_1 = norm1 * (1 - frac1_1) * \
-                pylab.normpdf(bins1, mu0_1, sigma0_1)
+                stats.norm.pdf(bins1, mu0_1, sigma0_1)
 
             pylab.semilogy(bins0, y0, 'C0', linewidth=1.5)
             pylab.semilogy(bins0, y1_0, 'C0--', linewidth=3.5)
@@ -4411,15 +4412,15 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
-                ax.ticklabel_format(style='sci', fontsize=4,
+                ax.ticklabel_format(style='sci', 
                                     scilimits=(0, 0))
                 set_xlabel(ax, 'I', self.value_units[0])
                 edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
-                # ax.set_axis_bgcolor(plt.cm.viridis(0))
+                
             set_ylabel(axs[0], 'Q', self.value_units[1])
-            # axs[0].ticklabel_format(style = 'sci',  fontsize=4)
+            
 
             self.save_fig(
                 fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
