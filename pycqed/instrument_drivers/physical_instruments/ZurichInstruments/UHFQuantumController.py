@@ -48,7 +48,6 @@ Changelog:
 
 import time
 import os
-import sys
 import logging
 import numpy as np
 import pycqed
@@ -368,17 +367,17 @@ class UHFQC(zibase.ZI_base_instrument):
                 unit='',  # unit is adc value
                 label='RO normalization offset',
                 initial_value=0.0,
-                docstring='an offset correction parameter for all weight functions, '\
-                         'this allows normalized calibration when performing cross-talk suppressed readout. The parameter '\
-                         'is not actually used in this driver, but in some of the support classes that make use of the driver.',
+                docstring='an offset correction parameter for all weight functions, '
+                'this allows normalized calibration when performing cross-talk suppressed readout. The parameter '
+                'is not actually used in this driver, but in some of the support classes that make use of the driver.',
                 parameter_class=ManualParameter)
 
         self.add_parameter(
             'AWG_file',
             set_cmd=self._do_set_AWG_file,
             docstring='Configures the AWG with a SeqC program from a specific file. '
-                     'Provided only for backwards compatibility. It is discouraged to use '
-                     'this parameter unless you know what you are doing',
+            'Provided only for backwards compatibility. It is discouraged to use '
+            'this parameter unless you know what you are doing',
             vals=validators.Anything())
 
         self.add_parameter(
@@ -408,14 +407,14 @@ class UHFQC(zibase.ZI_base_instrument):
             vals=validators.Lists())
 
         self.add_parameter('dio_calibration_delay',
-           set_cmd=self._set_dio_calibration_delay,
-           get_cmd=self._get_dio_calibration_delay,
-           unit='',
-           label='DIO Calibration delay',
-           docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
-                     'to be applied on the DIO interface in order to achieve reliable sampling'
-                     ' of the codewords. The valid range is 0 to 15.',
-           vals=validators.Ints())
+            set_cmd=self._set_dio_calibration_delay,
+            get_cmd=self._get_dio_calibration_delay,
+            unit='',
+            label='DIO Calibration delay',
+            docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
+            'to be applied on the DIO interface in order to achieve reliable sampling '
+            'of the codewords. The valid range is 0 to 15.',
+            vals=validators.Ints())
 
     def _codeword_table_preamble(self, awg_nr):
         """
