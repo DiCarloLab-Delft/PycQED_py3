@@ -5,6 +5,7 @@
 
 import numpy as np
 from matplotlib import pyplot as plt
+import PyQt5
 from qcodes.plots.pyqtgraph import QtPlot
 from qcodes.plots.colors import color_cycle
 

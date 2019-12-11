@@ -1,4 +1,5 @@
 import time
+import PyQt5
 import pyqtgraph as pg
 import pyqtgraph.multiprocess as pgmp
 

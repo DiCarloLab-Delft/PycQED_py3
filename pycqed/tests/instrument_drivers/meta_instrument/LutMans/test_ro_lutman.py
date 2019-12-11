@@ -22,4 +22,3 @@ class Test_ro_lutman(unittest.TestCase):
 
     def test_ro_lutman(self):
         pass
-        raise ValueError
