@@ -45,9 +45,9 @@ QUTech:DEBUG:CCIO0:MARKER:IN 16
 QUTech:DEBUG:CCIO0:MARKER:IN 17
 QUTech:DEBUG:CCIO0:MARKER:OUT 16
 QUTech:DEBUG:CCIO8:MARKER:OUT 31
-QUTech:SEQuence:PROGram #19    stop
+QUTech:SEQuence:PROGram:ASSEMble #19    stop
 
-QUTech:SEQuence:PROGram #19    stop
+QUTech:SEQuence:PROGram:ASSEMble #19    stop
 
 awgcontrol:run:immediate
 awgcontrol:stop:immediate
