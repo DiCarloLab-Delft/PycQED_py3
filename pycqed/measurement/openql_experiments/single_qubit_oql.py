@@ -93,12 +93,12 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
 
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
                            platf_cfg: str, trigger_idx: int,
-                           wait_time_ns: int = 0, cc: str='CCL',spec_instr:float ='spec'):
+                           wait_time_ns: int = 0, cc: str='CCL'):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
-    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    this one triggers the 0th trigger port of the CCLight and uses the zeroth
     wave output on the AWG (currently hardcoded, should be improved)
-
+    FIXME: comment outdated
     """
     p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
     k = oqh.create_kernel("main", p)
@@ -109,7 +109,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
         spec_instr = 'spec'
     elif cc=='QCC':
         spec_instr = 'sf_square'
-    elif cc=='cc':
+    elif cc=='CC':
         spec_instr = 'spec'
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
