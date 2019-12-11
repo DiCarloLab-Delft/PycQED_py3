@@ -1088,10 +1088,9 @@ class QWGMultiDevices:
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
     Usually all methods are static
     """
-    from pycqed.instrument_drivers.physical_instruments import QuTech_QCC
 
     @staticmethod
-    def dio_calibration(cc: QuTech_QCC, qwgs: List[QuTech_AWG_Module],
+    def dio_calibration(cc, qwgs: List[QuTech_AWG_Module],
             verbose: bool = False):
         """
         Calibrate multiple QWG using a CCLight
@@ -1111,24 +1110,30 @@ class QWGMultiDevices:
         # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
         for qwg in qwgs:
             qwg.stop()
-
         if not cc:
             raise ValueError("Cannot calibrate QWGs; No CC provided")
-
-        if cc.ask("QUTech:RUN?") == '1':
-            cc.stop()
 
         _qwg_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '_QWG'))
 
+        CC_model = cc.IDN()['model']
+        if 'QCC' in CC_model:
+            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
+                'QCC_DIO_Calibration.qisa')
+            cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
+            qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
+                'qcc_qisa_opcodes.qmap')
+        elif 'CCL' in CC_model:
+            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
+                'QWG_DIO_Calibration.qisa')
+            cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
+            qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
+                'qisa_opcodes.qmap')
+        else:
+            raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
-        qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
-            'QCC_DIO_Calibration.qisa')
-
-        cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
-
-        qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
-            'qcc_qisa_opcodes.qmap')
+        if cc.ask("QUTech:RUN?") == '1':
+            cc.stop()
 
         old_cs = cc.control_store()
         old_qisa_opcode = cc.qisa_opcode()
