@@ -104,7 +104,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     k = oqh.create_kernel("main", p)
 
     nr_clocks = int(spec_pulse_length/20e-9)
-    print('Adding {} to spec seq'.format(wait_time_ns))
+    print('Adding {} [ns] to spec seq'.format(wait_time_ns))
     if cc=='CCL':
         spec_instr = 'spec'
     elif cc=='QCC':

@@ -11,7 +11,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 class Test_QutechCC(unittest.TestCase):
     def test_all(self):
         file_name = 'Test_QutechCC_test_all.scpi.txt'
-        test_path = Path('test_output' / file_name)
+        test_path = Path('test_output') / file_name
         os.makedirs('test_output', exist_ok=True)
 
         transport = FileTransport(str(test_path))
