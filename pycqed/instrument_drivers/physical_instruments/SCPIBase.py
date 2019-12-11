@@ -34,6 +34,10 @@ class SCPIBase:
     def _ask_int(self, cmd_str: str) -> int:
         return int(self._ask(cmd_str))  # FIXME: can raise ValueError
 
+    def _ask_bin(self, cmd_str: str) -> bytes:
+        self._transport.write(cmd_str)
+        return self.bin_block_read()
+
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
     ###
@@ -93,11 +97,40 @@ class SCPIBase:
         """
         return self._ask('system:err?')
 
-    def get_system_error_count(self):
+    def get_system_error_count(self) -> int:
         return self._ask_int('system:error:count?')
+
+    def status_preset(self) -> None:
+        self._transport.write('STATus:PRESet')
 
     def get_system_version(self) -> str:
         return self._ask('system:version?')
+
+
+    def get_status_questionable_condition(self) -> int:
+        return self._ask_int('STATus:QUEStionable:CONDition?')
+
+    def get_status_questionable_event(self) -> int:
+        return self._ask_int('STATus:QUEStionable:EVENt?')
+
+    def set_status_questionable_enable(self, val) -> None:
+        self._transport.write('STATus:QUEStionable:ENABle {}'.format(val))
+
+    def get_status_questionable_enable(self) -> int:
+        return self._ask_int('STATus:QUEStionable:ENABle?')
+
+
+    def get_status_operation_condition(self) -> int:
+        return self._ask_int('STATus:OPERation:CONDition?')
+
+    def get_status_operation_event(self) -> int:
+        return self._ask_int('STATus:OPERation:EVENt?')
+
+    def set_status_operation_enable(self, val) -> None:
+        self._transport.write('STATus:OPERation:ENABle {}'.format(val))
+
+    def get_status_operation_enable(self) -> int:
+        return self._ask_int('STATus:OPERation:ENABle?')
 
     ###
     # IEEE 488.2 binblock handling
@@ -132,49 +165,6 @@ class SCPIBase:
         self._transport.read_binary(2)                                  # consume <CR><LF>
         return bin_block
 
-    @staticmethod
-    def _build_header_string(byte_cnt: int) -> str:
-        """ generate IEEE488.2 binblock header
-        """
-        byte_cnt_str = str(byte_cnt)
-        digit_cnt_str = str(len(byte_cnt_str))
-        bin_header_str = '#' + digit_cnt_str + byte_cnt_str
-        return bin_header_str
-
-    # FIXME: additions
-    # enter_critical
-    # exit_critical
-
-    def get_status_questionable_condition(self):
-        return self._ask_int('STATus:QUEStionable:CONDition?')
-
-    def get_status_questionable_event(self):
-        return self._ask_int('STATus:QUEStionable:EVENt?')
-
-    def set_status_questionable_enable(self, val):
-        self._transport.write('STATus:QUEStionable:ENABle {}'.format(val))
-
-    def get_status_questionable_enable(self):
-        return self._ask_int('STATus:QUEStionable:ENABle?')
-
-
-    def set_status_preset(self):
-        self._transport.write('STATus:PRESet')
-
-
-    def get_status_operation_condition(self):
-        return self._ask_int('STATus:OPERation:CONDition?')
-
-    def get_status_operation_event(self):
-        return self._ask_int('STATus:OPERation:EVENt?')
-
-    def set_status_operation_enable(self, val):
-        self._transport.write('STATus:OPERation:ENABle {}'.format(val))
-
-    def get_status_operation_enable(self):
-        return self._ask_int('STATus:OPERation:ENABle?')
-
-
     ###
     # IEEE488.2 status constants
     ###
@@ -191,16 +181,16 @@ class SCPIBase:
 
     # bits for STATus:OPERation
     # FIXME: add the function
-    STAT_OPER_CALIBRATING       = 0x0001       # The instrument is currently performing a calibration
-    STAT_OPER_SETTLING          = 0x0002          # The instrument is waiting for signals it controls to stabilize enough to begin measurements
-    STAT_OPER_RANGING           = 0x0004           # The instrument is currently changing its range
-    STAT_OPER_SWEEPING          = 0x0008          # A sweep is in progress
-    STAT_OPER_MEASURING         = 0x0010       # The instrument is actively measuring
-    STAT_OPER_WAIT_TRIG         = 0x0020        # The instrument is in a “wait for trigger” state of the trigger model
-    STAT_OPER_WAIT_ARM          = 0x0040         # The instrument is in a “wait for arm” state of the trigger model
-    STAT_OPER_CORRECTING        = 0x0080      # The instrument is currently performing a correction
-    STAT_OPER_INSTR_SUMMARY     = 0x2000  # One of n multiple logical instruments is reporting OPERational status
-    STAT_OPER_PROG_RUNNING      = 0x4000  # A user-defined program is currently in the run state
+    STAT_OPER_CALIBRATING       = 0x0001    # The instrument is currently performing a calibration
+    STAT_OPER_SETTLING          = 0x0002    # The instrument is waiting for signals it controls to stabilize enough to begin measurements
+    STAT_OPER_RANGING           = 0x0004    # The instrument is currently changing its range
+    STAT_OPER_SWEEPING          = 0x0008    # A sweep is in progress
+    STAT_OPER_MEASURING         = 0x0010    # The instrument is actively measuring
+    STAT_OPER_WAIT_TRIG         = 0x0020    # The instrument is in a “wait for trigger” state of the trigger model
+    STAT_OPER_WAIT_ARM          = 0x0040    # The instrument is in a “wait for arm” state of the trigger model
+    STAT_OPER_CORRECTING        = 0x0080    # The instrument is currently performing a correction
+    STAT_OPER_INST_SUMMARY      = 0x2000    # One of n multiple logical instruments is reporting OPERational status
+    STAT_OPER_PROG_RUNNING      = 0x4000    # A user-defined program is currently in the run state
 
     # bits for STATus:QUEStionable
     # FIXME: add the function
@@ -213,6 +203,19 @@ class SCPIBase:
     STAT_QUES_PHASE             = 0x0040
     STAT_QUES_MODULATION        = 0x0080
     STAT_QUES_CALIBRATION       = 0x0100
-    STAT_QUES_INSTR_SUMMARY     = 0x2000
+    STAT_QUES_INST_SUMMARY      = 0x2000
     STAT_QUES_COMMAND_WARNING   = 0x4000
+
+    ###
+    # static methods
+    ###
+
+    @staticmethod
+    def _build_header_string(byte_cnt: int) -> str:
+        """ generate IEEE488.2 binblock header
+        """
+        byte_cnt_str = str(byte_cnt)
+        digit_cnt_str = str(len(byte_cnt_str))
+        bin_header_str = '#' + digit_cnt_str + byte_cnt_str
+        return bin_header_str
 
