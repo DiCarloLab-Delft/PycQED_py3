@@ -435,7 +435,7 @@ class Test_CC(Test_CCL):
     @classmethod
     def setUpClass(self):
         super().setUpClass()
-        self.CC = QuTechCC('CC', DummyTransport())
+        self.CC = QuTechCC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
         self.CCL_qubit.instr_CC(self.CC.name)
 
         config_fn = os.path.join(
