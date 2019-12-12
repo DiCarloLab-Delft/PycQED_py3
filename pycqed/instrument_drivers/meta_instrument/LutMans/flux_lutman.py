@@ -24,6 +24,9 @@ import time
 from datetime import datetime
 import cma
 from pycqed.measurement.optimization import nelder_mead, multi_targets_phase_offset
+from pycqed.utilities.learnerND_optimize import (
+    mk_optimize_resolution_loss_func,
+    LearnerND_Optimize)
 
 import logging
 log = logging.getLogger(__name__)
@@ -1374,16 +1377,15 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             fluxlutman_static,
             which_gate,
             n_points=249,
+            res_bounds=(0.7, 3),
             theta_f_lims=[10, 180],
             lambda_2_lims=[-1., 1.],
             lambda_3=0.,
             sim_control_CZ_pars=None,
             label=None,
-            max_density_factor=3,  # Seems rasonable form experience
             target_cond_phase=180,
             optimize_phase_q0=False,
             evaluate_local_optimals=False,
-            expected_max_minima_num=3,  # Seems rasonable form experience
             qois=['Cost func', 'Cond phase', 'L1', 'phase_q0', 'phase_q1'],
             sweep_mode='adaptive',
             adaptive_pars=None):
@@ -1416,34 +1418,12 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             self.set(sim_control_CZ_par_name, sim_control_CZ.name)
 
         if sim_control_CZ_pars is None or 'cost_func_str' not in sim_control_CZ_pars:
-            # [Victor, 2019-12-04]
-            # The goal of this cost function is to force the learner to
-            # sample most points in regions where the cost fucntion is low
-            # So far I coundn't find an implemented way of doing this
-            # What i wanted was to combine SKOptLearner (that looks for global
-            # minimum) and a resolution limited loss e.g
-            # `adaptive.learner.learner2D.resolution_loss_function`
-            # The clever way I found of achieving the goal:
-            # The `adaptive.Learner2D` has the "feature" of getting stuck
-            # at divergencies => create divergencies in the cost function
-            # at the points we consider inteteresting to sample.
-            # 1. We want cost_func = 0 => change cost_func to 1/cost_func
-            # Now we have a divergence
-            # 2. Wrap the cost function with `tanh` to smooth out everything
-            # that is not close to zero
-            # 3. Renormalize the argument of `tanh` by divinding by some
-            # constant to "widen" the deep at zero and make it more easy for
-            # the learner to find the minimas of the original cost function
-            # [! Not totally sure about this argument]
-            # 4. Change sign to negative for the rest of the analysis to work
-            # because it is designed to look for minima
-            cost_func_str = "lambda qoi: -1/np.tanh(({} + qoi['L1'] * 100 / {}) / {})".format(
+            cost_func_str = "lambda qoi: {} + qoi['L1'] * 100 / {}".format(
                             multi_targets_phase_offset(target=target_cond_phase,
                                 spacing=2 * target_cond_phase,
                                 phase_name="qoi['phi_cond']"),
-                            0.05,  # 0.05% L1 equiv. to 1 deg in cond phase
-                            target_cond_phase / 2)
-            sim_control_CZ.set_cost_func(cost_func_str=cost_func_str)
+                            0.05)  # 0.05% L1 equiv. to 1 deg in cond phase
+            sim_control_CZ.cost_func_str(cost_func_str)
 
         if sim_control_CZ_pars is not None:
             for key, val in sim_control_CZ_pars.items():
@@ -1480,24 +1460,18 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             MC.run(label, mode='2D')
 
         elif sweep_mode == 'adaptive':
-            # Allow for regions with sampling denisties up to
-            # ~ max_density_factor times the uniform sampling
-            min_distance = 1 / np.sqrt(n_points) / max_density_factor
-            # Don't allow for regions to have too low sampling density
-            # Set a max_distance based on the expected maximum number
-            # of local minima such that. This
-            max_distance = (1 / np.sqrt(n_points)) * expected_max_minima_num
-
-            loss = adaptive.learner.learner2D.resolution_loss_function(
-                min_distance=min_distance,
-                max_distance=max_distance)
+            loss = mk_optimize_resolution_loss_func(
+                n_points=n_points,
+                n_dim=2,  # Optimizing 2 over parameters
+                res_bounds=res_bounds,
+                minimize=True)
 
             adaptive_pars_default = {
-                'adaptive_function': adaptive.Learner2D,
+                'adaptive_function': LearnerND_Optimize,
                 'n_points': n_points,
                 'bounds': np.array([theta_f_lims, lambda_2_lims]),
                 'goal': lambda l: l.npoints > n_points,
-                'loss_per_triangle': loss
+                'loss_per_simplex': loss
             }
             adaptive_pars = adaptive_pars or adaptive_pars_default
             MC.set_adaptive_function_parameters(adaptive_pars)
