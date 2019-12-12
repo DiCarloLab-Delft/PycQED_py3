@@ -11,6 +11,8 @@ try:
     from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
 except ImportError:
     pass  # This is to make the lutman work if no OpenQL is installed.
+
+import PyQt5
 from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
@@ -822,52 +824,59 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def _add_cfg_parameters(self):
 
-        self.add_parameter('cfg_awg_channel',
-                           initial_value=1,
-                           vals=vals.Ints(1, 8),
-                           parameter_class=ManualParameter)
-        self.add_parameter('cfg_distort',
-                           initial_value=True,
-                           vals=vals.Bool(),
-                           parameter_class=ManualParameter)
         self.add_parameter(
-            'cfg_append_compensation', docstring=(
+            'cfg_awg_channel',
+            initial_value=1,
+            vals=vals.Ints(1, 8),
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_distort',
+            initial_value=True,
+            vals=vals.Bool(),
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_append_compensation',
+            docstring=(
                 'If True compensation pulses will be added to individual '
                 ' waveforms creating very long waveforms for each codeword'),
             initial_value=True, vals=vals.Bool(),
             parameter_class=ManualParameter)
-        self.add_parameter('cfg_compensation_delay',
-                           parameter_class=ManualParameter,
-                           initial_value=3e-6,
-                           unit='s',
-                           vals=vals.Numbers())
-
         self.add_parameter(
-            'cfg_pre_pulse_delay', unit='s', label='Pre pulse delay',
+            'cfg_compensation_delay',
+            initial_value=3e-6,
+            unit='s',
+            vals=vals.Numbers(),
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_pre_pulse_delay',
+            unit='s',
+            label='Pre pulse delay',
             docstring='This parameter is used for fine timing corrections, the'
                       ' correction is applied in distort_waveform.',
             initial_value=0e-9,
             vals=vals.Numbers(0, 1e-6),
             parameter_class=ManualParameter)
-
-        self.add_parameter('instr_distortion_kernel',
-                           parameter_class=InstrumentRefParameter)
-        self.add_parameter('instr_partner_lutman',
-                           docstring='LutMan responsible for the corresponding'
-                           'channel in the AWG8 channel pair. '
-                           'Reference is used when uploading waveforms',
-                           parameter_class=InstrumentRefParameter)
-
         self.add_parameter(
-            '_awgs_fl_sequencer_program_expected_hash',
+            'instr_distortion_kernel',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_partner_lutman',  # FIXME: unused?
+            docstring='LutMan responsible for the corresponding'
+            'channel in the AWG8 channel pair. '
+            'Reference is used when uploading waveforms',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            '_awgs_fl_sequencer_program_expected_hash',  # FIXME: un used?
             docstring='crc32 hash of the awg8 sequencer program. '
             'This parameter is used to dynamically determine '
             'if the program needs to be uploaded. The initial_value is'
             ' None, indicating that the program needs to be uploaded.'
             ' After the first program is uploaded, the value is set.',
-            parameter_class=ManualParameter, initial_value=None,
-            vals=vals.Ints())
+            initial_value=None,
+            vals=vals.Ints(),
+            parameter_class=ManualParameter)
 
+        # FIXME: code commented out
         # self.add_parameter(
         #     'cfg_operating_mode',
         #     initial_value='Codeword_normal',
@@ -882,19 +891,24 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         #     get_cmd=self._get_cfg_operating_mode)
         # self._cfg_operating_mode = 'Codeword_normal'
 
-        self.add_parameter('cfg_max_wf_length',
-                           parameter_class=ManualParameter,
-                           initial_value=10e-6,
-                           unit='s', vals=vals.Numbers(0, 100e-6))
-        self.add_parameter('cfg_awg_channel_range',
-                           docstring='peak peak value, channel range of 5 corresponds to -2.5V to +2.5V',
-                           get_cmd=self._get_awg_channel_range,
-                           unit='V_pp')
-        self.add_parameter('cfg_awg_channel_amplitude',
-                           docstring='digital scale factor between 0 and 1',
-                           get_cmd=self._get_awg_channel_amplitude,
-                           set_cmd=self._set_awg_channel_amplitude,
-                           unit='a.u.', vals=vals.Numbers(0, 1))
+        self.add_parameter(
+            'cfg_max_wf_length',
+            parameter_class=ManualParameter,
+            initial_value=10e-6,
+            unit='s',
+            vals=vals.Numbers(0, 100e-6))
+        self.add_parameter(
+            'cfg_awg_channel_range',
+            docstring='peak peak value, channel range of 5 corresponds to -2.5V to +2.5V',
+            get_cmd=self._get_awg_channel_range,
+            unit='V_pp')
+        self.add_parameter(
+            'cfg_awg_channel_amplitude',
+            docstring='digital scale factor between 0 and 1',
+            get_cmd=self._get_awg_channel_amplitude,
+            set_cmd=self._set_awg_channel_amplitude,
+            unit='a.u.',
+            vals=vals.Numbers(0, 1))
 
     # def _set_cfg_operating_mode(self, val):
     #     self._cfg_operating_mode = val

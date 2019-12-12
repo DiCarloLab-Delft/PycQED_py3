@@ -60,7 +60,7 @@ if 1:
     cc = QuTechCC('cc', IPTransport(ip))
     cc.reset()
     cc.clear_status()
-    cc.set_status_questionable_frequency_enable(0x7FFF)
+    cc.status_preset()
 
     if 1:
         cc.debug_marker_out(0, cc.UHFQA_TRIG) # UHF-QA trigger
@@ -73,7 +73,7 @@ if 1:
     else:
         with open(p.filename, 'r') as f:
             prog = f.read()
-        cc.sequence_program(prog)
+        cc.sequence_program_assemble(prog)
 
     err_cnt = cc.get_system_error_count()
     for i in range(err_cnt):

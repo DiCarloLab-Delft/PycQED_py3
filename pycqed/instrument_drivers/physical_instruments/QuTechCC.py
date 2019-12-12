@@ -5,20 +5,34 @@
     Notes:              use QuTechCC_core to talk to instrument, do not add knowledge of SCPI syntax here
     Usage:
     Bugs:
+    - _ccio_slots_driving_vsm not handled correctly
+    - dio{}_out_delay not gettable
 
 """
 
 import logging
-
+from typing import List
 from .QuTechCC_core import QuTechCC_core
 from .Transport import Transport
 
 from qcodes.utils import validators as vals
 from qcodes import Instrument
-from qcodes.instrument.parameter import ManualParameter
-from qcodes.instrument.parameter import Parameter
 
 log = logging.getLogger(__name__)
+
+_cc_prog_dio_cal_microwave = """
+# staircase program for HDAWG microwave mode, CW_1 31->1, CW_2 1->31
+.DEF        cw_31_01        0x80003E01      # TRIG=1(0x80000000), CW_1=31(0x00003E00), CW_2=1(0x00000001)
+.DEF        incr            0xFFFFFE01      # CW_1--, CW_2++
+.DEF        duration        4
+repeat:     move            $cw_31_01,R0
+            move            31,R1           # loop counter
+inner:      seq_out         R0,$duration
+            add             R0,$incr,R0
+            loop            R1,@inner
+            jmp             @repeat
+"""
+
 
 
 class QuTechCC(QuTechCC_core, Instrument):
@@ -26,17 +40,21 @@ class QuTechCC(QuTechCC_core, Instrument):
                  name: str,
                  transport: Transport,
                  num_ccio: int=9,
-                 ccio_slot_driving_vsm: int=5) -> None:
+                 ccio_slots_driving_vsm: List[int] = None  # NB: default can not be '[]' because that is a mutable default argument
+                 ) -> None:
         super().__init__(name, transport) # calls QuTechCC_core
-        super(Instrument, QuTechCC).__init__(self, name) # calls Instrument
+        Instrument.__init__(self, name) # calls Instrument
 
         # user constants
         self._num_ccio = num_ccio  # the number of CCIO modules used
-        self._ccio_slot_driving_vsm = ccio_slot_driving_vsm  # the slot number of the CCIO driving the VSM (FIXME: supports one VSM only)
+        if ccio_slots_driving_vsm is None:
+            self._ccio_slots_driving_vsm = []
+        else:
+            self._ccio_slots_driving_vsm = ccio_slots_driving_vsm  # the slot numbers of the CCIO driving the VSM
 
         # fixed constants
         self._Q1REG_DIO_DELAY = 63  # the register used in OpenQL generated programs to set DIO delay
-        self._NUM_VSM_CH = 32  # the number of VSM channels used per connector
+        self._NUM_VSM_CH = 32  # the number of VSM channels used per CCIO connector
         self._CCIO_MAX_VSM_DELAY = 48
 
         self._add_parameters(self._num_ccio)
@@ -91,8 +109,10 @@ class QuTechCC(QuTechCC_core, Instrument):
         # support 'dio{}_out_delay' for device_object_CCL.py::prepare_timing()
         # NB: DIO starts from 1 on CC-light/QCC, but we use CCIO number starting from 0
         for ccio in range(0, num_ccio):
-            if ccio == self._ccio_slot_driving_vsm:  # skip VSM
-                continue
+            if 1:
+                # skip DIO delay setting for slots driving VSM. Note that vsm_channel_delay also sets DIO delay
+                if ccio in self._ccio_slots_driving_vsm:  # skip VSM
+                    continue
             self.add_parameter(
                 'dio{}_out_delay'.format(ccio),
                 label='Output Delay of DIO{}'.format(ccio),
@@ -107,6 +127,7 @@ class QuTechCC(QuTechCC_core, Instrument):
         # NB: CC supports 1/1200 MHz ~= 833 ps resolution
         # NB: CC supports setting trailing edge delay separately
         # NB: on CCL, index is qubit, not channel
+        # NB: supports single VSM only, use native parameter for >1 VSM
         for vsm_ch in range(0, self._NUM_VSM_CH):  # NB: VSM channel starts from 0 on CC-light/QCC
             self.add_parameter(
                 'vsm_channel_delay{}'.format(vsm_ch),
@@ -125,18 +146,19 @@ class QuTechCC(QuTechCC_core, Instrument):
     ##########################################################################
 
     # helper for parameter 'vsm_rise_delay{}'
+    # FIXME: hardcoded to first VSM
     def _set_vsm_rise_delay(self, bit: int, cnt_in_833_ps_steps: int) -> None:
-        self.set_vsm_delay_rise(self._ccio_slot_driving_vsm, bit, cnt_in_833_ps_steps)
+        self.set_vsm_delay_rise(self._ccio_slots_driving_vsm[0], bit, cnt_in_833_ps_steps)
 
     def _get_vsm_rise_delay(self, bit: int) -> int:
-        return self.set_vsm_delay_rise(self._ccio_slot_driving_vsm, bit)
+        return self.get_vsm_delay_rise(self._ccio_slots_driving_vsm[0], bit)
 
     # helper for parameter 'vsm_fall_delay{}'
     def _set_vsm_fall_delay(self, bit: int, cnt_in_833_ps_steps: int) -> None:
-        self.set_vsm_delay_fall(self._ccio_slot_driving_vsm, bit, cnt_in_833_ps_steps)
+        self.set_vsm_delay_fall(self._ccio_slots_driving_vsm[0], bit, cnt_in_833_ps_steps)
 
     def _get_vsm_fall_delay(self, bit: int) -> int:
-        return self.set_vsm_delay_fall(self._ccio_slot_driving_vsm, bit)
+        return self.get_vsm_delay_fall(self._ccio_slots_driving_vsm[0], bit)
 
     ##########################################################################
     # CC-light compatibility support
@@ -146,23 +168,54 @@ class QuTechCC(QuTechCC_core, Instrument):
     def _eqasm_program(self, file_name: str) -> None:
         with open(file_name, 'r') as f:
             prog = f.read()
-        self.sequence_program(prog)
+        self.sequence_program_assemble(prog)
 
     # helper for parameter 'vsm_channel_delay{}'
     # NB: CC-light range max = 127*2.5 ns = 317.5 ns, our fine delay range is 48/1200 MHz = 40 ns, so we must also shift program
+    # NB: supports one VSM only, no intend to upgrade
     def _set_vsm_channel_delay(self, bit: int, cnt_in_2ns5_steps: int) -> None:
         delay_ns = cnt_in_2ns5_steps * 2.5
         cnt_in_20ns_steps = int(delay_ns // 20)
         remain_ns = delay_ns - cnt_in_20ns_steps * 20
         cnt_in_833_ps_steps = round(remain_ns*1.2)  # NB: actual step size is 1/1200 MHz
-        self.set_vsm_delay_rise(self._ccio_slot_driving_vsm, bit, cnt_in_833_ps_steps)
-        self._set_dio_delay(self._ccio_slot_driving_vsm, cnt_in_20ns_steps)
+        self.set_vsm_delay_rise(self._ccio_slots_driving_vsm[0], bit, cnt_in_833_ps_steps)
+        self._set_dio_delay(self._ccio_slots_driving_vsm[0], cnt_in_20ns_steps)
 
     # helper for parameter 'dio{}_out_delay'
     def _set_dio_delay(self, ccio: int, cnt_in_20ns_steps: int) -> None:
         self.stop()
         self.set_q1_reg(ccio, self._Q1REG_DIO_DELAY, cnt_in_20ns_steps)
         self.start()
+
+    ##########################################################################
+    # DIO calibration support for connected instruments
+    ##########################################################################
+
+    def output_dio_calibration_data(self, dio_mode, port=None):
+        if dio_mode == "microwave":
+            cc_prog = _cc_prog_dio_cal_microwave
+        elif dio_mode == "new_microwave":
+            # FIXME
+            pass
+        elif dio_mode == "new_novsm_microwave":
+            # FIXME
+            pass
+        elif dio_mode == "flux":
+            # FIXME
+            pass
+        else:
+            raise ValueError("unsupported DIO mode")
+
+        log.debug(f"uploading DIO calibration program for mode '{dio_mode}' to CC")
+        self.sequence_program_assemble(cc_prog)
+        log.debug("printing CC errors")
+        err_cnt = self.get_system_error_count()
+        if err_cnt > 0:
+            log.warning('CC status after upload')
+        for i in range(err_cnt):
+            print(self.get_error())
+        self.start()
+        log.debug('starting CC')
 
 
 # helpers for Instrument::add_parameter.set_cmd

@@ -2,36 +2,35 @@ import unittest
 import pytest
 import numpy as np
 import os
-import pycqed as pq
-import time
 
+import pycqed as pq
 from pytest import approx
+
 import pycqed.analysis.analysis_toolbox as a_tools
+from pycqed.measurement import measurement_control
 
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
-from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
-from pycqed.measurement.waveform_control_CC import waveform as wf
-import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
-from pycqed.measurement import measurement_control
-from qcodes import station
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
-
 from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
-
-
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
+#from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
+#from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
+#from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL, CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC, QCC
-
+from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.Transport import DummyTransport
 
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
-
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
+from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
+import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
+#from pycqed.measurement.waveform_control_CC import waveform as wf
+
+from qcodes import station
+
 
 from pycqed.measurement.detector_functions import Multi_Detector_UHF, \
     UHFQC_input_average_detector, UHFQC_integrated_average_detector, \
@@ -67,6 +66,7 @@ class Test_Device_obj(unittest.TestCase):
 
         self.CCL = dummy_CCL('CCL')
         self.QCC = dummy_QCC('QCC')
+        self.CC = QuTechCC('CC', DummyTransport())
         self.VSM = Dummy_Duplexer('VSM')
 
         self.MC = measurement_control.MeasurementControl(
@@ -194,6 +194,20 @@ class Test_Device_obj(unittest.TestCase):
                             }
         assert dio_map == expected_dio_map
 
+    def test_get_dio_map_CC(self):
+        self.device.instr_CC(self.CC.name)
+        dio_map = self.device.dio_map()
+        expected_dio_map = {'ro_0': 0,
+                            'ro_1': 1,
+                            'ro_2': 2,
+                            'mw_0': 3,
+                            'mw_1': 4,
+                            'flux_0': 6,
+                            'flux_1': 7,
+                            'flux_2': 8}
+
+        assert dio_map == expected_dio_map
+
     def test_prepare_timing_CCL(self):
         self.device.instr_CC(self.CCL.name)
         self.device.tim_ro_latency_0(200e-9)
@@ -261,6 +275,24 @@ class Test_Device_obj(unittest.TestCase):
 
         assert(self.AWG_mw_1.sigouts_7_delay() == approx(0))
         assert(self.AWG_mw_1.sigouts_7_delay() == approx(0))
+
+    def test_prepare_timing_CC(self):
+        self.device.instr_CC(self.CC.name)
+        self.device.tim_ro_latency_0(200e-9)
+        self.device.tim_ro_latency_1(180e-9)
+        self.device.tim_flux_latency_0(-40e-9)
+        self.device.tim_flux_latency_1(100e-9)
+        self.device.tim_mw_latency_0(20e-9)
+        self.device.tim_mw_latency_1(0e-9)
+
+        self.device.prepare_timing()
+
+        assert(self.CC.dio0_out_delay() == 12)
+        assert(self.CC.dio1_out_delay() == 11)
+        assert(self.CC.dio3_out_delay() == 3)
+        assert(self.CC.dio4_out_delay() == 2)
+        assert(self.CC.dio6_out_delay() == 0)
+        assert(self.CC.dio7_out_delay() == 7)
 
     def test_prepare_readout_lo_freqs_config(self):
         # Test that the modulation frequencies of all qubits

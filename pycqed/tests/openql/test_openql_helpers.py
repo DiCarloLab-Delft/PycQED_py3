@@ -130,8 +130,7 @@ class Test_openql_compiler_helpers(unittest.TestCase):
         config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
         p = oqh.create_program('test_program', config_fn)
         k = oqh.create_kernel('my_kernel', p)
-        # The kernels are prefixed with k_
-        self.assertEqual(k.name, 'k_my_kernel')
+        self.assertEqual(k.name, 'my_kernel')
 
 
     def test_compile(self):
