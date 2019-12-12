@@ -533,6 +533,7 @@ def generate_config(filename: str,
             }
 
     # Prepare 20 ns special parking operation
+    # FIXME: code commented out
     # for flux_q in range(17):
     #         cfg["instructions"]["sf_sp_park q{}".format(flux_q)] = {
     #             "duration": flux_pulse_duration/2,

@@ -93,24 +93,26 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
 
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
                            platf_cfg: str, trigger_idx: int,
-                           wait_time_ns: int = 0, cc: str='CCL',spec_instr:float ='spec'):
+                           wait_time_ns: int = 0, cc: str='CCL'):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
-    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    this one triggers the 0th trigger port of the CCLight and uses the zeroth
     wave output on the AWG (currently hardcoded, should be improved)
-
+    FIXME: comment outdated
     """
     p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
     k = oqh.create_kernel("main", p)
 
     nr_clocks = int(spec_pulse_length/20e-9)
-    print('Adding {} to spec seq'.format(wait_time_ns))
+    print('Adding {} [ns] to spec seq'.format(wait_time_ns))
     if cc=='CCL':
         spec_instr = 'spec'
     elif cc=='QCC':
         spec_instr = 'sf_square'
+    elif cc=='CC':
+        spec_instr = 'spec'
     else:
-        raise ValuerError('CC type not understood: {}'.format(cc))
+        raise ValueError('CC type not understood: {}'.format(cc))
 
 
     for i in range(nr_clocks):
@@ -257,7 +259,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}".format(int(i*js+j)), p)
+            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])

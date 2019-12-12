@@ -3286,6 +3286,7 @@ class CCLight_Transmon(Qubit):
             upload=True
         )
 
+    # FIXME: the parameters of the function below are gone
     def ssro_and_optimal_weights():
         self.calibrate_optimal_weights(verify=False,
                                            analyze=True,
