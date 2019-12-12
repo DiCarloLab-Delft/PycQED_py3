@@ -283,7 +283,7 @@ class MeasurementAnalysis(object):
                    len(self.get_key('sweep_parameter_names')))
             values = self.g['Data'].value[:, ind]
         else:
-            values = self.g[key][()] # changed deprecated self.g[key].value => self.g[key][()]
+            values = self.g[key].value
         # Makes sure all data is np float64
         return np.asarray(values, dtype=np.float64)
 
@@ -4417,10 +4417,8 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                 edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
-
                 # ax.set_axis_bgcolor(plt.cm.viridis(0))
             set_ylabel(axs[0], 'Q', self.value_units[1])
-
             # axs[0].ticklabel_format(style = 'sci',  fontsize=4)
 
             self.save_fig(
@@ -8081,15 +8079,15 @@ class Resonator_Powerscan_Analysis_test(MeasurementAnalysis):
         shift = 0
         shift_data=[]
         for i in range(len(f0)):
-            if (f0[0] - f0[-1]) > 200e3:
+            if (f0[0] - f0[-1]) > 200e3: 
                 shift = f0[0] - f0[-1]
-            elif (f0[0] - f0[i]) > 200e3 :
+            elif (f0[0] - f0[i]) > 200e3 : 
                 shifts= f0[0] - f0[i]
                 shift_data.append(shifts)
                 shift=np.amax(shift_data)
             else:
                 logging.warning('No power shift found. Consider attenuation')
-
+                
         # if (f_high < f_low):
         #     shift = f_high - f_low
         # else:
