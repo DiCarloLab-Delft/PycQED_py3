@@ -627,6 +627,8 @@ class TestMultiQubitFluxLutMan:
             n_points=6,
             theta_f_lims=(115, 120),
             lambda_2_lims=(-0.3, -0.2))
-
-        np.testing.assert_almost_equal(guesses[0]['cz_theta_f_SE']['value'], 115.5555555555555)
-        np.testing.assert_almost_equal(guesses[0]['cz_lambda_2_SE']['value'], -0.24444444444444444)
+        first_optimal_pars = guesses[0][0]
+        np.testing.assert_almost_equal(first_optimal_pars['cz_theta_f_SE'],
+            115.833, decimal=3)
+        np.testing.assert_almost_equal(first_optimal_pars['cz_lambda_2_SE'],
+            -0.26666, decimal=3)

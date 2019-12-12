@@ -1377,7 +1377,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             fluxlutman_static,
             which_gate,
             n_points=249,
-            res_bounds=(0.7, 3),
+            res_bounds=(0.7, 2.0),
             theta_f_lims=[10, 180],
             lambda_2_lims=[-1., 1.],
             lambda_3=0.,
@@ -1464,7 +1464,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 n_points=n_points,
                 n_dim=2,  # Optimizing 2 over parameters
                 res_bounds=res_bounds,
-                minimize=True)
+                minimize=True,
+                use_std=True)
 
             adaptive_pars_default = {
                 'adaptive_function': LearnerND_Optimize,
