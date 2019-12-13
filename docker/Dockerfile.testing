@@ -1,6 +1,0 @@
-FROM registry.gitlab.com/dicarlolab/pycqed/base:latest
-
-ARG OPENQL_REVISION
-
-RUN pip install --no-cache-dir \
-        git+https://github.com/QE-Lab/OpenQL.git@$OPENQL_REVISION \

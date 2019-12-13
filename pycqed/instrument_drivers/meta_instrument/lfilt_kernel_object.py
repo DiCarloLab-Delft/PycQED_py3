@@ -100,8 +100,7 @@ class LinDistortionKernel(Instrument):
 
         # Returns a dict with filter type and number of that type
         nr_filts = self.get_number_of_realtime_filters()
-        print("nr_filts")
-        print(nr_filts)
+        
         # set exp_filters to 0
         for i in range(max_exp_filters):
             if i >= nr_filts['rt_exp_models']:
@@ -117,6 +116,8 @@ class LinDistortionKernel(Instrument):
                     self.cfg_awg_channel()-1, 0), 0)
 
         # Reset
+        
+        # 'FIXME: FIR filter reset is disabled because of #148'
         if nr_filts['rt_fir_models'] == 0:
             impulse_resp = np.zeros(40)
             impulse_resp[0] = 1

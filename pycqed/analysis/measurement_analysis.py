@@ -12,6 +12,7 @@ from pycqed.analysis import fitting_models as fit_mods
 import pycqed.measurement.hdf5_data as h5d
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.optimize as optimize
+from scipy import stats
 import lmfit
 from collections import Counter  # used in counting string fractions
 import textwrap
@@ -23,13 +24,13 @@ from scipy.ndimage.filters import gaussian_filter
 import imp
 import math
 
-try:
-    import pygsti
-except ImportError as e:
-    if str(e).find('pygsti') >= 0:
-        logging.warning('Could not import pygsti')
-    else:
-        raise
+# try:
+#     import pygsti
+# except ImportError as e:
+#     if str(e).find('pygsti') >= 0:
+#         logging.warning('Could not import pygsti')
+#     else:
+#         raise
 
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
@@ -49,14 +50,14 @@ except:
     pass
 from pycqed.analysis import composite_analysis as ca
 
-try:
-    import qutip as qtp
+# try:
+#     import qutip as qtp
 
-except ImportError as e:
-    if str(e).find('qutip') >= 0:
-        logging.warning('Could not import qutip')
-    else:
-        raise
+# except ImportError as e:
+#     if str(e).find('qutip') >= 0:
+#         logging.warning('Could not import qutip')
+#     else:
+#         raise
 
 imp.reload(dm_tools)
 
@@ -283,7 +284,7 @@ class MeasurementAnalysis(object):
                    len(self.get_key('sweep_parameter_names')))
             values = self.g['Data'].value[:, ind]
         else:
-            values = self.g[key].value
+            values = self.g[key][()] # changed deprecated self.g[key].value => self.g[key][()]
         # Makes sure all data is np float64
         return np.asarray(values, dtype=np.float64)
 
@@ -4177,18 +4178,18 @@ class SSRO_Analysis(MeasurementAnalysis):
             norm0 = (bins0[1] - bins0[0]) * min_len
             norm1 = (bins1[1] - bins1[0]) * min_len
 
-            y0 = norm0 * (1 - frac1_0) * pylab.normpdf(bins0, mu0_0, sigma0_0) + \
-                norm0 * frac1_0 * pylab.normpdf(bins0, mu1_0, sigma1_0)
-            y1_0 = norm0 * frac1_0 * pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y0 = norm0 * (1 - frac1_0) * stats.norm.pdf(bins0, mu0_0, sigma0_0) + \
+                norm0 * frac1_0 * stats.norm.pdf(bins0, mu1_0, sigma1_0)
+            y1_0 = norm0 * frac1_0 * stats.norm.pdf(bins0, mu1_0, sigma1_0)
             y0_0 = norm0 * (1 - frac1_0) * \
-                pylab.normpdf(bins0, mu0_0, sigma0_0)
+                stats.norm.pdf(bins0, mu0_0, sigma0_0)
 
             # building up the histogram fits for on measurements
-            y1 = norm1 * (1 - frac1_1) * pylab.normpdf(bins1, mu0_1, sigma0_1) + \
-                norm1 * frac1_1 * pylab.normpdf(bins1, mu1_1, sigma1_1)
-            y1_1 = norm1 * frac1_1 * pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y1 = norm1 * (1 - frac1_1) * stats.norm.pdf(bins1, mu0_1, sigma0_1) + \
+                norm1 * frac1_1 * stats.norm.pdf(bins1, mu1_1, sigma1_1)
+            y1_1 = norm1 * frac1_1 * stats.norm.pdf(bins1, mu1_1, sigma1_1)
             y0_1 = norm1 * (1 - frac1_1) * \
-                pylab.normpdf(bins1, mu0_1, sigma0_1)
+                stats.norm.pdf(bins1, mu0_1, sigma0_1)
 
             pylab.semilogy(bins0, y0, 'C0', linewidth=1.5)
             pylab.semilogy(bins0, y1_0, 'C0--', linewidth=3.5)
@@ -4411,15 +4412,15 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
-                ax.ticklabel_format(style='sci', fontsize=4,
+                ax.ticklabel_format(style='sci',
                                     scilimits=(0, 0))
                 set_xlabel(ax, 'I', self.value_units[0])
                 edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
-                # ax.set_axis_bgcolor(plt.cm.viridis(0))
+
             set_ylabel(axs[0], 'Q', self.value_units[1])
-            # axs[0].ticklabel_format(style = 'sci',  fontsize=4)
+
 
             self.save_fig(
                 fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
@@ -6742,8 +6743,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     Possible kw parameters:
 
-        frequency_guess         (default=None)
+        frequency_guess         (default="max")
             manually set the initial guess for qubit frequency
+            options are
+                None -> uses the peak finder to use a peak or dip
+                max -> uses the maximally measured value to guess the freq
+                float -> specify a value as the guess
 
         analyze_ef              (default=False)
             whether to look for a second peak/dip, which would be the at f_gf/2
@@ -6795,7 +6800,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     def fit_data(self, analyze_ef=False, **kw):
 
-        frequency_guess = kw.get('frequency_guess', None)
+        frequency_guess = kw.get('frequency_guess', 'max')
         percentile = kw.get('percentile', 20)
         num_sigma_threshold = kw.get('num_sigma_threshold', 5)
         window_len_filter = kw.get('window_len_filter', 3)
@@ -6830,9 +6835,13 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                          optimize=optimize,
                                          window_len=0)
 
+        # Determine the guess
         # extract highest peak -> ge transition
         if frequency_guess is not None:
-            f0 = frequency_guess
+            if isinstance(frequency_guess, float):
+                f0 = frequency_guess
+            elif frequency_guess == 'max':
+                f0 = self.sweep_points[np.argmax(data_dist_smooth)]
             kappa_guess = (max(self.sweep_points)-min(self.sweep_points))/20
             key = 'peak'
         elif self.peaks['dip'] is None:
@@ -7415,12 +7424,10 @@ class TwoD_Analysis(MeasurementAnalysis):
         self.ax_array = []
 
         for i, meas_vals in enumerate(self.measured_values):
-            kw["zlabel"] = kw.get("zlabel", self.value_names[i])
-            kw["z_unit"] = kw.get("zlabel", self.value_units[i])
+            # kw["zlabel"] = kw.get("zlabel", self.value_names[i])
+            # kw["z_unit"] = kw.get("z_unit", self.value_units[i])
 
             if filtered:
-                # print(self.measured_values)
-                # print(self.value_names)
                 if self.value_names[i] == 'Phase':
                     self.measured_values[i] = dm_tools.filter_resonator_visibility(
                         x=self.sweep_points,
@@ -7446,7 +7453,6 @@ class TwoD_Analysis(MeasurementAnalysis):
                                      y_name=self.parameter_names[1],
                                      y_unit=self.parameter_units[1],
                                      log=linecut_log,
-                                     # zlabel=self.zlabels[i],
                                      fig=fig, ax=ax, **kw)
                 ax.set_title(fig_title)
                 set_xlabel(ax, self.parameter_names[0],
@@ -7464,23 +7470,12 @@ class TwoD_Analysis(MeasurementAnalysis):
             self.ax_array.append(ax)
             if normalize:
                 print("normalize on")
-            # print "unransposed",meas_vals
-            # print "transposed", meas_vals.transpose()
+
             self.ax_array.append(ax)
             savename = 'Heatmap_{}'.format(self.value_names[i])
             fig_title = '{} {} \n{}'.format(
                 self.timestamp_string, self.measurementstring,
                 self.value_names[i])
-
-            if "xlabel" not in kw:
-                kw["xlabel"] = self.parameter_names[0]
-            if "ylabel" not in kw:
-                kw["ylabel"] = self.parameter_names[1]
-
-            if "xunit" not in kw:
-                kw["xunit"] = self.parameter_units[0]
-            if "yunit" not in kw:
-                kw["yunit"] = self.parameter_units[1]
 
             # subtract mean from each row/column if demanded
             plot_zvals = meas_vals.transpose()
@@ -7492,15 +7487,16 @@ class TwoD_Analysis(MeasurementAnalysis):
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=plot_zvals,
-                               # zlabel=self.zlabels[i],
+                               zlabel=self.value_names[i],
+                               z_unit=self.value_units[i],
                                fig=fig, ax=ax,
                                log=colorplot_log,
                                transpose=transpose,
                                normalize=normalize,
                                **kw)
 
-            # set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
-            # set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
+            set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+            set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
 
             if save_fig:
                 self.save_fig(fig, figname=savename, **kw)
@@ -7911,6 +7907,259 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
                                   params=params)
 
         return fit_res
+
+class Resonator_Powerscan_Analysis_test(MeasurementAnalysis):
+
+    def __init__(self, label='powersweep', **kw):
+        super(self.__class__, self).__init__(**kw)
+
+    # def run_default_analysis(self,  normalize=True, w_low_power=None,
+    #                          w_high_power=None, **kw):
+    # super(self.__class__, self).run_default_analysis(close_file=False,
+    #     save_fig=False, **kw)
+    # close_file = kw.pop('close_file', True)
+    def run_default_analysis(self, normalize=True, plot_Q=True, plot_f0=True,
+                             plot_linecuts=True, linecut_log=True,
+                             plot_all=False, save_fig=True, use_min=False,
+                             **kw):
+        close_file = kw.pop('close_file', True)
+        self.add_analysis_datagroup_to_file()
+
+        self.get_naming_and_values_2D()
+        self.fig_array = []
+        self.ax_array = []
+        fits = {}  # Dictionary to store the fit results in. Fit results are a
+        # dictionary themselfes -> Dictionary of Dictionaries
+
+        f0 = np.zeros(len(self.sweep_points_2D))
+        for u, power in enumerate(self.sweep_points_2D):
+            fit_res = self.fit_hanger_model(
+                self.sweep_points, self.measured_values[0][:, u])
+            self.save_fitted_parameters(
+                fit_res, var_name='Powersweep' + str(u))
+            fits[str(power)] = fit_res
+            if use_min:
+                min_index = np.argmin(self.measured_values[0][:, u])
+                f0[u] = np.min(self.sweep_points[min_index])
+            else:
+                f0[u] = fits[str(power)].values['f0']
+            self.f0 = f0
+
+        self.fit_results = fits
+
+        xlabel = kw.pop("xlabel", self.sweep_name)
+        ylabel = kw.pop("ylabel", self.sweep_name_2D)
+        x_unit = kw.pop("x_unit", self.sweep_unit)
+        y_unit = kw.pop("y_unit", self.sweep_unit_2D)
+        z_unit_linecuts = self.value_units[0]
+
+        for i, meas_vals in enumerate(self.measured_values):
+            if "zlabel" not in kw:
+                kw["zlabel"] = self.value_names[i]
+            if "z_unit" not in kw:
+                if normalize:
+                    kw["z_unit"] = 'normalized'
+                else:
+                    kw["z_unit"] = self.value_units[i]
+
+            if (not plot_all) & (i >= 1):
+                break
+            # Linecuts are above because normalization changes the values of the
+            # object. Thus it affects both colorplot and linecuts otherwise.
+            if plot_Q:
+                Q = np.zeros(len(self.sweep_points_2D))
+                Qc = np.zeros(len(self.sweep_points_2D))
+                for u, power in enumerate(self.sweep_points_2D):
+                    Q[u] = self.fit_results[str(power)].values['Q']
+                    Qc[u] = self.fit_results[str(power)].values['Qc']
+                fig, ax = self.default_ax(figsize=(8, 5))
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                fig_title = '{timestamp}_{measurement}_{val_name}_QvsPower'.format(
+                    timestamp=self.timestamp_string,
+                    measurement=self.measurementstring,
+                    val_name=self.zlabels[i])
+                ax.plot(
+                    self.sweep_points_2D, Q, 'blue', label='Loaded Q-Factor')
+                ax.plot(
+                    self.sweep_points_2D, Qc, 'green', label='Coupling Q-Factor')
+                ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
+                ax.set_position([0.1, 0.1, 0.5, 0.8])
+                set_ylabel(ax, 'Quality Factor')
+                set_xlabel(ax, ylabel, y_unit)
+
+                if save_fig:
+                    self.save_fig(
+                        fig, figname=fig_title, fig_tight=False, **kw)
+
+            if plot_f0:
+                fig, ax = self.default_ax(figsize=(8, 5))
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                fig_title = '{timestamp}_{measurement}_{val_name}_f0vsPower'.format(
+                    timestamp=self.timestamp_string,
+                    measurement=self.measurementstring,
+                    val_name=self.zlabels[i])
+                ax.plot(self.sweep_points_2D, f0, 'blue', marker='o',
+                        label='Cavity Frequency')
+                ax.legend(loc=0, bbox_to_anchor=(1.1, 1))
+                ax.set_position([0.15, 0.1, 0.5, 0.8])
+                set_ylabel(ax, xlabel, x_unit)
+                set_xlabel(ax, ylabel, y_unit)
+
+                if save_fig:
+                    self.save_fig(
+                        fig, figname=fig_title, fig_tight=False, **kw)
+
+            if plot_linecuts:
+                fig, ax = self.default_ax(figsize=(8, 5))
+                self.fig_array.append(fig)
+                self.ax_array.append(ax)
+                fig_title = '{timestamp}_{measurement}_{val_name}_linecut'.format(
+                    timestamp=self.timestamp_string,
+                    measurement=self.measurementstring,
+                    val_name=self.zlabels[i])
+                a_tools.linecut_plot(x=self.sweep_points,
+                                     y=self.sweep_points_2D,
+                                     z=self.measured_values[i],
+                                     plot_title=fig_title,
+                                     log=linecut_log,
+                                     xlabel=xlabel,
+                                     x_unit=x_unit,
+                                     y_name=ylabel,
+                                     y_unit=y_unit,
+                                     z_unit_linecuts=z_unit_linecuts,
+                                     fig=fig, ax=ax, **kw)
+                if save_fig:
+                    self.save_fig(
+                        fig, figname=fig_title, fig_tight=False, **kw)
+
+            fig, ax = self.default_ax(figsize=(8, 5))
+            self.fig_array.append(fig)
+            self.ax_array.append(ax)
+            if normalize:
+                meas_vals = a_tools.normalize_2D_data(meas_vals)
+            fig_title = '{timestamp}_{measurement}_{val_name}'.format(
+                timestamp=self.timestamp_string,
+                measurement=self.measurementstring,
+                val_name=self.zlabels[i])
+
+            a_tools.color_plot(x=self.sweep_points,
+                               y=self.sweep_points_2D,
+                               z=meas_vals.transpose(),
+                               plot_title=fig_title,
+                               xlabel=xlabel,
+                               x_unit=x_unit,
+                               ylabel=ylabel,
+                               y_unit=y_unit,
+                               fig=fig, ax=ax, **kw)
+            if save_fig:
+                self.save_fig(fig, figname=fig_title, **kw)
+
+        if close_file:
+            self.finish()
+
+
+        # Find low power regime
+        threshold = 0.1e6  # Gotta love hardcoded stuff
+        f_low = f0[0]
+        P_result = self.sweep_points_2D[0]
+        try:
+            for u, f in enumerate(f0):
+                if np.abs(f0[0] - f0[u+1]) < threshold:
+                    f_low = f0[u+1]
+                    P_result = self.sweep_points_2D[u]
+                else:
+                    break
+        except IndexError:
+            pass
+
+        # High power regime: just use the value at highest power
+        f_high = f0[-1]
+
+        shift = 0
+        shift_data=[]
+        for i in range(len(f0)):
+            if (f0[0] - f0[-1]) > 200e3:
+                shift = f0[0] - f0[-1]
+            elif (f0[0] - f0[i]) > 200e3 :
+                shifts= f0[0] - f0[i]
+                shift_data.append(shifts)
+                shift=np.amax(shift_data)
+            else:
+                logging.warning('No power shift found. Consider attenuation')
+
+        # if (f_high < f_low):
+        #     shift = f_high - f_low
+        # else:
+        #     shift = 0
+        #     logging.warning('No power shift found. Consider attenuation')
+        #     # raise Exception('High power regime frequency found to be higher than'
+        #     #                 'low power regime frequency')
+
+        self.f_low = f_low
+        self.f_high = f_high
+        self.shift = shift
+        self.power = P_result
+
+    def fit_hanger_model(self, sweep_values, measured_values):
+        HangerModel = fit_mods.SlopedHangerAmplitudeModel
+
+        # amplitude_guess = np.pi*sigma_guess * abs(
+        #     max(self.measured_powers)-min(self.measured_powers))
+
+        # Fit Power to a Lorentzian
+        measured_powers = measured_values ** 2
+
+        min_index = np.argmin(measured_powers)
+        max_index = np.argmax(measured_powers)
+
+        min_frequency = sweep_values[min_index]
+        max_frequency = sweep_values[max_index]
+
+        peaks = a_tools.peak_finder((sweep_values),
+                                    measured_values)
+
+        if peaks['dip'] is not None:  # look for dips first
+            f0 = peaks['dip']
+            amplitude_factor = -1.
+        elif peaks['peak'] is not None:  # then look for peaks
+            f0 = peaks['peak']
+            amplitude_factor = 1.
+        else:  # Otherwise take center of range
+            f0 = np.median(sweep_values)
+            amplitude_factor = -1.
+            logging.error('No peaks or dips in range')
+            # If this error is raised, it should continue the analysis but
+            # not use it to update the qubit object
+
+        amplitude_guess = max(measured_powers) - min(measured_powers)
+        # Creating parameters and estimations
+        S21min = min(measured_values) / max(measured_values)
+
+        Q = f0 / abs(min_frequency - max_frequency)
+        Qe = abs(Q / abs(1 - S21min))
+
+        HangerModel.set_param_hint('f0', value=f0,
+                                   min=min(sweep_values),
+                                   max=max(sweep_values))
+        HangerModel.set_param_hint('A', value=amplitude_guess)
+        HangerModel.set_param_hint('Q', value=Q)
+        HangerModel.set_param_hint('Qe', value=Qe)
+        HangerModel.set_param_hint('Qi', expr='1./(1./Q-1./Qe*cos(theta))',
+                                   vary=False)
+        HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
+        HangerModel.set_param_hint('theta', value=0, min=-np.pi / 2,
+                                   max=np.pi / 2)
+        HangerModel.set_param_hint('slope', value=0, vary=True,
+                                   min=-1, max=1)
+        params = HangerModel.make_params()
+        fit_res = HangerModel.fit(data=measured_powers,
+                                  f=sweep_values * 1.e9,
+                                  params=params)
+
+        return fit_res
+
 
 
 class time_trace_analysis(MeasurementAnalysis):
@@ -8537,7 +8786,6 @@ class DoubleFrequency(TD_Analysis):
         y2 = a_tools.normalize_data_v3(self.measured_values[0])
 
         y=y2
-        #TODO:Include the calibration points
         #TODO: implement prony's method and see if it's better
         y[:-4] = y1
         fit_res = self.fit(x[:-4], y[:-4])
@@ -8567,18 +8815,21 @@ class DoubleFrequency(TD_Analysis):
                    r'$\tau _1$: {:.2f} $\mu$s'.format(self.tau1 * 1e6) +
                    '  \t' + r'$\tau _2$: {:.2f}$\mu$s'.format(self.tau2 * 1e6))
 
-        ax.text(0.4, 0.95, textstr,
+        self.ax.text(0.4, 0.95, textstr,
                 transform=ax.transAxes, fontsize=11,
                 verticalalignment='top', bbox=self.box_props)
-        plot_x = x
+        plot_x = np.linspace(self.sweep_points[0],
+                        self.sweep_points[-self.NoCalPoints - 1],
+                        len(self.sweep_points) * 100)
 
-        ax.set_ylabel(r'$F |1\rangle$')
-        ax.set_title('%s: Double Frequency analysis' % self.timestamp)
-        ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x * 1e6, y, 'o-')
-        ax.plot(plot_x[:-4] * 1e6, self.fit_plot, '-')
-        fig.tight_layout()
-        self.save_fig(fig, **kw)
+        best_vals = fit_res.best_values
+        plot_y = fit_mods.DoubleExpDampOscFunc(
+            plot_x, **best_vals)
+
+        self.ax.set_title('%s: Double Frequency analysis' % self.timestamp)
+        self.ax.plot(plot_x, plot_y, '-')
+        self.fig.tight_layout()
+        self.save_fig(self.fig, **kw)
         self.data_file.close()
         return self.fit_res
 
@@ -8677,7 +8928,7 @@ class DoubleFrequency(TD_Analysis):
         Double_Cos_Model.set_param_hint(
             'freq_1', value=freq_guess[0], min=0)
         Double_Cos_Model.set_param_hint('phase_1', value=phi_guess[0])
-        Double_Cos_Model.set_param_hint('osc_offset', value=0.5, min=0, max=1)
+        Double_Cos_Model.set_param_hint('osc_offset', value=np.mean(measured_values), min=0, max=1)
         if (only_one_peak):
             Double_Cos_Model.set_param_hint(
                 'tau_2', value=0, vary=False, min=0)
@@ -8695,17 +8946,15 @@ class DoubleFrequency(TD_Analysis):
             Double_Cos_Model.set_param_hint(
                 'freq_2', value=freq_guess[1], min=0)
             Double_Cos_Model.set_param_hint('phase_2', value=phi_guess[1])
-
             Double_Cos_Model.set_param_hint(
-                'amp_1', value=amp_guess[0], min=0.05, max=1.1, vary=True)
+                'amp_1', value=amp_guess[0], min=0.05, max=2*amp_guess[0], vary=True)
             Double_Cos_Model.set_param_hint(
-                'amp_2', value=amp_guess[1], min=0.05, max=1.1, vary=True)
+                'amp_2', value=amp_guess[1], min=0.05, max=2*amp_guess[1], vary=True)
 
         params = Double_Cos_Model.make_params()
         fit_res = Double_Cos_Model.fit(data=measured_values,
                                        t=sweep_values,
                                        params=params)
-        self.fit_plot = fit_res.model.func(sweep_values, **fit_res.best_values)
         return fit_res
 
     def save_fig(self, fig, figname='_DoubleFreq_', xlabel='x', ylabel='y',
@@ -8945,7 +9194,11 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         peaks = np.zeros((len(self.X), 2))
         for i in range(len(self.X)):
             p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i], **kw)
-            peaks[i, :] = np.sort(p_dict[:2])
+            try:
+                peaks[i, :] = np.sort(p_dict[:2])
+            except Exception as e:
+                logging.warning(e)
+                peaks[i, :] = np.array([np.NaN, np.NaN])
 
         peaks_low = peaks[:, 0]
         peaks_high = peaks[:, 1]
@@ -9954,6 +10207,10 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     print('offset I {}, offset Q {}'.format(offset_I, offset_Q))
     y1 = data_file.measured_values[0] - offset_I
     y2 = data_file.measured_values[1] - offset_Q
+
+    I0_no_demod = y1
+    Q0_no_demod = y2
+
     I0, Q0 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
                        Q_o=Q_o, IF=IF, predistort=predistort)
     power0 = (I0 ** 2 + Q0 ** 2) / 50
@@ -9972,6 +10229,10 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     y2 = data_file.measured_values[1] - offset_Q
     I1, Q1 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
                        Q_o=Q_o, IF=IF, predistort=predistort)
+
+    I1_no_demod = y1
+    Q1_no_demod = y2
+
     power1 = (I1 ** 2 + Q1 ** 2) / 50
 
     amps = np.sqrt((I1 - I0) ** 2 + (Q1 - Q0) ** 2)
@@ -9979,6 +10240,21 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     # defining weight functions for postrotation
     weight_I = (I1 - I0) / amp_max
     weight_Q = (Q1 - Q0) / amp_max
+
+
+    weight_I_no_demod = (I1_no_demod - I0_no_demod) / amp_max
+    weight_Q_no_demod = (Q1_no_demod - Q0_no_demod) / amp_max
+
+    # Identical rescaling as is happening in the CCL transmon class
+    maxI_no_demod = np.max(np.abs(weight_I_no_demod))
+    maxQ_no_demod = np.max(np.abs(weight_Q_no_demod))
+    weight_scale_factor = 1./(4*np.max([maxI_no_demod, maxQ_no_demod]))
+    weight_I_no_demod = np.array(
+        weight_scale_factor*weight_I_no_demod)
+    weight_Q_no_demod = np.array(
+        weight_scale_factor*weight_Q_no_demod)
+
+
 
     if post_rotation_angle == None:
         arg_max = np.argmax(amps)
@@ -10099,9 +10375,17 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     f_axis_o, PSD1Q_o = func.PSD(A1Q[-1024:], 1 / Fs)
 
     n_spurious = int(round(2 * len(A0I) * abs(IF) / Fs))
-    f_spurious = f_axis[n_spurious]
+    if n_spurious>len(f_axis):
+        logging.warning('Calibrate_optimal_weights ANALYSIS: Spurious frequency not in range')
+        f_spurious = 0
+    else:
+        f_spurious = f_axis[n_spurious]
     n_offset = int(round(len(A0I[-1024:]) * abs(IF) / Fs))
-    f_offset = f_axis_o[n_offset]
+    if n_offset>len(f_axis_o):
+        logging.warning('Calibrate_optimal_weights ANALYSIS: offset frequency not in range')
+        f_offset = 0
+    else:
+        f_offset = f_axis_o[n_offset]
 
     # print('f_spurious', f_spurious)
     # print('f_offset', f_offset)
@@ -10112,8 +10396,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     cost_offset = 0
 
     for i in range(samples):
-        n_s = int(n_spurious - samples / 2 + i)
-        n_o = int(n_offset - samples / 2 + i)
+        n_s = np.clip(int(n_spurious - samples / 2 + i),0,len(PSD0I)-1)
+        n_o = np.clip(int(n_offset - samples / 2 + i),0,len(PSD0I_o)-1)
 
         cost_skew = cost_skew + \
             np.abs(PSD0I[n_s]) + np.abs(PSD1I[n_s]) + \
@@ -10210,6 +10494,26 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.legend()
     plt.xlabel('time (ns)')
     plt.ylabel('Integration weight (V)')
+    plt.title('demodulated weight functions_' + data_file.timestamp_string)
+    plt.axhline(0, linestyle='--')
+    edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
+    ax.set_xlim(0, plot_max_time*1e9)
+    plt.savefig(data_file.folder + '\\' + 'demodulated_weight_functions.' +
+                fig_format, format=fig_format)
+    plt.close()
+
+
+    fig, ax = plt.subplots()
+    plt.plot(time, weight_I_no_demod, label='weight I')
+    plt.plot(time, weight_Q_no_demod, label='weight Q')
+    if optimization_window != None:
+        plt.axvline((optimization_start - shift_w) * 1e9, linestyle='--',
+                    color='k', label='depletion optimization window')
+        plt.axvline((optimization_stop - shift_w) *
+                    1e9, linestyle='--', color='k')
+    plt.legend()
+    plt.xlabel('time (ns)')
+    plt.ylabel('Integration weight (V)')
     plt.title('weight functions_' + data_file.timestamp_string)
     plt.axhline(0, linestyle='--')
     edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
@@ -10217,6 +10521,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.savefig(data_file.folder + '\\' + 'weight_functions.' +
                 fig_format, format=fig_format)
     plt.close()
+
+
 
     # should return a dict for the function detector
     # return cost_skew, cost_offset, depletion_cost, x, y1, y2, I0, Q0, I1, Q1

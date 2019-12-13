@@ -149,8 +149,10 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             try:
                 entry_point.attrs[key] = item
             except Exception as e:
+
                 print('Exception occurred while writing'
-                      ' {}:{} of type {}'.format(key, item, type(item)))
+                      ' {}:{} of type {} at entry point {}'
+                      .format(key, item, type(item), entry_point))
                 logging.warning(e)
         elif isinstance(item, np.ndarray):
             entry_point.create_dataset(key, data=item)
@@ -251,15 +253,16 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
                                                  item)
         else:  # item either a group or a dataset
             if 'list_type' not in item.attrs:
-                data_dict[key] = item.value
+                data_dict[key] = item[()]  # changed deprecated item.value => item[()]
             elif item.attrs['list_type'] == 'str':
                 # lists of strings needs some special care, see also
                 # the writing part in the writing function above.
-                list_of_str = [x[0] for x in item.value]
+                list_of_str = [x[0] for x in item[()]]  # changed deprecated item.value => item[()]
                 data_dict[key] = list_of_str
-
+            elif item.attrs['list_type'] == 'array':
+                data_dict[key] = list(item[()])  # changed deprecated item.value => item[()]
             else:
-                data_dict[key] = list(item.value)
+                data_dict[key] = list(item[()])  # changed deprecated item.value => item[()]
     for key, item in h5_group.attrs.items():
         if isinstance(item, str):
             # Extracts "None" as an exception as h5py does not support
@@ -287,6 +290,46 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
             raise NotImplementedError('cannot read "list_type":"{}"'.format(
                 h5_group.attrs['list_type']))
     return data_dict
+
+
+def extract_pars_from_datafile(filepath: str, param_spec: dict)-> dict:
+    """
+    Extract parameters from an hdf5 datafile.
+
+    Args:
+        filepath (str)
+            tilepath of the hfd5 datafile.
+
+        param_spec (dict)
+            specification of parameters to extract.
+                key: name used to store the extracted entry
+                value: tuple consiting of "/" separated parameter path
+                    and attribute/dataset specificiation.
+                    The attribute/dataset specification is
+                        "attr:attribute_name" or "dset".
+
+            example param_spec
+                param_spec = {
+                    'T1': ('Analysis/Fitted Params F|1>/tau', 'attr:value'),
+                    'uT1': ('Analysis/Fitted Params F|1>/tau', 'attr:stderr'),
+                    'data': ('Experimental Data/Data', 'dset'),
+                    'timestamp': ('MC settings/begintime', 'dset' )}
+
+    Return:
+        param_dict (dict)
+            dictionary containing the extracted parameters.
+    """
+    param_dict = {}
+    f = h5py.File(filepath, 'r')
+    with h5py.File(filepath, 'r') as f:
+        for par_name, par_spec in param_spec.items():
+            entry = f[par_spec[0]]
+            if par_spec[1].startswith('dset'):
+                param_dict[par_name] = entry.value
+            elif par_spec[1].startswith('attr'):
+                param_dict[par_name] = entry.attrs[par_spec[1][5:]]
+
+    return param_dict
 
 
 def RepresentsInt(s):

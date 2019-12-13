@@ -3,34 +3,37 @@ import numpy as np
 import os
 import pycqed as pq
 import time
-import openql
 import warnings
-import pycqed.analysis.analysis_toolbox as a_tools
 
-import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
+import pycqed.analysis.analysis_toolbox as a_tools
+from pycqed.measurement import measurement_control
+
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
+
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
-from pycqed.measurement import measurement_control
-from qcodes import station
-
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQC import dummy_UHFQC
-
-from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
-
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
+
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
+
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
-from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
+from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.Transport import DummyTransport
+
+from qcodes import station
+
 
 Dummy_VSM_not_fixed = False
 
 
-class Test_QO(unittest.TestCase):
+class Test_CCL(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -41,7 +44,8 @@ class Test_QO(unittest.TestCase):
         self.MW2 = vmw.VirtualMWsource('MW2')
         self.MW3 = vmw.VirtualMWsource('MW3')
         self.SH = sh.virtual_SignalHound_USB_SA124B('SH')
-        self.UHFQC = dummy_UHFQC('UHFQC')
+        self.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator',
+                               device='dev2109', interface='1GbE')
 
         self.CCL = dummy_CCL('CCL')
         # self.VSM = Dummy_Duplexer('VSM')
@@ -57,7 +61,7 @@ class Test_QO(unittest.TestCase):
         self.MC.datadir(test_datadir)
         a_tools.datadir = self.MC.datadir()
 
-        self.AWG = v8.VirtualAWG8('DummyAWG8')
+        self.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
         self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
         self.AWG8_VSM_MW_LutMan.AWG(self.AWG.name)
         self.AWG8_VSM_MW_LutMan.channel_GI(1)
@@ -106,23 +110,6 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.mw_mixer_offs_GQ(.2)
         self.CCL_qubit.mw_mixer_offs_DI(.3)
         self.CCL_qubit.mw_mixer_offs_DQ(.4)
-
-    def test_instantiate_QuDevTransmon(self):
-        QDT = QuDev_transmon('QuDev_transmon',
-                             MC=None, heterodyne_instr=None, cw_source=None)
-        QDT.close()
-
-    def test_instantiate_TekTransmon(self):
-        TT = Tektronix_driven_transmon('TT')
-        TT.close()
-
-    def test_instantiate_CBoxv3_transmon(self):
-        CT = CBox_v3_driven_transmon('CT')
-        CT.close()
-
-    def test_instantiate_QWG_transmon(self):
-        QT = QWG_driven_transmon('QT')
-        QT.close()
 
     ##############################################
     # calculate methods
@@ -244,20 +231,16 @@ class Test_QO(unittest.TestCase):
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
 
-        self.assertEqual(self.UHFQC.quex_rot_3_real(), 1)
-        self.assertEqual(self.UHFQC.quex_rot_3_imag(), 1)
-        self.assertEqual(self.UHFQC.quex_rot_4_real(), 1)
-        self.assertEqual(self.UHFQC.quex_rot_4_imag(), -1)
+        self.assertEqual(self.UHFQC.qas_0_rotations_3(), 1 + 1j)
+        self.assertEqual(self.UHFQC.qas_0_rotations_4(), 1 - 1j)
 
-        uploaded_wf = self.UHFQC.quex_wint_weights_3_real()
+        uploaded_wf = self.UHFQC.qas_0_integration_weights_3_real()
         np.testing.assert_array_almost_equal(cosI, uploaded_wf)
         # Testing DSB case
         self.CCL_qubit.ro_acq_weight_type('DSB')
         self.CCL_qubit.prepare_readout()
-        self.assertEqual(self.UHFQC.quex_rot_3_real(), 2)
-        self.assertEqual(self.UHFQC.quex_rot_3_imag(), 0)
-        self.assertEqual(self.UHFQC.quex_rot_4_real(), 2)
-        self.assertEqual(self.UHFQC.quex_rot_4_imag(), 0)
+        self.assertEqual(self.UHFQC.qas_0_rotations_3(), 2)
+        self.assertEqual(self.UHFQC.qas_0_rotations_4(), 2)
 
         # Testing Optimal weight uploading
         test_I = np.ones(10)
@@ -268,17 +251,14 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.ro_acq_weight_type('optimal')
         self.CCL_qubit.prepare_readout()
 
-        self.UHFQC.quex_rot_4_real(.21)
-        self.UHFQC.quex_rot_4_imag(.108)
-        upl_I = self.UHFQC.quex_wint_weights_3_real()
-        upl_Q = self.UHFQC.quex_wint_weights_3_imag()
+        self.UHFQC.qas_0_rotations_4(.21 + 0.108j)
+        upl_I = self.UHFQC.qas_0_integration_weights_3_real()
+        upl_Q = self.UHFQC.qas_0_integration_weights_3_imag()
         np.testing.assert_array_almost_equal(test_I, upl_I)
         np.testing.assert_array_almost_equal(test_Q, upl_Q)
-        self.assertEqual(self.UHFQC.quex_rot_3_real(), 1)
-        self.assertEqual(self.UHFQC.quex_rot_3_imag(), -1)
+        self.assertEqual(self.UHFQC.qas_0_rotations_3(), 1 - 1j)
         # These should not have been touched by optimal weights
-        self.assertEqual(self.UHFQC.quex_rot_4_real(), .21)
-        self.assertEqual(self.UHFQC.quex_rot_4_imag(), .108)
+        self.assertEqual(self.UHFQC.qas_0_rotations_4(), .21 + .108j)
 
         self.CCL_qubit.ro_acq_weight_type('SSB')
 
@@ -384,6 +364,7 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.ro_acq_input_average_length(2e-6)
         self.CCL_qubit.measure_transients()
 
+    @unittest.skip('OpenQL bug for CCL config')
     def test_qubit_spec(self):
         freqs = np.linspace(6e9, 6.5e9, 31)
         # Data cannot be analyzed as dummy data is just random numbers
@@ -448,3 +429,34 @@ class Test_QO(unittest.TestCase):
                 inst.close()
             except KeyError:
                 pass
+
+class Test_CC(Test_CCL):
+
+    @classmethod
+    def setUpClass(self):
+        super().setUpClass()
+        self.CC = QuTechCC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
+        self.CCL_qubit.instr_CC(self.CC.name)
+
+        config_fn = os.path.join(
+            pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
+        self.CCL_qubit.cfg_openql_platform_fn(config_fn)
+
+
+class Test_Instantiate(unittest.TestCase):
+    def test_instantiate_QuDevTransmon(self):
+        QDT = QuDev_transmon('QuDev_transmon',
+                             MC=None, heterodyne_instr=None, cw_source=None)
+        QDT.close()
+
+    def test_instantiate_TekTransmon(self):
+        TT = Tektronix_driven_transmon('TT')
+        TT.close()
+
+    def test_instantiate_CBoxv3_transmon(self):
+        CT = CBox_v3_driven_transmon('CT')
+        CT.close()
+
+    def test_instantiate_QWG_transmon(self):
+        QT = QWG_driven_transmon('QT')
+        QT.close()

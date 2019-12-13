@@ -1,16 +1,13 @@
 import unittest
-import numpy as np
 import os
 import pycqed as pq
-import time
+import pytest
 
 
-import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
-from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 import pycqed.instrument_drivers.meta_instrument.distortions_corrector as dc
 import pycqed.instrument_drivers.meta_instrument.kernel_object as ko
 
-
+# pytestmark = pytest.mark.skip
 class Test_distorter(unittest.TestCase):
 
     @classmethod

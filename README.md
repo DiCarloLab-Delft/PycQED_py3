@@ -1,8 +1,8 @@
 # PycQED 
-[![Build Status](https://gitlab.com/dicarlolab/pycqed/badges/master/build.svg)](https://gitlab.com/dicarlolab/pycqed/pipelines)
+[![Build Status](https://github.com/DiCarloLab-Delft/pycqed_py3/workflows/Build%20Status/badge.svg)](https://github.com/DiCarloLab-Delft/pycqed_py3/actions)
 [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179)
 [![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger)
-[![codecov](https://codecov.io/gl/dicarlolab/pycqed/branch/master/graph/badge.svg)](https://codecov.io/gl/dicarlolab/pycqed)
+[![codecov](https://codecov.io/gh/DiCarloLab-Delft/PycQED_py3/branch/master/graph/badge.svg)](https://codecov.io/gh/DiCarloLab-Delft/PycQED_py3)
 
 A Python-based measurement environment for circuit-QED experiments by the 
 [DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/),
@@ -14,19 +14,6 @@ package.
 ## License
 This software is released under the [MIT License](LICENSE.md)
 
-## Contributors
-Contributors (in alphabetical order):
-
-- Serwan Asaad
-- Niels Bultink
-- Christian Dickel
-- Bart Dikken
-- Xiang Fu
-- Sjoerd de Jong
-- Gijs de Lange
-- Nathan Langford
-- Florian Luthi
-- Adriaan Rol
 
 ## Contributing
 Please see [Contributing.md](.github/CONTRIBUTING.md)
@@ -136,14 +123,14 @@ In a hard measurement the measurement is prepared by the software and then trigg
 #### Analysis
 The measurement analysis currently (april 2015) contains three modules.
 
-#####Measurement analysis
+##### Measurement analysis
 The measurement analysis module contains the main analysis objects. By instantiating one of these objects a dataset can be analyzed. It contains default methods for the most common experiments and makes extensive use of object oriented hereditary relations. This means that for example the Rabi_Analysis is a child of the TD_Analysis which is a child of the MeasurementAnalysis and has all the functions of it's parent classes.
 
 When instantiating such an object you can pass it a timestamp and/or a label to determine what datafile to load. By giving it the argument auto=True the default analysis script is run.
-#####Analysis Toolbox
+##### Analysis Toolbox
 This toolbox contains tools for analysis such as file-handling tools, plotting tools and some data analysis tools such as a peak finder.
 
-#####Fitting models
+##### Fitting models
 This module contains the lmfit model definitions and fitting functions used for curve fitting.
 
 ### The scripts folder

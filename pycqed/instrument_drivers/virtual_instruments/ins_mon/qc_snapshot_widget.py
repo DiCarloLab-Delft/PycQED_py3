@@ -42,26 +42,29 @@ class QcSnaphotWidget(QtGui.QTreeWidget):
                 par_snap = ins_snapshot['parameters'][par_name]
                 # Depending on the type of data stored in value do different
                 # things, currently only blocks non-dicts
-                if not isinstance(par_snap['value'], dict):
-                    value_str, unit = SI_val_to_msg_str(par_snap['value'],
-                                                        par_snap['unit'])
+                if 'value' in par_snap.keys():
+                    # Some parameters do not have a value, these are not shown
+                    # in the instrument monitor.
+                    if not isinstance(par_snap['value'], dict):
+                        value_str, unit = SI_val_to_msg_str(par_snap['value'],
+                                                            par_snap['unit'])
 
-                    # Omits printing of the date to make it more readable
-                    if par_snap['ts'] is not None:
-                        latest_str = par_snap['ts'][11:]
-                    else:
-                        latest_str = ''
+                        # Omits printing of the date to make it more readable
+                        if par_snap['ts'] is not None:
+                            latest_str = par_snap['ts'][11:]
+                        else:
+                            latest_str = ''
 
-                    # Name of the node in the self.nodes dictionary
-                    param_node_name = '{}.{}'.format(ins, par_name)
-                    # If node does not yet exist, create a node
-                    if param_node_name not in self.nodes:
-                        param_node = QtGui.QTreeWidgetItem(
-                            [par_name, value_str, unit, latest_str])
-                        node.addChild(param_node)
-                        self.nodes[param_node_name] = param_node
-                    else:  # else update existing node
-                        param_node = self.nodes[param_node_name]
-                        param_node.setData(1, 0, value_str)
-                        param_node.setData(2, 0, unit)
-                        param_node.setData(3, 0, latest_str)
+                        # Name of the node in the self.nodes dictionary
+                        param_node_name = '{}.{}'.format(ins, par_name)
+                        # If node does not yet exist, create a node
+                        if param_node_name not in self.nodes:
+                            param_node = QtGui.QTreeWidgetItem(
+                                [par_name, value_str, unit, latest_str])
+                            node.addChild(param_node)
+                            self.nodes[param_node_name] = param_node
+                        else:  # else update existing node
+                            param_node = self.nodes[param_node_name]
+                            param_node.setData(1, 0, value_str)
+                            param_node.setData(2, 0, unit)
+                            param_node.setData(3, 0, latest_str)

@@ -1,0 +1,23 @@
+smis s0, {0}
+smis s1, {1}
+smis s2, {2}
+smis s3, {3}
+smis s4, {4}
+smis s5, {5}
+smis s6, {6}
+smis s7, {0, 1, 2, 3, 4, 5, 6}
+smis s8, {0, 1, 5, 6}
+smis s9, {2, 3, 4}
+smit t0, {(2, 0)}
+smit t1, {(3, 1)}
+smit t2, {(6, 4)}
+smit t3, {(3, 5)}
+
+start:
+    qwait 3
+    bs 1 MeasZ s7 
+   
+    br always, start
+    nop
+    nop
+

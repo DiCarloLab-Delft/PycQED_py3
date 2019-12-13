@@ -26,7 +26,7 @@ def interpolate_heatmap(x, y, z, n: int=None, interp_method:str='linear'):
         z   (array): z data points
         n     (int): number of points for each dimension on the interpolated
             grid
-        interp_method {"linear", "nearest"} determines what interpolation
+        interp_method {"linear", "nearest", "deg"} determines what interpolation
             method is used.
 
     Returns:
@@ -62,19 +62,37 @@ def interpolate_heatmap(x, y, z, n: int=None, interp_method:str='linear'):
     if n is None:
         # Calculate how many grid points are needed.
         # factor from A=√3/4 * a² (equilateral triangle)
-        n = int(0.658 / np.sqrt(areas(ip).min()))
+        # N.B. a factor 4 was added as there were to few points for uniform 
+        # grid otherwise. 
+        n = int(0.658 / np.sqrt(areas(ip).min()))*4
         n = max(n, 10)
         if n > 500:
             logging.warning('n: {} larger than 500'.format(n))
             n=500
 
-    if interp_method == "nearest":
+    x_lin = y_lin = np.linspace(-0.5, 0.5, n)
+
+    if interp_method == 'linear':
+        z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
+    elif interp_method == "nearest":
         ip = interpolate.NearestNDInterpolator(
             scale(points, xy_mean=xy_mean, xy_scale=xy_scale), z)
+        z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
+    elif interp_method == "deg":
+        # Circular interpolation in deg units
+        phases=np.deg2rad(z)
+        newdata_cos=np.cos(phases)
+        newdata_sin=np.sin(phases)
 
-    x_lin = y_lin = np.linspace(-0.5, 0.5, n)
-    # Interpolation is evaulated linearly in the domain for interpolation
-    z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
+        ip_cos = interpolate.LinearNDInterpolator(
+            scale(points, xy_mean=xy_mean, xy_scale=xy_scale), newdata_cos)
+        newdata_cos = ip_cos(x_lin[:, None], y_lin[None, :]).squeeze()
+
+        ip_sin = interpolate.LinearNDInterpolator(
+            scale(points, xy_mean=xy_mean, xy_scale=xy_scale), newdata_sin)
+        newdata_sin = ip_sin(x_lin[:, None], y_lin[None, :]).squeeze()
+
+        z_grid = (np.rad2deg(np.arctan2(newdata_sin, newdata_cos)) % 360).squeeze()
 
     # x and y grid points need to be rescaled from the linearly chosen points
     points_grid = unscale(list(zip(x_lin, y_lin)),
