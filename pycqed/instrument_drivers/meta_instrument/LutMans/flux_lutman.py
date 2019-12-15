@@ -1477,7 +1477,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 n_dim=2,  # Optimizing 2 over parameters
                 res_bounds=res_bounds,
                 minimize=True,
-                use_std=True)
+                use_grad=True)
 
             adaptive_pars_default = {
                 'adaptive_function': LearnerND_Optimize,
