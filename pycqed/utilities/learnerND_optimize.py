@@ -92,7 +92,7 @@ class LearnerND_Optimize(LearnerND):
 
 
 def mk_optimize_resolution_loss_func(
-    n_points, n_dim, res_bounds=(0.5, 3.0), minimize=True, use_std=False
+    n_points, n_dim, res_bounds=(0.5, 3.0), minimize=True, use_grad=False
 ):
     """
     Creates a loss function that distributes sampling points over the
@@ -114,13 +114,12 @@ def mk_optimize_resolution_loss_func(
 
     Return: loss_per_simplex function to be used with LearnerND
     """
-
     def loss(simplex, values, value_scale, learner):
         # Assumes values is numpy array
         # The learner evaluate fisrt the boundaries
         # make sure the min max takes in account all data at the beggining
         # of the sampling
-        if len(learner.data) < 2 * len(simplex)**2:
+        if not learner.bounds_are_done:
             local_min = np.min(list(learner.data.values()))
             local_max = np.max(list(learner.data.values()))
         else:
@@ -134,11 +133,12 @@ def mk_optimize_resolution_loss_func(
         # loss will always be positive
         # This is important because the learner expect positive output
         # from the loss function
-        loss = np.sum((values - learner.best_min) / values_domain_len)
         if minimize:
-            loss = 1 / loss
-        if use_std:
-            loss *= np.std(values)
+            loss = np.average((learner.best_max - values) / values_domain_len)
+        else:
+            loss = np.average((values - learner.best_min) / values_domain_len)
+        if use_grad:
+            loss += np.std(values) / values_domain_len
         return loss
 
     func = mk_non_uniform_resolution_loss_func(
