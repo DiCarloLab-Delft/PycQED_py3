@@ -629,6 +629,6 @@ class TestMultiQubitFluxLutMan:
             lambda_2_lims=(-0.3, -0.2))
         first_optimal_pars = guesses[0][0]
         np.testing.assert_almost_equal(first_optimal_pars['cz_theta_f_SE'],
-            115.833, decimal=3)
+            116.6666, decimal=1)
         np.testing.assert_almost_equal(first_optimal_pars['cz_lambda_2_SE'],
-            -0.26666, decimal=3)
+            -0.23333, decimal=1)
