@@ -178,7 +178,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
 
         self.add_parameter(
             'cfg_codeword_protocol', initial_value='identical',
-            vals=validators.Enum('identical', 'microwave', 'new_microwave', 'new_novsm_microwave', 'flux'), docstring=(
+            vals=validators.Enum('identical', 'microwave', 'new_novsm_microwave', 'flux'), docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
@@ -358,8 +358,7 @@ while (1) {
                 num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
                 dio_mode_list = {
                     'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
-                    'microwave':            { 'mask': 0xFF, 'shift': [0,  0,  9,  9] },     # bits [7:0] and [16:9]. Skips bit 8 because of v1 hardware issues
-                    'new_microwave':        { 'mask': 0xFF, 'shift': [0,  0,  16, 16] },    # bits [7:0] and [23:16]
+                    'microwave':            { 'mask': 0xFF, 'shift': [0,  0,  16, 16] },    # bits [7:0] and [23:16]
                     'new_novsm_microwave':  { 'mask': 0x7F, 'shift': [0,  7,  16, 23] },    # bits [6:0], [13:7], [22:16] and [29:23]
                     'flux':                 { 'mask': 0x3F, 'shift': [0,  6,  16, 22] },    # FIXME: mask for 2 channels
                 }
@@ -390,17 +389,10 @@ while (1) {
                     # In the identical protocol all bits are used to trigger
                     # the same codewords on all AWG's
                     self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                elif self.cfg_codeword_protocol() == 'microwave':
-                    # In the mw protocol bits [0:7] -> CW0 and bits [(8+1):15] -> CW1
-                    # N.B. DIO bit 8 (first of 2nd byte)  not connected in AWG8!
-                    if awg_nr in [0, 1]:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                    elif awg_nr in [2, 3]:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 9)
 
                 # NEW
                 # In the new mw protocol bits [0:7] -> CW0 and bits [23:16] -> CW1
-                elif self.cfg_codeword_protocol() == 'new_microwave':
+                elif self.cfg_codeword_protocol() == 'microwave':
                     if awg_nr in [0, 1]:
                         self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
                     elif awg_nr in [2, 3]:
@@ -633,11 +625,7 @@ while (1) {
                                  (2, list(staircase_sequence + (staircase_sequence << 3))), \
                                  (3, list(staircase_sequence+ (staircase_sequence << 3)))]
 
-
         elif self.cfg_codeword_protocol() == 'microwave':
-            raise zibase.ziConfigurationError('old_microwave DIO scheme not supported on QCC.')
-
-        elif self.cfg_codeword_protocol() == 'new_microwave':
 
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
                 '..',
@@ -709,9 +697,6 @@ while (1) {
                                  (2, list(reversed(staircase_sequence))), \
                                  (3, list(reversed(staircase_sequence)))]
 
-        elif self.cfg_codeword_protocol() == 'new_microwave':
-            raise NotImplementedError
-
         elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
             raise NotImplementedError
 
@@ -765,7 +750,7 @@ while (1) {
                 'qisa_test_assembly','calibration_cws_mw.qisa'))
 
             sequence_length = 32
-            staircase_sequence = range(1, sequence_length)
+            staircase_sequence = np.arange(1, sequence_length)
             expected_sequence = [(0, list(reversed(staircase_sequence))), \
                                  (1, list(reversed(staircase_sequence))), \
                                  (2, list(reversed(staircase_sequence))), \
