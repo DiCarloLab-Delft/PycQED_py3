@@ -28,10 +28,13 @@ from qcodes.utils import validators as vals
 from qcodes.plots.colors import color_cycle
 
 # Used for adaptive sampling
+from adaptive import runner
 from adaptive.learner import BaseLearner
 from adaptive.learner import Learner1D
 from adaptive.learner import Learner2D
 from adaptive.learner import LearnerND
+# Optimizer based on adaptive sampling
+from pycqed.utilities.learnerND_optimize import LearnerND_Optimize
 
 # In the future should be replaced by `adaptive.learner.SKOptLearner`
 # SKOptLearnerND is a modified version of SKOptLearner
@@ -42,7 +45,6 @@ from adaptive.learner import LearnerND
 # cleanup the comments about this
 from pycqed.measurement.optimization import SKOptLearnerND
 from skopt import Optimizer  # imported for checking types
-from adaptive import runner
 
 try:
     import msvcrt  # used on windows to catch keyboard input
@@ -58,8 +60,10 @@ except Exception:
         'try "from qcodes.plots.pyqtgraph import QtPlot" '
         "to see the full error"
     )
-    print("When instantiating an MC object," 
+    print("When instantiating an MC object,"
           " be sure to set live_plot_enabled=False")
+
+log = logging.getLogger('__name__')
 
 
 def is_subclass(obj, test_obj):
@@ -393,6 +397,11 @@ class MeasurementControl(Instrument):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
+            elif issubclass(self.adaptive_function, LearnerND_Optimize):
+                # Because this is also an optimizer we save the result
+                # Pass the learner because it contains all the points
+                log.error('Saving...')
+                self.save_optimization_results(self.adaptive_function, self.learner)
 
         elif isinstance(self.adaptive_function, types.FunctionType) or isinstance(
             self.adaptive_function, np.ufunc
@@ -518,8 +527,8 @@ class MeasurementControl(Instrument):
                         set_val = sweep_function.set_parameter(swp_pt)
                     except ValueError as e:
                         if self.cfg_clipping_mode():
-                            logging.warning("MC clipping mode caught exception:")
-                            logging.warning(e)
+                            log.warning("MC clipping mode caught exception:")
+                            log.warning(e)
                         else:
                             raise e
             if isinstance(set_val, float):
@@ -814,7 +823,7 @@ class MeasurementControl(Instrument):
                     self._mon_upd_time = time.time()
                     self.main_QtPlot.update_plot()
             except Exception as e:
-                logging.warning(e)
+                log.warning(e)
 
     def initialize_plot_monitor_2D(self):
         """
@@ -875,7 +884,7 @@ class MeasurementControl(Instrument):
                     self.time_last_2Dplot_update = time.time()
                     self.secondary_QtPlot.update_plot()
             except Exception as e:
-                logging.warning(e)
+                log.warning(e)
 
     def initialize_plot_monitor_2D_interp(self, ld=0):
         """
@@ -963,7 +972,7 @@ class MeasurementControl(Instrument):
                     self.time_last_2Dplot_update = time.time()
                     self.secondary_QtPlot.update_plot()
             except Exception as e:
-                logging.warning(e)
+                log.warning(e)
 
     def initialize_plot_monitor_adaptive(self):
         """
@@ -1029,7 +1038,7 @@ class MeasurementControl(Instrument):
                         self.time_last_ad_plot_update = time.time()
                         self.secondary_QtPlot.update_plot()
             except Exception as e:
-                logging.warning(e)
+                log.warning(e)
         self.update_plotmon_2D_interp(force_update=force_update)
 
     def initialize_plot_monitor_adaptive_cma(self):
@@ -1260,7 +1269,7 @@ class MeasurementControl(Instrument):
                     self.time_last_ad_plot_update = time.time()
 
             except Exception as e:
-                logging.warning(e)
+                log.warning(e)
 
     def update_plotmon_2D_hard(self):
         """
@@ -1289,7 +1298,7 @@ class MeasurementControl(Instrument):
                     self.time_last_2Dplot_update = time.time()
                     self.secondary_QtPlot.update_plot()
         except Exception as e:
-            logging.warning(e)
+            log.warning(e)
 
     def _set_plotting_interval(self, plotting_interval):
         if hasattr(self, "main_QtPlot"):
@@ -1474,6 +1483,17 @@ class MeasurementControl(Instrument):
             opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
             opt_indx = opt_idx_selector(result.yi)
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
+        elif is_subclass(adaptive_function, LearnerND_Optimize):
+            # Because MC saves all the datapoints we save only the best point
+            # for convenience
+            # Only works for a function that returns a scalar
+            log.error('Really saving...')
+            opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
+            X = list(result.data.keys())
+            Y = list(result.data.values())
+            opt_indx = opt_idx_selector(Y)
+            xopt = X[opt_indx]
+            res_dict = {"xopt": np.array(xopt), "fopt": Y[opt_indx]}
         elif adaptive_function.__module__ == "pycqed.measurement.optimization":
             res_dict = {"xopt": result[0], "fopt": result[1]}
         else:
@@ -1489,7 +1509,7 @@ class MeasurementControl(Instrument):
         if data_object is None:
             data_object = self.data_object
         if not hasattr(self, "station"):
-            logging.warning(
+            log.warning(
                 "No station object specified, could not save", " instrument settings"
             )
         else:
