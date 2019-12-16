@@ -2,6 +2,7 @@ import adaptive
 from adaptive.learner import LearnerND
 import numpy as np
 from functools import partial
+from collections.abc import Iterable
 import logging
 
 log = logging.getLogger('__name__')
@@ -239,3 +240,30 @@ def mk_target_val_resolution_loss_func(
     if default_loss_func == 'needs_learner_example':
         func.needs_learner_access = True
     return func
+
+
+# ######################################################################
+# Utilities for evaluating points before starting the runner
+# ######################################################################
+
+def evaluate_X(learner, X):
+    """
+    Evaluates the learner's sampling function at the given point
+    or points.
+    Can be used to evaluate some initial points that the learner will
+    remember before running the runner.
+
+    Arguments:
+        learner: (BaseLearner) an instance of the learner
+        X: single point or iterable of points
+            A tuple is considered single point for a multi-variable
+            domain.
+    """
+    if type(X) is tuple or not isinstance(X, Iterable):
+        # A single-variable domain single point or
+        # a multi-variable domain single point is given
+        learner.tell(X, learner.function(X))
+    else:
+        # Several points are to be evaluated
+        Y = [learner.function(Xi) for Xi in X]
+        learner.tell_many(X, Y)

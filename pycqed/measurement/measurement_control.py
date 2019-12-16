@@ -34,7 +34,8 @@ from adaptive.learner import Learner1D
 from adaptive.learner import Learner2D
 from adaptive.learner import LearnerND
 # Optimizer based on adaptive sampling
-from pycqed.utilities.learnerND_optimize import LearnerND_Optimize
+from pycqed.utilities.learnerND_optimize import (LearnerND_Optimize,
+    evaluate_X)
 
 # In the future should be replaced by `adaptive.learner.SKOptLearner`
 # SKOptLearnerND is a modified version of SKOptLearner
@@ -385,6 +386,9 @@ class MeasurementControl(Instrument):
             else:
                 raise NotImplementedError("Learner subclass type not supported.")
 
+            if 'X0' in self.af_pars:
+                # Teach the learner the initial point if provided
+                evaluate_X(self.learner, self.af_pars['X0'])
             # N.B. the runner that is used is not an `adaptive.Runner` object
             # rather it is the `adaptive.runner.simple` function. This
             # ensures that everything runs in a single process, as is
@@ -400,7 +404,6 @@ class MeasurementControl(Instrument):
             elif issubclass(self.adaptive_function, LearnerND_Optimize):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
-                log.error('Saving...')
                 self.save_optimization_results(self.adaptive_function, self.learner)
 
         elif isinstance(self.adaptive_function, types.FunctionType) or isinstance(
@@ -1487,7 +1490,6 @@ class MeasurementControl(Instrument):
             # Because MC saves all the datapoints we save only the best point
             # for convenience
             # Only works for a function that returns a scalar
-            log.error('Really saving...')
             opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
             X = list(result.data.keys())
             Y = list(result.data.values())
