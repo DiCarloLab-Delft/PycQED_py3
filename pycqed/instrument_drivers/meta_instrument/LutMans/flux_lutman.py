@@ -25,7 +25,7 @@ from datetime import datetime
 import cma
 from pycqed.measurement.optimization import nelder_mead, multi_targets_phase_offset
 from pycqed.utilities.learnerND_optimize import (
-    mk_optimize_resolution_loss_func,
+    mk_optimize_res_loss_func,
     LearnerND_Optimize)
 
 import logging
@@ -1472,7 +1472,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             MC.run(label, mode='2D')
 
         elif sweep_mode == 'adaptive':
-            loss = mk_optimize_resolution_loss_func(
+            loss = mk_optimize_res_loss_func(
                 n_points=n_points,
                 n_dim=2,  # Optimizing 2 over parameters
                 res_bounds=res_bounds,
