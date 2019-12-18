@@ -1676,7 +1676,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self.set('cz_lambda_2_{}'.format(which_gate), lambda_2_saved)
         self.set('cz_theta_f_{}'.format(which_gate), theta_f_saved)
 
-        # coha.save_quantities_of_interest()
+        coha.save_quantities_of_interest()
         coha.run_post_extract()
 
         if not optimize_phase_q0:
