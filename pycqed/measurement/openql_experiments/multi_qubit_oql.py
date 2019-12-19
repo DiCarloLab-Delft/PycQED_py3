@@ -1365,7 +1365,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 k.gate("wait", list(np.arange(17)), 0) #alignment workaround
             else:
                 k.gate("wait", list(np.arange(17)), 0) #alignment workaround
-                k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
+                k.gate('wait', [q0,q1], 40)
+                # k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
                 k.gate("wait", list(np.arange(17)), 0) #alignment workaround
 
             if wait_time_after > 0:
