@@ -326,6 +326,10 @@ def extract_pars_from_datafile(filepath: str, param_spec: dict)-> dict:
             entry = f[par_spec[0]]
             if par_spec[1].startswith('dset'):
                 param_dict[par_name] = entry.value
+            elif par_spec[1].startswith('attr:all_attr'):
+                param_dict[par_name] = dict()
+                for attribute_name in entry.attrs.keys():
+                    param_dict[par_name][attribute_name] = entry.attrs[attribute_name]
             elif par_spec[1].startswith('attr'):
                 param_dict[par_name] = entry.attrs[par_spec[1][5:]]
 
