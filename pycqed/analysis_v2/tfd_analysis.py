@@ -211,3 +211,27 @@ def plot_pauli_ops(pauli_terms, energy_terms, ax=None, **kw):
     ax.set_ylabel('Expectation value')
     ax.set_ylim(-1.05, 1.05)
     ax.set_title('Digitized pauli expectation values')
+
+
+def plot_all_pauli_ops(full_dict, ax=None, **kw):
+    if ax is None:
+        f, ax = plt.subplots()
+
+    labels = full_dict.keys()
+    for i, label in enumerate(labels):
+        if 'ZZII' in label or 'IIZZ' in label or 'XXII' in label or 'IIXX' in label:
+            c = 'r'
+        elif 'ZIZI' in label or 'IZIZ' in label or 'XIXI' in label or 'IXIX' in label:
+            c = 'b'
+        else:
+            c = 'purple'
+        ax.bar(i, full_dict[label], color=c, align='center')
+        ax.set_xticks(np.arange(len(labels)))
+        ax.set_xticklabels(labels, rotation=60)
+        ax.text(1, -.5, '$Inter=${:.2f}'.format(full_dict['ZIZI']+full_dict['IZIZ']+
+                                                      full_dict['XIXI']+full_dict['IXIX']))
+        ax.text(15, -.5, '$Intra=${:.2f}'.format(full_dict['ZZII']+full_dict['IIZZ']+
+                                                      full_dict['XXII']+full_dict['IIXX']))
+    ax.set_ylabel('Expectation value')
+    ax.set_ylim(-1.05, 1.05)
+    ax.set_title('All pauli expectation values')
