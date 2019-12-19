@@ -1,8 +1,15 @@
 import copy
 import numpy as np
 import logging
+import collections
+from skopt import Optimizer
+from adaptive.utils import cache_latest
+from adaptive.notebook_integration import ensure_holoviews
+from adaptive.learner.base_learner import BaseLearner
 
 log = logging.getLogger(__name__)
+
+
 def nelder_mead(fun, x0,
                 initial_step=0.1,
                 no_improve_thr=10e-6, no_improv_break=10,
@@ -243,3 +250,155 @@ def SPSA(fun, x0,
     # verification
     fun(res[0][0])
     return res[0]
+
+
+class SKOptLearnerND(Optimizer, BaseLearner):
+    """
+    [Victor 2019-12-04]
+    This is an modification of the original
+    ``adaptive.learner.skopt_learner.SKOptLearner``
+    It is here because the original one uses set() and was not
+    compatible with the SKOpt optimizer that expects list()
+    Original docstring below
+    --------------------------------------------------------------------
+
+    Learn a function minimum using ``skopt.Optimizer``.
+
+    This is an ``Optimizer`` from ``scikit-optimize``,
+    with the necessary methods added to make it conform
+    to the ``adaptive`` learner interface.
+
+    Parameters
+    ----------
+    function : callable
+        The function to learn.
+    **kwargs :
+        Arguments to pass to ``skopt.Optimizer``.
+    """
+
+    def __init__(self, function, **kwargs):
+        self.function = function
+        self.pending_points = set()
+        self.data = collections.OrderedDict()
+        super().__init__(**kwargs)
+
+    def tell(self, x, y, fit=True):
+        if isinstance(x, collections.abc.Iterable):
+            self.pending_points.discard(tuple(x))
+            self.data[tuple(x)] = y
+            super().tell(x, y, fit)
+        else:
+            self.pending_points.discard(x)
+            self.data[x] = y
+            super().tell([x], y, fit)
+
+    def tell_pending(self, x):
+        # 'skopt.Optimizer' takes care of points we
+        # have not got results for.
+        self.pending_points.add(tuple(x))
+
+    def remove_unfinished(self):
+        pass
+
+    @cache_latest
+    def loss(self, real=True):
+        if not self.models:
+            return np.inf
+        else:
+            model = self.models[-1]
+            # Return the in-sample error (i.e. test the model
+            # with the training data). This is not the best
+            # estimator of loss, but it is the cheapest.
+            return 1 - model.score(self.Xi, self.yi)
+
+    def ask(self, n, tell_pending=True):
+        if not tell_pending:
+            raise NotImplementedError(
+                "Asking points is an irreversible "
+                "action, so use `ask(n, tell_pending=True`."
+            )
+        points = super().ask(n)
+        # TODO: Choose a better estimate for the loss improvement.
+        if self.space.n_dims > 1:
+            return points, [self.loss() / n] * n
+        else:
+            return [p[0] for p in points], [self.loss() / n] * n
+
+    @property
+    def npoints(self):
+        """Number of evaluated points."""
+        return len(self.Xi)
+
+    def plot(self, nsamples=200):
+        hv = ensure_holoviews()
+        if self.space.n_dims > 1:
+            raise ValueError("Can only plot 1D functions")
+        bounds = self.space.bounds[0]
+        if not self.Xi:
+            p = hv.Scatter([]) * hv.Curve([]) * hv.Area([])
+        else:
+            scatter = hv.Scatter(([p[0] for p in self.Xi], self.yi))
+            if self.models:
+                model = self.models[-1]
+                xs = np.linspace(*bounds, nsamples)
+                xsp = self.space.transform(xs.reshape(-1, 1).tolist())
+                y_pred, sigma = model.predict(xsp, return_std=True)
+                # Plot model prediction for function
+                curve = hv.Curve((xs, y_pred)).opts(style=dict(line_dash="dashed"))
+                # Plot 95% confidence interval as colored area around points
+                area = hv.Area(
+                    (xs, y_pred - 1.96 * sigma, y_pred + 1.96 * sigma),
+                    vdims=["y", "y2"],
+                ).opts(style=dict(alpha=0.5, line_alpha=0))
+
+            else:
+                area = hv.Area([])
+                curve = hv.Curve([])
+            p = scatter * curve * area
+
+        # Plot with 5% empty margins such that the boundary points are visible
+        margin = 0.05 * (bounds[1] - bounds[0])
+        plot_bounds = (bounds[0] - margin, bounds[1] + margin)
+
+        return p.redim(x=dict(range=plot_bounds))
+
+    def _get_data(self):
+        return [x[0] for x in self.Xi], self.yi
+
+    def _set_data(self, data):
+        xs, ys = data
+        self.tell_many(xs, ys)
+
+# ######################################################################
+# Some utilities
+# ######################################################################
+
+
+def multi_targets_phase_offset(target, spacing, phase_name: str = None):
+    """
+    Intended to be used in cost functions that targets several phases
+    at the same time equaly spaced
+
+    Args:
+        target(float): unit = deg, target phase for which the output
+            will be zero
+
+        spacing(float): unit = deg, spacing > 0, spacing to other phases
+            for which the output will be zero
+
+        phase_name(str): if specified a string version of the function
+            will be returned, inteded for the construction of a custom
+            cost lambda function including other terms, e.g. some
+            other target phase using this funtion.
+            NB: numpy needs to be defined as "np" in the file the string
+            function will be executed
+    """
+    target = np.asarray(target)
+    if phase_name is not None:
+        string = 'np.min([({phase_name} - {target}) % {spacing}, (360 - ({phase_name} - {target})) % {spacing}])'
+        return string.format(
+            phase_name=phase_name,
+            target=str(target),
+            spacing=str(spacing))
+    else:
+        return lambda phase: np.min([(phase - target) % spacing, (360 - (phase - target)) % spacing], axis=0)
