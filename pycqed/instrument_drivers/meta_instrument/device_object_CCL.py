@@ -849,6 +849,7 @@ class DeviceCCL(Instrument):
             q2: int = None, q3: int = None,
             flux_codeword='cz',
             flux_codeword_park=None,
+            reduced_swp_points=False,
             prepare_for_timedomain=True, MC=None,
             CZ_disabled: bool = False,
             wait_time_ns: int = 0, label='',
@@ -923,7 +924,10 @@ class DeviceCCL(Instrument):
             q3idx = self.find_instrument(q3).cfg_qubit_nr()
 
         # These are hardcoded angles in the mw_lutman for the AWG8
-        angles = np.arange(0, 341, 20)
+        if reduced_swp_points:
+            angles = np.arange(0, 341, 40)
+        else:
+            angles = np.arange(0, 341, 20)
 
         p = mqo.conditional_oscillation_seq(
             q0idx, q1idx, q2idx, q3idx,
@@ -2020,6 +2024,8 @@ class DeviceCCL(Instrument):
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain([q0])
 
         assert q0 in self.qubits()
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
@@ -2054,6 +2060,46 @@ class DeviceCCL(Instrument):
                                  flux_latency=0,
                                  flux_pulse_duration=10e-9,
                                  mw_pulse_separation=80e-9)
+
+    def measure_timing_1d_trace(self, q0, latencies, latency_type='flux',
+                                MC=None,  label='timing_{}_{}',
+                                qotheridx=2,
+                                buffer_time=40e-9,
+                                prepare_for_timedomain: bool = True):
+        mmt_label = label.format(self.name, q0)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        assert q0 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        self.prepare_for_timedomain([q0])
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        fl_lutman.sq_length(60e-9)
+        CC = self.instr_CC.get_instr()
+
+        # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 120ns
+        p = sqo.FluxTimingCalibration(q0idx,
+                                      times=[buffer_time],
+                                      platf_cfg=self.cfg_openql_platform_fn(),
+                                      flux_cw='fl_cw_06',
+                                      qubit_other_idx=qotheridx,
+                                      cal_points=False)
+        CC.eqasm_program(p.filename)
+
+        d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
+        MC.set_detector_function(d)
+
+        if latency_type == 'flux':
+            s = swf.tim_flux_latency_sweep(self)
+        elif latency_type == 'mw':
+            s = swf.tim_mw_latency_sweep(self)
+        else:
+            raise ValueError('Latency type {} not understood.'.format(latency_type))
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(latencies)
+        MC.run(mmt_label)
+
+        ma2.Basic1DAnalysis(label=mmt_label)
+
 
     def measure_ramsey_with_flux_pulse(self, q0: str, times,
                                        MC=None,

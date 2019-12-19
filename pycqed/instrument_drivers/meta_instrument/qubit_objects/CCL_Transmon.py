@@ -1954,9 +1954,9 @@ class CCLight_Transmon(Qubit):
         return True
 
     def calibrate_mw_pulses_basic(self, amps=np.linspace(0,1.6,31),
-                           freq_steps=[1, 3, 10, 30, 100, 300, 1000],
-                           n_iter_flipping=2, soft_avg_allxy=3,
-                           cal_skewness=False, cal_offsets=True):
+                                  freq_steps=[1, 3, 10, 30, 100, 300, 1000],
+                                  n_iter_flipping=2, soft_avg_allxy=3,
+                                  cal_skewness=False, cal_offsets=True):
         """
         Performs a standard calibration of microwave pulses consisting of
 
@@ -3047,9 +3047,7 @@ class CCLight_Transmon(Qubit):
             self.calibrate_optimal_weights(verify=False,
                                            analyze=True,
                                            update=True)
-            ret = self.measure_ssro(nr_shots=nr_shots,
-                                    analyze=True, SNR_detector=True,
-                                    cal_residual_excitation=True,
+            ret = self.measure_ssro(shots_per_meas=nr_shots,
                                     prepare=False,
                                     disable_metadata=True)
             return ret
@@ -3063,9 +3061,8 @@ class CCLight_Transmon(Qubit):
             d = det.Function_Detector(
                 self.measure_ssro,
                 msmt_kw={
-                    'nr_shots': nr_shots,
-                    'analyze': True, 'SNR_detector': True,
-                    'cal_residual_excitation': True,
+                    'shots_per_meas': nr_shots,
+                    # 'SNR_detector': True,
                     'prepare': False,
                     'disable_metadata': True
                 },
