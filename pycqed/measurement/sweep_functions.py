@@ -1158,10 +1158,10 @@ class FLsweep(Soft_Sweep):
         self.awg_model_QWG = self.AWG.IDN()['model'] == 'QWG'
 
 
-    def set_parameter(self, val): 
-        if self.awg_model_QWG: 
+    def set_parameter(self, val):
+        if self.awg_model_QWG:
             self.set_parameter_QWG(val)
-        else: 
+        else:
             self.set_parameter_HDAWG(val)
 
     def set_parameter_HDAWG(self, val):
@@ -1172,9 +1172,9 @@ class FLsweep(Soft_Sweep):
         self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name,
                                                    regenerate_waveforms=True)
         self.AWG.start()
-        return 
+        return
 
-    def set_parameter_QWG(self, val): 
+    def set_parameter_QWG(self, val):
         self.par(val)
         self.AWG.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
@@ -1207,10 +1207,8 @@ class Nested_resonator_tracker(Soft_Sweep):
         spec_source.on()
 
 
-
-
 class tim_flux_latency_sweep(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'Flux latency'
@@ -1226,8 +1224,9 @@ class tim_flux_latency_sweep(Soft_Sweep):
         time.sleep(.5)
         return val
 
+
 class tim_ro_latency_sweep(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'RO latency'
@@ -1239,13 +1238,12 @@ class tim_ro_latency_sweep(Soft_Sweep):
         self.dev.tim_ro_latency_1(val)
         self.dev.tim_ro_latency_2(val)
         self.dev.prepare_timing()
-
-
         time.sleep(.5)
         return val
 
+
 class tim_mw_latency_sweep(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'MW latency'
@@ -1259,6 +1257,6 @@ class tim_mw_latency_sweep(Soft_Sweep):
         self.dev.tim_mw_latency_3(val)
         self.dev.tim_mw_latency_4(val)
         self.dev.prepare_timing()
-        
+
         time.sleep(.5)
         return val
