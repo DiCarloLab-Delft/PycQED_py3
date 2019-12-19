@@ -16,7 +16,6 @@ import pycqed.analysis_v2.multiplexed_readout_analysis as mux_an
 import pycqed.analysis_v2.tfd_analysis as tfd_an
 from functools import reduce
 
-
 def flatten_list(l): return reduce(lambda x, y: x+y, l)
 
 
@@ -394,6 +393,11 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
             'pauli_terms': self.proc_data_dict['pauli_terms'],
             'energy_terms': self.proc_data_dict['energy_terms']
         }
+        self.plot_dicts['pauli_operators_Tomo_full'] = {
+            'plotfn': tfd_an.plot_all_pauli_ops,
+            'full_dict': self.proc_data_dict['quantities_of_interest']['full_tomo_dict']
+            # 'pauli_terms': self.proc_data_dict['pauli_terms']
+        }
 
 
 class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
@@ -669,4 +673,8 @@ class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
             'plotfn': tfd_an.plot_pauli_ops,
             'pauli_terms': self.proc_data_dict['pauli_terms'],
             'energy_terms': self.proc_data_dict['energy_terms']
+        }
+        self.plot_dicts['pauli_operators_Tomo_full'] = {
+            'plotfn': tfd_an.plot_all_pauli_ops,
+            'full_dict': self.proc_data_dict['quantities_of_interest']['full_tomo_dict']
         }
