@@ -1040,8 +1040,8 @@ class OptimizationAnalysis(MeasurementAnalysis):
         if len(self.parameter_names) != 1:
             axarray[0].set_title(self.timestamp_string + ' ' + figname3)
             for i in range(len(self.parameter_names)):
-                axarray[i].plot(self.sweep_points[i], self.measured_values[0],
-                                linestyle='--', c='k')
+                # axarray[i].plot(self.sweep_points[i], self.measured_values[0],
+                #                 linestyle='--', c='k')
                 # assumes only one value exists because it is an optimization
                 sc = axarray[i].scatter(self.sweep_points[i],
                                         self.measured_values[0],
@@ -1055,8 +1055,8 @@ class OptimizationAnalysis(MeasurementAnalysis):
             cbar = fig3.colorbar(sc, cax=cbar_ax)
             cbar.set_label('iteration (n)')
         else:
-            axarray.plot(self.sweep_points, self.measured_values[0],
-                         linestyle='--', c='k')
+            # axarray.plot(self.sweep_points, self.measured_values[0],
+            #              linestyle='--', c='k')
             sc = axarray.scatter(self.sweep_points, self.measured_values[0],
                                  c=np.arange(len(self.sweep_points)),
                                  cmap=cm, marker='o', lw=0.1)
