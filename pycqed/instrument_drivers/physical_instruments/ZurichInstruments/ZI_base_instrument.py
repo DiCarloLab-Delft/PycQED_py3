@@ -636,9 +636,9 @@ class ZI_base_instrument(Instrument):
         # Handle absolute path
         self.use_setVector = "setVector" in dir(self.daq)
 
-        # Connect a device (if not already connected)
+        # Connect a device
         if not self._is_device_connected(device):
-            log.info('Connecting to device')
+            log.info(f'Connecting to device {device}')
             self.daq.connectDevice(device, interface)
         self.devname = device
         self.devtype = self.gets('features/devtype')
@@ -657,19 +657,16 @@ class ZI_base_instrument(Instrument):
         filename = os.path.join(os.path.dirname(os.path.abspath(
             __file__)), 'zi_parameter_files', 'node_doc_{}.json'.format(self.devtype))
         if not os.path.isfile(filename):
-            log.info('Parameter file not found, creating new parameter file')
-            log.info("{}: creating parameter file {}".format(
-                self.devname, filename))
+            log.info(f"{self.devname}: Parameter file not found, creating  '{filename}''")
             self._create_parameter_file(filename=filename)
 
         try:
             # NB: defined in parent class
-            log.info('Loading parameter file')
+            log.info(f'{self.devname}: Loading parameter file')
             self._load_parameter_file(filename=filename)
         except FileNotFoundError:
             # Should never happen as we just created the file above
-            log.error("{}: parameter file for data parameters {} not found".format(
-                self.devname, filename))
+            log.error(f"{self.devname}: parameter file for data parameters {filename} not found")
             raise
 
         # Create modules
@@ -686,9 +683,7 @@ class ZI_base_instrument(Instrument):
 
         # Create waveform parameters
         self._num_codewords = 0
-        log.info('Adding codeword waveform parameters')
         self._add_codeword_waveform_parameters(num_codewords)
-        log.info('Adding codeword waveform parameters')
         # Create other neat parameters
         self._add_extra_parameters()
 
@@ -710,7 +705,7 @@ class ZI_base_instrument(Instrument):
         self.connect_message(begin_time=t0)
 
     ##########################################################################
-    # Private methods
+    # Private methods: Abstract Base Class methods
     ##########################################################################
 
     def _check_devtype(self):
@@ -750,12 +745,17 @@ class ZI_base_instrument(Instrument):
         """
         Adds extra useful parameters to the instrument.
         """
+        log.info(f'{self.devname}: Adding extra parameters')
         self.add_parameter(
             'timeout',
             unit='s',
             initial_value=30,
             parameter_class=ManualParameter,
             vals=validators.Ints())
+
+    ##########################################################################
+    # Private methods
+    ##########################################################################
 
     def _add_codeword_waveform_parameters(self, num_codewords) -> None:
         """
@@ -769,7 +769,7 @@ class ZI_base_instrument(Instrument):
                  ' to the channel as indicated on the device (1 is lowest).')
 
         self._params_to_skip_update = []
-        log.info('Adding codeword waveform parameters')
+        log.info(f'{self.devname}: Adding codeword waveform parameters')
         for ch in range(self._num_channels()):
             for cw in range(max(num_codewords, self._num_codewords)):
                 # NB: parameter naming identical to QWG
@@ -976,8 +976,7 @@ class ZI_base_instrument(Instrument):
 
     def _gen_write_waveform(self, ch, cw):
         def write_func(waveform):
-            log.debug("Writing waveform (len {}) to ch{} cw{}".format(
-                len(waveform), ch, cw))
+            log.debug(f"{self.devname}: Writing waveform (len {len(waveform)}) to ch{ch} cw{cw}")
             # Determine which AWG this waveform belongs to
             awg_nr = ch//2
 
@@ -992,26 +991,23 @@ class ZI_base_instrument(Instrument):
 
             # The length of HDAWG waveforms should be a multiple of 8 samples.
             if (len(waveform) % 8) != 0:
-                log.debug("waveform is not a multiple of "
-                          "8 samples, appending zeros.")
+                log.debug(f"{self.devname}: waveform is not a multiple of 8 samples, appending zeros.")
                 extra_zeros = 8-(len(waveform) % 8)
                 waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
 
             # If the length has changed, we need to recompile the AWG program
             if len(waveform) != len(self._awg_waveforms[wf_name]['waveform']):
-                log.debug("Length of waveform has changed. "
-                          "Flagging awg as requiring recompilation. ")
+                log.debug(f"{self.devname}: Length of waveform has changed. Flagging awg as requiring recompilation.")
                 self._awg_needs_configuration[awg_nr] = True
 
             # Update the associated CSV file
-            log.debug("Updating csv "
-                      "waveform {}, for ch{}, cw{}".format(wf_name, ch, cw))
+            log.debug(f"{self.devname}: Updating csv waveform {wf_name}, for ch{ch}, cw{cw}")
             self._write_csv_waveform(ch=ch, cw=cw, wf_name=wf_name,
                                      waveform=waveform)
 
             # And the entry in our table and mark it for update
             self._awg_waveforms[wf_name]['waveform'] = waveform
-            log.debug("Marking waveform as dirty.")
+            log.debug(f"{self.devname}: Marking waveform as dirty.")
             self._awg_waveforms[wf_name]['dirty'] = True
 
         return write_func
@@ -1029,24 +1025,21 @@ class ZI_base_instrument(Instrument):
 
             # Name of this waveform
             wf_name = gen_waveform_name(ch, cw)
-            log.debug("Reading waveform {} for ch{} cw{}".format(
-                wf_name, ch, cw))
+            log.debug(f"{self.devname}: Reading waveform {wf_name} for ch{ch} cw{cw}")
             # Check if the waveform data is in our dictionary
             if wf_name not in self._awg_waveforms:
-                log.debug(
-                    "Waveform not in self._awg_waveforms reading from csv file.")
+                log.debug(f"{self.devname}: Waveform not in self._awg_waveforms: reading from csv file.")
                 # Initialize elements
                 self._awg_waveforms[wf_name] = {
                     'waveform': None, 'dirty': False, 'readonly': False}
                 # Make sure everything gets recompiled
-                log.debug("Flagging awg as requiring recompilation.")
+                log.debug(f"{self.devname}: Flagging awg as requiring recompilation.")
                 self._awg_needs_configuration[awg_nr] = True
                 # It isn't, so try to read the data from CSV
                 waveform = self._read_csv_waveform(ch, cw, wf_name)
                 # Check whether  we got something
                 if waveform is None:
-                    log.debug(
-                        "Waveform CSV does not exist, initializing to zeros.")
+                    log.debug(f"{self.devname}: Waveform CSV does not exist, initializing to zeros.")
                     # Nope, initialize to zeros
                     waveform = np.zeros(32)
                     self._awg_waveforms[wf_name]['waveform'] = waveform
@@ -1067,7 +1060,7 @@ class ZI_base_instrument(Instrument):
             self._get_awg_directory(), 'waves',
             self.devname + '_' + wf_name + '.csv')
         try:
-            log.debug('reading waveform from csv {}'.format(filename))
+            log.debug(f"{self.devname}: reading waveform from csv '{filename}'")
             return np.genfromtxt(filename, delimiter=',')
         except OSError as e:
             # if the waveform does not exist yet dont raise exception
@@ -1095,12 +1088,11 @@ class ZI_base_instrument(Instrument):
 
             for wf_name, other_wf_name in wf_table:
                 len_wf = len(self._awg_waveforms[wf_name]['waveform'])
-                len_other_wf = len(
-                    self._awg_waveforms[other_wf_name]['waveform'])
+                len_other_wf = len(self._awg_waveforms[other_wf_name]['waveform'])
 
                 # First one is shorter
                 if len_wf < len_other_wf:
-                    log.info('Modifying {} for length matching.'.format(wf_name))
+                    log.info(f"{self.devname}: Modifying {wf_name} for length matching.")
                     # Temporarily unset the readonly flag to be allowed to append zeros
                     readonly = self._awg_waveforms[wf_name]['readonly']
                     self._awg_waveforms[wf_name]['readonly'] = False
@@ -1110,8 +1102,7 @@ class ZI_base_instrument(Instrument):
                     self._awg_waveforms[wf_name]['readonly'] = readonly
                     matching_updated = True
                 elif len_other_wf < len_wf:
-                    log.info(
-                        'Modifying {} for length matching.'.format(other_wf_name))
+                    log.info(f"{self.devname}: Modifying {other_wf_name} for length matching.")
                     readonly = self._awg_waveforms[other_wf_name]['readonly']
                     self._awg_waveforms[other_wf_name]['readonly'] = False
                     self.set(other_wf_name, np.concatenate(
@@ -1125,7 +1116,7 @@ class ZI_base_instrument(Instrument):
         Adjust the length of a codeword waveform such that each individual
         waveform of the pair has the same length
         """
-        log.info('Clearing dirty waveform tag for awg_nr {}'.format(awg_nr))
+        log.info(f"{self.devname}: Clearing dirty waveform tag for AWG {awg_nr}")
         for cw in range(self._num_codewords):
             wf_name = gen_waveform_name(2*awg_nr+0, cw)
             self._awg_waveforms[wf_name]['dirty'] = False
@@ -1176,7 +1167,7 @@ class ZI_base_instrument(Instrument):
         to update changed waveforms on the instrument as needed.
         """
         # Fixme. the _get_waveform_table should also be implemented for the UFH
-        log.info("Using dynamic waveform update for awg_nr {}.".format(awg_nr))
+        log.info(f"{self.devname}: Using dynamic waveform update for AWG {awg_nr}.")
         wf_table = self._get_waveform_table(awg_nr)
 
         for dio_cw, (wf_name, other_wf_name) in enumerate(wf_table):
@@ -1200,8 +1191,7 @@ class ZI_base_instrument(Instrument):
         """
         Configures an AWG with the program stored in the object in the self._awg_program[awg_nr] member.
         """
-        log.info(
-            'Configuring awg_nr {} with predefined codeword program'.format(awg_nr))
+        log.info(f"{self.devname}: Configuring AWG {awg_nr} with predefined codeword program")
         if self._awg_program[awg_nr] is not None:
             full_program = \
                 '// Start of automatically generated codeword table\n' + \
@@ -1211,11 +1201,10 @@ class ZI_base_instrument(Instrument):
 
             self.configure_awg_from_string(awg_nr, full_program)
         else:
-            logging.warning(
-                'No program configured for awg_nr {}.'.format(awg_nr))
+            logging.warning(f"{self.devname}: No program configured for awg_nr {awg_nr}.")
 
     ##########################################################################
-    # Public methods
+    # Public methods: node helpers
     ##########################################################################
 
     def setd(self, path, value) -> None:
@@ -1282,8 +1271,12 @@ class ZI_base_instrument(Instrument):
     def sync(self) -> None:
         self.daq.sync()
 
+    ##########################################################################
+    # Public methods
+    ##########################################################################
+
     def start(self):
-        log.info('Starting {}'.format(self.name))
+        log.info(f"{self.devname}: Starting '{self.name}'")
         self.check_errors()
 
         # Loop through each AWG and check whether to reconfigure it
@@ -1292,15 +1285,12 @@ class ZI_base_instrument(Instrument):
 
             # If the reconfiguration flag is set, upload new program
             if self._awg_needs_configuration[awg_nr]:
-                log.debug('Detected awg configuration tag '
-                          'for awg {}.'.format(awg_nr))
+                log.debug(f"{self.devname}: Detected awg configuration tag for AWG {awg_nr}.")
                 self._configure_awg_from_variable(awg_nr)
                 self._awg_needs_configuration[awg_nr] = False
                 self._clear_dirty_waveforms(awg_nr)
             else:
-
-                log.debug('Not detected awg configuration tag '
-                          'for awg {}.'.format(awg_nr))
+                log.debug(f"{self.devname}: Did not detect awg configuration tag for AWG {awg_nr}.")
                 # Loop through all waveforms and update accordingly
                 self._upload_updated_waveforms(awg_nr)
                 self._clear_dirty_waveforms(awg_nr)
@@ -1311,7 +1301,7 @@ class ZI_base_instrument(Instrument):
             if self._awg_program[awg_nr] is None:
                 # to configure all awgs use "upload_codeword_program" or specify
                 # another program
-                logging.warning("Not starting awg_nr {}.".format(awg_nr))
+                logging.warning(f"{self.devname}: Not starting awg_nr {awg_nr}.")
                 continue
             # Check that the AWG is ready
             if not self.get('awgs_{}_ready'.format(awg_nr)):
@@ -1319,7 +1309,7 @@ class ZI_base_instrument(Instrument):
                     'Tried to start AWG {} that is not ready!'.format(awg_nr))
             # Enable it
             self.set('awgs_{}_enable'.format(awg_nr), 1)
-        log.info('Started {}'.format(self.name))
+        log.info(f"{self.devname}: Started '{self.name}'")
 
     def stop(self):
         log.info('Stopping {}'.format(self.name))
@@ -1329,17 +1319,9 @@ class ZI_base_instrument(Instrument):
 
         self.check_errors()
 
-    def close(self) -> None:
+    # FIXME: temporary solution for issue
+    def FIXMEclose(self) -> None:
         try:
-            if self._is_device_connected(self.devname):
-                # Stop all AWG's. In case errors are flagged we demote them
-                # to warnings.
-                try:
-                    self.stop()
-                except ziRuntimeError as err:
-                    log.error(str(err))
-                # Disconnect device from server
-                self.daq.disconnectDevice(self.devname)
             # Disconnect application server
             self.daq.disconnect()
         except AttributeError:
@@ -1388,7 +1370,7 @@ class ZI_base_instrument(Instrument):
         This function is tested to work and give the correct error messages
         when compilation fails.
         """
-        log.info('Configuring awg_nr {} from string.'.format(awg_nr))
+        log.info(f'{self.devname}: Configuring AWG {awg_nr} from string.')
         # Check that awg_nr is set in accordance with devtype
         self._check_awg_nr(awg_nr)
 
@@ -1397,7 +1379,7 @@ class ZI_base_instrument(Instrument):
 
         # This check (and while loop) is added as a workaround for #9
         while not success_and_ready:
-            print('Configuring AWG {}...'.format(awg_nr))
+            log.info(f'{self.devname}: Configuring AWG {awg_nr}...')
 
             self._awgModule.set('awgModule/index', awg_nr)
             self._awgModule.set(
@@ -1414,7 +1396,6 @@ class ZI_base_instrument(Instrument):
 
                 if (time.time()-t0 >= timeout):
                     success = False
-                    # print('Timeout encountered during compilation.')
                     raise TimeoutError(
                         'Timeout while waiting for compilation to finish!')
 
@@ -1449,12 +1430,10 @@ class ZI_base_instrument(Instrument):
 
         # Check status
         if self.get('awgs_{}_waveform_memoryusage'.format(awg_nr)) > 1.0:
-            log.warning(
-                '{}: Waveform memory usage exceeds available internal memory!'.format(self.devname))
+            log.warning(f'{self.devname}: Waveform memory usage exceeds available internal memory!')
 
         if self.get('awgs_{}_sequencer_memoryusage'.format(awg_nr)) > 1.0:
-            log.warning(
-                '{}: Sequencer memory usage exceeds available instruction memory!'.format(self.devname))
+            log.warning(f'{self.devname}: Sequencer memory usage exceeds available instruction memory!')
 
     def plot_dio_snapshot(self, bits=range(32)):
         raise NotImplementedError('Virtual method with no implementation!')

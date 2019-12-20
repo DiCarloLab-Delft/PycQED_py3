@@ -15,6 +15,7 @@ from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+from packaging import version
 import numpy.fft as fft
 
 log = logging.getLogger(__name__)
@@ -124,7 +125,7 @@ class Multi_Detector(Detector_Function):
         detectors     (list):
             a list of detectors to combine.
         det_idx_prefix(bool):
-            if True suffixes the value names with
+            if True prefixes the value names with
         detector_labels (list):
             if not None, will be used instead instead of
             "det{idx}_" as a prefix for the different channels
@@ -141,6 +142,8 @@ class Multi_Detector(Detector_Function):
                     else:
                         val_name = detector_labels[i] + \
                             ' ' + detector_value_name
+                else:
+                    val_name = detector_value_name
                 self.value_names.append(val_name)
             for detector_value_unit in detector.value_units:
                 self.value_units.append(detector_value_unit)
@@ -1284,7 +1287,7 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         if self.prepare_for_each_point:
             self.prepare()
         time.sleep(self.delay)
-        if qc.__version__ < '0.1.11':
+        if version.parse(qc.__version__) < version.parse('0.1.11'):
             return self.SH.get_power_at_freq(Navg=self.Navg)
         else:
             self.SH.avg(self.Navg)
@@ -1842,8 +1845,21 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
 
+
+        # 191216 Thijs, Tumi and Adriaan investigated a bug related to this. 
+        # we do not understand this line added by Ramiro and Hani. and find it breaks things.
+        # Commenting out. To be removed if not discussed before March 2020. 
+        # if len(data_raw[next(iter(data_raw))])>1:
+        #     # Not clear why this should give an Error, FIXME clarify with comments.
+        #     log.warning('[DEBUG UHF detector] SHOULD HAVE HAD AN ERROR')
+        # # [-1] in data_ray is not clear 
+        # data = np.array([data_raw[key][-1]
+        
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
+        log.debug('[UHF detector] RAW shape',[data_raw[key]
+                         for key in sorted(data_raw.keys())])
+        log.debug('[UHF detector] shape 1',data.shape)
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':

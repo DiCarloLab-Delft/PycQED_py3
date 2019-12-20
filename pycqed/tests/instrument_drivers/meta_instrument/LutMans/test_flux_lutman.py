@@ -5,7 +5,7 @@ import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG
 from pycqed.instrument_drivers.meta_instrument import lfilt_kernel_object as lko
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import get_wf_idx_from_name
-
+from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ as scCZ
 
 class TestMultiQubitFluxLutMan:
 
@@ -18,6 +18,16 @@ class TestMultiQubitFluxLutMan:
         cls.fluxlutman = flm.HDAWG_Flux_LutMan('fluxlutman_main')
         cls.k0 = lko.LinDistortionKernel('k0')
         cls.fluxlutman_partner = flm.HDAWG_Flux_LutMan('fluxlutman_partner')
+
+        cls.fluxlutman_static = flm.HDAWG_Flux_LutMan('fluxlutman_static')
+        cls.sim_control_CZ_NE = scCZ.SimControlCZ(
+            cls.fluxlutman.name + '_sim_control_CZ_NE')
+        cls.sim_control_CZ_NW = scCZ.SimControlCZ(
+            cls.fluxlutman.name + '_sim_control_CZ_NW')
+        cls.sim_control_CZ_SE = scCZ.SimControlCZ(
+            cls.fluxlutman.name + '_sim_control_CZ_SE')
+        cls.sim_control_CZ_SW = scCZ.SimControlCZ(
+            cls.fluxlutman.name + '_sim_control_CZ_SW')
 
     def setup_method(self, method):
         # gets called before every test method
@@ -52,7 +62,7 @@ class TestMultiQubitFluxLutMan:
         self.k0.cfg_awg_channel(self.fluxlutman.cfg_awg_channel())
         self.fluxlutman.cfg_max_wf_length(5e-6)
 
-        poly_coeffs = -np.array([1.95027142e+09,  -3.22560292e+08,
+        poly_coeffs = -np.array([1.95027142e+09, -3.22560292e+08,
                                  5.25834946e+07])
         self.fluxlutman.q_polycoeffs_freq_01_det(poly_coeffs)
         self.fluxlutman.q_polycoeffs_anharm(np.array([0, 0, -300e6]))
@@ -93,20 +103,20 @@ class TestMultiQubitFluxLutMan:
         self.AWG.awgs_0_outputs_0_amplitude(.5)
         self.AWG.sigouts_0_range(5)
         sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
-        np.testing.assert_allclose(sf, 0.5*5/2)
+        np.testing.assert_allclose(sf, 0.5 * 5 / 2)
 
         self.AWG.sigouts_0_range(.8)
         sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
-        np.testing.assert_allclose(sf, 0.5*0.8/2)
+        np.testing.assert_allclose(sf, 0.5 * 0.8 / 2)
 
         self.fluxlutman.cfg_awg_channel(2)
         self.AWG.awgs_0_outputs_1_amplitude(.2)
         self.AWG.sigouts_1_range(.8)
         sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
-        np.testing.assert_allclose(sf, 0.2*0.8/2)
+        np.testing.assert_allclose(sf, 0.2 * 0.8 / 2)
 
         sc_inv = self.fluxlutman.get_amp_to_dac_val_scalefactor()
-        np.testing.assert_allclose(sc_inv, 1/sf)
+        np.testing.assert_allclose(sc_inv, 1 / sf)
 
         self.fluxlutman.cfg_awg_channel(1)
 
@@ -324,7 +334,7 @@ class TestMultiQubitFluxLutMan:
         assert 'custom_wf' in self.fluxlutman._wave_dict_dist
 
         x = np.arange(200)
-        y = np.cos(x)/20
+        y = np.cos(x) / 20
         self.fluxlutman.custom_wf(y)
         self.fluxlutman.generate_standard_waveforms()
         np.testing.assert_array_almost_equal(
@@ -332,7 +342,7 @@ class TestMultiQubitFluxLutMan:
 
         self.fluxlutman.custom_wf_length(30e-9)
         self.fluxlutman.generate_standard_waveforms()
-        y_cut = np.cos(x)/20
+        y_cut = np.cos(x) / 20
         cut_sample = 72  # 30ns * 2.4GSps
         y_cut[cut_sample:] = 0
         np.testing.assert_array_almost_equal(
@@ -362,7 +372,7 @@ class TestMultiQubitFluxLutMan:
         amp_J2_neg = self.fluxlutman.calc_eps_to_amp(
             0, state_A='11', state_B='02', positive_branch=False, which_gate='SE')
         lr = self.fluxlutman.calc_net_zero_length_ratio(which_gate='SE')
-        integral = lr*amp_J2_pos + (1-lr)*amp_J2_neg
+        integral = lr * amp_J2_pos + (1 - lr) * amp_J2_neg
         np.testing.assert_almost_equal(integral, 0)
 
     def test_czd_signs(self):
@@ -387,3 +397,102 @@ class TestMultiQubitFluxLutMan:
         self.fluxlutman.render_wave('cz_SE', time_units='lut_index')
         self.fluxlutman.render_wave('cz_SE', time_units='s')
 
+    def test_sim_CZ_single(self):
+        # The simplest use case: have only one
+        # instr_sim_control_CZ_{some_gate} in the fluxlutman and being
+        # able to run a simulation
+        self.fluxlutman_static.q_polycoeffs_anharm(np.array([0, 0, -318e6]))
+        self.fluxlutman.q_freq_01(6.87e9)
+        self.fluxlutman.sampling_rate(2400000000.0)
+        self.fluxlutman.q_polycoeffs_anharm(np.array([0, 0, -300e6]))
+        self.fluxlutman.q_polycoeffs_freq_01_det(np.array([-2.5e9, 0, 0]))
+
+        which_gate = 'SE'
+        self.fluxlutman.set('cz_length_{}'.format(which_gate), 48e-9)
+        self.fluxlutman.set('cz_lambda_2_{}'.format(which_gate), 0)
+        self.fluxlutman.set('cz_lambda_3_{}'.format(which_gate), 0)
+        self.fluxlutman.set('cz_length_{}'.format(which_gate), 48e-9)
+        self.fluxlutman.set('cz_theta_f_{}'.format(which_gate), 100)
+        self.fluxlutman.set('czd_double_sided_{}'.format(which_gate), True)
+        self.fluxlutman.set('q_J2_{}'.format(which_gate), np.sqrt(2) * 14.3e6)
+        self.fluxlutman.set('q_freq_10_{}'.format(which_gate), 5.79e9)
+        self.fluxlutman.set('bus_freq_{}'.format(which_gate), 8.5e9)
+        self.fluxlutman.set('czd_length_ratio_{}'.format(which_gate), 0.5)
+
+        self.sim_control_CZ_SE.which_gate('SE')
+        self.fluxlutman.set(
+            'instr_sim_control_CZ_SE',
+            self.sim_control_CZ_SE.name)
+
+        values, units = self.fluxlutman.sim_CZ(
+            fluxlutman_static=self.fluxlutman_static)
+
+        np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
+        np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
+        np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
+
+        assert 'L1' in units.keys()
+
+    def test_sim_CZ_multiple_per_flm(self):
+        # being able to simulate any CZ gate from the same fluxlutman
+        self.fluxlutman_static.q_polycoeffs_anharm(np.array([0, 0, -318e6]))
+        self.fluxlutman.q_freq_01(6.87e9)
+        self.fluxlutman.sampling_rate(2400000000.0)
+        self.fluxlutman.q_polycoeffs_anharm(np.array([0, 0, -300e6]))
+        self.fluxlutman.q_polycoeffs_freq_01_det(np.array([-2.5e9, 0, 0]))
+
+        for which_gate in ['NE', 'NW', 'SW', 'SE']:
+            self.fluxlutman.set('cz_length_{}'.format(which_gate), 48e-9)
+            self.fluxlutman.set('cz_lambda_2_{}'.format(which_gate), 0)
+            self.fluxlutman.set('cz_lambda_3_{}'.format(which_gate), 0)
+            self.fluxlutman.set('cz_length_{}'.format(which_gate), 48e-9)
+            self.fluxlutman.set('cz_theta_f_{}'.format(which_gate), 100)
+            self.fluxlutman.set('czd_double_sided_{}'.format(which_gate), True)
+            self.fluxlutman.set('q_J2_{}'.format(which_gate), np.sqrt(2) * 14.3e6)
+            self.fluxlutman.set('q_freq_10_{}'.format(which_gate), 5.79e9)
+            self.fluxlutman.set('bus_freq_{}'.format(which_gate), 8.5e9)
+            self.fluxlutman.set('czd_length_ratio_{}'.format(which_gate), 0.5)
+
+        self.sim_control_CZ_NE.which_gate('NE')
+        self.fluxlutman.set(
+            'instr_sim_control_CZ_NE',
+            self.sim_control_CZ_NE.name)
+        values, units = self.fluxlutman.sim_CZ(
+            fluxlutman_static=self.fluxlutman_static, which_gate='NE')
+        np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
+        np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
+        np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
+        assert 'L1' in units.keys()
+
+        self.sim_control_CZ_SE.which_gate('SE')
+        self.fluxlutman.set(
+            'instr_sim_control_CZ_SE',
+            self.sim_control_CZ_SE.name)
+        values, units = self.fluxlutman.sim_CZ(
+            fluxlutman_static=self.fluxlutman_static, which_gate='SE')
+        np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
+        np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
+        np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
+        assert 'L1' in units.keys()
+
+        self.sim_control_CZ_NW.which_gate('NW')
+        self.fluxlutman.set(
+            'instr_sim_control_CZ_NW',
+            self.sim_control_CZ_NW.name)
+        values, units = self.fluxlutman.sim_CZ(
+            fluxlutman_static=self.fluxlutman_static, which_gate='NW')
+        np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
+        np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
+        np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
+        assert 'L1' in units.keys()
+
+        self.sim_control_CZ_SW.which_gate('SW')
+        self.fluxlutman.set(
+            'instr_sim_control_CZ_SW',
+            self.sim_control_CZ_SW.name)
+        values, units = self.fluxlutman.sim_CZ(
+            fluxlutman_static=self.fluxlutman_static, which_gate='SW')
+        np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
+        np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
+        np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
+        assert 'L1' in units.keys()

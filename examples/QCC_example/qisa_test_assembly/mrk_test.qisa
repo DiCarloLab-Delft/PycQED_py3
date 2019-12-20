@@ -1,0 +1,38 @@
+SMIS s0, { 0 }
+SMIS s1, { 1, 3, 5, 7, 9, 11, 13, 15 }
+SMIS s2, { 2 }
+SMIS s3, { 3 }
+SMIS s4, { 4 }
+SMIS s5, { 5 }
+SMIS s6, { 6 }
+SMIS s7, { 7 }
+SMIS s8, { 8 }
+SMIS s9, { 9 }
+SMIS s10, { 10 }
+SMIS s11, { 11 }
+SMIS s12, { 12 }
+SMIS s13, { 13 }
+SMIS s14, { 14 }
+SMIS s15, { 15 }
+SMIS s16, { 16 }
+
+LDI  r4, 150
+LDI r3, 2
+SUB r3, r4, r3
+Loop:
+    qwait 10
+
+    bs 1 CW_01 s0
+    bs 1 CW_01 s0
+    bs 1 CW_01 s0
+    bs 1 CW_01 s0
+    bs 1 CW_01 s0
+    bs 1 CW_01 s0
+    bs 1 CW_01 s0
+    bs 1 CW_01 s0
+    bs 1 CW_01 s0
+    qwait 10
+    
+    BR always, loop
+    NOP
+    NOP

@@ -93,17 +93,27 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
 
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
                            platf_cfg: str, trigger_idx: int,
-                           spec_instr: float='spec'):
+                           wait_time_ns: int = 0, cc: str='CCL'):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
-    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    this one triggers the 0th trigger port of the CCLight and uses the zeroth
     wave output on the AWG (currently hardcoded, should be improved)
-
+    FIXME: comment outdated
     """
     p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
     k = oqh.create_kernel("main", p)
 
     nr_clocks = int(spec_pulse_length/20e-9)
+    print('Adding {} [ns] to spec seq'.format(wait_time_ns))
+    if cc=='CCL':
+        spec_instr = 'spec'
+    elif cc=='QCC':
+        spec_instr = 'sf_square'
+    elif cc=='CC':
+        spec_instr = 'spec'
+    else:
+        raise ValueError('CC type not understood: {}'.format(cc))
+
 
     for i in range(nr_clocks):
         # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
@@ -111,7 +121,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
         k.gate(spec_instr, [trigger_idx])
     if trigger_idx != qubit_idx:
         k.wait([trigger_idx, qubit_idx], 0)
-
+    k.wait([qubit_idx],wait_time_ns)
     k.measure(qubit_idx)
     p.add_kernel(k)
 
@@ -249,7 +259,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}".format(i+j//2), p) # FIXME: generates 2 identical kernel names if js=2. This does work, but is still undesirable
+            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
@@ -763,9 +773,9 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
     # don't use last 4 points if calibration points are used
     if cal_points:
         times = times[:-4]
-    for t in times:
+    for i_t,t in enumerate(times):
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi_flux_pi', p)
+        k = oqh.create_kernel('pi_flux_pi_{}'.format(i_t), p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
@@ -797,10 +807,10 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
 
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
 
-    for t in times:
+    for i_t,t in enumerate(times):
 
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel("pi-flux-pi", p)
+        k = oqh.create_kernel("pi-flux-pi_{}".format(i_t), p)
         k.prepz(q0)
         k.prepz(q1)
 

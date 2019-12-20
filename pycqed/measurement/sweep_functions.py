@@ -1186,9 +1186,12 @@ class FLsweep(Soft_Sweep):
 
 class Nested_resonator_tracker(Soft_Sweep):
     """
-    For resonator tr.
+    Sets a parameter and performs a "find_resonator_frequency" measurement
+    after setting the parameter.
     """
-    def __init__(self, qubit, nested_MC, par, use_min = False, freqs=None, **kw):
+    def __init__(self, qubit, nested_MC, par,
+                 use_min=False, freqs=None, reload_sequence=False,
+                 cc=None, sequence_file=None, **kw):
         super().__init__(**kw)
         self.qubit = qubit
         self.freqs = freqs
@@ -1197,15 +1200,23 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
+        self.reload_marked_sequence = reload_sequence
+        self.sequence_file = sequence_file
+        self.cc = cc
         self.use_min = use_min
 
     def set_parameter(self, val):
         self.par(val)
-        self.qubit.find_resonator_frequency(freqs=self.freqs, MC=self.nested_MC,use_min = self.use_min)
+        self.qubit.find_resonator_frequency(
+            freqs=self.freqs,
+            MC=self.nested_MC, use_min=self.use_min)
         self.qubit._prep_ro_sources()
+        if self.reload_marked_sequence:
+            # reload the meaningfull sequence
+            self.cc.eqasm_program(self.sequence_file.filename)
         spec_source = self.qubit.instr_spec_source.get_instr()
         spec_source.on()
-
+        self.cc.start()
 
 class tim_flux_latency_sweep(Soft_Sweep):
     def __init__(self, device):

@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # from: AWG8_staircase_test.ipynb
+# FIXME: superceded by ZI_base_instrument
 def plot_timing_diagram(data, bits, line_length=30):
     def _plot_lines(ax, pos, *args, **kwargs):
         if ax == 'x':
@@ -157,7 +158,7 @@ def check_dio_timing(data, strobe_index, bits):
                         # print('{} period = {} samples'. format(prev_val, duration))
 
                 # test setup and hold of data bits versus strobe rising/falling edge
-                # FIXME: aloow choosing edge, no need for prev_transition
+                # FIXME: allow choosing edge, no need for prev_transition
                 for bit in bits:
                     if idx > 1 and idx < len(data) - 1:
                         prompt = (data[idx] >> bit) & 1

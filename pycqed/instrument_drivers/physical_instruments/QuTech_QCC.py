@@ -161,13 +161,7 @@ class QCC(SCPI):
                         # The QECDataType assumes a long array of ints in which groups of 6 datapoints are returned.
                         # In this datatype every row corresponds to a timeslot
                         # every column corresponds to a qubit index.
-                        parameter["vals"] = vals.Arrays()
-                        parameter['get_parser'] = lambda v: np.reshape( 
-                            np.array(v.split(','), dtype=int), newshape=(-1, 6))
-                    elif (val_type == "QECOCMDataType"):
                         parameter["vals"] = vals.Anything()
-                        # parameter['get_parser'] = lambda v: np.array(
-                        #       v.split(','), dtype=int)
 
                     elif (val_type == "Non_Neg_Number"):
                         if ("range" in validator):
@@ -539,6 +533,7 @@ class dummy_QCC(QCC):
 
     def __init__(self, name, **kw):
         Instrument.__init__(self, name=name, **kw)
+        self._socket = None  # exists so close method of IP instrument works
         self._ensure_connection = True
         self._dummy_instr = True
         self.model = name

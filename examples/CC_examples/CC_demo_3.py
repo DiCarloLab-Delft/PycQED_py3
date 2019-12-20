@@ -5,6 +5,8 @@ import CC_logging
 
 import logging
 import sys
+import math
+import numpy as np
 
 from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
@@ -154,37 +156,80 @@ if sel==0:
         [0, 1]
     ]
 
+
+# helpers
+clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
+
+# program constants
+center_x = 15.5
+center_y = 15.5
+scales = np.arange(-1.0, 1.0, 0.01)
+angles = np.arange(-1.0, 1.0, 0.01)*math.pi
+mat_center = np.array(
+    [[1, 0, -center_x],
+     [0, 1, -center_y],
+     [0, 0, 1]])
+mat_uncenter = np.array(
+    [[1, 0, center_x],
+     [0, 1, center_y],
+     [0, 0, 1]])
+
 # generate program
-center_x = 16
-center_y = 16
-scale_x = 0.5
-scale_y = 1.0
-scales = [100] #[100, 50, 0]:   #range(-100,100,50):
-prog = 'start:\n'
-for scale in scales:
-    prog += ' move 50000,R0\n'
-    prog += 'loop{}:\n'.format(scale+100)
-    scale_x = scale/100
+log.debug('generating program')
+prog = ''
+prog += '   seq_bar 1\n'
+prog += 'start:\n'
+for i,scale in enumerate(scales):
+    prog += '    move 50000,R0\n'  # determines speed
+    prog += 'loop{}:\n'.format(i)
+    mat_scale = np.array(
+        [[scale,    0,          0],
+         [0,        scale,      0],
+         [0,        0,          1]])
+    phi = angles[i]  # FIXME: assumes angles and scales have compatible size
+    mat_rot = np.array(
+        [[math.cos(phi),    -math.sin(phi), 0],
+         [math.sin(phi),    math.cos(phi),  0],
+         [0,                0,              1]])
+    if 0:
+        mat_transform = mat_uncenter @ mat_scale @ mat_center
+    else:
+        mat_transform = mat_uncenter @ mat_rot @ mat_scale @ mat_center
+
     for coord in coords:
-        x = round((coord[0]-center_x)*scale_x + center_x)
-        y = round((coord[1]-center_y)*scale_y + center_y)
-        val = (1<<31) + (y<<9) + (x)
-        prog += '        seq_out {},1\n'.format(val)
-    prog += ' loop R0,@loop{}\n'.format(scale+100)
-prog += '        jmp @start\n'
+        # compute position
+        vec = np.array([coord[0], coord[1], 1])  # vector for affine transformation
+        pos = mat_transform @ vec  # @=matrix multiply
+        x = int(round(pos[0]))
+        y = int(round(pos[1]))
+        x = clamp(x, 0, 31)
+        y = clamp(y, 0, 31)
+
+        # generate instruction
+        val = (1<<31) + (y<<9) + (x)  # mode "microwave"
+        prog += '    seq_out {},1\n'.format(val)
+    prog += '    loop R0,@loop{}\n'.format(i)
+prog += '    jmp @start\n'
+log.debug('program generated: {} lines, {} bytes'.format(prog.count('\n'), len(prog)))
 
 
 log.debug('connecting to CC')
-cc = QuTechCC('cc', IPTransport(ip, timeout=5.0)) # FIXME: raised timeout until assembly time reduced
+cc = QuTechCC('cc', IPTransport(ip))
 cc.reset()
 cc.clear_status()
-cc.set_status_questionable_frequency_enable(0x7FFF)
+cc.status_preset()
 
-cc.sequence_program(prog)
+log.debug('uploading program to CC')
+cc.sequence_program_assemble(prog)
+if cc.get_assembler_error() != 0:
+    sys.stderr.write('error log = {}\n'.format(cc.get_assembler_log()))  # FIXME: result is messy
+    log.warning('assembly failed')
+else:
+    log.debug('checking for SCPI errors on CC')
+    err_cnt = cc.get_system_error_count()
+    for i in range(err_cnt):
+        print(cc.get_error())
+    log.debug('done checking for SCPI errors on CC')
 
-err_cnt = cc.get_system_error_count()
-for i in range(err_cnt):
-    print(cc.get_error())
-
-log.debug('starting CC')
-cc.start()
+    log.debug('starting CC')
+    cc.start()

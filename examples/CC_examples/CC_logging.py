@@ -26,6 +26,10 @@ root_logger.setLevel(logging.WARNING)  # set log level of logger
 pycqed_logger = logging.getLogger('pycqed')
 pycqed_logger.setLevel(logging.DEBUG)  # set log level of logger
 
+# configure ZI_base_instrument logger
+zibi_logger = logging.getLogger('pycqed.instrument_drivers.physical_instruments.ZurichInstruments')
+zibi_logger.setLevel(logging.INFO)  # set log level of logger
+
 # configure print logger
 print_logger = logging.getLogger('print')
 print_logger.setLevel(logging.DEBUG)
@@ -44,4 +48,4 @@ def print_logger_write(msg):
             else:
                 print_logger.info(line)
 
-sys.stdout.write = print_logger_write
+sys.stdout.write = print_logger_write  # reroute stdout write (and also __stdout__write if __stdout__ equals stdout)
