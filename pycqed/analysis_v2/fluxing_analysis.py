@@ -235,44 +235,41 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
     Intended for the analysis of CZ tuneup (theta_f, lambda_2) heatmaps
     The data can be from an experiment or simulation
     """
+
     def __init__(self,
-                t_start: str = None,
-                t_stop: str = None,
-                label: str = '',
-                data_file_path: str = None,
-                close_figs: bool = True,
-                options_dict: dict = None,
-                extract_only: bool = False,
-                do_fitting: bool = False,
-                save_qois: bool = True,
-                auto: bool = True,
-                interp_method: str = 'linear',
-
-                plt_orig_pnts: bool = True,
-                plt_contour_phase: bool = True,
-                plt_contour_L1: bool = False,
-                plt_optimal_values: bool = True,
-                plt_optimal_values_max: int = np.inf,
-                plt_clusters: bool = True,
-                clims: dict = None,
-                find_local_optimals: bool = True,
-                phase_thr=5,
-                L1_thr=0.3,
-                clustering_thr=10,
-                cluster_from_interp: bool = True,
-                opt_are_interp: bool = True,
-
-                rescore_spiked_optimals: bool = False,
-                plt_optimal_waveforms_all: bool = False,
-                plt_optimal_waveforms: bool = False,
-                waveform_flux_lm_name: str = None,
-
-                target_cond_phase: float = 180.,
-                single_q_phase_offset: bool = False,
-                calc_L1_from_missing_frac: bool = True,
-                calc_L1_from_offset_diff: bool = False,
-
-                comparison_timestamp: str = None):
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 data_file_path: str = None,
+                 close_figs: bool = True,
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 do_fitting: bool = False,
+                 save_qois: bool = True,
+                 auto: bool = True,
+                 interp_method: str = 'linear',
+                 plt_orig_pnts: bool = True,
+                 plt_contour_phase: bool = True,
+                 plt_contour_L1: bool = False,
+                 plt_optimal_values: bool = True,
+                 plt_optimal_values_max: int = np.inf,
+                 plt_clusters: bool = True,
+                 clims: dict = None,
+                 find_local_optimals: bool = True,
+                 phase_thr=5,
+                 L1_thr=0.3,
+                 clustering_thr=10,
+                 cluster_from_interp: bool = True,
+                 opt_are_interp: bool = True,
+                 rescore_spiked_optimals: bool = False,
+                 plt_optimal_waveforms_all: bool = False,
+                 plt_optimal_waveforms: bool = False,
+                 waveform_flux_lm_name: str = None,
+                 target_cond_phase: float = 180.,
+                 single_q_phase_offset: bool = False,
+                 calc_L1_from_missing_frac: bool = True,
+                 calc_L1_from_offset_diff: bool = False,
+                 comparison_timestamp: str = None):
 
         self.plt_orig_pnts = plt_orig_pnts
         self.plt_contour_phase = plt_contour_phase
@@ -318,22 +315,22 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             assert waveform_flux_lm_name is not None
 
         cost_func_Names = {'Cost func', 'Cost func.', 'cost func',
-        'cost func.', 'cost function', 'Cost function', 'Cost function value'}
+                           'cost func.', 'cost function', 'Cost function', 'Cost function value'}
         L1_names = {'L1', 'Leakage', 'half missing fraction'}
         ms_names = {'missing fraction', 'Missing fraction', 'missing frac',
-            'missing frac.', 'Missing frac', 'Missing frac.'}
+                    'missing frac.', 'Missing frac', 'Missing frac.'}
         cond_phase_names = {'Cond phase', 'Cond. phase', 'Conditional phase',
-            'cond phase', 'cond. phase', 'conditional phase'}
+                            'cond phase', 'cond. phase', 'conditional phase'}
         offset_diff_names = {'offset difference', 'offset diff',
-            'offset diff.', 'Offset difference', 'Offset diff',
-            'Offset diff.'}
+                             'offset diff.', 'Offset difference', 'Offset diff',
+                             'Offset diff.'}
         phase_q0_names = {'Q0 phase', 'phase q0'}
 
         # also account for possible underscores instead of a spaces between words
         allNames = [cost_func_Names, L1_names, ms_names, cond_phase_names,
-                offset_diff_names, phase_q0_names]
+                    offset_diff_names, phase_q0_names]
         allNames = [names.union({name.replace(' ', '_') for name in names})
-                for names in allNames]
+                    for names in allNames]
         allNames = [names.union({name + ' 1' for name in names}.union(
             {name + ' 2' for name in names})) for names in allNames]
         [self.cost_func_Names, self.L1_names, self.ms_names,
@@ -387,7 +384,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 }
             unit = self.proc_data_dict['value_units'][i]
             if unit == 'deg':
-                self.plot_dicts[val_name]['cbarticks'] = np.arange(0., 360.1, 45)
+                self.plot_dicts[val_name]['cbarticks'] = np.arange(
+                    0., 360.1, 45)
                 self.plot_dicts[val_name]['cmap_chosen'] = anglemap
                 self.plot_dicts[val_name]['clim'] = [0., 360.]
             elif unit == '%':
@@ -433,7 +431,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                         'vlim': (0, 360)
                     }
                 else:
-                    log.warning('No data found named {}'.format(self.cond_phase_names))
+                    log.warning('No data found named {}'.format(
+                        self.cond_phase_names))
 
             if self.plt_contour_L1:
                 # Find index of Leakage or Missing Fraction
@@ -445,7 +444,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
 
                 if z_L1 is not None:
                     vlim = (self.proc_data_dict['interpolated_values'][j].min(),
-                        self.proc_data_dict['interpolated_values'][j].max())
+                            self.proc_data_dict['interpolated_values'][j].max())
 
                     contour_levels = np.array([1, 5, 10])
                     # Leakage is estimated as (Missing fraction/2)
@@ -471,19 +470,19 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             if (self.plt_optimal_values and
                     found_optimals and
                     val_name in self.cost_func_Names):
-                    self.plot_dicts[val_name + '_optimal_pars'] = {
-                        'ax_id': val_name,
-                        'ypos': -0.25,
-                        'xpos': 0,
-                        'plotfn': self.plot_text,
-                        'box_props': 'fancy',
-                        'line_kws': {'alpha': 0},
-                        'text_string': self.get_readable_optimals(
-                            optimal_end=self.plt_optimal_values_max),
-                        'horizontalalignment': 'left',
-                        'verticalaligment': 'top',
-                        'fontsize': 14
-                    }
+                self.plot_dicts[val_name + '_optimal_pars'] = {
+                    'ax_id': val_name,
+                    'ypos': -0.25,
+                    'xpos': 0,
+                    'plotfn': self.plot_text,
+                    'box_props': 'fancy',
+                    'line_kws': {'alpha': 0},
+                    'text_string': self.get_readable_optimals(
+                        optimal_end=self.plt_optimal_values_max),
+                    'horizontalalignment': 'left',
+                    'verticalaligment': 'top',
+                    'fontsize': 14
+                }
 
             if self.plt_clusters and found_optimals:
                 self.plot_dicts[val_name + '_clusters'] = {
@@ -557,21 +556,26 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             # This was used for some debugging
             self.proc_data_dict['value_names'].append('phase_q1 - phase_q0')
             self.proc_data_dict['value_units'].append('deg')
-            phase_q0 = self.proc_data_dict['measured_values'][self.proc_data_dict['value_names'].index(phase_q0_name)]
-            phase_q1 = self.proc_data_dict['measured_values'][self.proc_data_dict['value_names'].index(phase_q1_name)]
-            self.proc_data_dict['measured_values'] = np.vstack((self.proc_data_dict['measured_values'], (phase_q1 - phase_q0) % 360))
+            phase_q0 = self.proc_data_dict['measured_values'][self.proc_data_dict['value_names'].index(
+                phase_q0_name)]
+            phase_q1 = self.proc_data_dict['measured_values'][self.proc_data_dict['value_names'].index(
+                phase_q1_name)]
+            self.proc_data_dict['measured_values'] = np.vstack(
+                (self.proc_data_dict['measured_values'], (phase_q1 - phase_q0) % 360))
 
         # Calculate L1 from missing fraction and/or offset differece if available
         vln_set = set(self.proc_data_dict['value_names'])
         for names, do_calc in [(self.ms_names, self.calc_L1_from_missing_frac),
-                (self.offset_diff_names, self.calc_L1_from_offset_diff)]:
+                               (self.offset_diff_names, self.calc_L1_from_offset_diff)]:
             found_name = len(vln_set.intersection(names)) > 0
             if (do_calc and found_name):
                 name = vln_set.intersection(names).pop()
                 self.proc_data_dict['value_names'].append('half ' + name)
                 self.proc_data_dict['value_units'].append('%')
-                L1_equiv = self.proc_data_dict['measured_values'][self.proc_data_dict['value_names'].index(name)] / 2
-                self.proc_data_dict['measured_values'] = np.vstack((self.proc_data_dict['measured_values'], L1_equiv))
+                L1_equiv = self.proc_data_dict['measured_values'][self.proc_data_dict['value_names'].index(
+                    name)] / 2
+                self.proc_data_dict['measured_values'] = np.vstack(
+                    (self.proc_data_dict['measured_values'], L1_equiv))
 
         vln = self.proc_data_dict['value_names']
         measured_vals = self.proc_data_dict['measured_values']
@@ -586,22 +590,28 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             # Because there is no standart what measured quantities are named
             # have to do some magic name matching here
             for names in [self.cost_func_Names, self.L1_names, self.ms_names, self.cond_phase_names,
-                    self.offset_diff_names, self.phase_q0_names]:
-                inters_this = names.intersection(self.proc_data_dict['value_names'])
-                inters_comp = names.intersection(coha_comp.proc_data_dict['value_names'])
+                          self.offset_diff_names, self.phase_q0_names]:
+                inters_this = names.intersection(
+                    self.proc_data_dict['value_names'])
+                inters_comp = names.intersection(
+                    coha_comp.proc_data_dict['value_names'])
                 if len(inters_this) > 0 and len(inters_comp) > 0:
                     this_name = inters_this.pop()
                     comp_name = inters_comp.pop()
-                    indx_this_name = self.proc_data_dict['value_names'].index(this_name)
+                    indx_this_name = self.proc_data_dict['value_names'].index(
+                        this_name)
                     self.proc_data_dict['value_names'].append('[{}]\n{} - {}'.format(
                         self.comparison_timestamp,
                         comp_name,
                         this_name))
-                    self.proc_data_dict['value_units'].append('∆ ' + self.proc_data_dict['value_units'][indx_this_name])
+                    self.proc_data_dict['value_units'].append(
+                        '∆ ' + self.proc_data_dict['value_units'][indx_this_name])
                     this_mv = self.proc_data_dict['measured_values'][indx_this_name]
-                    ref_mv = coha_comp.proc_data_dict['measured_values'][coha_comp.proc_data_dict['value_names'].index(comp_name)]
+                    ref_mv = coha_comp.proc_data_dict['measured_values'][coha_comp.proc_data_dict['value_names'].index(
+                        comp_name)]
                     delta_mv = ref_mv - this_mv
-                    self.proc_data_dict['measured_values'] = np.vstack((self.proc_data_dict['measured_values'], delta_mv))
+                    self.proc_data_dict['measured_values'] = np.vstack(
+                        (self.proc_data_dict['measured_values'], delta_mv))
 
         self.proc_data_dict['interpolated_values'] = []
         for i in range(len(self.proc_data_dict['value_names'])):
@@ -667,7 +677,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             lambda_2_arr = self.proc_data_dict['y_int']
 
             theta_f_arr, lambda_2_arr = interp_to_1D_arr(x_int=theta_f_arr,
-                y_int=lambda_2_arr)
+                                                         y_int=lambda_2_arr)
 
             extract_optimals_from = 'interpolated_values'
 
@@ -700,8 +710,10 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 # In case the code breaks and the dummy fluxlutman is not closed
                 # We give it a "random" time based name
                 time_string = datetime.now().strftime('%Y%d%m_%H%M%S_%f')
-                fluxlutman = flm.HDAWG_Flux_LutMan('flux_lm_auto_{}'.format(time_string))
-                ignore_pars = {'AWG', 'instr_distortion_kernel', 'instr_partner_lutman'}
+                fluxlutman = flm.HDAWG_Flux_LutMan(
+                    'flux_lm_auto_{}'.format(time_string))
+                ignore_pars = {'AWG', 'instr_distortion_kernel',
+                               'instr_partner_lutman'}
                 if self.waveform_flux_lm_name is None:
                     waveform_flux_lm_name = 'flux_lm'
                 else:
@@ -731,14 +743,16 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                     fluxlutman.generate_standard_waveforms()
                     waveform = fluxlutman._gen_cz(which_gate=which_gate)
                     waveforms.append(waveform)
-                    time = np.cumsum(np.full(np.size(waveform), 1 / fluxlutman.sampling_rate()))
+                    time = np.cumsum(
+                        np.full(np.size(waveform), 1 / fluxlutman.sampling_rate()))
                     times.append(time)
                     # NB: it is assumed 'No AWG present, returning unity scale factor.'
                     # NB2: this sorting very empirical
                     waveform_max = np.max(waveform)
 
                     # spiked_optimals.append(0)  # switch to this line to ignore spikes downscoring
-                    spiked_optimals.append(np.any(waveform > 1.25) * (waveform_max - np.average(np.abs(waveform))) / waveform_max)
+                    spiked_optimals.append(np.any(
+                        waveform > 1.25) * (waveform_max - np.average(np.abs(waveform))) / waveform_max)
 
                 # Change to np format for compatibility with hdf5
                 waveforms = np.array(waveforms)
@@ -775,7 +789,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 (clusters_pnts_y, y_arr[cluster_by_indx]))
             clusters_pnts_colors = np.concatenate(
                 (clusters_pnts_colors,
-                np.full(np.shape(cluster_by_indx)[0], l)))
+                 np.full(np.shape(cluster_by_indx)[0], l)))
 
         self.proc_data_dict['optimal_idxs'] = optimal_idxs
 
@@ -801,7 +815,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         optimal_measured_units = []
         mvs = self.proc_data_dict[extract_optimals_from]
         for optimal_idx in optimal_idxs:
-            optimal_measured_values.append({name: np.ravel(mvs[ii])[optimal_idx] for ii, name in enumerate(vln)})
+            optimal_measured_values.append(
+                {name: np.ravel(mvs[ii])[optimal_idx] for ii, name in enumerate(vln)})
         optimal_measured_units = {name: vlu[ii] for ii, name in enumerate(vln)}
         self.proc_data_dict['optimal_measured_values'] = optimal_measured_values
         self.proc_data_dict['optimal_measured_units'] = optimal_measured_units
@@ -860,12 +875,12 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
               bbox=box_props, fontdict=fontdict)
 
     def get_readable_optimals(self,
-            optimal_pars_values=None,
-            optimal_measured_values=None,
-            optimal_start: int = 0,
-            optimal_end: int = np.inf,
-            sig_digits: int = 4,
-            opt_are_interp=None):
+                              optimal_pars_values=None,
+                              optimal_measured_values=None,
+                              optimal_start: int = 0,
+                              optimal_end: int = np.inf,
+                              sig_digits: int = 4,
+                              opt_are_interp=None):
         if not optimal_pars_values:
             optimal_pars_values = self.proc_data_dict['optimal_pars_values']
         if not optimal_measured_values:
@@ -879,16 +894,19 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         string = ''
         for opt_idx in range(optimal_start, int(min(optimal_end + 1, optimals_max))):
             string += '========================\n'
-            string += 'Optimal #{}{}\n'.format(opt_idx, '[Spiked]' if spiked[opt_idx] else '')
+            string += 'Optimal #{}{}\n'.format(opt_idx,
+                                               '[Spiked]' if spiked[opt_idx] else '')
             string += '========================\n'
             for pv_name, pv_value in optimal_pars_values[opt_idx].items():
-                string += '{} = {:.{sig_digits}g} {}\n'.format(pv_name, pv_value, self.proc_data_dict['optimal_pars_units'][pv_name], sig_digits=sig_digits)
+                string += '{} = {:.{sig_digits}g} {}\n'.format(
+                    pv_name, pv_value, self.proc_data_dict['optimal_pars_units'][pv_name], sig_digits=sig_digits)
             string += '------------\n'
             if (self.cluster_from_interp and opt_are_interp and
                     optimal_pars_values is self.proc_data_dict['optimal_pars_values']):
                 string += '[!!! Interpolated values !!!]\n'
             for mv_name, mv_value in optimal_measured_values[opt_idx].items():
-                string += '{} = {:.{sig_digits}g} {}\n'.format(mv_name, mv_value, self.proc_data_dict['optimal_measured_units'][mv_name], sig_digits=sig_digits)
+                string += '{} = {:.{sig_digits}g} {}\n'.format(
+                    mv_name, mv_value, self.proc_data_dict['optimal_measured_units'][mv_name], sig_digits=sig_digits)
         return string
 
 
@@ -920,19 +938,19 @@ def scatter_pnts_overlay(
     if transpose:
         log.debug('Inverting x and y axis for non-interpolated points')
         ax.scatter(y, x, marker=marker,
-            color=color, edgecolors=edgecolors, linewidth=linewidth, s=s, c=c)
+                   color=color, edgecolors=edgecolors, linewidth=linewidth, s=s, c=c)
     else:
         ax.scatter(x, y, marker=marker,
-            color=color, edgecolors=edgecolors, linewidth=linewidth, s=s, c=c)
+                   color=color, edgecolors=edgecolors, linewidth=linewidth, s=s, c=c)
 
     return fig, ax
 
 
 def contour_overlay(x, y, z, colormap, transpose=False,
-        contour_levels=[90, 180, 270], vlim=(0, 360), fig=None,
-        linestyles='dashed',
-        cyclic_data=False,
-        ax=None, **kw):
+                    contour_levels=[90, 180, 270], vlim=(0, 360), fig=None,
+                    linestyles='dashed',
+                    cyclic_data=False,
+                    ax=None, **kw):
     """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     N.B. The contour overaly suffers from artifacts sometimes
@@ -971,24 +989,24 @@ def contour_overlay(x, y, z, colormap, transpose=False,
         z[(z < minz) | (z > maxz)] = np.nan
 
     c = ax.contour(x, y, z,
-        levels=contour_levels, linewidths=linewidth, cmap=colormap,
-        norm=norm, linestyles=linestyles)
+                   levels=contour_levels, linewidths=linewidth, cmap=colormap,
+                   norm=norm, linestyles=linestyles)
     ax.clabel(c, fmt='%.1f', inline='True', fontsize=fontsize)
 
     return fig, ax
 
 
 def annotate_pnts(txt, x, y,
-        textcoords='offset points',
-        ha='center',
-        va='center',
-        xytext=(0, 0),
-        bbox=dict(boxstyle='circle, pad=0.2', fc='white', alpha=0.7),
-        arrowprops=None,
-        transpose=False,
-        fig=None,
-        ax=None,
-        **kw):
+                  textcoords='offset points',
+                  ha='center',
+                  va='center',
+                  xytext=(0, 0),
+                  bbox=dict(boxstyle='circle, pad=0.2', fc='white', alpha=0.7),
+                  arrowprops=None,
+                  transpose=False,
+                  fig=None,
+                  ax=None,
+                  **kw):
     """
     A handy for loop for the ax.annotate
     """
@@ -1001,13 +1019,13 @@ def annotate_pnts(txt, x, y,
         x = y_tmp
 
     for i, text in enumerate(txt):
-            ax.annotate(text,
-                xy=(x[i], y[i]),
-                textcoords=textcoords,
-                ha=ha,
-                va=va,
-                xytext=xytext,
-                bbox=bbox)
+        ax.annotate(text,
+                    xy=(x[i], y[i]),
+                    textcoords=textcoords,
+                    ha=ha,
+                    va=va,
+                    xytext=xytext,
+                    bbox=bbox)
     return fig, ax
 
 
@@ -1051,21 +1069,24 @@ def get_optimal_pnts_indxs(
     for tol in tolerances:
         phase_thr *= tol
         L1_thr *= tol
-        cond_phase_dev_f = multi_targets_phase_offset(target_phase, 2 * target_phase)
+        cond_phase_dev_f = multi_targets_phase_offset(
+            target_phase, 2 * target_phase)
         # np.abs(cond_phase_arr - target_phase)
         cond_phase_abs_diff = cond_phase_dev_f(cond_phase_arr)
         sel = cond_phase_abs_diff <= phase_thr
         sel = sel * (L1_arr <= L1_thr)
         # sel = sel * (x_norm > y_norm)
         # Exclude point on the boundaries
-        sel = sel * (x < np.max(x)) * (x > np.min(x)) * (y < np.max(y)) * (y > np.min(y))
+        sel = sel * (x < np.max(x)) * (x > np.min(x)) * \
+            (y < np.max(y)) * (y > np.min(y))
         selected_points_indxs = np.where(sel)[0]
         if np.size(selected_points_indxs) == 0:
             log.warning('No optimal points found with  |target_phase - cond phase| < {} and L1 < {}.'.format(
                 phase_thr, L1_thr))
             if tol == tolerances[-1]:
                 return np.array([], dtype=int), np.array([], dtype=int)
-            log.warning('Increasing tolerance for phase_thr and L1 to x{}.'.format(tol + 1))
+            log.warning(
+                'Increasing tolerance for phase_thr and L1 to x{}.'.format(tol + 1))
         elif np.size(selected_points_indxs) == 1:
             return np.array(selected_points_indxs), np.array([selected_points_indxs])
         else:
@@ -1089,7 +1110,8 @@ def get_optimal_pnts_indxs(
 
         cluster_indxs = np.where(clusters == cluster_id)
         indxs_in_orig_array = selected_points_indxs[cluster_indxs]
-        L1_av_around = [av_around(x_norm, y_norm, L1_arr, idx, thresh * 1.5)[0] for idx in indxs_in_orig_array]
+        L1_av_around = [av_around(
+            x_norm, y_norm, L1_arr, idx, thresh * 1.5)[0] for idx in indxs_in_orig_array]
         min_idx = np.argmin(L1_av_around)
 
         optimal_idx = indxs_in_orig_array[min_idx]
@@ -1112,7 +1134,8 @@ def get_optimal_pnts_indxs(
     # Therefore not used
     # av_cp_diff_w = 0.
     # low leakage is best
-    w1 = av_L1_w * np.array(av_L1) / np.max(av_L1) / np.array([it for it in map(np.size, clusters_by_indx)])
+    w1 = av_L1_w * np.array(av_L1) / np.max(av_L1) / \
+        np.array([it for it in map(np.size, clusters_by_indx)])
     # value more the points with more neighbors as a confirmation of
     # low leakage area and also scores less points near the boundaries
     # of the sampling area

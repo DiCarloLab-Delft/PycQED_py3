@@ -8,6 +8,7 @@ from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import get_wf
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ as scCZ
 from pycqed.measurement import measurement_control as mc
 from qcodes import station as st
+import pycqed.analysis.analysis_toolbox as a_tools
 
 
 class TestMultiQubitFluxLutMan:
@@ -452,7 +453,8 @@ class TestMultiQubitFluxLutMan:
             self.fluxlutman.set('cz_length_{}'.format(which_gate), 48e-9)
             self.fluxlutman.set('cz_theta_f_{}'.format(which_gate), 100)
             self.fluxlutman.set('czd_double_sided_{}'.format(which_gate), True)
-            self.fluxlutman.set('q_J2_{}'.format(which_gate), np.sqrt(2) * 14.3e6)
+            self.fluxlutman.set('q_J2_{}'.format(
+                which_gate), np.sqrt(2) * 14.3e6)
             self.fluxlutman.set('q_freq_10_{}'.format(which_gate), 5.79e9)
             self.fluxlutman.set('bus_freq_{}'.format(which_gate), 8.5e9)
             self.fluxlutman.set('czd_length_ratio_{}'.format(which_gate), 0.5)
@@ -502,10 +504,18 @@ class TestMultiQubitFluxLutMan:
         assert 'L1' in units.keys()
 
     def test_get_guesses_from_cz_sim(self):
+        """
+        Test runs a small simulation of 6 datapoints and finds the optimum from 
+        this. Tests for the optimum being what is expected. 
+        """
         # Set up an experiment like environment
         self.station = st.Station()
+
         self.MC = mc.MeasurementControl('MC', live_plot_enabled=False)
         self.MC.station = self.station
+        # Ensures datadir of experiment and analysis are identical
+        self.MC.datadir(a_tools.datadir)
+
         self.station.add_component(self.MC)
         self.station.add_component(self.fluxlutman)
         self.station.add_component(self.fluxlutman_static)
@@ -590,7 +600,7 @@ class TestMultiQubitFluxLutMan:
                 7: {'name': 'custom_wf', 'type': 'custom'}},
             'sampling_rate': 2400000000.0,
             'q_polycoeffs_freq_01_det': np.array([-9.06217397e+08,
-                -0, -1.92463273e-07]),
+                                                  -0, -1.92463273e-07]),
             'q_polycoeffs_anharm': np.array([0, 0, -3.18e+08]),
             'q_freq_01': 5886845171.848719,
             'q_freq_10_NE': 6000000000.0,
@@ -620,6 +630,7 @@ class TestMultiQubitFluxLutMan:
         self.fluxlutman.set('cz_lambda_3_SE', 0)
         self.fluxlutman.set('cz_length_SE', 40e-9)
 
+        # Simulation runs here
         guesses = self.fluxlutman.get_guesses_from_cz_sim(
             fluxlutman_static=self.fluxlutman_static,
             MC=self.MC,
@@ -629,6 +640,6 @@ class TestMultiQubitFluxLutMan:
             lambda_2_lims=(-0.3, -0.2))
         first_optimal_pars = guesses[0][0]
         np.testing.assert_almost_equal(first_optimal_pars['cz_theta_f_SE'],
-            116.6666, decimal=1)
+                                       116.6666, decimal=1)
         np.testing.assert_almost_equal(first_optimal_pars['cz_lambda_2_SE'],
-            -0.23333, decimal=1)
+                                       -0.23333, decimal=1)

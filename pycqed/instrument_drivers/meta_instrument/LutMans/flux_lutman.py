@@ -720,7 +720,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         ch_pair = awg_ch % 2
 
         channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
-                awg_nr, ch_pair))
+            awg_nr, ch_pair))
         return channel_amp
 
     def _set_awg_channel_amplitude(self, val):
@@ -952,7 +952,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 # Give a warning and don't raise an error as things should not
                 # break because of this.
             log.warning('AWG amp to dac scale factor is 0, check "{}" '
-                            'output amplitudes'.format(self.AWG()))
+                        'output amplitudes'.format(self.AWG()))
             return 1
         return 1/self.get_dac_val_to_amp_scalefactor()
 
@@ -1352,33 +1352,39 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if which_gate is None:
             found = []
             for this_cz in ['NE', 'NW', 'SW', 'SE']:
-                instr_name = self.get('instr_sim_control_CZ_{}'.format(this_cz))
+                instr_name = self.get(
+                    'instr_sim_control_CZ_{}'.format(this_cz))
                 if instr_name is not None:
-                    found.append(self.parameters['instr_sim_control_CZ_{}'.format(this_cz)].get_instr())
+                    found.append(
+                        self.parameters['instr_sim_control_CZ_{}'.format(this_cz)].get_instr())
             if len(found) == 0:
-                raise Exception('No sim_control_CZ instrument found! Define a "SimControlCZ" instrument first.')
+                raise Exception(
+                    'No sim_control_CZ instrument found! Define a "SimControlCZ" instrument first.')
             elif len(found) > 1:
                 raise Exception('CZ instruments found: {}. Please specify "which_gate"'.
-                    format(found))
+                                format(found))
             else:
                 sim_control_CZ = found[0]
                 which_gate = sim_control_CZ.which_gate()
         else:
-            sim_control_CZ = self.parameters['instr_sim_control_CZ_{}'.format(which_gate)].get_instr()
+            sim_control_CZ = self.parameters['instr_sim_control_CZ_{}'.format(
+                which_gate)].get_instr()
             assert which_gate == sim_control_CZ.which_gate()
 
         detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ,
-            fluxlutman_static=fluxlutman_static, qois=qois)
+                                                       fluxlutman_static=fluxlutman_static, qois=qois)
 
         sim_results = detector.acquire_data_point()
 
         if qois == 'all':
-            values = {detector.value_names[i]: sim_results[i] for i, result in enumerate(sim_results)}
-            units = {detector.value_names[i]: detector.value_units[i] for i, result in enumerate(sim_results)}
+            values = {detector.value_names[i]: sim_results[i]
+                      for i, result in enumerate(sim_results)}
+            units = {detector.value_names[i]: detector.value_units[i]
+                     for i, result in enumerate(sim_results)}
         else:
             values = {qoi: sim_results[i] for i, qoi in enumerate(qois)}
             units = {qoi: detector.value_units[detector.value_names.index(qoi)]
-                for i, qoi in enumerate(qois)}
+                     for i, qoi in enumerate(qois)}
             pass
 
         return values, units
@@ -1413,7 +1419,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         sim_control_CZ_par_name = 'instr_sim_control_CZ_{}'.format(which_gate)
         sim_control_CZ_name = self.get(sim_control_CZ_par_name)
         found_name = sim_control_CZ_name is not None
-        found_instr = self._all_instruments.get(sim_control_CZ_name) is not None
+        found_instr = self._all_instruments.get(
+            sim_control_CZ_name) is not None
         if found_name and found_instr:
             sim_control_CZ = self.find_instrument(sim_control_CZ_name)
             assert which_gate == sim_control_CZ.which_gate()
@@ -1432,8 +1439,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if sim_control_CZ_pars is None or 'cost_func_str' not in sim_control_CZ_pars:
             cost_func_str = "lambda qoi: {} + qoi['L1'] * 100 / {}".format(
                             multi_targets_phase_offset(target=target_cond_phase,
-                                spacing=2 * target_cond_phase,
-                                phase_name="qoi['phi_cond']"),
+                                                       spacing=2 * target_cond_phase,
+                                                       phase_name="qoi['phi_cond']"),
                             0.05)  # 0.05% L1 equiv. to 1 deg in cond phase
             sim_control_CZ.cost_func_str(cost_func_str)
 
@@ -1445,7 +1452,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         # Create a CZ_trajectory_superoperator detector if it doesn't exist
         detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ,
-            fluxlutman_static=fluxlutman_static, qois=qois)
+                                                       fluxlutman_static=fluxlutman_static, qois=qois)
 
         MC.set_detector_function(detector)
 
@@ -1513,7 +1520,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             rescore_spiked_optimals=True,
             plt_optimal_waveforms_all=True,
             waveform_flux_lm_name=self.name,
-            opt_are_interp=not (evaluate_local_optimals and cluster_from_interp),
+            opt_are_interp=not (
+                evaluate_local_optimals and cluster_from_interp),
             clims={
                 'L1': [0, 1],
                 # 'Cost func': [0, 100] # was useful when the cost func
@@ -1533,13 +1541,15 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             print('Evaluating optima...')
             for opt_idx in range(opt_num):
                 adaptive_pars = {'adaptive_function': nelder_mead,
-                    'x0': [
-                        eval_opt_pvs[opt_idx]['cz_theta_f_{}'.format(which_gate)],
-                        eval_opt_pvs[opt_idx]['cz_lambda_2_{}'.format(which_gate)],
-                    ],
-                    'initial_step': [1, 0.01],
-                    'maxiter': 10  # Just a few points to evaluate near the minimum
-                }
+                                 'x0': [
+                                     eval_opt_pvs[opt_idx]['cz_theta_f_{}'.format(
+                                         which_gate)],
+                                     eval_opt_pvs[opt_idx]['cz_lambda_2_{}'.format(
+                                         which_gate)],
+                                 ],
+                                 'initial_step': [1, 0.01],
+                                 'maxiter': 10  # Just a few points to evaluate near the minimum
+                                 }
                 MC.set_adaptive_function_parameters(adaptive_pars)
                 MC.set_detector_function(detector)
 
@@ -1550,7 +1560,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
                 if label is None:
                     time_string = datetime.now().strftime('%f')
-                    label_eval = 'auto_{}_eval_{}_{}'.format(sim_control_CZ.name, opt_idx, time_string)
+                    label_eval = 'auto_{}_eval_{}_{}'.format(
+                        sim_control_CZ.name, opt_idx, time_string)
                 else:
                     label_eval = label + '_#{}'.format(opt_idx)
 
@@ -1589,9 +1600,11 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if optimize_phase_q0:
 
             cost_func_str = "lambda qoi: LJP_mod({} + qoi['L1'] * 100 / {} + {} / {}, {})".format(
-                multi_targets_phase_offset(target=target_cond_phase, spacing=2 * target_cond_phase, phase_name="qoi['phi_cond']"),
+                multi_targets_phase_offset(
+                    target=target_cond_phase, spacing=2 * target_cond_phase, phase_name="qoi['phi_cond']"),
                 str(0.05),  # 0.05% L1 equiv. to 1 deg in cond phase
-                multi_targets_phase_offset(target=0, spacing=90, phase_name="qoi['phase_q0']"),
+                multi_targets_phase_offset(
+                    target=0, spacing=90, phase_name="qoi['phase_q0']"),
                 str(1),
                 str(180))
             sim_control_CZ.set_cost_func(cost_func_str=cost_func_str)
@@ -1612,11 +1625,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 if cost_func < ftarget:
                     break
                 elif k > 0:
-                    print('Target value not reached under {} evaluations trying next optimal guess...'.format(maxfevals))
+                    print('Target value not reached under {} evaluations trying next optimal guess...'.format(
+                        maxfevals))
                 print('Starting optimizer for Optimal #{}'.format(k))
 
-                lambda_2_start = optimal_pars_values[k]['cz_lambda_2_{}'.format(which_gate)]
-                theta_f_start = optimal_pars_values[k]['cz_theta_f_{}'.format(which_gate)]
+                lambda_2_start = optimal_pars_values[k]['cz_lambda_2_{}'.format(
+                    which_gate)]
+                theta_f_start = optimal_pars_values[k]['cz_theta_f_{}'.format(
+                    which_gate)]
 
                 adaptive_pars = {
                     'adaptive_function': cma.fmin,
@@ -1634,7 +1650,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 }
 
                 MC.set_sweep_functions([self['cz_theta_f_{}'.format(which_gate)],
-                                        self['cz_lambda_2_{}'.format(which_gate)],
+                                        self['cz_lambda_2_{}'.format(
+                                            which_gate)],
                                         self['cz_lambda_3_{}'.format(which_gate)]])
 
                 MC.set_adaptive_function_parameters(adaptive_pars)
@@ -1642,18 +1659,25 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 optimizer_label = label + '_optimizer'
 
                 MC.run(optimizer_label,
-                        mode='adaptive',
-                        exp_metadata={'adaptive_pars': adaptive_pars})
+                       mode='adaptive',
+                       exp_metadata={'adaptive_pars': adaptive_pars})
 
-                a = ma.OptimizationAnalysis(label=optimizer_label, plot_all=True)
-                par_res = {par_name: a.optimization_result[0][i] for i, par_name in enumerate(a.parameter_names)}
-                mv_res = {mv: a.optimization_result[1][i] for i, mv in enumerate(a.value_names)}
+                a = ma.OptimizationAnalysis(
+                    label=optimizer_label, plot_all=True)
+                par_res = {par_name: a.optimization_result[0][i] for i, par_name in enumerate(
+                    a.parameter_names)}
+                mv_res = {mv: a.optimization_result[1][i]
+                          for i, mv in enumerate(a.value_names)}
 
                 best_seen_idx = np.argmin(a.data[np.size(a.parameter_names)])
-                best_seen_pars = a.data[:np.size(a.parameter_names), best_seen_idx]
-                best_senn_mvs = a.data[np.size(a.parameter_names):, best_seen_idx]
-                best_seen_par_res = {par_name: best_seen_pars[i] for i, par_name in enumerate(a.parameter_names)}
-                best_seen_mv_res = {mv: best_senn_mvs[i] for i, mv in enumerate(a.value_names)}
+                best_seen_pars = a.data[:np.size(
+                    a.parameter_names), best_seen_idx]
+                best_senn_mvs = a.data[np.size(
+                    a.parameter_names):, best_seen_idx]
+                best_seen_par_res = {
+                    par_name: best_seen_pars[i] for i, par_name in enumerate(a.parameter_names)}
+                best_seen_mv_res = {mv: best_senn_mvs[i]
+                                    for i, mv in enumerate(a.value_names)}
 
                 if not bool(best_par_res) or best_seen_mv_res['Cost func'] < cost_func:
                     best_par_res = best_seen_par_res
@@ -1733,7 +1757,7 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
         AWG = self.AWG.get_instr()
         awg_ch = self.cfg_awg_channel()
 
-        channel_amp = AWG.set('ch{}_amp'.format(awg_ch),val)
+        channel_amp = AWG.set('ch{}_amp'.format(awg_ch), val)
         return channel_amp
 
     def _add_cfg_parameters(self):
@@ -1847,7 +1871,8 @@ def roundup1024(n):
 def sim_pars_sanity_check(station, flm, flm_static, which_gate):
     dummy_flm_default_name = 'dummy_flm_default'
     found_dummy = dummy_flm_default_name in flm._all_instruments
-    dummy_flm_default = flm.find_instrument(dummy_flm_default_name) if found_dummy else None
+    dummy_flm_default = flm.find_instrument(
+        dummy_flm_default_name) if found_dummy else None
 
     if dummy_flm_default is None:
         dummy_flm_default = HDAWG_Flux_LutMan(dummy_flm_default_name)
