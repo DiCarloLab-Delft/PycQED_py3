@@ -459,49 +459,50 @@ class TestMultiQubitFluxLutMan:
             self.fluxlutman.set('bus_freq_{}'.format(which_gate), 8.5e9)
             self.fluxlutman.set('czd_length_ratio_{}'.format(which_gate), 0.5)
 
-        self.sim_control_CZ_NE.which_gate('NE')
-        self.fluxlutman.set(
-            'instr_sim_control_CZ_NE',
-            self.sim_control_CZ_NE.name)
-        values, units = self.fluxlutman.sim_CZ(
-            fluxlutman_static=self.fluxlutman_static, which_gate='NE')
-        np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
-        np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
-        np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
-        assert 'L1' in units.keys()
+        # Because simulation is slow this equivalent tests are commented out
+        # self.sim_control_CZ_NE.which_gate('NE')
+        # self.fluxlutman.set(
+        #     'instr_sim_control_CZ_NE',
+        #     self.sim_control_CZ_NE.name)
+        # values, units = self.fluxlutman.sim_CZ(
+        #     fluxlutman_static=self.fluxlutman_static, which_gate='NE')
+        # np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
+        # np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
+        # np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
+        # assert 'L1' in units.keys()
 
-        self.sim_control_CZ_SE.which_gate('SE')
-        self.fluxlutman.set(
-            'instr_sim_control_CZ_SE',
-            self.sim_control_CZ_SE.name)
-        values, units = self.fluxlutman.sim_CZ(
-            fluxlutman_static=self.fluxlutman_static, which_gate='SE')
-        np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
-        np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
-        np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
-        assert 'L1' in units.keys()
+        # self.sim_control_CZ_SE.which_gate('SE')
+        # self.fluxlutman.set(
+        #     'instr_sim_control_CZ_SE',
+        #     self.sim_control_CZ_SE.name)
+        # values, units = self.fluxlutman.sim_CZ(
+        #     fluxlutman_static=self.fluxlutman_static, which_gate='SE')
+        # np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
+        # np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
+        # np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
+        # assert 'L1' in units.keys()
 
-        self.sim_control_CZ_NW.which_gate('NW')
-        self.fluxlutman.set(
-            'instr_sim_control_CZ_NW',
-            self.sim_control_CZ_NW.name)
-        values, units = self.fluxlutman.sim_CZ(
-            fluxlutman_static=self.fluxlutman_static, which_gate='NW')
-        np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
-        np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
-        np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
-        assert 'L1' in units.keys()
+        # self.sim_control_CZ_NW.which_gate('NW')
+        # self.fluxlutman.set(
+        #     'instr_sim_control_CZ_NW',
+        #     self.sim_control_CZ_NW.name)
+        # values, units = self.fluxlutman.sim_CZ(
+        #     fluxlutman_static=self.fluxlutman_static, which_gate='NW')
+        # np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
+        # np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
+        # np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
+        # assert 'L1' in units.keys()
 
-        self.sim_control_CZ_SW.which_gate('SW')
-        self.fluxlutman.set(
-            'instr_sim_control_CZ_SW',
-            self.sim_control_CZ_SW.name)
-        values, units = self.fluxlutman.sim_CZ(
-            fluxlutman_static=self.fluxlutman_static, which_gate='SW')
-        np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
-        np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
-        np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
-        assert 'L1' in units.keys()
+        # self.sim_control_CZ_SW.which_gate('SW')
+        # self.fluxlutman.set(
+        #     'instr_sim_control_CZ_SW',
+        #     self.sim_control_CZ_SW.name)
+        # values, units = self.fluxlutman.sim_CZ(
+        #     fluxlutman_static=self.fluxlutman_static, which_gate='SW')
+        # np.testing.assert_almost_equal(values['Cond phase'], 340.1458978296672)
+        # np.testing.assert_almost_equal(values['L1'], 10.967187671584833)
+        # np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
+        # assert 'L1' in units.keys()
 
     def test_simulate_cz_and_select_optima(self):
         """
