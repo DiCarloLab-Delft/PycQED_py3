@@ -632,7 +632,7 @@ class TestMultiQubitFluxLutMan:
         self.fluxlutman.set('cz_length_SE', 40e-9)
 
         # Simulation runs here
-        guesses = self.fluxlutman.get_guesses_from_cz_sim(
+        guesses = self.fluxlutman.simulate_cz_and_select_optima(
             fluxlutman_static=self.fluxlutman_static,
             MC=self.MC,
             which_gate='SE',
