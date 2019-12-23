@@ -503,10 +503,10 @@ class TestMultiQubitFluxLutMan:
         np.testing.assert_almost_equal(values['L2'], 8.773750137267944)
         assert 'L1' in units.keys()
 
-    def test_get_guesses_from_cz_sim(self):
+    def test_simulate_cz_and_select_optima(self):
         """
-        Test runs a small simulation of 6 datapoints and finds the optimum from 
-        this. Tests for the optimum being what is expected. 
+        Test runs a small simulation of 6 datapoints and finds the optimum from
+        this. Tests for the optimum being what is expected.
         """
         # Set up an experiment like environment
         self.station = st.Station()

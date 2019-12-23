@@ -1389,7 +1389,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         return values, units
 
-    def get_guesses_from_cz_sim(
+    def simulate_cz_and_select_optima(
             self,
             MC,
             fluxlutman_static,
