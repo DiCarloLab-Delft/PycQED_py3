@@ -284,7 +284,7 @@ class MeasurementAnalysis(object):
                    len(self.get_key('sweep_parameter_names')))
             values = self.g['Data'].value[:, ind]
         else:
-            values = self.g[key].value
+            values = self.g[key][()] # changed deprecated self.g[key].value => self.g[key][()]
         # Makes sure all data is np float64
         return np.asarray(values, dtype=np.float64)
 
@@ -4412,15 +4412,15 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
-                ax.ticklabel_format(style='sci', 
+                ax.ticklabel_format(style='sci',
                                     scilimits=(0, 0))
                 set_xlabel(ax, 'I', self.value_units[0])
                 edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
-                
+
             set_ylabel(axs[0], 'Q', self.value_units[1])
-            
+
 
             self.save_fig(
                 fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
@@ -8080,15 +8080,15 @@ class Resonator_Powerscan_Analysis_test(MeasurementAnalysis):
         shift = 0
         shift_data=[]
         for i in range(len(f0)):
-            if (f0[0] - f0[-1]) > 200e3: 
+            if (f0[0] - f0[-1]) > 200e3:
                 shift = f0[0] - f0[-1]
-            elif (f0[0] - f0[i]) > 200e3 : 
+            elif (f0[0] - f0[i]) > 200e3 :
                 shifts= f0[0] - f0[i]
                 shift_data.append(shifts)
                 shift=np.amax(shift_data)
             else:
                 logging.warning('No power shift found. Consider attenuation')
-                
+
         # if (f_high < f_low):
         #     shift = f_high - f_low
         # else:

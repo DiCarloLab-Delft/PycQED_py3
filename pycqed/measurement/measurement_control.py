@@ -1378,6 +1378,9 @@ class MeasurementControl(Instrument):
         except (ValueError, AttributeError) as e:
             opt_res_dset = None
 
+        # Include best seen optimization
+        opt_res = getattr(self, "opt_res", None)
+
         result_dict = {
             "dset": self.dset[()],
             "opt_res_dset": opt_res_dset,
@@ -1385,6 +1388,7 @@ class MeasurementControl(Instrument):
             "sweep_parameter_units": self.sweep_par_units,
             "value_names": self.detector_function.value_names,
             "value_units": self.detector_function.value_units,
+            "opt_res": opt_res
         }
         return result_dict
 
@@ -1447,7 +1451,7 @@ class MeasurementControl(Instrument):
     def save_optimization_results(self, adaptive_function, result):
         """
         Saves the result of an adaptive measurement (optimization) to
-        the hdf5 file.
+        the hdf5 file and adds it to self as well.
 
         Contains some hardcoded data reshufling based on known adaptive
         functions.
@@ -1478,6 +1482,7 @@ class MeasurementControl(Instrument):
             res_dict = {"xopt": result[0], "fopt": result[1]}
         else:
             res_dict = {"opt": result}
+        self.opt_res = res_dict
         h5d.write_dict_to_hdf5(res_dict, entry_point=opt_res_grp)
 
     def save_instrument_settings(self, data_object=None, *args):
