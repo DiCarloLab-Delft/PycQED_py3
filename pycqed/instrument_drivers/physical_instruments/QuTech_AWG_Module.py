@@ -507,19 +507,6 @@ class QuTech_AWG_Module(SCPI):
 
         self.write(f'DIO:CALibrate:PARam {meas_time},{nr_itr}{target_index}')
 
-    def _dio_set_signals(self, signals: List):
-        """
-        FOR DEVELOPMENT ONLY: Set DIO simulation signals. Only works if kernel module and application are build with the
-        'OPT_DBG_SIM_DIO' define enabled
-        :param signals: list of unsigned int, the signal on a input (note: not the bitDiffs, the system will calculate
-        the bitDiffs). Need to contain 16 elements. Example: signal[0]=0xFFF00 where LSB is the oldest in time
-        :return: None
-        """
-
-        if not len(signals) == 16:
-            raise ValueError(f"Invalid number of DIO signals; expected 16, actual: {len(signals)}")
-        self.write("DIO:DBG:SIG {}".format(','.join(map(str, signals))))
-
     ##########################################################################
     # QCoDeS parameter support
     ##########################################################################
