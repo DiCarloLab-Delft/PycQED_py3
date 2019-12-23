@@ -48,7 +48,7 @@ class QuTechCC_core(SCPIBase):
 
     def get_q1_reg(self, ccio: int, reg: int) -> int:
         # only possible if CC is stopped
-        return self.ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
+        return self._transport.ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY {cnt_in_833_ps_steps}')

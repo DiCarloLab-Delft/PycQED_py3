@@ -799,7 +799,7 @@ setUserReg(4, err_cnt);"""
     ##########################################################################
 
     def acquisition(self, samples=100, averages=1, acquisition_time=0.010, timeout=10,
-                    channels=(0, 1), mode='rl') -> None:
+                    channels=(0, 1), mode='rl') -> None:  # FIXME: wrong return type
         self.timeout(timeout)
         self.acquisition_initialize(samples, averages, channels, mode)
         data = self.acquisition_poll(samples, True, acquisition_time)
@@ -869,7 +869,7 @@ setUserReg(4, err_cnt);"""
         self.start()
 
     def acquisition_poll(self, samples, arm=True,
-                         acquisition_time=0.010) -> None:
+                         acquisition_time=0.010) -> None:  # FIXME: wrong return type
         """
         Polls the UHFQC for data.
 

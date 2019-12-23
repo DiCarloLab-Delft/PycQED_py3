@@ -1647,13 +1647,14 @@ class UHFQC_spectroscopy_detector(Soft_Detector):
                  AWG=None, channels=(0, 1),
                  nr_averages=1024, integration_length=4096, **kw):
         super().__init__()
+        # FIXME: code commented out, some __init__ parameters no longer used
         #UHFQC=UHFQC, AWG=AWG, channels=channels,
         # nr_averages=nr_averages, nr_samples=nr_samples, **kw
         self.UHFQC = UHFQC
         self.ro_freq_mod = ro_freq_mod
 
     def acquire_data_point(self):
-        RESULT_LENGTH = 1600
+        RESULT_LENGTH = 1600  # FIXME: hardcoded
         vals = self.UHFQC.acquisition(
             samples=RESULT_LENGTH, acquisition_time=0.010, timeout=10)
         a = max(np.abs(fft.fft(vals[0][1:int(RESULT_LENGTH/2)])))

@@ -2,6 +2,7 @@
 
 import logging
 import sys
+from random import randint
 
 from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
@@ -22,19 +23,30 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
 
-log.debug('generating program')
-prog = ''
-for i in range(10000):
-    prog += '    seq_out         0x00000000,301\n'
 
 
-log.debug('connecting to CC')
+print('connecting to CC')
 cc = QuTechCC('cc', IPTransport(ip))
 cc.reset()
 cc.clear_status()
 cc.status_preset()
 
 for i in range(num_iter):
+    if 1:
+#        prog =  'loop:    seq_out         0x00000000,10\n'
+        prog =  'loop:    seq_out         0x00000000,2\n'
+        # 1: no ILLEGAL_INSTR_RT
+        # 2: ~50%
+        # 10: mostly
+        prog += '         jmp            @loop\n'
+    else:
+        length = randint(100,10000)
+        print(f'generating program of length {length}')
+        prog = ''
+        for line in range(length):
+            prog += '    seq_out         0x00000000,301\n'
+        prog += 'stop\n'
+
     cc.sequence_program_assemble(prog)
 
     for run in range(num_run_per_iter):
