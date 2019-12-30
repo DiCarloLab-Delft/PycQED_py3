@@ -61,8 +61,7 @@ except Exception:
         'try "from qcodes.plots.pyqtgraph import QtPlot" '
         "to see the full error"
     )
-    print("When instantiating an MC object,"
-          " be sure to set live_plot_enabled=False")
+    print("When instantiating an MC object," " be sure to set live_plot_enabled=False")
 
 log = logging.getLogger('__name__')
 
@@ -83,10 +82,14 @@ class MeasurementControl(Instrument):
     data points.
     """
 
-    def __init__(self, name: str,
-                 plotting_interval: float = 3,
-                 datadir: str = get_default_datadir(),
-                 live_plot_enabled: bool = True, verbose: bool = True):
+    def __init__(
+        self,
+        name: str,
+        plotting_interval: float = 3,
+        datadir: str = get_default_datadir(),
+        live_plot_enabled: bool = True,
+        verbose: bool = True,
+    ):
         super().__init__(name=name)
 
         self.add_parameter(
@@ -176,8 +179,14 @@ class MeasurementControl(Instrument):
     # Functions used to control the measurements #
     ##############################################
 
-    def run(self, name: str = None, exp_metadata: dict = None,
-            mode: str = '1D', disable_snapshot_metadata: bool = False, **kw):
+    def run(
+        self,
+        name: str = None,
+        exp_metadata: dict = None,
+        mode: str = "1D",
+        disable_snapshot_metadata: bool = False,
+        **kw
+    ):
         """
         Core of the Measurement control.
 
@@ -751,6 +760,7 @@ class MeasurementControl(Instrument):
                             symbol="o",
                             symbolSize=5,
                         )
+
                 if self.mode == "adaptive":
                     kw = {"pen": None}
                 else:
@@ -983,7 +993,6 @@ class MeasurementControl(Instrument):
         """
         if self.adaptive_function.__module__ == "cma.evolution_strategy":
             self.initialize_plot_monitor_adaptive_cma()
-            self.secondary_QtPlot.clear()
             self.initialize_plot_monitor_2D_interp()
 
         else:
@@ -992,7 +1001,8 @@ class MeasurementControl(Instrument):
             self.secondary_QtPlot.clear()
             self.initialize_plot_monitor_2D_interp()
 
-            zlabels = self.detector_function.value_names
+            value_names = self.detector_function.value_names
+            xlabels = self.sweep_par_names
             zunits = self.detector_function.value_units
 
             self.iter_traces = []
@@ -1002,16 +1012,37 @@ class MeasurementControl(Instrument):
             # this if statement prevents that from happening
             if len(self.sweep_functions) == 2:
                 iter_plotmon = self.main_QtPlot
-                iter_start_idx = len(self.sweep_functions) * len(zlabels)
+                iter_start_idx = len(self.sweep_functions) * len(value_names)
             else:
                 iter_plotmon = self.secondary_QtPlot
                 iter_start_idx = 0
 
+            if (
+                self._persist_ylabs == value_names
+                and self._persist_xlabs == xlabels
+                and self.persist_mode()
+            ):
+                persist = True
+            else:
+                persist = False
+
             # Add evolution of parameters over iterations
-            xlabels = self.sweep_par_names
             xunits = self.sweep_par_units
             xlabels_num = len(xlabels)
             for k in range(xlabels_num):
+                if persist:
+                    yp = self._persist_dat[:, k]
+                    xp = range(len(yp))
+                    if len(xp) < self.plotting_max_pts():
+                        iter_plotmon.add(
+                            x=xp,
+                            y=yp,
+                            subplot=k + 1 + iter_start_idx,
+                            color=0.75,  # a grayscale value
+                            pen=None,
+                            symbol="o",
+                            symbolSize=5,
+                        )
                 iter_plotmon.add(
                     x=[0],
                     y=[0],
@@ -1021,22 +1052,38 @@ class MeasurementControl(Instrument):
                     subplot=k + 1 + iter_start_idx,
                     symbol="o",
                     symbolSize=5,
+                    color=color_cycle[3],
                 )
                 self.iter_traces.append(iter_plotmon.traces[-1])
 
             iter_plotmon.win.nextRow()
 
-            zlables_num = len(zlabels)
+            zlables_num = len(value_names)
             for j in range(zlables_num):
+                if persist:
+                    yp = self._persist_dat[:, j + xlabels_num]
+                    xp = range(len(yp))
+                    if len(xp) < self.plotting_max_pts():
+                        iter_plotmon.add(
+                            x=xp,
+                            y=yp,
+                            subplot=xlabels_num + j + 1 + iter_start_idx,
+                            color=0.75,  # a grayscale value
+                            pen=None,
+                            symbol="o",
+                            symbolSize=5,
+                        )
+
                 iter_plotmon.add(
                     x=[0],
                     y=[0],
                     xlabel="iteration",
-                    ylabel=zlabels[j],
+                    ylabel=value_names[j],
                     yunit=zunits[j],
                     subplot=xlabels_num + j + 1 + iter_start_idx,
                     symbol="o",
                     symbolSize=5,
+                    color=color_cycle[j],
                 )
                 self.iter_traces.append(iter_plotmon.traces[-1])
 
@@ -1081,9 +1128,13 @@ class MeasurementControl(Instrument):
         """
         Uses the Qcodes plotting windows for plotting adaptive plot updates
         """
+
         # new code
         if self.main_QtPlot.traces != []:
             self.main_QtPlot.clear()
+
+        if self.secondary_QtPlot.traces != []:
+            self.secondary_QtPlot.clear()
 
         self.curves = []
         self.curves_best_ever = []
@@ -1169,27 +1220,77 @@ class MeasurementControl(Instrument):
             self.main_QtPlot.win.nextRow()
 
         ##########################################
-        # Secondary plotmon
+        # Secondary or Main plotmon
         ##########################################
 
-        # self.secondary_QtPlot.clear()
         self.iter_traces = []
         self.iter_bever_traces = []
         self.iter_mean_traces = []
 
-        plot_num = j
-        iter_plotmon = self.main_QtPlot
+        # Use the secondary plot for iterations if not in 2D mode
+        if len(self.sweep_functions) == 2:
+            iter_plotmon = self.main_QtPlot
+            plot_num = j
+        else:
+            iter_plotmon = self.secondary_QtPlot
+            plot_num = 0
+
+        # Add evolution of parameters over iterations
+        xlabels_num = len(xlabels)
+        for k in range(xlabels_num):
+            if persist:
+                yp = self._persist_dat[:, k]
+                xp = range(len(yp))
+                if len(xp) < self.plotting_max_pts():
+                    iter_plotmon.add(
+                        x=xp,
+                        y=yp,
+                        subplot=k + 1 + plot_num,
+                        color=0.75,  # a grayscale value
+                        pen=None,
+                        symbol="o",
+                        symbolSize=5,
+                    )
+            iter_plotmon.add(
+                x=[0],
+                y=[0],
+                xlabel="iteration",
+                ylabel=xlabels[k],
+                yunit=xunits[k],
+                subplot=k + 1 + plot_num,
+                symbol="o",
+                symbolSize=5,
+                color=color_cycle[3],
+            )
+            self.iter_traces.append(iter_plotmon.traces[-1])
+
+        iter_plotmon.win.nextRow()
+
         for j in range(len(self.detector_function.value_names)):
+            if persist:
+                yp = self._persist_dat[:, j + len(xlabels)]
+                xp = range(len(yp))
+                if len(xp) < self.plotting_max_pts():
+                    iter_plotmon.add(
+                        x=xp,
+                        y=yp,
+                        subplot=xlabels_num + plot_num + 1,
+                        color=0.75,  # a grayscale value
+                        symbol="o",
+                        pen=None,  # makes it a scatter
+                        symbolSize=5,
+                    )
+
             iter_plotmon.add(
                 x=[0],
                 y=[0],
                 name="Measured values",
-                xlabel="Iteration",
+                xlabel="iteration",
                 x_unit="#",
                 color=color_cycle[0],
                 ylabel=ylabels[j],
                 yunit=yunits[j],
-                subplot=plot_num + 1,
+                subplot=xlabels_num + plot_num + 1,
                 symbol="o",
                 symbolSize=5,
             )
@@ -1206,7 +1307,7 @@ class MeasurementControl(Instrument):
                 x_unit="#",
                 ylabel=ylabels[j],
                 yunit=yunits[j],
-                subplot=plot_num + 1,
+                subplot=xlabels_num + plot_num + 1,
             )
             self.iter_bever_traces.append(iter_plotmon.traces[-1])
             iter_plotmon.add(
@@ -1220,7 +1321,7 @@ class MeasurementControl(Instrument):
                 x_unit="#",
                 ylabel=ylabels[j],
                 yunit=yunits[j],
-                subplot=plot_num + 1,
+                subplot=xlabels_num + plot_num + 1,
             )
             self.iter_mean_traces.append(iter_plotmon.traces[-1])
             plot_num += 1
@@ -1249,6 +1350,16 @@ class MeasurementControl(Instrument):
                     # best_idx -1 as we count from 0 and best eval
                     # counts from 1.
                     best_index = int(self.opt_res_dset[-1, -1] - 1)
+
+                    # Update parameters' iterations
+                    sweep_functions_num = len(self.sweep_functions)
+                    for k in range(sweep_functions_num):
+                        y = self.dset[:, k]
+                        x = range(len(y))
+                        self.iter_traces[k]["config"]["x"] = x
+                        self.iter_traces[k]["config"]["y"] = y
+                        self.time_last_ad_plot_update = time.time()
+                        self.secondary_QtPlot.update_plot()
 
                     for j in range(len(self.detector_function.value_names)):
                         y_ind = nr_sweep_funcs + j
@@ -1284,8 +1395,8 @@ class MeasurementControl(Instrument):
                         # Measured value vs function evaluation
                         y = self.dset[:, y_ind]
                         x = range(len(y))
-                        self.iter_traces[j]["config"]["x"] = x
-                        self.iter_traces[j]["config"]["y"] = y
+                        self.iter_traces[j + sweep_functions_num]["config"]["x"] = x
+                        self.iter_traces[j + sweep_functions_num]["config"]["y"] = y
 
                         # generational means
                         gen_idx = self.opt_res_dset[:, 1]
@@ -1300,6 +1411,7 @@ class MeasurementControl(Instrument):
                         self.iter_bever_traces[j]["config"]["y"] = best_func_val
 
                     self.main_QtPlot.update_plot()
+                    self.secondary_QtPlot.update_plot()
                     self.update_plotmon_2D_interp(force_update=True)
 
                     self.time_last_ad_plot_update = time.time()
@@ -1714,8 +1826,7 @@ class MeasurementControl(Instrument):
 
         return start_idx
 
-    def get_datawriting_indices_update_ctr(self, new_data,
-                                           update: bool = True):
+    def get_datawriting_indices_update_ctr(self, new_data, update: bool = True):
         """
         Calculates the start and stop indices required for
         storing a hard measurement.
@@ -1916,6 +2027,9 @@ class MeasurementControl(Instrument):
         """
         Required as a standard interface for QCoDeS instruments.
         """
-        return {'vendor': 'PycQED', 'model': 'MeasurementControl',
-                'serial': '', 'firmware': '2.0'}
-
+        return {
+            "vendor": "PycQED",
+            "model": "MeasurementControl",
+            "serial": "",
+            "firmware": "2.0",
+        }
