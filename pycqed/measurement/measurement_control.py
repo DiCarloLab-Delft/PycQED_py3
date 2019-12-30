@@ -1007,14 +1007,34 @@ class MeasurementControl(Instrument):
                 iter_plotmon = self.secondary_QtPlot
                 iter_start_idx = 0
 
-            for j in range(len(zlabels)):
+            # Add evolution of parameters over iterations
+            xlabels = self.sweep_par_names
+            xunits = self.sweep_par_units
+            xlabels_num = len(xlabels)
+            for k in range(xlabels_num):
+                iter_plotmon.add(
+                    x=[0],
+                    y=[0],
+                    xlabel="iteration",
+                    ylabel=xlabels[k],
+                    yunit=xunits[k],
+                    subplot=k + 1 + iter_start_idx,
+                    symbol="o",
+                    symbolSize=5,
+                )
+                self.iter_traces.append(iter_plotmon.traces[-1])
+
+            iter_plotmon.win.nextRow()
+
+            zlables_num = len(zlabels)
+            for j in range(zlables_num):
                 iter_plotmon.add(
                     x=[0],
                     y=[0],
                     xlabel="iteration",
                     ylabel=zlabels[j],
                     yunit=zunits[j],
-                    subplot=j + 1 + iter_start_idx,
+                    subplot=xlabels_num + j + 1 + iter_start_idx,
                     symbol="o",
                     symbolSize=5,
                 )
@@ -1032,12 +1052,25 @@ class MeasurementControl(Instrument):
                     > self.plotting_interval()
                     or force_update
                 ):
-                    for j in range(len(self.detector_function.value_names)):
-                        y_ind = len(self.sweep_functions) + j
+                    sweep_functions_num = len(self.sweep_functions)
+                    detector_function_num = len(self.detector_function.value_names)
+
+                    # Update parameters' iterations
+                    for k in range(sweep_functions_num):
+                        y = self.dset[:, k]
+                        x = range(len(y))
+                        self.iter_traces[k]["config"]["x"] = x
+                        self.iter_traces[k]["config"]["y"] = y
+                        self.time_last_ad_plot_update = time.time()
+                        self.secondary_QtPlot.update_plot()
+
+                    for j in range(detector_function_num):
+                        y_ind = sweep_functions_num + j
                         y = self.dset[:, y_ind]
                         x = range(len(y))
-                        self.iter_traces[j]["config"]["x"] = x
-                        self.iter_traces[j]["config"]["y"] = y
+                        iter_traces_idx = j + sweep_functions_num
+                        self.iter_traces[iter_traces_idx]["config"]["x"] = x
+                        self.iter_traces[iter_traces_idx]["config"]["y"] = y
                         self.time_last_ad_plot_update = time.time()
                         self.secondary_QtPlot.update_plot()
             except Exception as e:
