@@ -510,13 +510,8 @@ class Test_MeasurementControl(unittest.TestCase):
         self.mock_parabola.noise(.5)
         self.MC.set_detector_function(self.mock_parabola.parabola)
         self.MC.run('adaptive params iter plot test', mode='adaptive')
-        import logging
-        log = logging.getLogger(__name__)
-        log.error(self.MC.secondary_QtPlot.traces[0]['config'].keys())
-        log.error(self.MC.secondary_QtPlot.traces[0]['config']['ylabel'])
-        log.error(self.MC.secondary_QtPlot.traces[0]['config']['ylabel'])
-        assert self.MC.secondary_QtPlot.traces[0]['config']['ylabel'] == 'x'
-        assert self.MC.secondary_QtPlot.traces[3]['config']['ylabel'] == 'parabola'
+        assert 'x' in self.MC.secondary_QtPlot.traces[0]['config']['ylabel']
+        assert 'parabola' in self.MC.secondary_QtPlot.traces[-2]['config']['ylabel']
 
     def test_adaptive_measurement_cma(self):
         """

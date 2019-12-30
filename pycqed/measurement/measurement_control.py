@@ -607,6 +607,11 @@ class MeasurementControl(Instrument):
         # that gives back data in the shape [[I_val_seg0, Q_val_seg0]]
         if len(np.shape(vals)) == 2:
             vals = np.array(vals)[:, 0]
+
+        # to check if vals is an array with multiple values
+        if isinstance(vals, collections.abc.Iterable):
+            vals = vals[self.par_idx]
+
         if self.minimize_optimization:
             if self.f_termination is not None:
                 if vals < self.f_termination:
@@ -619,9 +624,13 @@ class MeasurementControl(Instrument):
                     raise StopIteration()
             vals = np.multiply(-1, vals)
 
-        # to check if vals is an array with multiple values
-        if isinstance(vals, collections.abc.Iterable):
-            vals = vals[self.par_idx]
+        if is_subclass(self.adaptive_function, BaseLearner):
+            # Keep track of the best seen points so far so that they can
+            # plotted as stars
+            col_indx = len(self.sweep_function_names) + self.par_idx
+            if self.dset[self.adaptive_besteval_indxs[-1], col_indx] > vals:
+                self.adaptive_besteval_indxs.append(len(self.dset) - 1)
+
         return vals
 
     def finish(self, result):
@@ -952,8 +961,9 @@ class MeasurementControl(Instrument):
                 if (
                     time.time() - self.time_last_2Dplot_update
                     > self.plotting_interval()
-                    or force_update
-                ):
+                    # and avoid warning due to too little points
+                    and len(self.dset) > 4
+                ) or force_update:
                     # exists to force reset the x- and y-axis scale
                     new_sc = TransformState(0, 1, True)
 
@@ -1006,6 +1016,8 @@ class MeasurementControl(Instrument):
             zunits = self.detector_function.value_units
 
             self.iter_traces = []
+            self.iter_bever_traces = []
+            self.iter_bever_x_traces = []
 
             # Because of a bug in QCoDes pytqtgraph backend we don't
             # want line plots and heatmaps in the same plotmon
@@ -1052,9 +1064,20 @@ class MeasurementControl(Instrument):
                     subplot=k + 1 + iter_start_idx,
                     symbol="o",
                     symbolSize=5,
-                    color=color_cycle[3],
+                    color=color_cycle[2],
                 )
                 self.iter_traces.append(iter_plotmon.traces[-1])
+
+                iter_plotmon.add(
+                    x=[0],
+                    y=[0],
+                    xlabel="iteration",
+                    subplot=k + 1 + iter_start_idx,
+                    symbol="star",
+                    symbolSize=12,
+                    color=color_cycle[1],
+                )
+                self.iter_bever_x_traces.append(iter_plotmon.traces[-1])
 
             iter_plotmon.win.nextRow()
 
@@ -1087,6 +1110,17 @@ class MeasurementControl(Instrument):
                 )
                 self.iter_traces.append(iter_plotmon.traces[-1])
 
+                iter_plotmon.add(
+                    x=[0],
+                    y=[0],
+                    xlabel="iteration",
+                    subplot=xlabels_num + j + 1 + iter_start_idx,
+                    symbol="star",
+                    symbolSize=12,
+                    color=color_cycle[1]
+                )
+                self.iter_bever_traces.append(iter_plotmon.traces[-1])
+
     def update_plotmon_adaptive(self, force_update=False):
         if self.adaptive_function.__module__ == "cma.evolution_strategy":
             return self.update_plotmon_adaptive_cma(force_update=force_update)
@@ -1102,24 +1136,36 @@ class MeasurementControl(Instrument):
                     sweep_functions_num = len(self.sweep_functions)
                     detector_function_num = len(self.detector_function.value_names)
 
+                    # In case the dset is not complete yet
+                    # besteval_idxs = np.array(self.adaptive_besteval_indxs)
+                    len_dset = len(self.dset)
+                    # besteval_idxs = besteval_idxs[besteval_idxs < len(self.dset)]
                     # Update parameters' iterations
                     for k in range(sweep_functions_num):
                         y = self.dset[:, k]
-                        x = range(len(y))
+                        x = range(len_dset)
+                        besteval_idxs = np.array(self.adaptive_besteval_indxs)
+                        y_besteval = y[besteval_idxs]
                         self.iter_traces[k]["config"]["x"] = x
                         self.iter_traces[k]["config"]["y"] = y
+                        self.iter_bever_x_traces[k]["config"]["x"] = besteval_idxs
+                        self.iter_bever_x_traces[k]["config"]["y"] = y_besteval
                         self.time_last_ad_plot_update = time.time()
-                        self.secondary_QtPlot.update_plot()
+                    self.secondary_QtPlot.update_plot()
 
                     for j in range(detector_function_num):
                         y_ind = sweep_functions_num + j
                         y = self.dset[:, y_ind]
-                        x = range(len(y))
+                        x = range(len_dset)
+                        besteval_idxs = np.array(self.adaptive_besteval_indxs)
+                        y_besteval = y[besteval_idxs]
                         iter_traces_idx = j + sweep_functions_num
                         self.iter_traces[iter_traces_idx]["config"]["x"] = x
                         self.iter_traces[iter_traces_idx]["config"]["y"] = y
+                        self.iter_bever_traces[j]["config"]["x"] = besteval_idxs
+                        self.iter_bever_traces[j]["config"]["y"] = y_besteval
                         self.time_last_ad_plot_update = time.time()
-                        self.secondary_QtPlot.update_plot()
+                    self.secondary_QtPlot.update_plot()
             except Exception as e:
                 log.warning(e)
         self.update_plotmon_2D_interp(force_update=force_update)
@@ -1225,6 +1271,7 @@ class MeasurementControl(Instrument):
 
         self.iter_traces = []
         self.iter_bever_traces = []
+        self.iter_bever_x_traces = []
         self.iter_mean_traces = []
 
         # Use the secondary plot for iterations if not in 2D mode
@@ -1260,9 +1307,22 @@ class MeasurementControl(Instrument):
                 subplot=k + 1 + plot_num,
                 symbol="o",
                 symbolSize=5,
-                color=color_cycle[3],
+                color=color_cycle[2],
             )
             self.iter_traces.append(iter_plotmon.traces[-1])
+
+            iter_plotmon.add(
+                x=[0],
+                y=[0],
+                xlabel="iteration",
+                ylabel=xlabels[k],
+                yunit=xunits[k],
+                subplot=k + 1 + plot_num,
+                symbol="star",
+                symbolSize=12,
+                color=color_cycle[1],
+            )
+            self.iter_bever_x_traces.append(iter_plotmon.traces[-1])
 
         iter_plotmon.win.nextRow()
 
@@ -1352,14 +1412,18 @@ class MeasurementControl(Instrument):
                     best_index = int(self.opt_res_dset[-1, -1] - 1)
 
                     # Update parameters' iterations
+                    best_evals_idx = (self.opt_res_dset[:, -1] - 1).astype(int)
                     sweep_functions_num = len(self.sweep_functions)
                     for k in range(sweep_functions_num):
                         y = self.dset[:, k]
                         x = range(len(y))
                         self.iter_traces[k]["config"]["x"] = x
                         self.iter_traces[k]["config"]["y"] = y
+
+                        self.iter_bever_x_traces[k]["config"]["x"] = best_evals_idx
+                        self.iter_bever_x_traces[k]["config"]["y"] = y[best_evals_idx]
+
                         self.time_last_ad_plot_update = time.time()
-                        self.secondary_QtPlot.update_plot()
 
                     for j in range(len(self.detector_function.value_names)):
                         y_ind = nr_sweep_funcs + j
@@ -1405,7 +1469,6 @@ class MeasurementControl(Instrument):
 
                         # This plots the best ever measured value vs iteration
                         # number of evals column
-                        best_evals_idx = (self.opt_res_dset[:, -1] - 1).astype(int)
                         best_func_val = y[best_evals_idx]
                         self.iter_bever_traces[j]["config"]["x"] = best_evals_idx
                         self.iter_bever_traces[j]["config"]["y"] = best_func_val
@@ -1993,6 +2056,8 @@ class MeasurementControl(Instrument):
         # Determines if the optimization will minimize or maximize
         self.minimize_optimization = self.af_pars.pop("minimize", True)
         self.f_termination = self.af_pars.pop("f_termination", None)
+
+        self.adaptive_besteval_indxs = [0]
 
         # ensures the cma optimization results are saved during the experiment
         if (
