@@ -106,7 +106,8 @@ class Sequence:
         to be repeated.
         :param pulse_name: name of the pulse to repeat.
         :param operation_dict:
-        :param pattern: repetition pattern (n_repetitions, 1) (???) cf. Christian
+        :param pattern: repetition pattern (n_repetitions, nr_elements_per_loop or another loop-specification)
+                        cf. Christian
         :param pulse_channel_names: names of the channels on which the pulse is
         applied.
         :return:

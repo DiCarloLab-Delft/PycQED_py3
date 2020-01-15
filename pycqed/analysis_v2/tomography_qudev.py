@@ -239,6 +239,27 @@ def density_matrix_to_pauli_basis(rho):
           itertools.product(*[O1] * nr_qubits)]
     return np.array([(rho * O).tr().real for O in Os])
 
+def pauli_set_to_density_matrix(paulis):
+    """
+    Returns the expectation values for all combinations of Pauli operator
+    products. The dimension of the density matrix must be a power of two.
+    """
+    d2 = len(paulis)
+    if 4 ** ((d2.bit_length() - 1)//2) == d2:
+        nr_qubits = (d2.bit_length() - 1)//2
+        d = 2**nr_qubits
+    else:
+        raise ValueError(
+            'Dimension of the density matrix is not a power of '
+            'two.')
+
+    O1 = [qtp.qeye(2), qtp.sigmax(), qtp.sigmay(), qtp.sigmaz()]
+    Os = [qtp.Qobj(qtp.tensor(*O1s).full()) for O1s in
+          itertools.product(*[O1] * nr_qubits)]
+    rho = qtp.Qobj(dims=Os[0].dims)
+    for pauli, O in zip(paulis, Os):
+        rho += pauli*O
+    return rho/d
 
 def convert_to_density_matrix(rho):
     if not isinstance(rho, qtp.Qobj):

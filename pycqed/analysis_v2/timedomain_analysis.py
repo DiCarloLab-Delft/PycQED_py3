@@ -1994,24 +1994,31 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
         rotations = [qtp.Qobj(U) for U in rotations]
 
         all_Fs = tomo.rotated_measurement_operators(rotations, Fs)
-        all_Fs = list(itertools.chain(*np.array(all_Fs).T))
+        all_Fs = list(itertools.chain(*np.array(all_Fs, dtype=np.object).T))
         all_mus = np.array(list(itertools.chain(*data.T)))
         all_Omegas = sp.linalg.block_diag(*[Omega] * len(data[0]))
+
 
         self.proc_data_dict['meas_operators'] = all_Fs
         self.proc_data_dict['covar_matrix'] = all_Omegas
         self.proc_data_dict['meas_results'] = all_mus
 
-        rho_ls = tomo.least_squares_tomography(all_mus, all_Fs, all_Omegas)
-        self.proc_data_dict['rho_ls'] = rho_ls
-        self.proc_data_dict['rho'] = rho_ls
-        if self.options_dict.get('mle', False):
-            rho_mle = tomo.mle_tomography(all_mus, all_Fs, all_Omegas,
-                                          rho_guess=rho_ls)
-            self.proc_data_dict['rho_mle'] = rho_mle
-            self.proc_data_dict['rho'] = rho_mle
-        rho = self.proc_data_dict['rho']
+        if self.options_dict.get('pauli_raw', False):
+            pauli_raw = self.generate_raw_pauli_set()
+            rho_raw = tomo.pauli_set_to_density_matrix(pauli_raw)
+            self.proc_data_dict['rho_raw'] = rho_raw
+            self.proc_data_dict['rho'] = rho_raw
+        else:
+            rho_ls = tomo.least_squares_tomography(all_mus, all_Fs, all_Omegas)
+            self.proc_data_dict['rho_ls'] = rho_ls
+            self.proc_data_dict['rho'] = rho_ls
+            if self.options_dict.get('mle', False):
+                rho_mle = tomo.mle_tomography(all_mus, all_Fs, all_Omegas,
+                                              rho_guess=rho_ls)
+                self.proc_data_dict['rho_mle'] = rho_mle
+                self.proc_data_dict['rho'] = rho_mle
 
+        rho = self.proc_data_dict['rho']
         self.proc_data_dict['purity'] = (rho * rho).tr().real
 
         rho_target = metadata.get('rho_target', None)
@@ -2046,7 +2053,9 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                 ytick_labels = [r'$\langle' + lbl + '|$' for lbl in labels]
         color = (0.5 * np.angle(self.proc_data_dict['rho'].full()) / np.pi) % 1.
         cmap = self.options_dict.get('rho_colormap', self.default_phase_cmap())
-        if self.options_dict.get('mle', False):
+        if self.options_dict.get('pauli_raw', False):
+            title = 'Density matrix reconstructed from the Pauli set\n'
+        elif self.options_dict.get('mle', False):
             title = 'Maximum likelihood fit of the density matrix\n'
         else:
             title = 'Least squares fit of the density matrix\n'
@@ -2168,7 +2177,9 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                     [53, 54, 55, 57, 58, 59, 61, 62, 63]
         else:
             order = np.arange(4**nr_qubits)[1:]
-        if self.options_dict.get('mle', False):
+        if self.options_dict.get('pauli_raw', False):
+            fit_type = 'raw counts'
+        elif self.options_dict.get('mle', False):
             fit_type = 'maximum likelihood estimation'
         else:
             fit_type = 'least squares fit'
@@ -3064,7 +3075,9 @@ class MeasurementInducedDephasingAnalysis(MultiQubit_TimeDomain_Analysis):
                 'guess_dict': {'b': {'value': 0, 'vary': False}},
                 'fit_xvals': {'x': pdd['amps_reshaped']},
                 'fit_yvals': {'data': pdd['phase_offset'][qb]}}
+
             self.run_fitting()
+            self.save_fit_results()
 
             pdd['sigma'][qb] = self.fit_res[f'phase_contrast_fit_{qb}'].best_values['sigma']
             pdd['sigma_err'][qb] = self.fit_res[f'phase_contrast_fit_{qb}'].params['sigma']. \

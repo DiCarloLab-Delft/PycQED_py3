@@ -1524,17 +1524,23 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                  'blue':  [(v[i], c[i][2], c[i][2]) for i in range(len(v))]}
         cm = mc.LinearSegmentedColormap('customcmap', cdict)
 
-        if only_odd:
-            ylist = list(range(int(self.n_readouts/2)))
-            plt_data = self.proc_data_dict['probability_table'][1::2].T
+        plot_filter = self.options_dict.get('plot_filter', None)
+        if plot_filter is not None:
+            plt_data = plot_filter(self.proc_data_dict['probability_table']).T
         else:
-            ylist = list(range(self.n_readouts))
-            plt_data = self.proc_data_dict['probability_table'].T
+            if only_odd:
+                plt_data = self.proc_data_dict['probability_table'][1::2].T
+            else:
+                plt_data = self.proc_data_dict['probability_table'].T
+        ylist = list(range(len(plt_data.T)))
+        obs_filter = self.options_dict.get('obs_filter', np.arange(len(self.observables)))
+
+        plt_data = plt_data[obs_filter]
 
         plot_dict = {
             'axid': "ptable",
             'plotfn': self.plot_colorx,
-            'xvals': np.arange(len(self.observables)),
+            'xvals': np.arange(len(self.observables))[obs_filter],
             'yvals': np.array(len(self.observables)*[ylist]),
             'zvals': plt_data,
             'xlabel': "Channels",
@@ -1545,8 +1551,8 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                       self.raw_data_dict['measurementstring'][0]),
             'xunit': None,
             'yunit': None,
-            'xtick_loc': np.arange(len(self.observables)),
-            'xtick_labels': list(self.observables.keys()),
+            'xtick_loc': np.arange(len(self.observables))[obs_filter],
+            'xtick_labels': list(np.array(list(self.observables.keys()))[obs_filter]),
             'origin': 'upper',
             'cmap': cm,
             'aspect': 'equal',
@@ -1634,7 +1640,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         try:
             cal_points_list = convert_channel_names_to_index(
                 self.options_dict.get('cal_points'), self.n_readouts,
-                self.raw_data_dict['value_names'][0]
+                self.raw_data_dict['value_names']
             )
         except KeyError:
             cal_points_list = convert_channel_names_to_index(
@@ -1642,6 +1648,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                 list(self.channel_map.keys())
             )
         self.proc_data_dict['cal_points_list'] = cal_points_list
+        
         means = np.zeros((len(cal_points_list), len(observables)))
         cal_readouts = set()
         for i, cal_point in enumerate(cal_points_list):
@@ -1987,6 +1994,7 @@ def convert_channel_names_to_index(cal_points, nr_segments, value_names):
     Returns:
         cal_points_list in the converted format
     """
+    
     cal_points_list = []
     for observable in cal_points:
         if isinstance(observable, (list, np.ndarray)):
