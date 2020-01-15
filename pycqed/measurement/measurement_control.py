@@ -1158,8 +1158,7 @@ class MeasurementControl(Instrument):
                 parameter_list = dict_to_ordered_tuples(par_snap)
                 for (p_name, p) in parameter_list:
                     try:
-                        # val = repr(p['value'])
-                        val = str(p['value'])
+                        val = repr(p['value'])
                     except KeyError:
                         val = ''
                     instrument_grp.attrs[p_name] = val
