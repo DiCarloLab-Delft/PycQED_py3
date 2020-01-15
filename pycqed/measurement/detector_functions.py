@@ -28,6 +28,8 @@ class Detector_Function(object):
         self.set_kw()
         self.value_names = ['val A', 'val B']
         self.value_units = ['arb. units', 'arb. units']
+        # to be used by MC.get_percdone()
+        self.acq_data_len_scaling = 1
 
     def set_kw(self, **kw):
         '''
@@ -501,6 +503,9 @@ class UHFQC_multi_detector(UHFQC_Base):
                     raise Exception('Not all AWG instances in UHFQC_multi_...  '
                                     'are the same')
                 d.AWG = None
+        # to be used in MC.get_percdone()
+        self.acq_data_len_scaling = \
+            self.detectors[0].acquired_data_len_scaling
 
     def prepare(self, sweep_points):
         for d in self.detectors:
@@ -513,7 +518,6 @@ class UHFQC_multi_detector(UHFQC_Base):
                           for UHF, d in raw_data.items()]
 
         return np.concatenate(processed_data)
-
 
     def finish(self):
         if self.AWG is not None:
@@ -1081,6 +1085,8 @@ class UHFQC_integration_logging_det(UHFQC_Base):
         self.AWG = AWG
         self.integration_length = integration_length
         self.nr_shots = nr_shots
+        # to be used in MC.get_percdone()
+        self.acq_data_len_scaling = self.nr_shots
 
         # 0/1/2 crosstalk supressed /digitized/raw
         res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}

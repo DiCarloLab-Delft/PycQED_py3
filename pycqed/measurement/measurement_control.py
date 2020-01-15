@@ -154,6 +154,9 @@ class MeasurementControl(Instrument):
         # used for determining data writing indices and soft averages
         self.total_nr_acquired_values = 0
 
+        # used in get_percdone to scale the length of acquired data
+        self.acq_data_len_scaling = self.detector_function.acq_data_len_scaling
+
         # needs to be defined here because of the with statement below
         return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
@@ -1207,7 +1210,7 @@ class MeasurementControl(Instrument):
         h5d.write_dict_to_hdf5(metadata, entry_point=metadata_group)
 
     def get_percdone(self):
-        percdone = (self.total_nr_acquired_values)/(
+        percdone = self.total_nr_acquired_values/self.acq_data_len_scaling/(
             np.shape(self.get_sweep_points())[0]*self.soft_avg())*100
         return percdone
 
