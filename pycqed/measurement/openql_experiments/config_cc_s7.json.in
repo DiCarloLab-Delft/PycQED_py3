@@ -1049,6 +1049,16 @@
                 "signal_ref": "single-qubit-flux",
                 "static_codeword_override": 5
             }
+        },
+        "sf_square": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "signal_ref": "single-qubit-flux",
+                "static_codeword_override": 6
+            }
         }
 	},	// end of "instructions"
 

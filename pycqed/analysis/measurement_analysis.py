@@ -4927,7 +4927,6 @@ class Ramsey_Analysis(TD_Analysis):
 
         if print_fit_results:
             print(fit_res.fit_report())
-
         return fit_res
 
     def plot_results(self, fit_res, show_guess=False, art_det=0,

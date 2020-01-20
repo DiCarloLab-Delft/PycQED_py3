@@ -2232,6 +2232,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_shots, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
+        # data = np.array([data_raw[key][-1]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC

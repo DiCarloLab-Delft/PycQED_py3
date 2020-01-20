@@ -515,7 +515,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str):
         on:  (RO) - prepz - x180 - RO
     Args:
         qubit_idx (int) :
-        pulse_comb (str): What pulses to play valid options are
+        pulse_comb (list): What pulses to play valid options are
             "off", "on", "off_on"
         initialize (bool): if True does an extra initial measurement to
             post select data.
@@ -779,12 +779,12 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-        k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 0) #alignment workaround
+        k.gate("wait", [], 0) #alignment workaround
         # k.gate(flux_cw, [2, 0])
         k.gate('sf_square', [qubit_idx])
         if t_nanoseconds > 10:
             # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
-            k.gate("wait", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], t_nanoseconds) #alignment workaround
+            k.gate("wait", [], t_nanoseconds) #alignment workaround
             # k.gate("wait", [qubit_idx], t_nanoseconds)
         k.gate('rx90', [qubit_idx])
         k.measure(qubit_idx)

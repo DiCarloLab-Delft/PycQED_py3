@@ -1654,6 +1654,16 @@ setTrigger(0);
         else:
             raise ValueError('Invalid feedline {} selected for calibration.'.format(feedline))
 
+    def _prepare_CC_dio_calibration(self, CC, verbose=False):
+        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                                      '..', 'examples','CC_examples',
+                                      'uhfqc_calibration.vq1asm'))
+
+        # Set the DIO calibration mask to enable 9 bit measurement
+        self._dio_calibration_mask = 0x1ff
+        CC.eqasm_program(test_fp)
+        CC.start()
+
     def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
         """Configures a QCC with a default program that generates data suitable for DIO calibration. Also starts the QCC."""
 
@@ -1717,9 +1727,7 @@ while (1) {
         elif 'HDAWG8' in CC_model:
             self._prepare_HDAWG8_dio_calibration(HDAWG=CC, verbose=verbose)
         elif 'cc' in CC_model:
-            # expected_sequence = self._prepare_CC_dio_calibration(
-            #     CC=CC, verbose=verbose)
-            return
+            self._prepare_CC_dio_calibration(CC=CC, verbose=verbose)
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
