@@ -188,8 +188,11 @@ class Base_MW_LutMan(Base_LutMan):
         # lutmap is expected to obey lutmap mw schema
         for idx, waveform in self.LutMap().items():
             if waveform['type'] == 'ge':
-                amp = theta_to_amp(theta=waveform['theta'],
-                                   amp180=self.mw_amp180())
+                if abs(waveform['theta']) == 90:
+                    amp = self.mw_amp180()*self.mw_amp90_scale()
+                else:
+                    amp = theta_to_amp(theta=waveform['theta'],
+                                       amp180=self.mw_amp180())
                 self._wave_dict[idx] = self.wf_func(
                     amp=amp,
                     phase=waveform['phi'],
