@@ -11,7 +11,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 class Test_QutechCC(unittest.TestCase):
     def test_all(self):
         file_name = 'Test_QutechCC_test_all.scpi.txt'
-        test_path = Path('test_output' / file_name)
+        test_path = Path('test_output') / file_name
         os.makedirs('test_output', exist_ok=True)
 
         transport = FileTransport(str(test_path))
@@ -63,6 +63,6 @@ class Test_QutechCC(unittest.TestCase):
 
         # check results
         test_output = test_path.read_text()
-        golden_path = Path(pq.__path__[0] / 'tests/instrument_drivers/physical_instruments/golden' / file_name)
+        golden_path = Path(pq.__path__[0]) / 'tests/instrument_drivers/physical_instruments/golden' / file_name
         golden = golden_path.read_text()
         self.assertEqual(test_output, golden)

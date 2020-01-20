@@ -93,26 +93,26 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
 
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
                            platf_cfg: str, trigger_idx: int,
-                           wait_time_ns: int = 0, cc: str='CCL',spec_instr:float ='spec'):
+                           wait_time_ns: int = 0, cc: str='CCL'):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
-    this one triggers the 0th trigger port of the CCLight and usus the zeroth
+    this one triggers the 0th trigger port of the CCLight and uses the zeroth
     wave output on the AWG (currently hardcoded, should be improved)
-
+    FIXME: comment outdated
     """
     p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
     k = oqh.create_kernel("main", p)
 
     nr_clocks = int(spec_pulse_length/20e-9)
-    print('Adding {} to spec seq'.format(wait_time_ns))
+    print('Adding {} [ns] to spec seq'.format(wait_time_ns))
     if cc=='CCL':
         spec_instr = 'spec'
     elif cc=='QCC':
         spec_instr = 'sf_square'
-    elif cc=='cc':
+    elif cc=='CC':
         spec_instr = 'spec'
     else:
-        raise ValuerError('CC type not understood: {}'.format(cc))
+        raise ValueError('CC type not understood: {}'.format(cc))
 
 
     for i in range(nr_clocks):
@@ -773,9 +773,9 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
     # don't use last 4 points if calibration points are used
     if cal_points:
         times = times[:-4]
-    for t in times:
+    for i_t,t in enumerate(times):
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi_flux_pi', p)
+        k = oqh.create_kernel('pi_flux_pi_{}'.format(i_t), p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
@@ -807,10 +807,10 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
 
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
 
-    for t in times:
+    for i_t,t in enumerate(times):
 
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel("pi-flux-pi", p)
+        k = oqh.create_kernel("pi-flux-pi_{}".format(i_t), p)
         k.prepz(q0)
         k.prepz(q1)
 

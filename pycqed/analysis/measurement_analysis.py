@@ -12,6 +12,7 @@ from pycqed.analysis import fitting_models as fit_mods
 import pycqed.measurement.hdf5_data as h5d
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.optimize as optimize
+from scipy import stats
 import lmfit
 from collections import Counter  # used in counting string fractions
 import textwrap
@@ -283,7 +284,7 @@ class MeasurementAnalysis(object):
                    len(self.get_key('sweep_parameter_names')))
             values = self.g['Data'].value[:, ind]
         else:
-            values = self.g[key].value
+            values = self.g[key][()] # changed deprecated self.g[key].value => self.g[key][()]
         # Makes sure all data is np float64
         return np.asarray(values, dtype=np.float64)
 
@@ -4177,18 +4178,18 @@ class SSRO_Analysis(MeasurementAnalysis):
             norm0 = (bins0[1] - bins0[0]) * min_len
             norm1 = (bins1[1] - bins1[0]) * min_len
 
-            y0 = norm0 * (1 - frac1_0) * pylab.normpdf(bins0, mu0_0, sigma0_0) + \
-                norm0 * frac1_0 * pylab.normpdf(bins0, mu1_0, sigma1_0)
-            y1_0 = norm0 * frac1_0 * pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y0 = norm0 * (1 - frac1_0) * stats.norm.pdf(bins0, mu0_0, sigma0_0) + \
+                norm0 * frac1_0 * stats.norm.pdf(bins0, mu1_0, sigma1_0)
+            y1_0 = norm0 * frac1_0 * stats.norm.pdf(bins0, mu1_0, sigma1_0)
             y0_0 = norm0 * (1 - frac1_0) * \
-                pylab.normpdf(bins0, mu0_0, sigma0_0)
+                stats.norm.pdf(bins0, mu0_0, sigma0_0)
 
             # building up the histogram fits for on measurements
-            y1 = norm1 * (1 - frac1_1) * pylab.normpdf(bins1, mu0_1, sigma0_1) + \
-                norm1 * frac1_1 * pylab.normpdf(bins1, mu1_1, sigma1_1)
-            y1_1 = norm1 * frac1_1 * pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y1 = norm1 * (1 - frac1_1) * stats.norm.pdf(bins1, mu0_1, sigma0_1) + \
+                norm1 * frac1_1 * stats.norm.pdf(bins1, mu1_1, sigma1_1)
+            y1_1 = norm1 * frac1_1 * stats.norm.pdf(bins1, mu1_1, sigma1_1)
             y0_1 = norm1 * (1 - frac1_1) * \
-                pylab.normpdf(bins1, mu0_1, sigma0_1)
+                stats.norm.pdf(bins1, mu0_1, sigma0_1)
 
             pylab.semilogy(bins0, y0, 'C0', linewidth=1.5)
             pylab.semilogy(bins0, y1_0, 'C0--', linewidth=3.5)
@@ -4411,15 +4412,15 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
-                ax.ticklabel_format(style='sci', fontsize=4,
+                ax.ticklabel_format(style='sci',
                                     scilimits=(0, 0))
                 set_xlabel(ax, 'I', self.value_units[0])
                 edge = max(max(abs(xedges)), max(abs(yedges)))
                 ax.set_xlim(-edge, edge)
                 ax.set_ylim(-edge, edge)
-                # ax.set_axis_bgcolor(plt.cm.viridis(0))
+
             set_ylabel(axs[0], 'Q', self.value_units[1])
-            # axs[0].ticklabel_format(style = 'sci',  fontsize=4)
+
 
             self.save_fig(
                 fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
@@ -8079,15 +8080,15 @@ class Resonator_Powerscan_Analysis_test(MeasurementAnalysis):
         shift = 0
         shift_data=[]
         for i in range(len(f0)):
-            if (f0[0] - f0[-1]) > 200e3: 
+            if (f0[0] - f0[-1]) > 200e3:
                 shift = f0[0] - f0[-1]
-            elif (f0[0] - f0[i]) > 200e3 : 
+            elif (f0[0] - f0[i]) > 200e3 :
                 shifts= f0[0] - f0[i]
                 shift_data.append(shifts)
                 shift=np.amax(shift_data)
             else:
                 logging.warning('No power shift found. Consider attenuation')
-                
+
         # if (f_high < f_low):
         #     shift = f_high - f_low
         # else:

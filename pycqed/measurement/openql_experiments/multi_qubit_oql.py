@@ -548,11 +548,11 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
 
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
 
-    for t in times:
+    for i_t,t in enumerate(times):
 
         t_nanoseconds = int(round(t/1e-9))
 
-        k = oqh.create_kernel("RamZ_X", p)
+        k = oqh.create_kernel("RamZ_X_{}".format(i_t), p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
@@ -564,7 +564,7 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-        k = oqh.create_kernel("RamZ_Y", p)
+        k = oqh.create_kernel("RamZ_Y_{}".format(i_t), p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
@@ -796,7 +796,7 @@ def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
     p = oqh.create_program("two_qubit_ramsey", platf_cfg)
 
     for i, time in enumerate(times):
-        k = oqh.create_kernel("two_qubit_ramsey", p)
+        k = oqh.create_kernel("two_qubit_ramsey_{}".format(i), p)
         k.prepz(qubit_idx)
 
         if target_qubit_sequence == 'ramsey':
@@ -871,9 +871,9 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate(prep_pulse_q1, [q1])
             # FIXME hardcoded edge because of
             # brainless "directed edge recources" in compiler
-            k.gate("wait", list(np.arange(17)),  0) #alignment workaround
+            k.gate("wait", [],  0)# Empty list generates barrier for all qubits in platf. only works with 0.8.0
             k.gate('cz', [q0, q1])
-            k.gate("wait", list(np.arange(17)),  0) #alignment workaround
+            k.gate("wait", [],  0)
             # after-rotations
             k.gate(after_pulse_q1, [q1])
             # possibly wait
@@ -1330,6 +1330,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
             pulses
     '''
     p = oqh.create_program("conditional_oscillation_seq", platf_cfg)
+
     # These angles correspond to special pi/2 pulses in the lutman
     for i, angle in enumerate(angles):
         for case in cases:
@@ -1344,7 +1345,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 k.gate('rx180', [q1])
             k.gate('rx90', [q0])
             if not CZ_disabled:
-                k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+                k.gate("wait", [], 0) # Empty list generates barrier for all qubits in platf. only works with 0.8.0
                 k.gate(flux_codeword, [q0, q1])
 
                 # sometimes we want to move another qubit out of the way using
@@ -1362,11 +1363,11 @@ def conditional_oscillation_seq(q0: int, q1: int,
                         'flux_codeword_park "{}" not allowed'.format(
                             flux_codeword_park))
 
-                k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+                k.gate("wait", [], 0) #alignment workaround
             else:
-                k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+                k.gate("wait", [], 0) #alignment workaround
                 k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
-                k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+                k.gate("wait", [], 0) #alignment workaround
 
             if wait_time_after > 0:
                 k.gate('wait', [q0,q1], wait_time_after)
@@ -1876,14 +1877,16 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
     tomo_gates = [('i', 'i'), ('i', 'rx180'), ('rx180', 'i'), ('rx180', 'rx180'),
                   ('ry90', 'ry90'), ('rym90', 'rym90'), ('rx90', 'rx90'), ('rxm90', 'rxm90')]
 
-    for gates in tomo_gates:
+    for i_g, gates in enumerate(tomo_gates):
+        idx_g0 = i_g % 6
+        idx_g1 = ((i_g - idx_g0)//6) % 6
         # strings denoting the gates
         SP0 = cardinal_gates[idx_p0]
         SP1 = cardinal_gates[idx_p1]
         t_q0 = gates[1]
         t_q1 = gates[0]
         k = oqh.create_kernel(
-            'PT_{}_tomo_{}_{}'.format(cardinal, idx_p0, idx_p1), p)
+            'PT_{}_tomo_{}_{}'.format(cardinal, idx_g0, idx_g1), p)
 
         k.prepz(q0)
         k.prepz(q1)

@@ -22,7 +22,6 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQC import dummy_UHFQC
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
@@ -436,7 +435,7 @@ class Test_CC(Test_CCL):
     @classmethod
     def setUpClass(self):
         super().setUpClass()
-        self.CC = QuTechCC('CC', DummyTransport())
+        self.CC = QuTechCC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
         self.CCL_qubit.instr_CC(self.CC.name)
 
         config_fn = os.path.join(

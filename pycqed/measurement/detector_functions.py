@@ -125,7 +125,7 @@ class Multi_Detector(Detector_Function):
         detectors     (list):
             a list of detectors to combine.
         det_idx_prefix(bool):
-            if True suffixes the value names with
+            if True prefixes the value names with
         detector_labels (list):
             if not None, will be used instead instead of
             "det{idx}_" as a prefix for the different channels
@@ -142,6 +142,8 @@ class Multi_Detector(Detector_Function):
                     else:
                         val_name = detector_labels[i] + \
                             ' ' + detector_value_name
+                else:
+                    val_name = detector_value_name
                 self.value_names.append(val_name)
             for detector_value_unit in detector.value_units:
                 self.value_units.append(detector_value_unit)
@@ -1645,13 +1647,14 @@ class UHFQC_spectroscopy_detector(Soft_Detector):
                  AWG=None, channels=(0, 1),
                  nr_averages=1024, integration_length=4096, **kw):
         super().__init__()
+        # FIXME: code commented out, some __init__ parameters no longer used
         #UHFQC=UHFQC, AWG=AWG, channels=channels,
         # nr_averages=nr_averages, nr_samples=nr_samples, **kw
         self.UHFQC = UHFQC
         self.ro_freq_mod = ro_freq_mod
 
     def acquire_data_point(self):
-        RESULT_LENGTH = 1600
+        RESULT_LENGTH = 1600  # FIXME: hardcoded
         vals = self.UHFQC.acquisition(
             samples=RESULT_LENGTH, acquisition_time=0.010, timeout=10)
         a = max(np.abs(fft.fft(vals[0][1:int(RESULT_LENGTH/2)])))
@@ -1843,8 +1846,20 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
 
+        # 191216 Thijs, Tumi and Adriaan investigated a bug related to this.
+        # we do not understand this line added by Ramiro and Hani. and find it breaks things.
+        # Commenting out. To be removed if not discussed before March 2020.
+        # if len(data_raw[next(iter(data_raw))])>1:
+        #     # Not clear why this should give an Error, FIXME clarify with comments.
+        #     log.warning('[DEBUG UHF detector] SHOULD HAVE HAD AN ERROR')
+        # # [-1] in data_ray is not clear
+        # data = np.array([data_raw[key][-1]
+
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
+        log.debug('[UHF detector] RAW shape',[data_raw[key]
+                         for key in sorted(data_raw.keys())])
+        log.debug('[UHF detector] shape 1',data.shape)
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':

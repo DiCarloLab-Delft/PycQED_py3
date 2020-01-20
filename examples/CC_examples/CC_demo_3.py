@@ -220,7 +220,7 @@ cc.clear_status()
 cc.status_preset()
 
 log.debug('uploading program to CC')
-cc.sequence_program(prog)
+cc.sequence_program_assemble(prog)
 if cc.get_assembler_error() != 0:
     sys.stderr.write('error log = {}\n'.format(cc.get_assembler_log()))  # FIXME: result is messy
     log.warning('assembly failed')
