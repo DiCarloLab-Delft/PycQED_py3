@@ -127,7 +127,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         super().__init__(name=name, device=device, interface=interface, server=server, port=port, num_codewords=num_codewords, **kw)
         # Set default waveform length to 20 ns at 2.4 GSa/s
         self._default_waveform_length = 48
-        
+
         # Holds the DIO calibration delay
         self._dio_calibration_delay = 0
 
@@ -477,7 +477,7 @@ while (1) {
         log.info('Setting DIO calibration delay to {}'.format(value))
         # Store the value
         self._dio_calibration_delay = value
-        
+
         # And configure the delays
         self.setd('raw/dios/0/delays/*', self._dio_calibration_delay)
 
@@ -694,8 +694,8 @@ while (1) {
             staircase_sequence = range(0, sequence_length)
             expected_sequence = [(0, list(staircase_sequence)), \
                                  (1, list(staircase_sequence)), \
-                                 (2, list(reversed(staircase_sequence))), \
-                                 (3, list(reversed(staircase_sequence)))]
+                                 (2, list(staircase_sequence)), \
+                                 (3, list(staircase_sequence))]
 
         elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
             raise NotImplementedError
