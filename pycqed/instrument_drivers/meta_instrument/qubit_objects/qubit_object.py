@@ -315,8 +315,8 @@ class Qubit(Instrument):
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
 
-    def find_resonators(self, start_freq=6.9e9, stop_freq=7.9e9, VNA_power=-40,
-                        bandwidth=200, timeout=200, f_step=250e3, with_VNA=None,
+    def find_resonators(self, start_freq=6.9e9, stop_freq=8.1e9, VNA_power=-40,
+                        bandwidth=200, timeout=200, f_step=1e6, with_VNA=None,
                         verbose=True):
         """
         Performs a wide range scan to find all resonator dips. Will use VNA if
@@ -342,10 +342,7 @@ class Qubit(Instrument):
         if with_VNA:
             raise NotImplementedError
         else:
-            self.ro_pulse_amp(0.08)
-            self.ro_pulse_amp_CW(0.06)
-            self.ro_acq_averages(2**10)
-            self.ro_soft_avg(1)
+
             freqs = np.arange(start_freq, stop_freq + f_step, f_step)
             self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
             result = ma2.sa.Initial_Resonator_Scan_Analysis()
@@ -430,8 +427,8 @@ class Qubit(Instrument):
 
         return True
 
-    def find_resonator_frequency_initial(self, start_freq=6.9e9, stop_freq=7.9e9,
-                                         npts=50001, use_min=False, MC=None,
+    def find_resonator_frequency_initial(self, start_freq=6.9e9, stop_freq=8.1e9,
+                                         npts=50001, use_min=True, MC=None,
                                          update=True, with_VNA=None,
                                          resonators=None, look_for_missing=True):
         """
@@ -561,7 +558,7 @@ class Qubit(Instrument):
         #                         res.freq = a.fit_results.params['f0'].value*1e9
         # return True
 
-    def measure_individual_resonators(self, with_VNA=False, use_min=False):
+    def measure_individual_resonators(self, with_VNA=False, use_min=True):
         """
         Specifically designed for use in automation, not recommended to use by
         hand!
@@ -580,8 +577,8 @@ class Qubit(Instrument):
             else:
                 old_avger=self.ro_acq_averages()
                 self.ro_acq_averages(2**14)
-                self.ro_pulse_amp(0.08)
-                self.ro_pulse_amp_CW(0.06)
+                self.ro_pulse_amp(0.1)
+                self.ro_pulse_amp_CW(0.2)
                 freqs = np.arange(freq - 5e6, freq + 5e6, 50e3)
                 label = '_{:.3f}_{}'.format(str_freq, unit)
                 name = 'Resonator_scan' + self.msmt_suffix + label
@@ -986,8 +983,8 @@ class Qubit(Instrument):
             freq_res_par = self.f_res
             freq_RO_par = self.f_RO
 
-        old_avg = self.ro_acq_averages()
-        self.ro_acq_averages(2**14)
+        #old_avg = self.ro_acq_averages()
+        #self.ro_acq_averages(2**14)
 
         if freqs is None:
             f_center = freq_res_par()
@@ -999,7 +996,7 @@ class Qubit(Instrument):
         self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
         a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-        self.ro_acq_averages(old_avg)
+        #self.ro_acq_averages(old_avg)
 
         if use_min:
             f_res = a.min_frequency
