@@ -122,27 +122,36 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             #               calibrate_function=Qubit.name + '.measure_flux_arc_tracked_spectroscopy')
 
             # Validate qubit calibration
-            # self.add_node(Qubit.name + ' ALLXY',
-            #               calibrate_function=Qubit.name + '.calibrate_mw_gates_allxy')
+            self.add_node(Qubit.name + ' ALLXY',
+                          calibrate_function=Qubit.name + '.calibrate_mw_gates_allxy2')
             # self.add_node(Qubit.name + ' MOTZOI Calibration',
             #               calibrate_function=Qubit.name + '.calibrate_motzoi')
+            self.add_node(Qubit.name + ' Acquisition Delay Calibration',
+                          calibrate_function=Qubit.name + '.measure_ssro')
+            self.add_node(Qubit.name + ' Dispersive Shift',
+                          calibrate_function=Qubit.name + '.measure_dispersive_shift_pulsed')
+            self.add_node(Qubit.name + ' SSRO Coarse tune-up',
+                          calibrate_function=Qubit.name + '.measure_ssro')
+            self.add_node(Qubit.name + ' SSRO Optimization',
+                          calibrate_function=Qubit.name + '.measure_ssro')
+
 
             # If all goes well, the qubit is fully 'calibrated' and can be controlled
 
             # Qubits measurements
             self.add_node(Qubit.name + ' Anharmonicity',
-                           calibrate_function = Qubit.name + '.measure_anharmonicity_test')  
+                           calibrate_function = Qubit.name + '.measure_anharmonicity_test')
             # self.add_node(Qubit.name + ' Avoided Crossing')
             self.add_node(Qubit.name + ' T1',
                            calibrate_function = Qubit.name + '.measure_T1')
-            # self.add_node(Qubit.name + ' T1(time)')            
+            # self.add_node(Qubit.name + ' T1(time)')
             # self.add_node(Qubit.name + ' T1(frequency)')
             self.add_node(Qubit.name + ' T2_Echo',
-                           calibrate_function = Qubit.name + '.measure_echo')                    
+                           calibrate_function = Qubit.name + '.measure_echo')
             # self.add_node(Qubit.name + ' T2_Echo(time)')
             # self.add_node(Qubit.name + ' T2_Echo(frequency)')
             self.add_node(Qubit.name + ' T2_Star',
-                           calibrate_function = Qubit.name + '.measure_ramsey')                    
+                           calibrate_function = Qubit.name + '.measure_ramsey')
             # self.add_node(Qubit.name + ' T2_Star(time)')
             # self.add_node(Qubit.name + ' T2_Star(frequency)')
             ###################################################################
@@ -192,12 +201,22 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             self.add_edge(Qubit.name + ' Frequency at Sweetspot',
                           Qubit.name + ' Sweetspot')
 
-            # self.add_edge(Qubit.name + ' ALLXY',
-            #               Qubit.name + ' Rabi')
-            # self.add_edge(Qubit.name + ' ALLXY',
-            #               Qubit.name + ' Frequency Fine')
+            self.add_edge(Qubit.name + ' ALLXY',
+                          Qubit.name + ' Rabi')
+            self.add_edge(Qubit.name + ' ALLXY',
+                          Qubit.name + ' Frequency Fine')
             # self.add_edge(Qubit.name + ' ALLXY',
             #               Qubit.name + ' MOTZOI Calibration')
+            self.add_edge(Qubit.name + ' Acquisition Delay Calibration',
+                          Qubit.name + ' Rabi')
+            self.add_edge(Qubit.name + ' Dispersive Shift',
+                          Qubit.name + ' Rabi')
+            self.add_edge(Qubit.name + ' SSRO Coarse tune-up',
+                          Qubit.name + ' Dispersive Shift')
+            self.add_edge(Qubit.name + ' SSRO Coarse tune-up',
+                          Qubit.name + ' Acquisition Delay Calibration')
+            self.add_edge(Qubit.name + ' SSRO Optimization',
+                          Qubit.name + ' SSRO Coarse tune-up')
 
             self.add_edge(Qubit.name + ' T1',
                           Qubit.name + ' Frequency Fine')
@@ -205,7 +224,7 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           Qubit.name + ' Frequency Fine')
             self.add_edge(Qubit.name + ' T2_Star',
                           Qubit.name + ' Frequency Fine')
-            
+
             # Perform initial measurements to see if they make sense
             # self.add_edge(Qubit.name + ' T1',
             #               Qubit.name + ' ALLXY')
