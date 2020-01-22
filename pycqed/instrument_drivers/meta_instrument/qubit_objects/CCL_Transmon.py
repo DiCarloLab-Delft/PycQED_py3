@@ -752,6 +752,10 @@ class CCLight_Transmon(Qubit):
                            # typical target value
                            initial_value=-300e6,
                            vals=vals.Numbers())
+        self.add_parameter('dispersive_shift',
+                           label='Resonator dispersive shift', unit='Hz',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
 
         self.add_parameter('F_ssro',
                            initial_value=0,
@@ -3587,6 +3591,10 @@ class CCLight_Transmon(Qubit):
             else:
                 freqs = self.freq_res()+np.arange(-10e6, 10e6, .1e6)
 
+        if 'optimal' in self.ro_acq_weight_type():
+            raise ImplementationError(
+                    "Change readout demodulation to SSB.")
+
         self.prepare_for_timedomain()
         # off/on switching is achieved by turning the MW source on and
         # off as this is much faster than recompiling/uploading
@@ -3614,6 +3622,7 @@ class CCLight_Transmon(Qubit):
                 # fit converts to Hz
                 f_res.append(a.fit_results.params['f0'].value*1e9)
         if analyze:
+            self.dispersive_shift(f_res[1]-f_res[0])
             print('dispersive shift is {} MHz'.format((f_res[1]-f_res[0])*1e-6))
         return True
 
