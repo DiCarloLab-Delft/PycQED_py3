@@ -352,8 +352,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit', 'population_02_state',
                             'cond_phase02', 'coherent_leakage11', 'offset_difference', 'missing_fraction', '12_21_population_transfer', '12_03_population_transfer',
-                            'phase_diff_12_02', 'phase_diff_21_20', 'cond_phase12', 'cond_phase21', 'cond_phase03', 'cond_phase20']
-        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%', '%', '%', 'deg', 'deg', 'deg', 'deg', 'deg', 'deg']
+                            'phase_diff_12_02', 'phase_diff_21_20', 'cond_phase12', 'cond_phase21', 'cond_phase03', 'cond_phase20',
+                            'population_transfer_11_20', 'population_transfer_01_10']
+        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%', '%', 'deg', '%', '%', '%', '%', '%', 'deg', 'deg', 'deg', 'deg', 'deg', 'deg',
+        					'%', '%']
 
         self.qois = qois
         if self.qois != 'all': 
@@ -443,7 +445,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 if U_final_vec[i].type == 'oper':
                     U_final_vec[i] = qtp.to_super(U_final_vec[i])           # weighted averaging needs to be done for superoperators
                 U_final_vec[i] = U_final_vec[i] * weights[i]
-            U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting average propagator
+            U_superop_average = sum(U_final_vec)            # computing resulting average propagator
             #print(czf.verify_CPTP(U_superop_average))
 
 
@@ -460,7 +462,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                              qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100, qoi['population_02_state']*100,
                              qoi['cond_phase02'], qoi['coherent_leakage11']*100, qoi['offset_difference']*100, qoi['missing_fraction']*100, 
                              qoi['population_transfer_12_21']*100,qoi['population_transfer_12_03']*100,
-                             qoi['phase_diff_12_02'], qoi['phase_diff_21_20'], qoi['cond_phase12'], qoi['cond_phase21'], qoi['cond_phase03'], qoi['cond_phase20']]
+                             qoi['phase_diff_12_02'], qoi['phase_diff_21_20'], qoi['cond_phase12'], qoi['cond_phase21'], qoi['cond_phase03'], qoi['cond_phase20'],
+                             qoi['population_transfer_11_20']*100, qoi['population_transfer_01_10']*100]
             qoi_vec=np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
 
@@ -485,7 +488,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             qoi_plot[0,4], qoi_plot[0,5], qoi_plot[0,6], \
             qoi_plot[0,7], qoi_plot[0,8], qoi_plot[0,9], qoi_plot[0,10], \
             qoi_plot[0,11], qoi_plot[0,12], qoi_plot[0,13], qoi_plot[0,14], qoi_plot[0,15], qoi_plot[0,16], qoi_plot[0,17], qoi_plot[0,18],
-            qoi_plot[0,19], qoi_plot[0,20], qoi_plot[0,21], qoi_plot[0,22]]
+            qoi_plot[0,19], qoi_plot[0,20], qoi_plot[0,21], qoi_plot[0,22],
+            qoi_plot[0,23], qoi_plot[0,24]]
         if self.qois != 'all': 
             return np.array(return_values)[self.qoi_mask]
             

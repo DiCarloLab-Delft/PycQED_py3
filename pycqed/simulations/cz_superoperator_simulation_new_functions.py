@@ -870,25 +870,15 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
     if T2_q0_amplitude_dependent[0] != -1:
 
         f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()))
-        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()))
-        for i in range(len(sensitivity)):
-            if sensitivity[i] < 0.1:
-                sensitivity[i] = 0.1
-        inverse_sensitivity = 1/sensitivity
-        T2_q0_vec=linear_with_offset(inverse_sensitivity,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1])
-        for i in range(len(sensitivity)):    # manual fix for the TLS coupled at the sweetspot for Niels' Purcell device
-            if sensitivity[i] <= 0.2:
-                T2_q0_vec[i]=linear_with_offset(inverse_sensitivity[i],0,2e-6)
+        Tphi01_q0_vec = eval_freq_dep_t_phi_new(f_pulse_final, 
+                                                compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()), 
+                                                T2_q0_amplitude_dependent)
 
         # plot(x_plot_vec=[f_pulse_final/1e9],
         #                   y_plot_vec=[T2_q0_vec*1e6],
         #                   title='T2 vs frequency from fit',
         #                   xlabel='Frequency_q0 (GHz)', ylabel='T2 (mu s)')
 
-        if T1_q0 != 0:
-            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
-        else:
-            Tphi01_q0_vec = T2_q0_vec 
     else:
         Tphi01_q0_vec = []
 
@@ -896,6 +886,23 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
     c_ops = c_ops_amplitudedependent(T1_q0 * noise_parameters_CZ.T2_scaling(),T1_q1 * noise_parameters_CZ.T2_scaling(),
                                     Tphi01_q0_vec * noise_parameters_CZ.T2_scaling(),Tphi01_q1 * noise_parameters_CZ.T2_scaling())
     return c_ops
+
+def eval_freq_dep_t_phi_new(freq, freq_sweet, coeffs):
+    freq = np.clip(freq, a_min=None, a_max=freq_sweet)
+    sensitivity = get_flux_sensitivity(freq, freq_sweet)
+    sensitivity[sensitivity < 1e-3] = 1e-3
+    deph_rate = linear_with_offset(sensitivity, coeffs)
+    t_phi = 1 / deph_rate
+    return t_phi
+
+def get_flux_sensitivity(freq, freq_q_sweet, charge_energy=0):
+    cur_freq = (freq + charge_energy)
+    sweet_freq = (freq_q_sweet + charge_energy)
+    return ((sweet_freq) ** 2 / cur_freq) * (np.pi / 2) * np.sqrt(1 - ((cur_freq / sweet_freq) ** 4))
+
+def linear_with_offset(inv_sen, freq_dep_coeffs):
+    coeff1, coeff2 = freq_dep_coeffs
+    return (coeff1 * inv_sen) + coeff2
 
 
 def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
@@ -996,6 +1003,8 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
         population_transfer_12_03 = average_population_transfer_subspace_to_subspace(U_final,states_in=[[1,2]],states_out=[[0,3]])
     else:
         population_transfer_12_03 = 0
+    population_transfer_11_20 = average_population_transfer_subspace_to_subspace(U_final,states_in=[[1,1]],states_out=[[2,0]])
+    population_transfer_01_10 = average_population_transfer_subspace_to_subspace(U_final,states_in=[[0,1]],states_out=[[1,0]])
 
 
     H_rotatingframe = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=fluxlutman.q_freq_10(), 
@@ -1032,7 +1041,8 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, no
             'offset_difference': offset_difference, 'missing_fraction': missing_fraction,
             'phase_diff_12_02': phase_diff_12_02, 'phase_diff_21_20': phase_diff_21_20,
             'cond_phase12': cond_phase12, 'cond_phase21': cond_phase21, 'cond_phase03': cond_phase03, 'cond_phase20': cond_phase20,
-            'population_transfer_12_21': population_transfer_12_21, 'population_transfer_12_03': population_transfer_12_03}
+            'population_transfer_12_21': population_transfer_12_21, 'population_transfer_12_03': population_transfer_12_03,
+            'population_transfer_11_20': population_transfer_11_20, 'population_transfer_01_10': population_transfer_01_10}
 
 
 
@@ -1130,13 +1140,6 @@ def calc_sensitivity(freq,freq_sweetspot):
 
 def Tphi_from_T1andT2(T1,T2):
     return 1/(-1/(2*T1)+1/T2)
-
-
-def linear_with_offset(x, a, b):
-    '''
-    A linear signal with a fixed offset.
-    '''
-    return a * x + b
 
 
 def matrix_change_of_variables(H_0):
