@@ -749,6 +749,186 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 }
 
 
+
+class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', do_fitting: bool = True,
+                 data_file_path: str=None,
+                 qubit_name = '',
+                 options_dict: dict=None, auto=True,
+                 **kw):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label, do_fitting=do_fitting,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         **kw)
+
+        self.single_timestamp = True
+        self.qubit_name = qubit_name
+        self.params_dict = {'ro_pulse_length': '{}.ro_pulse_length'.format(self.qubit_name),
+                            'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'sweep_points': 'sweep_points',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'
+                            }
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        """
+        Processing data
+        """
+        self.Times = self.raw_data_dict['sweep_points']
+        self.I_data_UHF = self.raw_data_dict['measured_values'][0]
+        self.Q_data_UHF = self.raw_data_dict['measured_values'][1]
+        self.pulse_length = float(self.raw_data_dict['ro_pulse_length'.format(self.qubit_name)])
+
+        #######################################
+        # Determine the start of the pusle
+        #######################################
+        def get_pulse_start(x, y, tolerance=2):
+            pulse_baseline = np.mean(y)
+            pulse_std      = np.std(y)
+            start_index = np.where( abs(y-pulse_baseline) > pulse_std/2 )[0][0] # get first data point above threshold
+            return start_index - tolerance
+
+        #######################################
+        # Determine the end of depletion
+        #######################################
+        def get_pulse_length(x, y):
+            pulse_baseline = np.mean(y)
+            threshold      = 0.035*np.std(y)
+            pulse_std = threshold+1
+            i = 0
+            while pulse_std > threshold:
+                pulse_std = np.std(y[i:]-pulse_baseline)
+                i += 1
+            end_index = i-1
+            return end_index
+
+        Amplitude = max(abs(self.I_data_UHF))
+        baseline = np.mean(self.I_data_UHF)
+        start_index = get_pulse_start(self.Times, self.I_data_UHF)
+        end_index = get_pulse_length(self.Times, self.I_data_UHF)
+
+        self.proc_data_dict['I_Amplitude'] = baseline
+        self.proc_data_dict['I_baseline'] = baseline
+        self.proc_data_dict['I_pulse_start_index'] = start_index
+        self.proc_data_dict['I_pulse_end_index'] = end_index
+        self.proc_data_dict['I_pulse_start'] = self.Times[start_index]
+        self.proc_data_dict['I_pulse_end'] = self.Times[end_index]
+
+    def prepare_plots(self):
+
+        ##########################
+        # Transients
+        ##########################
+        self.plot_dicts['I_transients'] = {
+            'title': 'Measured transients $I_{quadrature}$',
+            'ax_id': 'I_axis',
+            'xvals': self.Times,
+            'yvals': self.I_data_UHF,
+            #'xrange': vxr,
+            #'yrange': start_line_y,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'C0', 'alpha': 1},
+            'marker': ''
+            }
+
+        ##########################
+        # Vertical lines
+        ##########################
+        start_line_x = [self.proc_data_dict['I_pulse_start'],
+                        self.proc_data_dict['I_pulse_start']]
+
+        pulse_line_x = [self.proc_data_dict['I_pulse_start']+self.pulse_length,
+                        self.proc_data_dict['I_pulse_start']+self.pulse_length]
+
+        end_line_x = [self.proc_data_dict['I_pulse_end'],
+                      self.proc_data_dict['I_pulse_end']]
+
+        vline_y = 1.7e2*np.array([1.1*self.proc_data_dict['I_Amplitude'],
+                            -1.1*self.proc_data_dict['I_Amplitude']])
+
+        yrange= [vline_y[1],vline_y[0]]
+
+        self.plot_dicts['I_pulse_start'] = {
+            'ax_id': 'I_axis',
+            'xvals': start_line_x,
+            'yvals': vline_y,
+            #'xrange': vxr,
+            #'yrange': start_line_y,
+            'xunit': 's',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['I_pulse_end'] = {
+            'ax_id': 'I_axis',
+            'xvals': pulse_line_x,
+            'yvals': vline_y,
+            #'xrange': vxr,
+            #'yrange': start_line_y,
+            'xunit': 's',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['I_depletion_end'] = {
+            'ax_id': 'I_axis',
+            'xvals': end_line_x,
+            'yvals': vline_y,
+            #'xrange': vxr,
+            'yrange': yrange,
+            'xunit': 's',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        ########################
+        # Plot bars
+        ########################
+
+        # bin_x = [self.proc_data_dict['I_pulse_start'] + self.pulse_length/2,
+        #          self.proc_data_dict['I_pulse_start'] + self.pulse_length/2]
+
+        # self.plot_dicts['I_pulse_length'] = {
+        #     'ax_id': 'I_axis',
+        #     'plotfn': self.plot_bar,
+        #     'xvals': bin_x,
+        #     'yvals': vline_y,
+        #     'xwidth': self.pulse_length,
+        #     'ywidth': self.pulse_length,
+        #     'xunit': 's',
+        #     'yunit': 'V',
+        #     'bar_kws': { 'alpha': .4, 'facecolor': 'C0'}#,
+        #                 # 'edgecolor': ''}
+        #     # 'setlabel': label_0,
+        #     # 'xlabel': eff_voltage_label,
+        #     # 'xunit': eff_voltage_unit,
+        #     # 'ylabel': z_hist_label,
+        # }
+
+
+
 class Multiplexed_Readout_Analysis_deprecated(ba.BaseDataAnalysis):
     """
     For two qubits, to make an n-qubit mux readout experiment.

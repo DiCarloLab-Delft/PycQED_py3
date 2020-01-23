@@ -59,7 +59,8 @@ from pycqed.analysis_v2.timedomain_analysis import (
     Oscillation_Analysis,
     Conditional_Oscillation_Analysis, Idling_Error_Rate_Analyisis,
     Grovers_TwoQubitAllStates_Analysis)
-from pycqed.analysis_v2.readout_analysis import Singleshot_Readout_Analysis
+from pycqed.analysis_v2.readout_analysis import (
+    Singleshot_Readout_Analysis, RO_acquisition_delayAnalysis)
 
 from pycqed.analysis_v2.multiplexed_readout_analysis import \
     Multiplexed_Readout_Analysis

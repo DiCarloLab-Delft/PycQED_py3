@@ -3564,6 +3564,64 @@ class CCLight_Transmon(Qubit):
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
+    def calibrate_ro_acq_delay(self, MC= None,
+                               analyze: bool= True,
+                               prepare: bool= True,
+                               disable_metadata: bool=False):
+        """
+        Calibrates the ro_acq_delay parameter for the readout.
+        For that it analyzes the transients.
+        """
+
+        self.ro_acq_delay(0)# set delay to zero
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        # if plot_max_time is None:
+        #     plot_max_time = self.ro_acq_integration_length()+250e-9
+
+        if prepare:
+            self.prepare_for_timedomain()
+            p = sqo.off_on(
+                qubit_idx=self.cfg_qubit_nr(), pulse_comb='off',
+                initialize=False,
+                platf_cfg=self.cfg_openql_platform_fn())
+            self.instr_CC.get_instr().eqasm_program(p.filename)
+        else:
+            p = None  # object needs to exist for the openql_sweep to work
+
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Transient time', unit='s',
+                             upload=prepare)
+        MC.set_sweep_function(s)
+
+        if 'UHFQC' in self.instr_acquisition():
+            sampling_rate = 1.8e9
+        else:
+            raise NotImplementedError()
+
+        MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples)/
+                            sampling_rate)
+        MC.set_detector_function(self.input_average_detector)
+
+        data = MC.run(name='Measure_transients{}'.format(self.msmt_suffix),
+                      disable_snapshot_metadata=disable_metadata)
+        dset = data['dset']
+        transients = []
+        transients.append(dset.T[1:])
+        if analyze:
+            ma2.RO_acquisition_delayAnalysis(qubit_name=self.name)
+
+        # if depletion_analysis:
+        #     a = ma.Input_average_analysis(
+        #         IF=self.ro_freq_mod(),
+        #         optimization_window=depletion_optimization_window,
+        #         plot=depletion_analysis_plot,
+        #         plot_max_time=plot_max_time)
+        return True
+
+
     def measure_dispersive_shift_pulsed(self, freqs=None, MC=None, analyze: bool=True,
                                         prepare: bool=True):
         """
@@ -4084,6 +4142,8 @@ class CCLight_Transmon(Qubit):
 
         Used for Graph based tune-up in the ALLXY node.
         '''
+        old_avg = self.ro_acq_averages()
+        self.ro_acq_averages(2**14)
 
         VSM = self.instr_VSM.get_instr()
         #Close all vsm channels
@@ -4132,7 +4192,7 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_optimization_method('nelder_mead')
         nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
         a2 = ma.OptimizationAnalysis(label='gate_tuneup_allxy')
-
+        self.ro_acq_averages(old_avg)
         #Open all vsm channels
         for module in modules:
             VSM.set('mod{}_marker_source'.format(module+1),'int')
