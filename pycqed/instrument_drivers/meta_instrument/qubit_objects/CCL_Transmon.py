@@ -3207,7 +3207,9 @@ class CCLight_Transmon(Qubit):
 
         options_dict={'post_select': post_select,
                       'nr_samples': 2+2*post_select,
-                      'post_select_threshold': post_select_threshold}
+                      'post_select_threshold': post_select_threshold,
+                      'predict_qubit_temp': True,
+                      'qubit_freq': self.freq_qubit()}
         if not vary_residual_excitation:
             options_dict.update(
                 {'fixed_p10':self.res_exc,
