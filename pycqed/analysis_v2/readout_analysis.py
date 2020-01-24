@@ -749,7 +749,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 }
 
 
-
 class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
@@ -791,7 +790,13 @@ class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
         #######################################
         # Determine the start of the pusle
         #######################################
-        def get_pulse_start(x, y, tolerance=2):
+        def get_pulse_start(x, y, tolerance=4):
+            '''
+            The start of the pulse is estimated by calculating the
+            standard deviation of the signal from its baseline.
+            The pulse start is set when the signal goes above the
+            half the standard deviation.
+            '''
             pulse_baseline = np.mean(y)
             pulse_std      = np.std(y)
             start_index = np.where( abs(y-pulse_baseline) > pulse_std/2 )[0][0] # get first data point above threshold
@@ -801,8 +806,12 @@ class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
         # Determine the end of depletion
         #######################################
         def get_pulse_length(x, y):
+            '''
+            Similarly to get_pulse_start, the end of depletion is
+            set when the signal goes below 5% of its standard dev.
+            '''
             pulse_baseline = np.mean(y)
-            threshold      = 0.035*np.std(y)
+            threshold      = 0.05*np.std(y)
             pulse_std = threshold+1
             i = 0
             while pulse_std > threshold:
@@ -811,30 +820,66 @@ class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
             end_index = i-1
             return end_index
 
-        Amplitude = max(abs(self.I_data_UHF))
-        baseline = np.mean(self.I_data_UHF)
-        start_index = get_pulse_start(self.Times, self.I_data_UHF)
-        end_index = get_pulse_length(self.Times, self.I_data_UHF)
+        Amplitude_I = max(abs(self.I_data_UHF))
+        baseline_I = np.mean(self.I_data_UHF)
+        start_index_I = get_pulse_start(self.Times, self.I_data_UHF)
+        end_index_I = get_pulse_length(self.Times, self.I_data_UHF)
 
-        self.proc_data_dict['I_Amplitude'] = baseline
-        self.proc_data_dict['I_baseline'] = baseline
-        self.proc_data_dict['I_pulse_start_index'] = start_index
-        self.proc_data_dict['I_pulse_end_index'] = end_index
-        self.proc_data_dict['I_pulse_start'] = self.Times[start_index]
-        self.proc_data_dict['I_pulse_end'] = self.Times[end_index]
+        Amplitude_Q = max(abs(self.Q_data_UHF))
+        baseline_Q = np.mean(self.Q_data_UHF)
+        start_index_Q = get_pulse_start(self.Times, self.Q_data_UHF)
+        end_index_Q = get_pulse_length(self.Times, self.Q_data_UHF)
+
+        self.proc_data_dict['I_Amplitude'] = Amplitude_I
+        self.proc_data_dict['I_baseline'] = baseline_I
+        self.proc_data_dict['I_pulse_start_index'] = start_index_I
+        self.proc_data_dict['I_pulse_end_index'] = end_index_I
+        self.proc_data_dict['I_pulse_start'] = self.Times[start_index_I]
+        self.proc_data_dict['I_pulse_end'] = self.Times[end_index_I]
+
+        self.proc_data_dict['Q_Amplitude'] = Amplitude_Q
+        self.proc_data_dict['Q_baseline'] = baseline_Q
+        self.proc_data_dict['Q_pulse_start_index'] = start_index_Q
+        self.proc_data_dict['Q_pulse_end_index'] = end_index_Q
+        self.proc_data_dict['Q_pulse_start'] = self.Times[start_index_Q]
+        self.proc_data_dict['Q_pulse_end'] = self.Times[end_index_Q]
 
     def prepare_plots(self):
+
+        I_start_line_x = [self.proc_data_dict['I_pulse_start'],
+                          self.proc_data_dict['I_pulse_start']]
+        I_pulse_line_x = [self.proc_data_dict['I_pulse_start']+self.pulse_length,
+                          self.proc_data_dict['I_pulse_start']+self.pulse_length]
+        I_end_line_x = [self.proc_data_dict['I_pulse_end'],
+                        self.proc_data_dict['I_pulse_end']]
+
+        Q_start_line_x = [self.proc_data_dict['Q_pulse_start'],
+                          self.proc_data_dict['Q_pulse_start']]
+        Q_pulse_line_x = [self.proc_data_dict['Q_pulse_start']+self.pulse_length,
+                           self.proc_data_dict['Q_pulse_start']+self.pulse_length]
+        Q_end_line_x = [self.proc_data_dict['Q_pulse_end'],
+                        self.proc_data_dict['Q_pulse_end']]
+
+        Amplitude = max(self.proc_data_dict['I_Amplitude'],
+                        self.proc_data_dict['Q_Amplitude'])
+        vline_y = np.array([1.1*Amplitude, -1.1*Amplitude])
+
+        x_range= [self.Times[0], self.Times[-1]]
+        y_range= [vline_y[1], vline_y[0]]
+
+        I_title = str(self.qubit_name)+' Measured transients $I_{quadrature}$'
+        Q_title = str(self.qubit_name)+' Measured transients $Q_{quadrature}$'
 
         ##########################
         # Transients
         ##########################
         self.plot_dicts['I_transients'] = {
-            'title': 'Measured transients $I_{quadrature}$',
+            'title': I_title,
             'ax_id': 'I_axis',
             'xvals': self.Times,
             'yvals': self.I_data_UHF,
-            #'xrange': vxr,
-            #'yrange': start_line_y,
+            'xrange': x_range,
+            'yrange': y_range,
             'xlabel': self.raw_data_dict['xlabel'],
             'xunit': 's',
             'ylabel': 'I Amplitude',
@@ -844,30 +889,35 @@ class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
             'marker': ''
             }
 
+        self.plot_dicts['Q_transients'] = {
+            'title': Q_title,
+            'ax_id': 'Q_axis',
+            'xvals': self.Times,
+            'yvals': self.Q_data_UHF,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'C0', 'alpha': 1},
+            'marker': ''
+            }
+
         ##########################
         # Vertical lines
         ##########################
-        start_line_x = [self.proc_data_dict['I_pulse_start'],
-                        self.proc_data_dict['I_pulse_start']]
-
-        pulse_line_x = [self.proc_data_dict['I_pulse_start']+self.pulse_length,
-                        self.proc_data_dict['I_pulse_start']+self.pulse_length]
-
-        end_line_x = [self.proc_data_dict['I_pulse_end'],
-                      self.proc_data_dict['I_pulse_end']]
-
-        vline_y = 1.7e2*np.array([1.1*self.proc_data_dict['I_Amplitude'],
-                            -1.1*self.proc_data_dict['I_Amplitude']])
-
-        yrange= [vline_y[1],vline_y[0]]
-
+        # I quadrature
         self.plot_dicts['I_pulse_start'] = {
             'ax_id': 'I_axis',
-            'xvals': start_line_x,
+            'xvals': I_start_line_x,
             'yvals': vline_y,
-            #'xrange': vxr,
-            #'yrange': start_line_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
             'xunit': 's',
+            'ylabel': 'I Amplitude',
             'yunit': 'V',
             'plotfn': self.plot_line,
             'linestyle': '--',
@@ -877,11 +927,13 @@ class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
 
         self.plot_dicts['I_pulse_end'] = {
             'ax_id': 'I_axis',
-            'xvals': pulse_line_x,
+            'xvals': I_pulse_line_x,
             'yvals': vline_y,
-            #'xrange': vxr,
-            #'yrange': start_line_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
             'xunit': 's',
+            'ylabel': 'I Amplitude',
             'yunit': 'V',
             'plotfn': self.plot_line,
             'linestyle': '--',
@@ -891,11 +943,62 @@ class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
 
         self.plot_dicts['I_depletion_end'] = {
             'ax_id': 'I_axis',
-            'xvals': end_line_x,
+            'xvals': I_end_line_x,
             'yvals': vline_y,
-            #'xrange': vxr,
-            'yrange': yrange,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
             'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        # Q quadrature
+        self.plot_dicts['Q_pulse_start'] = {
+            'ax_id': 'Q_axis',
+            'xvals': Q_start_line_x,
+            'yvals': vline_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['Q_pulse_end'] = {
+            'ax_id': 'Q_axis',
+            'xvals': Q_pulse_line_x,
+            'yvals': vline_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['Q_depletion_end'] = {
+            'ax_id': 'Q_axis',
+            'xvals': Q_end_line_x,
+            'yvals': vline_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
             'yunit': 'V',
             'plotfn': self.plot_line,
             'linestyle': '--',
@@ -904,29 +1007,84 @@ class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
             }
 
         ########################
-        # Plot bars
+        # Plot pulse windows
         ########################
 
-        # bin_x = [self.proc_data_dict['I_pulse_start'] + self.pulse_length/2,
-        #          self.proc_data_dict['I_pulse_start'] + self.pulse_length/2]
+        I_pulse_bin = np.array([self.proc_data_dict['I_pulse_start'],
+                    self.proc_data_dict['I_pulse_start']+self.pulse_length])
+        I_depletion_bin = np.array([self.proc_data_dict['I_pulse_start']
+                        +self.pulse_length, self.proc_data_dict['I_pulse_end']])
 
-        # self.plot_dicts['I_pulse_length'] = {
-        #     'ax_id': 'I_axis',
-        #     'plotfn': self.plot_bar,
-        #     'xvals': bin_x,
-        #     'yvals': vline_y,
-        #     'xwidth': self.pulse_length,
-        #     'ywidth': self.pulse_length,
-        #     'xunit': 's',
-        #     'yunit': 'V',
-        #     'bar_kws': { 'alpha': .4, 'facecolor': 'C0'}#,
-        #                 # 'edgecolor': ''}
-        #     # 'setlabel': label_0,
-        #     # 'xlabel': eff_voltage_label,
-        #     # 'xunit': eff_voltage_unit,
-        #     # 'ylabel': z_hist_label,
-        # }
+        Q_pulse_bin = np.array([self.proc_data_dict['Q_pulse_start'],
+                    self.proc_data_dict['Q_pulse_start']+self.pulse_length])
+        Q_depletion_bin = np.array([self.proc_data_dict['Q_pulse_start']
+                        +self.pulse_length, self.proc_data_dict['Q_pulse_end']])
 
+        self.plot_dicts['I_pulse_length'] = {
+            'ax_id': 'I_axis',
+            'xvals': I_pulse_bin,
+            'yvals': vline_y,
+            'xwidth': self.pulse_length,
+            'ywidth': self.proc_data_dict['I_Amplitude'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_bar,
+            'bar_kws': { 'alpha': .25, 'facecolor': 'C0'}
+            }
+
+        self.plot_dicts['I_pulse_depletion'] = {
+            'ax_id': 'I_axis',
+            'xvals': I_depletion_bin,
+            'yvals': vline_y,
+            'xwidth': self.pulse_length,
+            'ywidth': self.proc_data_dict['I_Amplitude'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_bar,
+            'bar_kws': { 'alpha': .25, 'facecolor': 'C1'}
+            }
+
+        self.plot_dicts['Q_pulse_length'] = {
+            'ax_id': 'Q_axis',
+            'xvals': Q_pulse_bin,
+            'yvals': vline_y,
+            'xwidth': self.pulse_length,
+            'ywidth': self.proc_data_dict['Q_Amplitude'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_bar,
+            'bar_kws': { 'alpha': .25, 'facecolor': 'C0'}
+            }
+
+        self.plot_dicts['Q_pulse_depletion'] = {
+            'ax_id': 'Q_axis',
+            'grid': True,
+            'grid_kws': {'alpha': .25, 'linestyle': '--'},
+            'xvals': Q_depletion_bin,
+            'yvals': vline_y,
+            'xwidth': self.pulse_length,
+            'ywidth': self.proc_data_dict['Q_Amplitude'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_bar,
+            'bar_kws': { 'alpha': .25, 'facecolor': 'C1'}
+            }
 
 
 class Multiplexed_Readout_Analysis_deprecated(ba.BaseDataAnalysis):

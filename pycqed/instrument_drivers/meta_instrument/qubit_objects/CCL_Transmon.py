@@ -3571,9 +3571,12 @@ class CCLight_Transmon(Qubit):
         """
         Calibrates the ro_acq_delay parameter for the readout.
         For that it analyzes the transients.
+
         """
 
         self.ro_acq_delay(0)# set delay to zero
+        old_pow = self.ro_pulse_amp()
+        self.ro_pulse_amp(0.5)
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3604,22 +3607,18 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples)/
                             sampling_rate)
         MC.set_detector_function(self.input_average_detector)
+        MC.run(name='Measure_Acq_Delay_{}'.format(self.msmt_suffix),
+               disable_snapshot_metadata=disable_metadata)
 
-        data = MC.run(name='Measure_transients{}'.format(self.msmt_suffix),
-                      disable_snapshot_metadata=disable_metadata)
-        dset = data['dset']
-        transients = []
-        transients.append(dset.T[1:])
+        self.ro_pulse_amp(old_pow)
+
         if analyze:
-            ma2.RO_acquisition_delayAnalysis(qubit_name=self.name)
-
-        # if depletion_analysis:
-        #     a = ma.Input_average_analysis(
-        #         IF=self.ro_freq_mod(),
-        #         optimization_window=depletion_optimization_window,
-        #         plot=depletion_analysis_plot,
-        #         plot_max_time=plot_max_time)
-        return True
+            a = ma2.RO_acquisition_delayAnalysis(qubit_name=self.name)
+            # Delay time is averaged over the two quadratures.
+            delay_time = (a.proc_data_dict['I_pulse_start']+
+                          a.proc_data_dict['Q_pulse_start'])/2
+            self.ro_acq_delay(delay_time)
+            return True
 
 
     def measure_dispersive_shift_pulsed(self, freqs=None, MC=None, analyze: bool=True,

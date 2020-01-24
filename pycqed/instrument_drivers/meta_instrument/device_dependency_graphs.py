@@ -127,7 +127,7 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             # self.add_node(Qubit.name + ' MOTZOI Calibration',
             #               calibrate_function=Qubit.name + '.calibrate_motzoi')
             self.add_node(Qubit.name + ' Acquisition Delay Calibration',
-                          calibrate_function=Qubit.name + '.measure_ssro')
+                          calibrate_function=Qubit.name + '.calibrate_ro_acq_delay')
             self.add_node(Qubit.name + ' Dispersive Shift',
                           calibrate_function=Qubit.name + '.measure_dispersive_shift_pulsed')
             self.add_node(Qubit.name + ' SSRO Coarse tune-up',
