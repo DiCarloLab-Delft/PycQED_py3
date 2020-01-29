@@ -1847,7 +1847,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if len(data_raw[next(iter(data_raw))])>1:
             print('[DEBUG UHF SWF] SHOULD HAVE HAD AN ERROR')
         # data = np.array([data_raw[key]
-        data = np.array([data_raw[key][-1]
+        data = np.array([data_raw[key]
         # data = np.array([data_raw[key][-1]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
         # print('[DEBUG UHF SWF] RAW shape',[data_raw[key]

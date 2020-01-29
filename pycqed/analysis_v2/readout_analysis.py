@@ -363,8 +363,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         fr = self.fit_res['shots_all']
         bv = fr.params
-        self.proc_data_dict['residual_excitation'] = bv['B_spurious'].value
-        self.proc_data_dict['measurement_induced_relaxation'] = bv['A_spurious'].value
+        self.proc_data_dict['residual_excitation'] = bv['A_spurious'].value
+        self.proc_data_dict['relaxation_events'] = bv['B_spurious'].value
 
         ###################################
         #  Save quantities of interest.   #
@@ -374,8 +374,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'F_d': self.proc_data_dict['F_discr'],
             'F_a': self.proc_data_dict['F_assignment_raw'],
             'residual_excitation': self.proc_data_dict['residual_excitation'],
-            'measurement_induced_relaxation':
-                self.proc_data_dict['measurement_induced_relaxation']
+            'relaxation_events':
+                self.proc_data_dict['relaxation_events']
         }
         self.qoi = self.proc_data_dict['quantities_of_interest']
 
