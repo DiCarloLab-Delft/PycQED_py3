@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib.pylab as pl
 from matplotlib import cm
+import pycqed.measurement.hdf5_data as h5d
+import lmfit
+from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
     cmap_to_alpha, cmap_first_to_alpha
 
@@ -69,7 +72,7 @@ class Residual_Crosstalk(ba.BaseDataAnalysis):
                 for i, bit in enumerate(state):
                     if int(bit) == 1:
                         active_spectator = spectator_list[i]
-                        active_spectator = active_spectator
+                        active_spectator = active_spectator[1:-1]
                 x, y = self.raw_data_dict[ts]['data'][:-2,0], self.raw_data_dict[ts]['data'][:-2,1]
                 fit_res = fit_residual_coupling_oscillation(x, y)
                 frequency = fit_res.best_values['frequency']
@@ -77,8 +80,8 @@ class Residual_Crosstalk(ba.BaseDataAnalysis):
                     frequency = -1*frequency
                 if np.std(y)/np.mean(y) < 0.1:
                     frequency = 0
-                residual_ZZ_matrix[qubits.index(target_qubit),qubits.index(active_spectator[1:-1])] = frequency
-                print('{}:Setting {},{} to {}'.format(ts, target_qubit, active_spectator[1:-1], frequency))
+                residual_ZZ_matrix[self.qubits.index(target_qubit), self.qubits.index(active_spectator)] = frequency
+                print('{}:Setting {},{} to {}'.format(ts, target_qubit, active_spectator, frequency))
             for i in range(len(self.qubits)):
                 residual_ZZ_matrix[i,i] = np.nan
             self.proc_data_dict['quantities_of_interest'] = {
@@ -136,7 +139,7 @@ def fit_residual_coupling_oscillation(x, y, **kw):
                                  params=params)
     return fit_res
 
-    def plot_crosstalk_matrix(crosstalk_matrix,
+def plot_crosstalk_matrix(crosstalk_matrix,
                           qubit_labels, combinations=None, ax=None,
                           valid_combinations=None, **kw):
     crosstalk_matrix = np.copy(crosstalk_matrix)/1000
