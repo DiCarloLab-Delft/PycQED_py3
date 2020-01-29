@@ -131,12 +131,12 @@ class TestDetectors:
                                    value_units=None,
                                    msmt_kw={'val_a': x, 'val_b': 1})
 
-        dm = det.Multi_Detector([d0, d1], det_idx_suffix=False)
+        dm = det.Multi_Detector([d0, d1], det_idx_prefix=False)
         assert dm.value_names == ['a', 'b']
         assert dm.value_units == ['my_unit', 'a.u.']
 
-        dm_suffix = det.Multi_Detector([d0, d1], det_idx_suffix=True)
-        assert dm_suffix.value_names == ['a_det0', 'b_det1']
+        dm_suffix = det.Multi_Detector([d0, d1], det_idx_prefix=True)
+        assert dm_suffix.value_names == ['det0 a', 'det1 b']
         assert dm_suffix.value_units == ['my_unit', 'a.u.']
 
         dh = det.Dummy_Detector_Hard()
@@ -159,12 +159,12 @@ class TestDetectors:
                                    value_units=None,
                                    msmt_kw={'val_a': x, 'val_b': 1})
 
-        dm = det.Multi_Detector([d0, d1], det_idx_suffix=False)
+        dm = det.Multi_Detector([d0, d1], det_idx_prefix=False)
         assert dm.value_names == ['a', 'b', 'b']
         assert dm.value_units == ['my_unit', 'a.u.', 'a.u.']
 
-        dm_suffix = det.Multi_Detector([d0, d1], det_idx_suffix=True)
-        assert dm_suffix.value_names == ['a_det0', 'b_det0', 'b_det1']
+        dm_suffix = det.Multi_Detector([d0, d1], det_idx_prefix=True)
+        assert dm_suffix.value_names == ['det0 a', 'det0 b', 'det1 b']
         assert dm_suffix.value_units == ['my_unit', 'a.u.', 'a.u.']
 
         xvals = np.linspace(0, 10, 10)

@@ -359,7 +359,7 @@ class Dummy_QuTechVSMModule(QuTechVSMModule):
                  **kw):
         Instrument.__init__(self, name=name, **kw)
 
-
+        self._socket = None  # exists so close method of IP instrument works
         self._dummy_instr = True
 
         self.modules = [1, 2, 3, 4, 5, 6, 7, 8]

@@ -1457,13 +1457,13 @@ class CCLight_Transmon(Qubit):
 
         if method == 'DAC':
             t_start = time.strftime('%Y%m%d_%H%M%S')
-            self.measure_qubit_frequency_dac_scan_test(freqs=freqs,
+            self.measure_qubit_frequency_dac_scan(freqs=freqs,
                                                   dac_values=dac_values,
                                                   fluxChan=fluxChan,
                                                   analyze=False,
                                                   mode=spec_mode,
                                                   nested_resonator_calibration=True,
-                                                  nested_resonator_calibration_use_min=True,
+                                                  # nested_resonator_calibration_use_min=True,
                                                   resonator_freqs=np.arange(-5e6,5e6,0.1e6)+self.freq_res())
                                                   # )
             timestamp = a_tools.get_timestamps_in_range(t_start,
@@ -2583,7 +2583,7 @@ class CCLight_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC(),
-            trigger_idx=0 if self.instr_CC()=="CCL" else 15,
+            trigger_idx=0 if CCL.name=='CCL' else 15,
             wait_time_ns=wait_time_ns)
 
         CCL.eqasm_program(p.filename)
@@ -3207,7 +3207,9 @@ class CCLight_Transmon(Qubit):
 
         options_dict={'post_select': post_select,
                       'nr_samples': 2+2*post_select,
-                      'post_select_threshold': post_select_threshold}
+                      'post_select_threshold': post_select_threshold,
+                      'predict_qubit_temp': True,
+                      'qubit_freq': self.freq_qubit()}
         if not vary_residual_excitation:
             options_dict.update(
                 {'fixed_p10':self.res_exc,
@@ -3286,6 +3288,7 @@ class CCLight_Transmon(Qubit):
             upload=True
         )
 
+    # FIXME: the parameters of the function below are gone
     def ssro_and_optimal_weights():
         self.calibrate_optimal_weights(verify=False,
                                            analyze=True,

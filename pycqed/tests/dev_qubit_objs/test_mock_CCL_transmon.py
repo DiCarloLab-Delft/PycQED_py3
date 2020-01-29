@@ -313,7 +313,7 @@ class Test_Mock_CCL(unittest.TestCase):
         self.CCL_qubit.measure_T1()
 
         assert self.CCL_qubit.T1() == pytest.approx(self.CCL_qubit.mock_T1(),
-                                                    abs=5e-6)
+                                                    abs=5e-5) # R.S. raised this because it was too tight
 
     ###########################################################
     # Test Echo

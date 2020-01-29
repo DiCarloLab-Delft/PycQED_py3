@@ -3,34 +3,37 @@ import numpy as np
 import os
 import pycqed as pq
 import time
-import openql
 import warnings
+
 import pycqed.analysis.analysis_toolbox as a_tools
+from pycqed.measurement import measurement_control
 
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
+
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
-from pycqed.measurement import measurement_control
-from qcodes import station
-
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
-
-from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
-
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
+
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
+import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
+
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
-from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
+from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.Transport import DummyTransport
+
+from qcodes import station
+
 
 Dummy_VSM_not_fixed = False
 
 
-class Test_QO(unittest.TestCase):
+class Test_CCL(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -107,23 +110,6 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.mw_mixer_offs_GQ(.2)
         self.CCL_qubit.mw_mixer_offs_DI(.3)
         self.CCL_qubit.mw_mixer_offs_DQ(.4)
-
-    def test_instantiate_QuDevTransmon(self):
-        QDT = QuDev_transmon('QuDev_transmon',
-                             MC=None, heterodyne_instr=None, cw_source=None)
-        QDT.close()
-
-    def test_instantiate_TekTransmon(self):
-        TT = Tektronix_driven_transmon('TT')
-        TT.close()
-
-    def test_instantiate_CBoxv3_transmon(self):
-        CT = CBox_v3_driven_transmon('CT')
-        CT.close()
-
-    def test_instantiate_QWG_transmon(self):
-        QT = QWG_driven_transmon('QT')
-        QT.close()
 
     ##############################################
     # calculate methods
@@ -443,3 +429,34 @@ class Test_QO(unittest.TestCase):
                 inst.close()
             except KeyError:
                 pass
+
+class Test_CC(Test_CCL):
+
+    @classmethod
+    def setUpClass(self):
+        super().setUpClass()
+        self.CC = QuTechCC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
+        self.CCL_qubit.instr_CC(self.CC.name)
+
+        config_fn = os.path.join(
+            pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
+        self.CCL_qubit.cfg_openql_platform_fn(config_fn)
+
+
+class Test_Instantiate(unittest.TestCase):
+    def test_instantiate_QuDevTransmon(self):
+        QDT = QuDev_transmon('QuDev_transmon',
+                             MC=None, heterodyne_instr=None, cw_source=None)
+        QDT.close()
+
+    def test_instantiate_TekTransmon(self):
+        TT = Tektronix_driven_transmon('TT')
+        TT.close()
+
+    def test_instantiate_CBoxv3_transmon(self):
+        CT = CBox_v3_driven_transmon('CT')
+        CT.close()
+
+    def test_instantiate_QWG_transmon(self):
+        QT = QWG_driven_transmon('QT')
+        QT.close()

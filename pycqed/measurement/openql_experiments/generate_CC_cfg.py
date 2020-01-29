@@ -17,7 +17,7 @@ def generate_config(out_filename: str,
                     flux_pulse_duration: int = 40,
                     ro_duration: int = 800,
                     init_duration: int = 200000,
-                    in_file_name: str = 'config_cc_s17_vsm.json.in'):
+                    in_filename: str = 'config_cc_s17_vsm.json.in'):
     """
     Generates a configuration file for OpenQL for use with the CC.
     Args:
@@ -41,7 +41,7 @@ def generate_config(out_filename: str,
             flux_mw_buffer=0,
     """
 
-    cfg = Path(in_file_name).read_text()
+    cfg = Path(in_filename).read_text()
 
     cfg = cfg.replace('@MW_DURATION@', str(mw_pulse_duration))
     cfg = cfg.replace('@FLUX_DURATION@', str(flux_pulse_duration))
@@ -54,7 +54,7 @@ def generate_config(out_filename: str,
     hdr += '//   flux_pulse_duration = ' + str(flux_pulse_duration) + '\n'
     hdr += '//   ro_duration         = ' + str(ro_duration) + '\n'
     hdr += '//   init_duration       = ' + str(init_duration) + '\n'
-    hdr += '//   in_file_name        = ' + in_file_name + '\n'
+    hdr += '//   in_filename        = ' + in_filename + '\n'
 
     cfg = hdr + cfg
 
