@@ -72,6 +72,11 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.options_dict['auto_rotation_angle'] = self.options_dict.get(
             'auto_rotation_angle', man_angle)
 
+        self.predict_qubit_temp = self.options_dict.get(predict_qubit_temp,
+                                                        False)
+        if self.predict_qubit_temp:
+            self.qubit_freq = self.options_dict['qubit_freq']
+
         if auto:
             self.run_analysis()
 
@@ -281,7 +286,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         cum_params['A_amplitude'].value = np.max(cdf_ys[0])
         cum_params['A_amplitude'].vary = False
         cum_params['B_amplitude'].value = np.max(cdf_ys[1])
-        cum_params['A_amplitude'].vary = False
+        cum_params['A_amplitude'].vary = False # FIXME: check if correct
         self.fit_dicts['shots_all'] = {
             'model': m_cul,
             'fit_xvals': {'x': cdf_xs},
@@ -294,6 +299,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         fr = self.fit_res['shots_all']
         bv = fr.best_values
 
+        # best values new
         bvn = deepcopy(bv)
         bvn['A_amplitude'] = 1
         bvn['B_amplitude'] = 1
@@ -737,6 +743,12 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 fit_text += '\n\n(Single quadrature data)'
 
             fit_text += '\n\nTotal shots: %d+%d' % (*self.proc_data_dict['nr_shots'],)
+            if self.predict_qubit_temp:
+                h = 6.62607004e-34
+                kb = 1.38064852e-23
+                res_exc = a_sp.value
+                effective_temp = h*6.42e9/(kb*np.log((1-res_exc)/res_exc))
+                fit_text += '\n\nEffective qubit temperature = {} mK\n@{:.0f}'.format(effective_temp*1e3,self.qubit_freq)
 
             for ax in ['cdf', '1D_histogram']:
                 self.plot_dicts['text_msg_' + ax] = {

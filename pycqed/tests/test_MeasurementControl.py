@@ -52,7 +52,7 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(y1, y[1, :])
 
         # Test that the return dictionary has the right entries
-        dat_keys = set(['dset', 'opt_res_dset', 'sweep_parameter_names',
+        dat_keys = set(['dset', 'opt_res', 'opt_res_dset', 'sweep_parameter_names',
                         'sweep_parameter_units',
                         'value_names', 'value_units'])
         self.assertEqual(dat_keys, set(dat.keys()))
@@ -83,7 +83,7 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(y1, y[1, :])
 
         # Test that the return dictionary has the right entries
-        dat_keys = set(['dset', 'opt_res_dset', 'sweep_parameter_names',
+        dat_keys = set(['dset', 'opt_res', 'opt_res_dset', 'sweep_parameter_names',
                         'sweep_parameter_units',
                         'value_names', 'value_units'])
         self.assertEqual(dat_keys, set(dat.keys()))
@@ -495,6 +495,29 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertLess(yf, 0.7)
         self.assertLess(pf, 0.7)
 
+    def test_adaptive_iter_plot(self):
+        """
+        Check that the evolution of parameters over iterations is
+        plotted correctly
+        """
+        self.MC.soft_avg(1)
+        self.mock_parabola.noise(0)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y, self.mock_parabola.z])
+        self.MC.set_adaptive_function_parameters(
+            {'adaptive_function': nelder_mead,
+             'x0': [-50, -50, -50], 'initial_step': [2.5, 2.5, 2.5]})
+        self.mock_parabola.noise(.5)
+        self.MC.set_detector_function(self.mock_parabola.parabola)
+        self.MC.run('adaptive params iter plot test', mode='adaptive')
+        import logging
+        log = logging.getLogger(__name__)
+        log.error(self.MC.secondary_QtPlot.traces[0]['config'].keys())
+        log.error(self.MC.secondary_QtPlot.traces[0]['config']['ylabel'])
+        log.error(self.MC.secondary_QtPlot.traces[0]['config']['ylabel'])
+        assert self.MC.secondary_QtPlot.traces[0]['config']['ylabel'] == 'x'
+        assert self.MC.secondary_QtPlot.traces[3]['config']['ylabel'] == 'parabola'
+
     def test_adaptive_measurement_cma(self):
         """
         Example on how to use the cma-es evolutionary algorithm.
@@ -613,14 +636,6 @@ class Test_MeasurementControl(unittest.TestCase):
 
         self.assertEqual(progress_param(), 100)
 
-
-    @classmethod
-    def tearDownClass(self):
-        self.MC.close()
-        self.mock_parabola.close()
-        del self.station.components['MC']
-        del self.station.components['mock_parabola']
-
     def test_persist_mode(self):
         sweep_pts = np.linspace(0, 10, 5)
         self.MC.persist_mode(True)
@@ -687,3 +702,10 @@ class Test_MeasurementControl(unittest.TestCase):
             {}, a.data_file['Experimental Data']['Experimental Metadata'])
 
         np.testing.assert_equal(metadata_dict, loaded_dict)
+
+    @classmethod
+    def tearDownClass(self):
+        self.MC.close()
+        self.mock_parabola.close()
+        del self.station.components['MC']
+        del self.station.components['mock_parabola']
