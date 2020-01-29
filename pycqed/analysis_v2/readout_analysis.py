@@ -281,7 +281,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         cum_params['A_amplitude'].value = np.max(cdf_ys[0])
         cum_params['A_amplitude'].vary = False
         cum_params['B_amplitude'].value = np.max(cdf_ys[1])
-        cum_params['A_amplitude'].vary = False
+        cum_params['A_amplitude'].vary = False # FIXME: check if correct
         self.fit_dicts['shots_all'] = {
             'model': m_cul,
             'fit_xvals': {'x': cdf_xs},
@@ -294,6 +294,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         fr = self.fit_res['shots_all']
         bv = fr.best_values
 
+        # best values new
         bvn = deepcopy(bv)
         bvn['A_amplitude'] = 1
         bvn['B_amplitude'] = 1
@@ -363,8 +364,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         fr = self.fit_res['shots_all']
         bv = fr.params
-        self.proc_data_dict['residual_excitation'] = bv['B_spurious'].value
-        self.proc_data_dict['measurement_induced_relaxation'] = bv['A_spurious'].value
+        self.proc_data_dict['residual_excitation'] = bv['A_spurious'].value
+        self.proc_data_dict['measurement_induced_relaxation'] = bv['B_spurious'].value
 
         ###################################
         #  Save quantities of interest.   #
