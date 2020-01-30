@@ -1183,7 +1183,6 @@ class FLsweep(Soft_Sweep):
         self.AWG.start()
 
 
-
 class Nested_resonator_tracker(Soft_Sweep):
     """
     Sets a parameter and performs a "find_resonator_frequency" measurement
@@ -1217,8 +1216,6 @@ class Nested_resonator_tracker(Soft_Sweep):
         spec_source = self.qubit.instr_spec_source.get_instr()
         spec_source.on()
         self.cc.start()
-
-
 
 class tim_flux_latency_sweep(Soft_Sweep):
     def __init__(self,device):

@@ -626,11 +626,11 @@ def get_data_from_timestamp_list(timestamps,
                     remove_timestamps.append(timestamp)
                     do_analysis = True
                 ana.finish()
-            except KeyError as e: 
+            except KeyError as e:
 
                 logging.warning('KeyError "%s" when processing timestamp %s' %
                                 (e, timestamp))
-                logging.warning(e) 
+                logging.warning(e)
 
             except Exception as e:
                 logging.warning('Error "%s" when processing timestamp %s' %
@@ -1796,7 +1796,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
                show=False, normalize=False, log=False,
                transpose=False, add_colorbar=True,
                xlabel='', ylabel='', zlabel='',
-               x_unit='', y_unit='', z_unit='',  **kw):
+               x_unit='', y_unit='', z_unit='', **kw):
     """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
@@ -1812,21 +1812,22 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
             combination of letters x, y, z for scaling of the according axis.
             Remember to set the labels correctly.
     """
-    if ax == None:
+    if ax is None:
         fig, ax = plt.subplots()
 
-    norm = None
-    try:
-        if log is True or 'z' in log:
-            norm = LogNorm()
+    norm = kw.get('norm', None)
+    if norm is None:
+        try:
+            if log is True or 'z' in log:
+                norm = LogNorm()
 
-        if 'y' in log:
-            y = np.log10(y)
+            if 'y' in log:
+                y = np.log10(y)
 
-        if 'x' in log:
-            x = np.log10(x)
-    except TypeError:  # log is not iterable
-        pass
+            if 'x' in log:
+                x = np.log10(x)
+        except TypeError:  # log is not iterable
+            pass
 
     # calculate coordinates for corners of color blocks
     # x coordinates
@@ -1886,6 +1887,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
     x_unit = kw.get('x_unit', x_unit)
     y_unit = kw.get('y_unit', y_unit)
     z_unit = kw.get('z_unit', z_unit)
+    cbarticks = kw.get('cbarticks', None)
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
@@ -1920,7 +1922,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
         if cax is None:
             ax_divider = make_axes_locatable(ax)
             cax = ax_divider.append_axes('right', size='5%', pad='2%')
-        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical')
+        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical', ticks=cbarticks)
         if zlabel is not None:
             set_cbarlabel(cbar, zlabel, unit=z_unit)
         return fig, ax, colormap, cbar

@@ -260,6 +260,15 @@ class SKOptLearnerND(Optimizer, BaseLearner):
     It is here because the original one uses set() and was not
     compatible with the SKOpt optimizer that expects list()
     Original docstring below
+
+    NB: This optimizer can be slow and is intended for very, very costly
+    functions compared to the computation time of the optiizer itself
+
+    NB2: One of the cool things is that it can do hyper-parameter
+    optimizations e.g. if the parameters are integers
+
+    NB3: The optimizer comes with several options and might require
+    some wise choices for your particular case
     --------------------------------------------------------------------
 
     Learn a function minimum using ``skopt.Optimizer``.

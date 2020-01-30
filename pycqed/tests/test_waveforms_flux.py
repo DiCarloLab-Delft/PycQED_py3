@@ -60,9 +60,18 @@ class Test_waveforms_flux(unittest.TestCase):
                     np.testing.assert_almost_equal(
                         thetas[len(thetas)//2], theta_f, decimal=3)
 
-        with self.assertRaises(ValueError):
+        # The martinis_flux_pulse was change to always clip values
+        # It breaks sometimes running optmizations if the optmizer tries
+        # certains values that are not allowed. It is a well know "issue"
+        # It is ok to go almost silent
+        with self.assertLogs("", level='DEBUG') as cm:
+            # with self.assertRaises(ValueError):
             theta_i = np.deg2rad(40)
             theta_f = np.deg2rad(30)
             thetas = wfl.martinis_flux_pulse(
                 35e-9, theta_i=theta_i, theta_f=theta_f,
                 lambda_2=lambda_2, lambda_3=lambda_3, sampling_rate=1e9)
+            msg0 = "final coupling weaker than initial coupling"
+            msg1 = "Martinis flux wave form has been clipped to"
+            self.assertIn(msg0, cm.output[0])
+            self.assertIn(msg1, cm.output[1])
