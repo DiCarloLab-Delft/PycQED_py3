@@ -127,7 +127,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         super().__init__(name=name, device=device, interface=interface, server=server, port=port, num_codewords=num_codewords, **kw)
         # Set default waveform length to 20 ns at 2.4 GSa/s
         self._default_waveform_length = 48
-        
+
         # Holds the DIO calibration delay
         self._dio_calibration_delay = 0
 
@@ -477,7 +477,7 @@ while (1) {
         log.info('Setting DIO calibration delay to {}'.format(value))
         # Store the value
         self._dio_calibration_delay = value
-        
+
         # And configure the delays
         self.setd('raw/dios/0/delays/*', self._dio_calibration_delay)
 
@@ -772,8 +772,13 @@ while (1) {
             CC (instr) : an instance of a CCL or QCC
             verbose (bool): if True prints to stdout
         """
+        idn_str = CC.IDN()
+        if 'model' in idn_str.keys():
+            model_key = 'model'
+        elif 'Model' in idn_str.keys():
+            model_key = 'Model'
 
-        CC_model = CC.IDN()['model']
+        CC_model = idn_str[model_key]
         if 'QCC' in CC_model:
             expected_sequence = self._prepare_QCC_dio_calibration(
                 QCC=CC, verbose=verbose)
