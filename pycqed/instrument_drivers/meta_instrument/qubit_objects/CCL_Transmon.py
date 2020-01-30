@@ -2975,7 +2975,7 @@ class CCLight_Transmon(Qubit):
                 Otherwise, uses CW spectroscopy.
         """
         old_spec_pow1=self.spec_pow()
-        self.spec_pow(-30)
+        self.spec_pow(-45)
         if freqs_01 is None:
             freqs_01=self.freq_qubit()+np.arange(-30e6,30.1e6,0.5e6)
         if freqs_12 is None:
@@ -3207,7 +3207,9 @@ class CCLight_Transmon(Qubit):
 
         options_dict={'post_select': post_select,
                       'nr_samples': 2+2*post_select,
-                      'post_select_threshold': post_select_threshold}
+                      'post_select_threshold': post_select_threshold,
+                      'predict_qubit_temp': True,
+                      'qubit_freq': self.freq_qubit()}
         if not vary_residual_excitation:
             options_dict.update(
                 {'fixed_p10':self.res_exc,
@@ -3222,7 +3224,7 @@ class CCLight_Transmon(Qubit):
         ######################################################################
         if update:
             self.res_exc = a.proc_data_dict['quantities_of_interest']['residual_excitation']
-            self.mmt_rel = a.proc_data_dict['quantities_of_interest']['measurement_induced_relaxation']
+            self.mmt_rel = a.proc_data_dict['quantities_of_interest']['relaxation_events']
             # UHFQC threshold is wrong, the magic number is a
             #  dirty hack. This works. we don't know why.
             magic_scale_factor = 1  # 0.655
@@ -3239,7 +3241,7 @@ class CCLight_Transmon(Qubit):
         return {'SNR': a.qoi['SNR'],
                 'F_d': a.qoi['F_d'],
                 'F_a': a.qoi['F_a'],
-                'relaxation': a.proc_data_dict['measurement_induced_relaxation'],
+                'relaxation': a.proc_data_dict['relaxation_events'],
                 'excitation': a.proc_data_dict['residual_excitation']}
 
 
@@ -3993,7 +3995,8 @@ class CCLight_Transmon(Qubit):
     def calibrate_mw_gates_allxy(self, nested_MC=None,
                                  start_values=None,
                                  initial_steps=None,
-                                 parameter_list=None):
+                                 parameter_list=None,
+                                 termination_opt=0.01):
         # FIXME: this tuneup does not update the qubit object parameters
         # FIXME2: this tuneup does not return True upon success
         if initial_steps is None:
@@ -4033,14 +4036,15 @@ class CCLight_Transmon(Qubit):
                         'initial_step': initial_steps,
                         'no_improv_break': 10,
                         'minimize': True,
-                        'maxiter': 500}
+                        'maxiter': 500,
+                        'f_termination': termination_opt}
 
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
         nested_MC.set_optimization_method('nelder_mead')
         nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
-        ma.OptimizationAnalysis(label='gate_tuneup_allxy')
+        a2 = ma.OptimizationAnalysis(label='gate_tuneup_allxy')
 
-        if a2.optimization_result[1][0] > 0.07:
+        if a2.optimization_result[1][0] > termination_opt:
             return False
         else:
             return True
