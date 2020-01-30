@@ -156,6 +156,9 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         assignment_prob_matrix = calc_assignment_prob_matrix(
             combinations, digitized_data, valid_combinations=valid_combinations)
         self.proc_data_dict['assignment_prob_matrix'] = assignment_prob_matrix
+        self.proc_data_dict['quantities_of_interest'] = {'assignment_probability_matrix':assignment_prob_matrix,
+                                                         'trace':np.trace(assignment_prob_matrix)}
+
 
     def prepare_plots(self):
         self.plot_dicts['assignment_probability_matrix'] = {
