@@ -459,7 +459,8 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
         for i_s, q_s in enumerate(q_spectator_idx):
             k.gate(gate_spec[i_s], [q_s])
         k.gate("wait", all_qubits, wait_nanoseconds)
-        k.gate('rxm90', [q0])
+        # k.gate('rxm90', [q0])
+        k.gate('ry90', [q0])
         k.measure(q0)
         for q_s in q_spectator_idx:
             k.measure(q_s)
