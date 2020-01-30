@@ -40,6 +40,9 @@ import pycqed.analysis_v2.cross_dephasing_analysis as cda
 reload(cda)
 import pycqed.analysis_v2.randomized_benchmarking_analysis as rba
 reload(rba)
+
+import pycqed.analysis_v2.multiplexed_readout_analysis as mux
+reload(mux)
 # import pycqed.analysis_v2.gate_set_tomography_analysis as gsa
 # reload(gsa)
 
