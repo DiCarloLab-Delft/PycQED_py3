@@ -1332,7 +1332,10 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('Residual_ZZ_{}_{}_{}{}'.format(q0, q_spectators, spectator_state, self.msmt_suffix))
+        MC.run('Residual_ZZ_{}_{}_{}{}'.format(q0, q_spectators, spectator_state, self.msmt_suffix),
+               exp_metadata={'target_qubit': q0,
+                             'spectator_qubits': str(q_spectators),
+                             'spectator_state': spectator_state})
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
@@ -1465,11 +1468,11 @@ class DeviceCCL(Instrument):
 
         # This assumes qubit names do not contain spaces
         det_qubits = [v.split()[-1] for v in d.value_names]
-        if qubits != det_qubits:
+        if (qubits != det_qubits) and (self.ro_acq_weight_type() == 'optimal'):
             # this occurs because the detector groups qubits per feedline.
             # If you do not pay attention, this will mess up the analysis of
             # this experiment.
-            raise ValueError('Detector qubits do not match order specified')
+            raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
 
         shots_per_meas = int(np.floor(
             np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
@@ -1490,7 +1493,7 @@ class DeviceCCL(Instrument):
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
             a = ma2.Multiplexed_Readout_Analysis(label=label)
-        return
+        return a.proc_data_dict['quantities_of_interest']['trace']
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
@@ -1617,7 +1620,8 @@ class DeviceCCL(Instrument):
                         freq_tone=6e9, pow_tone=-10, spec_tone=False,
                         measure_parked_qubit=False,
                         target_qubit_sequence: str = 'ramsey',
-                        waveform_name='square'):
+                        waveform_name='square',
+                        analyze=True):
         """
         Measure a chevron patter of esulting from swapping of the excitations
         of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
@@ -1748,15 +1752,20 @@ class DeviceCCL(Instrument):
         self.instr_CC.get_instr().start()
 
         if measure_parked_qubit:
-            d = self.get_int_avg_det(qubits=[q0, q_spec, q_park],
-                                     single_int_avg=True,
-                                     seg_per_point=1,
-                                     always_prepare=True)
+            q_list = [q0, q_spec, q_park]
         else:
-            d = self.get_correlation_detector(qubits=[q0, q_spec],
+            q_list = [q0, q_spec]
+
+        if 'optimal' in self.ro_acq_weight_type():
+            d = self.get_correlation_detector(qubits=q_list,
                                               single_int_avg=True,
                                               seg_per_point=1,
                                               always_prepare=True)
+        else:
+            d = self.get_int_avg_det(qubits=q_list,
+                                     single_int_avg=True,
+                                     seg_per_point=1,
+                                     always_prepare=True)
 
         # if we want to add a spec tone
         if spec_tone:
@@ -1776,7 +1785,8 @@ class DeviceCCL(Instrument):
             MC.set_sweep_points_2D(lengths)
 
             MC.run('Chevron {} {}'.format(q0, q_spec), mode='2D')
-            ma.TwoD_Analysis()
+            if analyze:
+                ma.TwoD_Analysis()
         else:
             MC.set_adaptive_function_parameters(
                 {'adaptive_function': adaptive.Learner2D,
@@ -1999,7 +2009,8 @@ class DeviceCCL(Instrument):
         p = mqo.Cryoscope(q0idx, buffer_time1=0,
                           buffer_time2=max_delay,
                           flux_cw=flux_cw,
-                          platf_cfg=self.cfg_openql_platform_fn())
+                          platf_cfg=self.cfg_openql_platform_fn(),
+                          cc=self.instr_CC())
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
