@@ -72,8 +72,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.options_dict['auto_rotation_angle'] = self.options_dict.get(
             'auto_rotation_angle', man_angle)
 
-        self.predict_qubit_temp = self.options_dict.get(predict_qubit_temp,
-                                                        False)
+        self.predict_qubit_temp = 'predict_qubit_temp' in self.options_dict
         if self.predict_qubit_temp:
             self.qubit_freq = self.options_dict['qubit_freq']
 
