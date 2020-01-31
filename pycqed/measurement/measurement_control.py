@@ -29,22 +29,23 @@ from qcodes.plots.colors import color_cycle
 
 # Used for adaptive sampling
 from adaptive import runner
-from adaptive.learner import BaseLearner
-from adaptive.learner import Learner1D
-from adaptive.learner import Learner2D
-from adaptive.learner import LearnerND
+from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
+
+# SKOptLearner Notes
+# NB: This optimizer can be slow and is intended for very, very costly
+# functions compared to the computation time of the optiizer itself
+
+# NB2: One of the cool things is that it can do hyper-parameter
+# optimizations e.g. if the parameters are integers
+
+# NB3: The optimizer comes with several options and might require
+# some wise choices for your particular case
+from adaptive.learner import SKOptLearner
+
 # Optimizer based on adaptive sampling
 from pycqed.utilities.learnerND_optimize import (LearnerND_Optimize,
     evaluate_X)
 
-# In the future should be replaced by `adaptive.learner.SKOptLearner`
-# SKOptLearnerND is a modified version of SKOptLearner
-# to fix a data type matching problem
-# [Victor 2019-12-04] my pull request should be merged soon
-# when an adaptive stable version 0.10.0+ is available replace all
-# SKOptLearnerND with `adaptive.learner.SKOptLearner` and
-# cleanup the comments about this
-from pycqed.measurement.optimization import SKOptLearnerND
 from skopt import Optimizer  # imported for checking types
 
 try:
@@ -375,8 +376,8 @@ class MeasurementControl(Instrument):
                     bounds=self.af_pars["bounds"],
                     loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
                 )
-            elif issubclass(self.adaptive_function, SKOptLearnerND):
-                # NB: SKOptLearnerND is a modified version of SKOptLearner
+            elif issubclass(self.adaptive_function, SKOptLearner):
+                # NB: SKOptLearner is a modified version of SKOptLearner
                 # to fix a data type matching problem
                 # NB2: This learner expects the `optimization_function`
                 # to be scalar
@@ -403,7 +404,7 @@ class MeasurementControl(Instrument):
             # ensures that everything runs in a single process, as is
             # required by QCoDeS (May 2018) and makes things simpler.
             self.runner = runner.simple(learner=self.learner, goal=self.af_pars["goal"])
-            if issubclass(self.adaptive_function, SKOptLearnerND):
+            if issubclass(self.adaptive_function, SKOptLearner):
                 # NB: Having an optmizer that also complies with the adaptive
                 # interface breaks a bit the previous structure
                 # now there are many checks for this case
