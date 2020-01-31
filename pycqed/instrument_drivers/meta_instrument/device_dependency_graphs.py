@@ -131,9 +131,9 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             self.add_node(Qubit.name + ' Dispersive Shift',
                           calibrate_function=Qubit.name + '.measure_dispersive_shift_pulsed')
             self.add_node(Qubit.name + ' SSRO Coarse tune-up',
-                          calibrate_function=Qubit.name + '.measure_ssro')
+                          calibrate_function=Qubit.name + '.calibrate_ssro_coarse')
             self.add_node(Qubit.name + ' SSRO Optimization',
-                          calibrate_function=Qubit.name + '.measure_ssro')
+                          calibrate_function=Qubit.name + '.calibrate_ssro_fine')
 
 
             # If all goes well, the qubit is fully 'calibrated' and can be controlled

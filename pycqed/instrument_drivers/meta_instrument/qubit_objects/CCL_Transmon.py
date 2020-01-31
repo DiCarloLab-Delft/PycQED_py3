@@ -3253,8 +3253,153 @@ class CCLight_Transmon(Qubit):
                 'relaxation': a.proc_data_dict['measurement_induced_relaxation'],
                 'excitation': a.proc_data_dict['residual_excitation']}
 
+    def calibrate_ssro_coarse(self, MC = None,
+                              nested_MC = None,
+                              freqs = None,
+                              amps = None,
+                              analyze: bool = True,
+                              update: bool = True):
+        '''
+        Performs a 2D sweep of <qubit>.ro_freq and <qubit>.ro_pulse_amp and
+        measures SSRO parameters (SNR, F_a, F_d).
+        After the sweep is done, it sets the parameters for which the assignment
+        fidelity was maximum.
 
+        Args:
+            freq (array):
+                Range of frequencies of sweep.
 
+            amps (array):
+                Range of amplitudes of sweep.
+        '''
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        if freqs is None:
+            if self.dispersive_shift() is not None:
+                freqs = np.arange(-2*abs(self.dispersive_shift()),
+                                abs(self.dispersive_shift()),.5e6) + self.freq_res()
+            else:
+                raise ValueError('self.dispersive_shift is None. Please specify\
+                                 range of sweep frequencies.')
+
+        if amps is None:
+            amps = np.linspace(.001, .5, 31)
+
+        nested_MC.set_sweep_function(self.ro_freq)
+        nested_MC.set_sweep_points(freqs)
+        nested_MC.set_sweep_function_2D(self.ro_pulse_amp)
+        nested_MC.set_sweep_points_2D(amps)
+
+        d = det.Function_Detector(self.measure_ssro,
+                                  result_keys=['SNR','F_a','F_d'],
+                                  value_names=['SNR','F_a','F_d'],
+                                  value_units=['a.u.','a.u.','a.u.'])
+        nested_MC.set_detector_function(d)
+        nested_MC.run(name='RO_coarse_tuneup', mode='2D')
+
+        if analyze is True:
+            # Analysis
+            a = ma.TwoD_Analysis(label='RO_coarse_tuneup', auto=False)
+            # Get best parameters
+            a.get_naming_and_values_2D()
+            arg = np.argmax(a.measured_values[1])
+            index = np.unravel_index(arg, (len(a.sweep_points),
+                                           len(a.sweep_points_2D)))
+            best_freq = a.sweep_points[index[0]]
+            best_amp  = a.sweep_points_2D[index[1]]
+            a.run_default_analysis()
+            print('Frequency: {}, Amplitude: {}'.format(best_freq, best_amp))
+
+            if update is True:
+                self.ro_freq(best_freq)
+                self.ro_pulse_amp(best_amp)
+
+            return True
+
+    def calibrate_ssro_fine(self, MC = None,
+                            nested_MC = None,
+                            start_freq = None,
+                            start_amp = None,
+                            start_freq_step = None,
+                            start_amp_step = None,
+                            threshold: float = .99,
+                            analyze: bool = True,
+                            update: bool = True):
+        '''
+        Runs an optimizer routine on the SSRO assignment fidelity of the
+        <qubit>.ro_freq and <qubit>.ro_pulse_amp parameters.
+        Intended to be used in the "SSRO Optimization" node of GBT.
+
+        Args:
+            start_freq (float):
+                Starting frequency of the optmizer.
+
+            start_amp (float):
+                Starting amplitude of the optimizer.
+
+            start_freq_step (float):
+                Starting frequency step of the optmizer.
+
+            start_amp_step (float):
+                Starting amplitude step of the optimizer.
+
+            threshold (float):
+                Fidelity thershold after which the optimizer stops.
+        '''
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        if start_freq_step is None:
+            if start_freq is None:
+                start_freq = self.ro_freq()
+                start_freq_step = 0.1e6
+            else:
+                raise ValueError('Must provide start frequency step if start\
+                                frequency is specified.')
+
+        if start_amp_step is None:
+            if start_amp is None:
+                start_amp = self.ro_pulse_amp()
+                start_amp_step = 0.01
+            else:
+                raise ValueError('Must provide start amplitude step if start\
+                                amplitude is specified.')
+
+        if start_amp is None:
+            start_amp = self.ro_pulse_amp()
+
+        nested_MC.set_sweep_functions([self.ro_freq, self.ro_pulse_amp])
+
+        d = det.Function_Detector(self.calibrate_optimal_weights,
+                                  result_keys=['F_a'],
+                                  value_names=['F_a'],
+                                  value_units=['a.u.'])
+        nested_MC.set_detector_function(d)
+
+        ad_func_pars = {'adaptive_function': nelder_mead,
+                        'x0': [self.ro_freq(), self.ro_pulse_amp()],
+                        'initial_step': [start_freq_step, start_amp_step],
+                        'no_improv_break': 10,
+                        'minimize': False,
+                        'maxiter': 20,
+                        'f_termination': threshold}
+        nested_MC.set_adaptive_function_parameters(ad_func_pars)
+
+        nested_MC.set_optimization_method('nelder_mead')
+        nested_MC.run(name='RO_fine_tuneup', mode='adaptive')
+
+        if analyze is True:
+            ma.OptimizationAnalysis(label='RO_fine_tuneup')
+            return True
 
     def measure_ssro_vs_frequency_amplitude(
             self, freqs=None, amps_rel=np.linspace(0, 1, 11),
@@ -3626,7 +3771,7 @@ class CCLight_Transmon(Qubit):
         """
         Measures the RO resonator spectroscopy with the qubit in ground and excited state.
         Specifically, performs two experiments. Applies sequence:
-        - initialize qubit in ground state (wait)
+        - initialize qubit in ground state (  wait)
         - (only in the second experiment) apply a (previously tuned up) pi pulse
         - apply readout pulse and measure
         This sequence is repeated while sweeping ro_freq.
@@ -3646,13 +3791,16 @@ class CCLight_Transmon(Qubit):
                     "Qubit has no resonator frequency.\
                      \nUpdate freq_res parameter.")
             else:
-                freqs = self.freq_res()+np.arange(-10e6, 10e6, .1e6)
+                freqs = self.freq_res()+np.arange(-10e6, 5e6, .1e6)
 
         if 'optimal' in self.ro_acq_weight_type():
             raise ImplementationError(
                     "Change readout demodulation to SSB.")
 
+        saved_param = self.ro_pulse_amp()
+        self.ro_pulse_amp(self.ro_pulse_amp_CW())
         self.prepare_for_timedomain()
+
         # off/on switching is achieved by turning the MW source on and
         # off as this is much faster than recompiling/uploading
         f_res = []
@@ -3678,10 +3826,11 @@ class CCLight_Transmon(Qubit):
                     label=self.msmt_suffix, close_fig=True)
                 # fit converts to Hz
                 f_res.append(a.fit_results.params['f0'].value*1e9)
+        self.ro_pulse_amp(saved_param)
         if analyze:
             self.dispersive_shift(f_res[1]-f_res[0])
             print('dispersive shift is {} MHz'.format((f_res[1]-f_res[0])*1e-6))
-        return True
+            return True
 
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
@@ -4223,7 +4372,7 @@ class CCLight_Transmon(Qubit):
             threshold:      Assignment fidelity error (1-F_a) threshold used in
                             the optimization.
 
-        Used for Graph based tune-up in the SSRO node.
+        Used for Graph based tune-up.
         '''
 
         # FIXME: Crashes whenever it tries to set the pulse amplitude higher
