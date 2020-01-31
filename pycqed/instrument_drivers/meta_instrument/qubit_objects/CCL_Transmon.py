@@ -3215,7 +3215,7 @@ class CCLight_Transmon(Qubit):
                 {'fixed_p10':self.res_exc,
                  'fixed_p01':self.mmt_rel})
 
-        a = ma2.Singleshot_Readout_Analysis(
+        a = ma2.ra.Singleshot_Readout_Analysis(
             options_dict=options_dict,
             extract_only=no_figs)
 
