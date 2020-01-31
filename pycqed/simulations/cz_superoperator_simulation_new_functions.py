@@ -171,8 +171,8 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
         J * (-1)*(a.dag()*b+a*b.dag()) \
-        # + J * (basis_state(0,1,to_vector=False)*basis_state(1,0,to_vector=False).dag() + \
-        #        basis_state(1,0,to_vector=False)*basis_state(0,1,to_vector=False).dag())
+         # + np.sqrt(3)*J * (basis_state(0,3,to_vector=False)*basis_state(1,2,to_vector=False).dag() + \
+         #        basis_state(1,2,to_vector=False)*basis_state(0,3,to_vector=False).dag())
         #(a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
     H = H * (2*np.pi)
     return H
@@ -948,24 +948,67 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
 
     #t0 = time.time()
 
-    exp_L_total=1
-    for i in range(len(amp)):
-        H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ)
-        H=S.dag()*H*S
-        S_H = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])   
-                                                   # Alternative for collapse operators that follow the basis of H
-                                                   # We do not believe that this would be the correct model.
-        if c_ops != []:
-            c_ops_temp=[]
-            for c in range(len(c_ops)):
-                if isinstance(c_ops[c],list):
-                    c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_H.dag())    # c_ops are already in the H_0 basis
-                else:
-                    c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
-            liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*intervals_list[i]).expm()
-        else:
-            liouville_exp_t=(-1j*H*intervals_list[i]).expm()
-        exp_L_total=liouville_exp_t*exp_L_total
+    normal_mode = False
+
+    if normal_mode:
+
+        exp_L_total=1
+        for i in range(len(amp)):
+            H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ)
+            H=S.dag()*H*S
+            S_H = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])   
+                                                       # Alternative for collapse operators that follow the basis of H
+                                                       # We do not believe that this would be the correct model.
+            if c_ops != []:
+                c_ops_temp=[]
+                for c in range(len(c_ops)):
+                    if isinstance(c_ops[c],list):
+                        c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_H.dag())    # c_ops are already in the H_0 basis
+                    else:
+                        c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
+                liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*intervals_list[i]).expm()
+            else:
+                liouville_exp_t=(-1j*H*intervals_list[i]).expm()
+            exp_L_total=liouville_exp_t*exp_L_total
+
+    else:
+
+        popul_12to12 = []
+        popul_12to21 = []
+        popul_12to03 = []
+
+        exp_L_total=1
+        for i in range(len(amp)):
+            H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ)
+            H=S.dag()*H*S
+            S_H = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])   
+                                                       # Alternative for collapse operators that follow the basis of H
+                                                       # We do not believe that this would be the correct model.
+            if c_ops != []:
+                c_ops_temp=[]
+                for c in range(len(c_ops)):
+                    if isinstance(c_ops[c],list):
+                        c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_H.dag())    # c_ops are already in the H_0 basis
+                    else:
+                        c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
+                liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*intervals_list[i]).expm()
+            else:
+                liouville_exp_t=(-1j*H*intervals_list[i]).expm()
+            exp_L_total=liouville_exp_t*exp_L_total
+
+            popul_12to12.append(average_population_transfer_subspace_to_subspace(exp_L_total,states_in=[[1,2]],states_out=[[1,2]]))
+            popul_12to21.append(average_population_transfer_subspace_to_subspace(exp_L_total,states_in=[[1,2]],states_out=[[2,1]]))
+            popul_12to03.append(average_population_transfer_subspace_to_subspace(exp_L_total,states_in=[[1,2]],states_out=[[0,3]]))
+
+        f_pulse = fluxlutman.calc_amp_to_freq(amp,'01')
+
+        plot(x_plot_vec=[np.array(f_pulse)/1e9],
+                  y_plot_vec=[np.array(popul_12to12),np.array(popul_12to21),np.array(popul_12to03)],
+                  title='Study of popul. exchange in 3-excitation manifold',
+                  xlabel='w_flux (GHz)',ylabel='Popul.',
+                  legend_labels=['12to12', '12to21', '12to03'])
+
+
 
     #t1 = time.time()
     #print('\n alternative propagator',t1-t0)
@@ -1080,6 +1123,7 @@ def plot(x_plot_vec,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No yl
             plt.plot(x_plot_vec[i], y_plot_vec[i], label=legend_labels[i])
 
     plt.legend()
+    #plt.ylim(15,20)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -1347,7 +1391,8 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
 
 def plot_spectrum(fluxlutman,noise_parameters_CZ):
     eig_vec=[]
-    amp_vec=np.arange(0,1.5,.01)
+    freq_vec = np.arange(6.0e9, 6.7e9, 0.01e9)
+    amp_vec=fluxlutman.calc_freq_to_amp(freq_vec,state='01')
     for amp in amp_vec:
         H=calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ)
         eigs=H.eigenenergies()
@@ -1356,7 +1401,7 @@ def plot_spectrum(fluxlutman,noise_parameters_CZ):
     eig_plot=[]
     for j in range(len(eig_vec[0])):
         eig_plot.append(eig_vec[:,j])
-    plot(x_plot_vec=[fluxlutman.calc_amp_to_freq(amp_vec,'01')/1e9],
+    plot(x_plot_vec=[freq_vec/1e9],
                           y_plot_vec=eig_plot,
                           title='Spectrum',
                           xlabel=r'$\omega_{q0}$ (GHz)',ylabel='Frequency (GHz)')
