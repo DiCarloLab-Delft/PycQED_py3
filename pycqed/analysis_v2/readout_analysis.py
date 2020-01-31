@@ -119,8 +119,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             data_range_y = (np.min([np.min(b) for b in shots[:, 1]]),
                             np.max([np.max(b) for b in shots[:, 1]]))
             data_range_xy = (data_range_x, data_range_y)
-            nr_bins_2D = self.options_dict.get(
-                'nr_bins_2D', 6*np.sqrt(nr_bins))
+            nr_bins_2D = int(self.options_dict.get(
+                'nr_bins_2D', 6*np.sqrt(nr_bins)))
             H0, xedges, yedges = np.histogram2d(x=shots[0, 0],
                                                 y=shots[0, 1],
                                                 bins=nr_bins_2D,
