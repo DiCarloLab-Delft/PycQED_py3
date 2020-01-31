@@ -625,7 +625,8 @@ class MeasurementControl(Instrument):
                     raise StopIteration()
             vals = np.multiply(-1, vals)
 
-        if is_subclass(self.adaptive_function, BaseLearner):
+        # if is_subclass(self.adaptive_function, BaseLearner):
+        if self.mode == "adaptive":
             # Keep track of the best seen points so far so that they can
             # plotted as stars
             col_indx = len(self.sweep_function_names) + self.par_idx
