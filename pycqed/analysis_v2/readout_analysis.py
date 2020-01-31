@@ -89,7 +89,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         nr_samples = self.options_dict.get('nr_samples', 2)
         sample_0 = self.options_dict.get('sample_0', 0)
         sample_1 = self.options_dict.get('sample_1', 1)
-        nr_bins = self.options_dict.get('nr_bins', 100)
+        nr_bins = int(self.options_dict.get('nr_bins', 100))
 
         ######################################################
         #  Separating data into shots for 0 and shots for 1  #
@@ -816,7 +816,7 @@ class Multiplexed_Readout_Analysis_deprecated(ba.BaseDataAnalysis):
         Responsible for creating the histograms based on the raw data
         """
         # Determine the shape of the data to extract wheter to rotate or not
-        nr_bins = self.options_dict.get('nr_bins', 100)
+        nr_bins = int(self.options_dict.get('nr_bins', 100))
 
         # self.proc_data_dict['shots_0'] = [''] * nr_expts
         # self.proc_data_dict['shots_1'] = [''] * nr_expts
