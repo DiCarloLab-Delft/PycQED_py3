@@ -5,6 +5,10 @@ from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
 from pycqed.simulations import cz_superoperator_simulation_new2 as cz_main
+from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ as scCZ
+import adaptive
+from pycqed.analysis_v2 import measurement_analysis as ma2
+from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 try:
@@ -17,6 +21,12 @@ from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import time
+from datetime import datetime
+import cma
+from pycqed.measurement.optimization import nelder_mead, multi_targets_phase_offset
+from pycqed.utilities.learnerND_optimize import (
+    mk_optimize_res_loss_func,
+    LearnerND_Optimize)
 
 import logging
 log = logging.getLogger(__name__)
@@ -124,7 +134,7 @@ class Base_Flux_LutMan(Base_LutMan):
                     xlabel=xlab[0], xunit=xlab[1], ylabel='Amplitude',
                     yunit='dac val.')
             else:
-                logging.warning('Wave not in distorted wave dict')
+                log.warning('Wave not in distorted wave dict')
         # Plotting the normal one second ensures it is on top.
         QtPlot_win.add(
             x=x, y=y, name=wave_name,
@@ -227,7 +237,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                initial_value=6e9,
                                unit='Hz', parameter_class=ManualParameter)
             self.add_parameter(
-                'q_J2_%s' % this_cz, vals=vals.Numbers(), unit='Hz',
+                'q_J2_%s' % this_cz, vals=vals.Numbers(1e3, 500e6), unit='Hz',
                 docstring='effective coupling between the 11 and 02 states.',
                 # initial value is chosen to not raise errors
                 initial_value=15e6, parameter_class=ManualParameter)
@@ -279,7 +289,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                vals=vals.Numbers(),
                                parameter_class=ManualParameter)
             self.add_parameter('cz_length_%s' % this_cz,
-                               vals=vals.Numbers(),
+                               vals=vals.Numbers(0.5e-9, 500e-9),
                                unit='s', initial_value=35e-9,
                                parameter_class=ManualParameter)
             self.add_parameter('cz_lambda_2_%s' % this_cz,
@@ -423,7 +433,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             corr_pulse = phase_corr_square(
                 int_val=corr_int, nr_samples=corr_samples)
             if np.max(corr_pulse) > 0.5:
-                logging.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
+                log.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
                     np.max(corr_pulse)))
         else:
             corr_pulse = np.zeros(corr_samples)
@@ -691,9 +701,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             polycoeffs += self.q_polycoeffs_freq_01_det()
             polycoeffs[2] += self.q_freq_01()
         elif state == '02':
-            polycoeffs += 2*self.q_polycoeffs_freq_01_det()
+            polycoeffs += 2 * self.q_polycoeffs_freq_01_det()
             polycoeffs += self.q_polycoeffs_anharm()
-            polycoeffs[2] += 2*self.q_freq_01()
+            polycoeffs[2] += 2 * self.q_freq_01()
         elif state == '10':
             polycoeffs[2] += freq_10
         elif state == '11':
@@ -710,7 +720,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         ch_pair = awg_ch % 2
 
         channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
-                awg_nr, ch_pair))
+            awg_nr, ch_pair))
         return channel_amp
 
     def _set_awg_channel_amplitude(self, val):
@@ -929,7 +939,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         N.B. the implementation is specific to this type of AWG
         """
         if self.AWG() is None:
-            logging.warning('No AWG present, returning unity scale factor.')
+            log.warning('No AWG present, returning unity scale factor.')
             return 1
         channel_amp = self.cfg_awg_channel_amplitude()
         channel_range_pp = self.cfg_awg_channel_range()
@@ -941,8 +951,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if self.get_dac_val_to_amp_scalefactor() == 0:
                 # Give a warning and don't raise an error as things should not
                 # break because of this.
-            logging.warning('AWG amp to dac scale factor is 0, check "{}" '
-                            'output amplitudes'.format(self.AWG()))
+            log.warning('AWG amp to dac scale factor is 0, check "{}" '
+                        'output amplitudes'.format(self.AWG()))
             return 1
         return 1/self.get_dac_val_to_amp_scalefactor()
 
@@ -984,7 +994,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             corr_pulse = phase_corr_square(
                 int_val=corr_int, nr_samples=corr_samples)
             if np.max(corr_pulse) > 0.5:
-                logging.warning('net-zero integral correction({:.2f}) larger than 0.5'.format(
+                log.warning('net-zero integral correction({:.2f}) larger than 0.5'.format(
                     np.max(corr_pulse)))
         else:
             corr_pulse = np.zeros(corr_samples)
@@ -1325,7 +1335,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         for this_cz in ['NE', 'NW', 'SW', 'SE']:
             self.add_parameter('bus_freq_%s' % this_cz,
                                docstring='[CZ simulation] Bus frequency.',
-                               vals=vals.Numbers(),
+                               vals=vals.Numbers(0.1e9, 1000e9),
+                               initial_value=7.77e9,
                                parameter_class=ManualParameter)
             self.add_parameter('instr_sim_control_CZ_%s' % this_cz,
                                docstring='Noise and other parameters for CZ simulation.',
@@ -1333,7 +1344,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def sim_CZ(self, fluxlutman_static, which_gate=None, qois='all'):
         """
-        Simulates a CZ gate for the current paramenters.
+        Simulates a CZ gate for the current parameters.
         At least one 'instr_sim_control_CZ_{which_gate}' needs to be set
         in the current fluxlutman.
         """
@@ -1341,38 +1352,370 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if which_gate is None:
             found = []
             for this_cz in ['NE', 'NW', 'SW', 'SE']:
-                try:
-                    found.append(getattr(self, 'instr_sim_control_CZ_{}'.format(this_cz)).get_instr())
-                except Exception:
-                    pass
-
+                instr_name = self.get(
+                    'instr_sim_control_CZ_{}'.format(this_cz))
+                if instr_name is not None:
+                    found.append(
+                        self.parameters['instr_sim_control_CZ_{}'.format(this_cz)].get_instr())
             if len(found) == 0:
-                raise Exception('No sim_control_CZ instrument found! Define a "SimControlCZ" instrument first.')
+                raise Exception(
+                    'No sim_control_CZ instrument found! Define a "SimControlCZ" instrument first.')
             elif len(found) > 1:
                 raise Exception('CZ instruments found: {}. Please specify "which_gate"'.
-                    format(found))
+                                format(found))
             else:
                 sim_control_CZ = found[0]
                 which_gate = sim_control_CZ.which_gate()
         else:
-            sim_control_CZ = getattr(self, 'instr_sim_control_CZ_{}'.format(which_gate)).get_instr()
+            sim_control_CZ = self.parameters['instr_sim_control_CZ_{}'.format(
+                which_gate)].get_instr()
             assert which_gate == sim_control_CZ.which_gate()
 
         detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ,
-            fluxlutman_static=fluxlutman_static, qois=qois)
+                                                       fluxlutman_static=fluxlutman_static, qois=qois)
 
         sim_results = detector.acquire_data_point()
 
         if qois == 'all':
-            values = {detector.value_names[i]: sim_results[i] for i, result in enumerate(sim_results)}
-            units = {detector.value_names[i]: detector.value_units[i] for i, result in enumerate(sim_results)}
+            values = {detector.value_names[i]: sim_results[i]
+                      for i, result in enumerate(sim_results)}
+            units = {detector.value_names[i]: detector.value_units[i]
+                     for i, result in enumerate(sim_results)}
         else:
             values = {qoi: sim_results[i] for i, qoi in enumerate(qois)}
             units = {qoi: detector.value_units[detector.value_names.index(qoi)]
-                for i, qoi in enumerate(qois)}
+                     for i, qoi in enumerate(qois)}
             pass
 
         return values, units
+
+    def simulate_cz_and_select_optima(
+            self,
+            MC,
+            fluxlutman_static,
+            which_gate,
+            n_points=249,
+            res_bounds=(0.7, 2.0),
+            theta_f_lims=[10, 180],
+            lambda_2_lims=[-1., 1.],
+            lambda_3=0.,
+            sim_control_CZ_pars=None,
+            label=None,
+            target_cond_phase=180,
+            optimize_phase_q0=False,
+            evaluate_local_optimals=False,
+            qois=['Cost func', 'Cond phase', 'L1', 'phase_q0', 'phase_q1'],
+            sweep_mode='adaptive',
+            adaptive_pars=None):
+        """
+        Runs an adaptive sampling of the CZ simulation by sweeping
+        cz_theta_f_{which_gate} and cz_lambda_2_{which_gate}
+        """
+        # Sanity checks for the parameters
+        # Making sure the default values were changed
+        sim_pars_sanity_check(MC.station, self, fluxlutman_static, which_gate)
+
+        # Create a SimControlCZ virtual instrument if it doesn't exist or get it
+        sim_control_CZ_par_name = 'instr_sim_control_CZ_{}'.format(which_gate)
+        sim_control_CZ_name = self.get(sim_control_CZ_par_name)
+        found_name = sim_control_CZ_name is not None
+        found_instr = self._all_instruments.get(
+            sim_control_CZ_name) is not None
+        if found_name and found_instr:
+            sim_control_CZ = self.find_instrument(sim_control_CZ_name)
+            assert which_gate == sim_control_CZ.which_gate()
+        else:
+            intr_name = 'sim_control_CZ_{}_{}'.format(which_gate, self.name)
+            sim_control_CZ = scCZ.SimControlCZ(intr_name)
+            sim_control_CZ.which_gate(which_gate)
+            MC.station.add_component(sim_control_CZ)
+            if found_name:
+                log.debug('Changing {} from {} to {}.'.format(
+                    sim_control_CZ_par_name,
+                    sim_control_CZ_name,
+                    intr_name))
+            self.set(sim_control_CZ_par_name, sim_control_CZ.name)
+
+        if sim_control_CZ_pars is None or 'cost_func_str' not in sim_control_CZ_pars:
+            cost_func_str = "lambda qoi: {} + qoi['L1'] * 100 / {}".format(
+                            multi_targets_phase_offset(target=target_cond_phase,
+                                                       spacing=2 * target_cond_phase,
+                                                       phase_name="qoi['phi_cond']"),
+                            0.05)  # 0.05% L1 equiv. to 1 deg in cond phase
+            sim_control_CZ.cost_func_str(cost_func_str)
+
+        if sim_control_CZ_pars is not None:
+            for key, val in sim_control_CZ_pars.items():
+                sim_control_CZ.set(key, val)
+
+        sim_control_CZ.set_cost_func()
+
+        # Create a CZ_trajectory_superoperator detector if it doesn't exist
+        detector = cz_main.CZ_trajectory_superoperator(self, sim_control_CZ,
+                                                       fluxlutman_static=fluxlutman_static, qois=qois)
+
+        MC.set_detector_function(detector)
+
+        MC.set_sweep_functions([
+            self['cz_theta_f_{}'.format(which_gate)],
+            self['cz_lambda_2_{}'.format(which_gate)]
+        ])
+
+        lambda_3_saved = self.get('cz_lambda_3_{}'.format(which_gate))
+        lambda_2_saved = self.get('cz_lambda_2_{}'.format(which_gate))
+        theta_f_saved = self.get('cz_theta_f_{}'.format(which_gate))
+
+        log.debug('Setting cz_lambda_3_{} to {}.'.format(which_gate, lambda_3))
+        self.set('cz_lambda_3_{}'.format(which_gate), lambda_3)
+
+        if label is None:
+            time_string = datetime.now().strftime('%f')
+            label = 'auto_{}_{}'.format(sim_control_CZ.name, time_string)
+
+        if sweep_mode == 'linear':
+            n_pnts_per_dim = np.int(np.ceil(np.sqrt(n_points)))
+            MC.set_sweep_points(np.linspace(*theta_f_lims, n_pnts_per_dim))
+            MC.set_sweep_points_2D(np.linspace(*lambda_2_lims, n_pnts_per_dim))
+            MC.run(label, mode='2D')
+
+        elif sweep_mode == 'adaptive':
+            loss = mk_optimize_res_loss_func(
+                n_points=n_points,
+                n_dim=2,  # Optimizing 2 over parameters
+                res_bounds=res_bounds,
+                minimize=True,
+                use_grad=True)
+
+            adaptive_pars_default = {
+                'adaptive_function': LearnerND_Optimize,
+                'n_points': n_points,
+                'bounds': np.array([theta_f_lims, lambda_2_lims]),
+                'goal': lambda l: l.npoints > n_points,
+                'loss_per_simplex': loss
+            }
+            adaptive_pars = adaptive_pars or adaptive_pars_default
+            MC.set_adaptive_function_parameters(adaptive_pars)
+            MC.run(
+                label,
+                mode='adaptive',
+                exp_metadata={'adaptive_pars': adaptive_pars})
+        else:
+            raise ValueError('sweep_mode not recognized!')
+
+        cluster_from_interp = False
+
+        coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
+            label=label,
+            close_figs=True,
+            extract_only=True,
+            save_qois=False,
+            plt_orig_pnts=True,
+            plt_contour_L1=False,
+            plt_optimal_values=True,
+            plt_contour_phase=True,
+            plt_optimal_values_max=2,
+            find_local_optimals=True,
+            plt_clusters=True,
+            cluster_from_interp=cluster_from_interp,
+            rescore_spiked_optimals=True,
+            plt_optimal_waveforms_all=True,
+            waveform_flux_lm_name=self.name,
+            opt_are_interp=not (
+                evaluate_local_optimals and cluster_from_interp),
+            clims={
+                'L1': [0, 1],
+                # 'Cost func': [0, 100] # was useful when the cost func
+                # was being top and bottom bounded with a modified
+                # Lennard-Jones potential
+            },
+            target_cond_phase=target_cond_phase
+        )
+        print('Adaptive sampling finished.')
+        # print(coha.get_readable_optimals(optimal_end=2))
+
+        eval_opt_pvs = list(coha.proc_data_dict['optimal_pars_values'])
+        eval_opt_mvs = list(coha.proc_data_dict['optimal_measured_values'])
+        opt_num = len(eval_opt_pvs)
+        if evaluate_local_optimals and cluster_from_interp and opt_num > 0:
+            print('Found {} optima from interpolated data'.format(opt_num))
+            print('Evaluating optima...')
+            for opt_idx in range(opt_num):
+                adaptive_pars = {'adaptive_function': nelder_mead,
+                                 'x0': [
+                                     eval_opt_pvs[opt_idx]['cz_theta_f_{}'.format(
+                                         which_gate)],
+                                     eval_opt_pvs[opt_idx]['cz_lambda_2_{}'.format(
+                                         which_gate)],
+                                 ],
+                                 'initial_step': [1, 0.01],
+                                 'maxiter': 10  # Just a few points to evaluate near the minimum
+                                 }
+                MC.set_adaptive_function_parameters(adaptive_pars)
+                MC.set_detector_function(detector)
+
+                MC.set_sweep_functions([
+                    self['cz_theta_f_{}'.format(which_gate)],
+                    self['cz_lambda_2_{}'.format(which_gate)]
+                ])
+
+                if label is None:
+                    time_string = datetime.now().strftime('%f')
+                    label_eval = 'auto_{}_eval_{}_{}'.format(
+                        sim_control_CZ.name, opt_idx, time_string)
+                else:
+                    label_eval = label + '_#{}'.format(opt_idx)
+
+                MC.run(
+                    label_eval,
+                    mode='adaptive',
+                    exp_metadata={'adaptive_pars': adaptive_pars})
+
+                eval_coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
+                    label=label_eval,
+                    close_figs=True,
+                    plt_orig_pnts=True,
+                    plt_contour_L1=False,
+                    plt_optimal_values=True,
+                    plt_contour_phase=True,
+                    find_local_optimals=False,
+                    cluster_from_interp=False,
+                    rescore_spiked_optimals=False,
+                    plt_optimal_waveforms_all=True,
+                    waveform_flux_lm_name=self.name,
+                    clims={
+                        'L1': [0, 1],
+                        'Cost func': [0, 100]
+                    },
+                    target_cond_phase=target_cond_phase
+                )
+                # Save the best point
+                eval_opt_pvs[opt_idx] = eval_coha.proc_data_dict['optimal_pars_values'][0]
+                eval_opt_mvs[opt_idx] = eval_coha.proc_data_dict['optimal_measured_values'][0]
+
+            # Save the evaluated values in the main analysis object
+            # So that the evaluated values are included in the plot
+            coha.proc_data_dict['optimal_pars_values'] = eval_opt_pvs
+            coha.proc_data_dict['optimal_measured_values'] = eval_opt_mvs
+
+        if optimize_phase_q0:
+
+            cost_func_str = "lambda qoi: LJP_mod({} + qoi['L1'] * 100 / {} + {} / {}, {})".format(
+                multi_targets_phase_offset(
+                    target=target_cond_phase, spacing=2 * target_cond_phase, phase_name="qoi['phi_cond']"),
+                str(0.05),  # 0.05% L1 equiv. to 1 deg in cond phase
+                multi_targets_phase_offset(
+                    target=0, spacing=90, phase_name="qoi['phase_q0']"),
+                str(1),
+                str(180))
+            sim_control_CZ.set_cost_func(cost_func_str=cost_func_str)
+
+            lambda_3_start = self.get('cz_lambda_3_{}'.format(which_gate))
+
+            # 6 = 3 * 2 deg, if we get 2 deg of deviation from the target it is
+            # good enough
+            ftarget = scCZ.LJP_mod(6, 180)
+            maxfevals = 300
+            cost_func = coha.proc_data_dict['optimal_measured_values'][0]['Cost func']
+            optimals_num = len(coha.proc_data_dict['optimal_measured_values'])
+            optimal_pars_values = coha.proc_data_dict['optimal_pars_values']
+            best_par_res = {}
+            best_mv_res = {}
+            k = 0
+            for k in range(optimals_num):
+                if cost_func < ftarget:
+                    break
+                elif k > 0:
+                    print('Target value not reached under {} evaluations trying next optimal guess...'.format(
+                        maxfevals))
+                print('Starting optimizer for Optimal #{}'.format(k))
+
+                lambda_2_start = optimal_pars_values[k]['cz_lambda_2_{}'.format(
+                    which_gate)]
+                theta_f_start = optimal_pars_values[k]['cz_theta_f_{}'.format(
+                    which_gate)]
+
+                adaptive_pars = {
+                    'adaptive_function': cma.fmin,
+                    'x0': [theta_f_start, lambda_2_start, lambda_3_start],
+                    'sigma0': 1,
+                    # options for the CMA algorithm can be found using
+                    # "cma.CMAOptions()"
+                    'minimize': True,
+                    'options': {
+                        'maxfevals': maxfevals,  # maximum function cals
+                        'ftarget': ftarget,
+                        # Scaling for individual sigma's
+                        # Allow for bigger exploration of lambda_3
+                        'cma_stds': [10, 0.05, .3]},
+                }
+
+                MC.set_sweep_functions([self['cz_theta_f_{}'.format(which_gate)],
+                                        self['cz_lambda_2_{}'.format(
+                                            which_gate)],
+                                        self['cz_lambda_3_{}'.format(which_gate)]])
+
+                MC.set_adaptive_function_parameters(adaptive_pars)
+
+                optimizer_label = label + '_optimizer'
+
+                MC.run(optimizer_label,
+                       mode='adaptive',
+                       exp_metadata={'adaptive_pars': adaptive_pars})
+
+                a = ma.OptimizationAnalysis(
+                    label=optimizer_label, plot_all=True)
+                par_res = {par_name: a.optimization_result[0][i] for i, par_name in enumerate(
+                    a.parameter_names)}
+                mv_res = {mv: a.optimization_result[1][i]
+                          for i, mv in enumerate(a.value_names)}
+
+                best_seen_idx = np.argmin(a.data[np.size(a.parameter_names)])
+                best_seen_pars = a.data[:np.size(
+                    a.parameter_names), best_seen_idx]
+                best_senn_mvs = a.data[np.size(
+                    a.parameter_names):, best_seen_idx]
+                best_seen_par_res = {
+                    par_name: best_seen_pars[i] for i, par_name in enumerate(a.parameter_names)}
+                best_seen_mv_res = {mv: best_senn_mvs[i]
+                                    for i, mv in enumerate(a.value_names)}
+
+                if not bool(best_par_res) or best_seen_mv_res['Cost func'] < cost_func:
+                    best_par_res = best_seen_par_res
+                    best_mv_res = best_seen_mv_res
+
+                cost_func = best_seen_mv_res['Cost func']
+
+                print('\nConverged to:')
+                print('Parameters:')
+                print(par_res)
+                print('Measured quantities:')
+                print(mv_res)
+                print('\nBest seen:')
+                print('Parameters:')
+                print(best_seen_par_res)
+                print('Measured quantities:')
+                print(best_seen_mv_res)
+
+        self.set('cz_lambda_3_{}'.format(which_gate), lambda_3_saved)
+        self.set('cz_lambda_2_{}'.format(which_gate), lambda_2_saved)
+        self.set('cz_theta_f_{}'.format(which_gate), theta_f_saved)
+
+        coha.save_quantities_of_interest()
+        coha.run_post_extract()
+
+        if not optimize_phase_q0:
+            print(coha.proc_data_dict['optimal_pars_values'])
+            print(coha.proc_data_dict['optimal_measured_values'])
+            print(coha.get_readable_optimals())
+            return coha.proc_data_dict['optimal_pars_values'], coha.proc_data_dict['optimal_measured_values']
+        else:
+            print('\nFinished optimizations with:')
+            print('Parameters:')
+            print(best_par_res)
+            print('Measured quantities:')
+            print(best_mv_res)
+            # Returning same shapes as above for uniformity
+            return [best_par_res], [best_mv_res]
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
@@ -1414,7 +1757,7 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
         AWG = self.AWG.get_instr()
         awg_ch = self.cfg_awg_channel()
 
-        channel_amp = AWG.set('ch{}_amp'.format(awg_ch),val)
+        channel_amp = AWG.set('ch{}_amp'.format(awg_ch), val)
         return channel_amp
 
     def _add_cfg_parameters(self):
@@ -1523,3 +1866,55 @@ def phase_corr_sine_series_half(a_i, nr_samples):
 
 def roundup1024(n):
     return int(np.ceil(n/1024)*1024)
+
+
+def sim_pars_sanity_check(station, flm, flm_static, which_gate):
+    dummy_flm_default_name = 'dummy_flm_default'
+    found_dummy = dummy_flm_default_name in flm._all_instruments
+    dummy_flm_default = flm.find_instrument(
+        dummy_flm_default_name) if found_dummy else None
+
+    if dummy_flm_default is None:
+        dummy_flm_default = HDAWG_Flux_LutMan(dummy_flm_default_name)
+        station.add_component(dummy_flm_default)
+    which_gate_pars = {
+        'bus_freq_',
+        'czd_double_sided_',
+        'cz_length_',
+        'q_freq_10_',
+        'q_J2_',
+    }
+    msg_str = '\n{} has default value!'
+
+    for par_prefix in which_gate_pars:
+        par_name = par_prefix + which_gate
+        val = flm.get(par_name)
+        val_default = dummy_flm_default.get(par_name)
+        if np.equal(val, val_default):
+            log.warning(msg_str.format(par_name))
+
+    np_pars = {
+        'q_polycoeffs_anharm',
+        'q_polycoeffs_freq_01_det'
+    }
+    for par_name in np_pars:
+        val = flm.get(par_name)
+        val_default = dummy_flm_default.get(par_name)
+        if np.any(np.equal(val, val_default)):
+            log.warning(msg_str.format(par_name))
+
+    pars = {'q_freq_01'}
+    for par_name in pars:
+        val = flm.get(par_name)
+        val_default = dummy_flm_default.get(par_name)
+        if np.equal(val, val_default):
+            log.warning(msg_str.format(par_name))
+
+    static_np_pars = {'q_polycoeffs_anharm'}
+    for par_name in static_np_pars:
+        val = flm_static.get(par_name)
+        val_default = dummy_flm_default.get(par_name)
+        if np.any(np.equal(val, val_default)):
+            log.warning(msg_str.format(par_name))
+
+    return True

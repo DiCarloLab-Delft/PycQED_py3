@@ -1183,7 +1183,6 @@ class FLsweep(Soft_Sweep):
         self.AWG.start()
 
 
-
 class Nested_resonator_tracker(Soft_Sweep):
     """
     Sets a parameter and performs a "find_resonator_frequency" measurement

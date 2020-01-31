@@ -10,7 +10,7 @@ from pycqed.measurement.sweep_functions import None_Sweep, None_Sweep_idx, \
 import pycqed.measurement.detector_functions as det
 from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
     import DummyParHolder
-from pycqed.measurement.optimization import nelder_mead, SPSA
+from pycqed.measurement.optimization import nelder_mead, SPSA, SKOptLearnerND
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.utilities.get_default_datadir import get_default_datadir
 from pycqed.measurement.hdf5_data import read_dict_from_hdf5
@@ -495,6 +495,24 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertLess(yf, 0.7)
         self.assertLess(pf, 0.7)
 
+    def test_adaptive_iter_plot(self):
+        """
+        Check that the evolution of parameters over iterations is
+        plotted correctly
+        """
+        self.MC.soft_avg(1)
+        self.mock_parabola.noise(0)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y, self.mock_parabola.z])
+        self.MC.set_adaptive_function_parameters(
+            {'adaptive_function': nelder_mead,
+             'x0': [-50, -50, -50], 'initial_step': [2.5, 2.5, 2.5]})
+        self.mock_parabola.noise(.5)
+        self.MC.set_detector_function(self.mock_parabola.parabola)
+        self.MC.run('adaptive params iter plot test', mode='adaptive')
+        assert 'x' in self.MC.secondary_QtPlot.traces[0]['config']['ylabel']
+        assert 'parabola' in self.MC.secondary_QtPlot.traces[-2]['config']['ylabel']
+
     def test_adaptive_measurement_cma(self):
         """
         Example on how to use the cma-es evolutionary algorithm.
@@ -595,6 +613,40 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('2D adaptive sampling test', mode='adaptive')
 
+    def test_adaptive_SKOptLearnerND(self):
+        # NB cool stuff: this can also optimize integers and other
+        # hyper-parameters
+        self.MC.soft_avg(1)
+        self.mock_parabola.noise(0.5)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y])
+        self.MC.set_adaptive_function_parameters({'adaptive_function': SKOptLearnerND,
+                                                    'goal': lambda l: l.npoints > 24,
+                                                    'dimensions': [(-50.0, +50.0),
+                                                                (-20.0, +30.0)],
+                                                    'base_estimator': 'gp',
+                                                    'acq_func': 'gp_hedge',
+                                                    'acq_optimizer': 'lbfgs'})
+        self.MC.set_detector_function(self.mock_parabola.parabola)
+        dat = self.MC.run('2D SKOptLearnerND adaptive sampling test', mode='adaptive')
+
+    def test_adaptive_SKOptLearnerND_list_of_vals(self):
+        # NB cool stuff: this can also optimize integers and other
+        # hyper-parameters
+        self.MC.soft_avg(1)
+        self.mock_parabola.noise(0.5)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y])
+        self.MC.set_adaptive_function_parameters({'adaptive_function': SKOptLearnerND,
+                                                    'goal': lambda l: l.npoints > 14,
+                                                    'dimensions': [(-50.0, +50.0),
+                                                                (-20.0, +30.0)],
+                                                    'base_estimator': 'gp',
+                                                    'acq_func': 'gp_hedge',
+                                                    'acq_optimizer': 'lbfgs'})
+        self.MC.set_detector_function(self.mock_parabola.parabola_list)
+        dat = self.MC.run('2D SKOptLearnerND adaptive sampling test multi', mode='adaptive')
+
     def test_progress_callback(self):
 
         progress_param = ManualParameter('progress', initial_value=0)
@@ -612,14 +664,6 @@ class Test_MeasurementControl(unittest.TestCase):
         dat = self.MC.run('1D_soft')
 
         self.assertEqual(progress_param(), 100)
-
-
-    @classmethod
-    def tearDownClass(self):
-        self.MC.close()
-        self.mock_parabola.close()
-        del self.station.components['MC']
-        del self.station.components['mock_parabola']
 
     def test_persist_mode(self):
         sweep_pts = np.linspace(0, 10, 5)
@@ -687,3 +731,10 @@ class Test_MeasurementControl(unittest.TestCase):
             {}, a.data_file['Experimental Data']['Experimental Metadata'])
 
         np.testing.assert_equal(metadata_dict, loaded_dict)
+
+    @classmethod
+    def tearDownClass(self):
+        self.MC.close()
+        self.mock_parabola.close()
+        del self.station.components['MC']
+        del self.station.components['mock_parabola']

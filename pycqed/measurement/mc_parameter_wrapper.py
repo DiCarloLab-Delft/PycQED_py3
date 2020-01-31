@@ -5,7 +5,6 @@ detector function
 import qcodes as qc
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
-import time
 
 
 def wrap_par_to_swf(parameter, retrieve_value=False):
@@ -30,7 +29,9 @@ def wrap_par_to_swf(parameter, retrieve_value=False):
     sweep_function.get = parameter.get
     return sweep_function
 
+
 def wrap_pars_to_swf(parameters, retrieve_value=False):
+    # FIXME: Shouldn't this be removed?
     '''
      - only soft sweep_functions
     '''
@@ -55,7 +56,6 @@ def wrap_pars_to_swf(parameters, retrieve_value=False):
                 par.get()
 
     sweep_function.set_parameter = set_par
-
 
     return sweep_function
 
@@ -123,7 +123,7 @@ def pass_function(**kw):
     pass
 
 
-def wrap_func_to_det(func, name, value_names, units, control='soft',  **kw):
+def wrap_func_to_det(func, name, value_names, units, control='soft', **kw):
     detector_function = det.Detector_Function()
     detector_function.detector_control = control
     detector_function.name = name

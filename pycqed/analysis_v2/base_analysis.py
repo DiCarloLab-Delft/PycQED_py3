@@ -48,6 +48,8 @@ class BaseDataAnalysis(object):
         if self.do_fitting:
             self.run_fitting() # fitting to models
         self.prepare_plots()   # specify default plots
+        if self.save_qois:
+            self.save_quantities_of_interest()
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
 
@@ -65,7 +67,8 @@ class BaseDataAnalysis(object):
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '', data_file_path: str = None,
                  close_figs: bool = True, options_dict: dict = None,
-                 extract_only: bool = False, do_fitting: bool = False):
+                 extract_only: bool = False, do_fitting: bool = False,
+                 save_qois: bool = True):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -135,6 +138,7 @@ class BaseDataAnalysis(object):
                                     of parameters will be extracted and used in analysis
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
+        :param save_qois: Should the save save_quantities_of_interest method be executed?
         '''
         # todo: what exactly does this flag do? May 2018 (Adriaan/Rene)
         self.single_timestamp = False
@@ -225,6 +229,10 @@ class BaseDataAnalysis(object):
 
         if type(self.auto_keys) is str:
             self.auto_keys = [self.auto_keys]
+        ####################################################
+        # Save quantities of interest switch               #
+        ####################################################
+        self.save_qois = save_qois
 
     def run_analysis(self):
         """
@@ -239,16 +247,20 @@ class BaseDataAnalysis(object):
             self.run_fitting()  # fitting to models
             self.save_fit_results()
             self.analyze_fit_results()  # analyzing the results of the fits
-        self.save_quantities_of_interest()
+        if self.save_qois:
+            self.save_quantities_of_interest()
 
         if not self.extract_only:
-            self.prepare_plots()  # specify default plots
-            self.plot(key_list='auto')  # make the plots
+            self.run_post_extract()
 
-            if self.options_dict.get('save_figs', False):
-                self.save_figures(
-                    close_figs=self.options_dict.get('close_figs', True),
-                    tag_tstamp=self.options_dict.get('tag_tstamp', True))
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto')  # make the plots
+
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
     def get_timestamps(self):
         """
