@@ -171,8 +171,8 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
         J * (-1)*(a.dag()*b+a*b.dag()) \
-         # + np.sqrt(3)*J * (basis_state(0,3,to_vector=False)*basis_state(1,2,to_vector=False).dag() + \
-         #        basis_state(1,2,to_vector=False)*basis_state(0,3,to_vector=False).dag())
+          # + 2*J * (basis_state(1,2,to_vector=False)*basis_state(2,1,to_vector=False).dag() + \
+          #        basis_state(2,1,to_vector=False)*basis_state(1,2,to_vector=False).dag())
         #(a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
     H = H * (2*np.pi)
     return H
@@ -996,6 +996,8 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
                 liouville_exp_t=(-1j*H*intervals_list[i]).expm()
             exp_L_total=liouville_exp_t*exp_L_total
 
+            #exp_L_total=qtp.Qobj(nullify_coherence(exp_L_total.full(),state_A=[1,2],state_B=[0,3]), type = 'super', dims = exp_L_total.dims)
+
             popul_12to12.append(average_population_transfer_subspace_to_subspace(exp_L_total,states_in=[[1,2]],states_out=[[1,2]]))
             popul_12to21.append(average_population_transfer_subspace_to_subspace(exp_L_total,states_in=[[1,2]],states_out=[[2,1]]))
             popul_12to03.append(average_population_transfer_subspace_to_subspace(exp_L_total,states_in=[[1,2]],states_out=[[0,3]]))
@@ -1007,6 +1009,23 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
                   title='Study of popul. exchange in 3-excitation manifold',
                   xlabel='w_flux (GHz)',ylabel='Popul.',
                   legend_labels=['12to12', '12to21', '12to03'])
+
+        time_vec = []
+        temp = 0
+        for interv in intervals_list:
+            temp += interv
+            time_vec.append(temp)
+        time_vec = np.array(time_vec)
+        plot(x_plot_vec=[time_vec*1e9],
+                  y_plot_vec=[np.array(popul_12to12),np.array(popul_12to21),np.array(popul_12to03)],
+                  title='Study of popul. exchange in 3-excitation manifold',
+                  xlabel='Time (ns)',ylabel='Popul.',
+                  legend_labels=['12to12', '12to21', '12to03'])
+
+        plot(x_plot_vec=[time_vec*1e9],
+                  y_plot_vec=[np.array(f_pulse)/1e9],
+                  title='Study of popul. exchange in 3-excitation manifold',
+                  xlabel='Time (ns)',ylabel='w_flux (GHz)')
 
 
 

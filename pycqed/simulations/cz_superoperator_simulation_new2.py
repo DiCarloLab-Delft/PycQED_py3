@@ -473,6 +473,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
             #czf.plot_spectrum(self.fluxlutman,self.noise_parameters_CZ)
+            #print(czf.coupled_transmons_hamiltonian_new(w_q0=5.2e9, w_q1=4.9e9, alpha_q0=-300e6, alpha_q1=-300e6, J=15e6))
 
 
         qoi_plot = np.array(qoi_plot)
