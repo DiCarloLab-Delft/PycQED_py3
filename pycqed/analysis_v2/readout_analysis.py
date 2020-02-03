@@ -72,6 +72,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.options_dict['auto_rotation_angle'] = self.options_dict.get(
             'auto_rotation_angle', man_angle)
 
+        self.predict_qubit_temp = 'predict_qubit_temp' in self.options_dict
+        if self.predict_qubit_temp:
+            self.qubit_freq = self.options_dict['qubit_freq']
+
         if auto:
             self.run_analysis()
 
@@ -85,7 +89,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         nr_samples = self.options_dict.get('nr_samples', 2)
         sample_0 = self.options_dict.get('sample_0', 0)
         sample_1 = self.options_dict.get('sample_1', 1)
-        nr_bins = self.options_dict.get('nr_bins', 100)
+        nr_bins = int(self.options_dict.get('nr_bins', 100))
 
         ######################################################
         #  Separating data into shots for 0 and shots for 1  #
@@ -115,8 +119,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             data_range_y = (np.min([np.min(b) for b in shots[:, 1]]),
                             np.max([np.max(b) for b in shots[:, 1]]))
             data_range_xy = (data_range_x, data_range_y)
-            nr_bins_2D = self.options_dict.get(
-                'nr_bins_2D', 6*np.sqrt(nr_bins))
+            nr_bins_2D = int(self.options_dict.get(
+                'nr_bins_2D', 6*np.sqrt(nr_bins)))
             H0, xedges, yedges = np.histogram2d(x=shots[0, 0],
                                                 y=shots[0, 1],
                                                 bins=nr_bins_2D,
@@ -281,7 +285,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         cum_params['A_amplitude'].value = np.max(cdf_ys[0])
         cum_params['A_amplitude'].vary = False
         cum_params['B_amplitude'].value = np.max(cdf_ys[1])
-        cum_params['A_amplitude'].vary = False
+        cum_params['A_amplitude'].vary = False # FIXME: check if correct
         self.fit_dicts['shots_all'] = {
             'model': m_cul,
             'fit_xvals': {'x': cdf_xs},
@@ -294,6 +298,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         fr = self.fit_res['shots_all']
         bv = fr.best_values
 
+        # best values new
         bvn = deepcopy(bv)
         bvn['A_amplitude'] = 1
         bvn['B_amplitude'] = 1
@@ -363,8 +368,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         fr = self.fit_res['shots_all']
         bv = fr.params
-        self.proc_data_dict['residual_excitation'] = bv['B_spurious'].value
-        self.proc_data_dict['measurement_induced_relaxation'] = bv['A_spurious'].value
+        self.proc_data_dict['residual_excitation'] = bv['A_spurious'].value
+        self.proc_data_dict['relaxation_events'] = bv['B_spurious'].value
 
         ###################################
         #  Save quantities of interest.   #
@@ -374,8 +379,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'F_d': self.proc_data_dict['F_discr'],
             'F_a': self.proc_data_dict['F_assignment_raw'],
             'residual_excitation': self.proc_data_dict['residual_excitation'],
-            'measurement_induced_relaxation':
-                self.proc_data_dict['measurement_induced_relaxation']
+            'relaxation_events':
+                self.proc_data_dict['relaxation_events']
         }
         self.qoi = self.proc_data_dict['quantities_of_interest']
 
@@ -737,6 +742,12 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 fit_text += '\n\n(Single quadrature data)'
 
             fit_text += '\n\nTotal shots: %d+%d' % (*self.proc_data_dict['nr_shots'],)
+            if self.predict_qubit_temp:
+                h = 6.62607004e-34
+                kb = 1.38064852e-23
+                res_exc = a_sp.value
+                effective_temp = h*6.42e9/(kb*np.log((1-res_exc)/res_exc))
+                fit_text += '\n\nEffective qubit temperature = {} mK\n@{:.0f}'.format(effective_temp*1e3,self.qubit_freq)
 
             for ax in ['cdf', '1D_histogram']:
                 self.plot_dicts['text_msg_' + ax] = {
@@ -1143,7 +1154,7 @@ class Multiplexed_Readout_Analysis_deprecated(ba.BaseDataAnalysis):
         Responsible for creating the histograms based on the raw data
         """
         # Determine the shape of the data to extract wheter to rotate or not
-        nr_bins = self.options_dict.get('nr_bins', 100)
+        nr_bins = int(self.options_dict.get('nr_bins', 100))
 
         # self.proc_data_dict['shots_0'] = [''] * nr_expts
         # self.proc_data_dict['shots_1'] = [''] * nr_expts

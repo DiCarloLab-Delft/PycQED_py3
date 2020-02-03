@@ -247,13 +247,16 @@ class Basic2DInterpolatedAnalysis(ba.BaseDataAnalysis):
                  label: str = '', data_file_path: str = None,
                  close_figs: bool = True, options_dict: dict = None,
                  extract_only: bool = False, do_fitting: bool = False,
-                 auto: bool=True, interp_method='linear'):
+                 auto: bool = True, interp_method='linear',
+                 save_qois: bool = True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
                          close_figs=close_figs,
                          options_dict=options_dict,
-                         extract_only=extract_only, do_fitting=do_fitting)
+                         extract_only=extract_only,
+                         do_fitting=do_fitting,
+                         save_qois=save_qois)
         self.interp_method = interp_method
         if auto:
             self.run_analysis()

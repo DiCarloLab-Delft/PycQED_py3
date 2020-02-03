@@ -1041,8 +1041,8 @@ class OptimizationAnalysis(MeasurementAnalysis):
         if len(self.parameter_names) != 1:
             axarray[0].set_title(self.timestamp_string + ' ' + figname3)
             for i in range(len(self.parameter_names)):
-                axarray[i].plot(self.sweep_points[i], self.measured_values[0],
-                                linestyle='--', c='k')
+                # axarray[i].plot(self.sweep_points[i], self.measured_values[0],
+                #                 linestyle='--', c='k')
                 # assumes only one value exists because it is an optimization
                 sc = axarray[i].scatter(self.sweep_points[i],
                                         self.measured_values[0],

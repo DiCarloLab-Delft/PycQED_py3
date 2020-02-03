@@ -1846,15 +1846,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
 
-        # 191216 Thijs, Tumi and Adriaan investigated a bug related to this.
-        # we do not understand this line added by Ramiro and Hani. and find it breaks things.
-        # Commenting out. To be removed if not discussed before March 2020.
-        # if len(data_raw[next(iter(data_raw))])>1:
-        #     # Not clear why this should give an Error, FIXME clarify with comments.
-        #     log.warning('[DEBUG UHF detector] SHOULD HAVE HAD AN ERROR')
-        # # [-1] in data_ray is not clear
-        # data = np.array([data_raw[key][-1]
-
+        if len(data_raw[next(iter(data_raw))])>1:
+            print('[DEBUG UHF SWF] SHOULD HAVE HAD AN ERROR')
+        # data = np.array([data_raw[key]
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
         log.debug('[UHF detector] RAW shape',[data_raw[key]

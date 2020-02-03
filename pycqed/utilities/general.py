@@ -215,9 +215,9 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
     return True
 
 
-def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
-                                     label: str='', filepath: str=None,
-                                     timestamp: str=None):
+def load_settings_onto_instrument_v2(instrument, load_from_instr: str = None,
+                                     label: str = '', filepath: str = None,
+                                     timestamp: str = None, ignore_pars: set = None):
     '''
     Loads settings from an hdf5 file onto the instrument handed to the
     function. By default uses the last hdf5 file in the datadirectory.
@@ -284,7 +284,8 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
         try:
             if (hasattr(instrument.parameters[parname], 'set') and
                     (par['value'] is not None)):
-                instrument.set(parname, par['value'])
+                if ignore_pars is None or parname not in ignore_pars:
+                    instrument.set(parname, par['value'])
         except Exception as e:
             print('Could not set parameter: "{}" to "{}" '
                   'for instrument "{}"'.format(parname, par['value'],

@@ -134,7 +134,7 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
                                        1.000, decimal=2)
         self.assertLess(a.proc_data_dict['residual_excitation'], 0.09)
         np.testing.assert_almost_equal(
-            a.proc_data_dict['measurement_induced_relaxation'], 0.1,
+            a.proc_data_dict['relaxation_events'], 0.1,
             decimal=1)
 
 
@@ -191,7 +191,7 @@ class Test_multiplexed_readout_analysis(unittest.TestCase):
 
     def test_multiplexed_readout_analysis(self):
         timestamp='20190916_184929'
-        
+
     #     t_start = '20180323_150203'
     #     t_stop = t_start
     #     a = ma.Multiplexed_Readout_Analysis(t_start=t_start, t_stop=t_stop,
