@@ -3349,7 +3349,7 @@ class CCLight_Transmon(Qubit):
                 Starting amplitude step of the optimizer.
 
             threshold (float):
-                Fidelity thershold after which the optimizer stops.
+                Fidelity thershold after which the optimizer stops iterating.
         '''
 
         if MC is None:
