@@ -1,5 +1,5 @@
 import numpy as np
-
+from functools import reduce
 def flatten_list(l): return reduce(lambda x, y: x+y, l)
 
 def compute_beta_matrix(num_qubits):

@@ -69,7 +69,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
             centers_vec[id_state, :] = centers_this_state
 
         # 2. compute matrix for betas
-        matrix_B = tomo_func.compute_beta_matrix(num_qubits)
+        matrix_B = tomo_func.compute_beta_matrix(self.num_qubits)
         # 3. Computing threshold
         mn_voltages = tomo_func.define_thresholds_avg(data_shots=data_shots,
                                                       value_names=value_names,
@@ -91,10 +91,10 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
         # 6. Bining weight-2 data
         correlations = [['Z1', 'D1'], ['D1', 'X'], ['D3', 'X'], ['D3', 'Z1']]
         idx_qubit_ro = ['D3', 'X', 'Z1', 'D1']
-        correl_discr, correl_avg = correlating_weight2_data(shots_discr=shots_discr,
-                                                            idx_qubit_ro=idx_qubit_ro,
-                                                            correlations=correlations,
-                                                            num_segments=self.num_segments):
+        correl_discr, correl_avg = tomo_func.correlating_weight2_data(shots_discr=shots_discr,
+                                                                      idx_qubit_ro=idx_qubit_ro,
+                                                                      correlations=correlations,
+                                                                      num_segments=self.num_segments)
         # 7. Compute betas weight-2
         betas_w2, op_idx_w2 = tomo_func.compute_betas_weight2(matrix_B=matrix_B,
                                                               correl_avg=correl_avg,
