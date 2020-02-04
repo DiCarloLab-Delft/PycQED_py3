@@ -1582,11 +1582,6 @@ class CCLight_Transmon(Qubit):
         TODO: if spec_pow is too low/high, it should adjust it to approx the
               ideal spec_pow + 25 dBm
         """
-        self.spec_pow(-30)
-        old_avg=self.ro_acq_averages()
-        old_avg_s=self.ro_soft_avg()
-        self.ro_acq_averages(2**14)
-        self.ro_soft_avg(1)
 
         if anharmonicity is None:
             # Standard estimate, negative by convention
@@ -1600,15 +1595,14 @@ class CCLight_Transmon(Qubit):
             freqs = np.arange(freq_center-1/2*freq_range, self.freq_qubit()+1/2*freq_range,
                               0.5e6)
         old_spec_pow = self.spec_pow()
-        self.spec_pow(self.spec_pow()+30)
+        self.spec_pow(self.spec_pow()+10)
+
         self.measure_spectroscopy(freqs=freqs, mode=mode, analyze=False)
 
         a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            analyze_ef=True)
-        f02 = 2*a.params['f0_gf_over_2'].value
         self.spec_pow(old_spec_pow)
-        self.ro_acq_averages(old_avg)
-        self.ro_soft_avg(old_avg_s)
+        f02 = 2*a.params['f0_gf_over_2'].value
         if update:
             self.anharmonicity(f02-2*self.freq_qubit())
             return True
@@ -2955,7 +2949,7 @@ class CCLight_Transmon(Qubit):
         ma.Three_Tone_Spectroscopy_Analysis(
             label='Two_tone',  f01=np.mean(freqs_01), f12=np.mean(freqs_12))
 
-    def measure_anharmonicity_test(self, freqs_01=None, freqs_12=None, f_01_power=None,
+    def measure_anharmonicity_GBT(self, freqs_01=None, freqs_12=None, f_01_power=None,
                               f_12_power=None,
                               MC=None, spec_source_2=None,
                               mode='pulsed_marked'):
@@ -2985,8 +2979,6 @@ class CCLight_Transmon(Qubit):
                 that the sources are pulsed using a marker.
                 Otherwise, uses CW spectroscopy.
         """
-        old_spec_pow1=self.spec_pow()
-        self.spec_pow(-45)
         if freqs_01 is None:
             freqs_01=self.freq_qubit()+np.arange(-30e6,30.1e6,0.5e6)
         if freqs_12 is None:
@@ -2998,16 +2990,9 @@ class CCLight_Transmon(Qubit):
             f_12_power = f_01_power+20
 
 
-
-        # if spec_source_2 == None :
-        #     spec_source_2=spec_source2
         print('f_anharmonicity estimation', f_anharmonicity)
         print('f_12 estimations', np.mean(freqs_12))
         CCL = self.instr_CC.get_instr()
-        # p = sqo.pulsed_spec_seq(
-        #     qubit_idx=self.cfg_qubit_nr(),
-        #     spec_pulse_length=self.spec_pulse_length(),
-        #     platf_cfg=self.cfg_openql_platform_fn())
         p = sqo.pulsed_spec_seq_marked(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
@@ -3049,8 +3034,6 @@ class CCLight_Transmon(Qubit):
         spec_source.off()
         spec_source_2.off()
         self.spec_pow(old_spec_pow1)
-
-
 
         # if analyze:
         #     a = ma.Three_Tone_Spectroscopy_Analysis(label='Two_tone',  f01=np.mean(freqs_01), f12=np.mean(freqs_12))
