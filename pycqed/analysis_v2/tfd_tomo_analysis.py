@@ -14,6 +14,7 @@ from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
 import pycqed.measurement.hdf5_data as h5d
 import pycqed.analysis_v2.multiplexed_readout_analysis as mux_an
 import pycqed.analysis_v2.tfd_analysis as tfd_an
+import pycqed.analysis_v2.tomo_functions as tomo_func
 from functools import reduce
 
 def flatten_list(l): return reduce(lambda x, y: x+y, l)
@@ -68,82 +69,25 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
             centers_vec[id_state, :] = centers_this_state
 
         # 2. compute matrix for betas
-        matrix_B = np.zeros((self.num_states, self.num_states))
-
-        for i in range(self.num_states):
-            for j in range(self.num_states):
-                # RO operator with I & Z from binary decomposition of i (0=I, 1=Z)
-                # format is #0(n+2)b, [2:] erases the bin str indication
-                operator_i = format(i, '#06b')[2:]
-                # computational state j (binary decompose j
-                # format is #0(n+2)b, [2:] erases the bin str indication
-                state_j = format(j, '#06b')[2:]
-                """
-                trace is the product of 1 (if I) or (+/-1 if Z) for each qubit.
-                For two binary words operator_word and state_word we need
-                operator_word b_3 b_2 b_1 b_0
-                state_word    s_3 s_2 s_1 s_0
-                -----------------------------
-                output_word   o_3 o_2 o_1 o_0
-
-                where o_i follows
-                if b_i==0:
-                    o_i = 1
-                else:
-                    o_i = 1 - 2*s_i
-
-                Solutions are o_i = 1 - 2*s_i*b_i
-                Final solution is Prod{o_i}
-                """
-                trace_op_rho = np.product(
-                    [1-2*int(state_j[k])*int(operator_i[k]) for k in range(len(state_j))])
-                matrix_B[i, j] = trace_op_rho
-
+        matrix_B = tomo_func.compute_beta_matrix(num_qubits)
         # 3. Computing threshold
-        mn_voltages = {}
-        for i, ch_name in enumerate(value_names):
-            ch_id = list(value_names).index(ch_name)
-            ch_data = data_shots[:, ch_id+1]  # select per channel
-            mn_voltages[ch_name] = {'0': [], '1': []}
-            for i_c, c in enumerate(combinations):
-                if c[i] == '0':
-                    mn_voltages[ch_name]['0'].append(
-                        list(ch_data[i_c::self.num_states]))
-                elif c[i] == '1':
-                    mn_voltages[ch_name]['1'].append(
-                        list(ch_data[i_c::self.num_states]))
-            mn_voltages[ch_name]['0'] = np.mean(
-                flatten_list(mn_voltages[ch_name]['0']))
-            mn_voltages[ch_name]['1'] = np.mean(
-                flatten_list(mn_voltages[ch_name]['1']))
-            mn_voltages[ch_name]['threshold'] = np.mean(
-                [mn_voltages[ch_name]['0'],
-                 mn_voltages[ch_name]['1']])
+        mn_voltages = tomo_func.define_thresholds_avg(data_shots=data_shots,
+                                                      value_names=value_names,
+                                                      combinations=combinations,
+                                                      num_states=self.num_states)
 
         # 4. Bining weight-1 data
-        shots_discr = np.zeros((data_shots.shape[0], 4))
-        qubit_state_avg = np.zeros((self.num_qubits, self.num_segments))
+        shots_discr,qubit_state_avg = tomo_func.threshold_data(data_shots=data_shots,
+                                                               mn_voltages=mn_voltages,
+                                                               num_qubits=self.num_qubits,
+                                                               num_segments=self.num_segments)
 
-        for k in mn_voltages.keys():
-            id_channel = np.sum(np.where(value_names == k, np.arange(1, 5), 0))
-            this_q_data = data_shots[:, id_channel]
-            this_th = mn_voltages[k]['threshold']
-            shots_discr[:, id_channel -
-                        1] = np.where(this_q_data > this_th, -1, 1)
-            qubit_state_avg[id_channel-1, :] = [np.mean(shots_discr[i_seg::self.num_segments,
-                                                                    id_channel-1]) for i_seg in range(self.num_segments)]
         # 5. Compute betas weight-1
-        betas_w1 = np.zeros((4, 2))
-        op_idx_w1 = np.zeros((4, 2), dtype=int)
-        for i in range(self.num_qubits):
-            op_list_bin = ['0000', format(2**(3-i), '#06b')[2:]]
-            op_id_list = [int(op, 2) for op in op_list_bin]
-            op_idx_w1[i, :] = op_id_list
-        #     print(op_id_list)
-
-            submatrix_B = matrix_B[op_id_list, :]
-            inv_subB = np.linalg.pinv(submatrix_B).transpose()
-            betas_w1[i, :] = inv_subB @ qubit_state_avg[i, cal_point_seg_start:]
+        betas_w1, op_idx_w1 = tomo_func.compute_betas_weight1(qubit_state_avg=qubit_state_avg,
+                                                              matrix_B=matrix_B,
+                                                              num_qubits=self.num_qubits,
+                                                              cal_point_seg_start=cal_point_seg_start):
+    
 
         # 6. Bining weight-2 data
         idx_qubit_ro = ['D4', 'X', 'Z2', 'D2']
@@ -168,10 +112,10 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
             op_list_bin = ['0000', format(z0, '#06b')[2:],
                            format(z1, '#06b')[2:],
                            format(z0z1, '#06b')[2:]]
-        #     op_id_list = [int(op,2) for op in op_list_bin]
+            # op_id_list = [int(op,2) for op in op_list_bin]
             op_id_list = [0, z0, z1, z0z1]
             op_idx_w2[i_c, :] = op_id_list
-        #     print(op_id_list,op_list_bin)
+            # print(op_id_list,op_list_bin)
 
             submatrix_B = matrix_B[op_id_list, :]
             inv_subB = np.linalg.pinv(submatrix_B).transpose()
@@ -276,7 +220,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                     # decide the sign
                     sign = np.product([1-2*int(rot_bin[k])*int(op_bin[k])
                                        for k in range(len(op_bin))])
-        #             print(ir,id_op)
+                    # print(ir,id_op)
                     this_M_matrix[ir, id_op] = sign*bt
             M_matrix[ch_w1_id *
                      num_prerots:(ch_w1_id+1)*num_prerots, :] = this_M_matrix
@@ -295,7 +239,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                     # decide the sign
                     sign = np.product([1-2*int(rot_bin[k])*int(op_bin[k])
                                        for k in range(len(op_bin))])
-        #             print(ir,id_op)
+                    # print(ir,id_op)
                     this_M_matrix[ir, id_op] = sign*bt
             M_matrix[36+ch_w2_id*num_prerots:36 +
                      (ch_w2_id+1)*num_prerots, :] = this_M_matrix
@@ -401,6 +345,9 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
 
 
 class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
+    """
+    Difference with Pauli_Tomo (not Full) is that this one inverts the full betas (which can always be done because of all calibration points)
+    """
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
                  g: float = 1, T: float = 1,
