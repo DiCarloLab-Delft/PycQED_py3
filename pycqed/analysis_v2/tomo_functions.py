@@ -1,5 +1,7 @@
 import numpy as np
 
+def flatten_list(l): return reduce(lambda x, y: x+y, l)
+
 def compute_beta_matrix(num_qubits):
     """
     Computes the matrix necesary to invert the beta coefficients.
@@ -62,7 +64,7 @@ def define_thresholds_avg(data_shots, value_names, combinations, num_states):
              mn_voltages[ch_name]['1']])
     return mn_voltages
 
-def threshold_weight1_data(data_shots, mn_voltages, num_qubits, num_segments):
+def threshold_weight1_data(data_shots, mn_voltages, num_qubits, num_segments, value_names):
     """
     Classifies tomo data based on thresholds given
     """
@@ -110,7 +112,7 @@ def compute_betas_weight1(qubit_state_avg, matrix_B, num_qubits, cal_point_seg_s
         betas_w1[i, :] = inv_subB @ qubit_state_avg[i, cal_point_seg_start:]
     return betas_w1, op_idx_w1
 
-def compute_betas_weight2(matrix_B, correl_avg, correlations, idx_qubit_ro, num_qubits):
+def compute_betas_weight2(matrix_B, correl_avg, correlations, idx_qubit_ro, num_qubits, cal_point_seg_start):
     """
     """
     betas_w2 = np.zeros((len(correlations), len(correlations)))

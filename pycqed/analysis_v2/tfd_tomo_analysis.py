@@ -79,6 +79,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
         # 4. Bining weight-1 data
         shots_discr,qubit_state_avg = tomo_func.threshold_weight1_data(data_shots=data_shots,
                                                                        mn_voltages=mn_voltages,
+                                                                       value_names=value_names,
                                                                        num_qubits=self.num_qubits,
                                                                        num_segments=self.num_segments)
 
@@ -86,7 +87,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
         betas_w1, op_idx_w1 = tomo_func.compute_betas_weight1(qubit_state_avg=qubit_state_avg,
                                                               matrix_B=matrix_B,
                                                               num_qubits=self.num_qubits,
-                                                              cal_point_seg_start=cal_point_seg_start)   
+                                                              cal_point_seg_start=cal_point_seg_start)
         # 6. Bining weight-2 data
         correlations = [['Z1', 'D1'], ['D1', 'X'], ['D3', 'X'], ['D3', 'Z1']]
         idx_qubit_ro = ['D3', 'X', 'Z1', 'D1']
@@ -98,6 +99,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
         betas_w2, op_idx_w2 = tomo_func.compute_betas_weight2(matrix_B=matrix_B,
                                                               correl_avg=correl_avg,
                                                               correlations=correlations,
+                                                              cal_point_seg_start=cal_point_seg_start,
                                                               idx_qubit_ro=idx_qubit_ro,
                                                               num_qubits=self.num_qubits)
         # 8. Complicating betas on qubit X
