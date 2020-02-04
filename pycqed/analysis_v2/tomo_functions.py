@@ -62,7 +62,7 @@ def define_thresholds_avg(data_shots, value_names, combinations, num_states):
              mn_voltages[ch_name]['1']])
     return mn_voltages
 
-def threshold_data(data_shots, mn_voltages, num_qubits, num_segments):
+def threshold_weight1_data(data_shots, mn_voltages, num_qubits, num_segments):
     """
     Classifies tomo data based on thresholds given
     """
@@ -79,13 +79,27 @@ def threshold_data(data_shots, mn_voltages, num_qubits, num_segments):
                                                                 id_channel-1]) for i_seg in range(num_segments)]
     return shots_discr,qubit_state_avg
 
+def correlating_weight2_data(shots_discr, idx_qubit_ro, correlations, num_segments):
+    """
+    """
+    correlations_idx = [
+        [idx_qubit_ro.index(c[0]), idx_qubit_ro.index(c[1])] for c in correlations]
+
+    correl_discr = np.zeros((shots_discr.shape[0], len(correlations_idx)))
+    correl_avg = np.zeros((num_segments, len(correlations_idx)))
+    for i, c in enumerate(correlations_idx):
+        correl_discr[:, i] = shots_discr[:, c[0]]*shots_discr[:, c[1]]
+        correl_avg[:, i] = [
+            np.mean(correl_discr[i_seg::num_segments, i]) for i_seg in range(num_segments)]
+    return correl_discr, correl_avg
+
 def compute_betas_weight1(qubit_state_avg, matrix_B, num_qubits, cal_point_seg_start):
     """
     Computes weight-one betas
     """
     betas_w1 = np.zeros((num_qubits, 2))
     op_idx_w1 = np.zeros((num_qubits, 2), dtype=int)
-    for i in range(self.num_qubits):
+    for i in range(num_qubits):
         op_list_bin = [format(0, '#0{}b'.format(num_qubits+2))[2:],
                        format(2**(3-i), '#0{}b'.format(num_qubits+2))[2:]]
         op_id_list = [int(op, 2) for op in op_list_bin]
@@ -96,8 +110,28 @@ def compute_betas_weight1(qubit_state_avg, matrix_B, num_qubits, cal_point_seg_s
         betas_w1[i, :] = inv_subB @ qubit_state_avg[i, cal_point_seg_start:]
     return betas_w1, op_idx_w1
 
+def compute_betas_weight2(matrix_B, correl_avg, correlations, idx_qubit_ro, num_qubits):
+    """
+    """
+    betas_w2 = np.zeros((len(correlations), len(correlations)))
+    op_idx_w2 = np.zeros((len(correlations), len(correlations)),
+                         dtype=int)
+    for i_c, c in enumerate(correlations):
+        z0 = 2**(3-idx_qubit_ro.index(c[0]))
+        z1 = 2**(3-idx_qubit_ro.index(c[1]))
+        z0z1 = z1+z0
+        op_list_bin = [format(0, '#0{}b'.format(num_qubits+2))[2:],
+                       format(z0, '#0{}b'.format(num_qubits+2))[2:],
+                       format(z1, '#0{}b'.format(num_qubits+2))[2:],
+                       format(z0z1, '#0{}b'.format(num_qubits+2))[2:]]
+        # op_id_list = [int(op,2) for op in op_list_bin]
+        op_id_list = [0, z0, z1, z0z1]
+        op_idx_w2[i_c, :] = op_id_list
+        # print(op_id_list,op_list_bin)
+
+        submatrix_B = matrix_B[op_id_list, :]
+        inv_subB = np.linalg.pinv(submatrix_B).transpose()
+        betas_w2[i_c, :] = inv_subB @ correl_avg[cal_point_seg_start:, i_c]
+    return betas_w2, op_idx_w2
 
 
-
-
-    
