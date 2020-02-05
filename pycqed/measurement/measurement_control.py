@@ -43,8 +43,7 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
-from pycqed.utilities.learnerND_optimize import (LearnerND_Optimize,
-    evaluate_X)
+from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, evaluate_X
 
 from skopt import Optimizer  # imported for checking types
 
@@ -55,6 +54,12 @@ except:
 
 try:
     import PyQt5
+
+    # The line below is necessary for the plotmon_2D to be able to set
+    # colorscales from qcodes_QtPlot_colors_override.py and be able to set the
+    # colorbar range when the plots are created
+    # See also MC.plotmon_2D_cmaps, MC.plotmon_2D_zranges below
+    from . import qcodes_QtPlot_monkey_patching  # KEEP ABOVE QtPlot import!!!
     from qcodes.plots.pyqtgraph import QtPlot, TransformState
 except Exception:
     print(
@@ -64,7 +69,7 @@ except Exception:
     )
     print("When instantiating an MC object," " be sure to set live_plot_enabled=False")
 
-log = logging.getLogger('__name__')
+log = logging.getLogger("__name__")
 
 
 def is_subclass(obj, test_obj):
@@ -175,6 +180,16 @@ class MeasurementControl(Instrument):
         self._persist_dat = None
         self._persist_xlabs = None
         self._persist_ylabs = None
+
+        # plotmon_2D colorbar color mapping and ranges
+        # Change this to your preferences when using the plotmon_2D
+        # This could be a parameter but it doesn't seem to be worth saving
+        # See `choose_MC_cmap_zrange` in this file to know how this is used
+        # e.g. self.plotmon_2D_cmaps = {"Phase": "anglemap"}
+        # see pycqed.measurment.qcodes_QtPlot_colors_override for more cmaps
+        self.plotmon_2D_cmaps = {}
+        # e.g. self.plotmon_2D_zranges = {"Phase": (0.0, 180.0)}
+        self.plotmon_2D_zranges = {}
 
     ##############################################
     # Functions used to control the measurements #
@@ -396,9 +411,9 @@ class MeasurementControl(Instrument):
             else:
                 raise NotImplementedError("Learner subclass type not supported.")
 
-            if 'X0' in self.af_pars:
+            if "X0" in self.af_pars:
                 # Teach the learner the initial point if provided
-                evaluate_X(self.learner, self.af_pars['X0'])
+                evaluate_X(self.learner, self.af_pars["X0"])
             # N.B. the runner that is used is not an `adaptive.Runner` object
             # rather it is the `adaptive.runner.simple` function. This
             # ensures that everything runs in a single process, as is
@@ -869,19 +884,23 @@ class MeasurementControl(Instrument):
             zunits = self.detector_function.value_units
 
             for j in range(len(self.detector_function.value_names)):
-                self.secondary_QtPlot.add(
-                    x=self.sweep_pts_x,
-                    y=self.sweep_pts_y,
-                    z=self.TwoD_array[:, :, j],
-                    xlabel=slabels[0],
-                    xunit=sunits[0],
-                    ylabel=slabels[1],
-                    yunit=sunits[1],
-                    zlabel=zlabels[j],
-                    zunit=zunits[j],
-                    subplot=j + 1,
-                    cmap="viridis",
-                )
+                cmap, zrange = self.choose_MC_cmap_zrange(zlabels[j], zunits[j])
+                config_dict = {
+                    "x": self.sweep_pts_x,
+                    "y": self.sweep_pts_y,
+                    "z": self.TwoD_array[:, :, j],
+                    "xlabel": slabels[0],
+                    "xunit": sunits[0],
+                    "ylabel": slabels[1],
+                    "yunit": sunits[1],
+                    "zlabel": zlabels[j],
+                    "zunit": zunits[j],
+                    "subplot": j + 1,
+                    "cmap": cmap,
+                }
+                if zrange is not None:
+                    config_dict["zrange"] = zrange
+                self.secondary_QtPlot.add(**config_dict)
 
     def update_plotmon_2D(self, force_update=False):
         """
@@ -927,21 +946,25 @@ class MeasurementControl(Instrument):
             self.im_plot_scatters = []
 
             for j in range(len(self.detector_function.value_names)):
-                self.secondary_QtPlot.add(
-                    x=[0, 1],
-                    y=[0, 1],
-                    z=np.zeros([2, 2]),
-                    xlabel=slabels[0],
-                    xunit=sunits[0],
-                    ylabel=slabels[1],
-                    yunit=sunits[1],
-                    zlabel=zlabels[j],
-                    zunit=zunits[j],
-                    subplot=j + 1,
-                    cmap="viridis",
-                )
-
+                cmap, zrange = self.choose_MC_cmap_zrange(zlabels[j], zunits[j])
+                config_dict = {
+                    "x": [0, 1],
+                    "y": [0, 1],
+                    "z": np.zeros([2, 2]),
+                    "xlabel": slabels[0],
+                    "xunit": sunits[0],
+                    "ylabel": slabels[1],
+                    "yunit": sunits[1],
+                    "zlabel": zlabels[j],
+                    "zunit": zunits[j],
+                    "subplot": j + 1,
+                    "cmap": cmap,
+                }
+                if zrange is not None:
+                    config_dict["zrange"] = zrange
+                self.secondary_QtPlot.add(**config_dict)
                 self.im_plots.append(self.secondary_QtPlot.traces[-1])
+
                 self.secondary_QtPlot.add(
                     x=[0],
                     y=[0],
@@ -2085,6 +2108,35 @@ class MeasurementControl(Instrument):
 
     def get_optimization_method(self):
         return self.optimization_method
+
+    def choose_MC_cmap_zrange(self, zlabel: str, zunit: str):
+        cost_func_names = ["cost", "cost func", "cost function"]
+        cmap = None
+        zrange = None
+        cmaps = self.plotmon_2D_cmaps
+        zranges = self.plotmon_2D_zranges
+
+        if cmaps and zlabel in cmaps.keys():
+            cmap = cmaps[zlabel]
+        elif np.any(np.array(cost_func_names) == zlabel.lower()):
+            cmap = (
+                "inferno_clip_high"
+                if hasattr(self, "minimize_optimization") and not self.minimize_optimization
+                else "inferno_clip_low"
+            )
+        elif zunit == "%":
+            cmap = "hot"
+        elif zunit.lower() == "deg":
+            cmap = "anglemap"
+        else:
+            cmap = "viridis"
+
+        if zranges and zlabel in zranges.keys():
+            zrange = zranges[zlabel]
+        elif zunit.lower() == "deg":
+            zrange = (0.0, 360.0)
+
+        return cmap, zrange
 
     ################################
     # Actual parameters            #
