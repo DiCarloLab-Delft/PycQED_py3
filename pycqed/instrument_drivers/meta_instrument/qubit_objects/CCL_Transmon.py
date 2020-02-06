@@ -1460,13 +1460,14 @@ class CCLight_Transmon(Qubit):
         if method == 'DAC':
             t_start = time.strftime('%Y%m%d_%H%M%S')
             self.measure_qubit_frequency_dac_scan(freqs=freqs,
-                                                  dac_values=dac_values,
-                                                  fluxChan=fluxChan,
-                                                  analyze=False,
-                                                  mode=spec_mode,
-                                                  nested_resonator_calibration=False,
-                                                  nested_resonator_calibration_use_min=False,
-                                                  resonator_freqs=np.arange(-5e6,5e6,0.1e6)+self.freq_res())
+                                dac_values=dac_values,
+                                fluxChan=fluxChan,
+                                analyze=False,
+                                mode=spec_mode,
+                                nested_resonator_calibration=False,
+                                # nested_resonator_calibration_use_min=False,
+                                resonator_freqs=np.arange(-5e6,5e6,0.1e6)
+                                    +self.freq_res())
                                                   # )
             timestamp = a_tools.get_timestamps_in_range(t_start,
                                                         label='Qubit_dac_scan'+
