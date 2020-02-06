@@ -57,6 +57,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
         centers_vec = np.zeros((self.num_states, self.num_qubits))
         self.num_segments = len(combinations)
         cal_point_seg_start = self.num_segments - self.num_states # 18 for 34 segments
+        self.cal_point_seg_start = cal_point_seg_start
 
         data_shots = self.raw_data_dict['data'][:, :]
         self.proc_data_dict['raw_shots'] = data_shots[:, 1:]
@@ -95,6 +96,10 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                                                                       idx_qubit_ro=idx_qubit_ro,
                                                                       correlations=correlations,
                                                                       num_segments=self.num_segments)
+        self.raw_data_dict['ro_sq_raw_signal'] = qubit_state_avg
+        self.raw_data_dict['ro_tq_raw_signal'] = correl_avg
+        self.raw_data_dict['ro_sq_ch_names'] = idx_qubit_ro
+        self.raw_data_dict['ro_tq_ch_names'] = correlations
         # 7. Compute betas weight-2
         betas_w2, op_idx_w2 = tomo_func.compute_betas_weight2(matrix_B=matrix_B,
                                                               correl_avg=correl_avg,
@@ -324,6 +329,24 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
             'full_dict': self.proc_data_dict['quantities_of_interest']['full_tomo_dict']
             # 'pauli_terms': self.proc_data_dict['pauli_terms']
         }
+        for ch_id,ch in enumerate(self.raw_data_dict['ro_sq_ch_names']):
+            self.plot_dicts['TV_{}'.format(ch)] = {
+                'plotfn': plot_tv_mode_with_ticks,
+                'xticks': self.raw_data_dict['combinations'],
+                'yvals': self.raw_data_dict['ro_sq_raw_signal'][ch_id,:],
+                'ylabel': ch,
+                'shade_from': self.cal_point_seg_start,
+                # 'yunit': self.raw_data_dict['value_units'][0][i],
+                'title': (self.raw_data_dict['timestamps'][0]+' - ' + ' TV: {}'.format(ch))}
+        for ch_id,ch in enumerate(self.raw_data_dict['ro_tq_ch_names']):
+            self.plot_dicts['TV_{}'.format(ch)] = {
+                'plotfn': plot_tv_mode_with_ticks,
+                'xticks': self.raw_data_dict['combinations'],
+                'yvals': self.raw_data_dict['ro_tq_raw_signal'][:,ch_id],
+                'ylabel': ch,
+                'shade_from': self.cal_point_seg_start,
+                # 'yunit': self.raw_data_dict['value_units'][0][i],
+                'title': (self.raw_data_dict['timestamps'][0]+' - ' + ' TV: {}'.format(ch))}
 
 
 class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
@@ -607,3 +630,16 @@ class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
             'plotfn': tfd_an.plot_all_pauli_ops,
             'full_dict': self.proc_data_dict['quantities_of_interest']['full_tomo_dict']
         }
+
+def plot_tv_mode_with_ticks(xticks, yvals, ylabel, shade_from=0, xticks_rotation=90, yunit='', title='', ax=None, **kw):
+    if ax is None:
+        f, ax = plt.subplots()
+
+    xvals = np.arange(len(yvals))
+    ax.fill_betweenx(x1=[shade_from],x2=[xvals.max()],y=[yvals.min(),yvals.max()], alpha=0.5, color='grey')
+    ax.plot(xvals,yvals,'-o')
+    ax.set_xticks(xvals)
+    ax.set_xticklabels(xticks, rotation=xticks_rotation)
+
+    # ax.set_ylabel(ylabel+ ' ({})'.format(yunit))
+    ax.set_title(title)
