@@ -151,7 +151,6 @@ class TFD_3CZ_Analysis_Pauli_Strings(ba.BaseDataAnalysis):
             'energy_terms': self.proc_data_dict['energy_terms']
         }
 
-
 def calc_tfd_hamiltonian(pauli_terms: dict, g: float = 1, T=1):
     """
     Calculate the thermal field double Hamiltonian expectation value.

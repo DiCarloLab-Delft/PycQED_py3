@@ -77,11 +77,11 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                                                       num_states=self.num_states)
 
         # 4. Bining weight-1 data
-        shots_discr,qubit_state_avg = tomo_func.threshold_weight1_data(data_shots=data_shots,
-                                                                       mn_voltages=mn_voltages,
-                                                                       value_names=value_names,
-                                                                       num_qubits=self.num_qubits,
-                                                                       num_segments=self.num_segments)
+        shots_discr, qubit_state_avg = tomo_func.threshold_weight1_data(data_shots=data_shots,
+                                                                        mn_voltages=mn_voltages,
+                                                                        value_names=value_names,
+                                                                        num_qubits=self.num_qubits,
+                                                                        num_segments=self.num_segments)
 
         # 5. Compute betas weight-1
         betas_w1, op_idx_w1 = tomo_func.compute_betas_weight1(qubit_state_avg=qubit_state_avg,
@@ -90,7 +90,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                                                               cal_point_seg_start=cal_point_seg_start)
         # 6. Bining weight-2 data
         correlations = [['Z1', 'D1'], ['D1', 'X'], ['D3', 'X'], ['D3', 'Z1']]
-        idx_qubit_ro = ['D3', 'X', 'Z1', 'D1']
+        idx_qubit_ro = ['D1', 'Z1', 'X', 'D3']
         correl_discr, correl_avg = tomo_func.correlating_weight2_data(shots_discr=shots_discr,
                                                                       idx_qubit_ro=idx_qubit_ro,
                                                                       correlations=correlations,
@@ -167,7 +167,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                 beta_i=betas_w1[ch,op] corresponds to i=op_idx_w1[ch,op] op_bin=format(i, '#0{}b'.format(self.num_qubits+2))[2:]
                 rot_bin=format(i_rot, '#0{}b'.format(self.num_qubits+2))[2:]
                 for each Z in op_i, if there is an X in pre-rot, flip sign of beta.
-                solved by writting
+                solved by writing
                 op_i    IZZI
                 rot_i   XIXI
                 op_bin  0110
