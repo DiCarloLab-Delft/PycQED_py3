@@ -613,6 +613,26 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('2D adaptive sampling test', mode='adaptive')
 
+    def test_plotmon_2D_monkey_patching(self):
+        self.MC.soft_avg(1)
+        self.mock_parabola.noise(0)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y])
+        self.MC.set_adaptive_function_parameters({'adaptive_function': adaptive.Learner2D,
+                                                  'goal': lambda l: l.npoints > 4 * 4,
+                                                  'bounds': ((-50, +50),
+                                                             (-20, +30))})
+        saved_unit = self.mock_parabola.parabola.unit
+        self.mock_parabola.parabola.unit = "deg"
+        self.MC.set_detector_function(self.mock_parabola.parabola)
+        dat = self.MC.run('2D adaptive anglemap45', mode='adaptive')
+        hist_proxy = self.MC.secondary_QtPlot.traces[0]["plot_object"]["hist"]
+        grad_proxy = hist_proxy.gradient
+        midle_color = grad_proxy.getLookupTable(3)._getValue()[1]
+        assert np.all(midle_color == [254, 229, 234])
+        assert hist_proxy.getLevels() == (0.0, 360.0)
+        self.mock_parabola.parabola.unit = saved_unit
+
     def test_adaptive_SKOptLearner(self):
         # NB cool stuff: this can also optimize integers and other
         # hyper-parameters
