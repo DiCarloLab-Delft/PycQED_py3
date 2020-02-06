@@ -1473,9 +1473,9 @@ class CCLight_Transmon(Qubit):
                                                   analyze=False,
                                                   mode=spec_mode,
                                                   nested_resonator_calibration=False,
-                                                  nested_resonator_calibration_use_min=False,
-                                                  resonator_freqs=np.arange(-5e6, 5e6, 0.1e6)+self.freq_res())
-            # )
+                                                  # nested_resonator_calibration_use_min=False,
+                                                  resonator_freqs=np.arange(-5e6,5e6,0.1e6)+self.freq_res())
+
             timestamp = a_tools.get_timestamps_in_range(t_start,
                                                         label='Qubit_dac_scan' +
                                                               self.msmt_suffix)

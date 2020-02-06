@@ -69,6 +69,7 @@ Happy monkey patching!
 """
 import ast
 import inspect
+
 # Do not import anything else from qcodes, it breaks this code
 from . import qcodes_QtPlot_colors_override
 import qcodes.plots.colors

@@ -253,7 +253,7 @@ Gradients = {
 }
 
 
-def make_qcodes_anglemap():
+def make_qcodes_anglemap45():
     anglemap_colorlist = make_anglemap45_colorlist(N=9, use_hpl=False)
     len_colorlist = len(anglemap_colorlist)
     color_scale = [
@@ -263,9 +263,9 @@ def make_qcodes_anglemap():
     return color_scale
 
 
-qcodes_anglemap = make_qcodes_anglemap()
+qcodes_anglemap45 = make_qcodes_anglemap45()
 
-colorscales_raw["anglemap"] = qcodes_anglemap
+colorscales_raw["anglemap45"] = qcodes_anglemap45
 
 
 def make_rgba(colorscale):
