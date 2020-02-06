@@ -59,12 +59,14 @@ def target_cond_phase(cond_phase=180):
 
 U_target = target_cond_phase()
 
-# otherwise average_gate_fidelity doesn't work
 U_target_diffdims = target_cond_phase()
-U_target_diffdims.dims = [
-    [n_levels_q0 * n_levels_q1],
-    [n_levels_q0 * n_levels_q1]
-]
+
+# As of qutip 4.5.0 this is not needed anymore
+# otherwise average_gate_fidelity doesn't work
+# U_target_diffdims.dims = [
+#     [n_levels_q0 * n_levels_q1],
+#     [n_levels_q0 * n_levels_q1]
+# ]
 
 
 '''

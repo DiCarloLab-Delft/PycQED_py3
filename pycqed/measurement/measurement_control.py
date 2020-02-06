@@ -2127,7 +2127,7 @@ class MeasurementControl(Instrument):
         elif zunit == "%":
             cmap = "hot"
         elif zunit.lower() == "deg":
-            cmap = "anglemap"
+            cmap = "anglemap45"
         else:
             cmap = "viridis"
 
