@@ -816,6 +816,8 @@ class Dispersive_shift_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['data_S21_excited'] = \
             self.raw_data_dict['measured_values'][1][0]
 
+        #self.proc_data_dict['f0_ground'] = self.raw_data_dict['f0'][0]
+
         #############################
         # Find resonator dips
         #############################
@@ -856,8 +858,8 @@ class Dispersive_shift_Analysis(ba.BaseDataAnalysis):
                    max(self.proc_data_dict['data_freqs_ground'][-1],
                        self.proc_data_dict['data_freqs_excited'][-1])]
 
-        y_range = [0, max(self.proc_data_dict['data_S21_ground'][-1],
-                          self.proc_data_dict['data_S21_excited'][-1])]
+        y_range = [0, max(max(self.proc_data_dict['data_S21_ground']),
+                          max(self.proc_data_dict['data_S21_excited']))]
 
         x_label = self.raw_data_dict['xlabel'][0]
         y_label = self.raw_data_dict['value_names'][0][0]
