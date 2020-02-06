@@ -3818,11 +3818,17 @@ class CCLight_Transmon(Qubit):
                     label=self.msmt_suffix, close_fig=True)
                 # fit converts to Hz
                 f_res.append(a.fit_results.params['f0'].value*1e9)
-        self.ro_pulse_amp(saved_param)
+
+        self.ro_pulse_amp(saved_param) # reload pulse amplitude
+
         if analyze:
-            self.dispersive_shift(f_res[1]-f_res[0])
-            print('dispersive shift is {} MHz'.format(
-                (f_res[1]-f_res[0])*1e-6))
+            a = ma2.Dispersive_shift_Analysis()
+            self.dispersive_shift(a.qoi['dispersive_shift'])
+            # Dispersive shift from 'hanger' fit
+            #print('dispersive shift is {} MHz'.format((f_res[1]-f_res[0])*1e-6))
+            # Dispersive shift from peak finder
+            print('dispersive shift is {} MHz'.format(a.qoi['dispersive_shift']*1e-6))
+
             return True
 
     def calibrate_optimal_weights(self, MC=None, verify: bool = True,
@@ -4346,7 +4352,7 @@ class CCLight_Transmon(Qubit):
                 VSM.set('mod{}_ch{}_marker_state'.format(
                     module+1, channel), 'on')
 
-        if a2.optimization_result[1][0] > termination_opt:
+        if a2.optimization_result[1][0] > f_termination:
             return False
         else:
             return True

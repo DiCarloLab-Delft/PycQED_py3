@@ -760,6 +760,204 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 }
 
 
+class Dispersive_shift_Analysis(ba.BaseDataAnalysis):
+    '''
+    Analisys for dispersive shift.
+    Designed to be used with <CCL_Transmon>.measure-dispersive_shift_pulsed
+    '''
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', do_fitting: bool = True,
+                 data_file_path: str=None,
+                 options_dict: dict=None, auto=True,
+                 **kw):
+        '''
+        Extract ground and excited state timestamps
+        '''
+        if (t_start is None) and (t_stop is None):
+            ground_ts = a_tools.return_last_n_timestamps(1, contains='Resonator_scan_off')
+            excited_ts= a_tools.return_last_n_timestamps(1, contains='Resonator_scan_on')
+        elif (t_start is None) ^ (t_stop is None):
+            raise ValueError('Must provide either none or both timestamps.')
+        else:
+            ground_ts = t_start # t_start is assigned to ground state
+            excited_ts= t_stop  # t_stop is assigned to excited state
+
+        super().__init__(t_start=ground_ts, t_stop=excited_ts,
+                         label='Resonator_scan', do_fitting=do_fitting,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         **kw)
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'sweep_points': 'sweep_points',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'
+                            }
+        self.numeric_params = []
+        #self.proc_data_dict = OrderedDict()
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        '''
+        Processing data
+        '''
+        # Frequencu sweep range in the ground/excited state
+        self.proc_data_dict['data_freqs_ground'] = \
+            self.raw_data_dict['sweep_points'][0]
+        self.proc_data_dict['data_freqs_excited'] = \
+            self.raw_data_dict['sweep_points'][1]
+
+        # S21 mag (transmission) in the ground/excited state
+        self.proc_data_dict['data_S21_ground'] = \
+            self.raw_data_dict['measured_values'][0][0]
+        self.proc_data_dict['data_S21_excited'] = \
+            self.raw_data_dict['measured_values'][1][0]
+
+        #############################
+        # Find resonator dips
+        #############################
+        pk_rep_ground = a_tools.peak_finder( \
+                            self.proc_data_dict['data_freqs_ground'],
+                            self.proc_data_dict['data_S21_ground'],
+                            window_len=5)
+        pk_rep_excited= a_tools.peak_finder( \
+                            self.proc_data_dict['data_freqs_excited'],
+                            self.proc_data_dict['data_S21_excited'],
+                            window_len=5)
+
+        min_idx_ground = np.argmin(pk_rep_ground['dip_values'])
+        min_idx_excited= np.argmin(pk_rep_excited['dip_values'])
+
+        min_freq_ground = pk_rep_ground['dips'][min_idx_ground]
+        min_freq_excited= pk_rep_excited['dips'][min_idx_excited]
+
+        min_S21_ground = pk_rep_ground['dip_values'][min_idx_ground]
+        min_S21_excited= pk_rep_excited['dip_values'][min_idx_excited]
+
+        dispersive_shift = min_freq_excited-min_freq_ground
+
+        self.proc_data_dict['Res_freq_ground'] = min_freq_ground
+        self.proc_data_dict['Res_freq_excited']= min_freq_excited
+        self.proc_data_dict['Res_S21_ground'] = min_S21_ground
+        self.proc_data_dict['Res_S21_excited']= min_S21_excited
+        self.proc_data_dict['quantities_of_interest'] = \
+            {'dispersive_shift': dispersive_shift}
+
+        self.qoi = self.proc_data_dict['quantities_of_interest']
+
+    def prepare_plots(self):
+
+
+        x_range = [min(self.proc_data_dict['data_freqs_ground'][0],
+                       self.proc_data_dict['data_freqs_excited'][0]) ,
+                   max(self.proc_data_dict['data_freqs_ground'][-1],
+                       self.proc_data_dict['data_freqs_excited'][-1])]
+
+        y_range = [0, max(self.proc_data_dict['data_S21_ground'][-1],
+                          self.proc_data_dict['data_S21_excited'][-1])]
+
+        x_label = self.raw_data_dict['xlabel'][0]
+        y_label = self.raw_data_dict['value_names'][0][0]
+
+        x_unit = self.raw_data_dict['xunit'][0][0]
+        y_unit = self.raw_data_dict['value_units'][0][0]
+
+        title = 'Transmission in the ground and excited state'
+
+        self.plot_dicts['S21_ground'] = {
+            'title': title,
+            'ax_id': 'Transmission_axis',
+            'xvals': self.proc_data_dict['data_freqs_ground'],
+            'yvals': self.proc_data_dict['data_S21_ground'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': x_label,
+            'xunit': x_unit,
+            'ylabel': y_label,
+            'yunit': y_unit,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'C0', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['S21_excited'] = {
+            'title': title,
+            'ax_id': 'Transmission_axis',
+            'xvals': self.proc_data_dict['data_freqs_excited'],
+            'yvals': self.proc_data_dict['data_S21_excited'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': x_label,
+            'xunit': x_unit,
+            'ylabel': y_label,
+            'yunit': y_unit,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'C1', 'alpha': 1},
+            'marker': ''
+            }
+
+        ####################################
+        # Plot arrow
+        ####################################
+        min_freq_ground = self.proc_data_dict['Res_freq_ground']
+        min_freq_excited= self.proc_data_dict['Res_freq_excited']
+        yval = y_range[1]/2
+        dispersive_shift = int((min_freq_excited-min_freq_ground)*1e-4)*1e-2
+        txt_str = r'$2_\chi/2\pi=$' + str(dispersive_shift) + ' MHz'
+
+        self.plot_dicts['Dispersive_shift_line'] = {
+            'ax_id': 'Transmission_axis',
+            'xvals': [min_freq_ground , min_freq_excited] ,
+            'yvals': [yval, yval] ,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['Dispersive_shift_vline'] = {
+            'ax_id': 'Transmission_axis',
+            'ymin': y_range[0],
+            'ymax': y_range[1],
+            'x': [min_freq_ground, min_freq_excited],
+            'xrange': x_range,
+            'yrange': y_range,
+            'plotfn': self.plot_vlines,
+            'line_kws': {'color': 'black', 'alpha': 0.5}
+            }
+
+        self.plot_dicts['Dispersive_shift_rmarker'] = {
+            'ax_id': 'Transmission_axis',
+            'xvals': [min_freq_ground] ,
+            'yvals': [yval] ,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': 5
+            }
+        self.plot_dicts['Dispersive_shift_lmarker'] = {
+            'ax_id': 'Transmission_axis',
+            'xvals': [min_freq_excited] ,
+            'yvals': [yval] ,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': 4
+            }
+
+        self.plot_dicts['Dispersive_shift_text'] = {
+            'ax_id': 'Transmission_axis',
+            'plotfn': self.plot_text,
+            'xpos': .5,
+            'ypos': .5,
+            'horizontalalignment': 'center',
+            'verticalalignment': 'bottom',
+            'text_string': txt_str,
+            'box_props': dict(boxstyle='round', pad=.4,
+                              facecolor='white', alpha=0.)
+            }
+
+
 class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
