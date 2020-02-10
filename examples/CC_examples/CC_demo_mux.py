@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# Based on: http://localhost:8888/notebooks/personal_folders/Miguel/qec_lut_demo.ipynb
 
 import os
 import logging
@@ -7,9 +8,9 @@ import numpy as np
 
 from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
-from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
-import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 
 # parameter handling
 sel = 0
@@ -18,7 +19,7 @@ if len(sys.argv)>1:
 
 # constants
 ip_cc = '192.168.0.241'
-uhfqa = 'dev2493'
+dev_uhfqa = 'dev2493'
 
 
 
@@ -29,6 +30,33 @@ log.setLevel(logging.DEBUG)
 
 if 1:
     log.debug('connecting to UHFQA')
+
+    UHFQC0 = ZI_UHFQC.UHFQC('UHFQC0', device=dev_uhfqa, nr_integration_channels=9)
+    UHFQC0.awg_sequence_acquisition_and_DIO_RED_test(
+        Iwaves=[np.ones(8), np.ones(8)],
+        Qwaves=[np.ones(8), np.ones(8)],
+        cases=[2, 5],
+        codewords=a * 2 + 1,
+        acquisition_delay=20e-9)
+    rolut0 = UHFQC_RO_LutMan('rolut0', num_res=5)
+    rolut0.AWG(UHFQC0.name)
+
+    # Prepare AWG_Seq as driver of DIO and set DIO output direction
+    UHFQC0.dios_0_mode(1)
+    UHFQC0.dios_0_drive(3)
+
+    # Initialize UHF for consecutive triggering and enable it
+    UHFQC0.awgs_0_single(0)
+    UHFQC0.awgs_0_enable(1)
+
+    # Determine trigger and strobe bits from DIO
+    UHFQC0.awgs_0_dio_valid_index(16)
+    UHFQC0.awgs_0_dio_valid_polarity(0)
+    UHFQC0.awgs_0_dio_strobe_index(16)
+    UHFQC0.awgs_0_dio_strobe_slope(1)
+    UHFQC0.awgs_0_userregs_2(2)
+
+
 
 
 if 1:
