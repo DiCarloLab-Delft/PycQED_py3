@@ -117,7 +117,7 @@ class Learner1D_Optimize(Learner1D):
 
 def mk_optimization_loss(
     minimize: bool = True, threshold: float = None, converge_at_local: bool = False,
-    use_random: bool = True
+    global_search_strategy: str = "random"
 ):
     # This sign vs = version is crutial
     if converge_at_local:
@@ -132,8 +132,10 @@ def mk_optimization_loss(
     comp_with = "last_best_min" if minimize else "last_best_max"
 
     moving_threshold = threshold is None
-    if use_random:
+    if global_search_strategy == "random":
         eval_non_interesting = lambda xs_: random.uniform(0, np.abs(xs_[0] - xs_[1]))
+    elif global_search_strategy == "default_loss":
+        eval_non_interesting = default_loss
     else:
         eval_non_interesting = lambda xs_: np.abs(xs_[0] - xs_[1])
 
@@ -168,7 +170,7 @@ def mk_optimization_loss_func(
     dist_is_norm=False,
     threshold=None,
     converge_at_local=False,
-    use_random=True
+    global_search_strategy: str = "random"
 ):
     """
     If you don't specify the threshold you must make use of
@@ -180,7 +182,8 @@ def mk_optimization_loss_func(
     """
     threshold_loss_func = mk_optimization_loss(
         minimize=minimize, threshold=threshold,
-        converge_at_local=converge_at_local, use_random=use_random
+        converge_at_local=converge_at_local,
+        global_search_strategy=global_search_strategy
     )
 
     func = mk_res_loss_func(
