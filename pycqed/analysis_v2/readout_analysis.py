@@ -747,7 +747,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 kb = 1.38064852e-23
                 res_exc = a_sp.value
                 effective_temp = h*6.42e9/(kb*np.log((1-res_exc)/res_exc))
-                fit_text += '\n\nEffective qubit temperature = {} mK\n@{:.0f}'.format(effective_temp*1e3,self.qubit_freq)
+                fit_text += '\n\nEffective qubit temperature = {:.2f} mK\n@{:.0f}'.format(effective_temp*1e3,self.qubit_freq)
 
             for ax in ['cdf', '1D_histogram']:
                 self.plot_dicts['text_msg_' + ax] = {
@@ -1001,17 +1001,36 @@ class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
         #######################################
         # Determine the start of the pusle
         #######################################
-        def get_pulse_start(x, y, tolerance=4):
+        def get_pulse_start(x, y, tolerance=2):
             '''
-            The start of the pulse is estimated by calculating the
-            standard deviation of the signal from its baseline.
-            The pulse start is set when the signal goes above the
-            half the standard deviation.
+            The start of the pulse is estimated in three steps:
+                1. Evaluate signal standard deviation in a certain interval as
+                   function of time: f(t).
+                2. Calculate the derivative of the aforementioned data: f'(t).
+                3. Evaluate when the derivative exceeds a threshold. This
+                   threshold is defined as max(f'(t))/5.
+            This approach is more tolerant to noisy signals.
             '''
-            pulse_baseline = np.mean(y)
-            pulse_std      = np.std(y)
-            start_index = np.where( abs(y-pulse_baseline) > pulse_std/2 )[0][0] # get first data point above threshold
-            return start_index - tolerance
+            pulse_baseline = np.mean(y) # get pulse baseline
+            pulse_std      = np.std(y)  # get pulse standard deviation
+
+            nr_points_interval = 200        # number of points in the interval
+            aux = int(nr_points_interval/2)
+
+            iteration_idx = np.arange(-aux, len(y)+aux)     # mask for circular array
+            aux_list = [ y[i%len(y)] for i in iteration_idx] # circular array
+
+            # Calculate standard deviation for each interval
+            y_std = []
+            for i in range(len(y)):
+                interval = aux_list[i : i+nr_points_interval]
+                y_std.append( np.std(interval) )
+
+            y_std_derivative = np.gradient(y_std[:-aux])# calculate derivative
+            threshold = max(y_std_derivative)/5        # define threshold
+            start_index = np.where( y_std_derivative > threshold )[0][0] + aux
+
+            return start_index-tolerance
 
         #######################################
         # Determine the end of depletion
