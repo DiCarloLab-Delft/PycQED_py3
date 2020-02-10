@@ -643,8 +643,8 @@ class Test_MeasurementControl(unittest.TestCase):
                                                     'goal': lambda l: l.npoints > 15,
                                                     'dimensions': [(-50.0, +50.0),
                                                                 (-20.0, +30.0)],
-                                                    'base_estimator': 'EI',
-                                                    'acq_func': 'gp_hedge',
+                                                    'base_estimator': 'gp',
+                                                    'acq_func': 'EI',
                                                     'acq_optimizer': 'lbfgs'})
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('2D SKOptLearner adaptive sampling test', mode='adaptive')
@@ -659,8 +659,8 @@ class Test_MeasurementControl(unittest.TestCase):
                                                     'goal': lambda l: l.npoints > 15,
                                                     'dimensions': [(-50, +50),
                                                                 (-20, +30)],
-                                                    'base_estimator': 'EI',
-                                                    'acq_func': 'gp_hedge',
+                                                    'base_estimator': 'gp',
+                                                    'acq_func': 'EI',
                                                     'acq_optimizer': 'lbfgs'})
         self.MC.set_detector_function(self.mock_parabola.parabola_int)
         dat = self.MC.run('2D SKOptLearner int parameters', mode='adaptive')
