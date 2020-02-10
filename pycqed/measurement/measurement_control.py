@@ -43,6 +43,7 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
+from pycqed.utilities.learner1D_optimize import Learner1D_Optimize
 from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, evaluate_X
 
 from skopt import Optimizer  # imported for checking types
@@ -219,8 +220,6 @@ class MeasurementControl(Instrument):
                     average data in specific bins for live plotting.
                     This is useful when it is required to take data in single
                     shot mode.
-
-
             mode (str):
                     Measurement mode. Can '1D', '2D', or 'adaptive'.
             disable_snapshot_metadata (bool):
@@ -392,10 +391,9 @@ class MeasurementControl(Instrument):
                     loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
                 )
             elif issubclass(self.adaptive_function, SKOptLearner):
-                # NB: SKOptLearner is a modified version of SKOptLearner
-                # to fix a data type matching problem
                 # NB2: This learner expects the `optimization_function`
                 # to be scalar
+                # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
                 self.learner = Learner(
                     self.optimization_function,
                     dimensions=self.af_pars["dimensions"],
@@ -426,7 +424,9 @@ class MeasurementControl(Instrument):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
-            elif issubclass(self.adaptive_function, LearnerND_Optimize):
+            elif issubclass(self.adaptive_function, LearnerND_Optimize) or issubclass(
+                self.adaptive_function, Learner1D_Optimize
+            ):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
@@ -1718,12 +1718,16 @@ class MeasurementControl(Instrument):
             # 'cmaes': result[-2],
             # 'logger': result[-1]}
         elif is_subclass(adaptive_function, Optimizer):
+            # result = learner
             # Because MC saves all the datapoints we save only the best point
             # for convenience
             opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
             opt_indx = opt_idx_selector(result.yi)
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
-        elif is_subclass(adaptive_function, LearnerND_Optimize):
+        elif is_subclass(adaptive_function, Learner1D_Optimize) or is_subclass(
+            adaptive_function, LearnerND_Optimize
+        ):
+            # result = learner
             # Because MC saves all the datapoints we save only the best point
             # for convenience
             # Only works for a function that returns a scalar
@@ -1732,7 +1736,12 @@ class MeasurementControl(Instrument):
             Y = list(result.data.values())
             opt_indx = opt_idx_selector(Y)
             xopt = X[opt_indx]
-            res_dict = {"xopt": np.array(xopt), "fopt": Y[opt_indx]}
+            res_dict = {
+                "xopt": np.array(xopt)
+                if is_subclass(adaptive_function, LearnerND_Optimize)
+                else xopt,
+                "fopt": Y[opt_indx],
+            }
         elif adaptive_function.__module__ == "pycqed.measurement.optimization":
             res_dict = {"xopt": result[0], "fopt": result[1]}
         else:
@@ -2121,7 +2130,8 @@ class MeasurementControl(Instrument):
         elif np.any(np.array(cost_func_names) == zlabel.lower()):
             cmap = (
                 "inferno_clip_high"
-                if hasattr(self, "minimize_optimization") and not self.minimize_optimization
+                if hasattr(self, "minimize_optimization")
+                and not self.minimize_optimization
                 else "inferno_clip_low"
             )
         elif zunit == "%":
