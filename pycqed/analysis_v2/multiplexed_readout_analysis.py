@@ -160,37 +160,38 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                                                          'trace':np.trace(assignment_prob_matrix)}
 
         # calculate cross-fidelity matrix
-        len_labs = len(self.proc_data_dict['qubit_labels'])
+        if not('skip_cross_fidelity' in self.options_dict.keys()):
+            len_labs = len(self.proc_data_dict['qubit_labels'])
 
-        crossFidMat = np.zeros((len_labs, len_labs))
-        for i in range(len_labs):
-            for j in range(len_labs):
-                PeiIj = 0
-                PgiPj = 0
+            crossFidMat = np.zeros((len_labs, len_labs))
+            for i in range(len_labs):
+                for j in range(len_labs):
+                    PeiIj = 0
+                    PgiPj = 0
 
-                # Loop over all entries in the Assignment probability matrix
-                for prep_idx, c_prep in enumerate(combinations):
-                    for decl_idx, c_decl in enumerate(combinations):
-                        # Select all entries in the assignment matrix for ei|Ij
-                        if (c_decl[i]=='1') and (c_prep[j] == '0'):
-                            PeiIj += assignment_prob_matrix[prep_idx, decl_idx]
-                        # Select all entries in the assignment matrix for ei|Ij
-                        elif (c_decl[i]=='0') and (c_prep[j] == '1'): # gi|Pj
-                            PgiPj += assignment_prob_matrix[prep_idx, decl_idx]
+                    # Loop over all entries in the Assignment probability matrix
+                    for prep_idx, c_prep in enumerate(combinations):
+                        for decl_idx, c_decl in enumerate(combinations):
+                            # Select all entries in the assignment matrix for ei|Ij
+                            if (c_decl[i]=='1') and (c_prep[j] == '0'):
+                                PeiIj += assignment_prob_matrix[prep_idx, decl_idx]
+                            # Select all entries in the assignment matrix for ei|Ij
+                            elif (c_decl[i]=='0') and (c_prep[j] == '1'): # gi|Pj
+                                PgiPj += assignment_prob_matrix[prep_idx, decl_idx]
 
-                # Normalize probabilities
-                normalization_factor = (len(combinations)/2)
+                    # Normalize probabilities
+                    normalization_factor = (len(combinations)/2)
 
-                PeiIj = PeiIj/normalization_factor
-                PgiPj = PgiPj/normalization_factor
+                    PeiIj = PeiIj/normalization_factor
+                    PgiPj = PgiPj/normalization_factor
 
-                # Add entry to cross fidelity matrix
-                Fc = 1 - PeiIj - PgiPj
-                crossFidMat[i,j] = Fc
+                    # Add entry to cross fidelity matrix
+                    Fc = 1 - PeiIj - PgiPj
+                    crossFidMat[i,j] = Fc
 
-        self.proc_data_dict['cross_fidelity_matrix'] = crossFidMat
-        self.proc_data_dict['quantities_of_interest'] = {'cross_fidelity_matrix': crossFidMat,
-                                                         'trace': np.trace(crossFidMat)}
+            self.proc_data_dict['cross_fidelity_matrix'] = crossFidMat
+            self.proc_data_dict['quantities_of_interest'] = {'cross_fidelity_matrix': crossFidMat,
+                                                             'trace': np.trace(crossFidMat)}
 
     def prepare_plots(self):
         self.plot_dicts['assignment_probability_matrix'] = {
@@ -202,15 +203,16 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             'qubit_labels': self.proc_data_dict['qubit_labels'],
             'plotsize': np.array(np.shape(self.proc_data_dict['assignment_prob_matrix'].T))*.8
         }
-        self.plot_dicts['plot_cross_ass_Fid_matrix'] = {
-            'plotfn': plot_cross_ass_Fid_matrix,
-            'prob_matrix':
-                self.proc_data_dict['cross_fidelity_matrix'],
-            'combinations': self.proc_data_dict['qubit_labels'],
-            'valid_combinations': self.proc_data_dict['qubit_labels'],
-            'qubit_labels': self.proc_data_dict['qubit_labels'],
-            'plotsize': np.array(np.shape(self.proc_data_dict['cross_fidelity_matrix'].T))*.8
-        }
+        if not('skip_cross_fidelity' in self.options_dict.keys()):
+            self.plot_dicts['plot_cross_ass_Fid_matrix'] = {
+                'plotfn': plot_cross_ass_Fid_matrix,
+                'prob_matrix':
+                    self.proc_data_dict['cross_fidelity_matrix'],
+                'combinations': self.proc_data_dict['qubit_labels'],
+                'valid_combinations': self.proc_data_dict['qubit_labels'],
+                'qubit_labels': self.proc_data_dict['qubit_labels'],
+                'plotsize': np.array(np.shape(self.proc_data_dict['cross_fidelity_matrix'].T))*.8
+            }
         for i, value_name in enumerate(self.raw_data_dict['value_names']):
             qubit_label = self.proc_data_dict['qubit_labels'][i]
 
